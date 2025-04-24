@@ -13,7 +13,9 @@ weights = {}
 # Iterate over all variables in the checkpoint
 for name in reader.get_variable_to_shape_map():
     print(f"Loading: {name}")
-    weights[name] = reader.get_tensor(name)
+    tensor = reader.get_tensor(name)
+    print(tensor.shape)
+    weights[name] = tensor
 
 # Save all the weights to a .npz file
 np.savez("gpt2_weights.npz", **weights)
