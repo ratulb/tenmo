@@ -31,7 +31,7 @@ struct Tensor(Copyable, Movable, Representable, Stringable, Writable):
     fn __del__(owned self):
         self.data.free()
     
-    fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
+    fn unsafe_ptr(self) -> UnsafePointer[Float32]:
         return self.data
 
     fn __str__(self) -> String:
