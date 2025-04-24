@@ -30,6 +30,9 @@ struct Tensor(Copyable, Movable, Representable, Stringable, Writable):
 
     fn __del__(owned self):
         self.data.free()
+    
+    fn unsafe_ptr(self):
+        return self.data
 
     fn __str__(self) -> String:
         var s = String()
