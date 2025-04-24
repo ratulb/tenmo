@@ -1,6 +1,6 @@
 from memory import UnsafePointer, memcpy
 from python import Python, PythonObject
-from tensor import Tensor
+from tensors import Tensor
 
 
 struct Weights:
@@ -59,6 +59,6 @@ fn main() raises:
     print("Weigts")
     weights = Weights()
     print(weights.keys().__str__())
-    tensor = weights.weights('model/wpe')
+    #tensor = weights.weights('model/wpe')
     #print(tensor.num_elements())
 

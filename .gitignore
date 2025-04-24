@@ -5,4 +5,5 @@
 # magic environments
 .magic
 models
-gpt2_weights.npz
+gpt2_weights.npz*
+.venv/
