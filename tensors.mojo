@@ -4,7 +4,7 @@ from utils import StaticTuple
 
 
 def main():
-    #tensor = Tensor[5].rand(4, 3, 2, 1)
+    # tensor = Tensor[5].rand(4, 3, 2, 1)
     tensor = Tensor[2].rand(4, 3)
     var indices = List[Int]()
     tensor.print_tensor_recursive(indices, 1)
@@ -96,6 +96,23 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self.data
 
+    fn __str__(self) -> String:
+        s = String("[")
+        if axes_sizes == 1:
+            s += "1D Tensor"
+        elif axes_sizes == 2:
+            s += "2D Tensor"
+        elif axes_sizes == 3:
+            s += "3D Tensor"
+        elif axes_sizes == 4:
+            s += "4D Tensor"
+        else:
+            s += "Unsupported Tensor"
+        s += self.shape.__str__()
+        s += ", Type: " + self.datatype.__str__()
+        s += "]"
+        return s
+
     @staticmethod
     fn rand(
         *tensor_shapes: Int, init_seed: Optional[Int] = None
@@ -119,7 +136,7 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
                 for i in range(self.shape[current_dim]):
                     indices.append(i)
                     print(self[indices], end="")
-                    indices.pop()
+                    _ = indices.pop()
                     if i < self.shape[current_dim] - 1:
                         print(", ", end="")
                 print("]")
@@ -134,6 +151,7 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
                 print(indent + "]")
         except e:
             print(e)
+
 
 struct Shape[axes: Int]:
     var axes_sizes: StaticTuple[Int, axes]

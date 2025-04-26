@@ -2,9 +2,16 @@ from memory import UnsafePointer, memcpy
 from python import Python, PythonObject
 from tensors import Tensor
 from utils import StaticTuple, Variant
-alias Variety = Variant[Tensor[1, DType.float32], Tensor[2, DType.float32], Tensor[3, DType.float32], Tensor[4, DType.float32]]
+
+alias Variety = Variant[
+    Tensor[1, DType.float32],
+    Tensor[2, DType.float32],
+    Tensor[3, DType.float32],
+    Tensor[4, DType.float32],
+]
 
 alias Resultant = Optional[Variety]
+
 
 struct Weights:
     var npz_file: StaticString
@@ -43,7 +50,7 @@ struct Weights:
                 print("I don't come here in dimension 2", np_weights.size)
                 memcpy(tensor_ptr1, np_weights_ptr, np_weights.size)
                 print("I don't come here in dimension 3")
-                return Optional(Variety(tensor1)) 
+                return Optional(Variety(tensor1))
             elif dimension == 2:
                 axes_dims2 = StaticTuple[Int, 2](
                     np_tensor_shape[0], np_tensor_shape[1]
@@ -51,7 +58,7 @@ struct Weights:
                 tensor2 = Tensor[2, DType.float32](axes_dims2)
                 tensor_ptr2 = tensor2.unsafe_ptr()
                 memcpy(tensor_ptr2, np_weights_ptr, np_weights.size)
-                return Optional(Variety(tensor2)) 
+                return Optional(Variety(tensor2))
             elif dimension == 3:
                 axes_dims3 = StaticTuple[Int, 3](
                     np_tensor_shape[0], np_tensor_shape[1], np_tensor_shape[2]
@@ -59,7 +66,7 @@ struct Weights:
                 tensor3 = Tensor[3, DType.float32](axes_dims3)
                 tensor_ptr3 = tensor3.unsafe_ptr()
                 memcpy(tensor_ptr3, np_weights_ptr, np_weights.size)
-                return Optional(Variety(tensor3)) 
+                return Optional(Variety(tensor3))
             elif dimension == 4:
                 axes_dims4 = StaticTuple[Int, 4](
                     np_tensor_shape[0],
@@ -70,7 +77,7 @@ struct Weights:
                 tensor4 = Tensor[4, DType.float32](axes_dims4)
                 tensor_ptr4 = tensor4.unsafe_ptr()
                 memcpy(tensor_ptr4, np_weights_ptr, np_weights.size)
-                return Optional(Variety(tensor4)) 
+                return Optional(Variety(tensor4))
             else:
                 print("Unsupported dimension")
                 return None
@@ -78,6 +85,7 @@ struct Weights:
             print("Exception here")
             print(e)
             return None
+
     @staticmethod
     fn ndarray_ptr[
         dtype: DType
@@ -170,9 +178,11 @@ fn run() raises -> None:
                 tensor_weights = weights.weights(tensor_key_name)
                 if tensor_weights:
                     print("Something inside!")
-                    cover = tensor_weights.value()
-                    d1_tensor = cover[Tensor[1, DType.float32]]
-                    print("1D tensor numels: ", d1_tensor.numels()) 
+                    value = tensor_weights.value()
+                    print("***************")
+                    d1_tensor = value[Tensor[1, DType.float32]]
+                    print("1D tensor numels: ", d1_tensor.numels())
+                    print(d1_tensor.__str__())
                     var indices = List[Int]()
                     print()
                     d1_tensor.print_tensor_recursive(indices, 1)
@@ -186,10 +196,10 @@ fn run() raises -> None:
                 print("Something went wrong! Wrong key?")
                 print(e)
             print()
- 
+
         else:
             print("Invaild choice or no choice made yet")
         print()
-        usr_choice = input("Enter 'q' to quit or press <Enter> to continue: ")
+        usr_choice = input("Enter 'q' to quit or press <Enter> to continue 🔄: ")
         if usr_choice == "q":
             break
