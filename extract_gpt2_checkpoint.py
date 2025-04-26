@@ -14,6 +14,8 @@ weights = {}
 for name in reader.get_variable_to_shape_map():
     print(f"Loading: {name}")
     tensor = reader.get_tensor(name)
+    if tensor.dtype != np.float32:
+        tensor = tensor.astype(np.float32)
     print(tensor.shape)
     weights[name] = tensor
 
