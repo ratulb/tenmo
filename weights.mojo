@@ -56,9 +56,34 @@ struct Weights:
 
 
 fn main() raises:
-    print("Weigts")
-    weights = Weights()
-    print(weights.keys().__str__())
+    print("GPT2 weight explorer")
+    #weights = Weights()
+    #print(weights.keys().__str__())
     #tensor = weights.weights('model/wpe')
     #print(tensor.num_elements())
+    run()
+
+fn run() raises -> None:
+    weights = Weights()
+    print("Available choices:\n 1) Load keys, 2) Load 10 keys at a time, \n 3) Search for keys with prefix,4) Load numpy weights for key, \n 5) Load Tensor weights from numpy, 6) 'q'(quit)")
+    usr_choice = String()
+    while True:
+        print("Current choice:", usr_choice)
+        if usr_choice == "1":
+            print("Load keys\n")
+            print(weights.keys().__str__())
+        elif usr_choice == "2":
+            print("Load 10 keys at a time")
+        elif usr_choice == "3":
+            print("Searching key with prefix")
+        elif usr_choice == "4":
+            print("numpy weights for key")
+        elif usr_choice == "5":
+            print("Tensor weight for key")
+        else:
+            print("Invaild choice or no choice made yet")
+        print()
+        usr_choice = input("Enter 'q' to quit or press <Enter> to continue: ")
+        if usr_choice == "q":
+            break
 
