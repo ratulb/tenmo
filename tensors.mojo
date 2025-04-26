@@ -5,7 +5,7 @@ from utils import StaticTuple
 
 def main():
     #tensor = Tensor[5].rand(4, 3, 2, 1)
-    tensor = Tensor[2].rand(4, 4)
+    tensor = Tensor[2].rand(4, 3)
     var indices = List[Int]()
     tensor.print_tensor_recursive(indices, 1)
 
@@ -116,9 +116,7 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         if current_dim == self.ndim() - 1:
             print(indent + "[", end="")
             for i in range(self.shape[current_dim]):
-                indices.append(i)
                 print(self[indices], end="")
-                _ = indices.pop()
                 if i < self.shape[current_dim] - 1:
                     print(", ", end="")
             print("]")
