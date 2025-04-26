@@ -1,11 +1,11 @@
 from memory import UnsafePointer, memcpy
 from random import randn, seed
-from testing import assert_equal
 from utils import StaticTuple
 
 
 def main():
-    tensor = Tensor[1, DType.float16].rand(5, 3, 4)
+    #tensor = Tensor[5].rand(4, 3, 2, 1)
+    tensor = Tensor[2].rand(4, 4)
     var indices = List[Int]()
     tensor.print_tensor_recursive(indices, 1)
 
@@ -15,16 +15,33 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     var data: UnsafePointer[Scalar[dtype]]
     var datatype: DType
 
-    fn __init__(out self, tensor_shape: StaticTuple[Int, axes_sizes]) raises:
-        if len(tensor_shape) != axes_sizes:
-            raise Error("Tensor dimension and arguement count does not match")
-        self.shape = Shape[axes_sizes](tensor_shape)
+    fn __init__(out self, *tensor_shapes: Int) raises:
+        axes_dims = Self.init_shape(tensor_shapes)
+        self = Self(axes_dims)
+
+    @staticmethod
+    fn init_shape(
+        shapes: VariadicList[Int],
+    ) raises -> StaticTuple[Int, axes_sizes]:
+        if len(shapes) != axes_sizes:
+            err = (
+                "Tensor dimension = "
+                + String(axes_sizes)
+                + " and args count = "
+                + String(len(shapes))
+                + " mismatch"
+            )
+            print(err)
+            raise Error("Dimension mismatch")
+        axes_dims = StaticTuple[Int, axes_sizes](0)
+        for i in range(axes_sizes):
+            axes_dims[i] = shapes[i]
+        return axes_dims
+
+    fn __init__(out self, axes_dims: StaticTuple[Int, axes_sizes]):
+        self.shape = Shape[axes_sizes](axes_dims)
         self.datatype = dtype
         self.data = UnsafePointer[Scalar[dtype]].alloc(self.shape.numels)
-
-    fn __init__(out self, *tensor_shape: Int) raises:
-        static_tuple = StaticTuple[Int, axes_sizes](tensor_shape)
-        self = Self(static_tuple)
 
     fn __getitem__(self, indices: List[Int]) raises -> Scalar[dtype]:
         static_tuple = StaticTuple[Int, axes_sizes](0)
@@ -81,13 +98,14 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
 
     @staticmethod
     fn rand(
-        *tensor_shape: Int, init_seed: Optional[Int] = None
+        *tensor_shapes: Int, init_seed: Optional[Int] = None
     ) raises -> Tensor[axes_sizes, dtype]:
         if init_seed:
             seed(init_seed.value())
         else:
             seed()
-        tensor = Tensor[axes_sizes, dtype](tensor_shape)
+        axes_dims = Self.init_shape(tensor_shapes)
+        tensor = Tensor[axes_sizes, dtype](axes_dims)
         randn(tensor.data, tensor.numels())
         return tensor
 
