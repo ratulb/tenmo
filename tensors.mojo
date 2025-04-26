@@ -5,7 +5,7 @@ from utils import StaticTuple
 
 
 def main():
-    tensor = Tensor[3, DType.float16].rand(10, 10, 10)
+    tensor = Tensor[1, DType.float16].rand(5, 3, 4)
     var indices = List[Int]()
     tensor.print_tensor_recursive(indices, 1)
 
@@ -18,7 +18,6 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     fn __init__(out self, tensor_shape: StaticTuple[Int, axes_sizes]) raises:
         if len(tensor_shape) != axes_sizes:
             raise Error("Tensor dimension and arguement count does not match")
-        print("Tensor dims len: ", len(tensor_shape))
         self.shape = Shape[axes_sizes](tensor_shape)
         self.datatype = dtype
         self.data = UnsafePointer[Scalar[dtype]].alloc(self.shape.numels)
@@ -89,8 +88,6 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         else:
             seed()
         tensor = Tensor[axes_sizes, dtype](tensor_shape)
-        print("In rand: ", tensor.numels())
-        print("In rand: ", tensor.datatype)
         randn(tensor.data, tensor.numels())
         return tensor
 
@@ -130,8 +127,6 @@ struct Shape[axes: Int]:
             self.numels = 1
             for i in range(axes):
                 self.numels *= self.axes_sizes[i]
-                print("numels: ", self.numels)
-            print("numels at the end: ", self.numels)
         else:
             self.numels = 0
 
