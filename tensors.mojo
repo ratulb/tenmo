@@ -1,50 +1,159 @@
 from memory import UnsafePointer, memcpy
-from random import random_ui64, randn, seed
+from random import randn, seed
 from testing import assert_equal
+from utils import StaticTuple
 
 
-# Tensor datatype is always float
-struct Tensor(Copyable, Movable, Representable, Stringable, Writable):
-    var data: UnsafePointer[Float32]
-    var rows: Int
-    var cols: Int
+def main():
+    tensor = Tensor[3, DType.float16].rand(10, 10, 10)
+    var indices = List[Int]()
+    tensor.print_tensor_recursive(indices, 1)
 
-    fn __init__(out self, rows: Int, cols: Int):
-        self.rows = rows
-        self.cols = cols
-        self.data = UnsafePointer[Float32].alloc(rows * cols)
 
-    fn __getitem__(self, row: Int, col: Int) -> Float32:
-        return self.data[row * self.cols + col]
+struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
+    var shape: Shape[axes_sizes]
+    var data: UnsafePointer[Scalar[dtype]]
+    var datatype: DType
 
-    fn __setitem__(self, row: Int, col: Int, value: Float32):
-        self.data[row * self.cols + col] = value
+    fn __init__(out self, tensor_shape: StaticTuple[Int, axes_sizes]) raises:
+        if len(tensor_shape) != axes_sizes:
+            raise Error("Tensor dimension and arguement count does not match")
+        print("Tensor dims len: ", len(tensor_shape))
+        self.shape = Shape[axes_sizes](tensor_shape)
+        self.datatype = dtype
+        self.data = UnsafePointer[Scalar[dtype]].alloc(self.shape.numels)
+
+    fn __init__(out self, *tensor_shape: Int) raises:
+        static_tuple = StaticTuple[Int, axes_sizes](tensor_shape)
+        self = Self(static_tuple)
+
+    fn __getitem__(self, indices: List[Int]) raises -> Scalar[dtype]:
+        static_tuple = StaticTuple[Int, axes_sizes](0)
+        for i in range(axes_sizes):
+            static_tuple[i] = indices[i]
+        index = self.shape.flatten_index(static_tuple)
+        if index == -1:
+            raise Error("Invalid indices")
+        return (self.data + index)[]
+
+    fn __getitem__(self, *indices: Int) raises -> Scalar[dtype]:
+        index = self.shape.flatten_index(indices)
+        if index == -1:
+            raise Error("Invalid indices")
+        return (self.data + index)[]
+
+    fn __setitem__(self, *indices: Int, value: Scalar[dtype]) raises:
+        index = self.shape.flatten_index(indices)
+        if index == -1:
+            raise Error("Invalid indices")
+        (self.data + index)[] = value
 
     fn __moveinit__(out self, owned other: Self):
-        self = Self(other.rows, other.cols)
-        memcpy(self.data, other.data, self.rows * self.cols)
+        self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
+        memcpy(self.data, other.data, other.numels())
+        self.shape = other.shape^
+        self.datatype = other.datatype
 
     fn __copyinit__(out self, other: Self):
-        self = Self(other.rows, other.cols)
-        memcpy(self.data, other.data, self.rows * self.cols)
+        self.shape = other.shape
+        self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
+        memcpy(self.data, other.data, other.numels())
+        self.datatype = other.datatype
 
     fn __del__(owned self):
         self.data.free()
-    
-    fn unsafe_ptr(self) -> UnsafePointer[Float32]:
+
+    @always_inline
+    fn numels(self) -> Int:
+        return self.shape.numels
+
+    @always_inline
+    fn ndim(self) -> Int:
+        return self.shape.ndim
+
+    fn __eq__(self: Self, rhs: Self) -> Bool:
+        return True
+
+    fn __ne__(self: Self, rhs: Self) -> Bool:
+        return True
+
+    fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self.data
 
+    @staticmethod
+    fn rand(
+        *tensor_shape: Int, init_seed: Optional[Int] = None
+    ) raises -> Tensor[axes_sizes, dtype]:
+        if init_seed:
+            seed(init_seed.value())
+        else:
+            seed()
+        tensor = Tensor[axes_sizes, dtype](tensor_shape)
+        print("In rand: ", tensor.numels())
+        print("In rand: ", tensor.datatype)
+        randn(tensor.data, tensor.numels())
+        return tensor
+
+    fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
+        current_dim = len(indices)
+        indent = " " * (level * 2)
+
+        if current_dim == self.ndim() - 1:
+            print(indent + "[", end="")
+            for i in range(self.shape[current_dim]):
+                indices.append(i)
+                print(self[indices], end="")
+                _ = indices.pop()
+                if i < self.shape[current_dim] - 1:
+                    print(", ", end="")
+            print("]")
+        else:
+            print(indent + "[")
+            for i in range(self.shape[current_dim]):
+                indices.append(i)
+                self.print_tensor_recursive(indices, level + 1)
+                _ = indices.pop()
+                if i < self.shape[current_dim] - 1:
+                    print(",")
+            print(indent + "]")
+
+
+struct Shape[axes: Int]:
+    var axes_sizes: StaticTuple[Int, axes]
+    var ndim: Int
+    var numels: Int
+
+    fn __init__(out self, array: StaticTuple[Int, axes]):
+        self.axes_sizes = array
+        self.ndim = axes
+        if len(array) > 0:
+            self.numels = 1
+            for i in range(axes):
+                self.numels *= self.axes_sizes[i]
+                print("numels: ", self.numels)
+            print("numels at the end: ", self.numels)
+        else:
+            self.numels = 0
+
+    fn flatten_index(self, indices: StaticTuple[Int, size=axes]) -> Int:
+        index = 0
+        stride = 1
+        for i in reversed(range(self.ndim)):
+            idx = indices[i]
+            self_idx = self[i]
+            if idx >= self_idx:
+                return -1
+            index += idx * stride
+            stride *= self_idx
+        return index
+
     fn __str__(self) -> String:
-        var s = String()
-        for i in range(self.rows):
-            s += "["
-            for j in range(self.cols):
-                s += String(self[i, j])
-                if j != self.cols - 1:
-                    s += ", "
-            s += "]"
-            if i != self.rows - 1:
-                s += "\n"
+        s = String("(")
+        for i in range(axes):
+            s += String(self.axes_sizes[i])
+            if i < axes - 1:
+                s += ", "
+        s += ")"
         return s
 
     fn __repr__(self) -> String:
@@ -54,62 +163,18 @@ struct Tensor(Copyable, Movable, Representable, Stringable, Writable):
         s = self.__str__()
         writer.write(s)
 
-    @staticmethod
-    fn rand(rows: Int, cols: Int) -> Self:
-        seed()
-        tensor = Self(rows, cols)
-        randn(tensor.data, rows * cols, 0.0, 1.0)
-        return tensor
+    fn __getitem__(self, index: Int) -> Int:
+        if 0 <= index < axes:
+            return self.axes_sizes[index]
+        else:
+            return -1
 
-    fn num_elements(self) -> Int:
-        return self.rows * self.cols
+    fn __moveinit__(out self, owned other: Self):
+        self.axes_sizes = other.axes_sizes
+        self.ndim = other.ndim
+        self.numels = other.numels
 
-    fn matmul(self, other: Self) -> Self:
-        var result = Tensor(self.rows, other.cols)
-        try:
-            assert_equal(
-                self.cols,
-                other.rows,
-                "Incompatible shapes for matrix multiplication",
-            )
-            for i in range(self.rows):
-                for j in range(other.cols):
-                    var sum: Float32 = 0.0
-                    for k in range(self.cols):
-                        sum += self[i, k] * other[k, j]
-                    result[i, j] = sum
-        except e:
-            print(e)
-        return result
-
-    fn transpose(self) -> Tensor:
-        result = Tensor(self.cols, self.rows)
-        for i in range(self.rows):
-            for j in range(self.cols):
-                result[j, i] = self[i, j]
-        
-        return result
-
-
-fn main():
-    this = Tensor(2, 2)
-    this[0,0] = 1
-    this[0,1] = 2
-    this[1,0] = 3
-    this[1,1] = 4
-
-    that = Tensor(2, 2)
-    that[0,0] = 5
-    that[0,1] = 6
-    that[1,0] = 7
-    that[1,1] = 8
-    result = this.matmul(that)
-    tome = result
-    print(tome)
-    transposed = tome.transpose()
-    print()
-    print(transposed)
-    #a = Tensor.rand(4096, 4096)
-    #b = Tensor.rand(4096, 4096)
-    #c = a.matmul(b)
-    #print(c.num_elements())
+    fn __copyinit__(out self, other: Self):
+        self.axes_sizes = other.axes_sizes
+        self.ndim = other.ndim
+        self.numels = other.numels
