@@ -1,7 +1,10 @@
 from memory import UnsafePointer, memcpy
 from python import Python, PythonObject
 from tensors import Tensor
+from utils import StaticTuple, Variant
+alias Variety = Variant[Tensor[1, DType.float32], Tensor[2, DType.float32], Tensor[3, DType.float32], Tensor[4, DType.float32]]
 
+alias Resultant = Optional[Variety]
 
 struct Weights:
     var npz_file: StaticString
@@ -23,18 +26,58 @@ struct Weights:
             except e:
                 print(e)
 
-    fn weights[
-        dim: Int = 1, dtype: DType = DType.float32
-    ](mut self, key: String) raises -> Tensor:
-        self.load_weights()
-        np_weights = self.gpt2_weights[key]
-        tensor_shape = np_weights.shape
-        print("np weghts shape: ", tensor_shape)
-        np_weights_ptr = Self.ndarray_ptr[dtype](np_weights)
-        # tensor_ptr = tensor.unsafe_ptr()
-        # memcpy(tensor_ptr, np_weights_ptr, np_weights.size())
-        return Tensor(1, 1)
-
+    fn weights(mut self, key: String) raises -> Resultant:
+        try:
+            self.load_weights()
+            np_weights = self.gpt2_weights[key]
+            np_tensor_shape = np_weights.shape
+            print("Tensor shape: ", np_tensor_shape)
+            np_weights_ptr = Self.ndarray_ptr[DType.float32](np_weights)
+            dimension = len(np_tensor_shape)
+            if dimension == 1:
+                print("I am in dimension 1", np_tensor_shape[0])
+                axes_dims1 = StaticTuple[Int, 1](np_tensor_shape[0])
+                print("I don't come here in dimension 1")
+                tensor1 = Tensor[1, DType.float32](axes_dims1)
+                tensor_ptr1 = tensor1.unsafe_ptr()
+                print("I don't come here in dimension 2", np_weights.size)
+                memcpy(tensor_ptr1, np_weights_ptr, np_weights.size)
+                print("I don't come here in dimension 3")
+                return Optional(Variety(tensor1)) 
+            elif dimension == 2:
+                axes_dims2 = StaticTuple[Int, 2](
+                    np_tensor_shape[0], np_tensor_shape[1]
+                )
+                tensor2 = Tensor[2, DType.float32](axes_dims2)
+                tensor_ptr2 = tensor2.unsafe_ptr()
+                memcpy(tensor_ptr2, np_weights_ptr, np_weights.size)
+                return Optional(Variety(tensor2)) 
+            elif dimension == 3:
+                axes_dims3 = StaticTuple[Int, 3](
+                    np_tensor_shape[0], np_tensor_shape[1], np_tensor_shape[2]
+                )
+                tensor3 = Tensor[3, DType.float32](axes_dims3)
+                tensor_ptr3 = tensor3.unsafe_ptr()
+                memcpy(tensor_ptr3, np_weights_ptr, np_weights.size)
+                return Optional(Variety(tensor3)) 
+            elif dimension == 4:
+                axes_dims4 = StaticTuple[Int, 4](
+                    np_tensor_shape[0],
+                    np_tensor_shape[1],
+                    np_tensor_shape[2],
+                    np_tensor_shape[3],
+                )
+                tensor4 = Tensor[4, DType.float32](axes_dims4)
+                tensor_ptr4 = tensor4.unsafe_ptr()
+                memcpy(tensor_ptr4, np_weights_ptr, np_weights.size)
+                return Optional(Variety(tensor4)) 
+            else:
+                print("Unsupported dimension")
+                return None
+        except e:
+            print("Exception here")
+            print(e)
+            return None
     @staticmethod
     fn ndarray_ptr[
         dtype: DType
@@ -122,6 +165,28 @@ fn run() raises -> None:
             print()
         elif usr_choice == "5":
             print("Tensor weight for key")
+            tensor_key_name = input("Enter key name for tensor weights: ")
+            try:
+                tensor_weights = weights.weights(tensor_key_name)
+                if tensor_weights:
+                    print("Something inside!")
+                    cover = tensor_weights.value()
+                    d1_tensor = cover[Tensor[1, DType.float32]]
+                    print("1D tensor numels: ", d1_tensor.numels()) 
+                    var indices = List[Int]()
+                    print()
+                    d1_tensor.print_tensor_recursive(indices, 1)
+                    print()
+                else:
+                    print("Got nothing")
+                print()
+                print("Voild hip hip hurray!")
+                print()
+            except e:
+                print("Something went wrong! Wrong key?")
+                print(e)
+            print()
+ 
         else:
             print("Invaild choice or no choice made yet")
         print()
