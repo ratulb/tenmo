@@ -177,16 +177,38 @@ fn run() raises -> None:
             try:
                 tensor_weights = weights.weights(tensor_key_name)
                 if tensor_weights:
-                    print("Something inside!")
                     value = tensor_weights.value()
-                    print("***************")
-                    d1_tensor = value[Tensor[1, DType.float32]]
-                    print("1D tensor numels: ", d1_tensor.numels())
-                    print(d1_tensor.__str__())
                     var indices = List[Int]()
-                    print()
-                    d1_tensor.print_tensor_recursive(indices, 1)
-                    print()
+                    if value.isa[Tensor[1, DType.float32]]():
+                        d1_tensor = value[Tensor[1, DType.float32]]
+                        print("1D tensor numels: ", d1_tensor.numels())
+                        print(d1_tensor.__str__())
+                        print()
+                        d1_tensor.print_tensor_recursive(indices, 1)
+                        print()
+                    elif value.isa[Tensor[2, DType.float32]]():
+                        d2_tensor = value[Tensor[2, DType.float32]]
+                        print("2D tensor numels: ", d2_tensor.numels())
+                        print(d2_tensor.__str__())
+                        print()
+                        d2_tensor.print_tensor_recursive(indices, 1)
+                        print()
+                    elif value.isa[Tensor[3, DType.float32]]():
+                        d3_tensor = value[Tensor[3, DType.float32]]
+                        print("3D tensor numels: ", d3_tensor.numels())
+                        print(d3_tensor.__str__())
+                        print()
+                        d3_tensor.print_tensor_recursive(indices, 1)
+                        print()
+                    elif value.isa[Tensor[4, DType.float32]]():
+                        d4_tensor = value[Tensor[4, DType.float32]]
+                        print("4D tensor numels: ", d4_tensor.numels())
+                        print(d4_tensor.__str__())
+                        print()
+                        d4_tensor.print_tensor_recursive(indices, 1)
+                        print()
+                    else:
+                        print("Unsupported tensor!")
                 else:
                     print("Got nothing")
                 print()

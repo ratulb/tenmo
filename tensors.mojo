@@ -126,29 +126,125 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         randn(tensor.data, tensor.numels())
         return tensor
 
+    # fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
+    # try:
+    # current_dim = len(indices)
+    # indent = " " * (level * 2)
+    #
+    # if current_dim == self.ndim() - 1:
+    # print(indent + "[", end="")
+    # for i in range(self.shape[current_dim]):
+    # indices.append(i)
+    # print(self[indices], end="")
+    # _ = indices.pop()
+    # if i < self.shape[current_dim] - 1:
+    # print(", ", end="")
+    # print("]")
+    # else:
+    # print(indent + "[")
+    # for i in range(self.shape[current_dim]):
+    # indices.append(i)
+    # self.print_tensor_recursive(indices, level + 1)
+    # _ = indices.pop()
+    # if i < self.shape[current_dim] - 1:
+    # print(",")
+    # print(indent + "]")
+    # except e:
+    # print(e)
+    # fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
+    # try:
+    # current_dim = len(indices)
+    # indent = " " * (level * 2)
+    #
+    ##max_items_to_show = 5  # How many items per dimension to display at most
+    # num_first = 3          # Show first 3
+    # num_last = 2           # Show last 2
+    #
+    # if current_dim == self.ndim() - 1:
+    # print(indent + "[", end="")
+    # size = self.shape[current_dim]
+    #
+    # for i in range(size):
+    # if i < num_first or i >= size - num_last:
+    # indices.append(i)
+    # print(self[indices], end="")
+    # _ = indices.pop()
+    # elif i == num_first:
+    # print("...", end="")
+    #
+    # if i < size - 1:
+    # print(", ", end="")
+    # print("]")
+    # else:
+    # print(indent + "[")
+    # size = self.shape[current_dim]
+    #
+    # for i in range(size):
+    # if i < num_first or i >= size - num_last:
+    # indices.append(i)
+    # self.print_tensor_recursive(indices, level + 1)
+    # _ = indices.pop()
+    # elif i == num_first:
+    # print(indent + "  ...")  # indent deeper
+    #
+    # if i < size - 1 and (i < num_first - 1 or i >= size - num_last):
+    # print(",")
+    # print(indent + "]")
+    # except e:
+    # print(e)
     fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
         try:
             current_dim = len(indices)
             indent = " " * (level * 2)
 
+            num_first = 3  # Show first 3 elements
+            num_last = 2  # Show last 2 elements
+
             if current_dim == self.ndim() - 1:
                 print(indent + "[", end="")
-                for i in range(self.shape[current_dim]):
-                    indices.append(i)
-                    print(self[indices], end="")
-                    _ = indices.pop()
-                    if i < self.shape[current_dim] - 1:
-                        print(", ", end="")
-                print("]")
+                size = self.shape[current_dim]
+
+                for i in range(size):
+                    if i < num_first:
+                        indices.append(i)
+                        print(
+                            self[indices],
+                            end=", " if (
+                                i != num_first - 1
+                                or size > num_first + num_last
+                            ) else "",
+                        )
+                        _ = indices.pop()
+                    elif i == num_first:
+                        if size > num_first + num_last:
+                            print("..., ", end="")
+                        # Skip printing middle elements
+                    elif i >= size - num_last:
+                        indices.append(i)
+                        print(self[indices], end=", " if i != size - 1 else "")
+                        _ = indices.pop()
+                print("]", end="")
             else:
                 print(indent + "[")
-                for i in range(self.shape[current_dim]):
-                    indices.append(i)
-                    self.print_tensor_recursive(indices, level + 1)
-                    _ = indices.pop()
-                    if i < self.shape[current_dim] - 1:
-                        print(",")
-                print(indent + "]")
+                size = self.shape[current_dim]
+
+                for i in range(size):
+                    if i < num_first:
+                        indices.append(i)
+                        self.print_tensor_recursive(indices, level + 1)
+                        _ = indices.pop()
+                        if i != num_first - 1 or size > num_first + num_last:
+                            print(",")
+                    elif i == num_first:
+                        if size > num_first + num_last:
+                            print(indent + "  ...,")
+                    elif i >= size - num_last:
+                        indices.append(i)
+                        self.print_tensor_recursive(indices, level + 1)
+                        _ = indices.pop()
+                        if i != size - 1:
+                            print(",")
+                print(indent + "]", end="")
         except e:
             print(e)
 
