@@ -110,26 +110,30 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         return tensor
 
     fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
-        current_dim = len(indices)
-        indent = " " * (level * 2)
+        try:
+            current_dim = len(indices)
+            indent = " " * (level * 2)
 
-        if current_dim == self.ndim() - 1:
-            print(indent + "[", end="")
-            for i in range(self.shape[current_dim]):
-                print(self[indices], end="")
-                if i < self.shape[current_dim] - 1:
-                    print(", ", end="")
-            print("]")
-        else:
-            print(indent + "[")
-            for i in range(self.shape[current_dim]):
-                indices.append(i)
-                self.print_tensor_recursive(indices, level + 1)
-                _ = indices.pop()
-                if i < self.shape[current_dim] - 1:
-                    print(",")
-            print(indent + "]")
-
+            if current_dim == self.ndim() - 1:
+                print(indent + "[", end="")
+                for i in range(self.shape[current_dim]):
+                    indices.append(i)
+                    print(self[indices], end="")
+                    indices.pop()
+                    if i < self.shape[current_dim] - 1:
+                        print(", ", end="")
+                print("]")
+            else:
+                print(indent + "[")
+                for i in range(self.shape[current_dim]):
+                    indices.append(i)
+                    self.print_tensor_recursive(indices, level + 1)
+                    _ = indices.pop()
+                    if i < self.shape[current_dim] - 1:
+                        print(",")
+                print(indent + "]")
+        except e:
+            print(e)
 
 struct Shape[axes: Int]:
     var axes_sizes: StaticTuple[Int, axes]
