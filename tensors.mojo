@@ -1,4 +1,4 @@
-from memory import UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy, memset, memset_zero
 from random import randn, seed
 from utils import StaticTuple
 
@@ -8,6 +8,26 @@ def main():
     tensor = Tensor[2].rand(4, 3)
     var indices = List[Int]()
     tensor.print_tensor_recursive(indices, 1)
+
+    tensor = Tensor[2].zeros(4, 3)
+    indices = List[Int]()
+    tensor.print_tensor_recursive(indices, 1)
+
+    tensor_false = Tensor[2, DType.bool].zeros(4, 3)
+    indices = List[Int]()
+    tensor_false.print_tensor_recursive(indices, 1)
+
+    tensor_true = Tensor[2, DType.bool].ones(4, 3)
+    indices = List[Int]()
+    tensor_true.print_tensor_recursive(indices, 1)
+
+    tensor = Tensor[2].ones(4, 3)
+    indices = List[Int]()
+    tensor.print_tensor_recursive(indices, 1)
+
+    tensor_uint8 = Tensor[2, DType.uint8].ones(4, 3)
+    indices = List[Int]()
+    tensor_uint8.print_tensor_recursive(indices, 1)
 
 
 struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
@@ -124,6 +144,28 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         axes_dims = Self.init_shape(tensor_shapes)
         tensor = Tensor[axes_sizes, dtype](axes_dims)
         randn(tensor.data, tensor.numels())
+        return tensor
+
+    @staticmethod
+    fn zeros(*tensor_shapes: Int) raises -> Tensor[axes_sizes, dtype]:
+        axes_dims = Self.init_shape(tensor_shapes)
+        tensor = Tensor[axes_sizes, dtype](axes_dims)
+        memset_zero(tensor.data, tensor.numels())
+        return tensor
+
+    @staticmethod
+    fn ones(*tensor_shapes: Int) raises -> Tensor[axes_sizes, dtype]:
+        axes_dims = Self.init_shape(tensor_shapes)
+        tensor = Tensor[axes_sizes, dtype](axes_dims)
+        var value: SIMD[dtype, 1]
+
+        @parameter
+        if dtype.is_floating_point():
+            value = SIMD[dtype, 1](1.0)
+        else:
+            value = SIMD[dtype, 1](1)
+        for i in range(tensor.numels()):
+            tensor.data.store(i, value)
         return tensor
 
     # fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
@@ -245,6 +287,7 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
                         if i != size - 1:
                             print(",")
                 print(indent + "]", end="")
+                print("\n")
         except e:
             print(e)
 
