@@ -1,6 +1,9 @@
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from random import randn, seed
 from utils import StaticTuple
+from utils.numerics import max_or_inf
+from time import perf_counter_ns
+from algorithm import vectorize
 
 
 def main():
@@ -25,15 +28,166 @@ def main():
     indices = List[Int]()
     tensor.print_tensor_recursive(indices, 1)
 
-    tensor_uint8 = Tensor[2, DType.uint8].ones(4, 3)
-    indices = List[Int]()
-    tensor_uint8.print_tensor_recursive(indices, 1)
+    t16 = Tensor[2, DType.uint16].zeros(5, 5)
+    t16[0, 0] = 1
+    t16[0, 1] = 2
+    t16[0, 2] = 3
+    t16[0, 3] = 4
+    t16[0, 4] = 5
+
+    t16[1, 0] = 6
+    t16[1, 1] = 7
+    t16[1, 2] = 8
+    t16[1, 3] = 9
+    t16[1, 4] = 10
+
+    t16[2, 0] = 11
+    t16[2, 1] = 12
+    t16[2, 2] = 13
+    t16[2, 3] = 14
+    t16[2, 4] = 15
+
+    t16[3, 0] = 16
+    t16[3, 1] = 17
+    t16[3, 2] = 18
+    t16[3, 3] = 19
+    t16[3, 4] = 20
+
+    t16[4, 0] = 21
+    t16[4, 1] = 22
+    t16[4, 2] = 23
+    t16[4, 3] = 24
+    t16[4, 4] = 25
+
+    other = Tensor[2, DType.uint16].zeros(5, 5)
+    other[0, 0] = 3
+    other[0, 1] = 4
+    other[0, 2] = 5
+    other[0, 3] = 6
+    other[0, 4] = 7
+
+    other[1, 0] = 8
+    other[1, 1] = 9
+    other[1, 2] = 10
+    other[1, 3] = 11
+    other[1, 4] = 12
+
+    other[2, 0] = 13
+    other[2, 1] = 14
+    other[2, 2] = 15
+    other[2, 3] = 16
+    other[2, 4] = 17
+
+    other[3, 0] = 18
+    other[3, 1] = 19
+    other[3, 2] = 20
+    other[3, 3] = 21
+    other[3, 4] = 22
+
+    other[4, 0] = 23
+    other[4, 1] = 24
+    other[4, 2] = 25
+    other[4, 3] = 26
+    other[4, 4] = 27
+
+    Tensor.print(t16.matmal_v2(other))
+    print()
+
+    Tensor.print(t16.matmal_v3(other))
+    print()
+
+
+    Tensor.print(t16.matmal(other))
 
 
 struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     var shape: Shape[axes_sizes]
     var data: UnsafePointer[Scalar[dtype]]
     var datatype: DType
+
+    fn matmal(self, other: Self) -> Tensor[axes_sizes, dtype]:
+        start = perf_counter_ns()
+        from testing import assert_equal
+
+        result = Tensor[axes_sizes, dtype].zeros(self.shape[0], other.shape[1])
+        try:
+            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
+            for i in range(self.shape[0]):
+                for j in range(other.shape[1]):
+                    for k in range(self.shape[1]):
+                        result[i, j] += self[i, k] * other[k, j]
+        except e:
+            print(e)
+        end = perf_counter_ns()
+        print("Total: ", end - start)
+        return result
+
+    fn load[nelts: Int = 1](self, rows: Int, cols: Int) -> SIMD[dtype, nelts]:
+        from testing import assert_equal
+
+        try:
+            assert_equal(2, self.ndim(), "load is supported only for 2d tensor")
+        except e:
+            print(e)
+        return self.data.load[width=nelts](rows * self.shape[1] + cols)
+
+    fn store[
+        nelts: Int = 1
+    ](self, rows: Int, cols: Int, val: SIMD[dtype, nelts]):
+        from testing import assert_equal
+
+        try:
+            assert_equal(
+                2, self.ndim(), "store is supported only for 2d tensor"
+            )
+        except e:
+            print(e)
+        self.data.store(rows * self.shape[1] + cols, val)
+
+    fn matmal_v2(self, other: Self) -> Tensor[axes_sizes, dtype]:
+        start = perf_counter_ns()
+        from testing import assert_equal
+
+        result = Tensor[axes_sizes, dtype].zeros(self.shape[0], other.shape[1])
+        try:
+            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
+            for i in range(self.shape[0]):
+                for j in range(self.shape[1]):
+                    for k in range(other.shape[1]):
+                        result[i, k] += self[i, j] * other[j, k]
+        except e:
+            print(e)
+        end = perf_counter_ns()
+        print("Total: ", end - start)
+
+        return result
+
+    fn matmal_v3(self, other: Self) -> Tensor[axes_sizes, dtype]:
+        start = perf_counter_ns()
+        from testing import assert_equal
+
+        result = Tensor[axes_sizes, dtype].zeros(self.shape[0], other.shape[1])
+        try:
+            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
+            for i in range(self.shape[0]):
+                for j in range(self.shape[1]):
+
+                    @parameter
+                    fn dot[simd_width: Int](idx: Int):
+                        result.store[simd_width](
+                            i,
+                            idx,
+                            result.load[simd_width](i, idx)
+                            + self[i, j] * other.load[simd_width](j, idx),
+                        )
+
+                    vectorize[dot, 4](other.shape[1])
+        except e:
+            print(e)
+        end = perf_counter_ns()
+        print("Total: ", end - start)
+
+        return result
 
     fn __init__(out self, *tensor_shapes: Int) raises:
         axes_dims = Self.init_shape(tensor_shapes)
@@ -42,7 +196,9 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     @staticmethod
     fn init_shape(
         shapes: VariadicList[Int],
-    ) raises -> StaticTuple[Int, axes_sizes]:
+        # ) raises -> StaticTuple[Int, axes_sizes]:
+    ) -> StaticTuple[Int, axes_sizes]:
+        axes_dims = StaticTuple[Int, axes_sizes](-1)
         if len(shapes) != axes_sizes:
             err = (
                 "Tensor dimension = "
@@ -52,8 +208,8 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
                 + " mismatch"
             )
             print(err)
-            raise Error("Dimension mismatch")
-        axes_dims = StaticTuple[Int, axes_sizes](0)
+            # raise Error("Dimension mismatch")
+            return axes_dims
         for i in range(axes_sizes):
             axes_dims[i] = shapes[i]
         return axes_dims
@@ -63,25 +219,29 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         self.datatype = dtype
         self.data = UnsafePointer[Scalar[dtype]].alloc(self.shape.numels)
 
-    fn __getitem__(self, indices: List[Int]) raises -> Scalar[dtype]:
+    # Warning - return max or infinite value of DType for wrong index
+    fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
         static_tuple = StaticTuple[Int, axes_sizes](0)
         for i in range(axes_sizes):
             static_tuple[i] = indices[i]
         index = self.shape.flatten_index(static_tuple)
         if index == -1:
-            raise Error("Invalid indices")
+            print("__getitem__(indices): Invalid indices")
+            return max_or_inf[dtype]()
         return (self.data + index)[]
 
-    fn __getitem__(self, *indices: Int) raises -> Scalar[dtype]:
+    fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
         index = self.shape.flatten_index(indices)
         if index == -1:
-            raise Error("Invalid indices")
+            print("__getitem__(*indices): Invalid indices")
+            return max_or_inf[dtype]()
         return (self.data + index)[]
 
-    fn __setitem__(self, *indices: Int, value: Scalar[dtype]) raises:
+    fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
         index = self.shape.flatten_index(indices)
         if index == -1:
-            raise Error("Invalid indices")
+            print("__setitem__(*indices): Invalid indices")
+            return
         (self.data + index)[] = value
 
     fn __moveinit__(out self, owned other: Self):
@@ -147,7 +307,8 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         return tensor
 
     @staticmethod
-    fn zeros(*tensor_shapes: Int) raises -> Tensor[axes_sizes, dtype]:
+    # fn zeros(*tensor_shapes: Int) raises -> Tensor[axes_sizes, dtype]:
+    fn zeros(*tensor_shapes: Int) -> Tensor[axes_sizes, dtype]:
         axes_dims = Self.init_shape(tensor_shapes)
         tensor = Tensor[axes_sizes, dtype](axes_dims)
         memset_zero(tensor.data, tensor.numels())
@@ -234,13 +395,14 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     # print(indent + "]")
     # except e:
     # print(e)
+
     fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
         try:
             current_dim = len(indices)
             indent = " " * (level * 2)
 
-            num_first = 3  # Show first 3 elements
-            num_last = 2  # Show last 2 elements
+            num_first = 5  # Show first 3 elements
+            num_last = 5  # Show last 2 elements
 
             if current_dim == self.ndim() - 1:
                 print(indent + "[", end="")
@@ -288,6 +450,16 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
                             print(",")
                 print(indent + "]", end="")
                 print("\n")
+        except e:
+            print(e)
+
+    @staticmethod
+    fn print(t: Tensor):
+        print(t.__str__())
+        print()
+        l = List[Int]()
+        try:
+            t.print_tensor_recursive(l, 1)
         except e:
             print(e)
 
