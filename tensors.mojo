@@ -4,6 +4,7 @@ from utils import StaticTuple
 from utils.numerics import max_or_inf
 from time import perf_counter_ns
 from algorithm import vectorize
+from sys import simdwidthof
 
 
 def main():
@@ -98,7 +99,11 @@ def main():
 
 
     Tensor.print(t16.matmal(other))
-
+    
+    tensor_big1 = Tensor[2].rand(1024, 4096)
+    tensor_big2 = Tensor[2].rand(4096, 512)
+ 
+    Tensor.print(tensor_big1.matmal_v3(tensor_big2))
 
 struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     var shape: Shape[axes_sizes]
@@ -181,7 +186,7 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
                             + self[i, j] * other.load[simd_width](j, idx),
                         )
 
-                    vectorize[dot, 4](other.shape[1])
+                    vectorize[dot, 2 * simdwidthof[dtype]()](other.shape[1])
         except e:
             print(e)
         end = perf_counter_ns()
