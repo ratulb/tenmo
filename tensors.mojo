@@ -5,11 +5,24 @@ from utils.numerics import max_or_inf
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
+from math import iota
 
 
 def main():
     # tensor = Tensor[5].rand(4, 3, 2, 1)
+    Tensor.print(Tensor.arange(7, start=3))
     tensor = Tensor[2].rand(4, 3)
+    print("Am I gone: ")
+    Tensor.print(tensor)
+    print()
+    multiplied = tensor / 2
+    print("I am multiplied: ")
+    Tensor.print(multiplied)
+    print()
+
+    rival = tensor == multiplied
+    print("rival")
+    Tensor.print(rival)
     var indices = List[Int]()
     tensor.print_tensor_recursive(indices, 1)
 
@@ -61,17 +74,17 @@ def main():
     t16[4, 4] = 25
 
     other = Tensor[2, DType.uint16].zeros(5, 5)
-    other[0, 0] = 3
-    other[0, 1] = 4
-    other[0, 2] = 5
-    other[0, 3] = 6
+    other[0, 0] = 10
+    other[0, 1] = 2
+    other[0, 2] = 3
+    other[0, 3] = 4
     other[0, 4] = 7
 
-    other[1, 0] = 8
-    other[1, 1] = 9
-    other[1, 2] = 10
-    other[1, 3] = 11
-    other[1, 4] = 12
+    other[1, 0] = 6
+    other[1, 1] = 7
+    other[1, 2] = 8
+    other[1, 3] = 9
+    other[1, 4] = 10
 
     other[2, 0] = 13
     other[2, 1] = 14
@@ -89,21 +102,23 @@ def main():
     other[4, 1] = 24
     other[4, 2] = 25
     other[4, 3] = 26
-    other[4, 4] = 27
+    other[4, 4] = 25
 
-    Tensor.print(t16.matmal_v2(other))
+    # Tensor.print(t16.matmal_v2(other))
     print()
 
-    Tensor.print(t16.matmal_v3(other))
+    # Tensor.print(t16.matmal_v3(other))
     print()
 
+    # Tensor.print(t16.matmal(other))
+    Tensor.print(t16 == other)
+    Tensor.print(t16 != other)
 
-    Tensor.print(t16.matmal(other))
-    
     tensor_big1 = Tensor[2].rand(1024, 4096)
     tensor_big2 = Tensor[2].rand(4096, 512)
- 
-    Tensor.print(tensor_big1.matmal_v3(tensor_big2))
+
+    # Tensor.print(tensor_big1.matmal_v3(tensor_big2))
+
 
 struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     var shape: Shape[axes_sizes]
@@ -194,7 +209,8 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
 
         return result
 
-    fn __init__(out self, *tensor_shapes: Int) raises:
+    # fn __init__(out self, *tensor_shapes: Int) raises:
+    fn __init__(out self, *tensor_shapes: Int):
         axes_dims = Self.init_shape(tensor_shapes)
         self = Self(axes_dims)
 
@@ -272,14 +288,92 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     fn ndim(self) -> Int:
         return self.shape.ndim
 
-    fn __eq__(self: Self, rhs: Self) -> Bool:
-        return True
+    fn __eq__(self: Self, other: Self) raises -> Tensor[axes_sizes, DType.bool]:
+        if self.shape != other.shape:
+            raise Error("Dimension mismatch")
+        copy = Tensor[axes_sizes, DType.bool](StaticTuple[Int, axes_sizes]())
+        memset_zero(copy.data, copy.numels())
+        copy.shape = self.shape
 
-    fn __ne__(self: Self, rhs: Self) -> Bool:
-        return True
+        @parameter
+        fn compare_elems[simd_width: Int](idx: Int):
+            copy.data.store[width=simd_width](
+                idx,
+                (
+                    self.data.load[width=simd_width](idx).__eq__(
+                        other.data.load[width=simd_width](idx)
+                    )
+                ),
+            )
+
+        vectorize[compare_elems, simdwidthof[DType.bool]()](copy.numels())
+        return copy
+
+    fn __ne__(self: Self, other: Self) raises -> Tensor[axes_sizes, DType.bool]:
+        result = self == other
+
+        @parameter
+        fn invert[simd_width: Int](idx: Int):
+            result.data.store[width=simd_width](
+                idx, ~result.data.load[width=simd_width](idx)
+            )
+
+        vectorize[invert, simdwidthof[DType.bool]()](result.numels())
+        return result
+
+    fn __mul__(self: Self, factor: Scalar[dtype]) -> Self:
+        copy = self
+
+        @parameter
+        fn mul_by_factor[simd_width: Int](idx: Int):
+            copy.data.store[width=simd_width](
+                idx, copy.data.load[width=simd_width](idx) * factor
+            )
+
+        vectorize[mul_by_factor, simdwidthof[dtype]()](copy.numels())
+        return copy
+
+    fn __add__(self: Self, value: Scalar[dtype]) -> Self:
+        copy = self
+
+        @parameter
+        fn add_value[simd_width: Int](idx: Int):
+            copy.data.store[width=simd_width](
+                idx, copy.data.load[width=simd_width](idx) + value
+            )
+
+        vectorize[add_value, simdwidthof[dtype]()](copy.numels())
+        return copy
+
+    fn __sub__(self: Self, value: Scalar[dtype]) -> Self:
+        copy = self
+
+        @parameter
+        fn subtract_value[simd_width: Int](idx: Int):
+            copy.data.store[width=simd_width](
+                idx, copy.data.load[width=simd_width](idx) - value
+            )
+
+        vectorize[subtract_value, simdwidthof[dtype]()](copy.numels())
+        return copy
+
+    fn __truediv__(self: Self, factor: Scalar[dtype]) -> Self:
+        copy = self
+
+        @parameter
+        fn div_by_factor[simd_width: Int](idx: Int):
+            copy.data.store[width=simd_width](
+                idx, copy.data.load[width=simd_width](idx).__truediv__(factor)
+            )
+
+        vectorize[div_by_factor, simdwidthof[dtype]()](copy.numels())
+        return copy
 
     fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self.data
+    
+    fn reshape[axes_count: Int](self, *newdims: Int) -> Tensor[axes_count, dtype]:
+        return Self(newdims)
 
     fn __str__(self) -> String:
         s = String("[")
@@ -310,6 +404,15 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         tensor = Tensor[axes_sizes, dtype](axes_dims)
         randn(tensor.data, tensor.numels())
         return tensor
+
+    @staticmethod
+    fn arange[
+        d_type: DType = DType.float32
+    ](end: Int, start: Int = 0) -> Tensor[1, d_type]:
+        len = end - start
+        result = Tensor[dtype=d_type](len)
+        iota(result.data, len, offset=start)
+        return result
 
     @staticmethod
     # fn zeros(*tensor_shapes: Int) raises -> Tensor[axes_sizes, dtype]:
@@ -473,6 +576,19 @@ struct Shape[axes: Int]:
     var axes_sizes: StaticTuple[Int, axes]
     var ndim: Int
     var numels: Int
+
+    fn __ne__(self, other: Self) -> Bool:
+        return self.__eq__(other) == False
+
+    fn __eq__(self, other: Self) -> Bool:
+        length1 = len(self.axes_sizes)
+        length2 = len(other.axes_sizes)
+        if length1 != length2:
+            return False
+        for i in range(length1):
+            if self.axes_sizes[i] != other.axes_sizes[i]:
+                return False
+        return self.ndim == other.ndim and self.numels == other.numels
 
     fn __init__(out self, array: StaticTuple[Int, axes]):
         self.axes_sizes = array
