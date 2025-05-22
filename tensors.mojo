@@ -125,115 +125,53 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     var data: UnsafePointer[Scalar[dtype]]
     var datatype: DType
 
-    fn matmal(self, other: Self) -> Tensor[axes_sizes, dtype]:
-        start = perf_counter_ns()
-        from testing import assert_equal
-
-        result = Tensor[axes_sizes, dtype].zeros(self.shape[0], other.shape[1])
-        try:
-            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
-            for i in range(self.shape[0]):
-                for j in range(other.shape[1]):
-                    for k in range(self.shape[1]):
-                        result[i, j] += self[i, k] * other[k, j]
-        except e:
-            print(e)
-        end = perf_counter_ns()
-        print("Total: ", end - start)
-        return result
-
-    fn load[nelts: Int = 1](self, rows: Int, cols: Int) -> SIMD[dtype, nelts]:
-        from testing import assert_equal
-
-        try:
-            assert_equal(2, self.ndim(), "load is supported only for 2d tensor")
-        except e:
-            print(e)
-        return self.data.load[width=nelts](rows * self.shape[1] + cols)
-
-    fn store[
-        nelts: Int = 1
-    ](self, rows: Int, cols: Int, val: SIMD[dtype, nelts]):
-        from testing import assert_equal
-
-        try:
-            assert_equal(
-                2, self.ndim(), "store is supported only for 2d tensor"
-            )
-        except e:
-            print(e)
-        self.data.store(rows * self.shape[1] + cols, val)
-
-    fn matmal_v2(self, other: Self) -> Tensor[axes_sizes, dtype]:
-        start = perf_counter_ns()
-        from testing import assert_equal
-
-        result = Tensor[axes_sizes, dtype].zeros(self.shape[0], other.shape[1])
-        try:
-            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
-            for i in range(self.shape[0]):
-                for j in range(self.shape[1]):
-                    for k in range(other.shape[1]):
-                        result[i, k] += self[i, j] * other[j, k]
-        except e:
-            print(e)
-        end = perf_counter_ns()
-        print("Total: ", end - start)
-
-        return result
-
-    fn matmal_v3(self, other: Self) -> Tensor[axes_sizes, dtype]:
-        start = perf_counter_ns()
-        from testing import assert_equal
-
-        result = Tensor[axes_sizes, dtype].zeros(self.shape[0], other.shape[1])
-        try:
-            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
-            for i in range(self.shape[0]):
-                for j in range(self.shape[1]):
-
-                    @parameter
-                    fn dot[simd_width: Int](idx: Int):
-                        result.store[simd_width](
-                            i,
-                            idx,
-                            result.load[simd_width](i, idx)
-                            + self[i, j] * other.load[simd_width](j, idx),
-                        )
-
-                    vectorize[dot, 2 * simdwidthof[dtype]()](other.shape[1])
-        except e:
-            print(e)
-        end = perf_counter_ns()
-        print("Total: ", end - start)
-
-        return result
-
     # fn __init__(out self, *tensor_shapes: Int) raises:
     fn __init__(out self, *tensor_shapes: Int):
-        axes_dims = Self.init_shape(tensor_shapes)
+        axes_dims = Self.init_shape[axes_sizes](tensor_shapes)
         self = Self(axes_dims)
 
-    @staticmethod
+    """@staticmethod
     fn init_shape(
-        shapes: VariadicList[Int],
+        axes_spans: VariadicList[Int],
         # ) raises -> StaticTuple[Int, axes_sizes]:
     ) -> StaticTuple[Int, axes_sizes]:
         axes_dims = StaticTuple[Int, axes_sizes](-1)
-        if len(shapes) != axes_sizes:
+        if len(axes_spans) != axes_sizes:
             err = (
                 "Tensor dimension = "
                 + String(axes_sizes)
                 + " and args count = "
-                + String(len(shapes))
+                + String(len(axes_spans))
                 + " mismatch"
             )
             print(err)
             # raise Error("Dimension mismatch")
             return axes_dims
         for i in range(axes_sizes):
-            axes_dims[i] = shapes[i]
+            axes_dims[i] = axes_spans[i]
+        return axes_dims"""
+    
+    @staticmethod
+    fn init_shape[axes_count: Int](
+        axes_spans: VariadicList[Int],
+        # ) raises -> StaticTuple[Int, axes_sizes]:
+    ) -> StaticTuple[Int, axes_count]:
+        axes_dims = StaticTuple[Int, axes_count](-1)
+        if len(axes_spans) != axes_count:
+            err = (
+                "Tensor dimension = "
+                + String(axes_count)
+                + " and args count = "
+                + String(len(axes_spans))
+                + " mismatch"
+            )
+            print(err)
+            # raise Error("Dimension mismatch")
+            return axes_dims
+        for i in range(axes_count):
+            axes_dims[i] = axes_spans[i]
         return axes_dims
+
 
     fn __init__(out self, axes_dims: StaticTuple[Int, axes_sizes]):
         self.shape = Shape[axes_sizes](axes_dims)
@@ -372,8 +310,94 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self.data
     
-    fn reshape[axes_count: Int](self, *newdims: Int) -> Tensor[axes_count, dtype]:
-        return Self(newdims)
+    fn matmal(self, other: Self) -> Tensor[axes_sizes, dtype]:
+        start = perf_counter_ns()
+        from testing import assert_equal
+
+        result = Tensor[axes_sizes, dtype].zeros(self.shape[0], other.shape[1])
+        try:
+            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
+            for i in range(self.shape[0]):
+                for j in range(other.shape[1]):
+                    for k in range(self.shape[1]):
+                        result[i, j] += self[i, k] * other[k, j]
+        except e:
+            print(e)
+        end = perf_counter_ns()
+        print("Total: ", end - start)
+        return result
+
+    fn load[nelts: Int = 1](self, rows: Int, cols: Int) -> SIMD[dtype, nelts]:
+        from testing import assert_equal
+
+        try:
+            assert_equal(2, self.ndim(), "load is supported only for 2d tensor")
+        except e:
+            print(e)
+        return self.data.load[width=nelts](rows * self.shape[1] + cols)
+
+    fn store[
+        nelts: Int = 1
+    ](self, rows: Int, cols: Int, val: SIMD[dtype, nelts]):
+        from testing import assert_equal
+
+        try:
+            assert_equal(
+                2, self.ndim(), "store is supported only for 2d tensor"
+            )
+        except e:
+            print(e)
+        self.data.store(rows * self.shape[1] + cols, val)
+
+    fn matmal_v2(self, other: Self) -> Tensor[axes_sizes, dtype]:
+        start = perf_counter_ns()
+        from testing import assert_equal
+
+        result = Tensor[axes_sizes, dtype].zeros(self.shape[0], other.shape[1])
+        try:
+            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
+            for i in range(self.shape[0]):
+                for j in range(self.shape[1]):
+                    for k in range(other.shape[1]):
+                        result[i, k] += self[i, j] * other[j, k]
+        except e:
+            print(e)
+        end = perf_counter_ns()
+        print("Total: ", end - start)
+
+        return result
+
+    fn matmal_v3(self, other: Self) -> Tensor[axes_sizes, dtype]:
+        start = perf_counter_ns()
+        from testing import assert_equal
+
+        result = Tensor[axes_sizes, dtype].zeros(self.shape[0], other.shape[1])
+        try:
+            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
+            for i in range(self.shape[0]):
+                for j in range(self.shape[1]):
+
+                    @parameter
+                    fn dot[simd_width: Int](idx: Int):
+                        result.store[simd_width](
+                            i,
+                            idx,
+                            result.load[simd_width](i, idx)
+                            + self[i, j] * other.load[simd_width](j, idx),
+                        )
+
+                    vectorize[dot, 2 * simdwidthof[dtype]()](other.shape[1])
+        except e:
+            print(e)
+        end = perf_counter_ns()
+        print("Total: ", end - start)
+
+        return result
+
+   
+    fn reshape[new_axes_sizes: Int](self, *newdims: Int) -> Tensor[new_axes_sizes, dtype]:
+        #shape = Self.init_shape[new_axes_sizes](newdims)
+        return Tensor[new_axes_sizes, dtype](newdims)
 
     fn __str__(self) -> String:
         s = String("[")
@@ -400,7 +424,7 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
             seed(init_seed.value())
         else:
             seed()
-        axes_dims = Self.init_shape(tensor_shapes)
+        axes_dims = Self.init_shape[axes_sizes](tensor_shapes)
         tensor = Tensor[axes_sizes, dtype](axes_dims)
         randn(tensor.data, tensor.numels())
         return tensor
@@ -417,14 +441,14 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     @staticmethod
     # fn zeros(*tensor_shapes: Int) raises -> Tensor[axes_sizes, dtype]:
     fn zeros(*tensor_shapes: Int) -> Tensor[axes_sizes, dtype]:
-        axes_dims = Self.init_shape(tensor_shapes)
+        axes_dims = Self.init_shape[axes_sizes](tensor_shapes)
         tensor = Tensor[axes_sizes, dtype](axes_dims)
         memset_zero(tensor.data, tensor.numels())
         return tensor
 
     @staticmethod
     fn ones(*tensor_shapes: Int) raises -> Tensor[axes_sizes, dtype]:
-        axes_dims = Self.init_shape(tensor_shapes)
+        axes_dims = Self.init_shape[axes_sizes](tensor_shapes)
         tensor = Tensor[axes_sizes, dtype](axes_dims)
         var value: SIMD[dtype, 1]
 
