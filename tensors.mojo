@@ -1,16 +1,16 @@
-from memory import UnsafePointer, memcpy, memset, memset_zero
+from math import iota
 from random import randn, seed
 from utils import StaticTuple
 from utils.numerics import max_or_inf
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
-from math import iota
-
+from memory import UnsafePointer, memcpy, memset, memset_zero
+from common_utils import int_varia_list_to_str
 
 def main():
     # tensor = Tensor[5].rand(4, 3, 2, 1)
-    Tensor.print(Tensor.arange(7, start=3))
+    Tensor.print(Tensor.arange(7, start=3).reshape[2](2,2))
     tensor = Tensor[2].rand(4, 3)
     print("Am I gone: ")
     Tensor.print(tensor)
@@ -23,12 +23,13 @@ def main():
     rival = tensor == multiplied
     print("rival")
     Tensor.print(rival)
-    var indices = List[Int]()
-    tensor.print_tensor_recursive(indices, 1)
 
-    tensor = Tensor[2].zeros(4, 3)
-    indices = List[Int]()
-    tensor.print_tensor_recursive(indices, 1)
+    tensor = Tensor[2].rand(4, 3)
+    print("Original")
+    Tensor.print(tensor)
+    reshaped = tensor.reshape[3](2, 2, 3)
+    print("Reshaped")
+    Tensor.print(reshaped)
 
     tensor_false = Tensor[2, DType.bool].zeros(4, 3)
     indices = List[Int]()
@@ -130,29 +131,10 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         axes_dims = Self.init_shape[axes_sizes](tensor_shapes)
         self = Self(axes_dims)
 
-    """@staticmethod
-    fn init_shape(
-        axes_spans: VariadicList[Int],
-        # ) raises -> StaticTuple[Int, axes_sizes]:
-    ) -> StaticTuple[Int, axes_sizes]:
-        axes_dims = StaticTuple[Int, axes_sizes](-1)
-        if len(axes_spans) != axes_sizes:
-            err = (
-                "Tensor dimension = "
-                + String(axes_sizes)
-                + " and args count = "
-                + String(len(axes_spans))
-                + " mismatch"
-            )
-            print(err)
-            # raise Error("Dimension mismatch")
-            return axes_dims
-        for i in range(axes_sizes):
-            axes_dims[i] = axes_spans[i]
-        return axes_dims"""
-    
     @staticmethod
-    fn init_shape[axes_count: Int](
+    fn init_shape[
+        axes_count: Int
+    ](
         axes_spans: VariadicList[Int],
         # ) raises -> StaticTuple[Int, axes_sizes]:
     ) -> StaticTuple[Int, axes_count]:
@@ -171,7 +153,6 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
         for i in range(axes_count):
             axes_dims[i] = axes_spans[i]
         return axes_dims
-
 
     fn __init__(out self, axes_dims: StaticTuple[Int, axes_sizes]):
         self.shape = Shape[axes_sizes](axes_dims)
@@ -309,7 +290,7 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
 
     fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self.data
-    
+
     fn matmal(self, other: Self) -> Tensor[axes_sizes, dtype]:
         start = perf_counter_ns()
         from testing import assert_equal
@@ -394,10 +375,27 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
 
         return result
 
-   
-    fn reshape[new_axes_sizes: Int](self, *newdims: Int) -> Tensor[new_axes_sizes, dtype]:
-        #shape = Self.init_shape[new_axes_sizes](newdims)
-        return Tensor[new_axes_sizes, dtype](newdims)
+    fn reshape[
+        new_axes_sizes: Int
+    ](self, *newdims: Int) raises -> Tensor[new_axes_sizes, dtype]:
+        shape = Self.init_shape[new_axes_sizes](newdims)  # StaticTuple
+        numels = 1
+        for idx in range(len(shape)):
+            numels *= shape[idx]
+        if numels != self.numels():
+            raise Error(
+                "Tensor with "
+                + String(self.numels())
+                + " elements can't be converted to "
+                + int_varia_list_to_str(newdims)
+                + " dimensional tensor"
+            )
+        result = Tensor[new_axes_sizes, dtype](shape)
+        @parameter
+        fn copy_elements[simd_width: Int](idx: Int):
+            result.data.store[width=simd_width](idx, self.data.load[width=simd_width](idx))
+        vectorize[copy_elements, simdwidthof[dtype]()](self.numels())
+        return result
 
     fn __str__(self) -> String:
         s = String("[")
