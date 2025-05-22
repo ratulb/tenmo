@@ -1,7 +1,6 @@
 from math import iota
 from random import randn, seed
 from utils import StaticTuple
-from utils.numerics import max_or_inf
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
@@ -10,8 +9,20 @@ from common_utils import int_varia_list_to_str
 
 
 def main():
+    t1 = Tensor(5)
+    for i in range(5):
+        t1[i] = i
+    added_3 = t1 + 3
+    print("Added\n")
+    Tensor.print(added_3)
+    expected = Tensor.arange(8, start=3)
+    print("Expected\n")
+    Tensor.print(expected)
+    result = added_3 == expected
+    print("Result\n")
+    Tensor.print(result)
     # tensor = Tensor[5].rand(4, 3, 2, 1)
-    Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
+    _ = """Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
     tensor = Tensor[2].rand(4, 3)
     print("Am I gone: ")
     Tensor.print(tensor)
@@ -120,9 +131,10 @@ def main():
     tensor_big2 = Tensor[2].rand(4096, 512)
 
     # Tensor.print(tensor_big1.matmal_v3(tensor_big2))
+    """
 
 
-struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
+struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](Stringable):
     var shape: Shape[axes_sizes]
     var data: UnsafePointer[Scalar[dtype]]
     var datatype: DType
@@ -201,23 +213,38 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32]:
     fn __eq__(self: Self, other: Self) raises -> Tensor[axes_sizes, DType.bool]:
         if self.shape != other.shape:
             raise Error("Dimension mismatch")
-        copy = Tensor[axes_sizes, DType.bool](StaticTuple[Int, axes_sizes]())
-        memset_zero(copy.data, copy.numels())
+        copy = Tensor[axes_sizes, DType.bool](StaticTuple[Int, axes_sizes](0))
         copy.shape = self.shape
 
         @parameter
         fn compare_elems[simd_width: Int](idx: Int):
-            copy.data.store[width=simd_width](
+            copy.data.store[width=simd_width, volatile=True](
                 idx,
-                (
-                    self.data.load[width=simd_width](idx).__eq__(
-                        other.data.load[width=simd_width](idx)
-                    )
-                ),
+                self.data.load[width=simd_width](idx)
+                == other.data.load[width=simd_width](idx),
             )
 
         vectorize[compare_elems, simdwidthof[DType.bool]()](copy.numels())
         return copy
+
+    fn __add__(self: Self, other: Self) raises -> Tensor[axes_sizes, dtype]:
+        if self.shape != other.shape:
+            raise Error("Add -> Dimension mismatch")
+        result = Tensor[axes_sizes, dtype](StaticTuple[Int, axes_sizes]())
+        result.shape = self.shape
+
+        @parameter
+        fn add_elems[simd_width: Int](idx: Int):
+            result.data.store[width=simd_width](
+                idx,
+                (
+                    self.data.load[width=simd_width](idx)
+                    + other.data.load[width=simd_width](idx)
+                ),
+            )
+
+        vectorize[add_elems, simdwidthof[dtype]()](result.numels())
+        return result
 
     fn __ne__(self: Self, other: Self) raises -> Tensor[axes_sizes, DType.bool]:
         result = self == other
