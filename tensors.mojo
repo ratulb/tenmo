@@ -8,6 +8,10 @@ from memory import UnsafePointer, memcpy, memset, memset_zero
 from common_utils import int_varia_list_to_str
 
 
+fn is_true(x: Scalar[DType.bool]) -> Bool:
+    return x
+
+
 def main():
     t1 = Tensor(5)
     for i in range(5):
@@ -21,6 +25,8 @@ def main():
     result = added_3 == expected
     print("Result\n")
     Tensor.print(result)
+
+    print(result.for_all(is_true))
     # tensor = Tensor[5].rand(4, 3, 2, 1)
     _ = """Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
     tensor = Tensor[2].rand(4, 3)
@@ -209,6 +215,23 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](Stringable):
     @always_inline
     fn ndim(self) -> Int:
         return self.shape.ndim
+
+    fn for_all[
+        simd_width: Int = simdwidthof[dtype]()
+    ](self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
+        num_elems = self.numels()
+        simd_blocks = num_elems // simd_width
+        remaining = num_elems % simd_width
+
+        for i in range(simd_blocks):
+            vector = self.data.load[width=simd_width](i * simd_width)
+            for j in range(simd_width):
+                if not pred(vector[j]):
+                    return False
+        for k in range(remaining):
+            if not pred(self.data.load[width=1](simd_blocks * simd_width + k)):
+                return False
+        return True
 
     fn __eq__(self: Self, other: Self) raises -> Tensor[axes_sizes, DType.bool]:
         if self.shape != other.shape:
