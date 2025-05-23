@@ -7,3 +7,6 @@
 models
 gpt2_weights.npz*
 .venv/
+__pycache__/
+data/
+model_weights.npy
