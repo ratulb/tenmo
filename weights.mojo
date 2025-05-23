@@ -3,14 +3,14 @@ from python import Python, PythonObject
 from tensors import Tensor
 from utils import StaticTuple, Variant
 
-alias Variety = Variant[
+alias TensorVariant = Variant[
     Tensor[1, DType.float32],
     Tensor[2, DType.float32],
     Tensor[3, DType.float32],
     Tensor[4, DType.float32],
 ]
 
-alias Resultant = Optional[Variety]
+alias Resultant = Optional[TensorVariant]
 
 
 struct Weights:
@@ -38,19 +38,14 @@ struct Weights:
             self.load_weights()
             np_weights = self.gpt2_weights[key]
             np_tensor_shape = np_weights.shape
-            print("Tensor shape: ", np_tensor_shape)
             np_weights_ptr = Self.ndarray_ptr[DType.float32](np_weights)
             dimension = len(np_tensor_shape)
             if dimension == 1:
-                print("I am in dimension 1", np_tensor_shape[0])
                 axes_dims1 = StaticTuple[Int, 1](np_tensor_shape[0])
-                print("I don't come here in dimension 1")
                 tensor1 = Tensor[1, DType.float32](axes_dims1)
                 tensor_ptr1 = tensor1.unsafe_ptr()
-                print("I don't come here in dimension 2", np_weights.size)
                 memcpy(tensor_ptr1, np_weights_ptr, np_weights.size)
-                print("I don't come here in dimension 3")
-                return Optional(Variety(tensor1))
+                return Optional(TensorVariant(tensor1))
             elif dimension == 2:
                 axes_dims2 = StaticTuple[Int, 2](
                     np_tensor_shape[0], np_tensor_shape[1]
@@ -58,7 +53,7 @@ struct Weights:
                 tensor2 = Tensor[2, DType.float32](axes_dims2)
                 tensor_ptr2 = tensor2.unsafe_ptr()
                 memcpy(tensor_ptr2, np_weights_ptr, np_weights.size)
-                return Optional(Variety(tensor2))
+                return Optional(TensorVariant(tensor2))
             elif dimension == 3:
                 axes_dims3 = StaticTuple[Int, 3](
                     np_tensor_shape[0], np_tensor_shape[1], np_tensor_shape[2]
@@ -66,7 +61,7 @@ struct Weights:
                 tensor3 = Tensor[3, DType.float32](axes_dims3)
                 tensor_ptr3 = tensor3.unsafe_ptr()
                 memcpy(tensor_ptr3, np_weights_ptr, np_weights.size)
-                return Optional(Variety(tensor3))
+                return Optional(TensorVariant(tensor3))
             elif dimension == 4:
                 axes_dims4 = StaticTuple[Int, 4](
                     np_tensor_shape[0],
@@ -77,7 +72,7 @@ struct Weights:
                 tensor4 = Tensor[4, DType.float32](axes_dims4)
                 tensor_ptr4 = tensor4.unsafe_ptr()
                 memcpy(tensor_ptr4, np_weights_ptr, np_weights.size)
-                return Optional(Variety(tensor4))
+                return Optional(TensorVariant(tensor4))
             else:
                 print("Unsupported dimension")
                 return None
