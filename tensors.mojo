@@ -1,4 +1,4 @@
-from math import iota
+from math import iota, exp
 from random import randn, seed
 from utils import StaticTuple
 from time import perf_counter_ns
@@ -6,10 +6,6 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from common_utils import int_varia_list_to_str
-
-
-fn is_true(x: Scalar[DType.bool]) -> Bool:
-    return x
 
 
 def main():
@@ -26,7 +22,6 @@ def main():
     print("Result\n")
     Tensor.print(result)
 
-    print(result.for_all(is_true))
     # tensor = Tensor[5].rand(4, 3, 2, 1)
     _ = """Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
     tensor = Tensor[2].rand(4, 3)
@@ -216,6 +211,18 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](Stringable):
     fn ndim(self) -> Int:
         return self.shape.ndim
 
+    fn all_true(self: Tensor[dtype = DType.bool]) -> Bool:
+        fn all_truthy(ambivalent: Scalar[DType.bool]) -> Bool:
+            return ambivalent == True
+
+        return self.for_all(all_truthy)
+
+    fn any_true(self: Tensor[dtype = DType.bool]) -> Bool:
+        fn any_truthy(ambivalent: Scalar[DType.bool]) -> Bool:
+            return ambivalent == True
+
+        return self.any(any_truthy)
+
     fn for_all[
         simd_width: Int = simdwidthof[dtype]()
     ](self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
@@ -232,6 +239,23 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](Stringable):
             if not pred(self.data.load[width=1](simd_blocks * simd_width + k)):
                 return False
         return True
+
+    fn any[
+        simd_width: Int = simdwidthof[dtype]()
+    ](self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
+        num_elems = self.numels()
+        simd_blocks = num_elems // simd_width
+        remaining = num_elems % simd_width
+
+        for i in range(simd_blocks):
+            vector = self.data.load[width=simd_width](i * simd_width)
+            for j in range(simd_width):
+                if pred(vector[j]):
+                    return True
+        for k in range(remaining):
+            if pred(self.data.load[width=1](simd_blocks * simd_width + k)):
+                return True
+        return False
 
     fn __eq__(self: Self, other: Self) raises -> Tensor[axes_sizes, DType.bool]:
         if self.shape != other.shape:
@@ -267,6 +291,19 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](Stringable):
             )
 
         vectorize[add_elems, simdwidthof[dtype]()](result.numels())
+        return result
+
+    fn exp(self) raises -> Tensor[axes_sizes, dtype]:
+        result = Tensor[axes_sizes, dtype](StaticTuple[Int, axes_sizes]())
+        result.shape = self.shape
+
+        @parameter
+        fn exp_elems[simd_width: Int](idx: Int):
+            result.data.store[width=simd_width](
+                idx, exp(self.data.load[width=simd_width](idx))
+            )
+
+        vectorize[exp_elems, simdwidthof[dtype]()](result.numels())
         return result
 
     fn __ne__(self: Self, other: Self) raises -> Tensor[axes_sizes, DType.bool]:
