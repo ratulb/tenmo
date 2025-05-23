@@ -4,7 +4,7 @@ from utils import StaticTuple
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
-from memory import UnsafePointer, memcpy, memset, memset_zero
+from memory import UnsafePointer, Pointer, memcpy, memset, memset_zero
 from common_utils import int_varia_list_to_str
 
 
@@ -13,6 +13,18 @@ def main():
     for i in range(5):
         t1[i] = i
     added_3 = t1 + 3
+    print("Iterating")
+    i = 0
+    for e in added_3:
+        i += 1
+        print(e[])
+        if i==2:
+            e[] = 100
+    print()
+    print()
+    for e in added_3:
+        print(e[])
+
     print("Added\n")
     Tensor.print(added_3)
     expected = Tensor.arange(8, start=3)
@@ -135,7 +147,9 @@ def main():
     """
 
 
-struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](Stringable):
+struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
+    Sized & Stringable
+):
     var shape: Shape[axes_sizes]
     var data: UnsafePointer[Scalar[dtype]]
     var datatype: DType
@@ -202,6 +216,9 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](Stringable):
 
     fn __del__(owned self):
         self.data.free()
+
+    fn __len__(self) -> Int:
+        return self.numels()
 
     @always_inline
     fn numels(self) -> Int:
@@ -612,6 +629,16 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](Stringable):
         except e:
             print(e)
 
+    fn __iter__(
+        ref self,
+    ) -> TensorElemIter[axes_sizes, dtype, __origin_of(self)]:
+        """Iterate over elements of the tensor, returning mutable references.
+
+        Returns:
+            An iterator of mutable references to the tensor elements.
+        """
+        return TensorElemIter(0, Pointer(to=self))
+
 
 struct Shape[axes: Int]:
     var axes_sizes: StaticTuple[Int, axes]
@@ -684,3 +711,52 @@ struct Shape[axes: Int]:
         self.axes_sizes = other.axes_sizes
         self.ndim = other.ndim
         self.numels = other.numels
+
+
+@value
+struct TensorElemIter[
+    mutability: Bool, //,
+    axes_count: Int,
+    dtype: DType,
+    origin: Origin[mutability],
+    forward: Bool = True,
+]:
+    """Iterator for Tensor element.
+
+    Parameters:
+        mutability: Whether the reference to the Tensor is mutable.
+        axes_count: Tensor dimension.
+        dtype: The type of the elements in the tensor.
+        origin: The origin of the Tensor.
+        forward: The iteration direction. `False` is backwards.
+    """
+
+    alias tensor = Tensor[axes_count, dtype]
+
+    var index: Int
+    var src: Pointer[Self.tensor, origin]
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(
+        mut self, out p: Pointer[Scalar[dtype], MutableAnyOrigin]
+    ) raises:
+        @parameter
+        if forward:
+            p = Pointer(to=self.src[].data[self.index])
+            self.index += 1
+        else:
+            self.index -= 1
+            p = Pointer(to=self.src[].data[self.index])
+
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        return self.__len__() > 0
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
