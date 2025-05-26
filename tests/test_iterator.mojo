@@ -28,7 +28,6 @@ fn test_mutation() raises:
         )
         value += 4
 
-
 fn main() raises:
     test_iteration()
     test_mutation()

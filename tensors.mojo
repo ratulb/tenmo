@@ -1,160 +1,34 @@
+### Mojo Tensor
+### Implement tensor library in mojo from first principles
+
 from math import iota, exp
 from random import randn, seed
-from utils import StaticTuple
+from utils import StaticTuple, Variant
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, Pointer, memcpy, memset, memset_zero
 from common_utils import int_varia_list_to_str
 
-
-def main():
-    t1 = Tensor(5)
-    for i in range(5):
-        t1[i] = i
-    added_3 = t1 + 3
-    print("Iterating")
-    i = 0
-    for e in added_3:
-        i += 1
-        print(e[])
-        if i==2:
-            e[] = 100
-    print()
-    print()
-    for e in added_3:
-        print(e[])
-
-    print("Added\n")
-    Tensor.print(added_3)
-    expected = Tensor.arange(8, start=3)
-    print("Expected\n")
-    Tensor.print(expected)
-    result = added_3 == expected
-    print("Result\n")
-    Tensor.print(result)
-
-    # tensor = Tensor[5].rand(4, 3, 2, 1)
-    _ = """Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
-    tensor = Tensor[2].rand(4, 3)
-    print("Am I gone: ")
-    Tensor.print(tensor)
-    print()
-    multiplied = tensor / 2
-    print("I am multiplied: ")
-    Tensor.print(multiplied)
-    print()
-
-    rival = tensor == multiplied
-    print("rival")
-    Tensor.print(rival)
-
-    tensor = Tensor[2].rand(4, 3)
-    print("Original")
-    Tensor.print(tensor)
-    reshaped = tensor.reshape[3](2, 2, 3)
-    print("Reshaped")
-    Tensor.print(reshaped)
-
-    tensor_false = Tensor[2, DType.bool].zeros(4, 3)
-    indices = List[Int]()
-    tensor_false.print_tensor_recursive(indices, 1)
-
-    tensor_true = Tensor[2, DType.bool].ones(4, 3)
-    indices = List[Int]()
-    tensor_true.print_tensor_recursive(indices, 1)
-
-    tensor = Tensor[2].ones(4, 3)
-    indices = List[Int]()
-    tensor.print_tensor_recursive(indices, 1)
-
-    t16 = Tensor[2, DType.uint16].zeros(5, 5)
-    t16[0, 0] = 1
-    t16[0, 1] = 2
-    t16[0, 2] = 3
-    t16[0, 3] = 4
-    t16[0, 4] = 5
-
-    t16[1, 0] = 6
-    t16[1, 1] = 7
-    t16[1, 2] = 8
-    t16[1, 3] = 9
-    t16[1, 4] = 10
-
-    t16[2, 0] = 11
-    t16[2, 1] = 12
-    t16[2, 2] = 13
-    t16[2, 3] = 14
-    t16[2, 4] = 15
-
-    t16[3, 0] = 16
-    t16[3, 1] = 17
-    t16[3, 2] = 18
-    t16[3, 3] = 19
-    t16[3, 4] = 20
-
-    t16[4, 0] = 21
-    t16[4, 1] = 22
-    t16[4, 2] = 23
-    t16[4, 3] = 24
-    t16[4, 4] = 25
-
-    other = Tensor[2, DType.uint16].zeros(5, 5)
-    other[0, 0] = 10
-    other[0, 1] = 2
-    other[0, 2] = 3
-    other[0, 3] = 4
-    other[0, 4] = 7
-
-    other[1, 0] = 6
-    other[1, 1] = 7
-    other[1, 2] = 8
-    other[1, 3] = 9
-    other[1, 4] = 10
-
-    other[2, 0] = 13
-    other[2, 1] = 14
-    other[2, 2] = 15
-    other[2, 3] = 16
-    other[2, 4] = 17
-
-    other[3, 0] = 18
-    other[3, 1] = 19
-    other[3, 2] = 20
-    other[3, 3] = 21
-    other[3, 4] = 22
-
-    other[4, 0] = 23
-    other[4, 1] = 24
-    other[4, 2] = 25
-    other[4, 3] = 26
-    other[4, 4] = 25
-
-    # Tensor.print(t16.matmal_v2(other))
-    print()
-
-    # Tensor.print(t16.matmal_v3(other))
-    print()
-
-    # Tensor.print(t16.matmal(other))
-    Tensor.print(t16 == other)
-    Tensor.print(t16 != other)
-
-    tensor_big1 = Tensor[2].rand(1024, 4096)
-    tensor_big2 = Tensor[2].rand(4096, 512)
-
-    # Tensor.print(tensor_big1.matmal_v3(tensor_big2))
-    """
-
+#alias Tensors = Variant[Tensor, Tensor[_, _]]
 
 struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
-    Sized & Stringable
+    Copyable & Movable & Sized & Stringable
 ):
+    # Gradients are float32
+    alias TensorAlias = UnsafePointer[Tensor[axes_sizes=*_, dtype=DType.float32]]
     var shape: Shape[axes_sizes]
     var data: UnsafePointer[Scalar[dtype]]
     var datatype: DType
+    var requires_grad: Bool
+    var grad: Self.TensorAlias
+    var op: Optional[StaticString]
+    var parents: List[Self.TensorAlias]
+    var _backward: Optional[fn () escaping raises -> None]
 
-    fn __init__(out self, *tensor_shapes: Int) raises:
+    fn __init__(
+        out self, *tensor_shapes: Int, requires_grad: Bool = False
+    ) raises:
         axes_dims = Self.init_shape[axes_sizes](tensor_shapes)
         self = Self(axes_dims)
 
@@ -176,10 +50,19 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
             axes_dims[i] = axes_spans[i]
         return axes_dims
 
-    fn __init__(out self, axes_dims: StaticTuple[Int, axes_sizes]):
+    fn __init__(
+        out self,
+        axes_dims: StaticTuple[Int, axes_sizes],
+        requires_grad: Bool = False,
+    ):
         self.shape = Shape[axes_sizes](axes_dims)
         self.datatype = dtype
         self.data = UnsafePointer[Scalar[dtype]].alloc(self.shape.numels)
+        self.requires_grad = requires_grad
+        self.grad = Self.TensorAlias()
+        self.op = None
+        self.parents = List[Self.TensorAlias](capacity=0)
+        self._backward = None
 
     fn __getitem__(self, indices: List[Int]) raises -> Scalar[dtype]:
         static_tuple = StaticTuple[Int, axes_sizes](0)
@@ -207,12 +90,22 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
         memcpy(self.data, other.data, other.numels())
         self.shape = other.shape^
         self.datatype = other.datatype
+        self.requires_grad = other.requires_grad
+        self.grad = Self.TensorAlias()  # Not moving grad
+        self.op = other.op
+        self.parents = List[Self.TensorAlias](capacity=0)  # Not moving parents
+        self._backward = other._backward
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         self.datatype = other.datatype
+        self.requires_grad = other.requires_grad
+        self.grad = Self.TensorAlias()  # Not copying grad
+        self.op = other.op
+        self.parents = List[Self.TensorAlias](capacity=0)  # Not copying parents
+        self._backward = other._backward
 
     fn __del__(owned self):
         self.data.free()
@@ -310,6 +203,23 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
         vectorize[add_elems, simdwidthof[dtype]()](result.numels())
         return result
 
+    fn __iadd__(self: Self, other: Self) raises:
+        if self.shape != other.shape:
+            raise Error("Add -> Dimension mismatch")
+
+        @parameter
+        fn add_elems[simd_width: Int](idx: Int):
+            self.data.store[width=simd_width](
+                idx,
+                (
+                    self.data.load[width=simd_width](idx)
+                    + other.data.load[width=simd_width](idx)
+                ),
+            )
+
+        vectorize[add_elems, simdwidthof[dtype]()](self.numels())
+
+
     fn exp(self) raises -> Tensor[axes_sizes, dtype]:
         result = Tensor[axes_sizes, dtype](StaticTuple[Int, axes_sizes]())
         result.shape = self.shape
@@ -335,17 +245,69 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
         vectorize[invert, simdwidthof[DType.bool]()](result.numels())
         return result
 
-    fn __mul__(self: Self, factor: Scalar[dtype]) -> Self:
-        copy = self
+    fn zero_grad(self):
+        print("ok - zero grading coming")
+        if self.requires_grad and self.grad:
+            print("ok - zero grading")
+            memset_zero(self.grad[].data, self.numels())
+
+    @staticmethod
+    fn _init_grad_[axes_count: Int, datatype: DType, //](mut tensor: Tensor[axes_count, datatype], shape: StaticTuple[Int, axes_count]) raises:
+        if tensor.requires_grad and not tensor.grad:
+            # Gradients are float32
+            gradients = Tensor[axes_sizes=axes_count, dtype=DType.float32](
+                shape
+            )
+            ptr = UnsafePointer[__type_of(gradients)].alloc(1)
+            ptr.init_pointee_copy(gradients)
+
+            print("ptr.type: ", ptr.type.__str__(gradients))
+            print("ptr.address_space: ", ptr.address_space)
+            print("ptr.alignment: ", ptr.alignment)
+            
+            print("ptr.mut: ", ptr.mut)
+            
+            result = ptr.bitcast[Tensor]()
+            #print("result.type: ", result.type.__str__(gradients))
+            print("result.address_space: ", result.address_space)
+            print("result.alignment: ", result.alignment)
+
+            #print(ptr.origin)
+            tensor.grad = Self.TensorAlias.alloc(1)
+            result.move_pointee_into(tensor.grad)
+            print("**********************")
+            print("**********************")
+            print("**********************")
+
+            #tensor.grad.init_pointee_move(result)
+            tensor.zero_grad()
+            Tensor.print(tensor.grad[])
+
+
+    fn __mul__(mut self: Self, factor: Scalar[dtype]) raises -> Self:
+        out = self
 
         @parameter
         fn mul_by_factor[simd_width: Int](idx: Int):
-            copy.data.store[width=simd_width](
-                idx, copy.data.load[width=simd_width](idx) * factor
+            out.data.store[width=simd_width](
+                idx, out.data.load[width=simd_width](idx) * factor
             )
 
-        vectorize[mul_by_factor, simdwidthof[dtype]()](copy.numels())
-        return copy
+        vectorize[mul_by_factor, simdwidthof[dtype]()](out.numels())
+        fn _backward() raises -> None:
+            if self.requires_grad:
+                alias axes_count = axes_sizes
+                shape = self.shape.axes_sizes
+                Self._init_grad_(self, shape)
+                #Self._init_grad_[axes_count, DType.float32](self, shape)
+                out.requires_grad = True
+                #Self._init_grad_[axes_count, DType.float32](out, shape)
+                Self._init_grad_(out, shape)
+                print("in _backward")
+                self.grad[] += out.grad[] * 2
+
+        out._backward = Optional(_backward)
+        return out
 
     fn __add__(self: Self, value: Scalar[dtype]) -> Self:
         copy = self
@@ -358,6 +320,16 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
 
         vectorize[add_value, simdwidthof[dtype]()](copy.numels())
         return copy
+
+    fn __iadd__(self: Self, value: Scalar[dtype]):
+
+        @parameter
+        fn add_value[simd_width: Int](idx: Int):
+            self.data.store[width=simd_width](
+                idx, self.data.load[width=simd_width](idx) + value
+            )
+
+        vectorize[add_value, simdwidthof[dtype]()](self.numels())
 
     fn __sub__(self: Self, value: Scalar[dtype]) -> Self:
         copy = self
@@ -515,19 +487,22 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
             s += "Unsupported Tensor"
         s += self.shape.__str__()
         s += ", Type: " + self.datatype.__str__()
+        s += ", requires_grad: " + String(self.requires_grad)
         s += "]"
         return s
 
     @staticmethod
     fn rand(
-        *tensor_shapes: Int, init_seed: Optional[Int] = None
+        *tensor_shapes: Int,
+        init_seed: Optional[Int] = None,
+        requires_grad: Bool = False,
     ) raises -> Tensor[axes_sizes, dtype]:
         if init_seed:
             seed(init_seed.value())
         else:
             seed()
         axes_dims = Self.init_shape[axes_sizes](tensor_shapes)
-        tensor = Tensor[axes_sizes, dtype](axes_dims)
+        tensor = Tensor[axes_sizes, dtype](axes_dims, requires_grad)
         randn(tensor.data, tensor.numels())
         return tensor
 
@@ -567,8 +542,8 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
             current_dim = len(indices)
             indent = " " * (level * 2)
 
-            num_first = 5  # Show first 3 elements
-            num_last = 5  # Show last 2 elements
+            num_first = 5  # Show first 5 elements
+            num_last = 5  # Show last 5 elements
 
             if current_dim == self.ndim() - 1:
                 print(indent + "[", end="")
@@ -638,6 +613,127 @@ struct Tensor[axes_sizes: Int = 1, dtype: DType = DType.float32](
             An iterator of mutable references to the tensor elements.
         """
         return TensorElemIter(0, Pointer(to=self))
+
+
+def main():
+    # tensor = Tensor[5].rand(4, 3, 2, 1)
+    # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
+    tensor = Tensor[2].rand(4, 3, requires_grad=True)
+    Tensor.print(tensor)
+    multiplied = tensor * 2
+    Tensor.print(multiplied)
+    if multiplied._backward:
+        multiplied._backward.value()()
+        #multiplied._backward.value()()
+    #tensor._init_grad_()
+    _ = """print("Am I gone: ")
+    Tensor.print(tensor)
+    print()
+    multiplied = tensor / 2
+    print("I am multiplied: ")
+    Tensor.print(multiplied)
+    print()
+
+    rival = tensor == multiplied
+    print("rival")
+    Tensor.print(rival)
+
+    tensor = Tensor[2].rand(4, 3)
+    print("Original")
+    Tensor.print(tensor)
+    reshaped = tensor.reshape[3](2, 2, 3)
+    print("Reshaped")
+    Tensor.print(reshaped)
+
+    tensor_false = Tensor[2, DType.bool].zeros(4, 3)
+    indices = List[Int]()
+    tensor_false.print_tensor_recursive(indices, 1)
+
+    tensor_true = Tensor[2, DType.bool].ones(4, 3)
+    indices = List[Int]()
+    tensor_true.print_tensor_recursive(indices, 1)
+
+    tensor = Tensor[2].ones(4, 3)
+    indices = List[Int]()
+    tensor.print_tensor_recursive(indices, 1)
+
+    t16 = Tensor[2, DType.uint16].zeros(5, 5)
+    t16[0, 0] = 1
+    t16[0, 1] = 2
+    t16[0, 2] = 3
+    t16[0, 3] = 4
+    t16[0, 4] = 5
+
+    t16[1, 0] = 6
+    t16[1, 1] = 7
+    t16[1, 2] = 8
+    t16[1, 3] = 9
+    t16[1, 4] = 10
+
+    t16[2, 0] = 11
+    t16[2, 1] = 12
+    t16[2, 2] = 13
+    t16[2, 3] = 14
+    t16[2, 4] = 15
+
+    t16[3, 0] = 16
+    t16[3, 1] = 17
+    t16[3, 2] = 18
+    t16[3, 3] = 19
+    t16[3, 4] = 20
+
+    t16[4, 0] = 21
+    t16[4, 1] = 22
+    t16[4, 2] = 23
+    t16[4, 3] = 24
+    t16[4, 4] = 25
+
+    other = Tensor[2, DType.uint16].zeros(5, 5)
+    other[0, 0] = 10
+    other[0, 1] = 2
+    other[0, 2] = 3
+    other[0, 3] = 4
+    other[0, 4] = 7
+
+    other[1, 0] = 6
+    other[1, 1] = 7
+    other[1, 2] = 8
+    other[1, 3] = 9
+    other[1, 4] = 10
+
+    other[2, 0] = 13
+    other[2, 1] = 14
+    other[2, 2] = 15
+    other[2, 3] = 16
+    other[2, 4] = 17
+
+    other[3, 0] = 18
+    other[3, 1] = 19
+    other[3, 2] = 20
+    other[3, 3] = 21
+    other[3, 4] = 22
+
+    other[4, 0] = 23
+    other[4, 1] = 24
+    other[4, 2] = 25
+    other[4, 3] = 26
+    other[4, 4] = 25
+
+    # Tensor.print(t16.matmal_v2(other))
+    print()
+
+    # Tensor.print(t16.matmal_v3(other))
+    print()
+
+    # Tensor.print(t16.matmal(other))
+    Tensor.print(t16 == other)
+    Tensor.print(t16 != other)
+
+    tensor_big1 = Tensor[2].rand(1024, 4096)
+    tensor_big2 = Tensor[2].rand(4096, 512)
+
+    # Tensor.print(tensor_big1.matmal_v3(tensor_big2))
+    """
 
 
 struct Shape[axes: Int]:
