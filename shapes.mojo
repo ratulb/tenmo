@@ -1,4 +1,5 @@
 from common_utils import varia_list_to_list
+from testing import assert_true
 
 
 struct Shape(Sized & Writable):
@@ -8,13 +9,17 @@ struct Shape(Sized & Writable):
 
     fn __init__(out self, dims: VariadicList[Int]):
         self.axes_spans = dims
-        self.ndim = len(self.axes_spans)
-        if len(self.axes_spans) > 0:
-            self.numels = 1
-            for i in range(len(self.axes_spans)):
-                self.numels *= self.axes_spans[i]
-        else:
+        self.ndim = len(dims)
+        self.numels = 1
+        for dim in dims:
+            self.numels *= dim
+        if self.ndim == 0:
             self.numels = 0
+        for each in self.axes_spans:
+            try:
+                assert_true(each > 0, "Wrong shape dimension")
+            except e:
+                print(e)
 
     fn spans(self) -> VariadicList[Int]:
         return self.axes_spans
@@ -27,8 +32,7 @@ struct Shape(Sized & Writable):
         if 0 <= index < len(self.axes_spans):
             idx = self.axes_spans[index]
         else:
-            idx= -1
-        print("Shape -> __getitem__: ", index, idx)
+            idx = -1
         return idx
 
     fn __eq__(self, other: Self) -> Bool:
@@ -49,7 +53,6 @@ struct Shape(Sized & Writable):
         for i in range(len(self.axes_spans)):
             numels *= self.axes_spans[i]
 
-        print("num_elements: ", numels)
         return numels
 
     fn flatten_index(self, indices: VariadicList[Int]) -> Int:
@@ -60,6 +63,7 @@ struct Shape(Sized & Writable):
         var elem_index: Int
         if len(indices) != len(self.axes_spans):
             elem_index = -1  # shape mismatch
+            return elem_index
         var index = 0
         var stride = 1
         for i in reversed(range(len(self.axes_spans))):
@@ -67,12 +71,10 @@ struct Shape(Sized & Writable):
             dim = self.axes_spans[i]
             if idx >= dim:
                 elem_index = -1
-                print("flatten_index inner: ", elem_index, indices.__str__())
                 return elem_index
             index += idx * stride
             stride *= dim
         elem_index = index
-        print("flatten_index: ", elem_index, indices.__str__())
         return elem_index
 
     fn __str__(self) -> String:
@@ -82,7 +84,6 @@ struct Shape(Sized & Writable):
             if i < len(self.axes_spans) - 1:
                 s += ", "
         s += ")"
-        print("Shape -> __str__", s)
         return s
 
     fn __repr__(self) -> String:

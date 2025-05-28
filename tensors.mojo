@@ -8,7 +8,8 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from common_utils import int_varia_list_to_str
+from common_utils import int_varia_list_to_str, passthrough, validate_shape
+from testing import assert_true
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -23,13 +24,13 @@ struct Tensor[dtype: DType = DType.float32](
     var parents: List[UnsafePointer[Tensor]]
     var _backward: Optional[fn () escaping raises -> None]
 
-    fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
+    fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False) raises:
         shape = Shape(axes_spans)
         self = Self(shape, requires_grad)
 
-    fn __init__(out self, shape: Shape, requires_grad: Bool = False):
-        self.shape = shape
-        # print("__init__", self.shape)
+    fn __init__(out self, shape: Shape, requires_grad: Bool = False) raises:
+        self.shape = Shape(shape.spans())
+        validate_shape(shape)
         self.requires_grad = requires_grad
         self.op = None
         self.parents = List[UnsafePointer[Tensor]](capacity=0)
@@ -43,19 +44,23 @@ struct Tensor[dtype: DType = DType.float32](
         index = self.shape.flatten_index(indices)
         if index == -1:
             raise Error("__getitem__(indices): Invalid indices")
-        return (self.data + index)[]
+        # return (self.data + index)[]
+        return self.data.load[volatile=True](index)
 
     fn __getitem__(self, *indices: Int) raises -> Scalar[dtype]:
         index = self.shape.flatten_index(indices)
         if index == -1:
             raise Error("__getitem__(*indices): Invalid indices")
-        return (self.data + index)[]
+        # return (self.data + index)[]
+        # return self.data.load(index)
+        return self.data.load[volatile=True](index)
 
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]) raises:
         index = self.shape.flatten_index(indices)
         if index == -1:
             raise Error("__setitem__(*indices): Invalid indices")
-        (self.data + index)[] = value
+        # (self.data + index)[] = value
+        self.data.store[volatile=True](index, value)
 
     fn __moveinit__(out self, owned other: Self):
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
@@ -293,7 +298,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         vectorize[add_value, simdwidthof[dtype]()](self.numels())
 
-    fn to_dtype[NewType: DType](self) -> Tensor[NewType]:
+    fn to_dtype[NewType: DType](self) raises -> Tensor[NewType]:
         result = Tensor[NewType](self.shape, self.requires_grad)
         # if self.dtype == NewType:
         memcpy(
@@ -488,29 +493,30 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn arange[
         datatype: DType = DType.int64
-    ](end: Int, start: Int = 0) -> Tensor[datatype]:
+        # ](end: Int, start: Int = 0) raises -> Tensor[dtype]:
+    ](*dims: Int) raises -> Tensor[datatype]:
+        start = 5
+        end = 17
         len = end - start
-        print("I am in arange: ok1: ", end, start, len)
-        dims = VariadicList[Int](len)
         shape = Shape(dims)
-
-        print("I am in arange: ok2: ", shape.num_elements())
-        result = Tensor[datatype](Shape(VariadicList[Int](len)))
-        # print("I am in arange: ok3: ", result.__str__())
-        # Tensor.print(result)
+        # shape = Shape(VariadicList[Int](2,3))
+        result = Tensor[dtype=datatype](shape)
         iota(result.data, len, offset=start)
-        print("I am in arange: ok4:")
         return result
 
     @staticmethod
-    fn zeros(*axes_spans: Int, requires_grad: Bool = False) -> Tensor[dtype]:
+    fn zeros(
+        *axes_spans: Int, requires_grad: Bool = False
+    ) raises -> Tensor[dtype]:
         shape = Shape(axes_spans)
         tensor = Tensor[dtype](shape, requires_grad)
         memset_zero(tensor.data, tensor.numels())
         return tensor
 
     @staticmethod
-    fn ones(*axes_spans: Int, requires_grad: Bool = False) -> Tensor[dtype]:
+    fn ones(
+        *axes_spans: Int, requires_grad: Bool = False
+    ) raises -> Tensor[dtype]:
         tensor = Tensor[dtype](Shape(axes_spans), requires_grad)
         var value: SIMD[dtype, 1]
 
@@ -527,10 +533,9 @@ struct Tensor[dtype: DType = DType.float32](
         try:
             current_dim = len(indices)
             indent = " " * (level * 2)
-
             num_first = 5
             num_last = 5
-
+            _ = self.shape.__str__()
             # Defensive check
             if current_dim >= self.ndim():
                 print(
@@ -546,7 +551,13 @@ struct Tensor[dtype: DType = DType.float32](
 
             # Size sanity check
             if size < 0 or size > 1_000_000:
-                print("ERROR: suspicious size: ", size, "at dim ", current_dim)
+                print(
+                    "ERROR: suspicious size: ",
+                    size,
+                    "at dim ",
+                    current_dim,
+                    self.shape.__str__(),
+                )
                 return
 
             # Base case: last dimension (print actual elements)
@@ -667,7 +678,7 @@ struct Tensor[dtype: DType = DType.float32](
                 print("\n")
         except e:
             print(e)
-        print("Out of print........")"""
+        print("Out of print........")
 
     @staticmethod
     fn print(t: Tensor):
@@ -677,6 +688,15 @@ struct Tensor[dtype: DType = DType.float32](
         try:
             t.print_tensor_recursive(l, 1)
         except e:
+            print(e)"""
+
+    fn print(self):
+        print(self.__str__())
+        print()
+        empty = List[Int]()
+        try:
+            self.print_tensor_recursive(empty, 2)
+        except e:
             print(e)
 
 
@@ -684,9 +704,10 @@ def main():
     # tensor = Tensor.rand(4, 3, 2, 1)
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
-    tensor = Tensor.arange(6)
-    print(tensor.shape.__str__())
-    Tensor.print(tensor)
+    tensor = Tensor.arange(12)
+    # l = List[Int]()
+    # tensor.print_tensor_recursive(l, 1)
+    tensor.print()
     # Tensor.print(tensor)
 
     _ = """tensor = Tensor.rand(4, 3, requires_grad=True)
