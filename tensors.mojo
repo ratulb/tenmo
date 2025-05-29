@@ -8,7 +8,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from common_utils import int_varia_list_to_str, validate_shape, next_power_of_2
+from common_utils import int_varia_list_to_str, validate_shape
 from testing import assert_true
 
 
@@ -21,8 +21,8 @@ struct Tensor[dtype: DType = DType.float32](
     var requires_grad: Bool
     var grad: UnsafePointer[Self]
     var op: Optional[StaticString]
-    var parents: List[UnsafePointer[Tensor]]
-    var _backward: Optional[fn () escaping raises -> None]
+    var parents: List[UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]]
+    var grad_fn: Optional[fn () escaping raises -> None]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False) raises:
         shape = Shape(axes_spans)
@@ -33,12 +33,24 @@ struct Tensor[dtype: DType = DType.float32](
         validate_shape(shape)
         self.requires_grad = requires_grad
         self.op = None
-        self.parents = List[UnsafePointer[Tensor]](capacity=0)
-        self._backward = None
+        self.parents = List[
+            UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
+        ](capacity=0)
+        self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
             self.shape.num_elements()
         )
+
+    fn grad_func(self) -> fn () escaping raises -> None:
+        if self.grad_fn:
+            return self.grad_fn.value()
+        else:
+
+            fn do_nothing() escaping raises -> None:
+                pass
+
+            return do_nothing
 
     fn __getitem__(self, indices: List[Int]) raises -> Scalar[dtype]:
         index = self.shape.flatten_index(indices)
@@ -70,10 +82,12 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = other.requires_grad
         self.grad = UnsafePointer[__type_of(other)]()  # Not moving grad
         self.op = other.op
-        self.parents = List[UnsafePointer[Tensor]](
+        self.parents = List[
+            UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
+        ](
             capacity=0
         )  # Not moving parents
-        self._backward = other._backward
+        self.grad_fn = other.grad_fn
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
@@ -83,10 +97,12 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = other.requires_grad
         self.grad = UnsafePointer[__type_of(other)]()  # Not copying grad
         self.op = other.op
-        self.parents = List[UnsafePointer[Tensor]](
+        self.parents = List[
+            UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
+        ](
             capacity=0
         )  # Not copying parents
-        self._backward = other._backward
+        self.grad_fn = other.grad_fn
 
     fn __del__(owned self):
         self.data.free()
@@ -227,9 +243,17 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[invert, simdwidthof[DType.bool]()](result.numels())
         return result
 
+    @always_inline
+    fn grad_required(self) -> Bool:
+        return self.requires_grad
+
+    @always_inline
+    fn grad_tensor_initialized(self) -> Bool:
+        return self.grad.__as_bool__()
+
     fn zero_grad(self):
         print("ok - zero grading coming")
-        if self.requires_grad and self.grad:
+        if self.grad_required() and self.grad_tensor_initialized():
             print("ok - zero grading")
             memset_zero(self.grad[].data, self.numels())
 
@@ -263,18 +287,20 @@ struct Tensor[dtype: DType = DType.float32](
 
         vectorize[mul_by_factor, simdwidthof[dtype]()](out.numels())
 
-        fn _backward() raises -> None:
+        out.requires_grad = self.requires_grad
+        out.parents.append(UnsafePointer(to=self))
+
+        fn grad_fn() raises -> None:
             if self.requires_grad:
                 # Self._init_grad_(self, self.shape)
                 self.init_grad_tensor()
-                out.requires_grad = True
                 # Self._init_grad_(out, out.shape)
                 out.init_grad_tensor()
                 print("in _backward")
                 self.grad[] += out.grad[] * factor
                 Tensor.print(self.grad[])
 
-        out._backward = Optional(_backward)
+        out.grad_fn = Optional(grad_fn)
         return out
 
     fn __add__(self, value: Scalar[dtype]) -> Tensor[dtype]:
@@ -485,19 +511,26 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn arange[
-        datatype: DType = DType.int64
-    ](end: Int, start: Int = 0, requires_grad: Bool = False) raises -> Tensor[
-        datatype
-    ]:
-        len = end - start
-        shape = Shape.single_dim_shape(len)
+        end: Int,
+        start: Int = 0,
+        datatype: DType = DType.int64,
+        length: Int = end - start,
+    ](requires_grad: Bool = False) raises -> Tensor[datatype]:
+        constrained[
+            end > start and end - start == length,
+            (
+                "arange -> invalid parameters - end should be > start and end -"
+                " start = length"
+            ),
+        ]()
+        shape = Shape(length)
         result = Tensor[dtype=datatype](shape, requires_grad)
         # print(result.dtype, __type_of(result[0]).__str__(result[0]))
         # print(__type_of(result).__str__(result))
-        iota(result.unsafe_ptr(), len, offset=start)
+        iota(result.unsafe_ptr(), length, offset=start)
+
         # casted = result.unsafe_ptr().bitcast[Scalar[datatype]]()
         # memcpy(result.unsafe_ptr(), casted, result.numels())
-        # result.print()
         return result
 
     @staticmethod
@@ -698,22 +731,28 @@ struct Tensor[dtype: DType = DType.float32](
 
 def main():
     # tensor = Tensor.rand(4, 3, 2, 1)
-    # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
-    # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
-    tensor = Tensor.arange(13, 7, True).to_dtype[DType.float32]()
-    l = List[Int]()
-    tensor.print_tensor_recursive(l, 1)
+    tensor = Tensor.rand(2, 3, requires_grad=True)
     tensor.print()
-    # Tensor.print(tensor)
+    out_tensor = tensor * 2
+    out_tensor.print()
+    # if out_tensor.grad_fn:
+    # out_tensor.grad_fn.value()()
+    # multiplied.grad_fn.value()()
+    out_tensor.grad_func()()
 
-    _ = """tensor = Tensor.rand(4, 3, requires_grad=True)
-    Tensor.print(tensor)
-    multiplied = tensor * 2
-    Tensor.print(multiplied)
-    if multiplied._backward:
-        multiplied._backward.value()()
-        # multiplied._backward.value()()
-    # tensor._init_grad_()
+    # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
+    # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
+    # tensor = Tensor.arange[5]().to_dtype[DType.float32]()
+    # l = List[Int]()
+    # tensor.print_tensor_recursive(l, 1)
+    # tensor.print()
+    # tensor.print()
+    # Tensor.print(tensor)
+    # tensor1 = Tensor.arange[4]()
+    # tensor1.print()
+    # tensor1.print()
+
+    _ = """# tensor._init_grad_()
     print(multiplied.dtype)
     print("Am I gone: ")
     Tensor.print(tensor)
