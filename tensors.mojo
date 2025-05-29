@@ -300,22 +300,15 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn to_dtype[NewType: DType](self) raises -> Tensor[NewType]:
         result = Tensor[NewType](self.shape, self.requires_grad)
-        # if self.dtype == NewType:
-        memcpy(
-            self.data.bitcast[Scalar[NewType]](),
-            result.data,
-            result.numels(),
-        )
-        return result
 
-        _ = """@parameter
+        @parameter
         fn cast_values[simd_width: Int](idx: Int):
             result.data.store[width=simd_width](
-                idx, self.data.load[width=simd_width](idx).cast[Scalar[NewType]]()
+                idx, self.data.load[width=simd_width](idx).cast[NewType]()
             )
 
         vectorize[cast_values, simdwidthof[NewType]()](result.numels())
-        return result"""
+        return result
 
     fn __sub__(self: Self, value: Scalar[dtype]) -> Self:
         copy = self
@@ -493,15 +486,17 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn arange[
         datatype: DType = DType.int64
-    ](end: Int, start: Int = 0) raises -> Tensor[datatype]:
+    ](end: Int, start: Int = 0, requires_grad: Bool = False) raises -> Tensor[
+        datatype
+    ]:
         len = end - start
         shape = Shape.single_dim_shape(len)
-        result = Tensor[dtype=datatype](shape)
+        result = Tensor[dtype=datatype](shape, requires_grad)
         # print(result.dtype, __type_of(result[0]).__str__(result[0]))
         # print(__type_of(result).__str__(result))
         iota(result.unsafe_ptr(), len, offset=start)
-        casted = result.unsafe_ptr().bitcast[Scalar[datatype]]()
-        memcpy(result.unsafe_ptr(), casted, result.numels())
+        # casted = result.unsafe_ptr().bitcast[Scalar[datatype]]()
+        # memcpy(result.unsafe_ptr(), casted, result.numels())
         # result.print()
         return result
 
@@ -705,9 +700,9 @@ def main():
     # tensor = Tensor.rand(4, 3, 2, 1)
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
-    tensor = Tensor.arange(13, 7)
-    # l = List[Int]()
-    # tensor.print_tensor_recursive(l, 1)
+    tensor = Tensor.arange(13, 7, True).to_dtype[DType.float32]()
+    l = List[Int]()
+    tensor.print_tensor_recursive(l, 1)
     tensor.print()
     # Tensor.print(tensor)
 
