@@ -21,6 +21,14 @@ struct Shape(Sized & Writable):
             except e:
                 print(e)
 
+    @staticmethod
+    fn single_dim_shape(*dim_span: Int) raises -> Shape:
+        assert_true(
+            len(dim_span) == 1 and dim_span[0] > 0,
+            "Invalid dim span for single dim shape",
+        )
+        return Shape(dim_span)
+
     fn spans(self) -> VariadicList[Int]:
         return self.axes_spans
 

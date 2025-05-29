@@ -8,7 +8,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from common_utils import int_varia_list_to_str, passthrough, validate_shape
+from common_utils import int_varia_list_to_str, validate_shape, next_power_of_2
 from testing import assert_true
 
 
@@ -29,7 +29,7 @@ struct Tensor[dtype: DType = DType.float32](
         self = Self(shape, requires_grad)
 
     fn __init__(out self, shape: Shape, requires_grad: Bool = False) raises:
-        self.shape = Shape(shape.spans())
+        self.shape = shape
         validate_shape(shape)
         self.requires_grad = requires_grad
         self.op = None
@@ -493,15 +493,16 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn arange[
         datatype: DType = DType.int64
-        # ](end: Int, start: Int = 0) raises -> Tensor[dtype]:
-    ](*dims: Int) raises -> Tensor[datatype]:
-        start = 5
-        end = 17
+    ](end: Int, start: Int = 0) raises -> Tensor[datatype]:
         len = end - start
-        shape = Shape(dims)
-        # shape = Shape(VariadicList[Int](2,3))
+        shape = Shape.single_dim_shape(len)
         result = Tensor[dtype=datatype](shape)
-        iota(result.data, len, offset=start)
+        # print(result.dtype, __type_of(result[0]).__str__(result[0]))
+        # print(__type_of(result).__str__(result))
+        iota(result.unsafe_ptr(), len, offset=start)
+        casted = result.unsafe_ptr().bitcast[Scalar[datatype]]()
+        memcpy(result.unsafe_ptr(), casted, result.numels())
+        # result.print()
         return result
 
     @staticmethod
@@ -695,7 +696,7 @@ struct Tensor[dtype: DType = DType.float32](
         print()
         empty = List[Int]()
         try:
-            self.print_tensor_recursive(empty, 2)
+            self.print_tensor_recursive(empty, 1)
         except e:
             print(e)
 
@@ -704,7 +705,7 @@ def main():
     # tensor = Tensor.rand(4, 3, 2, 1)
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
-    tensor = Tensor.arange(12)
+    tensor = Tensor.arange(13, 7)
     # l = List[Int]()
     # tensor.print_tensor_recursive(l, 1)
     tensor.print()
