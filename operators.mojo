@@ -12,22 +12,14 @@ fn _AddScalar[
     left_operand: UnsafePointer[Tensor[dtype]],
     right_operand: UnsafePointer[Tensor[dtype]],
     value: Scalar[dtype],
-) raises:  # value 0
+) raises:
     print("_Addcalar")
-    left_operand[].init_grad_tensor()
-    right_operand[].init_grad_tensor()
-    if right_operand[].grad_tensor_initialized() and right_operand[].grad_tensor_initialized():
-        print("right_operand[].grad[]: ")
-        right_operand[].grad[].print()
+    if (
+        left_operand[].grad_tensor_initialized()
+        and right_operand[].grad_tensor_initialized()
+    ):
         left_operand[].grad[] = left_operand[].grad[] + right_operand[].grad[]
-        print(
-            "_AddScalar gradient deposited",
-            left_operand[].grad.__as_bool__(),
-            right_operand[].grad.__as_bool__(),
-        )
 
-        print("right_operand[].grad[]: now")
-        right_operand[].grad[].print()
 
 alias Noop = 0
 alias AddScalar = 1
@@ -60,21 +52,9 @@ struct GradFn[dtype: DType]:
         self.factor = value
 
     fn __call__(self) raises:
-        print(
-            "You call me? GradFnMaterializer? You should call t - got it - you"
-            " dumbo!"
-        )
         if self.func_index == Noop:
             _Noop()
         elif self.func_index == AddScalar:
-            print(
-                "AddScalar",
-                self.left_operand.__as_bool__(),
-                self.right_operand.__as_bool__(),
-                self.factor,
-            )
-            _AddScalar(
-                self.left_operand, self.right_operand, self.factor
-            )
+            _AddScalar(self.left_operand, self.right_operand, self.factor)
         else:
             print("What to do?")

@@ -73,28 +73,25 @@ struct Tensor[dtype: DType = DType.float32](
         self.data.store[volatile=True](index, value)
 
     fn __moveinit__(out self, owned other: Self):
-        print("Move is being called?")
         self.shape = other.shape
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
-        # self.datatype = other.datatype
         self.requires_grad = other.requires_grad
-        self.grad = UnsafePointer[__type_of(other)]()  # Not moving grad yet
+        # self.grad = UnsafePointer[__type_of(other)]()  # Not moving grad yet
+        self.grad = other.grad
         # self.grad = UnsafePointer[__type_of(other)].alloc(1)
-        # other.grad.move_pointee_into(self.grad)  # moving grad
-        # other.grad.free()
         self.op = other.op
-        """self.parents = List[
+        _ = """self.parents = List[
             UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
         ](
             capacity=0
         )"""
         self.parents = other.parents
         self.grad_fn = other.grad_fn
-        #Self.transfer_grad(self, other, False)
-        #other.data.free()
+        # Self.transfer_grad(self, other, False)
+        # other.data.free()
         if other.grad_tensor_initialized():
-            #other.grad.free()
+            # other.grad.free()
             pass
 
     @staticmethod
@@ -119,28 +116,16 @@ struct Tensor[dtype: DType = DType.float32](
                     that.grad.free()
 
     fn __copyinit__(out self, other: Self):
-        print("Copy is being called?")
         self.shape = other.shape
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
-        self.grad = UnsafePointer[__type_of(other)]()  # Not copying grad
-        # self.grad = other.grad^  # moving grad
+        # self.grad = UnsafePointer[__type_of(other)]()  # Not copying grad
+        self.grad = other.grad
         self.op = other.op
-        _="""self.parents = List[
-            UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
-        ](
-            capacity=0
-        )"""
         self.parents = other.parents
         self.grad_fn = other.grad_fn
-        print(
-            "Copy is being called?",
-            self.requires_grad,
-            self.grad.__as_bool__(),
-            other.grad_tensor_initialized(),
-        )
-        #Self.transfer_grad(self, other, True)
+        # Self.transfer_grad(self, other, True)
 
     fn __del__(owned self):
         self.data.free()
@@ -300,21 +285,7 @@ struct Tensor[dtype: DType = DType.float32](
             gradients = Tensor[dtype](self.shape)
             self.grad = UnsafePointer[__type_of(self)].alloc(1)
             self.grad.init_pointee_move(gradients^)
-            print("This should be printed")
             self.zero_grad()
-
-    @staticmethod
-    fn _init_grad_(
-        mut tensor: Tensor[dtype],
-        shape: Shape,
-    ) raises:
-        if tensor.requires_grad and not tensor.grad:
-            # Gradients are float32
-            gradients = Tensor[dtype](shape)
-            tensor.grad = UnsafePointer[__type_of(gradients)].alloc(1)
-            tensor.grad.init_pointee_move(gradients)
-            tensor.zero_grad()
-            Tensor.print(tensor.grad[])
 
     fn __mul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
         out = self
@@ -344,7 +315,7 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn __add__(mut self, value: Scalar[dtype]) raises -> Tensor[dtype]:
-        #out = self
+        # out = self
         out = Tensor[dtype](self.shape, self.requires_grad)
 
         @parameter
@@ -355,10 +326,11 @@ struct Tensor[dtype: DType = DType.float32](
 
         vectorize[add_value, simdwidthof[dtype]()](out.numels())
 
-        out.requires_grad = self.requires_grad
-        out.parents.append(UnsafePointer(to=self))
-        print("Out tensor parents len: ", len(out.parents))
         if self.requires_grad:
+            out.requires_grad = self.requires_grad
+            out.parents.append(UnsafePointer(to=self))
+            self.init_grad_tensor()
+            out.init_grad_tensor()
             grad_func = GradFn[dtype](
                 AddScalar,
                 UnsafePointer(to=self),
@@ -366,16 +338,6 @@ struct Tensor[dtype: DType = DType.float32](
                 value,
             )
             out.grad_fn = grad_func
-        _ = """fn grad_fn() raises -> None:
-            if self.requires_grad:
-                # out.requires_grad = True
-                # out.parents.append(UnsafePointer(to=self))
-                self.init_grad_tensor()
-                out.init_grad_tensor()
-                print("add value in _backward")
-                self.grad[] += out.grad[]
-                Tensor.print(self.grad[])"""
-
         return out
 
     fn __iadd__(self, value: Scalar[dtype]):
@@ -708,71 +670,7 @@ struct Tensor[dtype: DType = DType.float32](
         except e:
             print("ERROR during tensor printing: ", e)
 
-    _ = """fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
-        try:
-            current_dim = len(indices)
-            indent = " " * (level * 2)
-
-            num_first = 5  # Show first 5 elements
-            num_last = 5  # Show last 5 elements
-
-            if current_dim == self.ndim() - 1:
-                print(indent + "[", end="")
-                size = self.shape[current_dim]
-                print(self.shape.__str__(), "size: ", size)
-
-                for i in range(size):
-                    if i < num_first:
-                        indices.append(i)
-                        print(
-                            self[indices],
-                            end=", " if (
-                                i != num_first - 1
-                                or size > num_first + num_last
-                            ) else "",
-                        )
-                        _ = indices.pop()
-                    elif i == num_first:
-                        if size > num_first + num_last:
-                            print("..., ", end="")
-                        # Skip printing middle elements
-                    elif i >= size - num_last:
-                        indices.append(i)
-                        print(self[indices], end=", " if i != size - 1 else "")
-                        _ = indices.pop()
-                    else:
-                        #print("Am I stuck here - of course")
-                        continue
-                        #print(self.shape.__str__())
-                print("]", end="")
-            else:
-                print(indent + "[")
-                size = self.shape[current_dim]
-
-                for i in range(size):
-                    if i < num_first:
-                        indices.append(i)
-                        self.print_tensor_recursive(indices, level + 1)
-                        _ = indices.pop()
-                        if i != num_first - 1 or size > num_first + num_last:
-                            print(",")
-                    elif i == num_first:
-                        if size > num_first + num_last:
-                            print(indent + "  ...,")
-                    elif i >= size - num_last:
-                        indices.append(i)
-                        self.print_tensor_recursive(indices, level + 1)
-                        _ = indices.pop()
-                        if i != size - 1:
-                            print(",")
-                print(indent + "]", end="")
-                print("I am stuck here........")
-                print("\n")
-        except e:
-            print(e)
-        print("Out of print........")
-
-    @staticmethod
+    _ = """@staticmethod
     fn print(t: Tensor):
         print(t.__str__())
         print()
