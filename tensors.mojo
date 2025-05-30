@@ -8,7 +8,12 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from common_utils import int_varia_list_to_str, validate_shape, next_id, IdGen
+from common_utils import (
+    int_varia_list_to_str,
+    validate_shape,
+)
+from operators import GradFn, AddScalar
+
 from testing import assert_true
 
 
@@ -22,7 +27,7 @@ struct Tensor[dtype: DType = DType.float32](
     var grad: UnsafePointer[Self]
     var op: Optional[StaticString]
     var parents: List[UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]]
-    var grad_fn: Optional[fn () escaping raises -> None]
+    var grad_fn: GradFn[dtype]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False) raises:
         shape = Shape(axes_spans)
@@ -36,23 +41,14 @@ struct Tensor[dtype: DType = DType.float32](
         self.parents = List[
             UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
         ]()
-        self.grad_fn = None
+        self.grad_fn = GradFn[dtype]()
         self.grad = UnsafePointer[__type_of(self)]()
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
             self.shape.num_elements()
         )
 
-    fn grad_func(self) -> fn () escaping raises -> None:
-        if self.grad_fn:
-            print("Surely Doing things")
-            return self.grad_fn.value()
-        else:
-
-            fn do_nothing() escaping raises -> None:
-                print("Doing nothing")
-                pass
-
-            return do_nothing
+    fn grad_func(self) -> GradFn[dtype]:
+        return self.grad_fn
 
     fn __getitem__(self, indices: List[Int]) raises -> Scalar[dtype]:
         index = self.shape.flatten_index(indices)
@@ -77,34 +73,74 @@ struct Tensor[dtype: DType = DType.float32](
         self.data.store[volatile=True](index, value)
 
     fn __moveinit__(out self, owned other: Self):
-        self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
-        memcpy(self.data, other.data, other.numels())
-        self.shape = other.shape^
-        # self.datatype = other.datatype
-        self.requires_grad = other.requires_grad
-        self.grad = UnsafePointer[__type_of(other)]()  # Not moving grad
-        self.op = other.op
-        self.parents = List[
-            UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
-        ](
-            capacity=0
-        )  # Not moving parents
-        self.grad_fn = other.grad_fn
-
-    fn __copyinit__(out self, other: Self):
+        print("Move is being called?")
         self.shape = other.shape
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         # self.datatype = other.datatype
         self.requires_grad = other.requires_grad
-        self.grad = UnsafePointer[__type_of(other)]()  # Not copying grad
+        self.grad = UnsafePointer[__type_of(other)]()  # Not moving grad yet
+        # self.grad = UnsafePointer[__type_of(other)].alloc(1)
+        # other.grad.move_pointee_into(self.grad)  # moving grad
+        # other.grad.free()
         self.op = other.op
-        self.parents = List[
+        """self.parents = List[
             UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
         ](
             capacity=0
-        )  # Not copying parents
+        )"""
+        self.parents = other.parents
         self.grad_fn = other.grad_fn
+        #Self.transfer_grad(self, other, False)
+        #other.data.free()
+        if other.grad_tensor_initialized():
+            #other.grad.free()
+            pass
+
+    @staticmethod
+    fn transfer_grad[
+        dtype: DType, //
+    ](mut this: Tensor[dtype], that: Tensor[dtype], copy: Bool) raises:
+        print("Transfer is being called?")
+        if (
+            that.grad_tensor_initialized()
+            and not this.grad_tensor_initialized()
+        ):
+            print("Transfer inner 1 is being called?")
+            this.init_grad_tensor()
+            if this.grad_tensor_initialized():
+                if copy:
+                    print("Getting called from copy")
+                    this.grad.init_pointee_copy(that.grad[])
+                else:
+                    print("I was called")
+                    that.grad.move_pointee_into(this.grad)
+                    that.data.free()
+                    that.grad.free()
+
+    fn __copyinit__(out self, other: Self):
+        print("Copy is being called?")
+        self.shape = other.shape
+        self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
+        memcpy(self.data, other.data, other.numels())
+        self.requires_grad = other.requires_grad
+        self.grad = UnsafePointer[__type_of(other)]()  # Not copying grad
+        # self.grad = other.grad^  # moving grad
+        self.op = other.op
+        _="""self.parents = List[
+            UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
+        ](
+            capacity=0
+        )"""
+        self.parents = other.parents
+        self.grad_fn = other.grad_fn
+        print(
+            "Copy is being called?",
+            self.requires_grad,
+            self.grad.__as_bool__(),
+            other.grad_tensor_initialized(),
+        )
+        #Self.transfer_grad(self, other, True)
 
     fn __del__(owned self):
         self.data.free()
@@ -259,12 +295,13 @@ struct Tensor[dtype: DType = DType.float32](
             print("ok - zero grading")
             memset_zero(self.grad[].data, self.numels())
 
-    fn init_grad_tensor(mut self):
-        cloned = self
-        self.grad = UnsafePointer[__type_of(self)].alloc(1)
-        self.grad.init_pointee_move(cloned)
-        print("This should be printed")
-        self.zero_grad()
+    fn init_grad_tensor(mut self) raises:
+        if self.grad_required() and not self.grad_tensor_initialized():
+            gradients = Tensor[dtype](self.shape)
+            self.grad = UnsafePointer[__type_of(self)].alloc(1)
+            self.grad.init_pointee_move(gradients^)
+            print("This should be printed")
+            self.zero_grad()
 
     @staticmethod
     fn _init_grad_(
@@ -293,7 +330,7 @@ struct Tensor[dtype: DType = DType.float32](
         out.requires_grad = self.requires_grad
         out.parents.append(UnsafePointer(to=self))
 
-        fn grad_fn() raises -> None:
+        _ = """fn grad_fn() raises -> None:
             if self.requires_grad:
                 # Self._init_grad_(self, self.shape)
                 self.init_grad_tensor()
@@ -301,14 +338,14 @@ struct Tensor[dtype: DType = DType.float32](
                 out.init_grad_tensor()
                 print("in _backward")
                 self.grad[] += out.grad[] * factor
-                Tensor.print(self.grad[])
+                Tensor.print(self.grad[])"""
 
-        out.grad_fn = Optional(grad_fn)
+        # out.grad_fn = Optional(grad_fn)
         return out
 
     fn __add__(mut self, value: Scalar[dtype]) raises -> Tensor[dtype]:
-        out = self
-        # var out = Tensor[dtype](self.shape, self.requires_grad)
+        #out = self
+        out = Tensor[dtype](self.shape, self.requires_grad)
 
         @parameter
         fn add_value[simd_width: Int](idx: Int):
@@ -320,8 +357,16 @@ struct Tensor[dtype: DType = DType.float32](
 
         out.requires_grad = self.requires_grad
         out.parents.append(UnsafePointer(to=self))
-
-        fn grad_fn() raises -> None:
+        print("Out tensor parents len: ", len(out.parents))
+        if self.requires_grad:
+            grad_func = GradFn[dtype](
+                AddScalar,
+                UnsafePointer(to=self),
+                UnsafePointer(to=out),
+                value,
+            )
+            out.grad_fn = grad_func
+        _ = """fn grad_fn() raises -> None:
             if self.requires_grad:
                 # out.requires_grad = True
                 # out.parents.append(UnsafePointer(to=self))
@@ -329,9 +374,8 @@ struct Tensor[dtype: DType = DType.float32](
                 out.init_grad_tensor()
                 print("add value in _backward")
                 self.grad[] += out.grad[]
-                Tensor.print(self.grad[])
+                Tensor.print(self.grad[])"""
 
-        out.grad_fn = Optional(grad_fn)
         return out
 
     fn __iadd__(self, value: Scalar[dtype]):
@@ -752,12 +796,14 @@ def main():
     # tensor = Tensor.rand(4, 3, 2, 1)
     tensor = Tensor.rand(2, 3, requires_grad=True)
     tensor.print()
-    out_tensor = tensor * 2
-    tensor.grad_func()()
+    out_tensor = tensor + 2
+    print("Out tensor parents len in main: ", len(out_tensor.parents))
+    # tensor.grad_func()()
     out_tensor.print()
     out_tensor.grad_func()()
     print("Tensor.grad: ")
-    #tensor.grad[].print()
+    print("Out tensor requires grad: ", out_tensor.requires_grad)
+    tensor.grad[].print()
     print(
         "I want grad here: ",
         out_tensor.grad.__as_bool__(),
@@ -766,12 +812,13 @@ def main():
         len(out_tensor.parents),
     )
     # if out_tensor.grad_fn:
+    out_tensor.grad[].print()
     # out_tensor.grad_fn.value()()
     # multiplied.grad_fn.value()()
-    #output = out_tensor * 2
+    # output = out_tensor * 2
     # output.grad[] += 1
     # output.grad_func()()
-    #print(output.grad.__as_bool__())
+    # print(output.grad.__as_bool__())
 
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
