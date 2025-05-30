@@ -8,7 +8,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from common_utils import int_varia_list_to_str, validate_shape
+from common_utils import int_varia_list_to_str, validate_shape, next_id, IdGen
 from testing import assert_true
 
 
@@ -35,7 +35,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.op = None
         self.parents = List[
             UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
-        ](capacity=0)
+        ]()
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
@@ -44,10 +44,12 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn grad_func(self) -> fn () escaping raises -> None:
         if self.grad_fn:
+            print("Surely Doing things")
             return self.grad_fn.value()
         else:
 
             fn do_nothing() escaping raises -> None:
+                print("Doing nothing")
                 pass
 
             return do_nothing
@@ -261,6 +263,7 @@ struct Tensor[dtype: DType = DType.float32](
         cloned = self
         self.grad = UnsafePointer[__type_of(self)].alloc(1)
         self.grad.init_pointee_move(cloned)
+        print("This should be printed")
         self.zero_grad()
 
     @staticmethod
@@ -303,19 +306,35 @@ struct Tensor[dtype: DType = DType.float32](
         out.grad_fn = Optional(grad_fn)
         return out
 
-    fn __add__(self, value: Scalar[dtype]) -> Tensor[dtype]:
-        copy = self
+    fn __add__(mut self, value: Scalar[dtype]) raises -> Tensor[dtype]:
+        out = self
+        # var out = Tensor[dtype](self.shape, self.requires_grad)
 
         @parameter
         fn add_value[simd_width: Int](idx: Int):
-            copy.data.store[width=simd_width](
-                idx, copy.data.load[width=simd_width](idx) + value
+            out.data.store[width=simd_width](
+                idx, self.data.load[width=simd_width](idx) + value
             )
 
-        vectorize[add_value, simdwidthof[dtype]()](copy.numels())
-        return copy
+        vectorize[add_value, simdwidthof[dtype]()](out.numels())
 
-    fn __iadd__(self: Self, value: Scalar[dtype]):
+        out.requires_grad = self.requires_grad
+        out.parents.append(UnsafePointer(to=self))
+
+        fn grad_fn() raises -> None:
+            if self.requires_grad:
+                # out.requires_grad = True
+                # out.parents.append(UnsafePointer(to=self))
+                self.init_grad_tensor()
+                out.init_grad_tensor()
+                print("add value in _backward")
+                self.grad[] += out.grad[]
+                Tensor.print(self.grad[])
+
+        out.grad_fn = Optional(grad_fn)
+        return out
+
+    fn __iadd__(self, value: Scalar[dtype]):
         @parameter
         fn add_value[simd_width: Int](idx: Int):
             self.data.store[width=simd_width](
@@ -734,11 +753,25 @@ def main():
     tensor = Tensor.rand(2, 3, requires_grad=True)
     tensor.print()
     out_tensor = tensor * 2
+    tensor.grad_func()()
     out_tensor.print()
+    out_tensor.grad_func()()
+    print("Tensor.grad: ")
+    #tensor.grad[].print()
+    print(
+        "I want grad here: ",
+        out_tensor.grad.__as_bool__(),
+        "requires_grad",
+        out_tensor.requires_grad,
+        len(out_tensor.parents),
+    )
     # if out_tensor.grad_fn:
     # out_tensor.grad_fn.value()()
     # multiplied.grad_fn.value()()
-    out_tensor.grad_func()()
+    #output = out_tensor * 2
+    # output.grad[] += 1
+    # output.grad_func()()
+    #print(output.grad.__as_bool__())
 
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
     # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))

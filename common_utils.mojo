@@ -61,3 +61,22 @@ fn next_power_of_2(n: Int) raises -> Int:
     while power < n:
         power *= 2
     return power
+
+from os import Atomic
+from memory import UnsafePointer
+
+
+struct IdGen:
+    alias tensor_ids = UnsafePointer[UInt64].alloc(1)
+
+    @staticmethod
+    fn next() -> UInt64:
+        return Atomic.fetch_add(Self.tensor_ids, 1)
+
+fn next_id() -> UInt64:
+    return IdGen.next()
+
+var global_id_ptr: UnsafePointer[UInt64] = UnsafePointer[UInt64].alloc(1)
+#Atomic.store(global_id_ptr, 0)
+
+
