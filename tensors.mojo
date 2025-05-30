@@ -77,55 +77,20 @@ struct Tensor[dtype: DType = DType.float32](
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
-        # self.grad = UnsafePointer[__type_of(other)]()  # Not moving grad yet
         self.grad = other.grad
-        # self.grad = UnsafePointer[__type_of(other)].alloc(1)
         self.op = other.op
-        _ = """self.parents = List[
-            UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
-        ](
-            capacity=0
-        )"""
         self.parents = other.parents
         self.grad_fn = other.grad_fn
-        # Self.transfer_grad(self, other, False)
-        # other.data.free()
-        if other.grad_tensor_initialized():
-            # other.grad.free()
-            pass
-
-    @staticmethod
-    fn transfer_grad[
-        dtype: DType, //
-    ](mut this: Tensor[dtype], that: Tensor[dtype], copy: Bool) raises:
-        print("Transfer is being called?")
-        if (
-            that.grad_tensor_initialized()
-            and not this.grad_tensor_initialized()
-        ):
-            print("Transfer inner 1 is being called?")
-            this.init_grad_tensor()
-            if this.grad_tensor_initialized():
-                if copy:
-                    print("Getting called from copy")
-                    this.grad.init_pointee_copy(that.grad[])
-                else:
-                    print("I was called")
-                    that.grad.move_pointee_into(this.grad)
-                    that.data.free()
-                    that.grad.free()
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
-        # self.grad = UnsafePointer[__type_of(other)]()  # Not copying grad
         self.grad = other.grad
         self.op = other.op
         self.parents = other.parents
         self.grad_fn = other.grad_fn
-        # Self.transfer_grad(self, other, True)
 
     fn __del__(owned self):
         self.data.free()
@@ -275,7 +240,6 @@ struct Tensor[dtype: DType = DType.float32](
         return self.grad.__as_bool__()
 
     fn zero_grad(self):
-        print("ok - zero grading coming")
         if self.grad_required() and self.grad_tensor_initialized():
             print("ok - zero grading")
             memset_zero(self.grad[].data, self.numels())
@@ -700,10 +664,9 @@ def main():
     out_tensor.print()
     out_tensor.grad_func()()
     print("Tensor.grad: ")
-    print("Out tensor requires grad: ", out_tensor.requires_grad)
     tensor.grad[].print()
     print(
-        "I want grad here: ",
+        "Out tensor grad inited",
         out_tensor.grad.__as_bool__(),
         "requires_grad",
         out_tensor.requires_grad,

@@ -1,7 +1,6 @@
 from shapes import Shape
 from testing import assert_true
 
-
 fn int_varia_list_to_str(list: VariadicList[Int]) -> String:
     s = String("[")
     for idx in range(len(list)):
@@ -52,7 +51,7 @@ fn is_power_of_2(n: Int) -> Bool:
 
 # Get next power of 2 for n
 fn next_power_of_2(n: Int) raises -> Int:
-    assert_true (n > 0, "Next power of 2 is supported for >= 1")
+    assert_true(n > 0, "Next power of 2 is supported for >= 1")
     if is_power_of_2(n):
         return n
     if n == 1:
@@ -61,6 +60,7 @@ fn next_power_of_2(n: Int) raises -> Int:
     while power < n:
         power *= 2
     return power
+
 
 from os import Atomic
 from memory import UnsafePointer
@@ -73,10 +73,10 @@ struct IdGen:
     fn next() -> UInt64:
         return Atomic.fetch_add(Self.tensor_ids, 1)
 
+
 fn next_id() -> UInt64:
     return IdGen.next()
 
-var global_id_ptr: UnsafePointer[UInt64] = UnsafePointer[UInt64].alloc(1)
-#Atomic.store(global_id_ptr, 0)
 
-
+#var global_id_ptr: UnsafePointer[UInt64] = UnsafePointer[UInt64].alloc(1)
+# Atomic.store(global_id_ptr, 0)
