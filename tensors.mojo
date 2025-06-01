@@ -10,12 +10,10 @@ from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
 from common_utils import (
     int_varia_list_to_str,
-    validate_shape,
+    validate_shape
 )
-from operators import GradFn, AddScalar
 
 from testing import assert_true
-
 
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable
@@ -24,31 +22,43 @@ struct Tensor[dtype: DType = DType.float32](
     var shape: Shape
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
-    var grad: UnsafePointer[Self]
-    var op: Optional[StaticString]
+    #var grad: UnsafePointer[__type_of(self)]
+    var grad: UnsafePointer[Tensor[dtype]]
     var parents: List[UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]]
-    var grad_fn: GradFn[dtype]
+    var grad_fn: Optional[fn () escaping raises -> None]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False) raises:
         shape = Shape(axes_spans)
         self = Self(shape, requires_grad)
 
+
     fn __init__(out self, shape: Shape, requires_grad: Bool = False) raises:
         self.shape = shape
         validate_shape(shape)
         self.requires_grad = requires_grad
-        self.op = None
         self.parents = List[
             UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]
         ]()
-        self.grad_fn = GradFn[dtype]()
-        self.grad = UnsafePointer[__type_of(self)]()
+        self.grad_fn = None
+        #self.grad = UnsafePointer[__type_of(self)]()
+        self.grad = UnsafePointer[Tensor[dtype]]()
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
             self.shape.num_elements()
         )
+        #self.init_grad_tensor()
 
-    fn grad_func(self) -> GradFn[dtype]:
+    fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
+
+    fn invoke_grad_fn(self, verbose: Bool = True) raises -> None:
+        if self.grad_fn:
+            if verbose:
+                print("\nInvoking  grad_fn")
+            self.grad_fn.value()()
+        else:
+            if verbose:
+                print("\nNo grad_fn")
+            pass
 
     fn __getitem__(self, indices: List[Int]) raises -> Scalar[dtype]:
         index = self.shape.flatten_index(indices)
@@ -78,19 +88,32 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
         self.grad = other.grad
-        self.op = other.op
         self.parents = other.parents
         self.grad_fn = other.grad_fn
+        if other.grad.__as_bool__():
+            print("Yes**** yes yes yes", len(other.grad[].shape))
+        if self.grad.__as_bool__():
+            print("Yes**** yes yes yes ergo.......", len(self.grad[].shape))
+
 
     fn __copyinit__(out self, other: Self):
+        print("Copyinit: shape.ndim = ", other.shape.ndim)
+
         self.shape = other.shape
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
         self.grad = other.grad
-        self.op = other.op
+        #self.grad = UnsafePointer[__type_of(other)]()
+        #self.grad = UnsafePointer[Tensor[dtype]]()
         self.parents = other.parents
         self.grad_fn = other.grad_fn
+        print("Copyinit: self shape.ndim = ", self.shape.ndim)
+        if other.grad.__as_bool__():
+            print("Yes yes yes yes")
+        if self.grad.__as_bool__():
+            print("Yes yes yes yes........self.grad  copyini")
+     
 
     fn __del__(owned self):
         self.data.free()
@@ -98,11 +121,11 @@ struct Tensor[dtype: DType = DType.float32](
     fn __len__(self) -> Int:
         return self.numels()
 
-    @always_inline
+    #@always_inline
     fn numels(self) -> Int:
         return self.shape.num_elements()
 
-    @always_inline
+    #@always_inline
     fn ndim(self) -> Int:
         return self.shape.ndim
 
@@ -246,24 +269,52 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn init_grad_tensor(mut self) raises:
         if self.grad_required() and not self.grad_tensor_initialized():
-            gradients = Tensor[dtype](self.shape)
+            #gradients = Tensor[dtype](self.shape, requires_grad=False)
+            gradients = self
+            print("Do I go where?")
+            gradients.requires_grad = False
+            print("init_grad_tensor: gradient shape.ndim = ", gradients.shape.ndim)
             self.grad = UnsafePointer[__type_of(self)].alloc(1)
+            #self.grad = UnsafePointer[Tensor[dtype]].alloc(1)
+            #self.grad = UnsafePointer[__type_of(gradients)].alloc(1)
             self.grad.init_pointee_move(gradients^)
+            print(
+                "init_grad_tensor self gradient shape",
+                self.grad[].shape.__str__(),
+            )
             self.zero_grad()
 
     fn __mul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
-        out = self
+        #out = self
+
+        out = Tensor[dtype](self.shape, self.requires_grad)
 
         @parameter
         fn mul_by_factor[simd_width: Int](idx: Int):
             out.data.store[width=simd_width](
-                idx, out.data.load[width=simd_width](idx) * factor
+                idx, self.data.load[width=simd_width](idx) * factor
             )
 
         vectorize[mul_by_factor, simdwidthof[dtype]()](out.numels())
 
-        out.requires_grad = self.requires_grad
-        out.parents.append(UnsafePointer(to=self))
+        if self.requires_grad:
+            out.parents.append(UnsafePointer(to=self))
+            self.init_grad_tensor()
+            out.init_grad_tensor()
+
+            self_ptr = UnsafePointer(to=self)
+            out_ptr = UnsafePointer(to=out)
+
+            fn grad_fn() raises -> None:
+                print("PRINTING OUT GRADIENTS", out_ptr[].grad.__as_bool__(), len(out_ptr[].grad[].shape))
+                #(out_ptr[].grad[] * factor).print()
+                print("ARE WE PAST THIS?")
+                #(out_ptr[].grad[] * factor).print()
+                #_ = out_ptr[].grad[] * factor
+                #result = out_ptr[].grad[] * factor
+                self_ptr[].grad[] = self_ptr[].grad[] + out_ptr[].grad[] * factor
+
+            out.grad_fn = Optional(grad_fn)
 
         _ = """fn grad_fn() raises -> None:
             if self.requires_grad:
@@ -275,7 +326,6 @@ struct Tensor[dtype: DType = DType.float32](
                 self.grad[] += out.grad[] * factor
                 Tensor.print(self.grad[])"""
 
-        # out.grad_fn = Optional(grad_fn)
         return out
 
     fn __add__(mut self, value: Scalar[dtype]) raises -> Tensor[dtype]:
@@ -291,17 +341,18 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[add_value, simdwidthof[dtype]()](out.numels())
 
         if self.requires_grad:
-            out.requires_grad = self.requires_grad
             out.parents.append(UnsafePointer(to=self))
             self.init_grad_tensor()
             out.init_grad_tensor()
-            grad_func = GradFn[dtype](
-                AddScalar,
-                UnsafePointer(to=self),
-                UnsafePointer(to=out),
-                value,
-            )
-            out.grad_fn = grad_func
+            self_ptr = UnsafePointer(to=self)
+            out_ptr = UnsafePointer(to=out)
+
+            fn grad_fn() raises -> None:
+                print("in _backward")
+                self_ptr[].grad[] = self_ptr[].grad[] + out_ptr[].grad[]
+
+            out.grad_fn = Optional(grad_fn)
+
         return out
 
     fn __iadd__(self, value: Scalar[dtype]):
@@ -465,7 +516,8 @@ struct Tensor[dtype: DType = DType.float32](
         return result
 
     fn __str__(self) -> String:
-        dims = self.ndim()
+        #dims = self.ndim()
+        dims = len(self.shape)
         s = String("[")
         if dims == 1:
             s += "1D Tensor"
@@ -546,16 +598,18 @@ struct Tensor[dtype: DType = DType.float32](
         for i in range(tensor.numels()):
             tensor.data.store(i, value)
         return tensor
-
+    fn print_tensor_serially(self):
+        pass
     fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
         try:
             current_dim = len(indices)
             indent = " " * (level * 2)
             num_first = 5
             num_last = 5
-            _ = self.shape.__str__()
+            #_ = self.shape.__str__()
             # Defensive check
             if current_dim >= self.ndim():
+            #if current_dim > self.ndim():
                 print(
                     "ERROR: current_dim (",
                     current_dim,
@@ -654,26 +708,27 @@ struct Tensor[dtype: DType = DType.float32](
             print(e)
 
 
-def main():
-    # tensor = Tensor.rand(4, 3, 2, 1)
-    tensor = Tensor.rand(2, 3, requires_grad=True)
-    tensor.print()
-    out_tensor = tensor + 2
-    print("Out tensor parents len in main: ", len(out_tensor.parents))
-    # tensor.grad_func()()
-    out_tensor.print()
-    out_tensor.grad_func()()
-    print("Tensor.grad: ")
-    tensor.grad[].print()
-    print(
-        "Out tensor grad inited",
-        out_tensor.grad.__as_bool__(),
-        "requires_grad",
-        out_tensor.requires_grad,
-        len(out_tensor.parents),
+fn check_it() raises:
+    tensor = Tensor.rand(5, requires_grad=True)
+    #print("Following is input tensor")
+    #tensor.print()
+    out_tensor = tensor * 100
+    assert_true(
+        len(out_tensor.parents) == 1,
+        "Output tensor parents length validation failed",
     )
-    # if out_tensor.grad_fn:
+    #print("Out tensor")
+    #out_tensor.print()
+    out_tensor.invoke_grad_fn()
+    #print("Tensor.grad: ")
+    #tensor.grad[].print()
+    print("The following is out tensor gradient")
     out_tensor.grad[].print()
+
+
+def main():
+    check_it()
+    # tensor = Tensor.rand(4, 3, 2, 1)
     # out_tensor.grad_fn.value()()
     # multiplied.grad_fn.value()()
     # output = out_tensor * 2
@@ -697,8 +752,6 @@ def main():
     print(multiplied.dtype)
     print("Am I gone: ")
     Tensor.print(tensor)
-    print()
-    multiplied = tensor / 2
     print("I am multiplied: ")
     Tensor.print(multiplied)
     print()

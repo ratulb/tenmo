@@ -28,9 +28,9 @@ fn passthrough(n: Int) -> VariadicList[Int]:
 
 
 fn validate_shape(shape: Shape) raises:
-    for shape_dim in shape.axes_spans:
-        _ = String(shape_dim)
-        assert_true(shape_dim > 0, "Shape dimension not valid")
+    for idx in range(shape.ndim):
+        #print("Validating shape: ", shape.axes_spans[idx])
+        assert_true(shape.axes_spans[idx] > 0, "Shape dimension not valid")
 
 
 # Create a single element VariadicList
@@ -67,15 +67,15 @@ from memory import UnsafePointer
 
 
 struct IdGen:
-    alias tensor_ids = UnsafePointer[UInt64].alloc(1)
+    #alias tensor_ids = UnsafePointer[UInt64].alloc(1)
 
     @staticmethod
-    fn next() -> UInt64:
-        return Atomic.fetch_add(Self.tensor_ids, 1)
+    fn next(loc: UnsafePointer[UInt64]) -> UInt64:
+        return Atomic.fetch_add(loc, 1)
 
 
-fn next_id() -> UInt64:
-    return IdGen.next()
+#fn next_id() -> UInt64:
+    #return IdGen.next()
 
 
 #var global_id_ptr: UnsafePointer[UInt64] = UnsafePointer[UInt64].alloc(1)

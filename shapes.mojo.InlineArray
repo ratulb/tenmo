@@ -1,21 +1,25 @@
 from common_utils import varia_list_to_list
 from testing import assert_true
-from utils import StaticTuple
+#from utils import StaticTuple
+from collections import InlineArray
 
 # Max supported dimensions is currently limited to 5
 alias max_dim_count = 5
 
 
 struct Shape(Sized & Writable):
-    var axes_spans: StaticTuple[Int, max_dim_count]
+    #var axes_spans: StaticTuple[Int, max_dim_count]
+    var axes_spans: InlineArray[Int, max_dim_count]
     var ndim: Int
     var numels: Int
 
     fn __init__(out self, dims: VariadicList[Int]) raises:
         assert_true(len(dims) > 0, "Shape dimension count should be > 0")
-        for each in dims:
-            assert_true(each > 0, "Wrong shape dimension")
-        _spans = StaticTuple[Int, max_dim_count](dims)
+        _spans = InlineArray[Int, max_dim_count](fill=-1)
+        for idx in range(len(dims)):
+            assert_true(dims[idx] > 0, "Wrong shape dimension")
+            _spans[idx] = dims[idx]
+        #_spans = StaticTuple[Int, max_dim_count](dims)
         _ndims = min(len(dims), len(_spans))
         _numels = 1
         for idx in range(_ndims):
@@ -93,12 +97,12 @@ struct Shape(Sized & Writable):
         writer.write(self.__str__())
 
     fn __moveinit__(out self, owned other: Self):
-        self.axes_spans = other.axes_spans
+        self.axes_spans = other.axes_spans^
         self.ndim = other.ndim
         self.numels = other.numels
 
     fn __copyinit__(out self, other: Self):
-        self.axes_spans = other.axes_spans
+        self.axes_spans = other.axes_spans.copy()
         self.ndim = other.ndim
         self.numels = other.numels
 

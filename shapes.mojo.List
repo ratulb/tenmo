@@ -1,30 +1,26 @@
 from common_utils import varia_list_to_list
 from testing import assert_true
-from utils import StaticTuple
-
-# Max supported dimensions is currently limited to 5
-alias max_dim_count = 5
 
 
 struct Shape(Sized & Writable):
-    var axes_spans: StaticTuple[Int, max_dim_count]
+    var axes_spans: List[Int]
     var ndim: Int
     var numels: Int
 
     fn __init__(out self, dims: VariadicList[Int]) raises:
         assert_true(len(dims) > 0, "Shape dimension count should be > 0")
-        for each in dims:
-            assert_true(each > 0, "Wrong shape dimension")
-        _spans = StaticTuple[Int, max_dim_count](dims)
-        _ndims = min(len(dims), len(_spans))
+        _spans = List[Int](capacity=len(dims))
+        for idx in range(len(dims)):
+            assert_true(dims[idx] > 0, "Wrong shape dimension")
+            _spans.append(dims[idx])
+        _ndims = len(_spans)
         _numels = 1
         for idx in range(_ndims):
             _numels *= _spans[idx]
-        for idx in range(_ndims, max_dim_count):
-            _spans[idx] = -1  # Negate anything beyond idx >=_ndims
         self.axes_spans = _spans
         self.ndim = _ndims
         self.numels = _numels
+
     fn __len__(self) -> Int:
         return self.ndim
 
@@ -101,4 +97,3 @@ struct Shape(Sized & Writable):
         self.axes_spans = other.axes_spans
         self.ndim = other.ndim
         self.numels = other.numels
-
