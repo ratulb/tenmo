@@ -21,9 +21,6 @@ struct Tensor[dtype: DType = DType.float32](
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
     var grad: UnsafePointer[Self]
-    _ = """var ancestors: Optional[
-        List[UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]]
-    ]"""
     var ancestors: UnsafePointer[List[UnsafePointer[Tensor[dtype]]]]
     var grad_fn: Optional[fn () escaping raises -> None]
 
@@ -268,10 +265,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn init_grad_tensor(mut self) raises:
         if self.grad_required() and not self.has_grad():
-            gradients = self
-            gradients.requires_grad = False
+            gradient_tensor = Tensor[self.dtype](self.shape)
             self.grad = UnsafePointer[__type_of(self)].alloc(1)
-            self.grad.init_pointee_move(gradients^)
+            self.grad.init_pointee_move(gradient_tensor^)
             self.zero_grad()
 
     fn add_ancestry(
