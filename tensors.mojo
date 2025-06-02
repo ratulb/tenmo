@@ -107,9 +107,21 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
     fn __del__(owned self):
-        self.data.free()
         if self.has_grad():
+            for i in range(self.numels()):
+                (self.data + i).destroy_pointee()
+                (self.grad[].data + i).destroy_pointee()
             self.grad.free()
+            print("__del__ getting called 1")
+        else:
+            for i in range(self.numels()):
+                (self.data + i).destroy_pointee()
+            print("__del__ getting called 2")
+        if self.ancestors.__as_bool__():
+            print("__del__ getting called 3")
+            self.ancestors.destroy_pointee()
+            self.ancestors.free()
+        self.data.free()
 
     fn __len__(self) -> Int:
         return self.numels()
@@ -285,6 +297,9 @@ struct Tensor[dtype: DType = DType.float32](
         print("Did add left_lineage")
         if right_lineage.__as_bool__():
             self.ancestors[].append(right_lineage)
+
+    fn __rmul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
+        return self.__mul__(factor)
 
     fn __mul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
         out = Tensor[dtype](self.shape, self.requires_grad)
@@ -695,6 +710,25 @@ struct Tensor[dtype: DType = DType.float32](
         except e:
             print(e)
 
+fn test_factor_mul_by() raises:
+    tensor = Tensor.rand(5, 3, requires_grad=True)
+    out_tensor = 2 * tensor
+    print(
+        "test_factor_mul_by: ",
+        out_tensor.ancestors[][0].__str__(),
+        len(out_tensor.ancestors[]),
+    )
+    assert_true(
+        len(out_tensor.ancestors[]) == 1,
+        "Output tensor ancestors length validation failed",
+    )
+    out_tensor.invoke_grad_fn()
+    print("The following is out tensor gradient")
+    out_tensor.grad[].print()
+    out_tensor.grad[].print()
+    tensor.print()
+    _= out_tensor.ancestors[]
+
 
 fn test_mul_by_factor() raises:
     tensor = Tensor.rand(5, 3, requires_grad=True)
@@ -711,26 +745,27 @@ fn test_mul_by_factor() raises:
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
     out_tensor.grad[].print()
-    out_tensor.grad[].print()
-
+    tensor.print()
+    _ = out_tensor.ancestors[]
 
 fn test_add_value() raises:
     tensor = Tensor.rand(3, 3, requires_grad=True)
     out_tensor = tensor + 100
-    print("test_add_value: ", out_tensor.ancestors[][0].__str__())
+    print("test_add_value: ", out_tensor.ancestors[][0].__str__(), len(out_tensor.ancestors[][0][]))
     assert_true(
         len(out_tensor.ancestors[]) == 1,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.grad[].print()
-    out_tensor.grad[].print()
+    tensor.print()
+    _ = out_tensor.ancestors
 
 
 def main():
-    test_add_value()
     test_mul_by_factor()
+    test_add_value()
+    #test_factor_mul_by()
     # tensor = Tensor.rand(4, 3, 2, 1)
     # out_tensor.grad_fn.value()()
     # multiplied.grad_fn.value()()
