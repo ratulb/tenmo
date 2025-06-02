@@ -3,7 +3,9 @@ from memory import UnsafePointer
 from tensors import Tensor
 
 
-struct Ancestors[dtype: DType = DType.float32](Sized & Copyable & Movable):
+struct Ancestors[dtype: DType = DType.float32](
+    Sized & Copyable & Movable & EqualityComparable
+):
     var ancestors: StaticTuple[UnsafePointer[Tensor[dtype]], 2]
 
     fn __init__(out self):
@@ -21,6 +23,18 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable & Movable):
 
     fn __moveinit__(out self, owned existing: Self):
         self.ancestors = existing.ancestors
+
+    fn __ne__(self, other: Self) -> Bool:
+        return ~(self == other)
+
+    fn __eq__(self, other: Self) -> Bool:
+        if self.capacity() != other.capacity() or len(self) != len(other):
+            return False
+        if self.capacity() == other.capacity() and len(self) == len(other):
+            for i in range(len(self)):
+                if self.ancestors[i] != other.ancestors[i]:
+                    return False
+        return True
 
     @always_inline
     fn capacity(self) -> Int:
@@ -84,6 +98,54 @@ fn test_ancestors_set() raises:
     tensor = Tensor.ones(10)
     ancestors.set(tensor)
     assert_true(ancestors.get(0) is not None, "Get assertion failed")
+    assert_true(
+        ancestors.get(0).value()[].numels() == 10,
+        "Get numels 10 assertion failed",
+    )
+    assert_true(
+        ancestors.get(1) == None,
+        "Accessing beyond current length assertion failed",
+    )
+    # Now length would be 2
+    ancestors.set(tensor, tensor)
+
+    assert_true(
+        ancestors.get(1) is not None,
+        "Accessing within length assertion failed",
+    )
+    tensor1 = ancestors.get(0).value()[]
+    tensor2 = ancestors.get(1).value()[]
+    same_tensor = (tensor == tensor1).all_true() and (
+        tensor == tensor2
+    ).all_true()
+
+    assert_true(
+        same_tensor,
+        "Same tensor assertion failed",
+    )
+
+    assert_true(
+        ancestors.get(0).value()[].shape.num_elements() == 10,
+        "Get shape num elements 10 assertion failed",
+    )
+
+
+fn test_ancestor_equality_check() raises:
+    ancestors = Ancestors()
+    tensor = Tensor.ones(32, 128, requires_grad=True)
+    assert_true(
+        tensor.ancestors is None, "Tensor ancestors None assertion failed"
+    )
+    output = 100 * tensor
+    assert_true(
+        output.ancestors is not None,
+        "Tensor ancestors not None assertion failed",
+    )
+    not_same = output.ancestors.value() != ancestors
+    assert_true(not_same, "Tensor ancestors unequality assertion failed")
+    ancestors.set(tensor)
+    same = output.ancestors.value() == ancestors
+    assert_true(same, "Tensor ancestors equality assertion failed")
 
 
 # Test that pointer obtained at callsite and evaluated at the callee is same
@@ -109,3 +171,5 @@ fn main() raises:
     test_is_same_pointer(ptr, tensor)
     # 2
     test_ancestors_set()
+    # 3
+    test_ancestor_equality_check()
