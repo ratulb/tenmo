@@ -6,10 +6,10 @@ from random import randn, seed
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
-from memory import UnsafePointer, memcpy, memset, memset_zero
+from memory import UnsafePointer, memcpy, memset, memset_zero, ArcPointer
 from shapes import Shape
 from common_utils import int_varia_list_to_str, validate_shape
-
+from ancestry import Ancestors
 from testing import assert_true
 
 
@@ -21,7 +21,8 @@ struct Tensor[dtype: DType = DType.float32](
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
     var grad: UnsafePointer[Self]
-    var ancestors: UnsafePointer[List[UnsafePointer[Tensor[dtype]]]]
+    # var ancestors: UnsafePointer[List[UnsafePointer[Tensor[dtype]]]]
+    var ancestors: Optional[Ancestors[dtype]]
     var grad_fn: Optional[fn () escaping raises -> None]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False) raises:
@@ -33,7 +34,8 @@ struct Tensor[dtype: DType = DType.float32](
         validate_shape(shape)
         self.requires_grad = requires_grad
         # self.ancestors = List[UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]]()
-        self.ancestors = UnsafePointer[List[UnsafePointer[Tensor[dtype]]]]()
+        # self.ancestors = UnsafePointer[List[UnsafePointer[Tensor[dtype]]]]()
+        self.ancestors = None
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
@@ -93,18 +95,21 @@ struct Tensor[dtype: DType = DType.float32](
         # self.grad = UnsafePointer[__type_of(other)]()
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
-        if other.ancestors:
-            print("other ancestors", len(other.ancestors[]))
-            print(
-                "other ancestors [0] shape",
-                other.ancestors[][0][].shape.__str__(),
-            )
-        if self.ancestors:
-            print("self ancestors", len(self.ancestors[]))
-            print(
-                "self ancestors [0] shape",
-                self.ancestors[][0][].shape.__str__(),
-            )
+        _ = """try:
+            if other.ancestors:
+                print("other ancestors", len(other.ancestors.value()))
+                print(
+                    "other ancestors [0] shape",
+                    other.ancestors.value().get(0)[][].shape.__str__(),
+                )
+            if self.ancestors:
+                print("self ancestors", len(self.ancestors.value()))
+                print(
+                    "self ancestors [0] shape",
+                    self.ancestors.value().get(0)[][].shape.__str__(),
+                )
+        except e:
+            print(e)"""
 
     fn __del__(owned self):
         if self.has_grad():
@@ -117,10 +122,9 @@ struct Tensor[dtype: DType = DType.float32](
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
             print("__del__ getting called 2")
-        if self.ancestors.__as_bool__():
-            print("__del__ getting called 3")
-            self.ancestors.destroy_pointee()
-            self.ancestors.free()
+        if self.ancestors is not None:
+            print("__del__ getting called on ancestors - can you delete it?")
+            # _ = self.ancestors
         self.data.free()
 
     fn __len__(self) -> Int:
@@ -289,14 +293,15 @@ struct Tensor[dtype: DType = DType.float32](
             Tensor[dtype]
         ](),
     ):
-        if self.ancestors.__as_bool__() == False:
-            self.ancestors = UnsafePointer[
-                List[UnsafePointer[Tensor[dtype]]]
-            ].alloc(1)
-        self.ancestors[].append(left_lineage)
-        print("Did add left_lineage")
-        if right_lineage.__as_bool__():
-            self.ancestors[].append(right_lineage)
+        if self.ancestors == None:
+            self.ancestors = Optional(Ancestors[dtype]())
+            print("Yes ancestors is initialized now")
+            if right_lineage.__as_bool__():
+                self.ancestors.value().set(left_lineage, right_lineage)
+                print("Did add left_lineage and right_lineage")
+            else:
+                self.ancestors.value().set(left_lineage)
+                print("Did add left_lineage")
 
     fn __rmul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
         return self.__mul__(factor)
@@ -710,62 +715,52 @@ struct Tensor[dtype: DType = DType.float32](
         except e:
             print(e)
 
+
 fn test_factor_mul_by() raises:
-    tensor = Tensor.rand(5, 3, requires_grad=True)
+    print("test_factor_mul_by")
+
+    tensor = Tensor.rand(256, 256, requires_grad=True)
     out_tensor = 2 * tensor
-    print(
-        "test_factor_mul_by: ",
-        out_tensor.ancestors[][0].__str__(),
-        len(out_tensor.ancestors[]),
-    )
     assert_true(
-        len(out_tensor.ancestors[]) == 1,
+        len(out_tensor.ancestors.value().get(0).value()[]) == 65536,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
     out_tensor.grad[].print()
-    out_tensor.grad[].print()
-    tensor.print()
-    _= out_tensor.ancestors[]
 
 
 fn test_mul_by_factor() raises:
-    tensor = Tensor.rand(5, 3, requires_grad=True)
+    print("test_mul_by_factor")
+    tensor = Tensor.rand(128, 30, requires_grad=True)
     out_tensor = tensor * 100
-    print(
-        "test_mul_by_factor: ",
-        out_tensor.ancestors[][0].__str__(),
-        len(out_tensor.ancestors[]),
-    )
     assert_true(
-        len(out_tensor.ancestors[]) == 1,
+        len(out_tensor.ancestors.value().get(0).value()[]) == 3840,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
     out_tensor.grad[].print()
-    tensor.print()
-    _ = out_tensor.ancestors[]
+
 
 fn test_add_value() raises:
-    tensor = Tensor.rand(3, 3, requires_grad=True)
-    out_tensor = tensor + 100
-    print("test_add_value: ", out_tensor.ancestors[][0].__str__(), len(out_tensor.ancestors[][0][]))
+    print("test_add_value")
+
+    tensor = Tensor.rand(50, 30, requires_grad=True)
+    out_tensor = 2 * tensor
     assert_true(
-        len(out_tensor.ancestors[]) == 1,
+        len(out_tensor.ancestors.value().get(0).value()[]) == 1500,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    tensor.print()
-    _ = out_tensor.ancestors
+    out_tensor.grad[].print()
 
 
 def main():
     test_mul_by_factor()
     test_add_value()
-    #test_factor_mul_by()
+    test_factor_mul_by()
     # tensor = Tensor.rand(4, 3, 2, 1)
     # out_tensor.grad_fn.value()()
     # multiplied.grad_fn.value()()
