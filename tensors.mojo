@@ -6,7 +6,7 @@ from random import randn, seed
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
-from memory import UnsafePointer, memcpy, memset, memset_zero, ArcPointer
+from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
 from common_utils import int_varia_list_to_str, validate_shape
 from ancestry import Ancestors
@@ -117,15 +117,20 @@ struct Tensor[dtype: DType = DType.float32](
                 (self.data + i).destroy_pointee()
                 (self.grad[].data + i).destroy_pointee()
             self.grad.free()
-            print("__del__ getting called 1")
+            print(
+                "Tensor__del__ -> freed grad(and pointees) and self data"
+                " pointees"
+            )
         else:
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
-            print("__del__ getting called 2")
+            print("Tensor__del__ -> freed self data pointees")
         if self.ancestors is not None:
-            print("__del__ getting called on ancestors - can you delete it?")
-            # _ = self.ancestors
+            print("Tensor__del__ -> discarded ancestors")
+            _ = self.ancestors
         self.data.free()
+        print("Tensor__del__ -> called free on data")
+        _ = self^
 
     fn __len__(self) -> Int:
         return self.numels()
