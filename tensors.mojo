@@ -21,7 +21,6 @@ struct Tensor[dtype: DType = DType.float32](
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
     var grad: UnsafePointer[Self]
-    # var ancestors: UnsafePointer[List[UnsafePointer[Tensor[dtype]]]]
     var ancestors: Optional[Ancestors[dtype]]
     var grad_fn: Optional[fn () escaping raises -> None]
 
@@ -34,7 +33,6 @@ struct Tensor[dtype: DType = DType.float32](
         validate_shape(shape)
         self.requires_grad = requires_grad
         # self.ancestors = List[UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]]()
-        # self.ancestors = UnsafePointer[List[UnsafePointer[Tensor[dtype]]]]()
         self.ancestors = None
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
@@ -95,21 +93,6 @@ struct Tensor[dtype: DType = DType.float32](
         # self.grad = UnsafePointer[__type_of(other)]()
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
-        _ = """try:
-            if other.ancestors:
-                print("other ancestors", len(other.ancestors.value()))
-                print(
-                    "other ancestors [0] shape",
-                    other.ancestors.value().get(0)[][].shape.__str__(),
-                )
-            if self.ancestors:
-                print("self ancestors", len(self.ancestors.value()))
-                print(
-                    "self ancestors [0] shape",
-                    self.ancestors.value().get(0)[][].shape.__str__(),
-                )
-        except e:
-            print(e)"""
 
     fn __del__(owned self):
         if self.has_grad():
@@ -210,16 +193,16 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[compare_elems, simdwidthof[DType.bool]()](copy.numels())
         return copy
 
-    fn __add__(self, other: Self) raises -> Tensor[dtype]:
+    fn __add__(mut self, mut other: Self) raises -> Tensor[dtype]:
         if self.shape != other.shape:
             raise Error("add -> Dimension mismatch")
 
         requires_grad = self.requires_grad or other.requires_grad
-        result = Tensor[dtype](self.shape, requires_grad)
+        var out = Tensor[dtype](self.shape, requires_grad)
 
         @parameter
         fn add_elems[simd_width: Int](idx: Int):
-            result.data.store[width=simd_width](
+            out.data.store[width=simd_width](
                 idx,
                 (
                     self.data.load[width=simd_width](idx)
@@ -227,8 +210,42 @@ struct Tensor[dtype: DType = DType.float32](
                 ),
             )
 
-        vectorize[add_elems, simdwidthof[dtype]()](result.numels())
-        return result
+        vectorize[add_elems, simdwidthof[dtype]()](out.numels())
+
+        if requires_grad:
+            out.init_grad_tensor()
+            out_ptr = UnsafePointer(to=out)
+
+            self_ptr = UnsafePointer[Tensor[dtype]]()
+            other_ptr = UnsafePointer[Tensor[dtype]]()
+
+            if self.requires_grad:
+                self.init_grad_tensor()
+                self_ptr = UnsafePointer(to=self)
+
+            if other.requires_grad:
+                other.init_grad_tensor()
+                other_ptr = UnsafePointer(to=other)
+
+            fn grad_fn() raises -> None:
+                if self_ptr[].requires_grad:
+                    self_ptr[].grad[] = self_ptr[].grad[] + out_ptr[].grad[]
+                if other_ptr[].requires_grad:
+                    other_ptr[].grad[] = other_ptr[].grad[] + out_ptr[].grad[]
+
+                print("in __add__ + other grad_fn")
+
+            out.grad_fn = Optional(grad_fn)
+            if self.requires_grad and other.requires_grad:
+                out.add_ancestry(self_ptr, other_ptr)
+            elif self.requires_grad and not other.requires_grad:
+                out.add_ancestry(self_ptr, other_ptr)
+            elif not self.requires_grad and other.requires_grad:
+                out.add_ancestry(other_ptr, self_ptr)
+            else:
+                pass
+
+        return out
 
     fn __iadd__(self, other: Self) raises:
         if self.shape != other.shape:
@@ -312,7 +329,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.__mul__(factor)
 
     fn __mul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
-        out = Tensor[dtype](self.shape, self.requires_grad)
+        var out = Tensor[dtype](self.shape, self.requires_grad)
 
         @parameter
         fn mul_by_factor[simd_width: Int](idx: Int):
@@ -329,9 +346,8 @@ struct Tensor[dtype: DType = DType.float32](
             out_ptr = UnsafePointer(to=out)
 
             fn grad_fn() raises -> None:
-                self_ptr[].grad[] = (
-                    self_ptr[].grad[] + out_ptr[].grad[] * factor
-                )
+                temp = out_ptr[].grad[] * factor
+                self_ptr[].grad[] = self_ptr[].grad[] + temp
                 print("in __mul__ * factor grad_fn")
 
             print("I have come here alright")
@@ -341,7 +357,7 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn __add__(mut self, value: Scalar[dtype]) raises -> Tensor[dtype]:
-        out = Tensor[dtype](self.shape, self.requires_grad)
+        var out = Tensor[dtype](self.shape, self.requires_grad)
 
         @parameter
         fn add_value[simd_width: Int](idx: Int):
@@ -721,6 +737,21 @@ struct Tensor[dtype: DType = DType.float32](
             print(e)
 
 
+fn test_add_2_tensor() raises:
+    print("test_add_2_tensor")
+
+    tensor1 = Tensor.rand(256, 512, requires_grad=True)
+    tensor2 = Tensor.rand(256, 512, requires_grad=False)
+    out_tensor = tensor1 + tensor2
+    _ = """assert_true(
+        len(out_tensor.ancestors.value().get(0).value()[]) == 65536,
+        "Output tensor ancestors length validation failed",
+    )
+    out_tensor.invoke_grad_fn()
+    print("The following is out tensor gradient")
+    out_tensor.grad[].print()"""
+
+
 fn test_factor_mul_by() raises:
     print("test_factor_mul_by")
 
@@ -763,6 +794,7 @@ fn test_add_value() raises:
 
 
 def main():
+    test_add_2_tensor()
     test_mul_by_factor()
     test_add_value()
     test_factor_mul_by()

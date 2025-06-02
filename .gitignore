@@ -10,3 +10,5 @@ gpt2_weights.npz*
 __pycache__/
 data/
 model_weights.npy
+*.copy.*
+*.copy
