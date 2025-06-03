@@ -8,6 +8,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
+from gradbox import GradBox
 from common_utils import int_varia_list_to_str, validate_shape
 from ancestry import Ancestors
 from testing import assert_true
@@ -20,7 +21,7 @@ struct Tensor[dtype: DType = DType.float32](
     var shape: Shape
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
-    var grad: UnsafePointer[Self]
+    var grad: Optional[GradBox[dtype]]
     var ancestors: Optional[Ancestors[dtype]]
     var grad_fn: Optional[fn () escaping raises -> None]
 
@@ -32,10 +33,9 @@ struct Tensor[dtype: DType = DType.float32](
         self.shape = shape
         validate_shape(shape)
         self.requires_grad = requires_grad
-        # self.ancestors = List[UnsafePointer[Tensor[dtype], origin=MutableAnyOrigin]]()
         self.ancestors = None
         self.grad_fn = None
-        self.grad = UnsafePointer[__type_of(self)]()
+        self.grad = None
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
             self.shape.num_elements()
         )
@@ -57,22 +57,18 @@ struct Tensor[dtype: DType = DType.float32](
         index = self.shape.flatten_index(indices)
         if index == -1:
             raise Error("__getitem__(indices): Invalid indices")
-        # return (self.data + index)[]
         return self.data.load[volatile=True](index)
 
     fn __getitem__(self, *indices: Int) raises -> Scalar[dtype]:
         index = self.shape.flatten_index(indices)
         if index == -1:
             raise Error("__getitem__(*indices): Invalid indices")
-        # return (self.data + index)[]
-        # return self.data.load(index)
         return self.data.load[volatile=True](index)
 
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]) raises:
         index = self.shape.flatten_index(indices)
         if index == -1:
             raise Error("__setitem__(*indices): Invalid indices")
-        # (self.data + index)[] = value
         self.data.store[volatile=True](index, value)
 
     fn __moveinit__(out self, owned other: Self):
@@ -90,20 +86,30 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
         self.grad = other.grad
-        # self.grad = UnsafePointer[__type_of(other)]()
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
 
+    fn unwrap_grad(
+        mut self,
+    ) raises -> ref [self.grad.value()] GradBox[self.dtype]:
+        if self.grad is None:
+            self.grad = Optional(GradBox[self.dtype](self.shape))
+        return self.grad.value()
+
     fn __del__(owned self):
+    #fn free(owned self):
         if self.has_grad():
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
-                (self.grad[].data + i).destroy_pointee()
-            self.grad.free()
-            print(
-                "Tensor__del__ -> freed grad(and pointees) and self data"
-                " pointees"
-            )
+                # (self.grad.value().unsafe_ptr()[].data + i).destroy_pointee()
+            try:
+                self.unwrap_grad().free()
+                print(
+                    "Tensor__del__ -> freed grad(and pointees) and self data"
+                    " pointees"
+                )
+            except e:
+                print("Error freeing grads", e)
         else:
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
@@ -195,7 +201,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __add__(mut self, mut other: Self) raises -> Tensor[dtype]:
         if self.shape != other.shape:
-            raise Error("add -> Dimension mismatch")
+            raise Error("add -> Dimension mismatch:", self.shape, other.shape)
 
         requires_grad = self.requires_grad or other.requires_grad
         var out = Tensor[dtype](self.shape, requires_grad)
@@ -213,35 +219,27 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[add_elems, simdwidthof[dtype]()](out.numels())
 
         if requires_grad:
-            out.init_grad_tensor()
             out_ptr = UnsafePointer(to=out)
-
-            self_ptr = UnsafePointer[Tensor[dtype]]()
-            other_ptr = UnsafePointer[Tensor[dtype]]()
-
-            if self.requires_grad:
-                self.init_grad_tensor()
-                self_ptr = UnsafePointer(to=self)
-
-            if other.requires_grad:
-                other.init_grad_tensor()
-                other_ptr = UnsafePointer(to=other)
+            self_ptr = UnsafePointer(to=self)
+            other_ptr = UnsafePointer(to=other)
 
             fn grad_fn() raises -> None:
+                out_grad = out_ptr[].unwrap_grad().gradients()
                 if self_ptr[].requires_grad:
-                    self_ptr[].grad[] = self_ptr[].grad[] + out_ptr[].grad[]
+                    self_ptr[].unwrap_grad().gradients() += out_grad
                 if other_ptr[].requires_grad:
-                    other_ptr[].grad[] = other_ptr[].grad[] + out_ptr[].grad[]
+                    other_ptr[].unwrap_grad().gradients() += out_grad
 
                 print("in __add__ + other grad_fn")
 
             out.grad_fn = Optional(grad_fn)
+
             if self.requires_grad and other.requires_grad:
                 out.add_ancestry(self_ptr, other_ptr)
-            elif self.requires_grad and not other.requires_grad:
-                out.add_ancestry(self_ptr, other_ptr)
-            elif not self.requires_grad and other.requires_grad:
-                out.add_ancestry(other_ptr, self_ptr)
+            elif self.requires_grad:
+                out.add_ancestry(self_ptr)
+            elif other.requires_grad:
+                out.add_ancestry(other_ptr)
             else:
                 pass
 
@@ -294,19 +292,12 @@ struct Tensor[dtype: DType = DType.float32](
         return self.requires_grad
 
     fn has_grad(self) -> Bool:
-        return self.grad.__as_bool__()
+        return self.grad is not None
 
     fn zero_grad(self):
         if self.grad_required() and self.has_grad():
             print("ok - zero grading")
-            memset_zero(self.grad[].data, self.numels())
-
-    fn init_grad_tensor(mut self) raises:
-        if self.grad_required() and not self.has_grad():
-            gradient_tensor = Tensor[self.dtype](self.shape)
-            self.grad = UnsafePointer[__type_of(self)].alloc(1)
-            self.grad.init_pointee_move(gradient_tensor^)
-            self.zero_grad()
+            memset_zero(self.grad.value().gradients().data, self.numels())
 
     fn add_ancestry(
         mut self,
@@ -340,14 +331,12 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[mul_by_factor, simdwidthof[dtype]()](out.numels())
 
         if self.requires_grad:
-            self.init_grad_tensor()
-            out.init_grad_tensor()
             self_ptr = UnsafePointer(to=self)
             out_ptr = UnsafePointer(to=out)
 
             fn grad_fn() raises -> None:
-                temp = out_ptr[].grad[] * factor
-                self_ptr[].grad[] = self_ptr[].grad[] + temp
+                temp = out_ptr[].unwrap_grad().gradients() * factor
+                self_ptr[].unwrap_grad().gradients() += temp
                 print("in __mul__ * factor grad_fn")
 
             print("I have come here alright")
@@ -368,13 +357,13 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[add_value, simdwidthof[dtype]()](out.numels())
 
         if self.requires_grad:
-            self.init_grad_tensor()
-            out.init_grad_tensor()
             self_ptr = UnsafePointer(to=self)
             out_ptr = UnsafePointer(to=out)
 
             fn grad_fn() raises -> None:
-                self_ptr[].grad[] = self_ptr[].grad[] + out_ptr[].grad[]
+                self_ptr[].unwrap_grad().gradients() += (
+                    out_ptr[].unwrap_grad().gradients()
+                )
                 print("in __add__ * value grad_fn")
 
             out.grad_fn = Optional(grad_fn)
@@ -626,9 +615,6 @@ struct Tensor[dtype: DType = DType.float32](
             tensor.data.store(i, value)
         return tensor
 
-    fn print_data(self):
-        pass
-
     fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
         try:
             current_dim = len(indices)
@@ -723,7 +709,7 @@ struct Tensor[dtype: DType = DType.float32](
         print()
         l = List[Int]()
         try:
-            t.print_tensor_recursive(l, 1)
+            t.print()_tensor_recursive(l, 1)
         except e:
             print(e)"""
 
@@ -737,19 +723,39 @@ struct Tensor[dtype: DType = DType.float32](
             print(e)
 
 
-fn test_add_2_tensor() raises:
-    print("test_add_2_tensor")
+fn test_add_2_tensors() raises:
+    print("test_add_2_tensors")
 
-    tensor1 = Tensor.rand(256, 512, requires_grad=True)
-    tensor2 = Tensor.rand(256, 512, requires_grad=False)
-    out_tensor = tensor1 + tensor2
-    _ = """assert_true(
-        len(out_tensor.ancestors.value().get(0).value()[]) == 65536,
-        "Output tensor ancestors length validation failed",
+    tensor1 = Tensor.rand(1024, 1024, requires_grad=True)
+    tensor2 = Tensor.rand(1024, 1024, requires_grad=True)
+    assert_true(
+        tensor1.shape == tensor2.shape,
+        "Input tensors shape match assertion failed",
     )
-    out_tensor.invoke_grad_fn()
+    out_tensor = tensor1 + tensor2
+    assert_true(
+        tensor1.shape == out_tensor.shape,
+        "Input/output tensors shape match assertion failed",
+    )
+    print("Tensor1 grad shape: ", tensor1.unwrap_grad().gradients().shape)
+    print("Tensor2 grad shape: ", tensor2.unwrap_grad().gradients().shape)
+    print("Out tensor grad shape: ", out_tensor.unwrap_grad().gradients().shape)
+    parent1 = out_tensor.ancestors.value().get(0).value()[]
+    parent2 = out_tensor.ancestors.value().get(1).value()[]
+    left_parent_is_tensor1 = (parent1 == tensor1).all_true()
+    right_parent_is_tensor2 = (parent2 == tensor2).all_true()
+    assert_true(
+        left_parent_is_tensor1 == True and right_parent_is_tensor2 == True,
+        "Output tensor ancestry validation failed",
+    )
     print("The following is out tensor gradient")
-    out_tensor.grad[].print()"""
+    out_tensor.unwrap_grad().gradients().print()
+    print("Before invoking grad_fn")
+    print("Tensor1 grad shape: ", tensor1.unwrap_grad().gradients().shape)
+    print("Tensor2 grad shape: ", tensor2.unwrap_grad().gradients().shape)
+    print("Out tensor grad shape: ", out_tensor.unwrap_grad().gradients().shape)
+
+    out_tensor.invoke_grad_fn()
 
 
 fn test_factor_mul_by() raises:
@@ -763,7 +769,7 @@ fn test_factor_mul_by() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.grad[].print()
+    out_tensor.unwrap_grad().gradients().print()
 
 
 fn test_mul_by_factor() raises:
@@ -776,7 +782,7 @@ fn test_mul_by_factor() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.grad[].print()
+    out_tensor.unwrap_grad().gradients().print()
 
 
 fn test_add_value() raises:
@@ -790,30 +796,30 @@ fn test_add_value() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.grad[].print()
+    out_tensor.unwrap_grad().gradients().print()
 
 
 def main():
-    test_add_2_tensor()
+    test_add_2_tensors()
     test_mul_by_factor()
     test_add_value()
     test_factor_mul_by()
     # tensor = Tensor.rand(4, 3, 2, 1)
-    # out_tensor.grad_fn.value()()
-    # multiplied.grad_fn.value()()
+    # out_tensor.grad_fn.value()
+    # multiplied.grad_fn.value()
     # output = out_tensor * 2
-    # output.grad[] += 1
-    # output.grad_func()()
+    # output.grad.value().unsafe_ptr()[] += 1
+    # output.grad_func()
     # print(output.grad.__as_bool__())
 
-    # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
-    # Tensor.print(Tensor.arange(7, start=3).reshape[2](2, 2))
+    # Tensor.print()(Tensor.arange(7, start=3).reshape[2](2, 2))
+    # Tensor.print()(Tensor.arange(7, start=3).reshape[2](2, 2))
     # tensor = Tensor.arange[5]().to_dtype[DType.float32]()
     # l = List[Int]()
-    # tensor.print_tensor_recursive(l, 1)
+    # tensor.print()_tensor_recursive(l, 1)
     # tensor.print()
     # tensor.print()
-    # Tensor.print(tensor)
+    # Tensor.print()(tensor)
     # tensor1 = Tensor.arange[4]()
     # tensor1.print()
     # tensor1.print()
@@ -821,33 +827,33 @@ def main():
     _ = """# tensor._init_grad_()
     print(multiplied.dtype)
     print("Am I gone: ")
-    Tensor.print(tensor)
+    Tensor.print()(tensor)
     print("I am multiplied: ")
-    Tensor.print(multiplied)
+    Tensor.print()(multiplied)
     print()
 
     rival = tensor == multiplied
     print("rival")
-    Tensor.print(rival)
+    Tensor.print()(rival)
 
     tensor = Tensor.rand(4, 3)
     print("Original")
-    Tensor.print(tensor)
+    Tensor.print()(tensor)
     reshaped = tensor.reshape(2, 2, 3)
     print("Reshaped")
-    Tensor.print(reshaped)
+    Tensor.print()(reshaped)
 
     tensor_false = Tensor.zeros(4, 3)
     indices = List[Int]()
-    tensor_false.print_tensor_recursive(indices, 1)
+    tensor_false.print()_tensor_recursive(indices, 1)
 
     tensor_true = Tensor.ones(4, 3)
     indices = List[Int]()
-    tensor_true.print_tensor_recursive(indices, 1)
+    tensor_true.print()_tensor_recursive(indices, 1)
 
     tensor = Tensor.ones(4, 3)
     indices = List[Int]()
-    tensor.print_tensor_recursive(indices, 1)
+    tensor.print()_tensor_recursive(indices, 1)
 
     t16 = Tensor.zeros(5, 5)
     t16[0, 0] = 1
@@ -911,18 +917,18 @@ def main():
     other[4, 3] = 26
     other[4, 4] = 25
 
-    # Tensor.print(t16.matmal_v2(other))
+    # Tensor.print()(t16.matmal_v2(other))
     print()
 
-    # Tensor.print(t16.matmal_v3(other))
+    # Tensor.print()(t16.matmal_v3(other))
     print()
 
-    # Tensor.print(t16.matmal(other))
-    Tensor.print(t16 == other)
-    Tensor.print(t16 != other)
+    # Tensor.print()(t16.matmal(other))
+    Tensor.print()(t16 == other)
+    Tensor.print()(t16 != other)
 
     tensor_big1 = Tensor.rand(1024, 4096)
     tensor_big2 = Tensor.rand(4096, 512)
 
-    # Tensor.print(tensor_big1.matmal_v3(tensor_big2))
+    # Tensor.print()(tensor_big1.matmal_v3(tensor_big2))
     """
