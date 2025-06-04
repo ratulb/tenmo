@@ -96,8 +96,8 @@ struct Tensor[dtype: DType = DType.float32](
             self.grad = Optional(GradBox[self.dtype](self.shape))
         return self.grad.value()
 
-    fn __del__(owned self):
-    #fn free(owned self):
+    #fn __del__(owned self):
+    fn free(owned self):
         if self.has_grad():
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
@@ -247,7 +247,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __iadd__(self, other: Self) raises:
         if self.shape != other.shape:
-            raise Error("iadd -> Dimension mismatch")
+            raise Error("iadd -> Dimension mismatch: ", self.shape, ", ", other.shape)
 
         @parameter
         fn add_elems[simd_width: Int](idx: Int):
@@ -337,7 +337,7 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn() raises -> None:
                 temp = out_ptr[].unwrap_grad().gradients() * factor
                 self_ptr[].unwrap_grad().gradients() += temp
-                print("in __mul__ * factor grad_fn")
+                print("in __mul__ * factor grad_fn", self_ptr[].has_grad(), temp.has_grad(), out_ptr[].has_grad())
 
             print("I have come here alright")
             out.grad_fn = Optional(grad_fn)
@@ -774,10 +774,10 @@ fn test_factor_mul_by() raises:
 
 fn test_mul_by_factor() raises:
     print("test_mul_by_factor")
-    tensor = Tensor.rand(128, 30, requires_grad=True)
+    tensor = Tensor.rand(128, 256, requires_grad=True)
     out_tensor = tensor * 100
     assert_true(
-        len(out_tensor.ancestors.value().get(0).value()[]) == 3840,
+        len(out_tensor.ancestors.value().get(0).value()[]) == 32768,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
@@ -788,10 +788,10 @@ fn test_mul_by_factor() raises:
 fn test_add_value() raises:
     print("test_add_value")
 
-    tensor = Tensor.rand(50, 30, requires_grad=True)
+    tensor = Tensor.rand(1024, 64, requires_grad=True)
     out_tensor = 2 * tensor
     assert_true(
-        len(out_tensor.ancestors.value().get(0).value()[]) == 1500,
+        len(out_tensor.ancestors.value().get(0).value()[]) == 65536,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
