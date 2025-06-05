@@ -12,6 +12,7 @@ from gradbox import GradBox
 from common_utils import int_varia_list_to_str, validate_shape
 from ancestry import Ancestors
 from testing import assert_true
+from operators import _tensor_op_tensor, AddTensor
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -106,14 +107,13 @@ struct Tensor[dtype: DType = DType.float32](
             self.grad.init_pointee_move(gradients^)
             self.zero_grad()
 
-
     fn gradients(
         mut self,
     ) raises -> ref [self.grad[]] Tensor[self.dtype]:
         if self.requires_grad == False or self.has_grad() == False:
-            err_s = String("Requires grad is: {0}, gradbox: uninitialized? {1}").format(
-                self.requires_grad, self.has_grad() == False
-            )
+            err_s = String(
+                "Requires grad is: {0}, gradbox: uninitialized? {1}"
+            ).format(self.requires_grad, self.has_grad() == False)
             raise Error(err_s)
         return self.grad[]
 
@@ -324,84 +324,98 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     # Element wise multiplication of two tensors
-    fn __mul__(mut self, mut other: Self) raises -> Tensor[dtype]:
+    # fn __mul__(mut self, mut other: Self) raises -> Tensor[dtype]:
+    fn __mul__(self, other: Self) raises -> Tensor[dtype]:
         if self.shape != other.shape:
             raise Error(
                 "__mul__self * other -> Dimension mismatch:",
                 self.shape,
                 other.shape,
             )
-
-        requires_grad = self.requires_grad or other.requires_grad
-        out = Tensor[dtype](self.shape, requires_grad)
+        _self = Self.pointee(self.pointer())
+        _other = Self.pointee(other.pointer())
+        requires_grad = _self.requires_grad or _other.requires_grad
+        out = Tensor[dtype](_self.shape, requires_grad)
 
         @parameter
         fn mul_elems[simd_width: Int](idx: Int):
             out.data.store[width=simd_width](
                 idx,
                 (
-                    self.data.load[width=simd_width](idx)
-                    * other.data.load[width=simd_width](idx)
+                    _self.data.load[width=simd_width](idx)
+                    * _other.data.load[width=simd_width](idx)
                 ),
             )
 
         vectorize[mul_elems, simdwidthof[dtype]()](out.numels())
 
         if requires_grad:
-            self_ptr = self.pointer()
-            other_ptr = other.pointer()
+            self_ptr = _self.pointer()
+            other_ptr = _other.pointer()
             out_ptr = out.pointer()
 
             fn grad_fn() raises -> None:
                 output = Self.pointee(out_ptr)
-                #assert_true(Self.pointee(out_ptr).requires_grad)
-                #assert_true(Self.pointee(out_ptr).requires_grad)
+                # assert_true(Self.pointee(out_ptr).requires_grad)
+                # assert_true(Self.pointee(out_ptr).requires_grad)
                 assert_true(output.requires_grad)
                 assert_true(output.has_grad())
                 out_grad = out_ptr[].gradients()
+                # out_grad = output.grad[]
                 assert_true(
                     out_grad.requires_grad == False
                     and out_grad.has_grad() == False
                 )
+                print("ok1")
                 if self_ptr[].requires_grad:
                     assert_true(Self.pointee(self_ptr).has_grad())
                     other_requires_grad = other_ptr[].requires_grad
                     other_ptr[].requires_grad = False  # Set it False for next op or else it would trigger ancestry tracking for gradient multiplication below
+                    print("ok2")
                     self_ptr[].gradients() += (
-                        out_grad * other_ptr[]
+                        out_ptr[].gradients()
+                        * other_ptr[]
+                        # out_grad * other_ptr[]
                     )
-                    other_ptr[].requires_grad = (
+                    # self_ptr[].grad[] += out_grad * other_ptr[]
+                    print("ok3")
+                    _ = """other_ptr[].requires_grad = (
                         other_requires_grad  # Set it back to original
-                    )
+                    )"""
                 if other_ptr[].requires_grad:
                     assert_true(Self.pointee(other_ptr).has_grad())
                     self_requires_grad = self_ptr[].requires_grad
                     self_ptr[].requires_grad = False  # Set it False for next op
-                    other_ptr[].gradients() += (
-                        out_grad * self_ptr[]
-                    )
+                    other_ptr[].gradients() += out_grad * self_ptr[]
                     self_ptr[].requires_grad = self_requires_grad
 
                 print("in __mul__ * other grad_fn")
-            if self.requires_grad and other.requires_grad:
+
+            if _self.requires_grad and _other.requires_grad:
                 out.add_ancestry(self_ptr, other_ptr)
-            elif self.requires_grad:
+            elif _self.requires_grad:
                 out.add_ancestry(self_ptr)
-            elif other.requires_grad:
+            elif _other.requires_grad:
                 out.add_ancestry(other_ptr)
 
             out.grad_fn = Optional(grad_fn)
 
         return out
 
-    fn __add__(mut self, mut other: Self) raises -> Tensor[dtype]:
-        if self.shape != other.shape:
-            raise Error("add -> Dimension mismatch:", self.shape, other.shape)
+    # fn __add__(mut self, mut other: Self) raises -> Tensor[dtype]:
+    fn __add__(self, other: Self) raises -> Tensor[dtype]:
+        this = Self.pointee(self.pointer())
+        that = Self.pointee(other.pointer())
+        # if self.shape != other.shape:
+        # raise Error("add -> Dimension mismatch:", self.shape, other.shape)
+        if this.shape != that.shape:
+            raise Error("add -> Dimension mismatch:", this.shape, that.shape)
 
-        requires_grad = self.requires_grad or other.requires_grad
-        var out = Tensor[dtype](self.shape, requires_grad)
-
-        @parameter
+        # requires_grad = self.requires_grad or other.requires_grad
+        requires_grad = this.requires_grad or that.requires_grad
+        # var out = Tensor[dtype](self.shape, requires_grad)
+        var out = _tensor_op_tensor[dtype, AddTensor](this, that)
+        _ = """@parameter
         fn add_elems[simd_width: Int](idx: Int):
             out.data.store[width=simd_width](
                 idx,
@@ -411,12 +425,12 @@ struct Tensor[dtype: DType = DType.float32](
                 ),
             )
 
-        vectorize[add_elems, simdwidthof[dtype]()](out.numels())
+        vectorize[add_elems, simdwidthof[dtype]()](out.numels())"""
 
         if requires_grad:
-            out_ptr = UnsafePointer(to=out)
-            self_ptr = UnsafePointer(to=self)
-            other_ptr = UnsafePointer(to=other)
+            out_ptr = out.pointer()
+            self_ptr = this.pointer()
+            other_ptr = that.pointer()
 
             fn grad_fn() raises -> None:
                 out_grad = out_ptr[].gradients()
@@ -429,14 +443,12 @@ struct Tensor[dtype: DType = DType.float32](
 
             out.grad_fn = Optional(grad_fn)
 
-            if self.requires_grad and other.requires_grad:
+            if this.requires_grad and that.requires_grad:
                 out.add_ancestry(self_ptr, other_ptr)
-            elif self.requires_grad:
+            elif this.requires_grad:
                 out.add_ancestry(self_ptr)
-            elif other.requires_grad:
+            elif that.requires_grad:
                 out.add_ancestry(other_ptr)
-            else:
-                pass
 
         return out
 
@@ -456,9 +468,7 @@ struct Tensor[dtype: DType = DType.float32](
             out_ptr = UnsafePointer(to=out)
 
             fn grad_fn() raises -> None:
-                self_ptr[].gradients() += (
-                    out_ptr[].gradients()
-                )
+                self_ptr[].gradients() += out_ptr[].gradients()
                 print("in __add__ * value grad_fn")
 
             out.grad_fn = Optional(grad_fn)
@@ -834,9 +844,7 @@ fn test_add_2_tensors() raises:
     )
     print("Tensor1 grad shape: ", tensor1.gradients().shape)
     print("Tensor2 grad shape: ", tensor2.gradients().shape)
-    print(
-        "Out tensor grad shape: ", out_tensor.gradients().shape
-    )
+    print("Out tensor grad shape: ", out_tensor.gradients().shape)
     parent1 = out_tensor.ancestors.value().get(0).value()[]
     parent2 = out_tensor.ancestors.value().get(1).value()[]
     left_parent_is_tensor1 = (parent1 == tensor1).all_true()
@@ -850,9 +858,7 @@ fn test_add_2_tensors() raises:
     print("Before invoking grad_fn")
     print("Tensor1 grad shape: ", tensor1.gradients().shape)
     print("Tensor2 grad shape: ", tensor2.gradients().shape)
-    print(
-        "Out tensor grad shape: ", out_tensor.gradients().shape
-    )
+    print("Out tensor grad shape: ", out_tensor.gradients().shape)
 
     out_tensor.invoke_grad_fn()
 
