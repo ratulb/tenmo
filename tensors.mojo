@@ -360,9 +360,9 @@ struct Tensor[dtype: DType = DType.float32](
                     and out_grad.has_grad() == False
                 )
                 print("Innocuous check4")
-                self.apply_gradients(self_ptr, other_ptr, out_ptr)
+                #self.apply_gradients(self_ptr, other_ptr, out_ptr)
                 #self.apply_gradients(other_ptr, self_ptr, out_ptr) #1
-                _="""if self_ptr[].requires_grad:
+                if self_ptr[].requires_grad:
                     assert_true(Self.pointee(self_ptr).has_grad())
                     other_requires_grad = other_ptr[].requires_grad
                     other_ptr[].requires_grad = False  # Set it False for next op or else it would trigger ancestry tracking for gradient multiplication below
@@ -381,7 +381,7 @@ struct Tensor[dtype: DType = DType.float32](
                     other_ptr[].open_gradbox().gradients() += (
                         out_grad * self_ptr[]
                     )
-                    self_ptr[].requires_grad = self_requires_grad"""
+                    self_ptr[].requires_grad = self_requires_grad
 
                 print("in __mul__ * other grad_fn")
             print("Issue here")
