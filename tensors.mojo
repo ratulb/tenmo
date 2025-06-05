@@ -12,11 +12,6 @@ from gradbox import GradBox
 from common_utils import int_varia_list_to_str, validate_shape
 from ancestry import Ancestors
 from testing import assert_true
-from builtin._location import (
-    __call_location,
-    _SourceLocation,
-    __source_location,
-)
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -108,30 +103,10 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad and self.grad is None:
             self.grad = Optional(GradBox[self.dtype](self.shape))
 
-    @always_inline
-    fn capture_call_loc[
-        depth: Int = 1
-    ](self, cond: Bool = False) -> _SourceLocation:
-        if (
-            not cond
-        ):  # NOTE: we test that __call_location works even in a nested scope.
-            return __call_location[depth]()
-        return _SourceLocation(-1, -1, "")
-
-    fn get_call_locs(self) -> _SourceLocation:  # , _SourceLocation):
-        return (
-            self.capture_call_loc()
-            # capture_call_loc_nodebug(),
-        )
-
     fn open_gradbox(
         mut self,
     ) raises -> ref [self.grad.value()] GradBox[self.dtype]:
         if self.requires_grad == False or self.grad is None:
-            # loc = self.get_call_locs()
-            # src_loc = __source_location()
-            # print("Call location: ", String(loc))
-            # print("Src location: ", String(src_loc))
             err_s = String("Requires grad is: {0}, gradbox: None? {1}").format(
                 self.requires_grad, self.grad is None
             )
@@ -317,7 +292,7 @@ struct Tensor[dtype: DType = DType.float32](
                 print("Did add left_lineage")
 
     fn __rmul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
-        return self.__mul__(factor, add_ancestry=True)
+        return self.__mul__(factor)
 
     fn __mul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
         var out = Tensor[dtype](self.shape, self.requires_grad)
@@ -353,8 +328,8 @@ struct Tensor[dtype: DType = DType.float32](
                 other.shape,
             )
 
-        grad_is_required = self.requires_grad or other.requires_grad
-        out = Tensor[dtype](self.shape, requires_grad=grad_is_required)
+        requires_grad = self.requires_grad or other.requires_grad
+        out = Tensor[dtype](self.shape, requires_grad)
 
         @parameter
         fn mul_elems[simd_width: Int](idx: Int):
@@ -368,48 +343,81 @@ struct Tensor[dtype: DType = DType.float32](
 
         vectorize[mul_elems, simdwidthof[dtype]()](out.numels())
 
-        print(
-            "__mul__ -> out has_grad and requires_grad: ",
-            out.has_grad(),
-            out.requires_grad,
-        )
-        # out.print()
-        if grad_is_required:
+        if requires_grad:
             self_ptr = self.pointer()
             other_ptr = other.pointer()
             out_ptr = out.pointer()
 
-            # print("Does out pointer requires_grad:? ", out_ptr[].requires_grad)
             fn grad_fn() raises -> None:
-                assert_true(Self.pointee(out_ptr).requires_grad)
-                assert_true(Self.pointee(out_ptr).has_grad())
+                output = Self.pointee(out_ptr)
+                #assert_true(Self.pointee(out_ptr).requires_grad)
+                #assert_true(Self.pointee(out_ptr).requires_grad)
+                assert_true(output.requires_grad)
+                assert_true(output.has_grad())
                 out_grad = out_ptr[].open_gradbox().gradients()
+                assert_true(
+                    out_grad.requires_grad == False
+                    and out_grad.has_grad() == False
+                )
                 print("Innocuous check4")
-                if self_ptr[].requires_grad:
+                self.apply_gradients(self_ptr, other_ptr, out_ptr)
+                #self.apply_gradients(other_ptr, self_ptr, out_ptr) #1
+                _="""if self_ptr[].requires_grad:
                     assert_true(Self.pointee(self_ptr).has_grad())
+                    other_requires_grad = other_ptr[].requires_grad
+                    other_ptr[].requires_grad = False  # Set it False for next op or else it would trigger ancestry tracking for gradient multiplication below
+                    print("A move is about to happen?")
                     self_ptr[].open_gradbox().gradients() += (
                         out_grad * other_ptr[]
                     )
+                    print("Was that a move?")
+                    other_ptr[].requires_grad = (
+                        other_requires_grad  # Set it back to original
+                    )
                 if other_ptr[].requires_grad:
                     assert_true(Self.pointee(other_ptr).has_grad())
+                    self_requires_grad = self_ptr[].requires_grad
+                    self_ptr[].requires_grad = False  # Set it False for next op
                     other_ptr[].open_gradbox().gradients() += (
                         out_grad * self_ptr[]
                     )
+                    self_ptr[].requires_grad = self_requires_grad"""
 
                 print("in __mul__ * other grad_fn")
-
+            print("Issue here")
             if self.requires_grad and other.requires_grad:
                 out.add_ancestry(self_ptr, other_ptr)
             elif self.requires_grad:
                 out.add_ancestry(self_ptr)
             elif other.requires_grad:
-                print("It should be printed twice")
                 out.add_ancestry(other_ptr)
 
             out.grad_fn = Optional(grad_fn)
-            # print("Innocuous check5", out_ptr[].requires_grad, out_ptr[].has_grad())
 
         return out
+
+    #@staticmethod
+    fn apply_gradients(self,
+        target: UnsafePointer[Self],
+        _from: UnsafePointer[Self],
+        output_gradients: UnsafePointer[Self],
+    ) raises:
+        if Self.pointee(target).requires_grad:
+            print("Apply gradient")
+            target_shape = Self.pointee(target).shape
+            _from_shape = Self.pointee(_from).shape
+            output_grad_shape = Self.pointee(output_gradients).shape
+            print(target,_from, output_gradients)
+            assert_true(target_shape == _from_shape and target_shape == output_grad_shape)
+
+
+            assert_true(Self.pointee(target).has_grad())
+            original_flag = _from[].requires_grad
+            _from[].requires_grad = False  # Prevent ancestry tracking
+            print(len(output_gradients[]), len(_from[]))
+            #target[].open_gradbox().gradients() += output_gradients[] * _from[]
+            #print(len(output_gradients[]), len(_from[]))
+            _from[].requires_grad = original_flag  # Restore flag
 
     fn __add__(mut self, mut other: Self) raises -> Tensor[dtype]:
         if self.shape != other.shape:
