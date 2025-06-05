@@ -21,7 +21,7 @@ struct Tensor[dtype: DType = DType.float32](
     var shape: Shape
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
-    var grad: Optional[GradBox[dtype]]
+    var grad: UnsafePointer[Self]
     var ancestors: Optional[Ancestors[dtype]]
     var grad_fn: Optional[fn () escaping raises -> None]
 
@@ -35,11 +35,11 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.ancestors = None
         self.grad_fn = None
-        self.grad = None
+        self.grad = UnsafePointer[__type_of(self)]()
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
             self.shape.num_elements()
         )
-        self.init_gradbox()
+        self.init_gradients()
 
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
@@ -99,19 +99,23 @@ struct Tensor[dtype: DType = DType.float32](
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
 
-    fn init_gradbox(mut self) raises:
-        if self.requires_grad and self.grad is None:
-            self.grad = Optional(GradBox[self.dtype](self.shape))
+    fn init_gradients(mut self) raises:
+        if self.requires_grad and self.grad.__as_bool__() == False:
+            gradients = Tensor[self.dtype](self.shape)
+            self.grad = UnsafePointer[__type_of(self)].alloc(1)
+            self.grad.init_pointee_move(gradients^)
+            self.zero_grad()
 
-    fn open_gradbox(
+
+    fn gradients(
         mut self,
-    ) raises -> ref [self.grad.value()] GradBox[self.dtype]:
-        if self.requires_grad == False or self.grad is None:
-            err_s = String("Requires grad is: {0}, gradbox: None? {1}").format(
-                self.requires_grad, self.grad is None
+    ) raises -> ref [self.grad[]] Tensor[self.dtype]:
+        if self.requires_grad == False or self.has_grad() == False:
+            err_s = String("Requires grad is: {0}, gradbox: uninitialized? {1}").format(
+                self.requires_grad, self.has_grad() == False
             )
             raise Error(err_s)
-        return self.grad.value()
+        return self.grad[]
 
     # fn __del__(owned self):
     fn free(owned self):
@@ -120,7 +124,7 @@ struct Tensor[dtype: DType = DType.float32](
                 (self.data + i).destroy_pointee()
                 # (self.grad.value().unsafe_ptr()[].data + i).destroy_pointee()
             try:
-                self.open_gradbox().free()
+                self.gradients().free()
                 print(
                     "Tensor__del__ -> freed grad(and pointees) and self data"
                     " pointees"
@@ -267,12 +271,12 @@ struct Tensor[dtype: DType = DType.float32](
         return self.requires_grad
 
     fn has_grad(self) -> Bool:
-        return self.grad is not None
+        return self.grad.__as_bool__() == True
 
     fn zero_grad(self):
         if self.grad_required() and self.has_grad():
             print("ok - zero grading")
-            memset_zero(self.grad.value().gradients().data, self.numels())
+            memset_zero(self.grad[].data, self.grad[].numels())
 
     fn add_ancestry(
         mut self,
@@ -310,8 +314,8 @@ struct Tensor[dtype: DType = DType.float32](
             out_ptr = UnsafePointer(to=out)
 
             fn grad_fn() raises -> None:
-                temp = out_ptr[].open_gradbox().gradients() * factor
-                self_ptr[].open_gradbox().gradients() += temp
+                temp = out_ptr[].gradients() * factor
+                self_ptr[].gradients() += temp
 
             print("I have come here alright - mul_by_factor")
             out.grad_fn = Optional(grad_fn)
@@ -354,23 +358,18 @@ struct Tensor[dtype: DType = DType.float32](
                 #assert_true(Self.pointee(out_ptr).requires_grad)
                 assert_true(output.requires_grad)
                 assert_true(output.has_grad())
-                out_grad = out_ptr[].open_gradbox().gradients()
+                out_grad = out_ptr[].gradients()
                 assert_true(
                     out_grad.requires_grad == False
                     and out_grad.has_grad() == False
                 )
-                print("Innocuous check4")
-                #self.apply_gradients(self_ptr, other_ptr, out_ptr)
-                #self.apply_gradients(other_ptr, self_ptr, out_ptr) #1
                 if self_ptr[].requires_grad:
                     assert_true(Self.pointee(self_ptr).has_grad())
                     other_requires_grad = other_ptr[].requires_grad
                     other_ptr[].requires_grad = False  # Set it False for next op or else it would trigger ancestry tracking for gradient multiplication below
-                    print("A move is about to happen?")
-                    self_ptr[].open_gradbox().gradients() += (
+                    self_ptr[].gradients() += (
                         out_grad * other_ptr[]
                     )
-                    print("Was that a move?")
                     other_ptr[].requires_grad = (
                         other_requires_grad  # Set it back to original
                     )
@@ -378,13 +377,12 @@ struct Tensor[dtype: DType = DType.float32](
                     assert_true(Self.pointee(other_ptr).has_grad())
                     self_requires_grad = self_ptr[].requires_grad
                     self_ptr[].requires_grad = False  # Set it False for next op
-                    other_ptr[].open_gradbox().gradients() += (
+                    other_ptr[].gradients() += (
                         out_grad * self_ptr[]
                     )
                     self_ptr[].requires_grad = self_requires_grad
 
                 print("in __mul__ * other grad_fn")
-            print("Issue here")
             if self.requires_grad and other.requires_grad:
                 out.add_ancestry(self_ptr, other_ptr)
             elif self.requires_grad:
@@ -395,29 +393,6 @@ struct Tensor[dtype: DType = DType.float32](
             out.grad_fn = Optional(grad_fn)
 
         return out
-
-    #@staticmethod
-    fn apply_gradients(self,
-        target: UnsafePointer[Self],
-        _from: UnsafePointer[Self],
-        output_gradients: UnsafePointer[Self],
-    ) raises:
-        if Self.pointee(target).requires_grad:
-            print("Apply gradient")
-            target_shape = Self.pointee(target).shape
-            _from_shape = Self.pointee(_from).shape
-            output_grad_shape = Self.pointee(output_gradients).shape
-            print(target,_from, output_gradients)
-            assert_true(target_shape == _from_shape and target_shape == output_grad_shape)
-
-
-            assert_true(Self.pointee(target).has_grad())
-            original_flag = _from[].requires_grad
-            _from[].requires_grad = False  # Prevent ancestry tracking
-            print(len(output_gradients[]), len(_from[]))
-            #target[].open_gradbox().gradients() += output_gradients[] * _from[]
-            #print(len(output_gradients[]), len(_from[]))
-            _from[].requires_grad = original_flag  # Restore flag
 
     fn __add__(mut self, mut other: Self) raises -> Tensor[dtype]:
         if self.shape != other.shape:
@@ -444,11 +419,11 @@ struct Tensor[dtype: DType = DType.float32](
             other_ptr = UnsafePointer(to=other)
 
             fn grad_fn() raises -> None:
-                out_grad = out_ptr[].open_gradbox().gradients()
+                out_grad = out_ptr[].gradients()
                 if self_ptr[].requires_grad:
-                    self_ptr[].open_gradbox().gradients() += out_grad
+                    self_ptr[].gradients() += out_grad
                 if other_ptr[].requires_grad:
-                    other_ptr[].open_gradbox().gradients() += out_grad
+                    other_ptr[].gradients() += out_grad
 
                 print("in __add__ + other grad_fn")
 
@@ -481,8 +456,8 @@ struct Tensor[dtype: DType = DType.float32](
             out_ptr = UnsafePointer(to=out)
 
             fn grad_fn() raises -> None:
-                self_ptr[].open_gradbox().gradients() += (
-                    out_ptr[].open_gradbox().gradients()
+                self_ptr[].gradients() += (
+                    out_ptr[].gradients()
                 )
                 print("in __add__ * value grad_fn")
 
@@ -857,10 +832,10 @@ fn test_add_2_tensors() raises:
         tensor1.shape == out_tensor.shape,
         "Input/output tensors shape match assertion failed",
     )
-    print("Tensor1 grad shape: ", tensor1.open_gradbox().gradients().shape)
-    print("Tensor2 grad shape: ", tensor2.open_gradbox().gradients().shape)
+    print("Tensor1 grad shape: ", tensor1.gradients().shape)
+    print("Tensor2 grad shape: ", tensor2.gradients().shape)
     print(
-        "Out tensor grad shape: ", out_tensor.open_gradbox().gradients().shape
+        "Out tensor grad shape: ", out_tensor.gradients().shape
     )
     parent1 = out_tensor.ancestors.value().get(0).value()[]
     parent2 = out_tensor.ancestors.value().get(1).value()[]
@@ -871,12 +846,12 @@ fn test_add_2_tensors() raises:
         "Output tensor ancestry validation failed",
     )
     print("The following is out tensor gradient")
-    out_tensor.open_gradbox().gradients().print()
+    out_tensor.gradients().print()
     print("Before invoking grad_fn")
-    print("Tensor1 grad shape: ", tensor1.open_gradbox().gradients().shape)
-    print("Tensor2 grad shape: ", tensor2.open_gradbox().gradients().shape)
+    print("Tensor1 grad shape: ", tensor1.gradients().shape)
+    print("Tensor2 grad shape: ", tensor2.gradients().shape)
     print(
-        "Out tensor grad shape: ", out_tensor.open_gradbox().gradients().shape
+        "Out tensor grad shape: ", out_tensor.gradients().shape
     )
 
     out_tensor.invoke_grad_fn()
@@ -893,7 +868,7 @@ fn test_factor_mul_by() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.open_gradbox().gradients().print()
+    out_tensor.gradients().print()
 
 
 fn test_mul_by_factor() raises:
@@ -906,7 +881,7 @@ fn test_mul_by_factor() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.open_gradbox().gradients().print()
+    out_tensor.gradients().print()
 
 
 fn test_add_value() raises:
@@ -920,7 +895,7 @@ fn test_add_value() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.open_gradbox().gradients().print()
+    out_tensor.gradients().print()
 
 
 def main():
