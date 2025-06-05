@@ -79,7 +79,8 @@ struct Ancestors[dtype: DType = DType.float32](
         self.ancestors[0] = ptr1
         self.ancestors[1] = ptr2
 
-    fn __del__(owned self):
+    fn free(owned self):
+    #fn __del__(owned self):
         print(
             "Deleting Ancestry with length: ",
             len(self),

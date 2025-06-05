@@ -1,6 +1,6 @@
 from tensors import Tensor
 from shapes import Shape
-from memory import UnsafePointer
+from memory import UnsafePointer, memset_zero
 
 
 struct GradBox[dtype: DType = DType.float32](
@@ -9,8 +9,8 @@ struct GradBox[dtype: DType = DType.float32](
     var storage: UnsafePointer[Tensor[dtype]]
 
     fn __init__(out self, shape: Shape) raises:
-        _storage = Tensor[dtype](shape)
-        _storage.fill(Scalar[dtype](0))
+        _storage = Tensor[dtype](shape, requires_grad=False)
+        memset_zero(_storage.data, _storage.numels())
         self.storage = UnsafePointer[__type_of(_storage)].alloc(1)
         self.storage.init_pointee_move(_storage^)
 
