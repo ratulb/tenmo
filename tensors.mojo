@@ -402,30 +402,16 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    # fn __add__(mut self, mut other: Self) raises -> Tensor[dtype]:
     fn __add__(self, other: Self) raises -> Tensor[dtype]:
         this = Self.pointee(self.pointer())
         that = Self.pointee(other.pointer())
-        # if self.shape != other.shape:
-        # raise Error("add -> Dimension mismatch:", self.shape, other.shape)
         if this.shape != that.shape:
-            raise Error("add -> Dimension mismatch:", this.shape, that.shape)
-
-        # requires_grad = self.requires_grad or other.requires_grad
-        requires_grad = this.requires_grad or that.requires_grad
-        # var out = Tensor[dtype](self.shape, requires_grad)
-        var out = _tensor_op_tensor[dtype, AddTensor](this, that)
-        _ = """@parameter
-        fn add_elems[simd_width: Int](idx: Int):
-            out.data.store[width=simd_width](
-                idx,
-                (
-                    self.data.load[width=simd_width](idx)
-                    + other.data.load[width=simd_width](idx)
-                ),
+            raise Error(
+                "__add__ -> Dimension mismatch:", this.shape, that.shape
             )
 
-        vectorize[add_elems, simdwidthof[dtype]()](out.numels())"""
+        requires_grad = this.requires_grad or that.requires_grad
+        var out = _tensor_op_tensor[dtype, AddTensor](this, that)
 
         if requires_grad:
             out_ptr = out.pointer()
@@ -435,11 +421,13 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn() raises -> None:
                 out_grad = out_ptr[].gradients()
                 if self_ptr[].requires_grad:
-                    self_ptr[].gradients() += out_grad
+                    self_ptr[].grad[] = _tensor_op_tensor[dtype, AddTensor](
+                        self_ptr[].grad[], out_grad
+                    )
                 if other_ptr[].requires_grad:
-                    other_ptr[].gradients() += out_grad
-
-                print("in __add__ + other grad_fn")
+                    other_ptr[].grad[] = _tensor_op_tensor[dtype, AddTensor](
+                        other_ptr[].grad[], out_grad
+                    )
 
             out.grad_fn = Optional(grad_fn)
 
