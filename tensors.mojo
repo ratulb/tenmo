@@ -8,13 +8,13 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from gradbox import GradBox
 from common_utils import int_varia_list_to_str, validate_shape, IdGen
 from ancestry import Ancestors
 from testing import assert_true
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
+    MulTensor,
     __tensor_op_scalar__,
     AddScalar,
     MulScalar,
@@ -47,6 +47,18 @@ struct Tensor[dtype: DType = DType.float32](
             self.shape.num_elements()
         )
         self.init_gradbox()
+
+    fn backward(self, mut start: Bool) raises:
+        if start:
+            print("Starting with tensor: ", self.pointer())
+            start = False
+        self.invoke_grad_fn()
+        if self.ancestors:
+            for i in range(len(self.ancestors.value())):
+                ancestor = self.ancestors.value().get(i)
+                if ancestor:
+                    print("Ancestor ptr addr: ", ancestor.value())
+                    ancestor.value()[].backward(start)
 
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
@@ -171,6 +183,12 @@ struct Tensor[dtype: DType = DType.float32](
             return ambivalent == True
 
         return self.for_all(all_truthy)
+
+    _ = """fn all_equals(self, value: Scalar[dtype]) -> Bool:
+        fn all_truthy(elem: Scalar[DType.bool]) -> Bool:
+            return value.__eq__(elem) == True
+
+        return self.for_all(all_truthy)"""
 
     fn any_true(self: Tensor[DType.bool]) -> Bool:
         fn any_truthy(ambivalent: Scalar[DType.bool]) -> Bool:
@@ -335,124 +353,98 @@ struct Tensor[dtype: DType = DType.float32](
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self.pointer())
 
+        print("Out pointer address: ", out.pointer())
+        print("Self pointer address: ", self.pointer())
         return out
 
     # Element wise multiplication of two tensors
-    # fn __mul__(mut self, mut other: Self) raises -> Tensor[dtype]:
     fn __mul__(self, other: Self) raises -> Tensor[dtype]:
-        if self.shape != other.shape:
+        if self.pointer()[].shape != other.pointer()[].shape:
             raise Error(
                 "__mul__self * other -> Dimension mismatch:",
-                self.shape,
-                other.shape,
+                self.pointer()[].shape,
+                other.pointer()[].shape,
             )
-        _self = Self.pointee(self.pointer())
-        _other = Self.pointee(other.pointer())
-        requires_grad = _self.requires_grad or _other.requires_grad
-        out = Tensor[dtype](_self.shape, requires_grad)
+        var out = __tensor_op_tensor__[dtype, MulTensor](
+            self.pointer()[], other.pointer()[]
+        )
 
-        @parameter
-        fn mul_elems[simd_width: Int](idx: Int):
-            out.data.store[width=simd_width](
-                idx,
-                (
-                    _self.data.load[width=simd_width](idx)
-                    * _other.data.load[width=simd_width](idx)
-                ),
-            )
-
-        vectorize[mul_elems, simdwidthof[dtype]()](out.numels())
-
-        if requires_grad:
-            self_ptr = _self.pointer()
-            other_ptr = _other.pointer()
-            out_ptr = out.pointer()
+        if self.pointer()[].requires_grad or other.pointer()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                output = Self.pointee(out_ptr)
-                # assert_true(Self.pointee(out_ptr).requires_grad)
-                # assert_true(Self.pointee(out_ptr).requires_grad)
-                assert_true(output.requires_grad)
-                assert_true(output.has_grad())
-                out_grad = out_ptr[].open_gradbox()
-                # out_grad = output.grad[]
-                assert_true(
-                    out_grad.requires_grad == False
-                    and out_grad.has_grad() == False
-                )
-                print("ok1")
-                if self_ptr[].requires_grad:
-                    assert_true(Self.pointee(self_ptr).has_grad())
-                    other_requires_grad = other_ptr[].requires_grad
-                    other_ptr[].requires_grad = False  # Set it False for next op or else it would trigger ancestry tracking for gradient multiplication below
-                    print("ok2")
-                    self_ptr[].open_gradbox() += (
-                        out_ptr[].open_gradbox()
-                        * other_ptr[]
-                        # out_grad * other_ptr[]
+                out_grad = out.pointer()[].grad[]
+
+                if self.pointer()[].requires_grad:
+                    product = __tensor_op_tensor__[dtype, MulTensor](
+                        out_grad, other.pointer()[]
                     )
-                    # self_ptr[].grad[] += out_grad * other_ptr[]
-                    print("ok3")
-                    _ = """other_ptr[].requires_grad = (
-                        other_requires_grad  # Set it back to original
-                    )"""
-                if other_ptr[].requires_grad:
-                    assert_true(Self.pointee(other_ptr).has_grad())
-                    self_requires_grad = self_ptr[].requires_grad
-                    self_ptr[].requires_grad = False  # Set it False for next op
-                    other_ptr[].open_gradbox() += out_grad * self_ptr[]
-                    self_ptr[].requires_grad = self_requires_grad
+                    self.pointer()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](self.pointer()[].grad[], product)
+
+                if other.pointer()[].requires_grad:
+                    product = __tensor_op_tensor__[dtype, MulTensor](
+                        out_grad, self.pointer()[]
+                    )
+                    other.pointer()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](other.pointer()[].grad[], product)
 
                 print("in __mul__ * other grad_fn")
 
-            if _self.requires_grad and _other.requires_grad:
-                out.add_ancestry(self_ptr, other_ptr)
-            elif _self.requires_grad:
-                out.add_ancestry(self_ptr)
-            elif _other.requires_grad:
-                out.add_ancestry(other_ptr)
+            if (
+                self.pointer()[].requires_grad
+                and other.pointer()[].requires_grad
+            ):
+                out.add_ancestry(self.pointer(), other.pointer())
+            elif self.pointer()[].requires_grad:
+                out.add_ancestry(self.pointer())
+            elif other.pointer()[].requires_grad:
+                out.add_ancestry(other.pointer())
 
             out.grad_fn = Optional(grad_fn)
 
         return out
 
     fn __add__(self, other: Self) raises -> Tensor[dtype]:
-        this_ptr = self.pointer()
-        other_ptr = other.pointer()
-        if this_ptr == other_ptr:
+        if self.pointer() == other.pointer():
             return self.__mul__(2)
-        this = Self.pointee(this_ptr)
-        that = Self.pointee(other_ptr)
-        if this.shape != that.shape:
+        if self.pointer()[].shape != other.pointer()[].shape:
             raise Error(
-                "__add__ -> Dimension mismatch:", this.shape, that.shape
+                "__add__ -> Dimension mismatch:",
+                self.pointer()[].shape,
+                other.pointer()[].shape,
             )
 
-        requires_grad = this.requires_grad or that.requires_grad
-        var out = __tensor_op_tensor__[dtype, AddTensor](this, that)
-        out_ptr = out.pointer()
+        var out = __tensor_op_tensor__[dtype, AddTensor](
+            self.pointer()[], other.pointer()[]
+        )
 
-        if requires_grad:
+        if self.pointer()[].requires_grad or other.pointer()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                out_grad = out_ptr[].open_gradbox()
-                if this_ptr[].requires_grad:
-                    this_ptr[].grad[] = __tensor_op_tensor__[dtype, AddTensor](
-                        this_ptr[].grad[], out_grad
-                    )
-                if other_ptr[].requires_grad:
-                    other_ptr[].grad[] = __tensor_op_tensor__[dtype, AddTensor](
-                        other_ptr[].grad[], out_grad
-                    )
+                print("I am getting called silently - don't you see?")
+                out_grad = out.pointer()[].grad[]
+                if self.pointer()[].requires_grad:
+                    self.pointer()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](self.pointer()[].grad[], out_grad)
+                if other.pointer()[].requires_grad:
+                    other.pointer()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](other.pointer()[].grad[], out_grad)
 
             out.grad_fn = Optional(grad_fn)
 
-            if this.requires_grad and that.requires_grad:
-                out.add_ancestry(this_ptr, other_ptr)
-            elif this.requires_grad:
-                out.add_ancestry(this_ptr)
-            elif that.requires_grad:
-                out.add_ancestry(other_ptr)
+            if (
+                self.pointer()[].requires_grad
+                and other.pointer()[].requires_grad
+            ):
+                out.add_ancestry(self.pointer(), other.pointer())
+            elif self.pointer()[].requires_grad:
+                out.add_ancestry(self.pointer())
+            elif other.pointer()[].requires_grad:
+                out.add_ancestry(other.pointer())
 
         return out
 
@@ -477,6 +469,7 @@ struct Tensor[dtype: DType = DType.float32](
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self.pointer())
+        print("Out pointer address: ", out.pointer())
 
         return out
 
@@ -730,7 +723,6 @@ struct Tensor[dtype: DType = DType.float32](
             indent = " " * (level * 2)
             num_first = 5
             num_last = 5
-            # _ = self.shape.__str__()
             # Defensive check
             if current_dim >= self.ndim():
                 # if current_dim > self.ndim():

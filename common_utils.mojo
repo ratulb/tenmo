@@ -1,6 +1,7 @@
 from shapes import Shape
 from testing import assert_true
 
+
 fn int_varia_list_to_str(list: VariadicList[Int]) -> String:
     s = String("[")
     for idx in range(len(list)):
@@ -29,7 +30,7 @@ fn passthrough(n: Int) -> VariadicList[Int]:
 
 fn validate_shape(shape: Shape) raises:
     for idx in range(shape.ndim):
-        #print("Validating shape: ", shape.axes_spans[idx])
+        # print("Validating shape: ", shape.axes_spans[idx])
         assert_true(shape.axes_spans[idx] > 0, "Shape dimension not valid")
 
 
@@ -66,17 +67,23 @@ from os import Atomic
 from memory import UnsafePointer
 
 
+@value
 struct IdGen:
-    #alias tensor_ids = UnsafePointer[UInt64].alloc(1)
+    var tensor_ids: UnsafePointer[UInt64]
 
-    @staticmethod
-    fn next(loc: UnsafePointer[UInt64]) -> UInt64:
-        return Atomic.fetch_add(loc, 1)
+    fn __init__(out self):
+        self.tensor_ids = UnsafePointer[UInt64].alloc(1)
+
+    fn __enter__(mut self) -> Self:
+        self.tensor_ids[] = 0
+        return self
+
+    fn __exit__(mut self):
+        print("Exiting IdGen")
+
+    fn next(self) -> UInt64:
+        return Atomic.fetch_add(self.tensor_ids, 1)
 
 
-#fn next_id() -> UInt64:
-    #return IdGen.next()
-
-
-#var global_id_ptr: UnsafePointer[UInt64] = UnsafePointer[UInt64].alloc(1)
-# Atomic.store(global_id_ptr, 0)
+fn main():
+    print("Hello")
