@@ -1,14 +1,14 @@
 from tensors import Tensor
 from testing import assert_true, assert_false
+from math import ceil
 
 
 fn test_tensor_mul_scalar() raises:
     tensor = Tensor.rand(4, 5, requires_grad=True)
     result1 = 2 + tensor
     result2 = tensor * 3
-    result3 = tensor * 42
+    result3 = 42 * tensor
     result4 = tensor + tensor
-
     try:
         assert_true(
             tensor.has_grad()
@@ -58,6 +58,19 @@ fn test_tensor_mul_scalar() raises:
         assert_true(
             tensor.grad[].for_all(pred3),
             "Grad for result4 and tensor assertion failed",
+        )
+
+        fn pred4(elem: Scalar[DType.float32]) -> Bool:
+            return ceil(elem) == -429.0
+
+        result3.invoke_grad_fn()  # Invoke it again
+
+        assert_true(
+            tensor.grad[].for_all(pred4),
+            (
+                "Grad for result3 and tensor after re-invocation of grad_fn"
+                " assertion failed"
+            ),
         )
 
     finally:
