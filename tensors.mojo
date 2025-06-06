@@ -9,20 +9,26 @@ from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
 from gradbox import GradBox
-from common_utils import int_varia_list_to_str, validate_shape
+from common_utils import int_varia_list_to_str, validate_shape, IdGen
 from ancestry import Ancestors
 from testing import assert_true
-from operators import _tensor_op_tensor, AddTensor
+from operators import (
+    __tensor_op_tensor__,
+    AddTensor,
+    __tensor_op_scalar__,
+    AddScalar,
+    MulScalar,
+)
 
 
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable
 ):
-    # Gradients are float32
+    alias GradBox = UnsafePointer[Self]
     var shape: Shape
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
-    var grad: UnsafePointer[Self]
+    var grad: Self.GradBox
     var ancestors: Optional[Ancestors[dtype]]
     var grad_fn: Optional[fn () escaping raises -> None]
 
@@ -40,7 +46,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
             self.shape.num_elements()
         )
-        self.init_gradients()
+        self.init_gradbox()
 
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
@@ -100,14 +106,23 @@ struct Tensor[dtype: DType = DType.float32](
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
 
-    fn init_gradients(mut self) raises:
+    fn init_gradbox(mut self) raises:
         if self.requires_grad and self.grad.__as_bool__() == False:
             gradients = Tensor[self.dtype](self.shape)
             self.grad = UnsafePointer[__type_of(self)].alloc(1)
             self.grad.init_pointee_move(gradients^)
             self.zero_grad()
 
-    fn gradients(
+    fn print_grad(self):
+        print("\nTensor GradBox\n")
+        if self.requires_grad == False:
+            print("Requires grad? No.")
+        elif self.requires_grad and self.has_grad() == False:
+            print("Gradbox not initialized")
+        else:
+            self.grad[].print()
+
+    fn open_gradbox(
         mut self,
     ) raises -> ref [self.grad[]] Tensor[self.dtype]:
         if self.requires_grad == False or self.has_grad() == False:
@@ -124,7 +139,7 @@ struct Tensor[dtype: DType = DType.float32](
                 (self.data + i).destroy_pointee()
                 # (self.grad.value().unsafe_ptr()[].data + i).destroy_pointee()
             try:
-                self.gradients().free()
+                self.open_gradbox().free()
                 print(
                     "Tensor__del__ -> freed grad(and pointees) and self data"
                     " pointees"
@@ -295,31 +310,30 @@ struct Tensor[dtype: DType = DType.float32](
                 self.ancestors.value().set(left_lineage)
                 print("Did add left_lineage")
 
-    fn __rmul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
-        return self.__mul__(factor)
+    fn __rmul__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
+        return self.__mul__(scalar)
 
-    fn __mul__(mut self, factor: Scalar[dtype]) raises -> Tensor[dtype]:
-        var out = Tensor[dtype](self.shape, self.requires_grad)
+    fn __mul__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
+        var out = __tensor_op_scalar__[dtype, MulScalar](
+            self.pointer()[], scalar
+        )
 
-        @parameter
-        fn mul_by_factor[simd_width: Int](idx: Int):
-            out.data.store[width=simd_width](
-                idx, self.data.load[width=simd_width](idx) * factor
-            )
-
-        vectorize[mul_by_factor, simdwidthof[dtype]()](out.numels())
-
-        if self.requires_grad:
-            self_ptr = UnsafePointer(to=self)
-            out_ptr = UnsafePointer(to=out)
+        if self.pointer()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                temp = out_ptr[].gradients() * factor
-                self_ptr[].gradients() += temp
+                print("Entering grad fn")
+                out_grad_scaled = __tensor_op_scalar__[dtype, MulScalar](
+                    out.pointer()[].grad[], scalar
+                )
+                print("In grad fn")
+                self.pointer()[].grad[] = __tensor_op_tensor__[
+                    dtype, AddTensor
+                ](self.pointer()[].grad[], out_grad_scaled)
+                print("Out of grad fn")
 
             print("I have come here alright - mul_by_factor")
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(UnsafePointer(to=self))
+            out.add_ancestry(self.pointer())
 
         return out
 
@@ -360,7 +374,7 @@ struct Tensor[dtype: DType = DType.float32](
                 # assert_true(Self.pointee(out_ptr).requires_grad)
                 assert_true(output.requires_grad)
                 assert_true(output.has_grad())
-                out_grad = out_ptr[].gradients()
+                out_grad = out_ptr[].open_gradbox()
                 # out_grad = output.grad[]
                 assert_true(
                     out_grad.requires_grad == False
@@ -372,8 +386,8 @@ struct Tensor[dtype: DType = DType.float32](
                     other_requires_grad = other_ptr[].requires_grad
                     other_ptr[].requires_grad = False  # Set it False for next op or else it would trigger ancestry tracking for gradient multiplication below
                     print("ok2")
-                    self_ptr[].gradients() += (
-                        out_ptr[].gradients()
+                    self_ptr[].open_gradbox() += (
+                        out_ptr[].open_gradbox()
                         * other_ptr[]
                         # out_grad * other_ptr[]
                     )
@@ -386,7 +400,7 @@ struct Tensor[dtype: DType = DType.float32](
                     assert_true(Self.pointee(other_ptr).has_grad())
                     self_requires_grad = self_ptr[].requires_grad
                     self_ptr[].requires_grad = False  # Set it False for next op
-                    other_ptr[].gradients() += out_grad * self_ptr[]
+                    other_ptr[].open_gradbox() += out_grad * self_ptr[]
                     self_ptr[].requires_grad = self_requires_grad
 
                 print("in __mul__ * other grad_fn")
@@ -403,64 +417,66 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn __add__(self, other: Self) raises -> Tensor[dtype]:
-        this = Self.pointee(self.pointer())
-        that = Self.pointee(other.pointer())
+        this_ptr = self.pointer()
+        other_ptr = other.pointer()
+        if this_ptr == other_ptr:
+            return self.__mul__(2)
+        this = Self.pointee(this_ptr)
+        that = Self.pointee(other_ptr)
         if this.shape != that.shape:
             raise Error(
                 "__add__ -> Dimension mismatch:", this.shape, that.shape
             )
 
         requires_grad = this.requires_grad or that.requires_grad
-        var out = _tensor_op_tensor[dtype, AddTensor](this, that)
+        var out = __tensor_op_tensor__[dtype, AddTensor](this, that)
+        out_ptr = out.pointer()
 
         if requires_grad:
-            out_ptr = out.pointer()
-            self_ptr = this.pointer()
-            other_ptr = that.pointer()
 
             fn grad_fn() raises -> None:
-                out_grad = out_ptr[].gradients()
-                if self_ptr[].requires_grad:
-                    self_ptr[].grad[] = _tensor_op_tensor[dtype, AddTensor](
-                        self_ptr[].grad[], out_grad
+                out_grad = out_ptr[].open_gradbox()
+                if this_ptr[].requires_grad:
+                    this_ptr[].grad[] = __tensor_op_tensor__[dtype, AddTensor](
+                        this_ptr[].grad[], out_grad
                     )
                 if other_ptr[].requires_grad:
-                    other_ptr[].grad[] = _tensor_op_tensor[dtype, AddTensor](
+                    other_ptr[].grad[] = __tensor_op_tensor__[dtype, AddTensor](
                         other_ptr[].grad[], out_grad
                     )
 
             out.grad_fn = Optional(grad_fn)
 
             if this.requires_grad and that.requires_grad:
-                out.add_ancestry(self_ptr, other_ptr)
+                out.add_ancestry(this_ptr, other_ptr)
             elif this.requires_grad:
-                out.add_ancestry(self_ptr)
+                out.add_ancestry(this_ptr)
             elif that.requires_grad:
                 out.add_ancestry(other_ptr)
 
         return out
 
-    fn __add__(mut self, value: Scalar[dtype]) raises -> Tensor[dtype]:
-        var out = Tensor[dtype](self.shape, self.requires_grad)
+    fn __radd__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
+        return self.__add__(scalar)
 
-        @parameter
-        fn add_value[simd_width: Int](idx: Int):
-            out.data.store[width=simd_width](
-                idx, self.data.load[width=simd_width](idx) + value
-            )
+    fn __add__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
+        var out = __tensor_op_scalar__[dtype, AddScalar](
+            self.pointer()[], scalar
+        )
 
-        vectorize[add_value, simdwidthof[dtype]()](out.numels())
-
-        if self.requires_grad:
-            self_ptr = UnsafePointer(to=self)
-            out_ptr = UnsafePointer(to=out)
+        if self.pointer()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                self_ptr[].gradients() += out_ptr[].gradients()
-                print("in __add__ * value grad_fn")
+                self_grad = self.pointer()[].grad[]
+                out_grad = out.pointer()[].grad[]
+                self.pointer()[].grad[] = __tensor_op_tensor__[
+                    dtype, AddTensor
+                ](self_grad, out_grad)
+
+                print("in __add__(scalar) grad_fn")
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(UnsafePointer(to=self))
+            out.add_ancestry(self.pointer())
 
         return out
 
@@ -830,9 +846,9 @@ fn test_add_2_tensors() raises:
         tensor1.shape == out_tensor.shape,
         "Input/output tensors shape match assertion failed",
     )
-    print("Tensor1 grad shape: ", tensor1.gradients().shape)
-    print("Tensor2 grad shape: ", tensor2.gradients().shape)
-    print("Out tensor grad shape: ", out_tensor.gradients().shape)
+    print("Tensor1 grad shape: ", tensor1.open_gradbox().shape)
+    print("Tensor2 grad shape: ", tensor2.open_gradbox().shape)
+    print("Out tensor grad shape: ", out_tensor.open_gradbox().shape)
     parent1 = out_tensor.ancestors.value().get(0).value()[]
     parent2 = out_tensor.ancestors.value().get(1).value()[]
     left_parent_is_tensor1 = (parent1 == tensor1).all_true()
@@ -842,11 +858,11 @@ fn test_add_2_tensors() raises:
         "Output tensor ancestry validation failed",
     )
     print("The following is out tensor gradient")
-    out_tensor.gradients().print()
+    out_tensor.open_gradbox().print()
     print("Before invoking grad_fn")
-    print("Tensor1 grad shape: ", tensor1.gradients().shape)
-    print("Tensor2 grad shape: ", tensor2.gradients().shape)
-    print("Out tensor grad shape: ", out_tensor.gradients().shape)
+    print("Tensor1 grad shape: ", tensor1.open_gradbox().shape)
+    print("Tensor2 grad shape: ", tensor2.open_gradbox().shape)
+    print("Out tensor grad shape: ", out_tensor.open_gradbox().shape)
 
     out_tensor.invoke_grad_fn()
 
@@ -862,7 +878,7 @@ fn test_factor_mul_by() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.gradients().print()
+    out_tensor.open_gradbox().print()
 
 
 fn test_mul_by_factor() raises:
@@ -875,7 +891,7 @@ fn test_mul_by_factor() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.gradients().print()
+    out_tensor.open_gradbox().print()
 
 
 fn test_add_value() raises:
@@ -889,7 +905,7 @@ fn test_add_value() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.gradients().print()
+    out_tensor.open_gradbox().print()
 
 
 def main():

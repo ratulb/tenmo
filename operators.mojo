@@ -4,12 +4,13 @@ from algorithm import vectorize
 from sys import simdwidthof
 
 
-fn _tensor_op_tensor[
+# Element wise operatorns
+fn __tensor_op_tensor__[
     dtype: DType, op: Int
 ](this: Tensor[dtype], that: Tensor[dtype]) raises -> Tensor[dtype]:
     if this.shape != that.shape:
         raise Error(
-            "_tensor_op__tensor(" + String(op) + ")  -> Dimension mismatch:",
+            "__tensor_op__tensor(" + String(op) + ")  -> Dimension mismatch:",
             this.shape,
             that.shape,
         )
@@ -32,7 +33,7 @@ fn _tensor_op_tensor[
             idx,
             (
                 this.data.load[width=simd_width](idx)
-                * that.data.load[width=simd_width](idx)
+                + that.data.load[width=simd_width](idx)
             ),
         )
 
@@ -40,6 +41,45 @@ fn _tensor_op_tensor[
         vectorize[mul_elems, simdwidthof[dtype]()](out.numels())
     elif op == AddTensor:
         vectorize[add_elems, simdwidthof[dtype]()](out.numels())
+
+    return out
+
+
+# Tensor and scalar ops
+fn __tensor_op_scalar__[
+    dtype: DType, op: Int
+](this: Tensor[dtype], scalar: Scalar[dtype]) raises -> Tensor[dtype]:
+    var out = Tensor[dtype](this.shape, this.requires_grad)
+
+    @parameter
+    fn add_scalar[simd_width: Int](idx: Int):
+        out.data.store[width=simd_width](
+            idx, this.data.load[width=simd_width](idx) + scalar
+        )
+
+    @parameter
+    fn mul_by_scalar[simd_width: Int](idx: Int):
+        out.data.store[width=simd_width](
+            idx, this.data.load[width=simd_width](idx) * scalar
+        )
+
+    if op == MulScalar:
+        vectorize[mul_by_scalar, simdwidthof[dtype]()](out.numels())
+    elif op == AddScalar:
+        vectorize[add_scalar, simdwidthof[dtype]()](out.numels())
+
+    _ = """if this.requires_grad:
+        this_ptr = this.pointer()
+        out_ptr = out.pointer()
+
+        fn grad_fn() raises -> None:
+            this_ptr[].grad[] = __tensor_op_tensor__[dtype, AddTensor](
+                this_ptr[].grad[], out_ptr[].grad[]
+            )
+            print("in __add__ * value grad_fn")
+
+        out.grad_fn = Optional(grad_fn)
+        out.add_ancestry(this_ptr)"""
 
     return out
 
@@ -65,8 +105,9 @@ fn _AddScalar[
 
 alias Noop = 0
 alias AddScalar = 1
-alias MulTensor = 2
-alias AddTensor = 3
+alias MulScalar = 2
+alias MulTensor = 3
+alias AddTensor = 4
 
 
 @value
@@ -107,8 +148,6 @@ struct GradFn[dtype: DType]:
 fn main():
     h = "howdy"
     hptr = UnsafePointer(to=h)
-    _h =hptr[]
+    _h = hptr[]
     _hptr = UnsafePointer(to=_h)
     print("Howdy?", hptr == _hptr)
-
-
