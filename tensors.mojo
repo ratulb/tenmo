@@ -19,6 +19,7 @@ from operators import (
     AddScalar,
     MulScalar,
 )
+from collections import Set
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -47,6 +48,36 @@ struct Tensor[dtype: DType = DType.float32](
             self.shape.num_elements()
         )
         self.init_gradbox()
+
+    @staticmethod
+    fn trace_ancestry[
+        _dtype: DType, //
+    ](
+        tensor: Tensor[_dtype],
+        mut visited: Set[String],
+        mut traced: List[UnsafePointer[Tensor[_dtype]]],
+    ):
+        if tensor.pointer().__str__() not in visited:
+            visited.add(tensor.pointer().__str__())
+            if tensor.ancestors is not None:
+                ancestors = tensor.ancestors.value()
+                for i in range(len(ancestors)):
+                    ancestor = ancestors.get(i)
+                    if ancestor is not None:
+                        Self.trace_ancestry(ancestor.value()[], visited, traced)
+                traced.append(tensor.pointer())
+
+    @staticmethod
+    fn walk_backward[_dtype: DType, //](tensor: Tensor[_dtype]) raises:
+        if tensor.has_grad() == False:
+            return
+        visited = Set[String]()
+        traced = List[UnsafePointer[Tensor[_dtype]]]()
+        Self.trace_ancestry(tensor, visited, traced)
+        tensor.grad[].fill(1.0)
+        print(len(traced))
+        for each in reversed(traced):
+            each[].invoke_grad_fn()
 
     fn backward(self, mut start: Bool) raises:
         if start:

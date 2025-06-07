@@ -2,7 +2,6 @@ from tensors import Tensor
 from testing import assert_true
 
 
-
 fn test_tensor_additions_1() raises:
     tensor1 = Tensor.rand(4, 4, requires_grad=True)
     tensor2 = Tensor.rand(4, 4, requires_grad=True)
@@ -10,7 +9,14 @@ fn test_tensor_additions_1() raises:
     tensor4 = Tensor.rand(4, 4, requires_grad=True)
     result1 = tensor1 + tensor2 * 3 + tensor3 * tensor4
 
-    print("Ptr addresses here: tensor1: ", tensor1.pointer(), "tensor2: ", tensor2.pointer(), "result1: ", result1.pointer())
+    print(
+        "Ptr addresses here: tensor1: ",
+        tensor1.pointer(),
+        "tensor2: ",
+        tensor2.pointer(),
+        "result1: ",
+        result1.pointer(),
+    )
     result1.print()
 
     try:
@@ -21,12 +27,14 @@ fn test_tensor_additions_1() raises:
             and result1.grad_func() is not None,
             "Tensor addition grad initialization assertion failed",
         )
-        result1.grad[].fill(100)
+        # result1.grad[].fill(100)
         start = True
-        #result1.invoke_grad_fn()
-        result1.backward(start)
-        #print(len(result1.ancestors.value()))
-        #result1.invoke_grad_fn()
+        # result1.invoke_grad_fn()
+        # result1.backward(start)
+
+        Tensor.walk_backward(result1)
+        # print(len(result1.ancestors.value()))
+        # result1.invoke_grad_fn()
 
         tensor1.grad[].print()
         tensor2.grad[].print()
