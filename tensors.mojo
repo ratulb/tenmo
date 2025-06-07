@@ -8,7 +8,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from common_utils import int_varia_list_to_str, validate_shape, log_debug
+from common_utils import int_varia_list_to_str, validate_shape, log_debug, piped
 from ancestry import Ancestors
 from testing import assert_true
 from operators import (
@@ -720,6 +720,21 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     @staticmethod
+    fn of(
+        *elems: Scalar[dtype], requires_grad: Bool = False
+    ) raises -> Tensor[dtype]:
+        if requires_grad:
+            assert_true(
+                dtype.is_numeric() and dtype.is_floating_point(),
+                "requires_grad can be True only for floating point types",
+            )
+        shape = Shape(piped(len(elems)))
+        tensor = Tensor[dtype](shape, requires_grad)
+        for i in range(len(elems)):
+            tensor[i] = elems[i]
+        return tensor
+
+    @staticmethod
     fn ones(
         *axes_spans: Int, requires_grad: Bool = False
     ) raises -> Tensor[dtype]:
@@ -918,10 +933,12 @@ fn test_add_value() raises:
 
 
 def main():
-    test_add_2_tensors()
+    _ = """test_add_2_tensors()
     test_mul_by_factor()
     test_add_value()
-    test_factor_mul_by()
+    test_factor_mul_by()"""
+    tensor = Tensor.of(1, 2, 3)
+    tensor.print()
     # tensor = Tensor.rand(4, 3, 2, 1)
     # out_tensor.grad_fn.value()
     # multiplied.grad_fn.value()
