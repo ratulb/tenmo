@@ -8,7 +8,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from common_utils import int_varia_list_to_str, validate_shape, IdGen
+from common_utils import int_varia_list_to_str, validate_shape, log_debug
 from ancestry import Ancestors
 from testing import assert_true
 from operators import (
@@ -152,7 +152,7 @@ struct Tensor[dtype: DType = DType.float32](
                 # (self.grad.value().unsafe_ptr()[].data + i).destroy_pointee()
             try:
                 self.open_gradbox().free()
-                print(
+                log_debug(
                     "Tensor__del__ -> freed grad(and pointees) and self data"
                     " pointees"
                 )
@@ -161,12 +161,12 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
-            print("Tensor__del__ -> freed self data pointees")
+            log_debug("Tensor__del__ -> freed self data pointees")
         if self.ancestors is not None:
-            print("Tensor__del__ -> discarded ancestors")
+            log_debug("Tensor__del__ -> discarded ancestors")
             _ = self.ancestors
         self.data.free()
-        print("Tensor__del__ -> called free on data")
+        log_debug("Tensor__del__ -> called free on data")
         _ = self^
 
     fn __len__(self) -> Int:

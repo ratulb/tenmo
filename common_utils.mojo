@@ -1,5 +1,21 @@
 from shapes import Shape
 from testing import assert_true
+from sys.param_env import env_get_string
+from logger import Level, Logger
+
+alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
+
+
+fn log_debug(msg: String):
+    log.debug(msg)
+
+
+fn log_info(msg: String):
+    log.info(msg)
+
+
+fn log_warning(msg: String):
+    log.warning(msg)
 
 
 fn int_varia_list_to_str(list: VariadicList[Int]) -> String:
