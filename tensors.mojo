@@ -735,6 +735,30 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     @staticmethod
+    fn of[
+        row_size: Int
+    ](*elems: Scalar[dtype], requires_grad: Bool = False) raises -> Tensor[
+        dtype
+    ]:
+        if requires_grad:
+            assert_true(
+                dtype.is_numeric() and dtype.is_floating_point(),
+                "requires_grad can be True only for floating point types",
+            )
+        assert_true(
+            row_size >= 1 and row_size <= len(elems),
+            "Invalid row size or not enough elements",
+        )
+        num_rows = len(elems) // row_size
+        axes_spans = piped(num_rows, row_size)
+        shape = Shape(axes_spans)
+        tensor = Tensor[dtype](shape, requires_grad)
+        for i in range(num_rows):
+            for j in range(row_size):
+                tensor[i, j] = elems[i * row_size + j]
+        return tensor
+
+    @staticmethod
     fn ones(
         *axes_spans: Int, requires_grad: Bool = False
     ) raises -> Tensor[dtype]:
@@ -939,6 +963,15 @@ def main():
     test_factor_mul_by()"""
     tensor = Tensor.of(1, 2, 3)
     tensor.print()
+    tensor1 = Tensor.of[1](1, 2, 3)
+    tensor1.print()
+    tensor2 = Tensor.of[2](1, 2, 3)
+    tensor2.print()
+    tensor3 = Tensor.of[3](1, 2, 3)
+    tensor3.print()
+    tensor4 = Tensor.of[3](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, requires_grad=True)
+    tensor4.print()
+
     # tensor = Tensor.rand(4, 3, 2, 1)
     # out_tensor.grad_fn.value()
     # multiplied.grad_fn.value()

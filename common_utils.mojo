@@ -43,11 +43,12 @@ fn validate_shape(shape: Shape) raises:
 
 
 # Create a single element VariadicList
-fn piped(n: Int) -> VariadicList[Int]:
-    fn single_elem_list(*single: Int) -> VariadicList[Int]:
+fn piped(m: Int, n: Int = -1) -> VariadicList[Int]:
+    fn create_variadic_list(*single: Int) -> VariadicList[Int]:
         return single
-
-    return single_elem_list(n)
+    if n == -1:
+        return create_variadic_list(m)
+    return create_variadic_list(m, n)
 
 
 
@@ -103,4 +104,10 @@ struct IdGen:
 
 
 fn main():
-    print("Hello")
+    vl = piped(3, 1)
+    for e in vl:
+        print(e)
+    
+
+
+
