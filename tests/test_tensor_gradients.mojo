@@ -46,11 +46,11 @@ fn test_tensor_additions_1() raises:
 
     print(
         "Ptr addresses here: tensor1: ",
-        tensor1.pointer(),
+        tensor1.address(),
         "tensor2: ",
-        tensor2.pointer(),
+        tensor2.address(),
         "result1: ",
-        result1.pointer(),
+        result1.address(),
     )
     result1.print()
 

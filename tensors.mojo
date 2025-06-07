@@ -57,15 +57,15 @@ struct Tensor[dtype: DType = DType.float32](
         mut visited: Set[String],
         mut traced: List[UnsafePointer[Tensor[_dtype]]],
     ):
-        if tensor.pointer().__str__() not in visited:
-            visited.add(tensor.pointer().__str__())
+        if tensor.address().__str__() not in visited:
+            visited.add(tensor.address().__str__())
             if tensor.ancestors is not None:
                 ancestors = tensor.ancestors.value()
                 for i in range(len(ancestors)):
                     ancestor = ancestors.get(i)
                     if ancestor is not None:
                         Self.trace_ancestry(ancestor.value()[], visited, traced)
-                traced.append(tensor.pointer())
+                traced.append(tensor.address())
 
     @staticmethod
     fn walk_backward[_dtype: DType, //](tensor: Tensor[_dtype]) raises:
@@ -80,7 +80,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn backward(self, mut start: Bool, grad_seed: Scalar[dtype] = 1.0) raises:
         if start:
-            # print("Starting with tensor: ", self.pointer())
+            # print("Starting with tensor: ", self.address())
             self.grad[].fill(grad_seed)
             start = False
         self.invoke_grad_fn()
@@ -94,14 +94,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
 
-    fn pointer(self) -> UnsafePointer[Self]:
+    fn address(self) -> UnsafePointer[Self]:
         return UnsafePointer(to=self)
-
-    @staticmethod
-    fn pointee(_pointer: UnsafePointer[Self]) raises -> Self:
-        if _pointer.__as_bool__() == False:
-            raise "Invalid Self pointer"
-        return _pointer[]
 
     fn invoke_grad_fn(self, verbose: Bool = True) raises -> None:
         if self.grad_fn:
@@ -359,117 +353,117 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __mul__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, MulScalar](
-            self.pointer()[], scalar
+            self.address()[], scalar
         )
 
-        if self.pointer()[].requires_grad:
+        if self.address()[].requires_grad:
 
             fn grad_fn() raises -> None:
                 out_grad_scaled = __tensor_op_scalar__[dtype, MulScalar](
-                    out.pointer()[].grad[], scalar
+                    out.address()[].grad[], scalar
                 )
-                self.pointer()[].grad[] = __tensor_op_tensor__[
+                self.address()[].grad[] = __tensor_op_tensor__[
                     dtype, AddTensor
-                ](self.pointer()[].grad[], out_grad_scaled)
+                ](self.address()[].grad[], out_grad_scaled)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self.pointer())
+            out.add_ancestry(self.address())
 
         return out
 
     # Element wise multiplication of two tensors
     fn __mul__(self, other: Self) raises -> Tensor[dtype]:
-        if self.pointer()[].shape != other.pointer()[].shape:
+        if self.address()[].shape != other.address()[].shape:
             raise Error(
                 "__mul__self * other -> Dimension mismatch:",
-                self.pointer()[].shape,
-                other.pointer()[].shape,
+                self.address()[].shape,
+                other.address()[].shape,
             )
         var out = __tensor_op_tensor__[dtype, MulTensor](
-            self.pointer()[], other.pointer()[]
+            self.address()[], other.address()[]
         )
 
-        if self.pointer()[].requires_grad or other.pointer()[].requires_grad:
+        if self.address()[].requires_grad or other.address()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                out_grad = out.pointer()[].grad[]
+                out_grad = out.address()[].grad[]
 
-                if self.pointer()[].requires_grad:
-                    requires_grad_original = other.pointer()[].requires_grad
-                    other.pointer()[].requires_grad = (
+                if self.address()[].requires_grad:
+                    requires_grad_original = other.address()[].requires_grad
+                    other.address()[].requires_grad = (
                         False  # Prevent requires_grad for grads
                     )
                     product = __tensor_op_tensor__[dtype, MulTensor](
-                        out_grad, other.pointer()[]
+                        out_grad, other.address()[]
                     )
-                    other.pointer()[].requires_grad = requires_grad_original
-                    self.pointer()[].grad[] = __tensor_op_tensor__[
+                    other.address()[].requires_grad = requires_grad_original
+                    self.address()[].grad[] = __tensor_op_tensor__[
                         dtype, AddTensor
-                    ](self.pointer()[].grad[], product)
+                    ](self.address()[].grad[], product)
 
-                if other.pointer()[].requires_grad:
-                    requires_grad_original = self.pointer()[].requires_grad
-                    self.pointer()[].requires_grad = False
+                if other.address()[].requires_grad:
+                    requires_grad_original = self.address()[].requires_grad
+                    self.address()[].requires_grad = False
                     product = __tensor_op_tensor__[dtype, MulTensor](
-                        out_grad, self.pointer()[]
+                        out_grad, self.address()[]
                     )
-                    self.pointer()[].requires_grad = requires_grad_original
-                    other.pointer()[].grad[] = __tensor_op_tensor__[
+                    self.address()[].requires_grad = requires_grad_original
+                    other.address()[].grad[] = __tensor_op_tensor__[
                         dtype, AddTensor
-                    ](other.pointer()[].grad[], product)
+                    ](other.address()[].grad[], product)
 
             if (
-                self.pointer()[].requires_grad
-                and other.pointer()[].requires_grad
+                self.address()[].requires_grad
+                and other.address()[].requires_grad
             ):
-                out.add_ancestry(self.pointer(), other.pointer())
-            elif self.pointer()[].requires_grad:
-                out.add_ancestry(self.pointer())
-            elif other.pointer()[].requires_grad:
-                out.add_ancestry(other.pointer())
+                out.add_ancestry(self.address(), other.address())
+            elif self.address()[].requires_grad:
+                out.add_ancestry(self.address())
+            elif other.address()[].requires_grad:
+                out.add_ancestry(other.address())
 
             out.grad_fn = Optional(grad_fn)
 
         return out
 
     fn __add__(self, other: Self) raises -> Tensor[dtype]:
-        if self.pointer() == other.pointer():
+        if self.address() == other.address():
             return self.__mul__(2)
-        if self.pointer()[].shape != other.pointer()[].shape:
+        if self.address()[].shape != other.address()[].shape:
             raise Error(
                 "__add__ -> Dimension mismatch:",
-                self.pointer()[].shape,
-                other.pointer()[].shape,
+                self.address()[].shape,
+                other.address()[].shape,
             )
 
         var out = __tensor_op_tensor__[dtype, AddTensor](
-            self.pointer()[], other.pointer()[]
+            self.address()[], other.address()[]
         )
 
-        if self.pointer()[].requires_grad or other.pointer()[].requires_grad:
+        if self.address()[].requires_grad or other.address()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                out_grad = out.pointer()[].grad[]
-                if self.pointer()[].requires_grad:
-                    self.pointer()[].grad[] = __tensor_op_tensor__[
+                out_grad = out.address()[].grad[]
+                if self.address()[].requires_grad:
+                    self.address()[].grad[] = __tensor_op_tensor__[
                         dtype, AddTensor
-                    ](self.pointer()[].grad[], out_grad)
-                if other.pointer()[].requires_grad:
-                    other.pointer()[].grad[] = __tensor_op_tensor__[
+                    ](self.address()[].grad[], out_grad)
+                if other.address()[].requires_grad:
+                    other.address()[].grad[] = __tensor_op_tensor__[
                         dtype, AddTensor
-                    ](other.pointer()[].grad[], out_grad)
+                    ](other.address()[].grad[], out_grad)
 
             out.grad_fn = Optional(grad_fn)
 
             if (
-                self.pointer()[].requires_grad
-                and other.pointer()[].requires_grad
+                self.address()[].requires_grad
+                and other.address()[].requires_grad
             ):
-                out.add_ancestry(self.pointer(), other.pointer())
-            elif self.pointer()[].requires_grad:
-                out.add_ancestry(self.pointer())
-            elif other.pointer()[].requires_grad:
-                out.add_ancestry(other.pointer())
+                out.add_ancestry(self.address(), other.address())
+            elif self.address()[].requires_grad:
+                out.add_ancestry(self.address())
+            elif other.address()[].requires_grad:
+                out.add_ancestry(other.address())
 
         return out
 
@@ -478,23 +472,23 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __add__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, AddScalar](
-            self.pointer()[], scalar
+            self.address()[], scalar
         )
 
-        if self.pointer()[].requires_grad:
+        if self.address()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                self_grad = self.pointer()[].grad[]
-                out_grad = out.pointer()[].grad[]
-                self.pointer()[].grad[] = __tensor_op_tensor__[
+                self_grad = self.address()[].grad[]
+                out_grad = out.address()[].grad[]
+                self.address()[].grad[] = __tensor_op_tensor__[
                     dtype, AddTensor
                 ](self_grad, out_grad)
 
                 print("in __add__(scalar) grad_fn")
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self.pointer())
-        print("Out pointer address: ", out.pointer())
+            out.add_ancestry(self.address())
+        print("Out pointer address: ", out.address())
 
         return out
 
