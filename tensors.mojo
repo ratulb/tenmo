@@ -374,13 +374,10 @@ struct Tensor[dtype: DType = DType.float32](
                 out_grad_scaled = __tensor_op_scalar__[dtype, MulScalar](
                     out.pointer()[].grad[], scalar
                 )
-                print("In grad fn")
                 self.pointer()[].grad[] = __tensor_op_tensor__[
                     dtype, AddTensor
                 ](self.pointer()[].grad[], out_grad_scaled)
-                print("Out of grad fn")
 
-            print("I have come here alright - mul_by_factor")
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self.pointer())
 
@@ -406,17 +403,25 @@ struct Tensor[dtype: DType = DType.float32](
                 out_grad = out.pointer()[].grad[]
 
                 if self.pointer()[].requires_grad:
+                    requires_grad_original = other.pointer()[].requires_grad
+                    other.pointer()[].requires_grad = (
+                        False  # Prevent requires_grad for grads
+                    )
                     product = __tensor_op_tensor__[dtype, MulTensor](
                         out_grad, other.pointer()[]
                     )
+                    other.pointer()[].requires_grad = requires_grad_original
                     self.pointer()[].grad[] = __tensor_op_tensor__[
                         dtype, AddTensor
                     ](self.pointer()[].grad[], product)
 
                 if other.pointer()[].requires_grad:
+                    requires_grad_original = self.pointer()[].requires_grad
+                    self.pointer()[].requires_grad = False
                     product = __tensor_op_tensor__[dtype, MulTensor](
                         out_grad, self.pointer()[]
                     )
+                    self.pointer()[].requires_grad = requires_grad_original
                     other.pointer()[].grad[] = __tensor_op_tensor__[
                         dtype, AddTensor
                     ](other.pointer()[].grad[], product)
