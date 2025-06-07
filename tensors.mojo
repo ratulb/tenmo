@@ -75,20 +75,20 @@ struct Tensor[dtype: DType = DType.float32](
         traced = List[UnsafePointer[Tensor[_dtype]]]()
         Self.trace_ancestry(tensor, visited, traced)
         tensor.grad[].fill(1.0)
-        print(len(traced))
         for each in reversed(traced):
             each[].invoke_grad_fn()
 
-    fn backward(self, mut start: Bool) raises:
+    fn backward(self, mut start: Bool, grad_seed: Scalar[dtype] = 1.0) raises:
         if start:
-            print("Starting with tensor: ", self.pointer())
+            # print("Starting with tensor: ", self.pointer())
+            self.grad[].fill(grad_seed)
             start = False
         self.invoke_grad_fn()
         if self.ancestors:
             for i in range(len(self.ancestors.value())):
                 ancestor = self.ancestors.value().get(i)
                 if ancestor:
-                    print("Ancestor ptr addr: ", ancestor.value())
+                    # print("Ancestor ptr addr: ", ancestor.value())
                     ancestor.value()[].backward(start)
 
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
@@ -157,7 +157,6 @@ struct Tensor[dtype: DType = DType.float32](
             self.zero_grad()
 
     fn print_grad(self):
-        print("\nTensor GradBox\n")
         if self.requires_grad == False:
             print("Requires grad? No.")
         elif self.requires_grad and self.has_grad() == False:
@@ -339,7 +338,6 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn zero_grad(self):
         if self.grad_required() and self.has_grad():
-            print("ok - zero grading")
             memset_zero(self.grad[].data, self.grad[].numels())
 
     fn add_ancestry(
@@ -351,13 +349,10 @@ struct Tensor[dtype: DType = DType.float32](
     ):
         if self.ancestors == None:
             self.ancestors = Optional(Ancestors[dtype]())
-            print("Yes ancestors is initialized now")
             if right_lineage.__as_bool__():
                 self.ancestors.value().set(left_lineage, right_lineage)
-                print("Did add left_lineage and right_lineage")
             else:
                 self.ancestors.value().set(left_lineage)
-                print("Did add left_lineage")
 
     fn __rmul__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
         return self.__mul__(scalar)
@@ -370,7 +365,6 @@ struct Tensor[dtype: DType = DType.float32](
         if self.pointer()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                print("Entering grad fn")
                 out_grad_scaled = __tensor_op_scalar__[dtype, MulScalar](
                     out.pointer()[].grad[], scalar
                 )
@@ -381,8 +375,6 @@ struct Tensor[dtype: DType = DType.float32](
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self.pointer())
 
-        print("Out pointer address: ", out.pointer())
-        print("Self pointer address: ", self.pointer())
         return out
 
     # Element wise multiplication of two tensors
@@ -426,8 +418,6 @@ struct Tensor[dtype: DType = DType.float32](
                         dtype, AddTensor
                     ](other.pointer()[].grad[], product)
 
-                print("in __mul__ * other grad_fn")
-
             if (
                 self.pointer()[].requires_grad
                 and other.pointer()[].requires_grad
@@ -459,7 +449,6 @@ struct Tensor[dtype: DType = DType.float32](
         if self.pointer()[].requires_grad or other.pointer()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                print("I am getting called silently - don't you see?")
                 out_grad = out.pointer()[].grad[]
                 if self.pointer()[].requires_grad:
                     self.pointer()[].grad[] = __tensor_op_tensor__[
@@ -670,7 +659,6 @@ struct Tensor[dtype: DType = DType.float32](
         return result
 
     fn __str__(self) -> String:
-        # dims = self.ndim()
         dims = len(self.shape)
         s = String("[")
         if dims == 1:
@@ -835,7 +823,7 @@ struct Tensor[dtype: DType = DType.float32](
                         continue
 
                 print(indent + "]", end="")
-                print("\n")
+                # print("\n")
 
         except e:
             print("ERROR during tensor printing: ", e)
@@ -852,7 +840,6 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn print(self):
         print(self.__str__())
-        print()
         empty = List[Int]()
         try:
             self.print_tensor_recursive(empty, 1)
