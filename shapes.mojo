@@ -1,4 +1,4 @@
-from common_utils import varia_list_to_list
+from common_utils import variadiclist_as_list
 from testing import assert_true
 from utils import StaticTuple
 
@@ -51,7 +51,7 @@ struct Shape(Sized & Writable):
         return self.numels
 
     fn flatten_index(self, indices: VariadicList[Int]) -> Int:
-        list = varia_list_to_list(indices)
+        list = variadiclist_as_list(indices)
         return self.flatten_index(list)
 
     fn flatten_index(self, indices: List[Int]) -> Int:

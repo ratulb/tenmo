@@ -5,18 +5,14 @@ from logger import Level, Logger
 
 alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
 
-
 fn log_debug(msg: String):
     log.debug(msg)
-
 
 fn log_info(msg: String):
     log.info(msg)
 
-
 fn log_warning(msg: String):
     log.warning(msg)
-
 
 fn int_varia_list_to_str(list: VariadicList[Int]) -> String:
     s = String("[")
@@ -29,7 +25,7 @@ fn int_varia_list_to_str(list: VariadicList[Int]) -> String:
 
 
 # Convert a VariadicList to List
-fn varia_list_to_list(vlist: VariadicList[Int]) -> List[Int]:
+fn variadiclist_as_list(vlist: VariadicList[Int]) -> List[Int]:
     list = List[Int](capacity=len(vlist))
     for each in vlist:
         list.append(each)
