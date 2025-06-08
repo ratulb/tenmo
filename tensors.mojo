@@ -594,7 +594,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    fn at(self, other: Self) raises -> Tensor[dtype]:
+    fn mat(self, other: Self) raises -> Tensor[dtype]:
         start = perf_counter_ns()
 
         assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
@@ -619,6 +619,24 @@ struct Tensor[dtype: DType = DType.float32](
         print("Total: ", end - start)
 
         return result
+
+    fn T(self, tile_size: Int = 32) raises -> Tensor[dtype]:
+        assert_true(
+            self.shape.ndim == 2, "Transpose allowed only for 2D tensors"
+        )
+        rows, cols = (self.shape[0], self.shape[1])
+        output = Tensor[dtype](
+            Shape(piped(cols, rows)), requires_grad=self.requires_grad
+        )
+
+        for i in range(0, rows, tile_size):
+            for j in range(0, cols, tile_size):
+                for ii in range(i, min(i + tile_size, rows)):
+                    for jj in range(j, min(j + tile_size, cols)):
+                        output[jj, ii] = self[ii, jj]
+
+        return output
+
 
     fn reshape(self, *newdims: Int) raises -> Tensor[dtype]:
         shape = Shape(newdims)
@@ -948,7 +966,19 @@ fn test_add_value() raises:
 
 
 def main():
-    test_add_2_tensors()
+    A = Tensor.rand(3, 3)
+    A_T = A.T()
+    A.print()
+    A_T.print()
+    B = Tensor.rand(3, 3)
+    C = A.matmal(B)
+    D = A.mat(B)
+    R = C == D
+    C.print()
+    D.print()
+    R.print()
+    assert_true(R.all_true(), "Matmal and at implementations are not same")
+    _ = """test_add_2_tensors()
     test_mul_by_factor()
     test_add_value()
     test_factor_mul_by()
@@ -961,7 +991,7 @@ def main():
     tensor3 = Tensor.of[3](1, 2, 3)
     tensor3.print()
     tensor4 = Tensor.of[3](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, requires_grad=True)
-    tensor4.print()
+    tensor4.print()"""
 
     # tensor = Tensor.rand(4, 3, 2, 1)
     # out_tensor.grad_fn.value()
