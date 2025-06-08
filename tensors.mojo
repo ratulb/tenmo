@@ -251,6 +251,47 @@ struct Tensor[dtype: DType = DType.float32](
                 return True
         return False
 
+    fn all_close[
+        simd_width: Int = simdwidthof[dtype](),
+        rtol: Scalar[dtype] = 1e-5,
+        atol: Scalar[dtype] = 1e-8,
+    ](self, other: Self) -> Bool:
+        constrained[
+            dtype.is_floating_point(),
+            "all_close is for floating point data types only",
+        ]()
+
+        if self.shape != other.shape:
+            print(
+                "all_close expects same shape 2D tensors: ",
+                self.shape,
+                ", ",
+                other.shape,
+            )
+
+        num_elems = self.numels()
+        simd_blocks = num_elems // simd_width
+        remaining = num_elems % simd_width
+
+        for i in range(simd_blocks):
+            vector1 = self.data.load[width=simd_width](i * simd_width)
+            vector2 = other.data.load[width=simd_width](i * simd_width)
+            diff = abs(vector1 - vector2)
+            tolerance = atol + rtol * abs(vector2)
+            all_checks_out = (diff < tolerance).reduce_and()
+            if all_checks_out == False:
+                return False
+        for k in range(remaining):
+            value1 = self.data.load[width=1](simd_blocks * simd_width + k)
+            value2 = other.data.load[width=1](simd_blocks * simd_width + k)
+            value_diff = abs(value1 - value2)
+            value_tolerance = atol + rtol * abs(value2)
+            checks_out = value_diff < value_tolerance
+            if checks_out == False:
+                return False
+
+        return True
+
     fn fill(self, value: Scalar[dtype]):
         @parameter
         fn set_value[simd_width: Int](idx: Int):
@@ -976,7 +1017,7 @@ def main():
     C.print()
     D.print()
     R.print()
-    assert_true(R.all_true(), "Matmal and at implementations are not same")
+    assert_true(C.all_close(D), "Matmal and at implementations are not same")
     _ = """test_add_2_tensors()
     test_mul_by_factor()
     test_add_value()
