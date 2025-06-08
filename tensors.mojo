@@ -173,15 +173,12 @@ struct Tensor[dtype: DType = DType.float32](
         if self.has_grad():
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
-                # (self.grad.value().unsafe_ptr()[].data + i).destroy_pointee()
-            try:
-                self.open_gradbox().free()
+                (self.grad[].data + i).destroy_pointee()
+                self.grad.free()
                 log_debug(
                     "Tensor__del__ -> freed grad(and pointees) and self data"
                     " pointees"
                 )
-            except e:
-                print("Error freeing grads", e)
         else:
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
@@ -542,11 +539,10 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn matmal(self, other: Self) raises -> Tensor[dtype]:
         start = perf_counter_ns()
-        from testing import assert_equal
 
+        assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
         try:
-            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
             for i in range(self.shape[0]):
                 for j in range(other.shape[1]):
                     for k in range(self.shape[1]):
@@ -583,11 +579,10 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn matmal_v2(self, other: Self) raises -> Tensor[dtype]:
         start = perf_counter_ns()
-        from testing import assert_equal
 
+        assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
         try:
-            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
             for i in range(self.shape[0]):
                 for j in range(self.shape[1]):
                     for k in range(other.shape[1]):
@@ -599,31 +594,27 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    fn matmal_v3(self, other: Self) raises -> Tensor[dtype]:
+    fn at(self, other: Self) raises -> Tensor[dtype]:
         start = perf_counter_ns()
-        from testing import assert_equal
 
+        assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
-        try:
-            assert_equal(self.shape[1], other.shape[0], "matmul - Dim mismatch")
-            for i in range(self.shape[0]):
-                for j in range(self.shape[1]):
+        for i in range(self.shape[0]):
+            for j in range(self.shape[1]):
 
-                    @parameter
-                    fn dot[simd_width: Int](idx: Int):
-                        try:
-                            result.store[simd_width](
-                                i,
-                                idx,
-                                result.load[simd_width](i, idx)
-                                + self[i, j] * other.load[simd_width](j, idx),
-                            )
-                        except e:
-                            print(e)
+                @parameter
+                fn dot[simd_width: Int](idx: Int):
+                    try:
+                        result.store[simd_width](
+                            i,
+                            idx,
+                            result.load[simd_width](i, idx)
+                            + self[i, j] * other.load[simd_width](j, idx),
+                        )
+                    except e:
+                        print(e)
 
-                    vectorize[dot, 2 * simdwidthof[dtype]()](other.shape[1])
-        except e:
-            raise e
+                vectorize[dot, 2 * simdwidthof[dtype]()](other.shape[1])
         end = perf_counter_ns()
         print("Total: ", end - start)
 
@@ -957,10 +948,10 @@ fn test_add_value() raises:
 
 
 def main():
-    _ = """test_add_2_tensors()
+    test_add_2_tensors()
     test_mul_by_factor()
     test_add_value()
-    test_factor_mul_by()"""
+    test_factor_mul_by()
     tensor = Tensor.of(1, 2, 3)
     tensor.print()
     tensor1 = Tensor.of[1](1, 2, 3)
