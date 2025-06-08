@@ -14,9 +14,11 @@ from testing import assert_true
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
+    SubtractTensor,
     MulTensor,
     __tensor_op_scalar__,
     AddScalar,
+    SubtractScalar,
     MulScalar,
 )
 from collections import Set
@@ -26,6 +28,7 @@ struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable
 ):
     alias GradBox = UnsafePointer[Self]
+    alias Address = UnsafePointer[Tensor[dtype]]
     var shape: Shape
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
@@ -551,17 +554,86 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[cast_values, simdwidthof[NewType]()](result.numels())
         return result
 
-    fn __sub__(self: Self, value: Scalar[dtype]) -> Self:
-        copy = self
+    fn __sub__(self, scalar: Scalar[dtype]) raises -> Self:
+        var out = __tensor_op_scalar__[dtype, SubtractScalar](
+            self.address()[], scalar
+        )
 
-        @parameter
-        fn subtract_value[simd_width: Int](idx: Int):
-            copy.data.store[width=simd_width](
-                idx, copy.data.load[width=simd_width](idx) - value
+        if self.address()[].requires_grad:
+
+            fn grad_fn() raises -> None:
+                self_grad = self.address()[].grad[]
+                out_grad = out.address()[].grad[]
+                self.address()[].grad[] = __tensor_op_tensor__[
+                    dtype, AddTensor
+                ](self_grad, out_grad)
+
+                print("in __sub__(scalar) grad_fn")
+
+            out.grad_fn = Optional(grad_fn)
+            out.add_ancestry(self.address())
+        return out
+
+    fn __sub__(self, other: Self) raises -> Tensor[dtype]:
+        requires_grad = self.requires_grad or other.requires_grad
+        if self.address() == other.address():
+            out = Tensor[dtype].zeros_like(self, requires_grad)
+            Self.set_ancestry(out.address(), self.address(), Self.Address())
+            return out
+        if self.shape != other.shape:
+            raise Error(
+                "__sub__(other) -> Dimension mismatch:",
+                self.shape,
+                other.shape,
             )
 
-        vectorize[subtract_value, simdwidthof[dtype]()](copy.numels())
-        return copy
+        out = __tensor_op_tensor__[dtype, SubtractTensor](
+            self.address()[], other.address()[]
+        )
+
+        if requires_grad:
+
+            fn grad_fn() raises -> None:
+                out_grad = out.address()[].grad[]
+                if self.address()[].requires_grad:
+                    self.address()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](self.address()[].grad[], out_grad)
+                if other.address()[].requires_grad:
+                    other.address()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](other.address()[].grad[], out_grad)
+
+            out.grad_fn = Optional(grad_fn)
+
+            _ = """if (
+                self.address()[].requires_grad
+                and other.address()[].requires_grad
+            ):
+                out.add_ancestry(self.address(), other.address())
+            elif self.address()[].requires_grad:
+                out.add_ancestry(self.address())
+            elif other.address()[].requires_grad:
+                out.add_ancestry(other.address())"""
+            Self.set_ancestry(out.address(), self.address(), other.address())
+
+        return out
+
+    @always_inline
+    @staticmethod
+    fn not_null(address: Self.Address) -> Bool:
+        return address.__as_bool__() == True
+
+    @staticmethod
+    fn set_ancestry(out: Self.Address, left: Self.Address, right: Self.Address):
+        if (
+            left[].requires_grad
+            and Self.not_null(right)
+            and right[].requires_grad
+        ):
+            out[].add_ancestry(left, right)
+        elif left[].requires_grad:
+            out[].add_ancestry(left)
 
     fn __truediv__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
         copy = self
@@ -767,6 +839,14 @@ struct Tensor[dtype: DType = DType.float32](
         tensor = Tensor[dtype](shape, requires_grad)
         memset_zero(tensor.data, tensor.numels())
         return tensor
+
+    @staticmethod
+    fn zeros_like(
+        tensor: Tensor[dtype], requires_grad: Bool = False
+    ) raises -> Tensor[dtype]:
+        out = Tensor[dtype](tensor.shape, requires_grad)
+        memset_zero(out.data, out.numels())
+        return out
 
     @staticmethod
     fn of(

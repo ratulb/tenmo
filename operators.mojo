@@ -5,9 +5,12 @@ from sys import simdwidthof
 
 alias Noop = 0
 alias AddScalar = 1
-alias MulScalar = 2
-alias MulTensor = 3
-alias AddTensor = 4
+alias SubtractScalar = 2
+alias MulScalar = 3
+alias MulTensor = 4
+alias AddTensor = 5
+alias SubtractTensor = 6
+
 
 # Element wise operatorns
 fn __tensor_op_tensor__[
@@ -42,10 +45,22 @@ fn __tensor_op_tensor__[
             ),
         )
 
+    @parameter
+    fn subtract_elems[simd_width: Int](idx: Int):
+        out.data.store[width=simd_width](
+            idx,
+            (
+                this.data.load[width=simd_width](idx)
+                - that.data.load[width=simd_width](idx)
+            ),
+        )
+
     if op == MulTensor:
         vectorize[mul_elems, simdwidthof[dtype]()](out.numels())
     elif op == AddTensor:
         vectorize[add_elems, simdwidthof[dtype]()](out.numels())
+    elif op == SubtractTensor:
+        vectorize[subtract_elems, simdwidthof[dtype]()](out.numels())
 
     return out
 
@@ -63,6 +78,12 @@ fn __tensor_op_scalar__[
         )
 
     @parameter
+    fn subtract_scalar[simd_width: Int](idx: Int):
+        out.data.store[width=simd_width](
+            idx, this.data.load[width=simd_width](idx) - scalar
+        )
+
+    @parameter
     fn mul_by_scalar[simd_width: Int](idx: Int):
         out.data.store[width=simd_width](
             idx, this.data.load[width=simd_width](idx) * scalar
@@ -72,5 +93,7 @@ fn __tensor_op_scalar__[
         vectorize[mul_by_scalar, simdwidthof[dtype]()](out.numels())
     elif op == AddScalar:
         vectorize[add_scalar, simdwidthof[dtype]()](out.numels())
-    return out
+    elif op == SubtractScalar:
+        vectorize[subtract_scalar, simdwidthof[dtype]()](out.numels())
 
+    return out
