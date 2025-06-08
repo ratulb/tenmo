@@ -35,12 +35,6 @@ fn varia_list_to_list(vlist: VariadicList[Int]) -> List[Int]:
         list.append(each)
     return list
 
-fn validate_shape(shape: Shape) raises:
-    for idx in range(shape.ndim):
-        # print("Validating shape: ", shape.axes_spans[idx])
-        assert_true(shape.axes_spans[idx] > 0, "Shape dimension not valid")
-
-
 
 # Create a single element VariadicList
 fn piped(m: Int, n: Int = -1) -> VariadicList[Int]:

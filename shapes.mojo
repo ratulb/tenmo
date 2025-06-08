@@ -102,3 +102,9 @@ struct Shape(Sized & Writable):
         self.ndim = other.ndim
         self.numels = other.numels
 
+    @staticmethod
+    fn validate(shape: Shape) raises:
+        for idx in range(shape.ndim):
+            assert_true(shape.axes_spans[idx] > 0, "Shape dimension not valid")
+
+

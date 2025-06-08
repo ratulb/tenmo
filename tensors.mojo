@@ -8,7 +8,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from common_utils import int_varia_list_to_str, validate_shape, log_debug, piped
+from common_utils import int_varia_list_to_str, log_debug, piped
 from ancestry import Ancestors
 from testing import assert_true
 from operators import (
@@ -41,8 +41,8 @@ struct Tensor[dtype: DType = DType.float32](
         self = Self(shape, requires_grad)
 
     fn __init__(out self, shape: Shape, requires_grad: Bool = False) raises:
+        Shape.validate(shape)
         self.shape = shape
-        validate_shape(shape)
         self.requires_grad = requires_grad
         self.ancestors = None
         self.grad_fn = None
