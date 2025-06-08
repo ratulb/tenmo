@@ -107,4 +107,13 @@ struct Shape(Sized & Writable):
         for idx in range(shape.ndim):
             assert_true(shape.axes_spans[idx] > 0, "Shape dimension not valid")
 
+    fn as_list(self) -> List[Int]:
+        result = List[Int](capacity=len(self))
+        for i in range(len(self)):
+            result.append(self[i])
+        return result
 
+
+
+
+        
