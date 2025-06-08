@@ -637,7 +637,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return output
 
-
     fn reshape(self, *newdims: Int) raises -> Tensor[dtype]:
         shape = Shape(newdims)
         if shape == self.shape:
