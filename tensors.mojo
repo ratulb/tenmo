@@ -575,16 +575,18 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn __sub__(self, other: Self) raises -> Tensor[dtype]:
-        requires_grad = self.requires_grad or other.requires_grad
+        requires_grad = (
+            self.address()[].requires_grad or other.address()[].requires_grad
+        )
         if self.address() == other.address():
-            out = Tensor[dtype].zeros_like(self, requires_grad)
+            out = Tensor[dtype].zeros_like(self.address()[], requires_grad)
             Self.set_ancestry(out.address(), self.address(), Self.Address())
             return out
-        if self.shape != other.shape:
+        if self.address()[].shape != other.address()[].shape:
             raise Error(
                 "__sub__(other) -> Dimension mismatch:",
-                self.shape,
-                other.shape,
+                self.address()[].shape,
+                other.address()[].shape,
             )
 
         out = __tensor_op_tensor__[dtype, SubtractTensor](
@@ -601,7 +603,7 @@ struct Tensor[dtype: DType = DType.float32](
                     ](self.address()[].grad[], out_grad)
                 if other.address()[].requires_grad:
                     other.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
+                        dtype, SubtractTensor
                     ](other.address()[].grad[], out_grad)
 
             out.grad_fn = Optional(grad_fn)

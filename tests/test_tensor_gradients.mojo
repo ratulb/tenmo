@@ -3,6 +3,62 @@ from testing import assert_true, assert_false
 from common_utils import log_debug
 
 
+fn test_tensor_additions_4() raises:
+    A = Tensor.rand(2, 3, requires_grad=True)
+    B = Tensor.rand(2, 3, requires_grad=True)
+    C = Tensor.rand(2, 3, requires_grad=True)
+    D = Tensor.rand(2, 3, requires_grad=True)
+    E = A + B * D
+    F = 2 * C * D - A
+    G = E - F * 2
+
+    Tensor.walk_backward(G)
+
+    # expected_gradients = List[Float32](15.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.0)
+
+    tensors = List(A, B, C, D, E, F, G)
+
+    for i in range(len(tensors)):
+        each = tensors[i]
+        assert_false(
+            each.grad[].requires_grad,
+            "Gradient's requires_grad = 'False' assertion failed",
+        )
+        each.grad[].print()
+        _ = """assert_true(
+            each.grad[][0] == expected_gradients[i],
+            "Gradient equality assertion failed",
+        )"""
+
+
+fn test_tensor_additions_3() raises:
+    A = Tensor.of(2.0, requires_grad=True)
+    B = Tensor.of(3.0, requires_grad=True)
+    C = Tensor.of(4.0, requires_grad=True)
+    D = Tensor.of(5.0, requires_grad=True)
+    E = A + B
+    F = C * D
+    G = E - F
+
+    Tensor.walk_backward(G)
+
+    # expected_gradients = List[Float32](15.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.0)
+
+    tensors = List(A, B, C, D, E, F, G)
+
+    for i in range(len(tensors)):
+        each = tensors[i]
+        assert_false(
+            each.grad[].requires_grad,
+            "Gradient's requires_grad = 'False' assertion failed",
+        )
+        each.grad[].print()
+        _ = """assert_true(
+            each.grad[][0] == expected_gradients[i],
+            "Gradient equality assertion failed",
+        )"""
+
+
 fn test_tensor_additions_2() raises:
     A = Tensor.zeros(1, requires_grad=True)
     B = Tensor.zeros(1, requires_grad=True)
@@ -15,8 +71,8 @@ fn test_tensor_additions_2() raises:
     F = E + A
     G = F * A
     # G = (A + B + D + A) * A
-    #start = True
-    #G.backward(start)
+    # start = True
+    # G.backward(start)
 
     Tensor.walk_backward(G)
 
@@ -94,5 +150,7 @@ fn test_tensor_additions_1() raises:
 
 
 fn main() raises:
-    test_tensor_additions_2()
+    # test_tensor_additions_2()
+    # test_tensor_additions_3()
+    test_tensor_additions_4()
     # test_tensor_additions_1()
