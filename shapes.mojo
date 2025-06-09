@@ -6,7 +6,7 @@ from utils import StaticTuple
 alias max_dim_count = 5
 
 
-struct Shape(Sized & Writable):
+struct Shape(Sized & Writable & Copyable & Movable):
     var axes_spans: StaticTuple[Int, max_dim_count]
     var ndim: Int
     var numels: Int
@@ -132,9 +132,55 @@ struct Shape(Sized & Writable):
     fn of(*dims: Int) raises -> Shape:
         return Shape(dims)
 
+    @staticmethod
+    fn pad_shapes(shape1: Shape, shape2: Shape) raises -> (Shape, Shape):
+        if shape1 == shape2:
+            return shape1, shape2
+        one, len1, len2 = List(1), len(shape1), len(shape2)
+        max_len = max(len1, len2)
+        padded1 = one * (max_len - len1) + shape1.list()
+        padded2 = one * (max_len - len2) + shape2.list()
+        return Shape(padded1), Shape(padded2)
+
+
+fn test_pad_shapes() raises:
+    shape1 = Shape.of(3, 4)
+    shape2 = Shape.of(
+        4,
+    )
+    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
+    assert_true(
+        padded1 == shape1 and padded2 == Shape.of(1, 4),
+        "Padding of shapes (3,4) and (4,) assertion failed",
+    )
+    shape1 = Shape.of(5, 3, 1)
+    shape2 = Shape.of(5, 1)
+    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
+    assert_true(
+        padded1 == shape1 and padded2 == Shape.of(1, 5, 1),
+        "Padding of shapes (5,3,1) and (5,1) assertion failed",
+    )
+    shape1 = Shape.of(
+        1,
+    )
+    shape2 = Shape.of(3, 4)
+    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
+    assert_true(
+        padded1 == Shape.of(1, 1) and padded2 == shape2,
+        "Padding of shapes (1, ) and (3,4) assertion failed",
+    )
+    shape1 = Shape.of(3, 4, 5, 2)
+    shape2 = Shape.of(3, 4, 5, 2)
+    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
+    assert_true(
+        padded1 == shape1 and padded2 == shape2,
+        "Padding of shapes (3,4,5,2 ) and (3,4,5,2) assertion failed",
+    )
+
 
 fn main() raises:
     shape1 = Shape(List(1, 2, 3, 4, 5, 6))
     print(shape1)
     shape2 = Shape.of(1, 2, 3, 4, 5, 6)
     print(shape2)
+    test_pad_shapes()
