@@ -25,6 +25,21 @@ struct Shape(Sized & Writable):
         self.axes_spans = _spans
         self.ndim = _ndims
         self.numels = _numels
+
+    fn __init__(out self, dims: List[Int]) raises:
+        assert_true(len(dims) > 0, "Shape dimension count should be > 0")
+        _ndims = min(len(dims), max_dim_count)
+        _spans = StaticTuple[Int, max_dim_count](-1)
+        for i in range(_ndims):
+            assert_true(dims[i] > 0, "Wrong shape dimension")
+            _spans[i] = dims[i]
+        _numels = 1
+        for idx in range(_ndims):
+            _numels *= _spans[idx]
+        self.axes_spans = _spans
+        self.ndim = _ndims
+        self.numels = _numels
+
     fn __len__(self) -> Int:
         return self.ndim
 
@@ -107,13 +122,19 @@ struct Shape(Sized & Writable):
         for idx in range(shape.ndim):
             assert_true(shape.axes_spans[idx] > 0, "Shape dimension not valid")
 
-    fn as_list(self) -> List[Int]:
+    fn list(self) -> List[Int]:
         result = List[Int](capacity=len(self))
         for i in range(len(self)):
             result.append(self[i])
         return result
 
+    @staticmethod
+    fn of(*dims: Int) raises -> Shape:
+        return Shape(dims)
 
 
-
-        
+fn main() raises:
+    shape1 = Shape(List(1, 2, 3, 4, 5, 6))
+    print(shape1)
+    shape2 = Shape.of(1, 2, 3, 4, 5, 6)
+    print(shape2)

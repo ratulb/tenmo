@@ -8,7 +8,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
-from common_utils import int_varia_list_to_str, log_debug, piped
+from common_utils import variadiclist_as_str, log_debug, piped
 from ancestry import Ancestors
 from testing import assert_true
 from operators import (
@@ -627,15 +627,15 @@ struct Tensor[dtype: DType = DType.float32](
         return address.__as_bool__() == True
 
     @staticmethod
-    fn set_ancestry(out: Self.Address, left: Self.Address, right: Self.Address):
+    fn set_ancestry(output: Self.Address, left: Self.Address, right: Self.Address):
         if (
             left[].requires_grad
             and Self.not_null(right)
             and right[].requires_grad
         ):
-            out[].add_ancestry(left, right)
+            output[].add_ancestry(left, right)
         elif left[].requires_grad:
-            out[].add_ancestry(left)
+            output[].add_ancestry(left)
 
     fn __truediv__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
         copy = self
@@ -761,7 +761,7 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor with "
                 + String(self.numels())
                 + " elements can't be converted to "
-                + int_varia_list_to_str(newdims)
+                + variadiclist_as_str(newdims)
                 + " dimensional tensor"
             )
         result = Tensor[dtype](shape, self.requires_grad)

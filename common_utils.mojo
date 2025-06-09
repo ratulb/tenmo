@@ -5,16 +5,20 @@ from logger import Level, Logger
 
 alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
 
+
 fn log_debug(msg: String):
     log.debug(msg)
+
 
 fn log_info(msg: String):
     log.info(msg)
 
+
 fn log_warning(msg: String):
     log.warning(msg)
 
-fn int_varia_list_to_str(list: VariadicList[Int]) -> String:
+
+fn variadiclist_as_str(list: VariadicList[Int]) -> String:
     s = String("[")
     for idx in range(len(list)):
         s += list[idx].__str__()
@@ -34,25 +38,12 @@ fn variadiclist_as_list(vlist: VariadicList[Int]) -> List[Int]:
 
 # Create a single element VariadicList
 fn piped(m: Int, n: Int = -1) -> VariadicList[Int]:
-    fn create_variadic_list(*single: Int) -> VariadicList[Int]:
-        return single
+    fn create_variadic_list(*elems: Int) -> VariadicList[Int]:
+        return elems
+
     if n == -1:
         return create_variadic_list(m)
     return create_variadic_list(m, n)
-
-
-
-# Create a single element VariadicList
-fn single_elem_list(elem: Int) raises -> VariadicList[Int]:
-    alias int_type = __mlir_type[`!kgen.variadic<`, Int, `>`]
-    typed_list = __mlir_op.`pop.variadic.create`[_type=int_type](elem)
-    result = VariadicList(typed_list)
-    assert_true(len(result) == 1, "Single element list length assertion failed")
-    assert_true(
-        result[0] == elem, "Single element list element assertion failed"
-    )
-    return result
-
 
 fn is_power_of_2(n: Int) -> Bool:
     return (n & (n - 1)) == 0
@@ -93,11 +84,11 @@ struct IdGen:
         return Atomic.fetch_add(self.tensor_ids, 1)
 
 
-fn main():
+fn main() raises:
     vl = piped(3, 1)
     for e in vl:
         print(e)
-    
-
-
-
+    vl2 = single_elem_list(8)
+    print(vl2[0])
+    for e1 in vl2:
+        print(e1)
