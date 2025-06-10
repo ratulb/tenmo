@@ -1,7 +1,7 @@
 ### Mojo Tensor
 ### Implement tensor library in mojo from first principles
 
-from math import iota, exp
+from math import iota, exp, floor
 from random import randn, seed
 from time import perf_counter_ns
 from algorithm import vectorize
@@ -132,7 +132,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __moveinit__(out self, owned other: Self):
         self.shape = other.shape
-        self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
+        self.data = UnsafePointer[Scalar[other.dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
         self.grad = other.grad
@@ -141,7 +141,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
-        self.data = UnsafePointer[Scalar[dtype]].alloc(other.numels())
+        self.data = UnsafePointer[Scalar[other.dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
         self.grad = other.grad
@@ -304,21 +304,21 @@ struct Tensor[dtype: DType = DType.float32](
 
         vectorize[set_value, simdwidthof[dtype]()](self.numels())
 
-    fn __eq__(self, other: Self) raises -> Tensor[DType.bool]:
+    fn __eq__(self, other: Tensor[self.dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
-            raise Error("eq -> Dimension mismatch")
-        copy = Tensor[DType.bool](self.shape, False)
+            abort("__eq__ -> Dimension mismatch")
+        result = Tensor[DType.bool](self.shape, False)
 
         @parameter
         fn compare_elems[simd_width: Int](idx: Int):
-            copy.data.store[width=simd_width, volatile=True](
+            result.data.store[width=simd_width, volatile=True](
                 idx,
                 self.data.load[width=simd_width](idx)
                 == other.data.load[width=simd_width](idx),
             )
 
-        vectorize[compare_elems, simdwidthof[DType.bool]()](copy.numels())
-        return copy
+        vectorize[compare_elems, simdwidthof[DType.bool]()](result.numels())
+        return result
 
     fn __iadd__(self, other: Self) raises:
         if self.shape != other.shape:
@@ -656,10 +656,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self.data
 
-    fn matmal(self, other: Self) raises -> Tensor[dtype]:
+    fn matmal(self, other: Self) -> Tensor[dtype]:
         start = perf_counter_ns()
-
-        assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
+        if self.shape[1] != other.shape[0]:
+            abort("matmul - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
         for i in range(self.shape[0]):
             for j in range(other.shape[1]):
@@ -693,10 +693,11 @@ struct Tensor[dtype: DType = DType.float32](
             raise e
         self.data.store(rows * self.shape[1] + cols, val)
 
-    fn matmal_v2(self, other: Self) raises -> Tensor[dtype]:
+    fn matmal_v2(self, other: Self) -> Tensor[dtype]:
         start = perf_counter_ns()
+        if self.shape[1] != other.shape[0]:
+            abort("matmul - Dim mismatch")
 
-        assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
         for i in range(self.shape[0]):
             for j in range(self.shape[1]):
@@ -709,8 +710,10 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn mat(self, other: Self) raises -> Tensor[dtype]:
         start = perf_counter_ns()
+        if self.shape[1] != other.shape[0]:
+            abort("matmul - Dim mismatch")
 
-        assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
+        # assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
         for i in range(self.shape[0]):
             for j in range(self.shape[1]):
@@ -797,7 +800,7 @@ struct Tensor[dtype: DType = DType.float32](
         *axes_spans: Int,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
-    ) raises -> Tensor[dtype]:
+    ) -> Tensor[dtype]:
         if init_seed:
             seed(init_seed.value())
         else:
@@ -808,41 +811,42 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     @staticmethod
-    fn arange(
-        start: Scalar[dtype] = 0,
-        step: Scalar[dtype] = 1,
-        end: Scalar[dtype] = max_finite[dtype](),
-    ) -> Tensor[dtype]:
-        return Tensor[dtype](1)
-
-    _ = """@staticmethod
     fn arange[
-        end: Int,
-        start: Int = 0,
-        datatype: DType = DType.int64,
-        length: Int = end - start,
-    ](requires_grad: Bool = False) raises -> Tensor[datatype]:
-        constrained[
-            end > start and end - start == length,
-            (
-                "arange -> invalid parameters - end should be > start and end -"
-                " start = length"
-            ),
-        ]()
-        shape = Shape(length)
-        result = Tensor[dtype=datatype](shape, requires_grad)
-        # print(result.dtype, __type_of(result[0]).__str__(result[0]))
-        # print(__type_of(result).__str__(result))
-        iota(result.unsafe_ptr(), length, offset=start)
+        dtype: DType = DType.float32
+    ](
+        start: Scalar[dtype] = 0,
+        end: Scalar[dtype] = max_finite[dtype](),
+        step: Scalar[dtype] = 1,
+        epsilon: Scalar[dtype] = 1e-8,
+    ) -> Tensor[dtype]:
+        if step == 0:
+            abort("step can not be zero")
+        if (step > 0 and start >= end) or (step < 0 and start <= end):
+            abort("Invalid range for the given step")
+        delta = end - start
+        size = floor(delta / step + epsilon)
+        if size <= 0:
+            abort("Error: computed arange size is zero")
+        tensor = Tensor[dtype](size.__int__())
 
-        # casted = result.unsafe_ptr().bitcast[Scalar[datatype]]()
-        # memcpy(result.unsafe_ptr(), casted, result.numels())
-        return result"""
+        @parameter
+        fn fill(i: Int) -> Scalar[dtype]:
+            return (i * step + start) % end
+
+        @parameter
+        fn mapper[simd_width: Int](idx: Int):
+            first_entry = fill(idx).cast[dtype]()
+            data = SIMD[dtype, simd_width](first_entry)
+            for i in range(1, simd_width):
+                data[i] = fill(idx + i).cast[dtype]()
+            tensor.data.store[width=simd_width](idx, data)
+
+        vectorize[mapper, simdwidthof[dtype]()](tensor.numels())
+
+        return tensor
 
     @staticmethod
-    fn zeros(
-        *axes_spans: Int, requires_grad: Bool = False
-    ) raises -> Tensor[dtype]:
+    fn zeros(*axes_spans: Int, requires_grad: Bool = False) -> Tensor[dtype]:
         shape = Shape(axes_spans)
         tensor = Tensor[dtype](shape, requires_grad)
         memset_zero(tensor.data, tensor.numels())
@@ -851,7 +855,7 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn zeros_like(
         tensor: Tensor[dtype], requires_grad: Bool = False
-    ) raises -> Tensor[dtype]:
+    ) -> Tensor[dtype]:
         out = Tensor[dtype](tensor.shape, requires_grad)
         memset_zero(out.data, out.numels())
         return out
@@ -911,12 +915,18 @@ struct Tensor[dtype: DType = DType.float32](
             tensor.data.store(i, value)
         return tensor
 
-    fn print_tensor_recursive(self, mut indices: List[Int], level: Int) raises:
+    fn print_tensor_recursive(
+        self,
+        mut indices: List[Int],
+        level: Int,
+        num_first: Int = 10,
+        num_last: Int = 10,
+    ) raises:
         try:
             current_dim = len(indices)
             indent = " " * (level * 2)
-            num_first = 5
-            num_last = 5
+            # num_first = 5
+            # num_last = 5
             # Defensive check
             if current_dim >= self.ndim():
                 # if current_dim > self.ndim():
@@ -998,21 +1008,13 @@ struct Tensor[dtype: DType = DType.float32](
         except e:
             print("ERROR during tensor printing: ", e)
 
-    _ = """@staticmethod
-    fn print(t: Tensor):
-        print(t.__str__())
-        print()
-        l = List[Int]()
-        try:
-            t.print()_tensor_recursive(l, 1)
-        except e:
-            print(e)"""
-
-    fn print(self):
+    fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(self.__str__())
         empty = List[Int]()
         try:
-            self.print_tensor_recursive(empty, 1)
+            self.print_tensor_recursive(
+                empty, 1, num_first=num_first, num_last=num_last
+            )
         except e:
             print(e)
 
@@ -1093,7 +1095,23 @@ fn test_add_value() raises:
     out_tensor.open_gradbox().print()
 
 
-def main():
+fn test_arange() raises:
+    tensor = Tensor.arange(0, 10)
+    # expected = Tensor.of(0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0)
+    expected = Tensor.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    # print(tensor.dtype, expected.dtype)
+    is_true = (tensor == expected).all_true()
+    assert_true(is_true, "arange gen check assertion failed")
+    tensor1 = Tensor.arange(0, -5, -0.5)
+    # expected = Tensor[DType.float32].of(
+    expected = Tensor.of(
+        0.0, -0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -3.5, -4.0, -4.5
+    ).to_dtype[DType.float32]()
+    is_true = (tensor1 == expected).all_true()
+    assert_true(is_true, "arange negative step assertion failed")
+
+
+fn test_transpose_matmul() raises:
     A = Tensor.rand(3, 3)
     A_T = A.T()
     A.print()
@@ -1106,146 +1124,12 @@ def main():
     D.print()
     R.print()
     assert_true(C.all_close(D), "Matmal and at implementations are not same")
-    _ = """test_add_2_tensors()
+
+
+def main():
+    test_arange()
+    test_add_2_tensors()
     test_mul_by_factor()
     test_add_value()
     test_factor_mul_by()
-    tensor = Tensor.of(1, 2, 3)
-    tensor.print()
-    tensor1 = Tensor.of[1](1, 2, 3)
-    tensor1.print()
-    tensor2 = Tensor.of[2](1, 2, 3)
-    tensor2.print()
-    tensor3 = Tensor.of[3](1, 2, 3)
-    tensor3.print()
-    tensor4 = Tensor.of[3](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, requires_grad=True)
-    tensor4.print()"""
-
-    # tensor = Tensor.rand(4, 3, 2, 1)
-    # out_tensor.grad_fn.value()
-    # multiplied.grad_fn.value()
-    # output = out_tensor * 2
-    # output.grad.value().unsafe_ptr()[] += 1
-    # output.grad_func()
-    # print(output.grad.__as_bool__())
-
-    # Tensor.print()(Tensor.arange(7, start=3).reshape[2](2, 2))
-    # Tensor.print()(Tensor.arange(7, start=3).reshape[2](2, 2))
-    # tensor = Tensor.arange[5]().to_dtype[DType.float32]()
-    # l = List[Int]()
-    # tensor.print()_tensor_recursive(l, 1)
-    # tensor.print()
-    # tensor.print()
-    # Tensor.print()(tensor)
-    # tensor1 = Tensor.arange[4]()
-    # tensor1.print()
-    # tensor1.print()
-
-    _ = """# tensor._init_grad_()
-    print(multiplied.dtype)
-    print("Am I gone: ")
-    Tensor.print()(tensor)
-    print("I am multiplied: ")
-    Tensor.print()(multiplied)
-    print()
-
-    rival = tensor == multiplied
-    print("rival")
-    Tensor.print()(rival)
-
-    tensor = Tensor.rand(4, 3)
-    print("Original")
-    Tensor.print()(tensor)
-    reshaped = tensor.reshape(2, 2, 3)
-    print("Reshaped")
-    Tensor.print()(reshaped)
-
-    tensor_false = Tensor.zeros(4, 3)
-    indices = List[Int]()
-    tensor_false.print()_tensor_recursive(indices, 1)
-
-    tensor_true = Tensor.ones(4, 3)
-    indices = List[Int]()
-    tensor_true.print()_tensor_recursive(indices, 1)
-
-    tensor = Tensor.ones(4, 3)
-    indices = List[Int]()
-    tensor.print()_tensor_recursive(indices, 1)
-
-    t16 = Tensor.zeros(5, 5)
-    t16[0, 0] = 1
-    t16[0, 1] = 2
-    t16[0, 2] = 3
-    t16[0, 3] = 4
-    t16[0, 4] = 5
-
-    t16[1, 0] = 6
-    t16[1, 1] = 7
-    t16[1, 2] = 8
-    t16[1, 3] = 9
-    t16[1, 4] = 10
-
-    t16[2, 0] = 11
-    t16[2, 1] = 12
-    t16[2, 2] = 13
-    t16[2, 3] = 14
-    t16[2, 4] = 15
-
-    t16[3, 0] = 16
-    t16[3, 1] = 17
-    t16[3, 2] = 18
-    t16[3, 3] = 19
-    t16[3, 4] = 20
-
-    t16[4, 0] = 21
-    t16[4, 1] = 22
-    t16[4, 2] = 23
-    t16[4, 3] = 24
-    t16[4, 4] = 25
-
-    other = Tensor.zeros(5, 5)
-    other[0, 0] = 10
-    other[0, 1] = 2
-    other[0, 2] = 3
-    other[0, 3] = 4
-    other[0, 4] = 7
-
-    other[1, 0] = 6
-    other[1, 1] = 7
-    other[1, 2] = 8
-    other[1, 3] = 9
-    other[1, 4] = 10
-
-    other[2, 0] = 13
-    other[2, 1] = 14
-    other[2, 2] = 15
-    other[2, 3] = 16
-    other[2, 4] = 17
-
-    other[3, 0] = 18
-    other[3, 1] = 19
-    other[3, 2] = 20
-    other[3, 3] = 21
-    other[3, 4] = 22
-
-    other[4, 0] = 23
-    other[4, 1] = 24
-    other[4, 2] = 25
-    other[4, 3] = 26
-    other[4, 4] = 25
-
-    # Tensor.print()(t16.matmal_v2(other))
-    print()
-
-    # Tensor.print()(t16.matmal_v3(other))
-    print()
-
-    # Tensor.print()(t16.matmal(other))
-    Tensor.print()(t16 == other)
-    Tensor.print()(t16 != other)
-
-    tensor_big1 = Tensor.rand(1024, 4096)
-    tensor_big2 = Tensor.rand(4096, 512)
-
-    # Tensor.print()(tensor_big1.matmal_v3(tensor_big2))
-    """
+    test_transpose_matmul()
