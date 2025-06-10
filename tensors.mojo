@@ -6,6 +6,7 @@ from random import randn, seed
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
+from utils.numerics import max_finite
 from os import abort
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
@@ -37,11 +38,11 @@ struct Tensor[dtype: DType = DType.float32](
     var ancestors: Optional[Ancestors[dtype]]
     var grad_fn: Optional[fn () escaping raises -> None]
 
-    fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False) raises:
+    fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
         self = Self(shape, requires_grad)
 
-    fn __init__(out self, shape: Shape, requires_grad: Bool = False) raises:
+    fn __init__(out self, shape: Shape, requires_grad: Bool = False):
         Shape.validate(shape)
         self.shape = shape
         self.requires_grad = requires_grad
@@ -147,7 +148,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
 
-    fn init_gradbox(mut self) raises:
+    fn init_gradbox(mut self):
         if self.requires_grad and self.grad.__as_bool__() == False:
             gradients = Tensor[self.dtype](self.shape)
             self.grad = UnsafePointer[__type_of(self)].alloc(1)
@@ -807,6 +808,14 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     @staticmethod
+    fn arange(
+        start: Scalar[dtype] = 0,
+        step: Scalar[dtype] = 1,
+        end: Scalar[dtype] = max_finite[dtype](),
+    ) -> Tensor[dtype]:
+        return Tensor[dtype](1)
+
+    _ = """@staticmethod
     fn arange[
         end: Int,
         start: Int = 0,
@@ -828,7 +837,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         # casted = result.unsafe_ptr().bitcast[Scalar[datatype]]()
         # memcpy(result.unsafe_ptr(), casted, result.numels())
-        return result
+        return result"""
 
     @staticmethod
     fn zeros(

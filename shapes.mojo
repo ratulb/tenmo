@@ -1,6 +1,6 @@
 from common_utils import variadiclist_as_list
-from testing import assert_true
 from flexarray import FlexArray
+from os import abort
 
 
 struct Shape(Sized & Writable & Copyable & Movable):
@@ -8,10 +8,12 @@ struct Shape(Sized & Writable & Copyable & Movable):
     var ndim: Int
     var numels: Int
 
-    fn __init__(out self, dims: VariadicList[Int]) raises:
-        assert_true(len(dims) > 0, "Shape dimension count should be > 0")
+    fn __init__(out self, dims: VariadicList[Int]):
+        if len(dims) < 1:
+            abort("Shape dimension count should be > 0")
         for each in dims:
-            assert_true(each > 0, "Wrong shape dimension")
+            if each < 1:
+                abort("Wrong shape dimension")
         _spans = FlexArray(dims)
         _ndims = len(_spans)
         _numels = 1
@@ -21,12 +23,14 @@ struct Shape(Sized & Writable & Copyable & Movable):
         self.ndim = _ndims
         self.numels = _numels
 
-    fn __init__(out self, dims: List[Int]) raises:
-        assert_true(len(dims) > 0, "Shape dimension count should be > 0")
+    fn __init__(out self, dims: List[Int]):
+        if len(dims) < 1:
+            abort("Shape dimension count should be > 0")
         _ndims = len(dims)
         _spans = FlexArray.with_capacity(len(dims))
         for i in range(_ndims):
-            assert_true(dims[i] > 0, "Wrong shape dimension")
+            if dims[i] < 1:
+                abort("Wrong shape dimension")
             _spans[i] = dims[i]
         _numels = 1
         for idx in range(_ndims):
@@ -113,9 +117,10 @@ struct Shape(Sized & Writable & Copyable & Movable):
         self.numels = other.numels
 
     @staticmethod
-    fn validate(shape: Shape) raises:
+    fn validate(shape: Shape):
         for idx in range(shape.ndim):
-            assert_true(shape.axes_spans[idx] > 0, "Shape dimension not valid")
+            if shape.axes_spans[idx] < 1:
+                abort("Shape dimension not valid")
 
     fn list(self) -> List[Int]:
         result = List[Int](capacity=len(self))
@@ -124,11 +129,11 @@ struct Shape(Sized & Writable & Copyable & Movable):
         return result
 
     @staticmethod
-    fn of(*dims: Int) raises -> Shape:
+    fn of(*dims: Int) -> Shape:
         return Shape(dims)
 
     @staticmethod
-    fn pad_shapes(shape1: Shape, shape2: Shape) raises -> (Shape, Shape):
+    fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
         if shape1 == shape2:
             return shape1, shape2
         one, len1, len2 = List(1), len(shape1), len(shape2)
@@ -136,6 +141,9 @@ struct Shape(Sized & Writable & Copyable & Movable):
         padded1 = one * (max_len - len1) + shape1.list()
         padded2 = one * (max_len - len2) + shape2.list()
         return Shape(padded1), Shape(padded2)
+
+
+from testing import assert_true
 
 
 fn test_pad_shapes() raises:
