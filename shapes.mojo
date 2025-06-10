@@ -1,13 +1,10 @@
 from common_utils import variadiclist_as_list
 from testing import assert_true
-from utils import StaticTuple
-
-# Max supported dimensions is currently limited to 5
-alias max_dim_count = 5
+from flexarray import FlexArray
 
 
 struct Shape(Sized & Writable & Copyable & Movable):
-    var axes_spans: StaticTuple[Int, max_dim_count]
+    var axes_spans: FlexArray
     var ndim: Int
     var numels: Int
 
@@ -15,27 +12,25 @@ struct Shape(Sized & Writable & Copyable & Movable):
         assert_true(len(dims) > 0, "Shape dimension count should be > 0")
         for each in dims:
             assert_true(each > 0, "Wrong shape dimension")
-        _spans = StaticTuple[Int, max_dim_count](dims)
-        _ndims = min(len(dims), len(_spans))
+        _spans = FlexArray(dims)
+        _ndims = len(_spans)
         _numels = 1
         for idx in range(_ndims):
-            _numels *= _spans[idx]
-        for idx in range(_ndims, max_dim_count):
-            _spans[idx] = -1  # Negate anything beyond idx >=_ndims
+            _numels *= _spans[idx].__int__()
         self.axes_spans = _spans
         self.ndim = _ndims
         self.numels = _numels
 
     fn __init__(out self, dims: List[Int]) raises:
         assert_true(len(dims) > 0, "Shape dimension count should be > 0")
-        _ndims = min(len(dims), max_dim_count)
-        _spans = StaticTuple[Int, max_dim_count](-1)
+        _ndims = len(dims)
+        _spans = FlexArray.with_capacity(len(dims))
         for i in range(_ndims):
             assert_true(dims[i] > 0, "Wrong shape dimension")
             _spans[i] = dims[i]
         _numels = 1
         for idx in range(_ndims):
-            _numels *= _spans[idx]
+            _numels *= _spans[idx].__int__()
         self.axes_spans = _spans
         self.ndim = _ndims
         self.numels = _numels
@@ -46,7 +41,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
     fn __getitem__(self, index: Int) -> Int:
         var idx: Int
         if 0 <= index < self.ndim:
-            idx = self.axes_spans[index]
+            idx = self.axes_spans[index].__int__()
         else:
             idx = -1
         return idx
@@ -84,7 +79,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
         var stride = 1
         for i in reversed(range(self.ndim)):
             idx = indices[i]
-            dim = self.axes_spans[i]
+            dim = self.axes_spans[i].__int__()
             if idx >= dim:
                 print("Shape fltatten_index -> index >= dim span", idx, dim)
                 return -1
