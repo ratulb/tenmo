@@ -6,6 +6,7 @@ from random import randn, seed
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
+from os import abort
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
 from common_utils import variadiclist_as_str, log_debug, piped
@@ -110,22 +111,22 @@ struct Tensor[dtype: DType = DType.float32](
                 print("\nNo grad_fn\n")
             pass
 
-    fn __getitem__(self, indices: List[Int]) raises -> Scalar[dtype]:
+    fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
         index = self.shape.flatten_index(indices)
         if index == -1:
-            raise Error("__getitem__(indices): Invalid indices")
+            abort("__getitem__(indices): Invalid indices")
         return self.data.load[volatile=True](index)
 
-    fn __getitem__(self, *indices: Int) raises -> Scalar[dtype]:
+    fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
         index = self.shape.flatten_index(indices)
         if index == -1:
-            raise Error("__getitem__(*indices): Invalid indices")
+            abort("__getitem__(*indices): Invalid indices")
         return self.data.load[volatile=True](index)
 
-    fn __setitem__(self, *indices: Int, value: Scalar[dtype]) raises:
+    fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
         index = self.shape.flatten_index(indices)
         if index == -1:
-            raise Error("__setitem__(*indices): Invalid indices")
+            abort("__setitem__(*indices): Invalid indices")
         self.data.store[volatile=True](index, value)
 
     fn __moveinit__(out self, owned other: Self):
@@ -627,7 +628,9 @@ struct Tensor[dtype: DType = DType.float32](
         return address.__as_bool__() == True
 
     @staticmethod
-    fn set_ancestry(output: Self.Address, left: Self.Address, right: Self.Address):
+    fn set_ancestry(
+        output: Self.Address, left: Self.Address, right: Self.Address
+    ):
         if (
             left[].requires_grad
             and Self.not_null(right)
@@ -657,13 +660,10 @@ struct Tensor[dtype: DType = DType.float32](
 
         assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
-        try:
-            for i in range(self.shape[0]):
-                for j in range(other.shape[1]):
-                    for k in range(self.shape[1]):
-                        result[i, j] += self[i, k] * other[k, j]
-        except e:
-            raise e
+        for i in range(self.shape[0]):
+            for j in range(other.shape[1]):
+                for k in range(self.shape[1]):
+                    result[i, j] += self[i, k] * other[k, j]
         end = perf_counter_ns()
         print("Total: ", end - start)
         return result
@@ -697,13 +697,10 @@ struct Tensor[dtype: DType = DType.float32](
 
         assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
-        try:
-            for i in range(self.shape[0]):
-                for j in range(self.shape[1]):
-                    for k in range(other.shape[1]):
-                        result[i, k] += self[i, j] * other[j, k]
-        except e:
-            raise e
+        for i in range(self.shape[0]):
+            for j in range(self.shape[1]):
+                for k in range(other.shape[1]):
+                    result[i, k] += self[i, j] * other[j, k]
         end = perf_counter_ns()
         print("Total: ", end - start)
 
