@@ -179,19 +179,20 @@ struct Tensor[dtype: DType = DType.float32](
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
                 (self.grad[].data + i).destroy_pointee()
-                self.grad.free()
-                log_debug(
-                    "Tensor__del__ -> freed grad(and pointees) and self data"
-                    " pointees"
-                )
+            self.grad.free()
+            log_debug(
+                "Tensor__del__ -> freed grad(and pointees) and self data"
+                " pointees"
+            )
         else:
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
             log_debug("Tensor__del__ -> freed self data pointees")
         if self.ancestors is not None:
             log_debug("Tensor__del__ -> discarded ancestors")
-            _ = self.ancestors
-        self.data.free()
+            self.ancestors.value().free()
+        if self.data:
+            self.data.free()
         log_debug("Tensor__del__ -> called free on data")
         _ = self^
 
@@ -1052,6 +1053,9 @@ fn test_add_2_tensors() raises:
     print("Out tensor grad shape: ", out_tensor.open_gradbox().shape)
 
     out_tensor.invoke_grad_fn()
+    out_tensor.free()
+    tensor1.free()
+    tensor2.free()
 
 
 fn test_factor_mul_by() raises:
