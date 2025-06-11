@@ -37,7 +37,7 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
         self.size = len(elems)
         self.capacity = len(elems)
         for i in range(len(elems)):
-            (self.data + i)[] = elems[i]
+            self.data.store[volatile=True](i, elems[i])
 
     @always_inline("nodebug")
     fn __init__(out self, elems: VariadicList[Int]):
@@ -50,7 +50,7 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
         self.size = len(elems)
         self.capacity = len(elems)
         for i in range(len(elems)):
-            (self.data + i)[] = elems[i]
+            self.data.store[volatile=True](i, elems[i])
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
@@ -72,7 +72,8 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
         return array
 
     @always_inline("nodebug")
-    fn __del__(owned self):
+    #fn __del__(owned self):
+    fn free(owned self):
         """Destroy the `FlexArray` and free its memory if owned.
 
         Only frees memory for owned arrays (positive _size) to prevent
@@ -99,7 +100,7 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
             if idx < 0 or idx >= len(self):
                 abort("FlexArray __getitem__ -> Out-of-bounds read")
 
-        return self.data[idx]
+        return self.data.load[volatile=True](idx)
 
     @always_inline("nodebug")
     fn __setitem__(mut self, idx: Int, value: Scalar[dtype]):
@@ -118,7 +119,7 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
         if idx == self.size:
             self.append(value)
         else:
-            self.data[idx] = value
+            self.data.store[volatile=True](idx, value)
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
