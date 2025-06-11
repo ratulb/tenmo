@@ -2,7 +2,7 @@
 ### Implement tensor library in mojo from first principles
 
 from math import iota, exp, floor
-from random import randn, seed
+from random import randn, seed, random_float64
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
@@ -799,6 +799,8 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn rand(
         *axes_spans: Int,
+        min: Scalar[dtype] = 0,
+        max: Scalar[dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[dtype]:
@@ -808,7 +810,14 @@ struct Tensor[dtype: DType = DType.float32](
             seed()
         shape = Shape(axes_spans)
         tensor = Tensor[dtype](shape, requires_grad)
-        randn(tensor.data, tensor.numels())
+        # randn(tensor.data, tensor.numels())
+        for i in range(tensor.numels()):  # vectorize?
+            tensor.data.store[volatile=True](
+                i,
+                random_float64(
+                    min.cast[DType.float64](), max.cast[DType.float64]()
+                ).cast[dtype](),
+            )
         return tensor
 
     @staticmethod
@@ -1019,6 +1028,11 @@ struct Tensor[dtype: DType = DType.float32](
         except e:
             print(e)
 
+    @staticmethod
+    fn free_all[dtype: DType, //](*tensors: Tensor[dtype]):
+        for each in tensors:
+            each.free()
+
 
 fn test_add_2_tensors() raises:
     print("test_add_2_tensors")
@@ -1056,6 +1070,7 @@ fn test_add_2_tensors() raises:
     out_tensor.free()
     tensor1.free()
     tensor2.free()
+    Tensor.free_all(tensor1, tensor1, out_tensor)
 
 
 fn test_factor_mul_by() raises:
@@ -1070,6 +1085,7 @@ fn test_factor_mul_by() raises:
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
     out_tensor.open_gradbox().print()
+    Tensor.free_all(tensor, out_tensor)
 
 
 fn test_mul_by_factor() raises:
@@ -1083,6 +1099,7 @@ fn test_mul_by_factor() raises:
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
     out_tensor.open_gradbox().print()
+    Tensor.free_all(tensor, out_tensor)
 
 
 fn test_add_value() raises:
@@ -1097,6 +1114,7 @@ fn test_add_value() raises:
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
     out_tensor.open_gradbox().print()
+    Tensor.free_all(tensor, out_tensor)
 
 
 fn test_arange() raises:
@@ -1106,6 +1124,9 @@ fn test_arange() raises:
     # print(tensor.dtype, expected.dtype)
     is_true = (tensor == expected).all_true()
     assert_true(is_true, "arange gen check assertion failed")
+
+    Tensor.free_all(tensor, expected)
+
     tensor1 = Tensor.arange(0, -5, -0.5)
     # expected = Tensor[DType.float32].of(
     expected = Tensor.of(
@@ -1113,6 +1134,7 @@ fn test_arange() raises:
     ).to_dtype[DType.float32]()
     is_true = (tensor1 == expected).all_true()
     assert_true(is_true, "arange negative step assertion failed")
+    Tensor.free_all(tensor1, expected)
 
 
 fn test_transpose_matmul() raises:
@@ -1128,6 +1150,29 @@ fn test_transpose_matmul() raises:
     D.print()
     R.print()
     assert_true(C.all_close(D), "Matmal and at implementations are not same")
+    Tensor.free_all(A, A_T, B, C, D)
+    Tensor.free_all(R)
+    Tensor.free_all(R)
+
+
+fn test_random() raises:
+    rand_tensor = Tensor.rand(10)
+    rand_tensor.print()
+
+    fn each(e: Scalar[DType.float32]) -> Bool:
+        return e >= 0 and e < 1
+
+    holds_true = rand_tensor.for_all(each)
+    assert_true(holds_true, "rand min and max range assertion failed")
+
+    rand_tensor2 = Tensor.rand(10, 20, min=-2, max=2)
+
+    fn each2(e: Scalar[DType.float32]) -> Bool:
+        return e >= -2 and e < 2
+
+    holds_true = rand_tensor2.for_all(each2)
+    assert_true(holds_true, "rand min(-2) and max(2) range assertion failed")
+    Tensor.free_all(rand_tensor, rand_tensor2)
 
 
 def main():
@@ -1137,3 +1182,4 @@ def main():
     test_add_value()
     test_factor_mul_by()
     test_transpose_matmul()
+    test_random()
