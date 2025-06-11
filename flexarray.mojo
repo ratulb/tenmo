@@ -1,5 +1,4 @@
-from memory import UnsafePointer, memcpy
-from testing import assert_true
+from memory import UnsafePointer, memcpy, Pointer
 from os import abort
 
 alias FLEX_ARRAY_VALIDATION = True
@@ -22,13 +21,14 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
     var capacity: Int
 
     fn __init__(out self):
+        """Constructs an empty FlexArray."""
         self.data = UnsafePointer[Scalar[dtype]]()
         self.capacity = 0
         self.size = 0
 
     @always_inline("nodebug")
     fn __init__(out self, *elems: Scalar[dtype]):
-        """Initialize a new owned `FlexArray` with the specified size.
+        """Initialize a new owned `FlexArray` with the elements.
 
         Args:
             elems: Number of scalars to allocate space for.
@@ -41,7 +41,7 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
 
     @always_inline("nodebug")
     fn __init__(out self, elems: VariadicList[Int]):
-        """Initialize a new owned `FlexArray` with the specified size.
+        """Initialize a new owned `FlexArray` with the specified integers.
 
         Args:
             elems: Number of scalars to allocate space for.
@@ -72,7 +72,7 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
         return array
 
     @always_inline("nodebug")
-    #fn __del__(owned self):
+    # fn __del__(owned self):
     fn free(owned self):
         """Destroy the `FlexArray` and free its memory if owned.
 
@@ -154,13 +154,11 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
         """
 
         # --- Safety checks ---
-        assert_true(
-            dst_offset >= 0 and src_offset >= 0 and size >= 0,
-            "Negative offset/size not allowed",
-        )
-        assert_true(
-            src_offset + size <= source.size, "Source range out of bounds"
-        )
+        if dst_offset < 0 or src_offset < 0 or size < 0:
+            abort("Negative offset/size not allowed")
+
+        if src_offset + size > source.size:
+            abort("Source range out of bounds")
 
         required_dst_size = dst_offset + size
 
@@ -238,8 +236,74 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
 
         print()
 
+    fn __iter__(ref self) -> _FlexArrayIter[self.dtype, __origin_of(self)]:
+        """Iterate over elements of the FlexArray, returning immutable references.
+
+        Returns:
+            An iterator of immutable references to the FlexArray elements.
+        """
+        return _FlexArrayIter[dtype](0, Pointer(to=self))
+
+    fn __reversed__(
+        ref self,
+    ) -> _FlexArrayIter[self.dtype, __origin_of(self), False]:
+        return _FlexArrayIter[dtype, forward=False](len(self), Pointer(to=self))
+
+
+struct _FlexArrayIter[
+    dtype: DType,
+    origin: Origin[False],
+    forward: Bool = True,
+](Sized & Copyable):
+    var index: Int
+    var src: Pointer[FlexArray[dtype], origin]
+
+    fn __init__(out self, idx: Int, src: Pointer[FlexArray[dtype], origin]):
+        self.src = src
+        self.index = idx
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(mut self) -> Scalar[dtype]:
+        @parameter
+        if forward:
+            self.index += 1
+            return self.src[][self.index - 1]
+        else:
+            self.index -= 1
+            return self.src[][self.index]
+
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        return self.__len__() > 0
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
+
 
 from testing import assert_false
+from testing import assert_true
+
+
+fn test_flexarray_iter() raises:
+    iterator = FlexArray(11, 22, 33, 44)
+    index = 0
+    fa = FlexArray(11, 22, 33, 44)
+    for each in fa:
+        assert_true(
+            each == iterator[index], "Forward iterator assertion failed"
+        )
+        index += 1
+    for each in fa.__reversed__():
+        index -= 1
+        assert_true(
+            each == iterator[index], "Backward iterator assertion failed"
+        )
 
 
 fn test_flexarray() raises:
@@ -277,3 +341,4 @@ fn test_flexarray() raises:
 
 fn main() raises:
     test_flexarray()
+    test_flexarray_iter()
