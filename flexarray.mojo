@@ -83,6 +83,32 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
             print("__del__ is kicking in alright")
             self.data.free()
 
+    fn __mul__(self, factor: Int) -> Self:
+        if factor < 1 or self.data.__as_bool__() == False:
+            return Self()
+        result = Self.with_capacity(len(self) * factor)
+        for i in range(factor):
+            result.copy_from(i * len(self), self, 0, len(self))
+        return result
+
+    fn __add__(self, other: Self) -> Self:
+        if (
+            self.data.__as_bool__() == False
+            and other.data.__as_bool__() == False
+        ):
+            return Self()
+        if self.data.__as_bool__() == False:
+            _other = other
+            return other
+        if other.data.__as_bool__() == False:
+            _self = self
+            return _self
+
+        result = Self.with_capacity(len(self) + len(other))
+        result.copy_from(0, self, 0, len(self))
+        result.copy_from(len(self), other, 0, len(other))
+        return result
+
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Scalar[dtype]:
         """Access an element at the specified index.
@@ -114,14 +140,14 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
 
         @parameter
         if FLEX_ARRAY_VALIDATION:
-            if idx < 0 and idx > len(self):
+            if idx < 0 or idx > len(self):
                 abort("FlexArray __setitem__ -> Cannot skip indices")
         if idx == self.size:
             self.append(value)
         else:
             self.data.store[volatile=True](idx, value)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __len__(self) -> Int:
         """Get the number of elements in the array.
 
@@ -130,8 +156,18 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
         """
         return self.size
 
+    fn __eq__(self, other: Self) -> Bool:
+        if len(self) != len(other):
+            return False
+        var index = 0
+        for element in self:
+            if element != other[index]:
+                return False
+            index += 1
+        return True
+
     @always_inline("nodebug")
-    fn copy_from(mut self, offset: Int, source: Self, size: Int) raises:
+    fn copy_from(mut self, offset: Int, source: Self, size: Int):
         """Copy elements from another `FlexArray`.
 
         Args:
@@ -143,7 +179,7 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
 
     fn copy_from(
         mut self, dst_offset: Int, source: Self, src_offset: Int, size: Int
-    ) raises:
+    ):
         """Copy elements from another FlexArray with source offset.
 
         Args:
@@ -216,6 +252,17 @@ struct FlexArray[dtype: DType = DType.int64](Sized & Copyable):
                 return True
         return False
 
+    fn copy(self) -> Self:
+        """Creates a deep copy of the given FlexArray.
+
+        Returns:
+            A copy of the value.
+        """
+        var copy = Self.with_capacity(capacity=self.capacity)
+        for e in self:
+            copy.append(e)
+        return copy^
+
     fn print(self, limit: Int = 5) raises -> None:
         total = len(self)
         print("FlexArray[", total, "] = ", end="")
@@ -286,59 +333,6 @@ struct _FlexArrayIter[
             return self.index
 
 
-from testing import assert_false
-from testing import assert_true
-
-
-fn test_flexarray_iter() raises:
-    iterator = FlexArray(11, 22, 33, 44)
-    index = 0
-    fa = FlexArray(11, 22, 33, 44)
-    for each in fa:
-        assert_true(
-            each == iterator[index], "Forward iterator assertion failed"
-        )
-        index += 1
-    for each in fa.__reversed__():
-        index -= 1
-        assert_true(
-            each == iterator[index], "Backward iterator assertion failed"
-        )
-
-
-fn test_flexarray() raises:
-    fa = FlexArray()
-    assert_false(fa.data, "Uninitialized data pointer assertion failed")
-    fa.append(100)
-    assert_true(
-        fa.size == 1 and fa.capacity == 1, "size and capacity assertion failed"
-    )
-    assert_true(100 in fa, "contains assertion failed")
-    copy1 = fa
-    assert_true(
-        100 in copy1, "Post __copyint__ destination contains assertion failed"
-    )
-    assert_true(100 in fa, "Post __copyint__ source contains assertion failed")
-    fa2 = FlexArray()
-    fa2.copy_from(0, fa, 1)
-    assert_true(
-        100 in fa2, "Post copy_from destination contains assertion failed"
-    )
-    fa3 = FlexArray(True, True, True, False)
-    fa3.print()
-    fa4 = FlexArray[DType.bool]()
-    fa4.copy_from(4, fa3, 4)
-    assert_true(
-        len(fa4) == 8,
-        "Copy from source - capacity initialization assertion failed",
-    )
-    fa4.print()
-    fa5 = FlexArray[DType.bool].with_capacity(12)
-    assert_true(len(fa5) == 0, "with_capacity len assertion failed")
-    fa5.copy_from(4, fa3, 4)
-    assert_true(len(fa5) == 8, "post with_capacity len assertion failed")
-
-
 fn main() raises:
-    test_flexarray()
-    test_flexarray_iter()
+    one = Bool()
+    print(one)

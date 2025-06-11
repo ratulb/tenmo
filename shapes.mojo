@@ -23,7 +23,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
         self.ndim = _ndims
         self.numels = _numels
 
-    fn __init__(out self, dims: List[Int]):
+    fn __init__(out self, dims: FlexArray):
         if len(dims) < 1:
             abort("Shape dimension count should be > 0")
         _ndims = len(dims)
@@ -31,7 +31,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
         for i in range(_ndims):
             if dims[i] < 1:
                 abort("Wrong shape dimension")
-            _spans[i] = dims[i]
+            _spans[i] = dims[i].__int__()
         _numels = 1
         for idx in range(_ndims):
             _numels *= _spans[idx].__int__()
@@ -122,8 +122,8 @@ struct Shape(Sized & Writable & Copyable & Movable):
             if shape.axes_spans[idx] < 1:
                 abort("Shape dimension not valid")
 
-    fn list(self) -> List[Int]:
-        result = List[Int](capacity=len(self))
+    fn flexarray(self) -> FlexArray:
+        result = FlexArray.with_capacity(len(self))
         for i in range(len(self)):
             result.append(self[i])
         return result
@@ -136,14 +136,24 @@ struct Shape(Sized & Writable & Copyable & Movable):
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
         if shape1 == shape2:
             return shape1, shape2
-        one, len1, len2 = List(1), len(shape1), len(shape2)
+        one = FlexArray(1)
+        len1, len2 = len(shape1), len(shape2)
         max_len = max(len1, len2)
-        padded1 = one * (max_len - len1) + shape1.list()
-        padded2 = one * (max_len - len2) + shape2.list()
+        padded1 = one * (max_len - len1) + shape1.flexarray()
+        padded2 = one * (max_len - len2) + shape2.flexarray()
         return Shape(padded1), Shape(padded2)
 
 
 from testing import assert_true
+
+
+fn test_shape_as_flexarray() raises:
+    shape = Shape.of(2, 4, 5)
+    fa = shape.flexarray()
+    assert_true(
+        fa[0] == 2 and fa[1] == 4 and fa[2] == 5,
+        "Shape to FlexArray assertion failed",
+    )
 
 
 fn test_pad_shapes() raises:
@@ -182,8 +192,9 @@ fn test_pad_shapes() raises:
 
 
 fn main() raises:
-    shape1 = Shape(List(1, 2, 3, 4, 5, 6))
+    shape1 = Shape(FlexArray(1, 2, 3, 4, 5, 6))
     print(shape1)
     shape2 = Shape.of(1, 2, 3, 4, 5, 6)
     print(shape2)
     test_pad_shapes()
+    test_shape_as_flexarray()
