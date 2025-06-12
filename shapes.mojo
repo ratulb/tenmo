@@ -1,10 +1,10 @@
 from common_utils import variadiclist_as_list
-from flexarray import FlexArray
+from intlist import IntList
 from os import abort
 
 
 struct Shape(Sized & Writable & Copyable & Movable):
-    var axes_spans: FlexArray
+    var axes_spans: IntList
     var ndim: Int
     var numels: Int
 
@@ -14,27 +14,27 @@ struct Shape(Sized & Writable & Copyable & Movable):
         for each in dims:
             if each < 1:
                 abort("Wrong shape dimension")
-        _spans = FlexArray(dims)
+        _spans = IntList(dims)
         _ndims = len(_spans)
         _numels = 1
         for idx in range(_ndims):
-            _numels *= _spans[idx].__int__()
+            _numels *= _spans[idx]
         self.axes_spans = _spans
         self.ndim = _ndims
         self.numels = _numels
 
-    fn __init__(out self, dims: FlexArray):
+    fn __init__(out self, dims: IntList):
         if len(dims) < 1:
             abort("Shape dimension count should be > 0")
         _ndims = len(dims)
-        _spans = FlexArray.with_capacity(len(dims))
+        _spans = IntList.with_capacity(len(dims))
         for i in range(_ndims):
             if dims[i] < 1:
                 abort("Wrong shape dimension")
-            _spans[i] = dims[i].__int__()
+            _spans[i] = dims[i]
         _numels = 1
         for idx in range(_ndims):
-            _numels *= _spans[idx].__int__()
+            _numels *= _spans[idx]
         self.axes_spans = _spans
         self.ndim = _ndims
         self.numels = _numels
@@ -45,7 +45,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
     fn __getitem__(self, index: Int) -> Int:
         var idx: Int
         if 0 <= index < self.ndim:
-            idx = self.axes_spans[index].__int__()
+            idx = self.axes_spans[index]
         else:
             idx = -1
         return idx
@@ -83,7 +83,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
         var stride = 1
         for i in reversed(range(self.ndim)):
             idx = indices[i]
-            dim = self.axes_spans[i].__int__()
+            dim = self.axes_spans[i]
             if idx >= dim:
                 print("Shape fltatten_index -> index >= dim span", idx, dim)
                 return -1
@@ -116,14 +116,18 @@ struct Shape(Sized & Writable & Copyable & Movable):
         self.ndim = other.ndim
         self.numels = other.numels
 
+    fn free(owned self):
+        print("Shape free kicking in alright")
+        self.axes_spans.free()
+        _ = self^
     @staticmethod
     fn validate(shape: Shape):
         for idx in range(shape.ndim):
             if shape.axes_spans[idx] < 1:
                 abort("Shape dimension not valid")
 
-    fn flexarray(self) -> FlexArray:
-        result = FlexArray.with_capacity(len(self))
+    fn intlist(self) -> IntList:
+        result = IntList.with_capacity(len(self))
         for i in range(len(self)):
             result.append(self[i])
         return result
@@ -136,23 +140,23 @@ struct Shape(Sized & Writable & Copyable & Movable):
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
         if shape1 == shape2:
             return shape1, shape2
-        one = FlexArray(1)
+        one = IntList(1)
         len1, len2 = len(shape1), len(shape2)
         max_len = max(len1, len2)
-        padded1 = one * (max_len - len1) + shape1.flexarray()
-        padded2 = one * (max_len - len2) + shape2.flexarray()
+        padded1 = one * (max_len - len1) + shape1.intlist()
+        padded2 = one * (max_len - len2) + shape2.intlist()
         return Shape(padded1), Shape(padded2)
 
 
 from testing import assert_true
 
 
-fn test_shape_as_flexarray() raises:
+fn test_shape_as_intlist() raises:
     shape = Shape.of(2, 4, 5)
-    fa = shape.flexarray()
+    fa = shape.intlist()
     assert_true(
         fa[0] == 2 and fa[1] == 4 and fa[2] == 5,
-        "Shape to FlexArray assertion failed",
+        "Shape to IntList assertion failed",
     )
 
 
@@ -192,9 +196,9 @@ fn test_pad_shapes() raises:
 
 
 fn main() raises:
-    shape1 = Shape(FlexArray(1, 2, 3, 4, 5, 6))
+    shape1 = Shape(IntList(1, 2, 3, 4, 5, 6))
     print(shape1)
     shape2 = Shape.of(1, 2, 3, 4, 5, 6)
     print(shape2)
     test_pad_shapes()
-    test_shape_as_flexarray()
+    test_shape_as_intlist()

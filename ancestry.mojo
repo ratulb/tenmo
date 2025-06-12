@@ -51,7 +51,7 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
     # fn __del__(owned self):
     fn free(owned self):
         if self.ancestors:
-            print("__del__ is kicking in alright")
+            print("Ancestors __del__ is kicking in alright")
             for idx in range(len(self)):
                 (self.ancestors + idx).destroy_pointee()
             self.ancestors.free()
@@ -67,6 +67,10 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
 
     fn __len__(self) -> Int:
         return self.size
+
+    fn append_all(mut self, *addresses: UnsafePointer[Tensor[dtype]]):
+        for address in addresses:
+            self.append(address)
 
     fn append(mut self, address: UnsafePointer[Tensor[dtype]]):
         if self.size == self.capacity:
@@ -101,12 +105,18 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
         print()
 
     fn __iter__(ref self) -> _AncestorsIter[self.dtype, __origin_of(self)]:
-        return _AncestorsIter[dtype](0, Pointer(to=self))
+        return _AncestorsIter[self.dtype](0, Pointer(to=self))
+
+    fn __reversed__(
+        ref self,
+    ) -> _AncestorsIter[self.dtype, __origin_of(self), False]:
+        return _AncestorsIter[self.dtype, forward=False](
+            len(self), Pointer(to=self)
+        )
 
 
 struct _AncestorsIter[
-    dtype: DType,
-    origin: Origin[False],
+    dtype: DType, origin: Origin[False], forward: Bool = True
 ](Sized & Copyable):
     var index: Int
     var src: Pointer[Ancestors[dtype], origin]
@@ -119,12 +129,27 @@ struct _AncestorsIter[
         return self
 
     fn __next__(mut self) -> UnsafePointer[Tensor[dtype]]:
-        self.index += 1
-        return self.src[].get(self.index - 1)
+        @parameter
+        if forward:
+            self.index += 1
+            return self.src[].get(self.index - 1)
+        else:
+            self.index -= 1
+            return self.src[].get(self.index)
 
     @always_inline
     fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
-        return len(self.src[]) - self.index
+        @parameter
+        if forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
+
+
+fn main():
+    tensor = Tensor.rand(5, 3)
+    print(tensor.address())
+    print(Int(tensor.address()))

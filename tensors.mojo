@@ -10,6 +10,7 @@ from utils.numerics import max_finite
 from os import abort
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
+from intlist import IntList
 from common_utils import variadiclist_as_str, log_debug, piped
 from ancestry import Ancestors
 from testing import assert_true
@@ -59,11 +60,11 @@ struct Tensor[dtype: DType = DType.float32](
         _dtype: DType, //
     ](
         tensor: Tensor[_dtype],
-        mut visited: Set[String],
+        mut visited: Set[Int],
         mut traced: List[UnsafePointer[Tensor[_dtype]]],
     ):
-        if tensor.address().__str__() not in visited:
-            visited.add(tensor.address().__str__())
+        if Int(tensor.address()) not in visited:
+            visited.add(Int(tensor.address()))
             ancestors = tensor.ancestors
             for ancestor in ancestors:
                 Self.trace_ancestry(ancestor[], visited, traced)
@@ -73,7 +74,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn walk_backward[_dtype: DType, //](tensor: Tensor[_dtype]) raises:
         if tensor.has_grad() == False:
             return
-        visited = Set[String]()
+        visited = Set[Int]()
         traced = List[UnsafePointer[Tensor[_dtype]]]()
         Self.trace_ancestry(tensor, visited, traced)
         tensor.grad[].fill(1.0)
@@ -183,6 +184,7 @@ struct Tensor[dtype: DType = DType.float32](
             log_debug("Tensor__del__ -> freed self data pointees")
         log_debug("Tensor__del__ -> discarded ancestors")
         self.ancestors.free()
+        self.shape.free()
         if self.data:
             self.data.free()
         log_debug("Tensor__del__ -> called free on data")
@@ -378,8 +380,7 @@ struct Tensor[dtype: DType = DType.float32](
         ](),
     ):
         if right_lineage.__as_bool__():
-            self.ancestors.append(left_lineage)
-            self.ancestors.append(right_lineage)
+            self.ancestors.append_all(left_lineage, right_lineage)
         else:
             self.ancestors.append(left_lineage)
 
