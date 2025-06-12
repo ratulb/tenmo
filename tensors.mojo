@@ -35,7 +35,7 @@ struct Tensor[dtype: DType = DType.float32](
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
     var grad: Self.GradBox
-    var ancestors: Optional[Ancestors[dtype]]
+    var ancestors: Ancestors[dtype]
     var grad_fn: Optional[fn () escaping raises -> None]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
@@ -46,7 +46,7 @@ struct Tensor[dtype: DType = DType.float32](
         Shape.validate(shape)
         self.shape = shape
         self.requires_grad = requires_grad
-        self.ancestors = None
+        self.ancestors = Ancestors[self.dtype].none()
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
@@ -64,13 +64,10 @@ struct Tensor[dtype: DType = DType.float32](
     ):
         if tensor.address().__str__() not in visited:
             visited.add(tensor.address().__str__())
-            if tensor.ancestors is not None:
-                ancestors = tensor.ancestors.value()
-                for i in range(len(ancestors)):
-                    ancestor = ancestors.get(i)
-                    if ancestor is not None:
-                        Self.trace_ancestry(ancestor.value()[], visited, traced)
-                traced.append(tensor.address())
+            ancestors = tensor.ancestors
+            for ancestor in ancestors:
+                Self.trace_ancestry(ancestor[], visited, traced)
+            traced.append(tensor.address())
 
     @staticmethod
     fn walk_backward[_dtype: DType, //](tensor: Tensor[_dtype]) raises:
@@ -85,16 +82,12 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn backward(self, mut start: Bool, grad_seed: Scalar[dtype] = 1.0) raises:
         if start:
-            # print("Starting with tensor: ", self.address())
+            print("Starting with tensor: ", self.address())
             self.grad[].fill(grad_seed)
             start = False
         self.invoke_grad_fn()
-        if self.ancestors:
-            for i in range(len(self.ancestors.value())):
-                ancestor = self.ancestors.value().get(i)
-                if ancestor:
-                    # print("Ancestor ptr addr: ", ancestor.value())
-                    ancestor.value()[].backward(start)
+        for ancestor in self.ancestors:
+            ancestor[].backward(start)
 
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
@@ -188,9 +181,8 @@ struct Tensor[dtype: DType = DType.float32](
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
             log_debug("Tensor__del__ -> freed self data pointees")
-        if self.ancestors is not None:
-            log_debug("Tensor__del__ -> discarded ancestors")
-            self.ancestors.value().free()
+        log_debug("Tensor__del__ -> discarded ancestors")
+        self.ancestors.free()
         if self.data:
             self.data.free()
         log_debug("Tensor__del__ -> called free on data")
@@ -385,12 +377,11 @@ struct Tensor[dtype: DType = DType.float32](
             Tensor[dtype]
         ](),
     ):
-        if self.ancestors == None:
-            self.ancestors = Optional(Ancestors[dtype]())
-            if right_lineage.__as_bool__():
-                self.ancestors.value().set(left_lineage, right_lineage)
-            else:
-                self.ancestors.value().set(left_lineage)
+        if right_lineage.__as_bool__():
+            self.ancestors.append(left_lineage)
+            self.ancestors.append(right_lineage)
+        else:
+            self.ancestors.append(left_lineage)
 
     fn __rmul__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
         return self.__mul__(scalar)
@@ -1051,8 +1042,8 @@ fn test_add_2_tensors() raises:
     print("Tensor1 grad shape: ", tensor1.open_gradbox().shape)
     print("Tensor2 grad shape: ", tensor2.open_gradbox().shape)
     print("Out tensor grad shape: ", out_tensor.open_gradbox().shape)
-    parent1 = out_tensor.ancestors.value().get(0).value()[]
-    parent2 = out_tensor.ancestors.value().get(1).value()[]
+    parent1 = out_tensor.ancestors.get(0)[]
+    parent2 = out_tensor.ancestors.get(1)[]
     left_parent_is_tensor1 = (parent1 == tensor1).all_true()
     right_parent_is_tensor2 = (parent2 == tensor2).all_true()
     assert_true(
@@ -1079,7 +1070,7 @@ fn test_factor_mul_by() raises:
     tensor = Tensor.rand(256, 256, requires_grad=True)
     out_tensor = 2 * tensor
     assert_true(
-        len(out_tensor.ancestors.value().get(0).value()[]) == 65536,
+        len(out_tensor.ancestors.get(0)[]) == 65536,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
@@ -1093,7 +1084,7 @@ fn test_mul_by_factor() raises:
     tensor = Tensor.rand(128, 256, requires_grad=True)
     out_tensor = tensor * 100
     assert_true(
-        len(out_tensor.ancestors.value().get(0).value()[]) == 32768,
+        len(out_tensor.ancestors.get(0)[]) == 32768,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
@@ -1108,7 +1099,7 @@ fn test_add_value() raises:
     tensor = Tensor.rand(1024, 64, requires_grad=True)
     out_tensor = 2 * tensor
     assert_true(
-        len(out_tensor.ancestors.value().get(0).value()[]) == 65536,
+        len(out_tensor.ancestors.get(0)[]) == 65536,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
