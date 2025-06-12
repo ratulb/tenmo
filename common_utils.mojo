@@ -45,9 +45,6 @@ fn piped(m: Int, n: Int = -1) -> VariadicList[Int]:
         return create_variadic_list(m)
     return create_variadic_list(m, n)
 
-fn is_power_of_2(n: Int) -> Bool:
-    return (n & (n - 1)) == 0
-
 
 # Get next power of 2 for n
 fn next_power_of_2(n: Int) raises -> Int:
@@ -88,7 +85,3 @@ fn main() raises:
     vl = piped(3, 1)
     for e in vl:
         print(e)
-    vl2 = single_elem_list(8)
-    print(vl2[0])
-    for e1 in vl2:
-        print(e1)

@@ -57,28 +57,27 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn trace_ancestry[
-        _dtype: DType, //
+        dtype: DType, //
     ](
-        tensor: Tensor[_dtype],
+        tensor: Tensor[dtype],
         mut visited: Set[Int],
-        mut traced: List[UnsafePointer[Tensor[_dtype]]],
+        mut traced: Ancestors[dtype],
     ):
-        if Int(tensor.address()) not in visited:
+        if tensor.int_addr() not in visited:
             visited.add(Int(tensor.address()))
-            ancestors = tensor.ancestors
-            for ancestor in ancestors:
+            for ancestor in tensor.ancestors:
                 Self.trace_ancestry(ancestor[], visited, traced)
             traced.append(tensor.address())
 
     @staticmethod
-    fn walk_backward[_dtype: DType, //](tensor: Tensor[_dtype]) raises:
+    fn walk_backward[dtype: DType, //](tensor: Tensor[dtype]) raises:
         if tensor.has_grad() == False:
             return
         visited = Set[Int]()
-        traced = List[UnsafePointer[Tensor[_dtype]]]()
+        traced = Ancestors[dtype]()
         Self.trace_ancestry(tensor, visited, traced)
         tensor.grad[].fill(1.0)
-        for each in reversed(traced):
+        for each in traced.__reversed__():
             each[].invoke_grad_fn()
 
     fn backward(self, mut start: Bool, grad_seed: Scalar[dtype] = 1.0) raises:
@@ -93,8 +92,13 @@ struct Tensor[dtype: DType = DType.float32](
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
 
+    @always_inline
     fn address(self) -> UnsafePointer[Self]:
         return UnsafePointer(to=self)
+
+    @always_inline
+    fn int_addr(self) -> Int:
+        return Int(self.address())
 
     fn invoke_grad_fn(self, verbose: Bool = True) raises -> None:
         if self.grad_fn:
