@@ -9,19 +9,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
     var numels: Int
 
     fn __init__(out self, dims: VariadicList[Int]):
-        if len(dims) < 1:
-            abort("Shape dimension count should be > 0")
-        for each in dims:
-            if each < 1:
-                abort("Wrong shape dimension")
-        _spans = IntList(dims)
-        _ndims = len(_spans)
-        _numels = 1
-        for idx in range(_ndims):
-            _numels *= _spans[idx]
-        self.axes_spans = _spans
-        self.ndim = _ndims
-        self.numels = _numels
+        self = Self(IntList(dims))
 
     fn __init__(out self, dims: IntList):
         if len(dims) < 1:
@@ -120,6 +108,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
         print("Shape free kicking in alright")
         self.axes_spans.free()
         _ = self^
+
     @staticmethod
     fn validate(shape: Shape):
         for idx in range(shape.ndim):
