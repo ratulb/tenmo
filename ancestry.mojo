@@ -34,7 +34,7 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
         memcpy(self.ancestors, existing.ancestors, existing.size)
 
     @staticmethod
-    fn none() -> Ancestors[dtype]:
+    fn void() -> Ancestors[dtype]:
         return Self()
 
     @staticmethod

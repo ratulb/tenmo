@@ -47,7 +47,8 @@ struct Tensor[dtype: DType = DType.float32](
         Shape.validate(shape)
         self.shape = shape
         self.requires_grad = requires_grad
-        self.ancestors = Ancestors[self.dtype].none()
+        self.ancestors = Ancestors[dtype].void()
+
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
         self.data = UnsafePointer[Scalar[self.dtype]].alloc(
