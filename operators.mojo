@@ -97,3 +97,7 @@ fn __tensor_op_scalar__[
         vectorize[subtract_scalar, simdwidthof[dtype]()](out.numels())
 
     return out
+
+
+fn main():
+    pass
