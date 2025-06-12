@@ -111,7 +111,7 @@ struct Tensor[dtype: DType = DType.float32](
                 print("\nNo grad_fn\n")
             pass
 
-    fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
+    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
         index = self.shape.flatten_index(indices)
         if index == -1:
             abort("__getitem__(indices): Invalid indices")
@@ -924,7 +924,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn print_tensor_recursive(
         self,
-        mut indices: List[Int],
+        mut indices: IntList,
         level: Int,
         num_first: Int = 10,
         num_last: Int = 10,
@@ -932,8 +932,6 @@ struct Tensor[dtype: DType = DType.float32](
         try:
             current_dim = len(indices)
             indent = " " * (level * 2)
-            # num_first = 5
-            # num_last = 5
             # Defensive check
             if current_dim >= self.ndim():
                 # if current_dim > self.ndim():
@@ -1017,7 +1015,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(self.__str__())
-        empty = List[Int]()
+        empty = IntList()
         try:
             self.print_tensor_recursive(
                 empty, 1, num_first=num_first, num_last=num_last
