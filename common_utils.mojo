@@ -2,6 +2,7 @@ from shapes import Shape
 from testing import assert_true
 from sys.param_env import env_get_string
 from logger import Level, Logger
+from intlist import IntList
 
 alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
 
@@ -29,11 +30,11 @@ fn variadiclist_as_str(list: VariadicList[Int]) -> String:
 
 
 # Convert a VariadicList to List
-fn variadiclist_as_list(vlist: VariadicList[Int]) -> List[Int]:
-    list = List[Int](capacity=len(vlist))
+fn variadiclist_as_intlist(vlist: VariadicList[Int]) -> IntList:
+    list = IntList.with_capacity(capacity=len(vlist))
     for each in vlist:
         list.append(each)
-    return list
+    return list^
 
 
 # Create a single element VariadicList
@@ -49,7 +50,7 @@ fn piped(m: Int, n: Int = -1) -> VariadicList[Int]:
 # Get next power of 2 for n
 fn next_power_of_2(n: Int) raises -> Int:
     assert_true(n > 0, "Next power of 2 is supported for >= 1")
-    if is_power_of_2(n):
+    if n.is_power_of_two():
         return n
     if n == 1:
         return 1

@@ -1,4 +1,4 @@
-from common_utils import variadiclist_as_list
+from common_utils import variadiclist_as_intlist
 from intlist import IntList
 from os import abort
 
@@ -53,10 +53,10 @@ struct Shape(Sized & Writable & Copyable & Movable):
         return self.numels
 
     fn flatten_index(self, indices: VariadicList[Int]) -> Int:
-        list = variadiclist_as_list(indices)
+        list = variadiclist_as_intlist(indices)
         return self.flatten_index(list)
 
-    fn flatten_index(self, indices: List[Int]) -> Int:
+    fn flatten_index(self, indices: IntList) -> Int:
         if len(indices) != self.ndim:
             print(
                 (

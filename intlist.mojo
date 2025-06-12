@@ -4,7 +4,8 @@ from os import abort
 
 @register_passable
 struct IntList(Sized & Copyable):
-    """A memory-efficient, register-passable, dynamic array of Ints."""
+    """A memory-efficient, register-passable, dynamic array of Ints. Would abort on any erroneous condition.
+    """
 
     var data: UnsafePointer[Int]
     var size: Int
@@ -18,7 +19,7 @@ struct IntList(Sized & Copyable):
 
     @always_inline("nodebug")
     fn __init__(out self, *elems: Int):
-        """Initialize a new owned `IntList` with the elements.
+        """Initialize a new `IntList` with variadic number of elements.
         Args:
             elems: Number of Ints to allocate space for.
         """
@@ -30,7 +31,7 @@ struct IntList(Sized & Copyable):
 
     @always_inline("nodebug")
     fn __init__(out self, elems: VariadicList[Int]):
-        """Initialize a new owned `IntList` with the elements.
+        """Initialize a new `IntList` with the with VariadicList[Int] - used primarily in Shape.
         Args:
             elems: Number of Ints to allocate space for.
         """
@@ -39,7 +40,6 @@ struct IntList(Sized & Copyable):
         self.capacity = len(elems)
         for idx in range(len(elems)):
             (self.data + idx)[] = elems[idx]
-
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
@@ -63,11 +63,7 @@ struct IntList(Sized & Copyable):
     @always_inline("nodebug")
     # fn __del__(owned self):
     fn free(owned self):
-        """Destroy the `IntList` and free its memory if owned.
-
-        Only frees memory for owned arrays (positive _size) to prevent
-        double-free errors with views.
-        """
+        """Destroy the `IntList` and free its memory."""
         if self.data:
             print("IntList __del__ is kicking in alright")
             self.data.free()
@@ -79,6 +75,23 @@ struct IntList(Sized & Copyable):
         for i in range(factor):
             result.copy_from(i * len(self), self, 0, len(self))
         return result
+
+    fn pop(mut self, index: Int = -1) -> Int:
+        if len(self) < 1:
+            abort("cannot pop from empty IntList")
+
+        var i = index
+        if i < 0:
+            i += self.size
+        if i < 0 or i >= len(self):
+            abort("pop index out of bounds")
+
+        val = (self.data + i).take_pointee()
+        for j in range(i + 1, self.size):
+            (self.data + j).move_pointee_into(self.data + j - 1)
+
+        self.size -= 1
+        return val
 
     fn __add__(self: IntList, other: IntList) -> IntList:
         if (
@@ -345,4 +358,6 @@ fn main() raises:
     il.print()
     il.reverse()
     il.print()
-
+    for _ in range(len(il)):
+        _ = il.pop()
+    il.print()
