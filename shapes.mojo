@@ -3,14 +3,39 @@ from intlist import IntList
 from os import abort
 from memory import Pointer
 
+from testing import assert_true, assert_raises
+
+
+fn test_broadcast_shapes() raises:
+    shape1 = Shape.of(3, 4)  # 2D tensor
+    shape2 = Shape.of(
+        4,
+    )  # 1D tensor
+    result = Shape.broadcast_shapes(shape1, shape2)
+    assert_true(result == Shape.of(3, 4), "Shape broadcast 1 assertion failed")
+
+    shape1 = Shape.of(5, 3, 1)
+    shape2 = Shape.of(5, 1)
+    with assert_raises():
+        _ = Shape.broadcast_shapes(shape1, shape2)
+
+    shape1 = Shape.of(1)
+    shape2 = Shape.of(
+        3,
+        4,
+    )
+    result = Shape.broadcast_shapes(shape1, shape2)
+    assert_true(result == Shape.of(3, 4), "Shape broadcast 1 assertion failed")
+
 
 fn main() raises:
-    shape = Shape.of(1)
-    #print(shape)
+    test_broadcast_shapes()
+    _ = """shape = Shape.of(1)
+    # print(shape)
     for e in shape:
         e.print()
     print("==========")
-    _="""shape1 = Shape(IntList(2, 3, 4))
+    shape1 = Shape(IntList(2, 3, 4))
     print(shape1)
     dropped = shape1.drop_axis(2)
     print(dropped)
@@ -38,17 +63,17 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(mut self) -> IntList: #
-        result = self.current.copy() #
-        self.index += 1 #
+    fn __next__(mut self) -> IntList:  #
+        result = self.current.copy()  #
+        self.index += 1  #
         for i in range(self.shape[].ndim - 1, -1, -1):
             self.current[i] += 1
-            #self.current.print()
-            if self.current[i] < self.shape[][i]: #
+            # self.current.print()
+            if self.current[i] < self.shape[][i]:  #
                 break
-            self.current[i] = 0 #
-            #self.current.print() #
-        return result #
+            self.current[i] = 0  #
+            # self.current.print() #
+        return result  #
 
     fn __len__(self) -> Int:
         return self.shape[].num_elements() - self.index
@@ -65,7 +90,6 @@ struct Shape(Sized & Writable & Copyable & Movable):
     fn __init__(out self, dims: VariadicList[Int]):
         _dims = IntList.with_capacity(len(dims))
         for each in dims:
-            print(each)
             _dims.append(each)
         self = Self(_dims)
 
@@ -73,11 +97,9 @@ struct Shape(Sized & Writable & Copyable & Movable):
         if len(dims) < 1:
             abort("Shape -> __init__: Shape dimension count should be > 0")
         _ndims = len(dims)
-        #_spans = IntList.with_capacity(len(dims))
         for i in range(_ndims):
             if dims[i] < 1:
                 abort("Shape -> __init__: Wrong shape dimension")
-            #_spans[i] = dims[i]
         _numels = 1
         for idx in range(_ndims):
             _numels *= dims[idx]
@@ -96,6 +118,30 @@ struct Shape(Sized & Writable & Copyable & Movable):
             return shape
         axes = self.intlist()[:axis] + self.intlist()[axis + 1 :]
         return Shape(axes)
+
+    @staticmethod
+    def broadcast_shapes(this: Shape, that: Shape) -> Shape:
+        shape1, shape2 = Self.pad_shapes(this, that)
+        result_shape = IntList.with_capacity(len(shape1))
+        s1 = shape1.intlist()
+        s2 = shape2.intlist()
+
+        for dims in s1.zip(s2):
+            if dims[0] == dims[1]:
+                result_shape.append(dims[0])
+            elif dims[0] == 1:
+                result_shape.append(dims[1])
+            elif dims[1] == 1:
+                result_shape.append(dims[0])
+            else:
+                raise Error(
+                    "Shape -> broadcast_shape - cannot broadcast shapes: "
+                    + this.__str__()
+                    + ", "
+                    + that.__str__()
+                )
+
+        return Shape(result_shape)
 
     fn __len__(self) -> Int:
         return self.ndim

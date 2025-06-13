@@ -347,7 +347,7 @@ struct IntList(Sized & Copyable):
     ) -> Iterator[__origin_of(self), False]:
         return Iterator[forward=False](len(self), Pointer(to=self))
 
-    fn __zip_iter__(
+    fn zip(
         ref self, ref other: Self
     ) -> ZipIterator[__origin_of(self), __origin_of(other)]:
         """Iterate over elements of the IntList, returning immutable references.
@@ -437,6 +437,6 @@ fn main() raises:
     ll[1:4].print()"""
     l1 = IntList(1, 2, 3)
     l2 = IntList(4, 5, 6, 7)
-    zipped = l1.__zip_iter__(l2)
+    zipped = l1.zip(l2)
     for each in zipped:
         print(each[0], each[1])
