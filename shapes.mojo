@@ -1,6 +1,60 @@
 from common_utils import variadiclist_as_intlist
 from intlist import IntList
 from os import abort
+from memory import Pointer
+
+
+fn main() raises:
+    shape = Shape.of(1)
+    #print(shape)
+    for e in shape:
+        e.print()
+    print("==========")
+    _="""shape1 = Shape(IntList(2, 3, 4))
+    print(shape1)
+    dropped = shape1.drop_axis(2)
+    print(dropped)
+    for each in shape1:
+        each.print()
+    print(shape1)
+    shape2 = Shape.of(1, 2, 3, 4, 5, 6)
+    print(shape2)
+    test_pad_shapes()
+    test_shape_as_intlist()"""
+
+
+struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
+    var shape: Pointer[Shape, origin]
+    var current: IntList
+    var index: Int
+
+    fn __init__(out self, shape: Pointer[Shape, origin]):
+        self.shape = shape
+        self.current = IntList.with_capacity(shape[].ndim)
+        self.index = 0
+        for _ in range(shape[].ndim):
+            self.current.append(0)
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(mut self) -> IntList: #
+        result = self.current.copy() #
+        self.index += 1 #
+        for i in range(self.shape[].ndim - 1, -1, -1):
+            self.current[i] += 1
+            #self.current.print()
+            if self.current[i] < self.shape[][i]: #
+                break
+            self.current[i] = 0 #
+            #self.current.print() #
+        return result #
+
+    fn __len__(self) -> Int:
+        return self.shape[].num_elements() - self.index
+
+    fn __has_next__(self) -> Bool:
+        return self.shape[].num_elements() - self.index > 0
 
 
 struct Shape(Sized & Writable & Copyable & Movable):
@@ -9,34 +63,48 @@ struct Shape(Sized & Writable & Copyable & Movable):
     var numels: Int
 
     fn __init__(out self, dims: VariadicList[Int]):
-        self = Self(IntList(dims))
+        _dims = IntList.with_capacity(len(dims))
+        for each in dims:
+            print(each)
+            _dims.append(each)
+        self = Self(_dims)
 
     fn __init__(out self, dims: IntList):
         if len(dims) < 1:
-            abort("Shape dimension count should be > 0")
+            abort("Shape -> __init__: Shape dimension count should be > 0")
         _ndims = len(dims)
-        _spans = IntList.with_capacity(len(dims))
+        #_spans = IntList.with_capacity(len(dims))
         for i in range(_ndims):
             if dims[i] < 1:
-                abort("Wrong shape dimension")
-            _spans[i] = dims[i]
+                abort("Shape -> __init__: Wrong shape dimension")
+            #_spans[i] = dims[i]
         _numels = 1
         for idx in range(_ndims):
-            _numels *= _spans[idx]
-        self.axes_spans = _spans
+            _numels *= dims[idx]
+        self.axes_spans = dims
         self.ndim = _ndims
         self.numels = _numels
+
+    fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
+        return ShapeIndexIter(Pointer(to=self))
+
+    fn drop_axis(self, axis: Int) -> Shape:
+        if axis < 0 or axis >= self.ndim:
+            abort("Shape -> drop_axis: Invalid axis " + String(axis))
+        if self.ndim == 1:
+            shape = self
+            return shape
+        axes = self.intlist()[:axis] + self.intlist()[axis + 1 :]
+        return Shape(axes)
 
     fn __len__(self) -> Int:
         return self.ndim
 
-    fn __getitem__(self, index: Int) -> Int:
-        var idx: Int
-        if 0 <= index < self.ndim:
-            idx = self.axes_spans[index]
+    fn __getitem__(self, idx: Int) -> Int:
+        if 0 <= idx < self.ndim:
+            return self.axes_spans[idx]
         else:
-            idx = -1
-        return idx
+            return -1
 
     fn __eq__(self, other: Self) -> Bool:
         if self.ndim != other.ndim:
@@ -182,12 +250,3 @@ fn test_pad_shapes() raises:
         padded1 == shape1 and padded2 == shape2,
         "Padding of shapes (3,4,5,2 ) and (3,4,5,2) assertion failed",
     )
-
-
-fn main() raises:
-    shape1 = Shape(IntList(1, 2, 3, 4, 5, 6))
-    print(shape1)
-    shape2 = Shape.of(1, 2, 3, 4, 5, 6)
-    print(shape2)
-    test_pad_shapes()
-    test_shape_as_intlist()

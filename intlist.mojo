@@ -1,3 +1,4 @@
+#from memory import UnsafePointer, memcpy, memset_zero, Pointer
 from memory import UnsafePointer, memcpy, Pointer
 from os import abort
 
@@ -56,9 +57,27 @@ struct IntList(Sized & Copyable):
     fn with_capacity(capacity: Int) -> IntList:
         array = Self()
         array.data = UnsafePointer[Int].alloc(capacity)
+        #memset_zero(array.data, capacity)
         array.capacity = capacity
         array.size = 0
         return array
+
+    @staticmethod
+    fn insert_axis(indices: IntList, index: Int, axis: Int) -> IntList:
+        # Insert `index` at position `axis` in `indices`, return a new IntList
+
+        if axis < 0 or axis > len(indices):
+            abort("Axis out of bounds")
+
+        result = IntList.with_capacity(len(indices) + 1)
+
+        for i in range(len(indices) + 1):
+            if i == axis:
+                result.append(index)
+            if i < len(indices):
+                result.append(indices[i])
+
+        return result
 
     @always_inline("nodebug")
     # fn __del__(owned self):
@@ -75,6 +94,19 @@ struct IntList(Sized & Copyable):
         for i in range(factor):
             result.copy_from(i * len(self), self, 0, len(self))
         return result
+
+    fn __getitem__(self, slice: Slice) -> Self:
+        var start, end, step = slice.indices(len(self))
+        var spread = range(start, end, step)
+
+        if not len(spread):
+            return Self()
+
+        var result = Self.with_capacity(capacity=len(spread))
+        for i in spread:
+            result.append(self[i])
+
+        return result^
 
     fn pop(mut self, index: Int = -1) -> Int:
         if len(self) < 1:
@@ -123,7 +155,7 @@ struct IntList(Sized & Copyable):
         """
 
         if idx < 0 or idx >= len(self):
-            abort("IntList __getitem__ -> Out-of-bounds read")
+            abort("IntList __getitem__ -> Out-of-bounds read: " + String(idx))
 
         return (self.data + idx)[]
 
@@ -361,3 +393,5 @@ fn main() raises:
     for _ in range(len(il)):
         _ = il.pop()
     il.print()
+    ll = IntList(1, 2, 3, 4, 5, 6)
+    ll[1:4].print()

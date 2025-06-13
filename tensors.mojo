@@ -2,7 +2,7 @@
 ### Implement tensor library in mojo from first principles
 
 from math import iota, exp, floor
-from random import randn, seed, random_float64
+from random import seed, random_float64
 from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
@@ -127,6 +127,12 @@ struct Tensor[dtype: DType = DType.float32](
         index = self.shape.flatten_index(indices)
         if index == -1:
             abort("__setitem__(*indices): Invalid indices")
+        self.data.store[volatile=True](index, value)
+
+    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
+        index = self.shape.flatten_index(indices)
+        if index == -1:
+            abort("__setitem__(IntList): Invalid indices")
         self.data.store[volatile=True](index, value)
 
     fn __moveinit__(out self, owned other: Self):
@@ -774,6 +780,37 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[copy_elements, simdwidthof[dtype]()](self.numels())
         return result
 
+    fn sum(self, axis: Int = -1) -> Tensor[dtype]:
+        if self.ndim() == 1:
+            result = Tensor[dtype].zeros(1, requires_grad=self.requires_grad)
+
+            @parameter
+            fn sum_elems[simd_width: Int](idx: Int):
+                result[0] += self.data.load[width=simd_width](idx).reduce_add()
+
+            vectorize[sum_elems, simdwidthof[dtype]()](self.numels())
+            return result
+
+        else:
+            _axis = axis
+            if _axis != -1:
+                if _axis < 0 or _axis > self.ndim():
+                    abort("Invalid axis for tensor sum: " + String(_axis))
+            else:
+                _axis = self.ndim() - 1
+
+            out_shape = self.shape.drop_axis(_axis)
+            out = Tensor[dtype].zeros(out_shape, requires_grad=self.requires_grad)
+
+            for idx in out_shape:  # all indices of output tensor
+                sum_val = Scalar[dtype](0)
+                for i in range(self.shape[axis]):
+                    full_idx = IntList.insert_axis(idx, i, axis)
+                    sum_val += self[full_idx]
+                out[idx] = sum_val
+
+            return out
+
     fn __str__(self) -> String:
         dims = len(self.shape)
         s = String("[")
@@ -855,15 +892,19 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn zeros(*axes_spans: Int, requires_grad: Bool = False) -> Tensor[dtype]:
         shape = Shape(axes_spans)
-        tensor = Tensor[dtype](shape, requires_grad)
-        memset_zero(tensor.data, tensor.numels())
-        return tensor
+        return Self.zeros(shape, requires_grad)
 
     @staticmethod
     fn zeros_like(
         tensor: Tensor[dtype], requires_grad: Bool = False
     ) -> Tensor[dtype]:
         out = Tensor[dtype](tensor.shape, requires_grad)
+        memset_zero(out.data, out.numels())
+        return out
+
+    @staticmethod
+    fn zeros(shape: Shape, requires_grad: Bool = False) -> Tensor[dtype]:
+        out = Tensor[dtype](shape, requires_grad)
         memset_zero(out.data, out.numels())
         return out
 
@@ -1170,11 +1211,23 @@ fn test_random() raises:
     Tensor.free_all(rand_tensor, rand_tensor2)
 
 
+fn test_sum() raises:
+    ones = Tensor.ones(3, 3)
+    ones.print()
+    #axis = -1
+    # summed = ones.sum(axis)
+    summed = ones.sum(1)
+    summed.print()
+
+
 def main():
-    test_arange()
+    test_sum()
+    #result = Tensor.zeros(2,3, requires_grad=False)
+    #result.print()
+    _ = """test_arange()
     test_add_2_tensors()
     test_mul_by_factor()
     test_random()
     test_transpose_matmul()
     test_add_value()
-    test_factor_mul_by()
+    test_factor_mul_by()"""
