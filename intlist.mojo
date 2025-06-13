@@ -1,4 +1,3 @@
-#from memory import UnsafePointer, memcpy, memset_zero, Pointer
 from memory import UnsafePointer, memcpy, Pointer
 from os import abort
 
@@ -57,7 +56,6 @@ struct IntList(Sized & Copyable):
     fn with_capacity(capacity: Int) -> IntList:
         array = Self()
         array.data = UnsafePointer[Int].alloc(capacity)
-        #memset_zero(array.data, capacity)
         array.capacity = capacity
         array.size = 0
         return array
@@ -349,6 +347,16 @@ struct IntList(Sized & Copyable):
     ) -> Iterator[__origin_of(self), False]:
         return Iterator[forward=False](len(self), Pointer(to=self))
 
+    fn __zip_iter__(
+        ref self, ref other: Self
+    ) -> ZipIterator[__origin_of(self), __origin_of(other)]:
+        """Iterate over elements of the IntList, returning immutable references.
+
+        Returns:
+            An iterator of immutable references to the IntList elements.
+        """
+        return ZipIterator(0, Pointer(to=self), Pointer(to=other))
+
 
 struct Iterator[
     origin: Origin[False],
@@ -384,9 +392,41 @@ struct Iterator[
         else:
             return self.index
 
+struct ZipIterator[
+    origin_this: Origin[False],
+    origin_that: Origin[False],
+](Sized & Copyable):
+    var index: Int
+    var src_this: Pointer[IntList, origin_this]
+    var src_that: Pointer[IntList, origin_that]
+
+    fn __init__(
+        out self,
+        idx: Int,
+        src_this: Pointer[IntList, origin_this],
+        src_that: Pointer[IntList, origin_that],
+    ):
+        self.src_this = src_this
+        self.src_that = src_that
+        self.index = idx
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(mut self) -> (Int, Int):
+        self.index += 1
+        return self.src_this[][self.index - 1], self.src_that[][self.index - 1]
+
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        return self.__len__() > 0
+
+    fn __len__(self) -> Int:
+        return min(len(self.src_this[]), len(self.src_that[])) - self.index
+
 
 fn main() raises:
-    il = IntList(1, 2, 3)
+    _ = """il = IntList(1, 2, 3)
     il.print()
     il.reverse()
     il.print()
@@ -394,4 +434,9 @@ fn main() raises:
         _ = il.pop()
     il.print()
     ll = IntList(1, 2, 3, 4, 5, 6)
-    ll[1:4].print()
+    ll[1:4].print()"""
+    l1 = IntList(1, 2, 3)
+    l2 = IntList(4, 5, 6, 7)
+    zipped = l1.__zip_iter__(l2)
+    for each in zipped:
+        print(each[0], each[1])
