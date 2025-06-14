@@ -120,6 +120,17 @@ struct Shape(Sized & Writable & Copyable & Movable):
         return Shape(axes)
 
     @staticmethod
+    fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
+        if shape1 == shape2:
+            return shape1, shape2
+        one = IntList(1)
+        len1, len2 = len(shape1), len(shape2)
+        max_len = max(len1, len2)
+        padded1 = one * (max_len - len1) + shape1.intlist()
+        padded2 = one * (max_len - len2) + shape2.intlist()
+        return Shape(padded1), Shape(padded2)
+
+    @staticmethod
     def broadcast_shapes(this: Shape, that: Shape) -> Shape:
         shape1, shape2 = Self.pad_shapes(this, that)
         result_shape = IntList.with_capacity(len(shape1))
@@ -238,17 +249,6 @@ struct Shape(Sized & Writable & Copyable & Movable):
     @staticmethod
     fn of(*dims: Int) -> Shape:
         return Shape(dims)
-
-    @staticmethod
-    fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
-        if shape1 == shape2:
-            return shape1, shape2
-        one = IntList(1)
-        len1, len2 = len(shape1), len(shape2)
-        max_len = max(len1, len2)
-        padded1 = one * (max_len - len1) + shape1.intlist()
-        padded2 = one * (max_len - len2) + shape2.intlist()
-        return Shape(padded1), Shape(padded2)
 
 
 from testing import assert_true

@@ -800,7 +800,9 @@ struct Tensor[dtype: DType = DType.float32](
                 _axis = self.ndim() - 1
 
             out_shape = self.shape.drop_axis(_axis)
-            out = Tensor[dtype].zeros(out_shape, requires_grad=self.requires_grad)
+            out = Tensor[dtype].zeros(
+                out_shape, requires_grad=self.requires_grad
+            )
 
             for idx in out_shape:  # all indices of output tensor
                 sum_val = Scalar[dtype](0)
@@ -1214,7 +1216,7 @@ fn test_random() raises:
 fn test_sum() raises:
     ones = Tensor.ones(3, 3)
     ones.print()
-    #axis = -1
+    # axis = -1
     # summed = ones.sum(axis)
     summed = ones.sum(1)
     summed.print()
@@ -1222,12 +1224,10 @@ fn test_sum() raises:
 
 def main():
     test_sum()
-    #result = Tensor.zeros(2,3, requires_grad=False)
-    #result.print()
-    _ = """test_arange()
+    test_arange()
     test_add_2_tensors()
     test_mul_by_factor()
     test_random()
     test_transpose_matmul()
     test_add_value()
-    test_factor_mul_by()"""
+    test_factor_mul_by()
