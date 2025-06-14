@@ -7,12 +7,27 @@ from testing import assert_true, assert_raises
 
 
 fn test_broadcast_shapes() raises:
-    shape1 = Shape.of(3, 4)  # 2D tensor
+    shape1 = Shape.of(32, 16)
     shape2 = Shape.of(
-        4,
-    )  # 1D tensor
+        16,
+    )
     result = Shape.broadcast_shapes(shape1, shape2)
-    assert_true(result == Shape.of(3, 4), "Shape broadcast 1 assertion failed")
+    assert_true(result == Shape.of(32, 16), "Shape broadcast 1 assertion failed")
+
+    shape1 = Shape.of(4, 16, 32)
+    shape2 = Shape.of(
+        32,
+    )
+    result = Shape.broadcast_shapes(shape1, shape2)
+    assert_true(result == Shape.of(4, 16, 32), "Shape broadcast 2 assertion failed")
+
+    shape1 = Shape.of(4, 16, 32, 64)
+    shape2 = Shape.of(
+        64,
+    )
+    result = Shape.broadcast_shapes(shape1, shape2)
+    assert_true(result == Shape.of(4, 16, 32, 64), "Shape broadcast 3 assertion failed")
+
 
     shape1 = Shape.of(5, 3, 1)
     shape2 = Shape.of(5, 1)

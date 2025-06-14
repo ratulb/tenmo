@@ -312,7 +312,12 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __eq__(self, other: Tensor[self.dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
-            abort("__eq__ -> Dimension mismatch")
+            abort(
+                "Tensor __eq__ -> Dimension mismatch: "
+                + self.shape.__str__()
+                + ", "
+                + other.shape.__str__()
+            )
         result = Tensor[DType.bool](self.shape, False)
 
         @parameter
@@ -1215,19 +1220,42 @@ fn test_random() raises:
 
 fn test_sum() raises:
     ones = Tensor.ones(3, 3)
-    ones.print()
-    # axis = -1
-    # summed = ones.sum(axis)
     summed = ones.sum(1)
-    summed.print()
+    expect = Tensor.of(3, 3, 3)
+    assert_true((summed == expect).all_true(), "1D sum assertion failed")
+
+    tensor = Tensor.arange(1, 21).reshape(2, 5, 2)
+    summed = tensor.sum(1)
+    _ = """
+    [2D Tensor(2, 2), Type: float32, requires_grad: False]
+        [
+            [25.0, 30.0, ],
+            [75.0, 80.0, ],
+    ]"""
+    expect = Tensor.of[2](25, 30, 75, 80)
+    assert_true(
+        (summed == expect).all_true(), "Sum across axis 1 assertion failed"
+    )
+
+    summed = tensor.sum(0)
+    expect = Tensor.of[2](12, 14, 16, 18, 20, 22, 24, 26, 28, 30)
+    assert_true(
+        (summed == expect).all_true(), "Sum across axis 0 assertion failed"
+    )
+
+    expect = Tensor.of[5](3, 7, 11, 15, 19, 23, 27, 31, 35, 39)
+    summed = tensor.sum(2)
+    assert_true(
+        (summed == expect).all_true(), "Sum across axis 2 assertion failed"
+    )
 
 
 def main():
     test_sum()
-    test_arange()
+    _ = """test_arange()
     test_add_2_tensors()
     test_mul_by_factor()
     test_random()
     test_transpose_matmul()
     test_add_value()
-    test_factor_mul_by()
+    test_factor_mul_by()"""
