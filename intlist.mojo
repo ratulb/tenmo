@@ -130,11 +130,13 @@ struct IntList(Sized & Copyable):
         ):
             return IntList()
         if self.data.__as_bool__() == False:
-            _other = other
+            #_other = other
+            #return _other
             return other
         if other.data.__as_bool__() == False:
-            _self = self
-            return _self
+            #_self = self
+            #return _self
+            return self
 
         result = IntList.with_capacity(len(self) + len(other))
         result.copy_from(0, self, 0, len(self))
