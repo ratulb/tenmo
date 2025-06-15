@@ -1226,7 +1226,7 @@ fn test_random() raises:
 
 fn test_sum() raises:
     ones = Tensor.ones(3, 3)
-    summed = ones.sum(1)
+    summed = ones.sum(0)
     expect = Tensor.of(3, 3, 3)
     assert_true((summed == expect).all_true(), "1D sum assertion failed")
 
