@@ -1,7 +1,8 @@
 from memory import UnsafePointer
 from tensors import Tensor
-from algorithm import vectorize
+from algorithm import vectorize, parallelize
 from sys import simdwidthof
+from shapes import Shape
 
 alias Noop = 0
 alias AddScalar = 1
@@ -10,6 +11,46 @@ alias MulScalar = 3
 alias MulTensor = 4
 alias AddTensor = 5
 alias SubtractTensor = 6
+
+
+fn sum_across_rows[
+    dtype: DType = DType.float32
+](tensor: Tensor[dtype]) -> Tensor[dtype]:
+    rows = tensor.shape[0]
+    cols = tensor.shape[1]
+    shape = Shape.of(rows)
+    out = Tensor[dtype].zeros(shape, requires_grad=tensor.requires_grad)
+
+    @parameter
+    fn sum_row(row: Int):
+        row_start = tensor.data.offset(row * cols)
+
+        @parameter
+        fn sum_row_elems[simd_width: Int](idx: Int):
+            out[row] += row_start.load[width=simd_width](idx).reduce_add()
+
+        vectorize[sum_row_elems, simdwidthof[dtype]()](cols)
+
+    parallelize[sum_row](rows)
+    return out
+
+
+fn sum_across_cols[
+    dtype: DType = DType.float32
+](tensor: Tensor[dtype]) -> Tensor[dtype]:
+    cols = tensor.shape[1]
+    shape = Shape.of(cols)
+    out = Tensor[dtype].zeros(shape, requires_grad=tensor.requires_grad)
+
+    @parameter
+    fn sum_cols(col: Int):
+        col_start = tensor.data.offset(col)
+        out[col] += col_start.strided_load[width = simdwidthof[dtype]()](
+            cols
+        ).reduce_add()
+
+    parallelize[sum_cols](cols)
+    return out
 
 
 # Element wise operatorns
@@ -99,5 +140,14 @@ fn __tensor_op_scalar__[
     return out
 
 
-fn main():
-    pass
+fn main() raises:
+    tensor = Tensor.of[5](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+    tensor.print()
+    # summ = sum_across_rows(tensor)
+    # summ.print()
+    # sl = tensor.data.strided_load[width=16](5)
+    # print(sl.__str__())
+    # print(len(sl))
+    # print(sl.reduce_add().__str__())
+    summ = sum_across_cols(tensor)
+    summ.print()

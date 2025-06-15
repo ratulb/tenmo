@@ -23,6 +23,8 @@ from operators import (
     AddScalar,
     SubtractScalar,
     MulScalar,
+    sum_across_rows,
+    sum_across_cols,
 )
 from collections import Set
 
@@ -786,6 +788,13 @@ struct Tensor[dtype: DType = DType.float32](
         return result
 
     fn sum(self, axis: Int = -1) -> Tensor[dtype]:
+        _axis = axis
+        if _axis != -1:
+            if _axis < 0 or _axis >= self.ndim():
+                abort("Invalid axis for tensor sum: " + String(_axis))
+        else:
+            _axis = self.ndim() - 1
+
         if self.ndim() == 1:
             result = Tensor[dtype].zeros(1, requires_grad=self.requires_grad)
 
@@ -796,14 +805,11 @@ struct Tensor[dtype: DType = DType.float32](
             vectorize[sum_elems, simdwidthof[dtype]()](self.numels())
             return result
 
-        else:
-            _axis = axis
-            if _axis != -1:
-                if _axis < 0 or _axis > self.ndim():
-                    abort("Invalid axis for tensor sum: " + String(_axis))
-            else:
-                _axis = self.ndim() - 1
+        elif self.ndim() == 2:
+            out = sum_across_rows(self) if _axis == 1 else sum_across_cols(self)
+            return out
 
+        else:
             out_shape = self.shape.drop_axis(_axis)
             out = Tensor[dtype].zeros(
                 out_shape, requires_grad=self.requires_grad
