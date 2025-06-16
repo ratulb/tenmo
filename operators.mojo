@@ -17,6 +17,62 @@ alias AddTensor = 5
 alias SubtractTensor = 6
 
 
+fn sum_3d[
+    axis: Int,
+    dtype: DType = DType.float32,
+    simd_width: Int = simdwidthof[dtype](),
+](tensor: Tensor[dtype]) -> Tensor[dtype]:
+    constrained[
+        axis == 0 or axis == 1 or axis == 2,
+        "operators -> sum_3d - axis can be only 0, 1 or 2. axis: "
+        + String(axis),
+    ]()
+    if tensor.ndim() != 3:
+        abort(
+            "operators -> sum_3d - Tensor is ndim is not 3: "
+            + String(tensor.ndim())
+        )
+    tensor.print()
+    print()
+    shape = tensor.shape
+    H = tensor.shape[0]
+    W = tensor.shape[1]
+    D = tensor.shape[2]
+
+    fn offset_for_xy(x: Int, y: Int) -> Int:
+        return x * (W * D) + y * D
+
+    fn offset_for_xz(x: Int, z: Int) -> Int:
+        return x * (W * D) + z
+
+    fn offset_for_yz(y: Int, z: Int) -> Int:
+        return (y * D) + z
+
+    out = Tensor[dtype].zeros(
+        shape.drop_axis(axis), requires_grad=tensor.requires_grad
+    )
+    if axis == 2:
+        for indices in out.shape:
+            x, y = indices[0], indices[1]
+            offset = offset_for_xy(x, y)
+            for idx in range(D):
+                out[indices] += tensor.data.load[width=1](offset + idx)
+    if axis == 1:
+        for indices in out.shape:
+            x, z = indices[0], indices[1]
+            offset = offset_for_xz(x, z)
+            for idx in range(W):
+                out[indices] += tensor.data.load[width=1](offset + idx * D)
+    if axis == 0:
+        for indices in out.shape:
+            y, z = indices[0], indices[1]
+            offset = offset_for_yz(y, z)
+            for idx in range(H):
+                out[indices] += tensor.data.load[width=1](offset + idx * W * D)
+
+    return out
+
+
 fn sum_across_rows[  # sum axis=1
     dtype: DType = DType.float32, simd_width: Int = simdwidthof[dtype]()
 ](tensor: Tensor[dtype]) -> Tensor[dtype]:
@@ -31,10 +87,10 @@ fn sum_across_rows[  # sum axis=1
 
     @parameter
     fn sum_chunk(thread_id: Int):
-        _start = thread_id * chunk_size
-        end = min(_start + chunk_size, ROWS)
+        start = thread_id * chunk_size
+        end = min(start + chunk_size, ROWS)
 
-        for row in range(_start, end):
+        for row in range(start, end):
             row_start = tensor.data.offset(row * COLS)
 
             @parameter
@@ -315,3 +371,10 @@ fn main() raises:
     test_sum_1d()
     test_sum_across_cols()
     test_sum_1d()
+    tensor_3d = Tensor.rand(2, 3, 4)
+    # _result = sum_3d[2](tensor_3d)
+    # result.print()
+    # _result = sum_3d[1](tensor_3d)
+    # _result.print()
+    result = sum_3d[0](tensor_3d)
+    result.print()
