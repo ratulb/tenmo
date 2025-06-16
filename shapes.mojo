@@ -12,22 +12,27 @@ fn test_broadcast_shapes() raises:
         16,
     )
     result = Shape.broadcast_shapes(shape1, shape2)
-    assert_true(result == Shape.of(32, 16), "Shape broadcast 1 assertion failed")
+    assert_true(
+        result == Shape.of(32, 16), "Shape broadcast 1 assertion failed"
+    )
 
     shape1 = Shape.of(4, 16, 32)
     shape2 = Shape.of(
         32,
     )
     result = Shape.broadcast_shapes(shape1, shape2)
-    assert_true(result == Shape.of(4, 16, 32), "Shape broadcast 2 assertion failed")
+    assert_true(
+        result == Shape.of(4, 16, 32), "Shape broadcast 2 assertion failed"
+    )
 
     shape1 = Shape.of(4, 16, 32, 64)
     shape2 = Shape.of(
         64,
     )
     result = Shape.broadcast_shapes(shape1, shape2)
-    assert_true(result == Shape.of(4, 16, 32, 64), "Shape broadcast 3 assertion failed")
-
+    assert_true(
+        result == Shape.of(4, 16, 32, 64), "Shape broadcast 3 assertion failed"
+    )
 
     shape1 = Shape.of(5, 3, 1)
     shape2 = Shape.of(5, 1)
@@ -43,8 +48,25 @@ fn test_broadcast_shapes() raises:
     assert_true(result == Shape.of(3, 4), "Shape broadcast 1 assertion failed")
 
 
+fn test_index_iter() raises:
+    shape = Shape.of(1)
+    for each in shape:
+        assert_true(
+            each == IntList(0),
+            "Unit shape(Shape.of(1)) index iteration assertion failed",
+        )
+    shape = Shape.of(2, 1)
+    indices = shape.__iter__()
+    assert_true(
+        indices.__next__() == IntList(0, 0)
+        and indices.__next__() == IntList(1, 0),
+        "Shape(2,1) iteration assertion failed",
+    )
+
+
 fn main() raises:
     test_broadcast_shapes()
+    test_index_iter()
     _ = """shape = Shape.of(1)
     # print(shape)
     for e in shape:
