@@ -243,16 +243,16 @@ from testing import assert_true
 fn test_sum_1d() raises:
     tensor = Tensor.of(1, 2, 3, 4, 5, 6, 7, 8)
     summ = sum_1d(tensor)
-    assert_true(summ[0] == 36, "sum_1d assertion failed")
+    assert_true(summ.item() == 36, "sum_1d assertion failed")
 
     summ = sum_1d(tensor, 1)
-    assert_true(summ[0] == 35, "sum_1d start_index = 1 assertion failed")
+    assert_true(summ.item() == 35, "sum_1d start_index = 1 assertion failed")
 
     summ = sum_1d(tensor, -8)
-    assert_true(summ[0] == 36.0, "sum_1d start_index = -8 assertion failed")
+    assert_true(summ.item() == 36.0, "sum_1d start_index = -8 assertion failed")
 
     summ = sum_1d(tensor, -1)
-    assert_true(summ[0] == 8, "sum_1d start_index = -1 assertion failed")
+    assert_true(summ.item() == 8, "sum_1d start_index = -1 assertion failed")
     Tensor.free_all(tensor)
 
 

@@ -32,6 +32,7 @@ struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable
 ):
     alias GradBox = UnsafePointer[Self]
+    alias UnitShape = Shape.of(1)
     alias Address = UnsafePointer[Tensor[dtype]]
     var shape: Shape
     var data: UnsafePointer[Scalar[dtype]]
@@ -135,6 +136,11 @@ struct Tensor[dtype: DType = DType.float32](
         if index == -1:
             abort("__setitem__(IntList): Invalid indices")
         self.data.store[volatile=True](index, value)
+
+    fn item(self) -> Scalar[self.dtype]:
+        if self.shape != Self.UnitShape:
+            abort("Tensor -> item - shape is not "+ Self.UnitShape.__str__())
+        return self[0]
 
     fn __moveinit__(out self, owned other: Self):
         self.shape = other.shape
@@ -1264,9 +1270,12 @@ fn test_sum() raises:
     assert_true(
         (summed == expect).all_true(), "Sum across axis 2 assertion failed"
     )
-
+fn test_item() raises:
+    tensor = Tensor.of(42)
+    assert_true(tensor.item() == 42)
 
 def main():
+    test_item()
     test_sum()
     _ = """test_arange()
     test_add_2_tensors()
