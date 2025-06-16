@@ -66,11 +66,10 @@ struct IntList(Sized & Copyable):
         # Insert `index` at position `axis` in `indices`, return a new IntList
 
         if axis < 0 or axis > len(indices):
-            abort("Axis out of bounds")
+            abort("IntList -> insert_axis - Axis out of bounds")
 
         result = IntList.with_capacity(len(indices) + 1)
-
-        for i in range(len(indices) + 1):
+        for i in range(result.capacity):
             if i == axis:
                 result.append(index)
             if i < len(indices):
