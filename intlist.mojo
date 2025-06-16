@@ -2,6 +2,64 @@ from memory import UnsafePointer, memcpy, Pointer
 from os import abort
 from common_utils import log_debug
 
+from testing import assert_true
+
+
+fn test_insert() raises:
+    il = IntList(2, 3, 4, 5, 6)
+    inserted = il.insert(0, 9)
+    assert_true(
+        inserted == IntList(9, 2, 3, 4, 5, 6),
+        "IntList -> insert at 0 assertion failed",
+    )
+    inserted = il.insert(1, 9)
+    assert_true(
+        inserted == IntList(2, 9, 3, 4, 5, 6),
+        "IntList -> insert at 1 assertion failed",
+    )
+
+    inserted = il.insert(2, 9)
+    assert_true(
+        inserted == IntList(2, 3, 9, 4, 5, 6),
+        "IntList -> insert at 2 assertion failed",
+    )
+
+    inserted = il.insert(3, 9)
+    assert_true(
+        inserted == IntList(2, 3, 4, 9, 5, 6),
+        "IntList -> insert at 3 assertion failed",
+    )
+
+    inserted = il.insert(4, 9)
+    assert_true(
+        inserted == IntList(2, 3, 4, 5, 9, 6),
+        "IntList -> insert at 4 assertion failed",
+    )
+
+    inserted = il.insert(5, 9)
+    assert_true(
+        inserted == IntList(2, 3, 4, 5, 6, 9),
+        "IntList -> insert at 3 assertion failed",
+    )
+
+
+fn main() raises:
+    _ = """il = IntList(1, 2, 3)
+    il.print()
+    il.reverse()
+    il.print()
+    for _ in range(len(il)):
+        _ = il.pop()
+    il.print()
+    ll = IntList(1, 2, 3, 4, 5, 6)
+    ll[1:4].print()
+    l1 = IntList(1, 2, 3)
+    l2 = IntList(4, 5, 6, 7)
+    zipped = l1.zip(l2)
+    for each in zipped:
+        print(each[0], each[1])"""
+    test_insert()
+
 
 @register_passable
 struct IntList(Sized & Copyable):
@@ -61,19 +119,18 @@ struct IntList(Sized & Copyable):
         array.size = 0
         return array
 
-    @staticmethod
-    fn insert_axis(indices: IntList, index: Int, axis: Int) -> IntList:
-        # Insert `index` at position `axis` in `indices`, return a new IntList
+    fn insert(self, at: Int, value: Int) -> IntList:
+        # Insert `value` at position `at` in `self`, return a new IntList
+        # `at` could be start, middle or end
+        if at < 0 or at > len(self):
+            abort("IntList -> insert - index out of bounds: " + String(at))
 
-        if axis < 0 or axis > len(indices):
-            abort("IntList -> insert_axis - Axis out of bounds")
-
-        result = IntList.with_capacity(len(indices) + 1)
+        result = IntList.with_capacity(len(self) + 1)
         for i in range(result.capacity):
-            if i == axis:
-                result.append(index)
-            if i < len(indices):
-                result.append(indices[i])
+            if i == at:
+                result.append(value)
+            if i < len(self):
+                result.append(self[i])
 
         return result
 
@@ -130,12 +187,12 @@ struct IntList(Sized & Copyable):
         ):
             return IntList()
         if self.data.__as_bool__() == False:
-            #_other = other
-            #return _other
+            # _other = other
+            # return _other
             return other
         if other.data.__as_bool__() == False:
-            #_self = self
-            #return _self
+            # _self = self
+            # return _self
             return self
 
         result = IntList.with_capacity(len(self) + len(other))
@@ -394,6 +451,7 @@ struct Iterator[
         else:
             return self.index
 
+
 struct ZipIterator[
     origin_this: Origin[False],
     origin_that: Origin[False],
@@ -425,20 +483,3 @@ struct ZipIterator[
 
     fn __len__(self) -> Int:
         return min(len(self.src_this[]), len(self.src_that[])) - self.index
-
-
-fn main() raises:
-    _ = """il = IntList(1, 2, 3)
-    il.print()
-    il.reverse()
-    il.print()
-    for _ in range(len(il)):
-        _ = il.pop()
-    il.print()
-    ll = IntList(1, 2, 3, 4, 5, 6)
-    ll[1:4].print()"""
-    l1 = IntList(1, 2, 3)
-    l2 = IntList(4, 5, 6, 7)
-    zipped = l1.zip(l2)
-    for each in zipped:
-        print(each[0], each[1])

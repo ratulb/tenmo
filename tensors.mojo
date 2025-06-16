@@ -138,7 +138,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn item(self) -> Scalar[self.dtype]:
         if self.shape != Shape.UnitShape:
-            abort("Tensor -> item - shape is not "+ Shape.UnitShape.__str__())
+            abort("Tensor -> item - shape is not " + Shape.UnitShape.__str__())
         return self[0]
 
     fn __moveinit__(out self, owned other: Self):
@@ -822,12 +822,12 @@ struct Tensor[dtype: DType = DType.float32](
                 out_shape, requires_grad=self.requires_grad
             )
 
-            for idx in out_shape:  # all indices of output tensor
+            for indices in out_shape:  # all indices of output tensor
                 sum_val = Scalar[dtype](0)
-                for i in range(self.shape[axis]):
-                    full_idx = IntList.insert_axis(idx, i, axis)
+                for i in range(self.shape[_axis]):
+                    full_idx = indices.insert(_axis, i)
                     sum_val += self[full_idx]
-                out[idx] = sum_val
+                out[indices] = sum_val
 
             return out
 
@@ -1269,17 +1269,20 @@ fn test_sum() raises:
     assert_true(
         (summed == expect).all_true(), "Sum across axis 2 assertion failed"
     )
+
+
 fn test_item() raises:
     tensor = Tensor.of(42)
     assert_true(tensor.item() == 42)
 
+
 def main():
     test_item()
     test_sum()
-    _ = """test_arange()
+    test_arange()
     test_add_2_tensors()
     test_mul_by_factor()
     test_random()
     test_transpose_matmul()
     test_add_value()
-    test_factor_mul_by()"""
+    test_factor_mul_by()
