@@ -43,22 +43,56 @@ fn test_insert() raises:
     )
 
 
-fn main() raises:
-    _ = """il = IntList(1, 2, 3)
-    il.print()
+fn test_copy() raises:
+    il = IntList(1, 2)
+    copied = il.copy()
+    assert_true(copied == IntList(1, 2), "reverse assertion failed")
+
+
+fn test_reverse() raises:
+    il = IntList(1, 2)
     il.reverse()
-    il.print()
-    for _ in range(len(il)):
-        _ = il.pop()
-    il.print()
-    ll = IntList(1, 2, 3, 4, 5, 6)
-    ll[1:4].print()
+    assert_true(il == IntList(2, 1), "reverse assertion failed")
+
+
+fn test_pop() raises:
+    il = IntList(1, 2, 3)
+    assert_true(
+        il.pop() == 3 and il.pop() == 2 and il.pop() == 1 and len(il) == 0,
+        "pop assertion failed",
+    )
+
+
+fn test_zip() raises:
     l1 = IntList(1, 2, 3)
     l2 = IntList(4, 5, 6, 7)
     zipped = l1.zip(l2)
+    i = 0
     for each in zipped:
-        print(each[0], each[1])"""
+        if i == 0:
+            assert_true(
+                each[0] == 1 and each[1] == 4,
+                "zip iteration 0 - assertion failed",
+            )
+        if i == 1:
+            assert_true(
+                each[0] == 2 and each[1] == 5,
+                "zip iteration 1 - assertion failed",
+            )
+        if i == 2:
+            assert_true(
+                each[0] == 3 and each[1] == 6,
+                "zip iteration 2 - assertion failed",
+            )
+        i += 1
+
+
+fn main() raises:
     test_insert()
+    test_reverse()
+    test_copy()
+    test_pop()
+    test_zip()
 
 
 @register_passable
