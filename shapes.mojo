@@ -98,6 +98,7 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
 
 
 struct Shape(Sized & Writable & Copyable & Movable):
+    alias UnitShape = Shape.of(1)
     var axes_spans: IntList
     var ndim: Int
     var numels: Int
