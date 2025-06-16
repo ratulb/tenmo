@@ -11,9 +11,8 @@ from os import abort
 from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
 from intlist import IntList
-from common_utils import variadiclist_as_str, log_debug, piped
 from ancestry import Ancestors
-from testing import assert_true
+from common_utils import variadiclist_as_str, log_debug, piped
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
@@ -722,9 +721,13 @@ struct Tensor[dtype: DType = DType.float32](
     fn mat(self, other: Self) raises -> Tensor[dtype]:
         start = perf_counter_ns()
         if self.shape[1] != other.shape[0]:
-            abort("matmul - Dim mismatch")
+            abort(
+                "Tensor -> mat - Dim mismatch: "
+                + self.shape.__str__()
+                + ", "
+                + other.shape.__str__()
+            )
 
-        # assert_true(self.shape[1] == other.shape[0], "matmul - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
         for i in range(self.shape[0]):
             for j in range(self.shape[1]):
@@ -748,9 +751,8 @@ struct Tensor[dtype: DType = DType.float32](
         return result
 
     fn T(self, tile_size: Int = 32) raises -> Tensor[dtype]:
-        assert_true(
-            self.shape.ndim == 2, "Transpose allowed only for 2D tensors"
-        )
+        if self.shape.ndim != 2:
+            abort("Tensor -> transpose allowed only for 2D tensors")
         rows, cols = (self.shape[0], self.shape[1])
         output = Tensor[dtype](
             Shape(piped(cols, rows)), requires_grad=self.requires_grad
@@ -926,10 +928,11 @@ struct Tensor[dtype: DType = DType.float32](
         *elems: Scalar[dtype], requires_grad: Bool = False
     ) raises -> Tensor[dtype]:
         if requires_grad:
-            assert_true(
-                dtype.is_numeric() and dtype.is_floating_point(),
-                "requires_grad can be True only for floating point types",
-            )
+            if not (dtype.is_numeric() and dtype.is_floating_point()):
+                abort(
+                    "Tensor -> of -> requires_grad can be True only for"
+                    " floating point types"
+                )
         shape = Shape(piped(len(elems)))
         tensor = Tensor[dtype](shape, requires_grad)
         for i in range(len(elems)):
@@ -943,14 +946,18 @@ struct Tensor[dtype: DType = DType.float32](
         dtype
     ]:
         if requires_grad:
-            assert_true(
-                dtype.is_numeric() and dtype.is_floating_point(),
-                "requires_grad can be True only for floating point types",
+            if not (dtype.is_numeric() and dtype.is_floating_point()):
+                abort(
+                    "Tensor -> of[row_size] -> requires_grad can be True only"
+                    " for floating point types"
+                )
+        if not (row_size >= 1 and row_size <= len(elems)):
+            abort(
+                (
+                    "Tensor -> of[row_size] -> invalid row size or not enough"
+                    " elements"
+                ),
             )
-        assert_true(
-            row_size >= 1 and row_size <= len(elems),
-            "Invalid row size or not enough elements",
-        )
         num_rows = len(elems) // row_size
         axes_spans = piped(num_rows, row_size)
         shape = Shape(axes_spans)
@@ -1081,6 +1088,9 @@ struct Tensor[dtype: DType = DType.float32](
     fn free_all[dtype: DType, //](*tensors: Tensor[dtype]):
         for each in tensors:
             each.free()
+
+
+from testing import assert_true
 
 
 fn test_add_2_tensors() raises:
