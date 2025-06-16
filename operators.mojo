@@ -3,6 +3,7 @@ from tensors import Tensor
 from algorithm import vectorize, parallelize
 from sys import simdwidthof
 from shapes import Shape
+from os import abort
 
 # from runtime.asyncrt import num_physical_cores
 from sys import num_logical_cores, num_physical_cores
@@ -24,16 +25,16 @@ fn sum_across_rows[  # sum axis=1
     shape = Shape.of(ROWS)
     out = Tensor[dtype].zeros(shape, requires_grad=tensor.requires_grad)
 
-    #num_threads = num_physical_cores()
+    # num_threads = num_physical_cores()
     num_threads = num_logical_cores()
     chunk_size = (ROWS + num_threads - 1) // num_threads
 
     @parameter
     fn sum_chunk(thread_id: Int):
-        start = thread_id * chunk_size
-        end = min(start + chunk_size, ROWS)
+        _start = thread_id * chunk_size
+        end = min(_start + chunk_size, ROWS)
 
-        for row in range(start, end):
+        for row in range(_start, end):
             row_start = tensor.data.offset(row * COLS)
 
             @parameter
@@ -46,8 +47,33 @@ fn sum_across_rows[  # sum axis=1
     return out
 
 
+fn sum_1d[
+    dtype: DType = DType.float32, simd_width: Int = simdwidthof[dtype]()
+](tensor: Tensor[dtype], start_index: Int = 0) -> Tensor[dtype]:
+    if tensor.ndim() != 1:
+        abort("operators -> sum_1d - tensor ndim is not 1")
+    start = start_index if start_index >= 0 else len(tensor) + start_index
+    if not (start >= 0 and start < len(tensor)):
+        abort(
+            "operators -> sum_1d start_index out of bounds: "
+            + String(start_index)
+        )
+    out = Tensor[dtype].zeros(1, requires_grad=tensor.requires_grad)
+    accum: Scalar[dtype] = 0
+
+    @parameter
+    fn sum_from[_simd_width: Int](idx: Int):
+        accum += tensor.data.load[width=_simd_width](idx + start).reduce_add()
+
+    vectorize[sum_from, simd_width](tensor.numels() - start)
+    out[0] = accum
+    return out
+
+
 fn sum_across_cols[  # sum axis = 0
-    dtype: DType = DType.float32
+    # dtype: DType = DType.float32
+    dtype: DType,
+    //
 ](tensor: Tensor[dtype]) -> Tensor[dtype]:
     COLS = tensor.shape[1]
     ROWS = tensor.shape[0]
@@ -211,19 +237,81 @@ fn __tensor_op_scalar__[
     return out
 
 
-fn main() raises:
-    tensor = Tensor.of[5](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
-    tensor.print()
-    print()
-    # summ = sum_across_rows(tensor)
-    # summ.print()
-    # sl = tensor.data.strided_load[width=16](5)
-    # print(sl.__str__())
-    # print(len(sl))
-    # print(sl.reduce_add().__str__())
-    # summ = sum_across_cols(tensor)
-    # summ.print()
-    print()
-    # print(num_logical_cores(), num_physical_cores())
+from testing import assert_true
+
+
+fn test_sum_1d() raises:
+    tensor = Tensor.of(1, 2, 3, 4, 5, 6, 7, 8)
+    summ = sum_1d(tensor)
+    assert_true(summ[0] == 36, "sum_1d assertion failed")
+
+    summ = sum_1d(tensor, 1)
+    assert_true(summ[0] == 35, "sum_1d start_index = 1 assertion failed")
+
+    summ = sum_1d(tensor, -8)
+    assert_true(summ[0] == 36.0, "sum_1d start_index = -8 assertion failed")
+
+    summ = sum_1d(tensor, -1)
+    assert_true(summ[0] == 8, "sum_1d start_index = -1 assertion failed")
+    Tensor.free_all(tensor)
+
+
+fn test_sum_across_rows() raises:
+    tensor = Tensor.of[5](
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+    )
     summ = sum_across_rows(tensor)
-    summ.print()
+    expect = Tensor.of(15.0, 40.0, 65.0)
+    assert_true(
+        (summ == expect).all_true(),
+        "operators -> sum_across_rows assertion failed",
+    )
+    Tensor.free_all(summ, tensor)
+
+
+fn test_sum_across_cols() raises:
+    tensor = Tensor.of[5](
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0,
+        11.0,
+        12.0,
+        13.0,
+        14.0,
+        15.0,
+    )
+    summ = sum_across_cols(tensor)
+    expect = Tensor.of(18.0, 21.0, 24.0, 27.0, 30.0)
+    assert_true(
+        (summ == expect).all_true(),
+        "operators -> sum_across_cols assertion failed",
+    )
+    Tensor.free_all(summ, tensor)
+
+
+fn main() raises:
+    test_sum_across_rows()
+    test_sum_1d()
+    test_sum_across_cols()
+    test_sum_1d()
