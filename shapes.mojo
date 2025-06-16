@@ -1,4 +1,4 @@
-from common_utils import variadiclist_as_intlist
+from common_utils import variadiclist_as_intlist, log_debug
 from intlist import IntList
 from os import abort
 from memory import Pointer
@@ -245,7 +245,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
         self.numels = other.numels
 
     fn free(owned self):
-        print("Shape free kicking in alright")
+        log_debug("Shape free kicking in alright")
         self.axes_spans.free()
         _ = self^
 

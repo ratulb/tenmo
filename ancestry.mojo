@@ -1,7 +1,7 @@
 from memory import UnsafePointer, memcpy, Pointer
 from os import abort
 from tensors import Tensor
-
+from common_utils import log_debug
 
 @register_passable
 struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
@@ -51,7 +51,7 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
     # fn __del__(owned self):
     fn free(owned self):
         if self.ancestors:
-            print("Ancestors __del__ is kicking in alright")
+            log_debug("Ancestors __del__ is kicking in alright")
             for idx in range(len(self)):
                 (self.ancestors + idx).destroy_pointee()
             self.ancestors.free()

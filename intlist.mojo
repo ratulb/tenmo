@@ -1,5 +1,6 @@
 from memory import UnsafePointer, memcpy, Pointer
 from os import abort
+from common_utils import log_debug
 
 
 @register_passable
@@ -82,7 +83,7 @@ struct IntList(Sized & Copyable):
     fn free(owned self):
         """Destroy the `IntList` and free its memory."""
         if self.data:
-            print("IntList __del__ is kicking in alright")
+            log_debug("IntList __del__ is kicking in alright")
             self.data.free()
 
     fn __mul__(self: IntList, factor: Int) -> IntList:
