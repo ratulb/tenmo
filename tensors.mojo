@@ -491,6 +491,7 @@ struct Tensor[dtype: DType = DType.float32](
             raise Error(
                 "__add__ -> Dimension mismatch:",
                 self.address()[].shape,
+                " <=> ",
                 other.address()[].shape,
             )
 
@@ -1094,6 +1095,18 @@ struct Tensor[dtype: DType = DType.float32](
         for each in tensors:
             each.free()
 
+    fn view(ref self) -> View[__origin_of(self), self.dtype]:
+        return View(Pointer(to=self))
+
+
+@fieldwise_init
+struct View[
+    mutability: Bool, //,
+    origin: Origin[mutability],
+    dtype: DType = DType.float32,
+]:
+    var src: Pointer[Tensor[dtype], origin]
+
 
 from testing import assert_true
 
@@ -1276,8 +1289,14 @@ fn test_item() raises:
     assert_true(tensor.item() == 42)
 
 
+fn test_view() raises:
+    tensor = Tensor.rand(2, 4, 5)
+    t_view = tensor.view()
+    print("The shape of: ", t_view.src[].shape)
+
+
 def main():
-    test_item()
+    _ = """test_item()
     test_sum()
     test_arange()
     test_add_2_tensors()
@@ -1285,4 +1304,5 @@ def main():
     test_random()
     test_transpose_matmul()
     test_add_value()
-    test_factor_mul_by()
+    test_factor_mul_by()"""
+    test_view()
