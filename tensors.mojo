@@ -216,6 +216,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn ndim(self) -> Int:
         return self.shape.ndim
 
+    @always_inline
+    fn broadcastable(self, to: Tensor[dtype]) -> Bool:
+        return self.shape.broadcastable(to.shape)
+
     fn all_true(self: Tensor[DType.bool]) -> Bool:
         fn all_truthy(ambivalent: Scalar[DType.bool]) -> Bool:
             return ambivalent == True

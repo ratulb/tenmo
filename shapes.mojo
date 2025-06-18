@@ -7,11 +7,12 @@ from tensors import Tensor
 
 
 fn main() raises:
+    test_broadcastable()
     tensor1 = Tensor.rand(3, 1)
     print(tensor1.shape)
     tensor2 = Tensor.rand(1, 2)
     print(tensor2.shape)
-    print("ndims: ", tensor1.shape.ndim, tensor2.shape.ndim)
+    _ = """print("ndims: ", tensor1.shape.ndim, tensor2.shape.ndim)
     if tensor1.shape != tensor2.shape:
         broadcast_shape = Shape.broadcast_shapes(tensor1.shape, tensor2.shape)
         print("broadcast_shape: ", broadcast_shape)
@@ -27,18 +28,18 @@ fn main() raises:
             )
             print("translated for shape1: ")
             translated.print()
-        _ = """mask = tensor2.shape.broadcast_mask(tensor1.shape)
+        mask = tensor2.shape.broadcast_mask(tensor1.shape)
         for indices in broadcast_shape:
             #indices.print()
             translated = tensor2.shape.translate_index(indices, mask, broadcast_shape)
             print("translated for shape2: ")
             translated.print()
         print("mask")
-        mask.print()"""
+        mask.print()
 
     else:
         summ = tensor1 + tensor2
-        summ.print()
+        summ.print()"""
 
     _ = """test_broadcast_shapes()
     test_index_iter()
@@ -126,6 +127,25 @@ fn test_index_iter() raises:
     )
 
 
+fn test_broadcastable() raises:
+    assert_true(
+        Shape.of(1).broadcastable(Shape.of(1)),
+        "broadcastable assertion 1 failed",
+    )
+    assert_true(
+        Shape.of(4, 5).broadcastable(Shape.of(1)),
+        "broadcastable assertion 2 failed",
+    )
+    assert_true(
+        Shape.of(2, 3, 5).broadcastable(Shape.of(1, 5)),
+        "broadcastable assertion 3 failed",
+    )
+    assert_true(
+        Shape.of(2, 3, 5).broadcastable(Shape.of(3, 5)),
+        "broadcastable assertion 4 failed",
+    )
+
+
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
     var shape: Pointer[Shape, origin]
     var current: IntList
@@ -189,18 +209,28 @@ struct Shape(Sized & Writable & Copyable & Movable):
     fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
         return ShapeIndexIter(Pointer(to=self))
 
+    fn broadcastable(self, to: Shape) -> Bool:
+        dims1 = self.intlist()
+        dims2 = to.intlist()
+        zip_reversed = dims1.zip_reversed(dims2)
+        for dims in zip_reversed:
+            if dims[0] != dims[1]:
+                if dims[0] != 1 and dims[1] != 1:
+                    return False
+        return True
+
     fn broadcast_mask(self, target_shape: Shape) -> IntList:
         mask = IntList()
         offset = target_shape.ndim - self.ndim
 
         for i in range(target_shape.ndim):
             if i < offset:
-                mask.append(1)  # base has no dimension here
+                mask.append(1)  # self has no dimension here
             else:
                 base_dim = self[i - offset]
                 target_dim = target_shape[i]
                 if base_dim == 1 and target_dim != 1:
-                    mask.append(1)  # base is being expanded
+                    mask.append(1)  # self is being expanded
                 else:
                     mask.append(0)  # match or both 1 → not broadcasted
 
@@ -208,7 +238,12 @@ struct Shape(Sized & Writable & Copyable & Movable):
 
     fn drop_axis(self, axis: Int) -> Shape:
         if axis < 0 or axis >= self.ndim:
-            abort("Shape -> drop_axis: Invalid axis " + String(axis))
+            abort(
+                "Shape -> drop_axis: Invalid axis: "
+                + String(axis)
+                + " for shape: "
+                + self.__str__()
+            )
         if self.ndim == 1:
             shape = self
             return shape
@@ -228,6 +263,13 @@ struct Shape(Sized & Writable & Copyable & Movable):
 
     @staticmethod
     fn broadcast_shapes(this: Shape, that: Shape) -> Shape:
+        if not this.broadcastable(that):
+            abort(
+                "Shape -> broadcast_shapes - not broadcastable: "
+                + this.__str__()
+                + " <=> "
+                + that.__str__()
+            )
         shape1, shape2 = Self.pad_shapes(this, that)
         result_shape = IntList.with_capacity(len(shape1))
         s1 = shape1.intlist()
