@@ -1105,7 +1105,7 @@ struct View[
     origin: Origin[mutability],
     dtype: DType = DType.float32,
 ]:
-    var src: Pointer[Tensor[dtype], origin]
+    var target: Pointer[Tensor[dtype], origin]
 
 
 from testing import assert_true
@@ -1291,8 +1291,11 @@ fn test_item() raises:
 
 fn test_view() raises:
     tensor = Tensor.rand(2, 4, 5)
-    t_view = tensor.view()
-    print("The shape of: ", t_view.src[].shape)
+    view = tensor.view()
+    assert_true(
+        tensor.shape == view.target[].shape,
+        "Tensor and view shape equality asserttion failed",
+    )
 
 
 def main():
