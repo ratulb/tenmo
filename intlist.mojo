@@ -46,7 +46,7 @@ fn test_insert() raises:
 fn test_copy() raises:
     il = IntList(1, 2)
     copied = il.copy()
-    assert_true(copied == IntList(1, 2), "reverse assertion failed")
+    assert_true(copied == IntList(1, 2), "copy assertion failed")
 
 
 fn test_reverse() raises:
@@ -87,12 +87,70 @@ fn test_zip() raises:
         i += 1
 
 
+fn test_zip_reversed() raises:
+    l1 = IntList(1, 2, 3)
+    l2 = IntList(4, 5, 6, 7)
+    zipped = l1.zip_reversed(l2)
+
+    i = 0
+    for each in zipped:
+        if i == 0:
+            assert_true(
+                each[0] == 3 and each[1] == 7,
+                "zip reverse iteration 0 - assertion failed",
+            )
+        if i == 1:
+            assert_true(
+                each[0] == 2 and each[1] == 6,
+                "zip reverse iteration 1 - assertion failed",
+            )
+        if i == 2:
+            assert_true(
+                each[0] == 1 and each[1] == 5,
+                "zip reverse iteration 2 - assertion failed",
+            )
+        i += 1
+
+    l1 = IntList(1, 2, 3)
+    l2 = IntList(4, 5, 6)
+    zipped = l1.zip_reversed(l2)
+
+    i = 0
+    for each in zipped:
+        if i == 0:
+            assert_true(
+                each[0] == 3 and each[1] == 6,
+                (
+                    "equal length IntList zip reverse iteration 0 - assertion"
+                    " failed"
+                ),
+            )
+        if i == 1:
+            assert_true(
+                each[0] == 2 and each[1] == 5,
+                (
+                    "equal length IntList zip reverse iteration 1 - assertion"
+                    " failed"
+                ),
+            )
+        if i == 2:
+            assert_true(
+                each[0] == 1 and each[1] == 4,
+                (
+                    "Equal length IntList zip reverse iteration 2 - assertion"
+                    " failed"
+                ),
+            )
+        i += 1
+
+
 fn main() raises:
     test_insert()
     test_reverse()
     test_copy()
     test_pop()
     test_zip()
+    test_zip_reversed()
 
 
 @register_passable
@@ -450,6 +508,18 @@ struct IntList(Sized & Copyable):
         """
         return ZipIterator(0, Pointer(to=self), Pointer(to=other))
 
+    fn zip_reversed(
+        ref self, ref other: Self
+    ) -> ZipIterator[__origin_of(self), __origin_of(other), False]:
+        """Iterate over elements of the IntList, returning immutable references reverse order.
+
+        Returns:
+            An iterator of immutable references to the IntList elements in reverse order.
+        """
+        return ZipIterator[forward=False](
+            min(len(self), len(other)), Pointer(to=self), Pointer(to=other)
+        )
+
 
 struct Iterator[
     origin: Origin[False],
@@ -489,8 +559,10 @@ struct Iterator[
 struct ZipIterator[
     origin_this: Origin[False],
     origin_that: Origin[False],
+    forward: Bool = True,
 ](Sized & Copyable):
     var index: Int
+    var offset: Int
     var src_this: Pointer[IntList, origin_this]
     var src_that: Pointer[IntList, origin_that]
 
@@ -503,17 +575,39 @@ struct ZipIterator[
         self.src_this = src_this
         self.src_that = src_that
         self.index = idx
+        self.offset = abs(len(src_this[]) - len(src_that[]))
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(mut self) -> (Int, Int):
-        self.index += 1
-        return self.src_this[][self.index - 1], self.src_that[][self.index - 1]
+        @parameter
+        if forward:
+            self.index += 1
+            return (
+                self.src_this[][self.index - 1],
+                self.src_that[][self.index - 1],
+            )
+        else:
+            self.index -= 1
+            if len(self.src_this[]) > len(self.src_that[]):
+                return (
+                    self.src_this[][self.index + self.offset],
+                    self.src_that[][self.index],
+                )
+            else:
+                return (
+                    self.src_this[][self.index],
+                    self.src_that[][self.index + self.offset],
+                )
 
     @always_inline
     fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
-        return min(len(self.src_this[]), len(self.src_that[])) - self.index
+        @parameter
+        if forward:
+            return min(len(self.src_this[]), len(self.src_that[])) - self.index
+        else:
+            return self.index
