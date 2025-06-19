@@ -7,14 +7,23 @@ from tensors import Tensor
 
 
 fn main() raises:
-    test_broadcastable()
+    tensor1 = Tensor.of(1, 2, 3, 4, 5)
+    tensor2 = Tensor.of(6)
+    shape1 = tensor1.shape
+    shape2 = tensor2.shape
+    print("shapes: ", shape1, shape2)
+    rzipped = shape1.intlist().zip_reversed(shape2.intlist())
+    for each in rzipped:
+        print(each[0], each[1])
+
+    _ = """test_broadcastable()
     tensor1 = Tensor.rand(3, 1)
     print(tensor1.shape)
     tensor2 = Tensor.rand(1, 2)
     print(tensor2.shape)
-    _ = """print("ndims: ", tensor1.shape.ndim, tensor2.shape.ndim)
+    print("ndims: ", tensor1.shape.ndim, tensor2.shape.ndim)
     if tensor1.shape != tensor2.shape:
-        broadcast_shape = Shape.broadcast_shapes(tensor1.shape, tensor2.shape)
+        broadcast_shape = Shape.broadcast_shape(tensor1.shape, tensor2.shape)
         print("broadcast_shape: ", broadcast_shape)
         mask = tensor1.shape.broadcast_mask(tensor2.shape)
         print("mask")
@@ -41,7 +50,7 @@ fn main() raises:
         summ = tensor1 + tensor2
         summ.print()"""
 
-    _ = """test_broadcast_shapes()
+    _ = """test_broadcast_shape()
     test_index_iter()
     shape = Shape.of(1)
     # print(shape)
@@ -64,12 +73,12 @@ fn main() raises:
 from testing import assert_true, assert_raises
 
 
-fn test_broadcast_shapes() raises:
+fn test_broadcast_shape() raises:
     shape1 = Shape.of(32, 16)
     shape2 = Shape.of(
         16,
     )
-    result = Shape.broadcast_shapes(shape1, shape2)
+    result = Shape.broadcast_shape(shape1, shape2)
     assert_true(
         result == Shape.of(32, 16), "Shape broadcast 1 assertion failed"
     )
@@ -78,7 +87,7 @@ fn test_broadcast_shapes() raises:
     shape2 = Shape.of(
         32,
     )
-    result = Shape.broadcast_shapes(shape1, shape2)
+    result = Shape.broadcast_shape(shape1, shape2)
     assert_true(
         result == Shape.of(4, 16, 32), "Shape broadcast 2 assertion failed"
     )
@@ -87,7 +96,7 @@ fn test_broadcast_shapes() raises:
     shape2 = Shape.of(
         64,
     )
-    result = Shape.broadcast_shapes(shape1, shape2)
+    result = Shape.broadcast_shape(shape1, shape2)
     assert_true(
         result == Shape.of(4, 16, 32, 64), "Shape broadcast 3 assertion failed"
     )
@@ -95,17 +104,17 @@ fn test_broadcast_shapes() raises:
     shape1 = Shape.of(5, 3, 1)
     shape2 = Shape.of(5, 1)
     with assert_raises():
-        _ = Shape.broadcast_shapes(shape1, shape2)
+        _ = Shape.broadcast_shape(shape1, shape2)
 
     shape1 = Shape.of(1)
     shape2 = Shape.of(
         3,
         4,
     )
-    result = Shape.broadcast_shapes(shape1, shape2)
+    result = Shape.broadcast_shape(shape1, shape2)
     assert_true(result == Shape.of(3, 4), "Shape broadcast 4 assertion failed")
 
-    result = Shape.broadcast_shapes(Shape.of(2, 1), Shape.of(4, 2, 5))
+    result = Shape.broadcast_shape(Shape.of(2, 1), Shape.of(4, 2, 5))
     assert_true(
         result == Shape.of(4, 2, 5), "Shape broadcast 5 assertion failed"
     )
@@ -143,6 +152,12 @@ fn test_broadcastable() raises:
     assert_true(
         Shape.of(2, 3, 5).broadcastable(Shape.of(3, 5)),
         "broadcastable assertion 4 failed",
+    )
+    tensor1 = Tensor.of(1, 2, 3, 4, 5)
+    tensor2 = Tensor.of(6)
+    print(
+        tensor1.shape.broadcastable(tensor2.shape),
+        tensor2.broadcastable(tensor1),
     )
 
 
@@ -262,10 +277,10 @@ struct Shape(Sized & Writable & Copyable & Movable):
         return Shape(padded1), Shape(padded2)
 
     @staticmethod
-    fn broadcast_shapes(this: Shape, that: Shape) -> Shape:
+    fn broadcast_shape(this: Shape, that: Shape) -> Shape:
         if not this.broadcastable(that):
             abort(
-                "Shape -> broadcast_shapes - not broadcastable: "
+                "Shape -> broadcast_shape - not broadcastable: "
                 + this.__str__()
                 + " <=> "
                 + that.__str__()
@@ -348,12 +363,12 @@ struct Shape(Sized & Writable & Copyable & Movable):
         translated = IntList.with_capacity(self.ndim)
         offset = broadcast_shape.ndim - self.ndim
 
-        for i in range(broadcast_shape.ndim):
-            if mask[i] == 1:
-                # continue
+        for i in range(self.ndim):
+            broadcast_axis = i + offset
+            if mask[broadcast_axis] == 1:
                 translated.append(0)
             else:
-                translated.append(indices[i + offset])
+                translated.append(indices[broadcast_axis])
 
         return translated
 
