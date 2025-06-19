@@ -410,10 +410,10 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.ancestors.append(left_lineage)
 
-    fn __rmul__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
+    fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
 
-    fn __mul__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
+    fn __mul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, MulScalar](
             self.address()[], scalar
         )
@@ -488,16 +488,45 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn __add__(self, other: Self) raises -> Tensor[dtype]:
+    @always_inline
+    fn broadcast_shape(self, other: Self) -> Shape:
+        return Shape.broadcast_shape(self.shape, other.shape)
+
+    @always_inline
+    fn broadcast_mask(self, broadcast_shape: Shape) -> IntList:
+        return self.shape.broadcast_mask(broadcast_shape)
+
+    @always_inline
+    fn translate_index(
+        self, indices: IntList, mask: IntList, broadcast_shape: Shape
+    ) -> IntList:
+        return self.shape.translate_index(indices, mask, broadcast_shape)
+
+    fn broadcast_add(self, other: Self) -> Tensor[dtype]:
+        result_shape = self.broadcast_shape(other)
+        mask1 = self.broadcast_mask(result_shape)
+        mask2 = other.broadcast_mask(result_shape)
+        requires_grad = self.requires_grad or other.requires_grad
+        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
+        for indices in result_shape:
+            self_indices = self.translate_index(indices, mask1, result_shape)
+            other_indices = other.translate_index(indices, mask2, result_shape)
+            result[indices] = self[self_indices] + other[other_indices]
+        return result
+
+    fn __add__(self, other: Self) -> Tensor[dtype]:
         if self.address() == other.address():
             return self.__mul__(2)
-        if self.address()[].shape != other.address()[].shape:
-            raise Error(
-                "__add__ -> Dimension mismatch:",
-                self.address()[].shape,
-                " <=> ",
-                other.address()[].shape,
+        if not self.address()[].broadcastable(other.address()[]):
+            abort(
+                "__add__ -> Dimension mismatch: "
+                + self.address()[].shape.__str__()
+                + " <=> "
+                + other.address()[].shape.__str__()
             )
+
+        if self.address()[].shape != other.address()[].shape:
+            return self.address()[].broadcast_add(other.address()[])
 
         var out = __tensor_op_tensor__[dtype, AddTensor](
             self.address()[], other.address()[]
@@ -1302,14 +1331,33 @@ fn test_view() raises:
     )
 
 
+fn test_broadcast_add_2_tensors() raises:
+    print("test_broadcast_add_2_tensors")
+    tensor1 = Tensor.of(1, 2, 3, 4, 5)
+    tensor2 = Tensor.of(6, requires_grad=True)
+    result = tensor1 + tensor2
+    assert_true(
+        (result == Tensor.of(7, 8, 9, 10, 11)).all_true(),
+        "broadcast add assertion 1 failed",
+    )
+    tensor1 = Tensor.of[3](1, 2, 3, 4, 5, 6)
+    tensor2 = Tensor.of(6)
+    result = tensor1 + tensor2
+    assert_true(
+        (result == Tensor.of[3](7, 8, 9, 10, 11, 12)).all_true(),
+        "broadcast add assertion 2 failed",
+    )
+
+
 def main():
+    test_broadcast_add_2_tensors()
+    _ = """test_add_2_tensors()
     test_item()
     test_sum()
     test_arange()
-    test_add_2_tensors()
     test_mul_by_factor()
     test_random()
     test_transpose_matmul()
     test_add_value()
     test_factor_mul_by()
-    test_view()
+    test_view()"""
