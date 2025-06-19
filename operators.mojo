@@ -212,11 +212,11 @@ fn __tensor_op_tensor__[
 ](this: Tensor[dtype], that: Tensor[dtype]) -> Tensor[dtype]:
     if this.shape != that.shape:
         abort(
-            "operator ->__tensor_op__tensor("
+            "operator -> __tensor_op__tensor("
             + String(op)
             + ")  -> Dimension mismatch: "
             + this.shape.__str__()
-            + " <=>"
+            + " != "
             + that.shape.__str__()
         )
     requires_grad = this.requires_grad or that.requires_grad
