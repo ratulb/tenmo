@@ -964,6 +964,22 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn of(
+        row: List[Scalar[dtype]], requires_grad: Bool = False
+    ) -> Tensor[dtype]:
+        if requires_grad:
+            if not (dtype.is_numeric() and dtype.is_floating_point()):
+                abort(
+                    "Tensor -> of(row: List[dtype]) -> requires_grad can be"
+                    " True only for floating point types"
+                )
+        shape = Shape(IntList(len(row)))
+        tensor = Tensor[dtype](shape, requires_grad)
+        for i in range(len(row)):
+            tensor[i] = row[i]
+        return tensor
+
+    @staticmethod
+    fn of(
         *elems: Scalar[dtype], requires_grad: Bool = False
     ) raises -> Tensor[dtype]:
         if requires_grad:
@@ -1347,10 +1363,24 @@ fn test_broadcast_add_2_tensors() raises:
         (result == Tensor.of[3](7, 8, 9, 10, 11, 12)).all_true(),
         "broadcast add assertion 2 failed",
     )
+    tensor1 = Tensor.rand(2, 1, 4, 1, init_seed=Optional(42))
+    tensor1.print()
+    tensor2 = Tensor.rand(2, 1, 5, init_seed=Optional(42))
+    tensor2.print()
+    result = tensor1 + tensor2
+    result.print()
+
+
+fn test_tensor_of_list() raises:
+    tensor = Tensor.of([1, 3, 4, 5])
+    tensor.print()
+    tensor_int32 = Tensor[DType.int32].of([1, 3, 4, 5])
+    tensor_int32.print()
 
 
 def main():
     test_broadcast_add_2_tensors()
+    test_tensor_of_list()
     _ = """test_add_2_tensors()
     test_item()
     test_sum()
