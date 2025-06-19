@@ -963,25 +963,72 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     @staticmethod
-    fn of(
-        row: List[Scalar[dtype]], requires_grad: Bool = False
-    ) -> Tensor[dtype]:
+    fn d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[dtype]:
         if requires_grad:
             if not (dtype.is_numeric() and dtype.is_floating_point()):
                 abort(
-                    "Tensor -> of(row: List[dtype]) -> requires_grad can be"
+                    "Tensor -> d1 -> requires_grad can be"
                     " True only for floating point types"
                 )
         shape = Shape(IntList(len(row)))
         tensor = Tensor[dtype](shape, requires_grad)
-        for i in range(len(row)):
-            tensor[i] = row[i]
+        memcpy(tensor.data, row.data, len(row))
+        return tensor
+
+    alias Rows = List[Self.Row]
+
+    @staticmethod
+    fn d3(
+        blocks: List[Self.Rows], requires_grad: Bool = False
+    ) -> Tensor[dtype]:
+        if requires_grad:
+            if not (dtype.is_numeric() and dtype.is_floating_point()):
+                abort(
+                    "Tensor -> d3 -> requires_grad can"
+                    " be True only for floating point types"
+                )
+        dims = IntList(len(blocks), len(blocks[0]), len(blocks[0][0]))
+        flattened = List[Scalar[dtype]](capacity=dims.product())
+        for block in blocks:
+            if len(block) != dims[1]:
+                abort("Tensor -> d3 -> not all blocks equal in length")
+            for row in block:
+                if len(row) != dims[2]:
+                    abort("Tensor -> d3 -> not all rows equal in length")
+
+                flattened.extend(row)
+        shape = Shape(dims)
+        tensor = Tensor[dtype](shape, requires_grad)
+        memcpy(tensor.data, flattened.data, tensor.numels())
+        return tensor
+
+    alias Row = List[Scalar[dtype]]
+
+    @staticmethod
+    fn d2(rows: List[Self.Row], requires_grad: Bool = False) -> Tensor[dtype]:
+        if requires_grad:
+            if not (dtype.is_numeric() and dtype.is_floating_point()):
+                abort(
+                    "Tensor -> d2 -> requires_grad can"
+                    " be True only for floating point types"
+                )
+        dims = IntList(len(rows), len(rows[0]))
+        flattened = List[Scalar[dtype]](capacity=dims.product())
+        for row in rows:
+            if len(row) != dims[1]:
+                abort("Tensor -> d2 -> not all rows equal in length")
+            flattened.extend(row)
+        shape = Shape(dims)
+        tensor = Tensor[dtype](shape, requires_grad)
+        memcpy(tensor.data, flattened.data, tensor.numels())
         return tensor
 
     @staticmethod
     fn of(
-        *elems: Scalar[dtype], requires_grad: Bool = False
-    ) raises -> Tensor[dtype]:
+        *elems: Scalar[dtype],
+        requires_grad: Bool = False
+        # ) raises -> Tensor[dtype]:
+    ) -> Tensor[dtype]:
         if requires_grad:
             if not (dtype.is_numeric() and dtype.is_floating_point()):
                 abort(
@@ -1372,16 +1419,40 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 fn test_tensor_of_list() raises:
-    tensor = Tensor.of([1, 3, 4, 5])
-    tensor.print()
-    tensor_int32 = Tensor[DType.int32].of([1, 3, 4, 5])
-    tensor_int32.print()
+    tensor = Tensor.d1([1, 3, 4, 5])
+    assert_true(
+        tensor.numels() == 4 and tensor.dtype == DType.float32,
+        "Tensor from list assertion 1 failed",
+    )
+    tensor_int32 = Tensor[DType.int32].d1([1, 3, 4, 5])
+    assert_true(
+        tensor_int32.numels() == 4 and tensor_int32.dtype == DType.int32,
+        "Tensor from list assertion 2 failed",
+    )
+    tensor_2d = Tensor.d2(
+        List(List(1.0, 2, 3), List(4.0, 5, 6), List(7.0, 8, 9))
+    )
+    assert_true(
+        tensor_2d.shape == Shape.of(3, 3) and tensor_2d.numels() == 9,
+        "Tensor from assertion 3 failed",
+    )
+    tensor2d = Tensor.d2([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+    assert_true(
+        tensor2d.shape == Shape.of(3, 3) and tensor2d.numels() == 9,
+        "Tensor from assertion 3 failed",
+    )
+
+    tensor3d = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+    assert_true(
+        tensor3d.shape == Shape.of(2, 2, 2) and tensor3d.numels() == 8,
+        "Tensor from assertion 4 failed",
+    )
 
 
 def main():
     test_broadcast_add_2_tensors()
     test_tensor_of_list()
-    _ = """test_add_2_tensors()
+    test_add_2_tensors()
     test_item()
     test_sum()
     test_arange()
@@ -1390,4 +1461,4 @@ def main():
     test_transpose_matmul()
     test_add_value()
     test_factor_mul_by()
-    test_view()"""
+    test_view()
