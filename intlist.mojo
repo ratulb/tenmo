@@ -144,7 +144,13 @@ fn test_zip_reversed() raises:
         i += 1
 
 
+fn test_product() raises:
+    il = IntList(1, 3, 4, 10)
+    assert_true(il.product() == 120, "product assertion failed")
+
+
 fn main() raises:
+    test_product()
     test_insert()
     test_reverse()
     test_copy()
@@ -210,6 +216,12 @@ struct IntList(Sized & Copyable):
         array.capacity = capacity
         array.size = 0
         return array
+
+    fn product(self) -> Int:
+        result = 1
+        for each in self:
+            result *= each
+        return result
 
     fn insert(self, at: Int, value: Int) -> IntList:
         # Insert `value` at position `at` in `self`, return a new IntList
