@@ -48,7 +48,7 @@ struct Tensor[dtype: DType = DType.float32](
         Shape.validate(shape)
         self.shape = shape
         self.requires_grad = requires_grad
-        self.ancestors = Ancestors[dtype].void()
+        self.ancestors = Ancestors[dtype].untracked()
 
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
@@ -1303,7 +1303,7 @@ fn test_view() raises:
 
 
 def main():
-    _ = """test_item()
+    test_item()
     test_sum()
     test_arange()
     test_add_2_tensors()
@@ -1311,5 +1311,5 @@ def main():
     test_random()
     test_transpose_matmul()
     test_add_value()
-    test_factor_mul_by()"""
+    test_factor_mul_by()
     test_view()
