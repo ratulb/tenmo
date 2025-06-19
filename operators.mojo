@@ -209,12 +209,15 @@ fn sum_across_cols[# sum axis = 0
 # Element wise operatorns
 fn __tensor_op_tensor__[
     dtype: DType, op: Int
-](this: Tensor[dtype], that: Tensor[dtype]) raises -> Tensor[dtype]:
+](this: Tensor[dtype], that: Tensor[dtype]) -> Tensor[dtype]:
     if this.shape != that.shape:
-        raise Error(
-            "__tensor_op__tensor(" + String(op) + ")  -> Dimension mismatch:",
-            this.shape,
-            that.shape,
+        abort(
+            "operator ->__tensor_op__tensor("
+            + String(op)
+            + ")  -> Dimension mismatch: "
+            + this.shape.__str__()
+            + " <=>"
+            + that.shape.__str__()
         )
     requires_grad = this.requires_grad or that.requires_grad
     out = Tensor[dtype](this.shape, requires_grad)
@@ -262,7 +265,7 @@ fn __tensor_op_tensor__[
 # Tensor and scalar ops
 fn __tensor_op_scalar__[
     dtype: DType, op: Int
-](this: Tensor[dtype], scalar: Scalar[dtype]) raises -> Tensor[dtype]:
+](this: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
     var out = Tensor[dtype](this.shape, this.requires_grad)
 
     @parameter
