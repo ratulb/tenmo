@@ -149,7 +149,14 @@ fn test_product() raises:
     assert_true(il.product() == 120, "product assertion failed")
 
 
+fn test_replace() raises:
+    il = IntList(1, 2, 4)
+    il = il.replace(2, 3)
+    il.print()
+
+
 fn main() raises:
+    test_replace()
     test_product()
     test_insert()
     test_reverse()
@@ -337,7 +344,13 @@ struct IntList(Sized & Copyable):
         else:
             (self.data + idx)[] = value
 
-    # @always_inline("nodebug")
+    @always_inline
+    fn replace(self, idx: Int, value: Int) -> Self:
+        result = self
+        result[idx] = value
+        return result
+
+    @always_inline("nodebug")
     fn __len__(self) -> Int:
         """Get the number of elements in the array.
 

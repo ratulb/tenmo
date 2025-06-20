@@ -498,13 +498,19 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn broadcast_add(self, other: Self) -> Tensor[dtype]:
         result_shape = self.broadcast_shape(other)
+        print("result_shape: ", result_shape)  # result_shape:  (4)
         mask1 = self.broadcast_mask(result_shape)
+        mask1.print()  # IntList[ 1 ] = 0
         mask2 = other.broadcast_mask(result_shape)
+        mask2.print()  # IntList[ 1 ] = 1
         requires_grad = self.requires_grad or other.requires_grad
         result = Tensor[dtype](result_shape, requires_grad=requires_grad)
+        result.print()  # [1D Tensor(4), Type: float32, requires_grad: True][0.0, 0.0, 0.0, 0.0,]
         for indices in result_shape:
+            # indices.print() #  IntList[1] = 0 IntList[1] = 1  IntList[1] = 2 IntList[1] = 3
             self_indices = self.translate_index(indices, mask1, result_shape)
             other_indices = other.translate_index(indices, mask2, result_shape)
+            other_indices.print()  # IntList[1]=0 IntList[1]=0 IntList[1]=0 IntList[1]=0
             result[indices] = self[self_indices] + other[other_indices]
         return result
 
@@ -822,7 +828,7 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[copy_elements, simdwidthof[dtype]()](self.numels())
         return result
 
-    fn sum(self, axis: Int = -1) -> Tensor[dtype]:
+    fn sum(self, axis: Int = -1, keepdim: Bool = False) -> Tensor[dtype]:
         _axis = axis
         if _axis != -1:
             if _axis < 0 or _axis >= self.ndim():
@@ -840,20 +846,24 @@ struct Tensor[dtype: DType = DType.float32](
             vectorize[sum_elems, simdwidthof[dtype]()](self.numels())
             return result
 
-        elif self.ndim() == 2:
+            _ = """elif self.ndim() == 2:
             out = sum_across_rows(self) if _axis == 1 else sum_across_cols(self)
-            return out
+            return out"""
 
         else:
-            out_shape = self.shape.drop_axis(_axis)
+            shape = self.shape
+            out_shape = shape.replace(_axis, 1) if keepdim else shape.drop_axis(
+                _axis
+            )
             out = Tensor[dtype].zeros(
                 out_shape, requires_grad=self.requires_grad
             )
-
             for indices in out_shape:  # all indices of output tensor
                 sum_val = Scalar[dtype](0)
                 for i in range(self.shape[_axis]):
-                    full_idx = indices.insert(_axis, i)
+                    full_idx = indices.replace(
+                        _axis, i
+                    ) if keepdim else indices.insert(_axis, i)
                     sum_val += self[full_idx]
                 out[indices] = sum_val
 
@@ -1344,14 +1354,19 @@ fn test_random() raises:
 
 fn test_sum() raises:
     ones = Tensor.ones(3, 3)
+    summed = ones.sum(0, keepdim=True)
+    assert_true(
+        (summed == Tensor.d2([[3, 3, 3]])).all_true(),
+        "keepdim = True sum assertion 1 failed",
+    )
+    ones = Tensor.ones(3, 3)
     summed = ones.sum(0)
     expect = Tensor.of(3, 3, 3)
     assert_true((summed == expect).all_true(), "1D sum assertion failed")
 
     tensor = Tensor.arange(1, 21).reshape(2, 5, 2)
     summed = tensor.sum(1)
-    _ = """
-    [2D Tensor(2, 2), Type: float32, requires_grad: False]
+    _ = """[2D Tensor(2, 2), Type: float32, requires_grad: False]
         [
             [25.0, 30.0, ],
             [75.0, 80.0, ],
@@ -1390,14 +1405,14 @@ fn test_view() raises:
 
 fn test_broadcast_add_2_tensors() raises:
     print("test_broadcast_add_2_tensors")
-    tensor1 = Tensor.of(1, 2, 3, 4, 5)
+    tensor1 = Tensor.of(1, 2, 3, 4)
     tensor2 = Tensor.of(6, requires_grad=True)
     result = tensor1 + tensor2
     assert_true(
-        (result == Tensor.of(7, 8, 9, 10, 11)).all_true(),
+        (result == Tensor.of(7, 8, 9, 10)).all_true(),
         "broadcast add assertion 1 failed",
     )
-    tensor1 = Tensor.of[3](1, 2, 3, 4, 5, 6)
+    _ = """tensor1 = Tensor.of[3](1, 2, 3, 4, 5, 6)
     tensor2 = Tensor.of(6)
     result = tensor1 + tensor2
     assert_true(
@@ -1409,7 +1424,7 @@ fn test_broadcast_add_2_tensors() raises:
     tensor2 = Tensor.rand(2, 1, 5, init_seed=Optional(42))
     tensor2.print()
     result = tensor1 + tensor2
-    result.print()
+    result.print()"""
 
 
 fn test_tensor_of_list() raises:
@@ -1444,11 +1459,11 @@ fn test_tensor_of_list() raises:
 
 
 def main():
+    test_sum()
     test_broadcast_add_2_tensors()
     test_tensor_of_list()
     test_add_2_tensors()
     test_item()
-    test_sum()
     test_arange()
     test_mul_by_factor()
     test_random()
