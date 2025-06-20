@@ -240,7 +240,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
         return True
 
     fn broadcast_mask(self, target_shape: Shape) -> IntList:
-        mask = IntList()
+        mask = IntList.with_capacity(target_shape.ndim)
         offset = target_shape.ndim - self.ndim
 
         for i in range(target_shape.ndim):
