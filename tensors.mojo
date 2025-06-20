@@ -226,12 +226,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return self.for_all(all_truthy)
 
-    _ = """fn all_equals(self, value: Scalar[dtype]) -> Bool:
-        fn all_truthy(elem: Scalar[DType.bool]) -> Bool:
-            return value.__eq__(elem) == True
-
-        return self.for_all(all_truthy)"""
-
     fn any_true(self: Tensor[DType.bool]) -> Bool:
         fn any_truthy(ambivalent: Scalar[DType.bool]) -> Bool:
             return ambivalent == True
