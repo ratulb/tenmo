@@ -7,6 +7,7 @@ from tensors import Tensor
 
 
 fn main() raises:
+    test_replace()
     tensor1 = Tensor.of(1, 2, 3, 4, 5)
     tensor2 = Tensor.of(6)
     shape1 = tensor1.shape
@@ -72,6 +73,10 @@ fn main() raises:
 
 from testing import assert_true, assert_raises
 
+fn test_replace() raises:
+    shape = Shape.of(3,4,2)
+    shape = shape.replace(2, 5)
+    assert_true(shape == Shape.of(3,4,5), "replace assertion failed")
 
 fn test_broadcast_shape() raises:
     shape1 = Shape.of(32, 16)
@@ -250,6 +255,21 @@ struct Shape(Sized & Writable & Copyable & Movable):
                     mask.append(0)  # match or both 1 → not broadcasted
 
         return mask
+
+    fn replace(self, axis: Int, extent: Int) -> Shape:
+        if axis < 0 or axis >= self.ndim:
+            abort(
+                "Shape -> replace: Invalid axis: "
+                + String(axis)
+                + " for shape: "
+                + self.__str__()
+            )
+        if extent < 1:
+            abort("Shape -> replace: Invalid extent: " + String(extent))
+        axes = self.intlist()
+        axes[axis] = extent
+        return Shape(axes)
+
 
     fn drop_axis(self, axis: Int) -> Shape:
         if axis < 0 or axis >= self.ndim:
