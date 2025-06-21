@@ -4,6 +4,12 @@ from common_utils import log_debug
 
 from testing import assert_true
 
+fn test_sort() raises:
+    il = IntList(9, 2, 3, 4, 5, 6)
+    il.sort()
+    assert_true(il == IntList(2, 3, 4, 5, 6, 9), "Ascending sort assertion failed")
+    il.sort(False)
+    assert_true(il == IntList(9, 6, 5, 4, 3, 2), "Descending sort assertion failed")
 
 fn test_insert() raises:
     il = IntList(2, 3, 4, 5, 6)
@@ -156,6 +162,7 @@ fn test_replace() raises:
 
 
 fn main() raises:
+    test_sort()
     test_replace()
     test_product()
     test_insert()
@@ -224,11 +231,21 @@ struct IntList(Sized & Copyable):
         array.size = 0
         return array
 
+    @always_inline
     fn product(self) -> Int:
         result = 1
         for each in self:
             result *= each
         return result
+
+    fn sort(self, asc: Bool = True):
+        for i in range(1, len(self)):
+            elem = self[i]
+            j = i
+            while j > 0 and (elem < self[j - 1] if asc else elem > self[j - 1]):
+                (self.data + j)[] = self[j - 1]
+                j -= 1
+            (self.data + j)[] = elem
 
     fn insert(self, at: Int, value: Int) -> IntList:
         # Insert `value` at position `at` in `self`, return a new IntList
