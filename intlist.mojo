@@ -4,12 +4,46 @@ from common_utils import log_debug
 
 from testing import assert_true
 
+
+fn test_sorted() raises:
+    il = IntList(9, 2, 3, 4, 5, 6)
+    assert_true(
+        il.sorted() == IntList(2, 3, 4, 5, 6, 9),
+        "Ascending sorted assertion failed",
+    )
+    assert_true(
+        il.sorted(False) == IntList(9, 6, 5, 4, 3, 2),
+        "Descending sorted assertion failed",
+    )
+
+
+fn test_of() raises:
+    l = List(9, 2, 3, 4, 5, 6)
+    il = IntList.of(l)
+    il.sort()
+    assert_true(
+        il == IntList(2, 3, 4, 5, 6, 9), "IntList of and sort assertion failed"
+    )
+    l2 = [9, 2, 3, 4, 5, 6]
+    il2 = IntList.of(l2)
+    il2.sort(False)
+    assert_true(
+        il2 == IntList(9, 6, 5, 4, 3, 2),
+        "IntList of and sort assertion 2 failed",
+    )
+
+
 fn test_sort() raises:
     il = IntList(9, 2, 3, 4, 5, 6)
     il.sort()
-    assert_true(il == IntList(2, 3, 4, 5, 6, 9), "Ascending sort assertion failed")
+    assert_true(
+        il == IntList(2, 3, 4, 5, 6, 9), "Ascending sort assertion failed"
+    )
     il.sort(False)
-    assert_true(il == IntList(9, 6, 5, 4, 3, 2), "Descending sort assertion failed")
+    assert_true(
+        il == IntList(9, 6, 5, 4, 3, 2), "Descending sort assertion failed"
+    )
+
 
 fn test_insert() raises:
     il = IntList(2, 3, 4, 5, 6)
@@ -162,6 +196,8 @@ fn test_replace() raises:
 
 
 fn main() raises:
+    test_sorted()
+    test_of()
     test_sort()
     test_replace()
     test_product()
@@ -224,6 +260,13 @@ struct IntList(Sized & Copyable):
         memcpy(self.data, existing.data, existing.size)
 
     @staticmethod
+    fn of(src: List[Int]) -> IntList:
+        result = IntList.with_capacity(len(src))
+        memcpy(result.data, src.data, len(src))
+        result.size = len(src)
+        return result
+
+    @staticmethod
     fn with_capacity(capacity: Int) -> IntList:
         array = Self()
         array.data = UnsafePointer[Int].alloc(capacity)
@@ -237,6 +280,11 @@ struct IntList(Sized & Copyable):
         for each in self:
             result *= each
         return result
+
+    fn sorted(self, asc: Bool = True) -> IntList:
+        copied = self.copy()
+        copied.sort(asc)
+        return copied
 
     fn sort(self, asc: Bool = True):
         for i in range(1, len(self)):
