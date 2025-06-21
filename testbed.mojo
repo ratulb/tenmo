@@ -1,7 +1,7 @@
 from tensors import Tensor
 from intlist import IntList
 from shapes import Shape
-
+from os import abort
 
 fn main() raises:
     tensor = Tensor.rand(2, 3, 4, 5, 6, init_seed=Optional(42))
@@ -19,6 +19,9 @@ fn sum[
     input_shape = tensor.shape
     input_rank = input_shape.rank()
     sorted_axes = IntList.new(axes).sorted()
+    for ax in sorted_axes:
+        if ax < 0 or ax >= input_rank:
+            abort("Invalid axis in sum: " + String(ax))
 
     spans = IntList.with_capacity(input_rank)
     for i in range(input_rank):
