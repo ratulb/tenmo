@@ -5,17 +5,6 @@ from logger import Level, Logger
 from intlist import IntList
 
 
-trait From:
-    @staticmethod
-    fn `from`[T: Copyable](value: T) -> Self:
-        ...
-
-
-trait Into:
-    fn into[T: Copyable](self) -> T:
-        ...
-
-
 alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
 
 

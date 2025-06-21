@@ -440,6 +440,9 @@ struct Shape(Sized & Writable & Copyable & Movable):
             result.append(self[i])
         return result
 
+    fn into(self) -> IntList:
+        return self.intlist()
+
     @staticmethod
     fn of(*dims: Int) -> Shape:
         return Shape(dims)

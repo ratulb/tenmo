@@ -5,6 +5,18 @@ from common_utils import log_debug
 from testing import assert_true
 
 
+fn test_select() raises:
+    il = IntList(9, 2, 3, 4, 5, 6)
+    assert_true(
+        il.select(IntList(2, 5)) == IntList(3, 6),
+        "select assertion 1 failed",
+    )
+    assert_true(
+        il.select(IntList(0, 4, 1)) == IntList(9, 5, 2),
+        "select assertion 2 failed",
+    )
+
+
 fn test_sorted() raises:
     il = IntList(9, 2, 3, 4, 5, 6)
     assert_true(
@@ -196,6 +208,7 @@ fn test_replace() raises:
 
 
 fn main() raises:
+    test_select()
     test_sorted()
     test_of()
     test_sort()
@@ -294,6 +307,22 @@ struct IntList(Sized & Copyable):
                 (self.data + j)[] = self[j - 1]
                 j -= 1
             (self.data + j)[] = elem
+
+    fn select(self, indices: IntList) -> IntList:
+        n = len(self)
+        result = IntList.with_capacity(len(indices))
+
+        for i in indices:
+            if i < 0 or i >= n:
+                abort(
+                    "Index out of bounds in IntList - select: "
+                    + String(i)
+                    + ", not in [0, "
+                    + String(n)
+                    + ")"
+                )
+            result.append(self[i])
+        return result
 
     fn insert(self, at: Int, value: Int) -> IntList:
         # Insert `value` at position `at` in `self`, return a new IntList
