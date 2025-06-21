@@ -1,8 +1,16 @@
-from memory import UnsafePointer, memcpy, Pointer
+from memory import UnsafePointer, memcpy, memset, Pointer
 from os import abort
 from common_utils import log_debug
 
 from testing import assert_true
+
+
+fn test_with_capacity_fill() raises:
+    il = IntList.with_capacity(3, -10)
+    assert_true(
+        il == IntList(-10, -10, -10) and len(il) == 3,
+        "with_capacity with fill assertion failed",
+    )
 
 
 fn test_select() raises:
@@ -31,13 +39,13 @@ fn test_sorted() raises:
 
 fn test_of() raises:
     l = List(9, 2, 3, 4, 5, 6)
-    il = IntList.of(l)
+    il = IntList.new(l)
     il.sort()
     assert_true(
         il == IntList(2, 3, 4, 5, 6, 9), "IntList of and sort assertion failed"
     )
     l2 = [9, 2, 3, 4, 5, 6]
-    il2 = IntList.of(l2)
+    il2 = IntList.new(l2)
     il2.sort(False)
     assert_true(
         il2 == IntList(9, 6, 5, 4, 3, 2),
@@ -208,6 +216,7 @@ fn test_replace() raises:
 
 
 fn main() raises:
+    test_with_capacity_fill()
     test_select()
     test_sorted()
     test_of()
@@ -273,18 +282,22 @@ struct IntList(Sized & Copyable):
         memcpy(self.data, existing.data, existing.size)
 
     @staticmethod
-    fn of(src: List[Int]) -> IntList:
+    fn new(src: List[Int]) -> IntList:
         result = IntList.with_capacity(len(src))
         memcpy(result.data, src.data, len(src))
         result.size = len(src)
         return result
 
     @staticmethod
-    fn with_capacity(capacity: Int) -> IntList:
+    fn with_capacity(capacity: Int, fill: Optional[Int] = None) -> IntList:
         array = Self()
         array.data = UnsafePointer[Int].alloc(capacity)
         array.capacity = capacity
         array.size = 0
+        if fill:
+            for idx in range(capacity):
+                (array.data + idx)[] = fill.value()
+            array.size = capacity
         return array
 
     @always_inline
