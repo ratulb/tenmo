@@ -4,6 +4,18 @@ from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
 
+
+trait From:
+    @staticmethod
+    fn `from`[T: Copyable](value: T) -> Self:
+        ...
+
+
+trait Into:
+    fn into[T: Copyable](self) -> T:
+        ...
+
+
 alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
 
 
@@ -64,12 +76,15 @@ from os import Atomic
 from memory import UnsafePointer
 
 
-@value
+@fieldwise_init
 struct IdGen:
     var tensor_ids: UnsafePointer[UInt64]
 
     fn __init__(out self):
         self.tensor_ids = UnsafePointer[UInt64].alloc(1)
+
+    fn __copyinit__(out self, existing: Self):
+        self.tensor_ids = existing.tensor_ids
 
     fn __enter__(mut self) -> Self:
         self.tensor_ids[] = 0
