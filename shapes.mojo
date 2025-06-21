@@ -73,10 +73,12 @@ fn main() raises:
 
 from testing import assert_true, assert_raises
 
+
 fn test_replace() raises:
-    shape = Shape.of(3,4,2)
+    shape = Shape.of(3, 4, 2)
     shape = shape.replace(2, 5)
-    assert_true(shape == Shape.of(3,4,5), "replace assertion failed")
+    assert_true(shape == Shape.of(3, 4, 5), "replace assertion failed")
+
 
 fn test_broadcast_shape() raises:
     shape1 = Shape.of(32, 16)
@@ -270,7 +272,6 @@ struct Shape(Sized & Writable & Copyable & Movable):
         axes[axis] = extent
         return Shape(axes)
 
-
     fn drop_axis(self, axis: Int) -> Shape:
         if axis < 0 or axis >= self.ndim:
             abort(
@@ -327,8 +328,13 @@ struct Shape(Sized & Writable & Copyable & Movable):
 
         return Shape(result_shape)
 
+    @always_inline
     fn __len__(self) -> Int:
         return self.ndim
+
+    @always_inline
+    fn rank(self) -> Int:
+        return len(self)
 
     fn __getitem__(self, idx: Int) -> Int:
         if 0 <= idx < self.ndim:
