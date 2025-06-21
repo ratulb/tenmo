@@ -5,6 +5,28 @@ from common_utils import log_debug
 from testing import assert_true
 
 
+fn test_occurence() raises:
+    il = IntList(0, 3, 0, 5, 0)
+    assert_true(il.occurence(0) == 3, "occurence assertion failed")
+
+
+fn test_bulk_replace() raises:
+    il = IntList(0, 1, 0, 1, 0)
+    result = il.replace(IntList(1, 3), IntList(3, 5))
+    assert_true(
+        result == IntList(0, 3, 0, 5, 0), "bulk replace assertion failed"
+    )
+    result.print()
+
+
+fn test_bulk_insert() raises:
+    il = IntList(0, 0, 0)
+    result = il.insert(IntList(1, 3), IntList(3, 5))
+    assert_true(
+        result == IntList(0, 3, 0, 5, 0), "bulk insert assertion failed"
+    )
+
+
 fn test_with_capacity_fill() raises:
     il = IntList.with_capacity(3, -10)
     assert_true(
@@ -216,6 +238,9 @@ fn test_replace() raises:
 
 
 fn main() raises:
+    test_bulk_replace()
+    test_occurence()
+    test_bulk_insert()
     test_with_capacity_fill()
     test_select()
     test_sorted()
@@ -337,6 +362,58 @@ struct IntList(Sized & Copyable):
             result.append(self[i])
         return result
 
+    fn occurence(self, elem: Int) -> Int:
+        times = 0
+        for each in self:
+            if each == elem:
+                times += 1
+        return times
+
+    fn insert(self, indices: IntList, values: IntList) -> IntList:
+        if len(indices) != len(values):
+            abort("IntList -> insert: indices and values must be same length")
+
+        n = len(self)
+        m = len(indices)
+        final_size = n + m
+
+        # Step 1: Validate indices
+        seen = IntList.with_capacity(n + 1, -1)
+
+        for i in range(m):
+            idx = indices[i]
+            if idx < 0 or idx > n:
+                abort("IntList -> insert: index out of bounds: " + String(idx))
+            if seen[idx] == 1:
+                abort(
+                    "IntList -> insert: duplicate insert index at "
+                    + String(idx)
+                )
+            seen[idx] = 1
+
+        # Step 2: Verify no gaps after inserts
+        insert_count = seen.occurence(1)
+        if insert_count != m:
+            abort("IntList -> insert: mismatch in seen insert count vs values")
+
+        # Step 3: Create dense result
+        result = IntList.with_capacity(final_size)
+        insert_cursor = 0
+        original_cursor = 0
+
+        for i in range(final_size):
+            if insert_cursor < m and indices[insert_cursor] == i:
+                result.append(values[insert_cursor])
+                insert_cursor += 1
+            else:
+                if original_cursor >= n:
+                    abort(
+                        "IntList -> insert: ran out of source values too early"
+                    )
+                result.append(self[original_cursor])
+                original_cursor += 1
+        return result
+
     fn insert(self, at: Int, value: Int) -> IntList:
         # Insert `value` at position `at` in `self`, return a new IntList
         # `at` could be start, middle or end
@@ -455,6 +532,27 @@ struct IntList(Sized & Copyable):
     fn replace(self, idx: Int, value: Int) -> Self:
         result = self
         result[idx] = value
+        return result
+
+    fn replace(self: IntList, indices: IntList, values: IntList) -> IntList:
+        n = len(self)
+        m = len(indices)
+
+        if m != len(values):
+            abort("IntList -> replace: indices and values must be same length")
+
+        # Validate indices: no out-of-bounds, no duplicates
+        for i in range(m):
+            idx = indices[i]
+            if idx < 0 or idx >= n:
+                abort("IntList -> replace: index out of bounds: " + String(idx))
+
+        result = self.copy()
+
+        # Apply replacements
+        for i in range(m):
+            result[indices[i]] = values[i]
+
         return result
 
     @always_inline("nodebug")
