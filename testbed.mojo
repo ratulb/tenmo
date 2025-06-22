@@ -3,11 +3,11 @@ from intlist import IntList
 from shapes import Shape
 from os import abort
 
+
 fn main() raises:
-    tensor = Tensor.rand(2, 3, 4, 5, 6, init_seed=Optional(42))
+    tensor = Tensor.of(1, 2, 3, 4, 5, 6, 7, 8)
     tensor.print()
-    print()
-    summed = sum(tensor, axes=[1, 3], keepdim=True)
+    summed = sum(tensor, axes=[0], keepdim=False)
     summed.print()
 
 
@@ -36,7 +36,6 @@ fn sum[
     out_shape = Shape(spans)
 
     var out = Tensor[dtype].zeros(out_shape, requires_grad=tensor.requires_grad)
-
     red_shape = Shape(input_shape.axes_spans.select(sorted_axes))
 
     for out_idx in out.shape:
@@ -51,5 +50,4 @@ fn sum[
             sum_val += tensor[full_idx]
 
         out[out_idx] = sum_val
-
     return out
