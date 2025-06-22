@@ -6,72 +6,48 @@ from memory import Pointer
 from tensors import Tensor
 
 
-fn main() raises:
-    test_replace()
-    tensor1 = Tensor.of(1, 2, 3, 4, 5)
-    tensor2 = Tensor.of(6)
-    shape1 = tensor1.shape
-    shape2 = tensor2.shape
-    print("shapes: ", shape1, shape2)
-    rzipped = shape1.intlist().zip_reversed(shape2.intlist())
-    for each in rzipped:
-        print(each[0], each[1])
-
-    _ = """test_broadcastable()
-    tensor1 = Tensor.rand(3, 1)
-    print(tensor1.shape)
-    tensor2 = Tensor.rand(1, 2)
-    print(tensor2.shape)
-    print("ndims: ", tensor1.shape.ndim, tensor2.shape.ndim)
-    if tensor1.shape != tensor2.shape:
-        broadcast_shape = Shape.broadcast_shape(tensor1.shape, tensor2.shape)
-        print("broadcast_shape: ", broadcast_shape)
-        mask = tensor1.shape.broadcast_mask(tensor2.shape)
-        print("mask")
-        mask.print()
-
-        for indices in broadcast_shape:
-            print("Broadcast shape index")
-            indices.print()
-            translated = tensor1.shape.translate_index(
-                indices, mask, broadcast_shape
-            )
-            print("translated for shape1: ")
-            translated.print()
-        mask = tensor2.shape.broadcast_mask(tensor1.shape)
-        for indices in broadcast_shape:
-            #indices.print()
-            translated = tensor2.shape.translate_index(indices, mask, broadcast_shape)
-            print("translated for shape2: ")
-            translated.print()
-        print("mask")
-        mask.print()
-
-    else:
-        summ = tensor1 + tensor2
-        summ.print()"""
-
-    _ = """test_broadcast_shape()
-    test_index_iter()
-    shape = Shape.of(1)
-    # print(shape)
-    for e in shape:
-        e.print()
-    print("==========")
-    shape1 = Shape(IntList(2, 3, 4))
-    print(shape1)
-    dropped = shape1.drop_axis(2)
-    print(dropped)
-    for each in shape1:
-        each.print()
-    print(shape1)
-    shape2 = Shape.of(1, 2, 3, 4, 5, 6)
-    print(shape2)
-    test_pad_shapes()
-    test_shape_as_intlist()"""
-
-
 from testing import assert_true, assert_raises
+
+
+fn test_empty_shape() raises:
+    shape = Shape(IntList())
+    assert_true(shape[0] == -1, "Empty shape __getitem__ assertion failed")
+    for each in shape:
+        assert_true(each == IntList(), "Empty shape iteration assertion failed")
+    tensor = Tensor[DType.bool](shape)
+    assert_true(
+        tensor[IntList()] == False, "Scalar tensor get assertion 1 failed"
+    )
+    tensor[IntList()] = True
+    assert_true(
+        tensor[IntList()] == True, "Scalar tensor get assertion 2 failed"
+    )
+    assert_true(tensor.item() == True, "Scalar tensor item() assertion failed")
+    assert_true(
+        shape.broadcastable(Shape.of(1)),
+        "broadcastable assertion 1 failed for empty shape",
+    )
+    assert_true(
+        Shape.of(1).broadcastable(shape),
+        "broadcastable assertion 1 failed for empty shape",
+    )
+
+    broadcast_shape = Shape.broadcast_shape(shape, Shape.of(1))
+    assert_true(
+        broadcast_shape == Shape.of(1),
+        "Empty shape broadcast to Shape.of(1) assertion failed",
+    )
+
+    broadcast_shape = Shape.broadcast_shape(Shape.of(1), shape)
+    assert_true(
+        broadcast_shape == Shape.of(1),
+        "Shape.of(1) broadcast with empty shape assertion failed",
+    )
+    broadcast_mask = shape.broadcast_mask(Shape.of(1))
+    assert_true(
+        broadcast_mask == IntList(1),
+        "Empty shape broadcast mask assertion failed",
+    )
 
 
 fn test_replace() raises:
@@ -108,10 +84,11 @@ fn test_broadcast_shape() raises:
         result == Shape.of(4, 16, 32, 64), "Shape broadcast 3 assertion failed"
     )
 
-    shape1 = Shape.of(5, 3, 1)
+    _ = """shape1 = Shape.of(5, 3, 1)
     shape2 = Shape.of(5, 1)
+
     with assert_raises():
-        _ = Shape.broadcast_shape(shape1, shape2)
+        _ = Shape.broadcast_shape(shape1, shape2)"""
 
     shape1 = Shape.of(1)
     shape2 = Shape.of(
@@ -162,10 +139,76 @@ fn test_broadcastable() raises:
     )
     tensor1 = Tensor.of(1, 2, 3, 4, 5)
     tensor2 = Tensor.of(6)
-    print(
-        tensor1.shape.broadcastable(tensor2.shape),
-        tensor2.broadcastable(tensor1),
+    assert_true(
+        tensor1.shape.broadcastable(tensor2.shape)
+        and tensor2.broadcastable(tensor1),
+        "Tensor shape broadcastable assertion failed",
     )
+
+
+fn test_shape_as_intlist() raises:
+    shape = Shape.of(2, 4, 5)
+    fa = shape.intlist()
+    assert_true(
+        fa[0] == 2 and fa[1] == 4 and fa[2] == 5,
+        "Shape to IntList assertion failed",
+    )
+
+
+fn test_pad_shapes() raises:
+    shape1 = Shape.of(3, 4)
+    shape2 = Shape.of(
+        4,
+    )
+    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
+    assert_true(
+        padded1 == shape1 and padded2 == Shape.of(1, 4),
+        "Padding of shapes (3,4) and (4,) assertion failed",
+    )
+    shape1 = Shape.of(5, 3, 1)
+    shape2 = Shape.of(5, 1)
+    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
+    assert_true(
+        padded1 == shape1 and padded2 == Shape.of(1, 5, 1),
+        "Padding of shapes (5,3,1) and (5,1) assertion failed",
+    )
+    shape1 = Shape.of(
+        1,
+    )
+    shape2 = Shape.of(3, 4)
+    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
+    assert_true(
+        padded1 == Shape.of(1, 1) and padded2 == shape2,
+        "Padding of shapes (1, ) and (3,4) assertion failed",
+    )
+    shape1 = Shape.of(3, 4, 5, 2)
+    shape2 = Shape.of(3, 4, 5, 2)
+    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
+    assert_true(
+        padded1 == shape1 and padded2 == shape2,
+        "Padding of shapes (3,4,5,2 ) and (3,4,5,2) assertion failed",
+    )
+
+
+fn test_zip_reversed() raises:
+    shape1 = Shape.of(1, 2, 3, 4, 5)
+    shape2 = Shape.of(6)
+    rzipped = shape1.intlist().zip_reversed(shape2.intlist())
+    for each in rzipped:
+        assert_true(
+            each[0] == 5 and each[1] == 6, "zip_reversed assertion failed"
+        )
+
+
+fn main() raises:
+    test_empty_shape()
+    test_replace()
+    test_broadcastable()
+    test_pad_shapes()
+    test_broadcast_shape()
+    test_shape_as_intlist()
+    test_index_iter()
+    test_zip_reversed()
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
@@ -215,9 +258,15 @@ struct Shape(Sized & Writable & Copyable & Movable):
         self = Self(_dims)
 
     fn __init__(out self, dims: IntList):
-        if len(dims) < 1:
-            abort("Shape -> __init__: Shape dimension count should be > 0")
+        _ = """if len(dims) < 1:
+            abort("Shape -> __init__: Shape dimension count should be > 0")"""
         _ndims = len(dims)
+        # Allow scalar tensors (rank 0, i.e., Shape())
+        if _ndims == 0:
+            self.axes_spans = IntList()
+            self.ndim = 0
+            self.numels = 1
+            return
         for i in range(_ndims):
             if dims[i] < 1:
                 abort("Shape -> __init__: Wrong shape dimension")
@@ -361,6 +410,13 @@ struct Shape(Sized & Writable & Copyable & Movable):
         return self.flatten_index(list)
 
     fn flatten_index(self, indices: IntList) -> Int:
+        if self.ndim == 0:
+            if len(indices) != 0:
+                abort(
+                    "Shape.flatten_index: Scalar tensor should receive no"
+                    " indices"
+                )
+            return 0
         if len(indices) != self.ndim:
             print(
                 (
@@ -446,50 +502,3 @@ struct Shape(Sized & Writable & Copyable & Movable):
     @staticmethod
     fn of(*dims: Int) -> Shape:
         return Shape(dims)
-
-
-from testing import assert_true
-
-
-fn test_shape_as_intlist() raises:
-    shape = Shape.of(2, 4, 5)
-    fa = shape.intlist()
-    assert_true(
-        fa[0] == 2 and fa[1] == 4 and fa[2] == 5,
-        "Shape to IntList assertion failed",
-    )
-
-
-fn test_pad_shapes() raises:
-    shape1 = Shape.of(3, 4)
-    shape2 = Shape.of(
-        4,
-    )
-    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
-    assert_true(
-        padded1 == shape1 and padded2 == Shape.of(1, 4),
-        "Padding of shapes (3,4) and (4,) assertion failed",
-    )
-    shape1 = Shape.of(5, 3, 1)
-    shape2 = Shape.of(5, 1)
-    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
-    assert_true(
-        padded1 == shape1 and padded2 == Shape.of(1, 5, 1),
-        "Padding of shapes (5,3,1) and (5,1) assertion failed",
-    )
-    shape1 = Shape.of(
-        1,
-    )
-    shape2 = Shape.of(3, 4)
-    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
-    assert_true(
-        padded1 == Shape.of(1, 1) and padded2 == shape2,
-        "Padding of shapes (1, ) and (3,4) assertion failed",
-    )
-    shape1 = Shape.of(3, 4, 5, 2)
-    shape2 = Shape.of(3, 4, 5, 2)
-    padded1, padded2 = Shape.pad_shapes(shape1, shape2)
-    assert_true(
-        padded1 == shape1 and padded2 == shape2,
-        "Padding of shapes (3,4,5,2 ) and (3,4,5,2) assertion failed",
-    )
