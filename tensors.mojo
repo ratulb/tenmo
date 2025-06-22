@@ -52,9 +52,12 @@ struct Tensor[dtype: DType = DType.float32](
 
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
-        self.data = UnsafePointer[Scalar[self.dtype]].alloc(
-            self.shape.num_elements()
-        )
+        if shape.ndim == 0:  # Tensor with Shape ()
+            self.data = UnsafePointer[Scalar[self.dtype]].alloc(1)
+        else:
+            self.data = UnsafePointer[Scalar[self.dtype]].alloc(
+                self.shape.num_elements()
+            )
         self.init_gradbox()
 
     @staticmethod
@@ -113,33 +116,54 @@ struct Tensor[dtype: DType = DType.float32](
             pass
 
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
+        if self.shape.ndim == 0 and len(indices) != 0:  # Tensor with Shape ()
+            abort("Tensor -> __getitem__: Scalar tensor expects no indices")
         index = self.shape.flatten_index(indices)
         if index == -1:
             abort("__getitem__(indices): Invalid indices")
         return self.data.load[volatile=True](index)
 
     fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
+        if self.shape.ndim == 0:  # Tensor with Shape ()
+            abort(
+                "Tensor -> __getitem__(*indices: Int): api not supported for"
+                " scalar tensor. Use __getitem__(IntList())"
+            )
+
         index = self.shape.flatten_index(indices)
         if index == -1:
             abort("__getitem__(*indices): Invalid indices")
         return self.data.load[volatile=True](index)
 
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
+        if self.shape.ndim == 0:  # Tensor with Shape ()
+            abort(
+                "Tensor -> __setitem__(*indices: Int): api not supported for"
+                " scalar tensor. Use __setitem__(IntList())"
+            )
         index = self.shape.flatten_index(indices)
         if index == -1:
             abort("__setitem__(*indices): Invalid indices")
         self.data.store[volatile=True](index, value)
 
     fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
+        if self.shape.ndim == 0 and len(indices) != 0:  # Tensor with Shape ()
+            abort("Tensor -> __setitem__: Scalar tensor expects no indices")
         index = self.shape.flatten_index(indices)
         if index == -1:
             abort("__setitem__(IntList): Invalid indices")
         self.data.store[volatile=True](index, value)
 
     fn item(self) -> Scalar[self.dtype]:
-        if self.shape != Shape.UnitShape:
-            abort("Tensor -> item - shape is not " + Shape.UnitShape.__str__())
-        return self[0]
+        if (
+            self.shape != Shape.UnitShape and self.shape.ndim != 0
+        ):  # Tensor with Shape ()
+            abort(
+                "Tensor.item(): Only valid for scalar or singleton tensors, got"
+                " shape: "
+                + self.shape.__str__()
+            )
+        return self[0] if self.shape == Shape.UnitShape else self[IntList()]
 
     fn __moveinit__(out self, owned other: Self):
         self.shape = other.shape
@@ -881,7 +905,7 @@ struct Tensor[dtype: DType = DType.float32](
         elif dims == 4:
             s += "4D Tensor"
         else:
-            s += "Unsupported Tensor"
+            s += "Tensor"
         s += self.shape.__str__()
         s += ", Type: " + self.dtype.__str__()
         s += ", requires_grad: " + String(self.requires_grad)
@@ -1097,6 +1121,9 @@ struct Tensor[dtype: DType = DType.float32](
         num_last: Int = 10,
     ) raises:
         try:
+            if self.ndim() == 0:  # Tensor with Shape ()
+                print(self[IntList()])
+                return
             current_dim = len(indices)
             indent = " " * (level * 2)
             # Defensive check
