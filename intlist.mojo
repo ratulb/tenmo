@@ -5,6 +5,18 @@ from common_utils import log_debug
 from testing import assert_true
 
 
+fn test_indices_of() raises:
+    il = IntList(1, 0, 1, 2, 1)
+    indices = il.indices_of(1)
+    assert_true(indices == IntList(0, 2, 4), "indices_of assertion 1 failed")
+    indices = il.indices_of(0)
+    assert_true(indices == IntList(1), "indices_of assertion 2 failed")
+    indices = il.indices_of(2)
+    assert_true(indices == IntList(3), "indices_of assertion 3 failed")
+    indices = il.indices_of(5)
+    assert_true(indices == IntList.Empty, "indices_of assertion 4 failed")
+
+
 fn test_occurence() raises:
     il = IntList(0, 3, 0, 5, 0)
     assert_true(il.occurence(0) == 3, "occurence assertion failed")
@@ -238,6 +250,7 @@ fn test_replace() raises:
 
 
 fn main() raises:
+    test_indices_of()
     test_bulk_replace()
     test_occurence()
     test_bulk_insert()
@@ -260,6 +273,7 @@ fn main() raises:
 struct IntList(Sized & Copyable):
     """A memory-efficient, register-passable, dynamic array of Ints. Would abort on any erroneous condition.
     """
+
     alias Empty = IntList()
     var data: UnsafePointer[Int]
     var size: Int
@@ -360,6 +374,15 @@ struct IntList(Sized & Copyable):
                     + ")"
                 )
             result.append(self[i])
+        return result
+
+    fn indices_of(self, val: Int) -> IntList:
+        """Returns a new IntList containing all indices where self[i] == val."""
+        result = IntList.with_capacity(self.size)
+
+        for i in range(self.size):
+            if (self.data + i)[] == val:
+                result.append(i)
         return result
 
     fn occurence(self, elem: Int) -> Int:
