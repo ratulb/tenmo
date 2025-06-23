@@ -1494,6 +1494,13 @@ fn test_reshape() raises:
     assert_true(
         tensor[2, 2] == reshaped[8], "reshape __getitem__ assertion failed"
     )
+    tensor = Tensor.of(42)
+    assert_true(tensor.shape == Shape.Unit, "Tensor shape assertion failure")
+    reshaped = tensor.reshape(1, 1)
+    assert_true(
+        reshaped.shape == Shape.of(1, 1) and reshaped[0, 0] == tensor[0],
+        "post reshape shape and get assertion failed",
+    )
 
 
 def main():
