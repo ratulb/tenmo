@@ -7,18 +7,22 @@ from os import abort
 fn main() raises:
     tensor = Tensor.of(1, 2, 3, 4, 5, 6, 7, 8)
     tensor.print()
-    summed = sum(tensor, axes=[0], keepdim=False)
+    summed = sum(tensor, keepdim=True)
+    # summed = sum(tensor, axes=[0], keepdim=False)
     summed.print()
 
 
 fn sum[
     dtype: DType = DType.float32
-](tensor: Tensor[dtype], axes: List[Int], keepdim: Bool = False) -> Tensor[
-    dtype
-]:
+](
+    tensor: Tensor[dtype], axes: List[Int] = [-1], keepdim: Bool = False
+) -> Tensor[dtype]:
     input_shape = tensor.shape
     input_rank = input_shape.rank()
-    sorted_axes = IntList.new(axes).sorted()
+    sorted_axes = IntList(tensor.shape.rank() - 1) if (
+        len(axes) == 0 or axes == [-1]
+    ) else IntList.new(axes).sorted()
+    # sorted_axes = IntList.new(axes).sorted()
     for ax in sorted_axes:
         if ax < 0 or ax >= input_rank:
             abort("Invalid axis in sum: " + String(ax))

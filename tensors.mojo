@@ -862,7 +862,58 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(result.data, self.data, self.numels())
         return result
 
-    fn sum(self, axis: Int = -1, keepdim: Bool = False) -> Tensor[dtype]:
+    fn sum(
+        self, axes: List[Int] = [-1], keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        _rank = self.shape.rank()
+
+        sorted_axes = IntList(_rank - 1) if (
+            len(axes) == 0 or axes == [-1]
+        ) else IntList.new(axes).sorted()
+
+        for axis in sorted_axes:
+            if axis < 0 or axis >= _rank:
+                abort(
+                    "Tensor -> sum - invalid axis in sum: "
+                    + String(axis)
+                    + " for tensor with shape: "
+                    + self.shape.__str__()
+                )
+
+        spans = IntList.with_capacity(_rank)
+
+        for i in range(_rank):
+            if i in sorted_axes:
+                if keepdims:
+                    spans.append(1)
+                else:
+                    continue
+            else:
+                spans.append(self.shape[i])
+
+        out_shape = Shape(spans)
+
+        var out = Tensor[dtype].zeros(
+            out_shape, requires_grad=self.requires_grad
+        )
+
+        reduced_shape = Shape(self.shape.axes_spans.select(sorted_axes))
+        for out_idx in out_shape:
+            var summ = Scalar[dtype](0)
+
+            for red_idx in reduced_shape:
+                if keepdims:
+                    full_idx = out_idx.replace(sorted_axes, red_idx)
+                else:
+                    full_idx = out_idx.insert(sorted_axes, red_idx)
+
+                summ += self[full_idx]
+
+            out[out_idx] = summ
+
+        return out
+
+    _ = """fn sum(self, axis: Int = -1, keepdim: Bool = False) -> Tensor[dtype]:
         _axis = axis
         if _axis != -1:
             if _axis < 0 or _axis >= self.ndim():
@@ -880,9 +931,9 @@ struct Tensor[dtype: DType = DType.float32](
             vectorize[sum_elems, simdwidthof[dtype]()](self.numels())
             return result
 
-            _ = """elif self.ndim() == 2:
-            out = sum_across_rows(self) if _axis == 1 else sum_across_cols(self)
-            return out"""
+        #elif self.ndim() == 2:
+            #out = sum_across_rows(self) if _axis == 1 else sum_across_cols(self)
+            #return out
 
         else:
             shape = self.shape
@@ -901,7 +952,7 @@ struct Tensor[dtype: DType = DType.float32](
                     sum_val += self[full_idx]
                 out[indices] = sum_val
 
-            return out
+            return out"""
 
     fn __str__(self) -> String:
         dims = len(self.shape)
@@ -1389,18 +1440,18 @@ fn test_random() raises:
 
 fn test_sum() raises:
     ones = Tensor.ones(3, 3)
-    summed = ones.sum(0, keepdim=True)
+    summed = ones.sum(axes=[0], keepdims=True)
     assert_true(
         (summed == Tensor.d2([[3, 3, 3]])).all_true(),
         "keepdim = True sum assertion 1 failed",
     )
     ones = Tensor.ones(3, 3)
-    summed = ones.sum(0)
+    summed = ones.sum(axes=[0])
     expect = Tensor.of(3, 3, 3)
     assert_true((summed == expect).all_true(), "1D sum assertion failed")
 
     tensor = Tensor.arange(1, 21).reshape(2, 5, 2)
-    summed = tensor.sum(1)
+    summed = tensor.sum(axes=[1])
     _ = """[2D Tensor(2, 2), Type: float32, requires_grad: False]
         [
             [25.0, 30.0, ],
@@ -1411,14 +1462,14 @@ fn test_sum() raises:
         (summed == expect).all_true(), "Sum across axis 1 assertion failed"
     )
 
-    summed = tensor.sum(0)
+    summed = tensor.sum(axes=[0])
     expect = Tensor.of[2](12, 14, 16, 18, 20, 22, 24, 26, 28, 30)
     assert_true(
         (summed == expect).all_true(), "Sum across axis 0 assertion failed"
     )
 
     expect = Tensor.of[5](3, 7, 11, 15, 19, 23, 27, 31, 35, 39)
-    summed = tensor.sum(2)
+    summed = tensor.sum()
     assert_true(
         (summed == expect).all_true(), "Sum across axis 2 assertion failed"
     )
@@ -1540,7 +1591,7 @@ fn test_reshape() raises:
 def main():
     test_reshape()
     test_scalar_tensor()
-    _ = """test_sum()
+    test_sum()
     test_broadcast_add_2_tensors()
     test_tensor_of_list()
     test_add_2_tensors()
@@ -1551,4 +1602,4 @@ def main():
     test_transpose_matmul()
     test_add_value()
     test_factor_mul_by()
-    test_view()"""
+    test_view()
