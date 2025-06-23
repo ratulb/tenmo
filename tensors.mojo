@@ -1479,7 +1479,11 @@ fn test_tensor_of_list() raises:
 fn test_scalar_tensor() raises:
     tensor = Tensor.scalar(42)
     assert_true(
-        (tensor.item() == 42.0 and tensor.shape == Shape.Void),
+        (
+            tensor.item() == 42.0
+            and tensor.shape == Shape.Void
+            and tensor.numels() == 1
+        ),
         "Scalar tensor item and shapeassertion failed",
     )
 
