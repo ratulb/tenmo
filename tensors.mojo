@@ -829,12 +829,12 @@ struct Tensor[dtype: DType = DType.float32](
 
         return output
 
-    fn reshape(self, *newdims: Int) raises -> Tensor[dtype]:
+    fn reshape(self, *newdims: Int) -> Tensor[dtype]:
         shape = Shape(newdims)
         if shape == self.shape:
             return self
         if shape.num_elements() != self.numels():
-            raise Error(
+            abort(
                 "Tensor with "
                 + String(self.numels())
                 + " elements can't be converted to "
@@ -842,14 +842,7 @@ struct Tensor[dtype: DType = DType.float32](
                 + " dimensional tensor"
             )
         result = Tensor[dtype](shape, self.requires_grad)
-
-        @parameter
-        fn copy_elements[simd_width: Int](idx: Int):
-            result.data.store[width=simd_width](
-                idx, self.data.load[width=simd_width](idx)
-            )
-
-        vectorize[copy_elements, simdwidthof[dtype]()](self.numels())
+        memcpy(result.data, self.data, self.numels())
         return result
 
     fn sum(self, axis: Int = -1, keepdim: Bool = False) -> Tensor[dtype]:
@@ -1491,7 +1484,16 @@ fn test_scalar_tensor() raises:
     )
 
 
+fn test_reshape() raises:
+    tensor = Tensor.rand(3, 3)
+    reshaped = tensor.reshape(9)
+    assert_true(
+        tensor[2, 2] == reshaped[8], "reshape __getitem__ assertion failed"
+    )
+
+
 def main():
+    test_reshape()
     test_scalar_tensor()
     _ = """test_sum()
     test_broadcast_add_2_tensors()
