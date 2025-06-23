@@ -829,7 +829,24 @@ struct Tensor[dtype: DType = DType.float32](
 
         return output
 
-    fn reshape(self, *newdims: Int) -> Tensor[dtype]:
+    @always_inline
+    fn is_scalar(self) -> Bool:
+        return self.numels() == 1 and self.shape == Shape.Void
+
+    fn reshape(self, requires_grad: Bool = False) -> Tensor[dtype]:
+        if self.is_scalar():
+            return self
+        if self.numels() != 1:
+            abort(
+                "Only tensor with single element can be reshaped to scalar"
+                " tensor"
+            )
+        result = Tensor[dtype].scalar(self.data[], requires_grad)
+        return result
+
+    fn reshape(
+        self, *newdims: Int, requires_grad: Bool = False
+    ) -> Tensor[dtype]:
         shape = Shape(newdims)
         if shape == self.shape:
             return self
@@ -841,7 +858,7 @@ struct Tensor[dtype: DType = DType.float32](
                 + variadiclist_as_str(newdims)
                 + " dimensional tensor"
             )
-        result = Tensor[dtype](shape, self.requires_grad)
+        result = Tensor[dtype](shape, requires_grad=requires_grad)
         memcpy(result.data, self.data, self.numels())
         return result
 
@@ -1511,6 +1528,12 @@ fn test_reshape() raises:
     assert_true(
         reshaped.shape == Shape.Unit and reshaped[0] == tensor.item(),
         "post reshape 2 - shape and get assertion failed for scalar tensor",
+    )
+    tensor = Tensor.rand(1, 1)
+    reshaped = tensor.reshape()
+    assert_true(
+        reshaped.shape == Shape.Void and reshaped.item() == tensor[0, 0],
+        "post reshape random tensor - shape and get assertion failed",
     )
 
 
