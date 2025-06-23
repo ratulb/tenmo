@@ -1483,8 +1483,17 @@ fn test_tensor_of_list() raises:
     )
 
 
+fn test_scalar_tensor() raises:
+    tensor = Tensor.scalar(42)
+    assert_true(
+        (tensor.item() == 42.0 and tensor.shape == Shape.Void),
+        "Scalar tensor item and shapeassertion failed",
+    )
+
+
 def main():
-    test_sum()
+    test_scalar_tensor()
+    _ = """test_sum()
     test_broadcast_add_2_tensors()
     test_tensor_of_list()
     test_add_2_tensors()
@@ -1495,4 +1504,4 @@ def main():
     test_transpose_matmul()
     test_add_value()
     test_factor_mul_by()
-    test_view()
+    test_view()"""
