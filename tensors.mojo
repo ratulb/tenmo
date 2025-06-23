@@ -536,6 +536,37 @@ struct Tensor[dtype: DType = DType.float32](
             other_indices = other.translate_index(indices, mask2, result_shape)
             other_indices.print()  # IntList[1]=0 IntList[1]=0 IntList[1]=0 IntList[1]=0
             result[indices] = self[self_indices] + other[other_indices]
+
+        if self.requires_grad or other.requires_grad:
+
+            fn grad_fn() raises -> None:
+                out_grad = result.grad[]
+
+                if self.requires_grad:
+                    grad_self = out_grad.sum(
+                        sorted_axes=self.broadcast_mask(
+                            result.shape
+                        ).indices_of(1),
+                        keepdims=True,
+                    ).reshape(self.shape)
+                    self.grad[] = self.grad[].add(grad_self)
+
+                if other.requires_grad:
+                    grad_other = out_grad.sum(
+                        sorted_axes=other.broadcast_mask(
+                            result.shape
+                        ).indices_of(1),
+                        keepdims=True,
+                    ).reshape(other.shape)
+                    other.grad[] = other.grad[].add(grad_other)
+
+            result.grad_fn = Optional(grad_fn)
+            if self.requires_grad and other.requires_grad:
+                result.add_ancestry(self.address(), other.address())
+            elif self.requires_grad:
+                result.add_ancestry(self.address())
+            elif other.requires_grad:
+                result.add_ancestry(other.address())
         return result
 
     fn __add__(self, other: Self) -> Tensor[dtype]:
@@ -847,7 +878,12 @@ struct Tensor[dtype: DType = DType.float32](
     fn reshape(
         self, *newdims: Int, requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        shape = Shape(newdims)
+        return self.reshape(Shape(newdims), requires_grad)
+
+    fn reshape(
+        self, shape: Shape, requires_grad: Bool = False
+    ) -> Tensor[dtype]:
+        # shape = Shape(newdims)
         if shape == self.shape:
             return self
         if shape.num_elements() != self.numels():
@@ -862,14 +898,8 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(result.data, self.data, self.numels())
         return result
 
-    fn sum(
-        self, axes: List[Int] = [-1], keepdims: Bool = False
-    ) -> Tensor[dtype]:
+    fn sum(self, sorted_axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
         _rank = self.shape.rank()
-
-        sorted_axes = IntList(_rank - 1) if (
-            len(axes) == 0 or axes == [-1]
-        ) else IntList.new(axes).sorted()
 
         for axis in sorted_axes:
             if axis < 0 or axis >= _rank:
@@ -912,6 +942,57 @@ struct Tensor[dtype: DType = DType.float32](
             out[out_idx] = summ
 
         return out
+
+    fn sum(
+        self, axes: List[Int] = [-1], keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        _rank = self.shape.rank()
+
+        sorted_axes = IntList(_rank - 1) if (
+            len(axes) == 0 or axes == [-1]
+        ) else IntList.new(axes).sorted()
+        return self.sum(sorted_axes, keepdims)
+        _ = """for axis in sorted_axes:
+            if axis < 0 or axis >= _rank:
+                abort(
+                    "Tensor -> sum - invalid axis in sum: "
+                    + String(axis)
+                    + " for tensor with shape: "
+                    + self.shape.__str__()
+                )
+
+        spans = IntList.with_capacity(_rank)
+
+        for i in range(_rank):
+            if i in sorted_axes:
+                if keepdims:
+                    spans.append(1)
+                else:
+                    continue
+            else:
+                spans.append(self.shape[i])
+
+        out_shape = Shape(spans)
+
+        var out = Tensor[dtype].zeros(
+            out_shape, requires_grad=self.requires_grad
+        )
+
+        reduced_shape = Shape(self.shape.axes_spans.select(sorted_axes))
+        for out_idx in out_shape:
+            var summ = Scalar[dtype](0)
+
+            for red_idx in reduced_shape:
+                if keepdims:
+                    full_idx = out_idx.replace(sorted_axes, red_idx)
+                else:
+                    full_idx = out_idx.insert(sorted_axes, red_idx)
+
+                summ += self[full_idx]
+
+            out[out_idx] = summ
+
+        return out"""
 
     _ = """fn sum(self, axis: Int = -1, keepdim: Bool = False) -> Tensor[dtype]:
         _axis = axis
