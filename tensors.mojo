@@ -1484,7 +1484,7 @@ fn test_scalar_tensor() raises:
             and tensor.shape == Shape.Void
             and tensor.numels() == 1
         ),
-        "Scalar tensor item and shapeassertion failed",
+        "Scalar tensor item and shape assertion failed",
     )
 
 
@@ -1500,6 +1500,17 @@ fn test_reshape() raises:
     assert_true(
         reshaped.shape == Shape.of(1, 1) and reshaped[0, 0] == tensor[0],
         "post reshape shape and get assertion failed",
+    )
+    tensor = Tensor.scalar(42)
+    reshaped = tensor.reshape(1, 1)
+    assert_true(
+        reshaped.shape == Shape.of(1, 1) and reshaped[0, 0] == tensor.item(),
+        "post reshape shape and get assertion failed for scalar tensor",
+    )
+    reshaped = tensor.reshape(1)
+    assert_true(
+        reshaped.shape == Shape.Unit and reshaped[0] == tensor.item(),
+        "post reshape 2 - shape and get assertion failed for scalar tensor",
     )
 
 
