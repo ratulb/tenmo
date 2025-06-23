@@ -156,14 +156,14 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn item(self) -> Scalar[self.dtype]:
         if (
-            self.shape != Shape.UnitShape and self.shape.ndim != 0
+            self.shape != Shape.Unit and self.shape.ndim != 0
         ):  # Tensor with Shape ()
             abort(
                 "Tensor.item(): Only valid for scalar or singleton tensors, got"
                 " shape: "
                 + self.shape.__str__()
             )
-        return self[0] if self.shape == Shape.UnitShape else self[IntList()]
+        return self[0] if self.shape == Shape.Unit else self[IntList.Empty]
 
     fn __moveinit__(out self, owned other: Self):
         self.shape = other.shape
@@ -1052,11 +1052,7 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     @staticmethod
-    fn of(
-        *elems: Scalar[dtype],
-        requires_grad: Bool = False
-        # ) raises -> Tensor[dtype]:
-    ) -> Tensor[dtype]:
+    fn of(*elems: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
         if requires_grad:
             if not (dtype.is_numeric() and dtype.is_floating_point()):
                 abort(
@@ -1072,9 +1068,7 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn of[
         row_size: Int
-    ](*elems: Scalar[dtype], requires_grad: Bool = False) raises -> Tensor[
-        dtype
-    ]:
+    ](*elems: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
         if requires_grad:
             if not (dtype.is_numeric() and dtype.is_floating_point()):
                 abort(
@@ -1098,9 +1092,13 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     @staticmethod
-    fn ones(
-        *axes_spans: Int, requires_grad: Bool = False
-    ) raises -> Tensor[dtype]:
+    fn scalar(val: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
+        result = Tensor[dtype](Shape.Void, requires_grad=requires_grad)
+        result[IntList.Empty] = val
+        return result
+
+    @staticmethod
+    fn ones(*axes_spans: Int, requires_grad: Bool = False) -> Tensor[dtype]:
         tensor = Tensor[dtype](Shape(axes_spans), requires_grad)
         var value: SIMD[dtype, 1]
 
@@ -1122,7 +1120,7 @@ struct Tensor[dtype: DType = DType.float32](
     ) raises:
         try:
             if self.ndim() == 0:  # Tensor with Shape ()
-                print(self[IntList()])
+                print(self[IntList.Empty])
                 return
             current_dim = len(indices)
             indent = " " * (level * 2)

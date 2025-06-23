@@ -260,7 +260,7 @@ fn main() raises:
 struct IntList(Sized & Copyable):
     """A memory-efficient, register-passable, dynamic array of Ints. Would abort on any erroneous condition.
     """
-
+    alias Empty = IntList()
     var data: UnsafePointer[Int]
     var size: Int
     var capacity: Int

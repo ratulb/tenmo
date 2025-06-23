@@ -10,17 +10,17 @@ from testing import assert_true, assert_raises
 
 
 fn test_empty_shape() raises:
-    shape = Shape(IntList())
+    shape = Shape(IntList.Empty)
     assert_true(shape[0] == -1, "Empty shape __getitem__ assertion failed")
     for each in shape:
-        assert_true(each == IntList(), "Empty shape iteration assertion failed")
+        assert_true(each == IntList.Empty, "Empty shape iteration assertion failed")
     tensor = Tensor[DType.bool](shape)
     assert_true(
-        tensor[IntList()] == False, "Scalar tensor get assertion 1 failed"
+        tensor[IntList.Empty] == False, "Scalar tensor get assertion 1 failed"
     )
-    tensor[IntList()] = True
+    tensor[IntList.Empty] = True
     assert_true(
-        tensor[IntList()] == True, "Scalar tensor get assertion 2 failed"
+        tensor[IntList.Empty] == True, "Scalar tensor get assertion 2 failed"
     )
     assert_true(tensor.item() == True, "Scalar tensor item() assertion failed")
     assert_true(
@@ -246,7 +246,8 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
 
 
 struct Shape(Sized & Writable & Copyable & Movable):
-    alias UnitShape = Shape.of(1)
+    alias Unit = Shape.of(1)
+    alias Void = Shape(IntList.Empty)
     var axes_spans: IntList
     var ndim: Int
     var numels: Int
@@ -263,7 +264,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
         _ndims = len(dims)
         # Allow scalar tensors (rank 0, i.e., Shape())
         if _ndims == 0:
-            self.axes_spans = IntList()
+            self.axes_spans = IntList.Empty
             self.ndim = 0
             self.numels = 1
             return
