@@ -7,8 +7,7 @@ fn test_broadcast_add_2_tensors() raises:
         (result == Tensor.of(7, 8, 9, 10)).all_true(),
         "broadcast add assertion 1 failed",
     )
-    _ = """start = True
-    result.backward(start=start)"""
+    # result.backward()
     Tensor.walk_backward(result)
     assert_true(
         (
@@ -22,11 +21,11 @@ fn test_broadcast_add_2_tensors() raises:
                 ]
             )
         ).all_true(),
-        "grad check 1 assertion failed",
+        "grad check 1 - assertion failed",
     )
     assert_true(
         (tensor2.grad[] == Tensor.of([4])).all_true(),
-        "grad check 2 assertion failed",
+        "grad check 2 - assertion failed",
     )
 
     tensor1 = Tensor.of[3](1, 2, 3, 4, 5, 6, requires_grad=True)
@@ -55,24 +54,95 @@ fn test_broadcast_add_2_tensors() raises:
                 ]
             )
         ).all_true(),
-        "grad check 3 assertion failed",
+        "grad check 3 - assertion failed",
     )
     assert_true(
         (tensor2.grad[] == Tensor.of([6])).all_true(),
-        "grad check 4 assertion failed",
+        "grad check 4 - assertion failed",
     )
 
-    tensor1 = Tensor.rand(2, 1, 4, 1, init_seed=Optional(42))
-    tensor1.print()
-    tensor2 = Tensor.rand(2, 1, 5, init_seed=Optional(42))
-    tensor2.print()
+    tensor1 = Tensor.rand(
+        2, 1, 4, 1, init_seed=Optional(42), requires_grad=True
+    )
+    tensor2 = Tensor.rand(2, 1, 5, init_seed=Optional(42), requires_grad=True)
     result = tensor1 + tensor2
-    result.print()
+    Tensor.walk_backward(result)
+    assert_true(
+        (
+            tensor1.grad[]
+            == Tensor.d4(
+                [
+                    [
+                        [
+                            [
+                                10,
+                            ],
+                            [
+                                10,
+                            ],
+                            [
+                                10,
+                            ],
+                            [
+                                10,
+                            ],
+                        ],
+                    ],
+                    [
+                        [
+                            [
+                                10,
+                            ],
+                            [
+                                10,
+                            ],
+                            [
+                                10,
+                            ],
+                            [
+                                10,
+                            ],
+                        ],
+                    ],
+                ]
+            )
+        ).all_true(),
+        "grad check 5 - assertion failed",
+    )
+
+    assert_true(
+        (
+            tensor2.grad[]
+            == Tensor.d3(
+                [
+                    [
+                        [
+                            8.0,
+                            8.0,
+                            8.0,
+                            8.0,
+                            8.0,
+                        ],
+                    ],
+                    [
+                        [
+                            8.0,
+                            8.0,
+                            8.0,
+                            8.0,
+                            8.0,
+                        ],
+                    ],
+                ]
+            )
+        ).all_true(),
+        "grad check 6 - assertion failed",
+    )
 
 
 def main():
     test_broadcast_add_2_tensors()
-    _ = """test_sum()
+    test_sum()
     test_reshape()
     test_scalar_tensor()
     test_tensor_of_list()
@@ -84,7 +154,7 @@ def main():
     test_transpose_matmul()
     test_add_value()
     test_factor_mul_by()
-    test_view()"""
+    test_view()
 
 
 ### Mojo Tensor
@@ -181,7 +251,10 @@ struct Tensor[dtype: DType = DType.float32](
             each[].invoke_grad_fn(verbose)
 
     fn backward(
-        self, start_grad: Scalar[dtype] = 1.0, start: Bool = True, verbose: Bool = False,
+        self,
+        start_grad: Scalar[dtype] = 1.0,
+        start: Bool = True,
+        verbose: Bool = False,
     ) raises:
         if start:
             self.grad[].fill(start_grad)
@@ -1223,6 +1296,49 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     alias Row = List[Scalar[dtype]]
+
+    alias Block = List[Self.Rows]
+
+    @staticmethod
+    fn d4(
+        blockgrid: List[Self.Block], requires_grad: Bool = False
+    ) -> Tensor[dtype]:
+        if requires_grad:
+            if not (dtype.is_numeric() and dtype.is_floating_point()):
+                abort(
+                    "Tensor -> d4 -> requires_grad can"
+                    " be True only for floating point types"
+                )
+        dims = IntList(
+            len(blockgrid),
+            len(blockgrid[0]),
+            len(blockgrid[0][0]),
+            len(blockgrid[0][0][0]),
+        )
+        flattened = List[Scalar[dtype]](capacity=dims.product())
+        for block in blockgrid:
+            if len(block) != dims[1]:
+                abort(
+                    "Tensor -> d4 -> not all blocks are of equal length in the"
+                    " blockgrid"
+                )
+            for matrix in block:
+                if len(matrix) != dims[2]:
+                    abort(
+                        "Tensor -> d4 -> not all matrices are of equal length"
+                        " in block"
+                    )
+                for row in matrix:
+                    if len(row) != dims[3]:
+                        abort(
+                            "Tensor -> d4 not all rows are of equal length in"
+                            " matrix"
+                        )
+                    flattened.extend(row)
+        shape = Shape(dims)
+        tensor = Tensor[dtype](shape, requires_grad)
+        memcpy(tensor.data, flattened.data, tensor.numels())
+        return tensor
 
     @staticmethod
     fn d2(rows: List[Self.Row], requires_grad: Bool = False) -> Tensor[dtype]:
