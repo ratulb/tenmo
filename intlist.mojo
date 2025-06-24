@@ -5,6 +5,22 @@ from common_utils import log_debug
 from testing import assert_true, assert_false
 
 
+fn test_new() raises:
+    l = List(1, 2, 3)
+    il = IntList.new(l)
+    assert_true(il == IntList(1, 2, 3), "new assertion 1 failed")
+    l = List[Int]()
+    il = IntList.new(l)
+    assert_true(il == IntList(), "new assertion 2 failed")
+
+
+fn test_range_list() raises:
+    il = IntList.range_list(3)
+    assert_true(il == IntList(0, 1, 2), "range_list assertion 1 failed")
+    il = IntList.range_list(0)
+    assert_true(il == IntList(), "range_list assertion 2 failed")
+
+
 fn test_has_duplicates() raises:
     il = IntList(1, 0, 1, 2, 1)
     assert_true(il.has_duplicates(), "has_duplicates True assertion failed")
@@ -260,6 +276,8 @@ fn test_replace() raises:
 
 
 fn main() raises:
+    test_range_list()
+    test_new()
     test_has_duplicates()
     test_indices_of()
     test_bulk_replace()
@@ -337,6 +355,13 @@ struct IntList(Sized & Copyable):
         memcpy(result.data, src.data, len(src))
         result.size = len(src)
         return result
+
+    @staticmethod
+    fn range_list(n: Int) -> IntList:
+        var out = IntList.with_capacity(n)
+        for i in range(n):
+            out.append(i)
+        return out
 
     @staticmethod
     fn with_capacity(capacity: Int, fill: Optional[Int] = None) -> IntList:
