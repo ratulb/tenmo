@@ -1,3 +1,92 @@
+fn test_broadcast_add_2_tensors() raises:
+    print("Test broadcast add 2 tensors")
+    tensor1 = Tensor.of(1, 2, 3, 4, requires_grad=True)
+    tensor2 = Tensor.of(6, requires_grad=True)
+    result = tensor1 + tensor2
+    assert_true(
+        (result == Tensor.of(7, 8, 9, 10)).all_true(),
+        "broadcast add assertion 1 failed",
+    )
+    _ = """start = True
+    result.backward(start=start)"""
+    Tensor.walk_backward(result)
+    assert_true(
+        (
+            tensor1.grad[]
+            == Tensor.d1(
+                [
+                    1,
+                    1,
+                    1,
+                    1,
+                ]
+            )
+        ).all_true(),
+        "grad check 1 assertion failed",
+    )
+    assert_true(
+        (tensor2.grad[] == Tensor.of([4])).all_true(),
+        "grad check 2 assertion failed",
+    )
+
+    tensor1 = Tensor.of[3](1, 2, 3, 4, 5, 6, requires_grad=True)
+    tensor2 = Tensor.of(6, requires_grad=True)
+    result = tensor1 + tensor2
+    Tensor.walk_backward(result)
+    assert_true(
+        (result == Tensor.of[3](7, 8, 9, 10, 11, 12)).all_true(),
+        "broadcast add assertion 2 failed",
+    )
+    assert_true(
+        (
+            tensor1.grad[]
+            == Tensor.d2(
+                [
+                    [
+                        1,
+                        1,
+                        1,
+                    ],
+                    [
+                        1,
+                        1,
+                        1,
+                    ],
+                ]
+            )
+        ).all_true(),
+        "grad check 3 assertion failed",
+    )
+    assert_true(
+        (tensor2.grad[] == Tensor.of([6])).all_true(),
+        "grad check 4 assertion failed",
+    )
+
+    tensor1 = Tensor.rand(2, 1, 4, 1, init_seed=Optional(42))
+    tensor1.print()
+    tensor2 = Tensor.rand(2, 1, 5, init_seed=Optional(42))
+    tensor2.print()
+    result = tensor1 + tensor2
+    result.print()
+
+
+def main():
+    test_broadcast_add_2_tensors()
+    _ = """test_sum()
+    test_reshape()
+    test_scalar_tensor()
+    test_tensor_of_list()
+    test_add_2_tensors()
+    test_item()
+    test_arange()
+    test_mul_by_factor()
+    test_random()
+    test_transpose_matmul()
+    test_add_value()
+    test_factor_mul_by()
+    test_view()"""
+
+
 ### Mojo Tensor
 ### Implement tensor library in mojo from first principles
 
@@ -75,24 +164,30 @@ struct Tensor[dtype: DType = DType.float32](
             traced.append(tensor.address())
 
     @staticmethod
-    fn walk_backward[dtype: DType, //](tensor: Tensor[dtype]) raises:
+    fn walk_backward[
+        dtype: DType, //
+    ](
+        tensor: Tensor[dtype],
+        start_grad: Scalar[dtype] = 1.0,
+        verbose: Bool = False,
+    ) raises:
         if tensor.has_grad() == False:
             return
         visited = Set[Int]()
         traced = Ancestors[dtype]()
         Self.trace_ancestry(tensor, visited, traced)
-        tensor.grad[].fill(1.0)
+        tensor.grad[].fill(start_grad)
         for each in traced.__reversed__():
-            each[].invoke_grad_fn()
+            each[].invoke_grad_fn(verbose)
 
-    fn backward(self, mut start: Bool, grad_seed: Scalar[dtype] = 1.0) raises:
+    fn backward(
+        self, start_grad: Scalar[dtype] = 1.0, start: Bool = True, verbose: Bool = False,
+    ) raises:
         if start:
-            print("Starting with tensor: ", self.address())
-            self.grad[].fill(grad_seed)
-            start = False
-        self.invoke_grad_fn()
+            self.grad[].fill(start_grad)
+        self.invoke_grad_fn(verbose)
         for ancestor in self.ancestors:
-            ancestor[].backward(start)
+            ancestor[].backward(start=False)
 
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
@@ -105,7 +200,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn int_addr(self) -> Int:
         return Int(self.address())
 
-    fn invoke_grad_fn(self, verbose: Bool = True) raises -> None:
+    fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:
         if self.grad_fn:
             if verbose:
                 print("\nInvoking  grad_fn\n")
@@ -529,19 +624,19 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn broadcast_add(self, other: Self) -> Tensor[dtype]:
         result_shape = self.broadcast_shape(other)
-        print("result_shape: ", result_shape)  # result_shape:  (4)
+        # print("result_shape: ", result_shape)  # result_shape:  (4)
         mask1 = self.broadcast_mask(result_shape)
-        mask1.print()  # IntList[ 1 ] = 0
+        # mask1.print()  # IntList[ 1 ] = 0
         mask2 = other.broadcast_mask(result_shape)
-        mask2.print()  # IntList[ 1 ] = 1
+        # mask2.print()  # IntList[ 1 ] = 1
         requires_grad = self.requires_grad or other.requires_grad
         result = Tensor[dtype](result_shape, requires_grad=requires_grad)
-        result.print()  # [1D Tensor(4), Type: float32, requires_grad: True][0.0, 0.0, 0.0, 0.0,]
+        # result.print()  # [1D Tensor(4), Type: float32, requires_grad: True][0.0, 0.0, 0.0, 0.0,]
         for indices in result_shape:
             # indices.print() #  IntList[1] = 0 IntList[1] = 1  IntList[1] = 2 IntList[1] = 3
             self_indices = self.translate_index(indices, mask1, result_shape)
             other_indices = other.translate_index(indices, mask2, result_shape)
-            other_indices.print()  # IntList[1]=0 IntList[1]=0 IntList[1]=0 IntList[1]=0
+            # other_indices.print()  # IntList[1]=0 IntList[1]=0 IntList[1]=0 IntList[1]=0
             result[indices] = self[self_indices] + other[other_indices]
 
         if self.requires_grad or other.requires_grad:
@@ -1525,30 +1620,6 @@ fn test_view() raises:
     )
 
 
-fn test_broadcast_add_2_tensors() raises:
-    print("test_broadcast_add_2_tensors")
-    tensor1 = Tensor.of(1, 2, 3, 4)
-    tensor2 = Tensor.of(6, requires_grad=True)
-    result = tensor1 + tensor2
-    assert_true(
-        (result == Tensor.of(7, 8, 9, 10)).all_true(),
-        "broadcast add assertion 1 failed",
-    )
-    _ = """tensor1 = Tensor.of[3](1, 2, 3, 4, 5, 6)
-    tensor2 = Tensor.of(6)
-    result = tensor1 + tensor2
-    assert_true(
-        (result == Tensor.of[3](7, 8, 9, 10, 11, 12)).all_true(),
-        "broadcast add assertion 2 failed",
-    )
-    tensor1 = Tensor.rand(2, 1, 4, 1, init_seed=Optional(42))
-    tensor1.print()
-    tensor2 = Tensor.rand(2, 1, 5, init_seed=Optional(42))
-    tensor2.print()
-    result = tensor1 + tensor2
-    result.print()"""
-
-
 fn test_tensor_of_list() raises:
     tensor = Tensor.d1([1, 3, 4, 5])
     assert_true(
@@ -1622,20 +1693,3 @@ fn test_reshape() raises:
         reshaped.shape == Shape.Void and reshaped.item() == tensor[0, 0],
         "post reshape random tensor - shape and get assertion failed",
     )
-
-
-def main():
-    test_reshape()
-    test_scalar_tensor()
-    test_sum()
-    test_broadcast_add_2_tensors()
-    test_tensor_of_list()
-    test_add_2_tensors()
-    test_item()
-    test_arange()
-    test_mul_by_factor()
-    test_random()
-    test_transpose_matmul()
-    test_add_value()
-    test_factor_mul_by()
-    test_view()
