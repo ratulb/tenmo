@@ -2,7 +2,18 @@ from memory import UnsafePointer, memcpy, memset, Pointer
 from os import abort
 from common_utils import log_debug
 
-from testing import assert_true
+from testing import assert_true, assert_false
+
+
+fn test_has_duplicates() raises:
+    il = IntList(1, 0, 1, 2, 1)
+    assert_true(il.has_duplicates(), "has_duplicates True assertion failed")
+    il = IntList(1)
+    assert_false(il.has_duplicates(), "has_duplicates False assertion failed")
+    il = IntList(1, 2, 3)
+    assert_false(
+        il.has_duplicates(), "has_duplicates False assertion 2  failed"
+    )
 
 
 fn test_indices_of() raises:
@@ -28,7 +39,6 @@ fn test_bulk_replace() raises:
     assert_true(
         result == IntList(0, 3, 0, 5, 0), "bulk replace assertion failed"
     )
-    result.print()
 
 
 fn test_bulk_insert() raises:
@@ -246,10 +256,11 @@ fn test_product() raises:
 fn test_replace() raises:
     il = IntList(1, 2, 4)
     il = il.replace(2, 3)
-    il.print()
+    assert_true(il == IntList(1, 2, 3), "replace assertion failed")
 
 
 fn main() raises:
+    test_has_duplicates()
     test_indices_of()
     test_bulk_replace()
     test_occurence()
@@ -345,6 +356,17 @@ struct IntList(Sized & Copyable):
         for each in self:
             result *= each
         return result
+
+    fn has_duplicates(self) -> Bool:
+        if len(self) <= 1:
+            return False
+        var sorted_list = self.sorted()
+
+        for i in range(len(sorted_list) - 1):
+            if sorted_list[i] == sorted_list[i + 1]:
+                return True
+
+        return False
 
     fn sorted(self, asc: Bool = True) -> IntList:
         copied = self.copy()
