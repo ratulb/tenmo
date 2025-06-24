@@ -12,7 +12,7 @@ from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
 from intlist import IntList
 from ancestry import Ancestors
-from common_utils import variadiclist_as_str, log_debug, piped
+from common_utils import log_debug, piped
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
@@ -418,15 +418,13 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn add_ancestry(
         mut self,
-        left_lineage: UnsafePointer[Tensor[dtype]],
-        right_lineage: UnsafePointer[Tensor[dtype]] = UnsafePointer[
-            Tensor[dtype]
-        ](),
+        left: UnsafePointer[Tensor[dtype]],
+        right: UnsafePointer[Tensor[dtype]] = UnsafePointer[Tensor[dtype]](),
     ):
-        if right_lineage.__as_bool__():
-            self.ancestors.append_all(left_lineage, right_lineage)
+        if right.__as_bool__():
+            self.ancestors.add_ancestry(left[], right[])
         else:
-            self.ancestors.append(left_lineage)
+            self.ancestors.add_ancestry(left[])
 
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
@@ -492,17 +490,26 @@ struct Tensor[dtype: DType = DType.float32](
                         dtype, AddTensor
                     ](other.address()[].grad[], product)
 
-            if (
-                self.address()[].requires_grad
-                and other.address()[].requires_grad
-            ):
-                out.add_ancestry(self.address(), other.address())
-            elif self.address()[].requires_grad:
-                out.add_ancestry(self.address())
-            elif other.address()[].requires_grad:
-                out.add_ancestry(other.address())
-
+            out.add_ancestry(self.address(), other.address())
             out.grad_fn = Optional(grad_fn)
+
+        return out
+
+    fn broadcast_to(self, target_shape: Shape) -> Tensor[dtype]:
+        if not self.shape.broadcastable(target_shape):
+            abort(
+                "Tensor -> broadcast_to: shape "
+                + self.shape.__str__()
+                + " not broadcastable to "
+                + target_shape.__str__()
+            )
+
+        mask = self.shape.broadcast_mask(target_shape)
+        out = Tensor[dtype](target_shape, requires_grad=self.requires_grad)
+
+        for idx in target_shape:
+            src_idx = self.shape.translate_index(idx, mask, target_shape)
+            out[idx] = self[src_idx]
 
         return out
 
@@ -540,33 +547,32 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad or other.requires_grad:
 
             fn grad_fn() raises -> None:
-                out_grad = result.grad[]
+                out_grad = result.address()[].grad[]
 
-                if self.requires_grad:
+                if self.address()[].requires_grad:
                     grad_self = out_grad.sum(
-                        sorted_axes=self.broadcast_mask(
-                            result.shape
-                        ).indices_of(1),
+                        sorted_axes=self.address()[]
+                        .broadcast_mask(result.address()[].shape)
+                        .indices_of(1),
                         keepdims=True,
-                    ).reshape(self.shape)
-                    self.grad[] = self.grad[].add(grad_self)
+                    ).reshape(self.address()[].shape)
+                    self.address()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](self.address()[].grad[], grad_self)
 
-                if other.requires_grad:
+                if other.address()[].requires_grad:
                     grad_other = out_grad.sum(
-                        sorted_axes=other.broadcast_mask(
-                            result.shape
-                        ).indices_of(1),
+                        sorted_axes=other.address()[]
+                        .broadcast_mask(result.address()[].shape)
+                        .indices_of(1),
                         keepdims=True,
-                    ).reshape(other.shape)
-                    other.grad[] = other.grad[].add(grad_other)
+                    ).reshape(other.address()[].shape)
+                    other.address()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](other.address()[].grad[], grad_other)
 
             result.grad_fn = Optional(grad_fn)
-            if self.requires_grad and other.requires_grad:
-                result.add_ancestry(self.address(), other.address())
-            elif self.requires_grad:
-                result.add_ancestry(self.address())
-            elif other.requires_grad:
-                result.add_ancestry(other.address())
+            result.add_ancestry(self.address(), other.address())
         return result
 
     fn __add__(self, other: Self) -> Tensor[dtype]:
@@ -601,16 +607,7 @@ struct Tensor[dtype: DType = DType.float32](
                     ](other.address()[].grad[], out_grad)
 
             out.grad_fn = Optional(grad_fn)
-
-            if (
-                self.address()[].requires_grad
-                and other.address()[].requires_grad
-            ):
-                out.add_ancestry(self.address(), other.address())
-            elif self.address()[].requires_grad:
-                out.add_ancestry(self.address())
-            elif other.address()[].requires_grad:
-                out.add_ancestry(other.address())
+            out.add_ancestry(self.address(), other.address())
 
         return out
 
@@ -680,19 +677,20 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(self.address())
         return out
 
-    fn __sub__(self, other: Self) raises -> Tensor[dtype]:
+    fn __sub__(self, other: Self) -> Tensor[dtype]:
         requires_grad = (
             self.address()[].requires_grad or other.address()[].requires_grad
         )
         if self.address() == other.address():
             out = Tensor[dtype].zeros_like(self.address()[], requires_grad)
-            Self.set_ancestry(out.address(), self.address(), Self.Address())
+            out.add_ancestry(self.address())
             return out
         if self.address()[].shape != other.address()[].shape:
-            raise Error(
-                "__sub__(other) -> Dimension mismatch:",
-                self.address()[].shape,
-                other.address()[].shape,
+            abort(
+                "Tensor ->__sub__(other) - Dimension mismatch:"
+                + self.address()[].shape.__str__()
+                + ", "
+                + other.address()[].shape.__str__()
             )
 
         out = __tensor_op_tensor__[dtype, SubtractTensor](
@@ -714,36 +712,9 @@ struct Tensor[dtype: DType = DType.float32](
 
             out.grad_fn = Optional(grad_fn)
 
-            _ = """if (
-                self.address()[].requires_grad
-                and other.address()[].requires_grad
-            ):
-                out.add_ancestry(self.address(), other.address())
-            elif self.address()[].requires_grad:
-                out.add_ancestry(self.address())
-            elif other.address()[].requires_grad:
-                out.add_ancestry(other.address())"""
-            Self.set_ancestry(out.address(), self.address(), other.address())
+            out.add_ancestry(self.address(), other.address())
 
         return out
-
-    @always_inline
-    @staticmethod
-    fn not_null(address: Self.Address) -> Bool:
-        return address.__as_bool__() == True
-
-    @staticmethod
-    fn set_ancestry(
-        output: Self.Address, left: Self.Address, right: Self.Address
-    ):
-        if (
-            left[].requires_grad
-            and Self.not_null(right)
-            and right[].requires_grad
-        ):
-            output[].add_ancestry(left, right)
-        elif left[].requires_grad:
-            output[].add_ancestry(left)
 
     fn __truediv__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
         copy = self
@@ -891,7 +862,7 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor with "
                 + String(self.numels())
                 + " elements can't be converted to "
-                + variadiclist_as_str(newdims)
+                + String(shape.num_elements())
                 + " dimensional tensor"
             )
         result = Tensor[dtype](shape, requires_grad=requires_grad)
@@ -941,6 +912,31 @@ struct Tensor[dtype: DType = DType.float32](
 
             out[out_idx] = summ
 
+        if self.requires_grad:
+
+            fn grad_fn() raises -> None:
+                out_grad = out.address()[].grad[]
+                expanded = out_grad
+                if not keepdims:
+                    expanded = out_grad.reshape(
+                        Shape(
+                            out_grad.shape.intlist().insert(
+                                sorted_axes,
+                                IntList.with_capacity(len(sorted_axes), 1),
+                            )
+                        )
+                    )
+
+                self.address()[].grad[] = __tensor_op_tensor__[
+                    dtype, AddTensor
+                ](
+                    self.address()[].grad[],
+                    expanded.broadcast_to(self.address()[].shape),
+                )
+
+            out.grad_fn = Optional(grad_fn)
+            out.add_ancestry(self.address())
+
         return out
 
     fn sum(
@@ -952,47 +948,6 @@ struct Tensor[dtype: DType = DType.float32](
             len(axes) == 0 or axes == [-1]
         ) else IntList.new(axes).sorted()
         return self.sum(sorted_axes, keepdims)
-        _ = """for axis in sorted_axes:
-            if axis < 0 or axis >= _rank:
-                abort(
-                    "Tensor -> sum - invalid axis in sum: "
-                    + String(axis)
-                    + " for tensor with shape: "
-                    + self.shape.__str__()
-                )
-
-        spans = IntList.with_capacity(_rank)
-
-        for i in range(_rank):
-            if i in sorted_axes:
-                if keepdims:
-                    spans.append(1)
-                else:
-                    continue
-            else:
-                spans.append(self.shape[i])
-
-        out_shape = Shape(spans)
-
-        var out = Tensor[dtype].zeros(
-            out_shape, requires_grad=self.requires_grad
-        )
-
-        reduced_shape = Shape(self.shape.axes_spans.select(sorted_axes))
-        for out_idx in out_shape:
-            var summ = Scalar[dtype](0)
-
-            for red_idx in reduced_shape:
-                if keepdims:
-                    full_idx = out_idx.replace(sorted_axes, red_idx)
-                else:
-                    full_idx = out_idx.insert(sorted_axes, red_idx)
-
-                summ += self[full_idx]
-
-            out[out_idx] = summ
-
-        return out"""
 
     _ = """fn sum(self, axis: Int = -1, keepdim: Bool = False) -> Tensor[dtype]:
         _axis = axis

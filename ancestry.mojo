@@ -3,6 +3,7 @@ from os import abort
 from tensors import Tensor
 from common_utils import log_debug
 
+
 @register_passable
 struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
     var ancestors: UnsafePointer[UnsafePointer[Tensor[dtype]]]
@@ -78,6 +79,18 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
             self.resize(new_capacity)
         (self.ancestors + self.size)[] = address
         self.size += 1
+
+    fn add_ancestry(mut self, left: Tensor[dtype], right: Tensor[dtype]):
+        if left.requires_grad and right.requires_grad:
+            self.append_all(left.address(), right.address())
+        elif left.requires_grad:
+            self.append(left.address())
+        elif right.requires_grad:
+            self.append(right.address())
+
+    fn add_ancestry(mut self, tensor: Tensor[dtype]):
+        if tensor.requires_grad:
+            self.append(tensor.address())
 
     fn resize(mut self, new_capacity: Int):
         self.reserve(new_capacity)
