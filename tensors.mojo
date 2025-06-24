@@ -1,14 +1,18 @@
 fn test_broadcast_add_2_tensors() raises:
     print("Test broadcast add 2 tensors")
+
     tensor1 = Tensor.of(1, 2, 3, 4, requires_grad=True)
     tensor2 = Tensor.of(6, requires_grad=True)
+
     result = tensor1 + tensor2
+
     assert_true(
         (result == Tensor.of(7, 8, 9, 10)).all_true(),
         "broadcast add assertion 1 failed",
     )
     # result.backward()
     Tensor.walk_backward(result)
+
     assert_true(
         (
             tensor1.grad[]
@@ -23,6 +27,7 @@ fn test_broadcast_add_2_tensors() raises:
         ).all_true(),
         "grad check 1 - assertion failed",
     )
+
     assert_true(
         (tensor2.grad[] == Tensor.of([4])).all_true(),
         "grad check 2 - assertion failed",
@@ -30,12 +35,16 @@ fn test_broadcast_add_2_tensors() raises:
 
     tensor1 = Tensor.of[3](1, 2, 3, 4, 5, 6, requires_grad=True)
     tensor2 = Tensor.of(6, requires_grad=True)
+
     result = tensor1 + tensor2
+
     Tensor.walk_backward(result)
+
     assert_true(
         (result == Tensor.of[3](7, 8, 9, 10, 11, 12)).all_true(),
         "broadcast add assertion 2 failed",
     )
+
     assert_true(
         (
             tensor1.grad[]
@@ -56,6 +65,7 @@ fn test_broadcast_add_2_tensors() raises:
         ).all_true(),
         "grad check 3 - assertion failed",
     )
+
     assert_true(
         (tensor2.grad[] == Tensor.of([6])).all_true(),
         "grad check 4 - assertion failed",
@@ -65,8 +75,11 @@ fn test_broadcast_add_2_tensors() raises:
         2, 1, 4, 1, init_seed=Optional(42), requires_grad=True
     )
     tensor2 = Tensor.rand(2, 1, 5, init_seed=Optional(42), requires_grad=True)
+
     result = tensor1 + tensor2
+
     Tensor.walk_backward(result)
+
     assert_true(
         (
             tensor1.grad[]
@@ -1169,6 +1182,8 @@ struct Tensor[dtype: DType = DType.float32](
             s += "3D Tensor"
         elif dims == 4:
             s += "4D Tensor"
+        elif dims == 5:
+            s += "5D Tensor"
         else:
             s += "Tensor"
         s += self.shape.__str__()
@@ -1255,17 +1270,28 @@ struct Tensor[dtype: DType = DType.float32](
         memset_zero(out.data, out.numels())
         return out
 
+    alias Row = List[Scalar[dtype]]
+
     @staticmethod
     fn d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[dtype]:
-        if requires_grad:
-            if not (dtype.is_numeric() and dtype.is_floating_point()):
-                abort(
-                    "Tensor -> d1 -> requires_grad can be"
-                    " True only for floating point types"
-                )
+        Self.validate_dtype_consistency(dtype, requires_grad, "d1")
         shape = Shape(IntList(len(row)))
         tensor = Tensor[dtype](shape, requires_grad)
         memcpy(tensor.data, row.data, len(row))
+        return tensor
+
+    @staticmethod
+    fn d2(rows: List[Self.Row], requires_grad: Bool = False) -> Tensor[dtype]:
+        Self.validate_dtype_consistency(dtype, requires_grad, "d2")
+        dims = IntList(len(rows), len(rows[0]))
+        flattened = List[Scalar[dtype]](capacity=dims.product())
+        for row in rows:
+            if len(row) != dims[1]:
+                abort("Tensor -> d2 -> not all rows equal in length")
+            flattened.extend(row)
+        shape = Shape(dims)
+        tensor = Tensor[dtype](shape, requires_grad)
+        memcpy(tensor.data, flattened.data, tensor.numels())
         return tensor
 
     alias Rows = List[Self.Row]
@@ -1274,12 +1300,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn d3(
         blocks: List[Self.Rows], requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        if requires_grad:
-            if not (dtype.is_numeric() and dtype.is_floating_point()):
-                abort(
-                    "Tensor -> d3 -> requires_grad can"
-                    " be True only for floating point types"
-                )
+        Self.validate_dtype_consistency(dtype, requires_grad, "d3")
         dims = IntList(len(blocks), len(blocks[0]), len(blocks[0][0]))
         flattened = List[Scalar[dtype]](capacity=dims.product())
         for block in blocks:
@@ -1295,20 +1316,13 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(tensor.data, flattened.data, tensor.numels())
         return tensor
 
-    alias Row = List[Scalar[dtype]]
-
     alias Block = List[Self.Rows]
 
     @staticmethod
     fn d4(
         blockgrid: List[Self.Block], requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        if requires_grad:
-            if not (dtype.is_numeric() and dtype.is_floating_point()):
-                abort(
-                    "Tensor -> d4 -> requires_grad can"
-                    " be True only for floating point types"
-                )
+        Self.validate_dtype_consistency(dtype, requires_grad, "d4")
         dims = IntList(
             len(blockgrid),
             len(blockgrid[0]),
@@ -1340,20 +1354,43 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(tensor.data, flattened.data, tensor.numels())
         return tensor
 
+    alias Blocks = List[Self.Block]
+
     @staticmethod
-    fn d2(rows: List[Self.Row], requires_grad: Bool = False) -> Tensor[dtype]:
-        if requires_grad:
-            if not (dtype.is_numeric() and dtype.is_floating_point()):
-                abort(
-                    "Tensor -> d2 -> requires_grad can"
-                    " be True only for floating point types"
-                )
-        dims = IntList(len(rows), len(rows[0]))
+    fn d5(
+        blockhive: List[Self.Blocks], requires_grad: Bool = False
+    ) -> Tensor[dtype]:
+        Self.validate_dtype_consistency(dtype, requires_grad, "d5")
+        dims = IntList(
+            len(blockhive),
+            len(blockhive[0]),
+            len(blockhive[0][0]),
+            len(blockhive[0][0][0]),
+            len(blockhive[0][0][0][0]),
+        )
         flattened = List[Scalar[dtype]](capacity=dims.product())
-        for row in rows:
-            if len(row) != dims[1]:
-                abort("Tensor -> d2 -> not all rows equal in length")
-            flattened.extend(row)
+        for blocks in blockhive:
+            if len(blocks) != dims[1]:
+                abort(
+                    "Tensor -> d5 -> not all blocks are of equal length in the"
+                    " input"
+                )
+            for block in blocks:
+                if len(block) != dims[2]:
+                    abort("Tensor -> d5 -> unequal block length")
+                for matrix in block:
+                    if len(matrix) != dims[3]:
+                        abort(
+                            "Tensor -> d5 not all matrices are of equal length"
+                            " in block"
+                        )
+                    for row in matrix:
+                        if len(row) != dims[4]:
+                            abort(
+                                "Tensor -> d5 not all rows are of equal length"
+                                " in matrix"
+                            )
+                        flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
         memcpy(tensor.data, flattened.data, tensor.numels())
@@ -1361,12 +1398,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn of(*elems: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
-        if requires_grad:
-            if not (dtype.is_numeric() and dtype.is_floating_point()):
-                abort(
-                    "Tensor -> of -> requires_grad can be True only for"
-                    " floating point types"
-                )
+        Self.validate_dtype_consistency(dtype, requires_grad, "of")
         shape = Shape(piped(len(elems)))
         tensor = Tensor[dtype](shape, requires_grad)
         for i in range(len(elems)):
@@ -1377,12 +1409,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn of[
         row_size: Int
     ](*elems: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
-        if requires_grad:
-            if not (dtype.is_numeric() and dtype.is_floating_point()):
-                abort(
-                    "Tensor -> of[row_size] -> requires_grad can be True only"
-                    " for floating point types"
-                )
+        Self.validate_dtype_consistency(dtype, requires_grad, "of[row_size]")
+
         if not (row_size >= 1 and row_size <= len(elems)):
             abort(
                 (
@@ -1418,6 +1446,19 @@ struct Tensor[dtype: DType = DType.float32](
         for i in range(tensor.numels()):
             tensor.data.store(i, value)
         return tensor
+
+    @staticmethod
+    fn validate_dtype_consistency(
+        dtype: DType, requires_grad: Bool, label: String
+    ):
+        if requires_grad:
+            if not (dtype.is_floating_point()):
+                abort(
+                    "Tensor → "
+                    + label
+                    + " → requires_grad=True is only supported for floating"
+                    " point types. "
+                )
 
     fn print_tensor_recursive(
         self,
