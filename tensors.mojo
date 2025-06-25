@@ -1,15 +1,15 @@
 fn test_sum() raises:
     tensor = Tensor.of(1, 2, 3, 4, requires_grad=True)
-    result = tensor.sum()
+    result = tensor.sum(axes=[], keepdims=False)
     result.print()
     Tensor.walk_backward(result)
     tensor.grad[].print()
-    tensor = Tensor.arange(end=24).reshape(2, 3, 4, requires_grad=True)
-    result = tensor.sum(axes=[-1], keepdims=True)
+    tensor = Tensor.arange(24).reshape(2, 3, 4, requires_grad=True)
+    result = tensor.sum(axes=[], keepdims=False)
     tensor.print()
     result.print()
 
-    _ = """ones = Tensor.ones(3, 3)
+    ones = Tensor.ones(3, 3)
     summed = ones.sum(axes=[0], keepdims=True)
     assert_true(
         (summed == Tensor.d2([[3, 3, 3]])).all_true(),
@@ -21,13 +21,13 @@ fn test_sum() raises:
     assert_true((summed == expect).all_true(), "1D sum assertion failed")
 
     tensor = Tensor.arange(1, 21).reshape(2, 5, 2)
-    summed = tensor.sum(axes=[1])"""
+    summed = tensor.sum(axes=[1])
     _ = """[2D Tensor(2, 2), Type: float32, requires_grad: False]
         [
             [25.0, 30.0, ],
             [75.0, 80.0, ],
     ]"""
-    _ = """expect = Tensor.of[2](25, 30, 75, 80)
+    expect = Tensor.of[2](25, 30, 75, 80)
     assert_true(
         (summed == expect).all_true(), "Sum across axis 1 assertion failed"
     )
@@ -42,7 +42,7 @@ fn test_sum() raises:
     summed = tensor.sum()
     assert_true(
         (summed == expect).all_true(), "Sum across axis 2 assertion failed"
-    )"""
+    )
 
 
 fn test_broadcast_add_2_tensors() raises:
@@ -202,7 +202,7 @@ fn test_broadcast_add_2_tensors() raises:
 
 def main():
     test_sum()
-    _ = """
+    test_arange()
     test_broadcast_add_2_tensors()
     test_sum()
     test_reshape()
@@ -210,13 +210,12 @@ def main():
     test_tensor_of_list()
     test_add_2_tensors()
     test_item()
-    test_arange()
     test_mul_by_factor()
     test_random()
     test_transpose_matmul()
     test_add_value()
     test_factor_mul_by()
-    test_view()"""
+    test_view()
 
 
 ### Mojo Tensor
@@ -869,7 +868,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         vectorize[add_value, simdwidthof[dtype]()](self.numels())
 
-    fn to_dtype[NewType: DType](self) raises -> Tensor[NewType]:
+    fn to_dtype[NewType: DType](self) -> Tensor[NewType]:
         result = Tensor[NewType](self.shape, self.requires_grad)
 
         @parameter
@@ -1165,6 +1164,7 @@ struct Tensor[dtype: DType = DType.float32](
             _axes = IntList.range_list(_rank)
         else:
             _axes = IntList.new(axes)
+
         return self.sum(_axes, keepdims)
 
     fn sum(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
@@ -1189,15 +1189,22 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         reduced_shape = Shape(self.shape.axes_spans.select(sorted_axes))
+        reducing_all = len(sorted_axes) == self.shape.rank()
         for out_idx in out_shape:
             var summ = Scalar[dtype](0)
 
             for red_idx in reduced_shape:
                 if keepdims:
                     full_idx = out_idx.replace(sorted_axes, red_idx)
+                elif not keepdims and reducing_all:
+                    full_idx = (
+                        red_idx  # no need to insert into out_idx (it's empty)
+                    )
                 else:
                     full_idx = out_idx.insert(sorted_axes, red_idx)
-
+                    _ = """full_idx = Self.merge_indices(
+                        red_idx, out_idx, sorted_axes, self.shape.rank()
+                    )"""
                 summ += self[full_idx]
 
             out[out_idx] = summ
@@ -1228,6 +1235,25 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(self.address())
 
         return out
+
+    @staticmethod
+    fn merge_indices(
+        red_idx: IntList,  # values for the reduced axes
+        out_idx: IntList,  # values for the retained axes
+        sorted_axes: IntList,  # reduced axes
+        total_rank: Int,  # original tensor rank
+    ) -> IntList:
+        var full_idx = IntList.with_capacity(total_rank)
+        var red_cursor = 0
+        var out_cursor = 0
+        for i in range(total_rank):
+            if i in sorted_axes:
+                full_idx.append(red_idx[red_cursor])
+                red_cursor += 1
+            else:
+                full_idx.append(out_idx[out_cursor])
+                out_cursor += 1
+        return full_idx
 
     @staticmethod
     fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
@@ -1338,23 +1364,45 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     @staticmethod
-    fn arange[
-        dtype: DType = DType.float32
-    ](
-        start: Scalar[dtype] = 0,
-        end: Scalar[dtype] = max_finite[dtype](),
-        step: Scalar[dtype] = 1,
-        epsilon: Scalar[dtype] = 1e-8,
+    fn arange(
+        *args: Scalar[dtype],
+        requires_grad: Bool = False,
     ) -> Tensor[dtype]:
+        start: Scalar[dtype] = 0
+        end: Scalar[dtype] = max_finite[dtype]()
+        step: Scalar[dtype] = 1
+
+        n = len(args)
+        if n == 1:
+            end = args[0]
+        elif n == 2:
+            start = args[0]
+            end = args[1]
+        elif n == 3:
+            start = args[0]
+            end = args[1]
+            step = args[2]
+        else:
+            abort(
+                "Tensor.arange expects 1 to 3 arguments:\n"
+                + "- arange(end)\n"
+                + "- arange(start, end)\n"
+                + "- arange(start, end, step)\n"
+                + "Got: "
+                + String(len(args))
+                + " argument(s)"
+            )
+
         if step == 0:
             abort("step can not be zero")
         if (step > 0 and start >= end) or (step < 0 and start <= end):
             abort("Invalid range for the given step")
         delta = end - start
-        size = floor(delta / step + epsilon)
+        size = floor(delta / step)
         if size <= 0:
             abort("Error: computed arange size is zero")
-        tensor = Tensor[dtype](size.__int__())
+        count = size.__int__()
+        tensor = Tensor[dtype](count, requires_grad=requires_grad)
 
         @parameter
         fn fill(i: Int) -> Scalar[dtype]:
@@ -1800,13 +1848,12 @@ fn test_arange() raises:
     Tensor.free_all(tensor, expected)
 
     tensor1 = Tensor.arange(0, -5, -0.5)
-    # expected = Tensor[DType.float32].of(
-    expected = Tensor.of(
+    expected1 = Tensor.of(
         0.0, -0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -3.5, -4.0, -4.5
-    ).to_dtype[DType.float32]()
-    is_true = (tensor1 == expected).all_true()
+    )
+    is_true = (tensor1 == expected1).all_true()
     assert_true(is_true, "arange negative step assertion failed")
-    Tensor.free_all(tensor1, expected)
+    Tensor.free_all(tensor1, expected1)
 
 
 fn test_transpose_matmul() raises:
