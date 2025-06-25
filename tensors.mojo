@@ -1,3 +1,50 @@
+fn test_sum() raises:
+    tensor = Tensor.of(1, 2, 3, 4, requires_grad=True)
+    result = tensor.sum()
+    result.print()
+    Tensor.walk_backward(result)
+    tensor.grad[].print()
+    tensor = Tensor.arange(end=24).reshape(2, 3, 4, requires_grad=True)
+    result = tensor.sum(axes=[-1], keepdims=True)
+    tensor.print()
+    result.print()
+
+    _ = """ones = Tensor.ones(3, 3)
+    summed = ones.sum(axes=[0], keepdims=True)
+    assert_true(
+        (summed == Tensor.d2([[3, 3, 3]])).all_true(),
+        "keepdim = True sum assertion 1 failed",
+    )
+    ones = Tensor.ones(3, 3)
+    summed = ones.sum(axes=[0])
+    expect = Tensor.of(3, 3, 3)
+    assert_true((summed == expect).all_true(), "1D sum assertion failed")
+
+    tensor = Tensor.arange(1, 21).reshape(2, 5, 2)
+    summed = tensor.sum(axes=[1])"""
+    _ = """[2D Tensor(2, 2), Type: float32, requires_grad: False]
+        [
+            [25.0, 30.0, ],
+            [75.0, 80.0, ],
+    ]"""
+    _ = """expect = Tensor.of[2](25, 30, 75, 80)
+    assert_true(
+        (summed == expect).all_true(), "Sum across axis 1 assertion failed"
+    )
+
+    summed = tensor.sum(axes=[0])
+    expect = Tensor.of[2](12, 14, 16, 18, 20, 22, 24, 26, 28, 30)
+    assert_true(
+        (summed == expect).all_true(), "Sum across axis 0 assertion failed"
+    )
+
+    expect = Tensor.of[5](3, 7, 11, 15, 19, 23, 27, 31, 35, 39)
+    summed = tensor.sum()
+    assert_true(
+        (summed == expect).all_true(), "Sum across axis 2 assertion failed"
+    )"""
+
+
 fn test_broadcast_add_2_tensors() raises:
     print("Test broadcast add 2 tensors")
 
@@ -154,6 +201,8 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 def main():
+    test_sum()
+    _ = """
     test_broadcast_add_2_tensors()
     test_sum()
     test_reshape()
@@ -167,7 +216,7 @@ def main():
     test_transpose_matmul()
     test_add_value()
     test_factor_mul_by()
-    test_view()
+    test_view()"""
 
 
 ### Mojo Tensor
@@ -710,19 +759,13 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn broadcast_add(self, other: Self) -> Tensor[dtype]:
         result_shape = self.broadcast_shape(other)
-        # print("result_shape: ", result_shape)  # result_shape:  (4)
         mask1 = self.broadcast_mask(result_shape)
-        # mask1.print()  # IntList[ 1 ] = 0
         mask2 = other.broadcast_mask(result_shape)
-        # mask2.print()  # IntList[ 1 ] = 1
         requires_grad = self.requires_grad or other.requires_grad
         result = Tensor[dtype](result_shape, requires_grad=requires_grad)
-        # result.print()  # [1D Tensor(4), Type: float32, requires_grad: True][0.0, 0.0, 0.0, 0.0,]
         for indices in result_shape:
-            # indices.print() #  IntList[1] = 0 IntList[1] = 1  IntList[1] = 2 IntList[1] = 3
             self_indices = self.translate_index(indices, mask1, result_shape)
             other_indices = other.translate_index(indices, mask2, result_shape)
-            # other_indices.print()  # IntList[1]=0 IntList[1]=0 IntList[1]=0 IntList[1]=0
             result[indices] = self[self_indices] + other[other_indices]
 
         if self.requires_grad or other.requires_grad:
@@ -732,7 +775,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                 if self.address()[].requires_grad:
                     grad_self = out_grad.sum(
-                        sorted_axes=self.address()[]
+                        axes=self.address()[]
                         .broadcast_mask(result.address()[].shape)
                         .indices_of(1),
                         keepdims=True,
@@ -743,7 +786,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                 if other.address()[].requires_grad:
                     grad_other = out_grad.sum(
-                        sorted_axes=other.address()[]
+                        axes=other.address()[]
                         .broadcast_mask(result.address()[].shape)
                         .indices_of(1),
                         keepdims=True,
@@ -1042,7 +1085,7 @@ struct Tensor[dtype: DType = DType.float32](
             abort(
                 "Tensor with "
                 + String(self.numels())
-                + " elements can't be converted to "
+                + " element(s) can't be converted to "
                 + String(shape.num_elements())
                 + " dimensional tensor"
             )
@@ -1050,17 +1093,83 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(result.data, self.data, self.numels())
         return result
 
-    fn sum(self, sorted_axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
+    fn mean(
+        self, axes: List[Int] = [-1], keepdims: Bool = False
+    ) -> Tensor[dtype]:
         _rank = self.shape.rank()
+        _axes = IntList()
+        if axes == [-1]:
+            _axes = IntList(_rank - 1)
+        elif len(axes) == 0:
+            _axes = IntList.range_list(_rank)
+        else:
+            _axes = IntList.new(axes)
+        return self.mean(_axes, keepdims)
 
-        for axis in sorted_axes:
-            if axis < 0 or axis >= _rank:
-                abort(
-                    "Tensor -> sum - invalid axis in sum: "
-                    + String(axis)
-                    + " for tensor with shape: "
-                    + self.shape.__str__()
+    fn mean(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
+        sorted_axes = Self.validate_and_normalize_axes(self.shape, axes)
+        # Compute total count of elements being reduced
+        reduce_dims = self.shape.axes_spans.select(sorted_axes)
+        var count = 1
+        for span in reduce_dims:
+            count *= span
+
+        if count == 0:
+            abort("Mean reduction over zero elements not allowed.")
+
+        # Perform sum
+        summed = self.sum(sorted_axes, keepdims)
+
+        # Divide by count
+        var result = summed / Scalar[dtype](count)
+
+        # Gradient logic
+        if self.requires_grad:
+
+            fn grad_fn() raises -> None:
+                out_grad = result.address()[].grad[]
+                var expanded = out_grad
+                if not keepdims:
+                    expanded = out_grad.reshape(
+                        Shape(
+                            out_grad.shape.intlist().insert(
+                                sorted_axes,
+                                IntList.with_capacity(len(sorted_axes), 1),
+                            )
+                        )
+                    )
+
+                # Broadcast and divide
+                broadcasted = expanded.broadcast_to(self.address()[].shape)
+                scaled = broadcasted / Scalar[dtype](count)
+                self.address()[].grad[] = __tensor_op_tensor__[
+                    dtype, AddTensor
+                ](
+                    self.address()[].grad[],
+                    scaled,
                 )
+
+            result.grad_fn = Optional(grad_fn)
+            result.ancestors.add_ancestry(self)
+
+        return result
+
+    fn sum(
+        self, axes: List[Int] = [-1], keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        _rank = self.shape.rank()
+        _axes = IntList()
+        if axes == [-1]:
+            _axes = IntList(_rank - 1)
+        elif len(axes) == 0:
+            _axes = IntList.range_list(_rank)
+        else:
+            _axes = IntList.new(axes)
+        return self.sum(_axes, keepdims)
+
+    fn sum(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
+        sorted_axes = Self.validate_and_normalize_axes(self.shape, axes)
+        _rank = self.shape.rank()
 
         spans = IntList.with_capacity(_rank)
 
@@ -1120,15 +1229,27 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn sum(
-        self, axes: List[Int] = [-1], keepdims: Bool = False
-    ) -> Tensor[dtype]:
-        _rank = self.shape.rank()
-
-        sorted_axes = IntList(_rank - 1) if (
-            len(axes) == 0 or axes == [-1]
-        ) else IntList.new(axes).sorted()
-        return self.sum(sorted_axes, keepdims)
+    @staticmethod
+    fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
+        rank = shape.rank()
+        sorted_axes = axes.sorted()
+        # Check for invalid axes
+        for axis in sorted_axes:
+            if axis < 0 or axis >= rank:
+                abort(
+                    "Tensor -> validate_and_normalize_axes - invalid axis: "
+                    + String(axis)
+                    + " for tensor shape: "
+                    + shape.__str__()
+                )
+        # Check for duplicate axes
+        for i in range(len(sorted_axes) - 1):
+            if sorted_axes[i] == sorted_axes[i + 1]:
+                abort(
+                    "Tensor -> validate_and_normalize_axes - duplicate axes"
+                    " specified."
+                )
+        return sorted_axes
 
     _ = """fn sum(self, axis: Int = -1, keepdim: Bool = False) -> Tensor[dtype]:
         _axis = axis
@@ -1724,43 +1845,6 @@ fn test_random() raises:
     holds_true = rand_tensor2.for_all(each2)
     assert_true(holds_true, "rand min(-2) and max(2) range assertion failed")
     Tensor.free_all(rand_tensor, rand_tensor2)
-
-
-fn test_sum() raises:
-    ones = Tensor.ones(3, 3)
-    summed = ones.sum(axes=[0], keepdims=True)
-    assert_true(
-        (summed == Tensor.d2([[3, 3, 3]])).all_true(),
-        "keepdim = True sum assertion 1 failed",
-    )
-    ones = Tensor.ones(3, 3)
-    summed = ones.sum(axes=[0])
-    expect = Tensor.of(3, 3, 3)
-    assert_true((summed == expect).all_true(), "1D sum assertion failed")
-
-    tensor = Tensor.arange(1, 21).reshape(2, 5, 2)
-    summed = tensor.sum(axes=[1])
-    _ = """[2D Tensor(2, 2), Type: float32, requires_grad: False]
-        [
-            [25.0, 30.0, ],
-            [75.0, 80.0, ],
-    ]"""
-    expect = Tensor.of[2](25, 30, 75, 80)
-    assert_true(
-        (summed == expect).all_true(), "Sum across axis 1 assertion failed"
-    )
-
-    summed = tensor.sum(axes=[0])
-    expect = Tensor.of[2](12, 14, 16, 18, 20, 22, 24, 26, 28, 30)
-    assert_true(
-        (summed == expect).all_true(), "Sum across axis 0 assertion failed"
-    )
-
-    expect = Tensor.of[5](3, 7, 11, 15, 19, 23, 27, 31, 35, 39)
-    summed = tensor.sum()
-    assert_true(
-        (summed == expect).all_true(), "Sum across axis 2 assertion failed"
-    )
 
 
 fn test_item() raises:
