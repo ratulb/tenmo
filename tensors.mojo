@@ -1,13 +1,66 @@
 fn test_sum() raises:
+    # 1. Basic Value Tests
+    a = Tensor.of(1, 2, 3)
+    b = Tensor.d1([1, 2, 3])
+    c = Tensor.of([1, 2, 3])
+    assert_true((a.sum([0]) == Tensor.scalar(6)).all_true())
+    assert_true((b.sum([0]) == Tensor.scalar(6)).all_true())
+    assert_true((c.sum([0]) == Tensor.scalar(6)).all_true())
+    assert_true((a.sum([0], keepdims=True) == Tensor.of(6)).all_true())
+    assert_true((a.sum([0], keepdims=True) == Tensor.of([6])).all_true())
+
+    # 2. Multi-Dimensional Tensor Tests
+    a = Tensor.d2([[1, 2], [3, 4]])  # Shape (2, 2)
+    assert_true((a.sum([0]) == Tensor.of([4, 6])).all_true())
+    assert_true((a.sum([1]) == Tensor.of([3, 7])).all_true())
+    assert_true((a.sum([0, 1]) == Tensor.scalar(10)).all_true())
+    assert_true((a.sum([0, 1], keepdims=True) == Tensor.d2([[10]])).all_true())
+    # 3. Scalar Input
+    a = Tensor.scalar(42)
+    assert_true((a.sum([]) == Tensor.scalar(42)).all_true())
+    # assert_true((a.sum([0]) == Tensor.scalar(42)).all_true())
+    # 4. Keepdims=True
+    a = Tensor.d2([[1, 2], [3, 4]])  # (2,2)
+    out = a.sum([1], keepdims=True)  # Should be (2,1)
+    assert_true(
+        (out == Tensor.d2([[3], [7]])).all_true()
+        and out.shape == Shape.of(2, 1)
+    )
+    # 5. Gradient Checks
+    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    b = a.sum([1])  # b shape (2,)
+    Tensor.walk_backward(b)
+    # Now a.grad should be Tensor.of([[1, 1], [1, 1]])
+    assert_true(
+        (b == Tensor.of(3, 7)).all_true()
+        and b.requires_grad
+        and (a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true()
+    )
+
+    # 6. Broadcasting Compatibility
+    a = Tensor.d2([[1, 2, 3]], requires_grad=True)  # (1,3)
+    b = a.sum([0], keepdims=False)  # (3,)
+    Tensor.walk_backward(b)
+    # a.grad == Tensor.of([[1, 1, 1]])
+    assert_true(
+        (b == Tensor.of(1, 2, 3)).all_true()
+        and b.requires_grad
+        and (a.grad[] == Tensor.d2([[1, 1, 1]])).all_true()
+    )
     tensor = Tensor.of(1, 2, 3, 4, requires_grad=True)
     result = tensor.sum(axes=[], keepdims=False)
-    result.print()
+    assert_true((result == Tensor.scalar(10)).all_true())
     Tensor.walk_backward(result)
-    tensor.grad[].print()
+    assert_true(
+        (
+            tensor.grad[] == Tensor[DType.float32].of(1.0, 1.0, 1.0, 1.0)
+        ).all_true()
+    )
     tensor = Tensor.arange(24).reshape(2, 3, 4, requires_grad=True)
     result = tensor.sum(axes=[], keepdims=False)
-    tensor.print()
-    result.print()
+    assert_true(result.item() == 276.0)
+    result = tensor.sum(axes=[], keepdims=True)
+    assert_true((result == Tensor.d3([[[276.0]]])).all_true())
 
     ones = Tensor.ones(3, 3)
     summed = ones.sum(axes=[0], keepdims=True)
@@ -1258,8 +1311,24 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
         rank = shape.rank()
+
+        if rank == 0:
+            if len(axes) == 1 and axes[0] == -1:
+                return (
+                    IntList()
+                )  # Interpret `[-1]` as "reduce all axes" for scalars
+            if len(axes) > 0:
+                abort(
+                    "Tensor -> validate_and_normalize_axes - cannot reduce over"
+                    " axes "
+                    + axes.__str__()
+                    + " for scalar tensor with shape: "
+                    + shape.__str__()
+                )
+            return IntList()  # Scalar sum over [] is valid
+
         sorted_axes = axes.sorted()
-        # Check for invalid axes
+
         for axis in sorted_axes:
             if axis < 0 or axis >= rank:
                 abort(
@@ -1268,13 +1337,14 @@ struct Tensor[dtype: DType = DType.float32](
                     + " for tensor shape: "
                     + shape.__str__()
                 )
-        # Check for duplicate axes
+
         for i in range(len(sorted_axes) - 1):
             if sorted_axes[i] == sorted_axes[i + 1]:
                 abort(
                     "Tensor -> validate_and_normalize_axes - duplicate axes"
                     " specified."
                 )
+
         return sorted_axes
 
     _ = """fn sum(self, axis: Int = -1, keepdim: Bool = False) -> Tensor[dtype]:
@@ -1567,9 +1637,20 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn of(*elems: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
-        Self.validate_dtype_consistency(dtype, requires_grad, "of")
-        shape = Shape(piped(len(elems)))
+        Self.validate_dtype_consistency(dtype, requires_grad, "of(*elems)")
+        shape = Shape.of(len(elems))
         tensor = Tensor[dtype](shape, requires_grad)
+        for i in range(len(elems)):
+            tensor[i] = elems[i]
+        return tensor
+
+    @staticmethod
+    fn of(
+        elems: List[Scalar[Self.dtype]], requires_grad: Bool = False
+    ) -> Tensor[Self.dtype]:
+        Self.validate_dtype_consistency(dtype, requires_grad, "of(elems)")
+        shape = Shape.of(len(elems))
+        tensor = Tensor[Self.dtype](shape, requires_grad)
         for i in range(len(elems)):
             tensor[i] = elems[i]
         return tensor

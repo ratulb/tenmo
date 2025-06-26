@@ -644,6 +644,15 @@ struct IntList(Sized & Copyable):
             index += 1
         return True
 
+    fn __str__(self) -> String:
+        var s = String("[")
+        for i in range(len(self)):
+            s += String(self[i])
+            if i < len(self) - 1:
+                s += ", "
+        s += "]"
+        return s
+
     @always_inline("nodebug")
     fn copy_from(
         mut self: IntList,
