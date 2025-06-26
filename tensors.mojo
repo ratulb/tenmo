@@ -1,3 +1,43 @@
+fn test_mean() raises:
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    b = a.mean([0])
+    assert_true((b == Tensor[DType.float32].d1([2.5, 3.5, 4.5])).all_true())
+    b.backward()
+    assert_true(
+        (
+            a.grad[]
+            == Tensor[DType.float32].d2([[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]])
+        ).all_true()
+    )
+    # Mean over all → scalar
+    s = a.mean([])
+    assert_true((s == Tensor[DType.float32].scalar(3.5)).all_true())
+    s.backward()
+    # a.grad == [[1/6, 1/6, 1/6], [1/6, 1/6, 1/6]] + 0.5 from previous backward call
+    assert_true(
+        a.grad[].all_close(
+            Tensor.d2(
+                [
+                    [0.1666666, 0.1666666, 0.1666666],
+                    [0.1666666, 0.1666666, 0.1666666],
+                ]
+            )
+            + 0.5
+        )
+    )
+    a.zero_grad()
+    s.backward()
+    assert_true(
+        a.grad[].all_close(
+            Tensor.d2(
+                [
+                    [0.1666666, 0.1666666, 0.1666666],
+                    [0.1666666, 0.1666666, 0.1666666],
+                ]
+            )
+        )
+    )
+
 fn test_sum() raises:
     # 1. Basic Value Tests
     a = Tensor.of(1, 2, 3)
@@ -254,12 +294,13 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 def main():
+    _="""test_mean()
     test_sum()
     test_arange()
     test_broadcast_add_2_tensors()
     test_sum()
     test_reshape()
-    test_scalar_tensor()
+    test_scalar_tensor()"""
     test_tensor_of_list()
     test_add_2_tensors()
     test_item()

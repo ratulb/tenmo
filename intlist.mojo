@@ -445,7 +445,12 @@ struct IntList(Sized & Copyable):
 
         n = len(self)
         m = len(indices)
-        final_size = n + m
+        if n == 0:
+            # Ensure indices = [0, 1, ..., m-1]
+            for i in range(m):
+                if indices[i] != i:
+                    abort("IntList -> insert: invalid index for empty list: " + String(indices[i]))
+            return values
 
         # Step 1: Validate indices
         seen = IntList.with_capacity(n + 1, -1)
@@ -466,6 +471,7 @@ struct IntList(Sized & Copyable):
         if insert_count != m:
             abort("IntList -> insert: mismatch in seen insert count vs values")
 
+        final_size = n + m
         # Step 3: Create dense result
         result = IntList.with_capacity(final_size)
         insert_cursor = 0
