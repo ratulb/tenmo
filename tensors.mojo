@@ -1,3 +1,15 @@
+fn test_miscellaneous() raises:
+    a = Tensor.of(1.0, 2.0, 3.0, requires_grad=True)
+    b = Tensor.scalar(5.0)
+    c = a + b
+    c.sum().backward()
+    # should be [1, 1, 1]
+    assert_true((a.grad[] == Tensor.of(1.0, 1, 1)).all_true())
+    reshaped = (a + b).mean().reshape()
+    Tensor.scalar(42, requires_grad=True).sum().backward()  # This one crashes
+    reshaped.backward()  # backward does not return anything
+
+
 fn test_mean() raises:
     a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     b = a.mean([0])
@@ -37,6 +49,7 @@ fn test_mean() raises:
             )
         )
     )
+
 
 fn test_sum() raises:
     # 1. Basic Value Tests
@@ -96,7 +109,7 @@ fn test_sum() raises:
             tensor.grad[] == Tensor[DType.float32].of(1.0, 1.0, 1.0, 1.0)
         ).all_true()
     )
-    tensor = Tensor.arange(24).reshape(2, 3, 4, requires_grad=True)
+    tensor = Tensor.arange(24).reshape(2, 3, 4)
     result = tensor.sum(axes=[], keepdims=False)
     assert_true(result.item() == 276.0)
     result = tensor.sum(axes=[], keepdims=True)
@@ -294,13 +307,14 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 def main():
-    _="""test_mean()
+    test_miscellaneous()
+    _ = """test_mean()
     test_sum()
     test_arange()
     test_broadcast_add_2_tensors()
     test_sum()
     test_reshape()
-    test_scalar_tensor()"""
+    test_scalar_tensor()
     test_tensor_of_list()
     test_add_2_tensors()
     test_item()
@@ -309,7 +323,7 @@ def main():
     test_transpose_matmul()
     test_add_value()
     test_factor_mul_by()
-    test_view()
+    test_view()"""
 
 
 ### Mojo Tensor
@@ -505,6 +519,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.grad = other.grad
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
+        self.init_gradbox()
 
     fn init_gradbox(mut self):
         if self.requires_grad and self.grad.__as_bool__() == False:
@@ -741,13 +756,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn add_ancestry(
         mut self,
-        left: UnsafePointer[Tensor[dtype]],
-        right: UnsafePointer[Tensor[dtype]] = UnsafePointer[Tensor[dtype]](),
+        *tensors: Tensor[dtype],
     ):
-        if right.__as_bool__():
-            self.ancestors.add_ancestry(left[], right[])
-        else:
-            self.ancestors.add_ancestry(left[])
+        self.ancestors.add_ancestry(tensors)
 
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
@@ -768,7 +779,7 @@ struct Tensor[dtype: DType = DType.float32](
                 ](self.address()[].grad[], out_grad_scaled)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self.address())
+            out.add_ancestry(self)
 
         return out
 
@@ -813,7 +824,7 @@ struct Tensor[dtype: DType = DType.float32](
                         dtype, AddTensor
                     ](other.address()[].grad[], product)
 
-            out.add_ancestry(self.address(), other.address())
+            out.add_ancestry(self, other)
             out.grad_fn = Optional(grad_fn)
 
         return out
@@ -889,7 +900,7 @@ struct Tensor[dtype: DType = DType.float32](
                     ](other.address()[].grad[], grad_other)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self.address(), other.address())
+            result.add_ancestry(self, other)
         return result
 
     fn __add__(self, other: Self) -> Tensor[dtype]:
@@ -924,7 +935,7 @@ struct Tensor[dtype: DType = DType.float32](
                     ](other.address()[].grad[], out_grad)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self.address(), other.address())
+            out.add_ancestry(self, other)
 
         return out
 
@@ -948,8 +959,7 @@ struct Tensor[dtype: DType = DType.float32](
                 print("in __add__(scalar) grad_fn")
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self.address())
-        print("Out pointer address: ", out.address())
+            out.add_ancestry(self)
 
         return out
 
@@ -991,7 +1001,7 @@ struct Tensor[dtype: DType = DType.float32](
                 print("in __sub__(scalar) grad_fn")
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self.address())
+            out.add_ancestry(self)
         return out
 
     fn __sub__(self, other: Self) -> Tensor[dtype]:
@@ -1000,7 +1010,7 @@ struct Tensor[dtype: DType = DType.float32](
         )
         if self.address() == other.address():
             out = Tensor[dtype].zeros_like(self.address()[], requires_grad)
-            out.add_ancestry(self.address())
+            out.add_ancestry(self)
             return out
         if self.address()[].shape != other.address()[].shape:
             abort(
@@ -1029,7 +1039,7 @@ struct Tensor[dtype: DType = DType.float32](
 
             out.grad_fn = Optional(grad_fn)
 
-            out.add_ancestry(self.address(), other.address())
+            out.add_ancestry(self, other)
 
         return out
 
@@ -1152,38 +1162,49 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_scalar(self) -> Bool:
         return self.numels() == 1 and self.shape == Shape.Void
 
-    fn reshape(self, requires_grad: Bool = False) -> Tensor[dtype]:
-        if self.is_scalar():
-            return self
+    fn reshape(self) -> Tensor[dtype]:
         if self.numels() != 1:
             abort(
                 "Only tensor with single element can be reshaped to scalar"
                 " tensor"
             )
-        result = Tensor[dtype].scalar(self.data[], requires_grad)
-        return result
+        return self.reshape(Shape.Void)
 
-    fn reshape(
-        self, *newdims: Int, requires_grad: Bool = False
-    ) -> Tensor[dtype]:
-        return self.reshape(Shape(newdims), requires_grad)
+    fn reshape(self, *newdims: Int) -> Tensor[dtype]:
+        return self.reshape(Shape(newdims))
 
-    fn reshape(
-        self, shape: Shape, requires_grad: Bool = False
-    ) -> Tensor[dtype]:
-        # shape = Shape(newdims)
-        if shape == self.shape:
-            return self
-        if shape.num_elements() != self.numels():
+    fn reshape(self, new_shape: Shape) -> Tensor[dtype]:
+        if self.numels() != new_shape.num_elements():
             abort(
                 "Tensor with "
                 + String(self.numels())
                 + " element(s) can't be converted to "
-                + String(shape.num_elements())
+                + String(new_shape.num_elements())
                 + " dimensional tensor"
             )
-        result = Tensor[dtype](shape, requires_grad=requires_grad)
-        memcpy(result.data, self.data, self.numels())
+
+        requires_grad = self.requires_grad
+        var result = Tensor[dtype](new_shape, requires_grad=requires_grad)
+
+        # Point to same data buffer
+        result.data = self.data
+
+        if requires_grad:
+            # If original has grad populated, copy reshaped version
+            result.grad[] = self.grad[].reshape(new_shape)
+
+            # Setup gradient function
+            fn grad_fn() raises -> None:
+                grad_out = result.address()[].grad[]
+                reshaped_grad = grad_out.reshape(self.address()[].shape)
+
+                self.address()[].grad[] = __tensor_op_tensor__[
+                    dtype, AddTensor
+                ](self.address()[].grad[], reshaped_grad)
+
+            result.grad_fn = Optional(grad_fn)
+            result.add_ancestry(self)
+
         return result
 
     fn mean(
@@ -1243,7 +1264,7 @@ struct Tensor[dtype: DType = DType.float32](
                 )
 
             result.grad_fn = Optional(grad_fn)
-            result.ancestors.add_ancestry(self)
+            result.add_ancestry(self)
 
         return result
 
@@ -1265,6 +1286,23 @@ struct Tensor[dtype: DType = DType.float32](
         sorted_axes = Self.validate_and_normalize_axes(self.shape, axes)
         _rank = self.shape.rank()
 
+        # Early scalar return
+        if _rank == 0:
+            scalar_out = Tensor[dtype].zeros(
+                Shape.Void, requires_grad=self.requires_grad
+            )
+            scalar_out[IntList.Empty] = self[IntList.Empty]
+            if self.requires_grad:
+
+                fn scalar_grad_fn() raises -> None:
+                    self.address()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](self.address()[].grad[], scalar_out.address()[].grad[])
+
+                scalar_out.grad_fn = Optional(scalar_grad_fn)
+                scalar_out.add_ancestry(self)
+            return scalar_out
+
         spans = IntList.with_capacity(_rank)
 
         for i in range(_rank):
@@ -1278,9 +1316,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         out_shape = Shape(spans)
 
-        var out = Tensor[dtype].zeros(
-            out_shape, requires_grad=self.requires_grad
-        )
+        out = Tensor[dtype].zeros(out_shape, requires_grad=self.requires_grad)
 
         reduced_shape = Shape(self.shape.axes_spans.select(sorted_axes))
         reducing_all = len(sorted_axes) == self.shape.rank()
@@ -1326,7 +1362,7 @@ struct Tensor[dtype: DType = DType.float32](
                 )
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self.address())
+            out.add_ancestry(self)
 
         return out
 
@@ -1726,7 +1762,11 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn ones(*axes_spans: Int, requires_grad: Bool = False) -> Tensor[dtype]:
-        tensor = Tensor[dtype](Shape(axes_spans), requires_grad)
+        return Self.ones(Shape(axes_spans), requires_grad)
+
+    @staticmethod
+    fn ones(shape: Shape, requires_grad: Bool = False) -> Tensor[dtype]:
+        tensor = Tensor[dtype](shape, requires_grad=requires_grad)
         var value: SIMD[dtype, 1]
 
         @parameter

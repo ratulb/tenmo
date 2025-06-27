@@ -439,6 +439,21 @@ struct IntList(Sized & Copyable):
                 times += 1
         return times
 
+    @always_inline
+    fn is_strictly_increasing_from_zero(self) -> Bool:
+        for i in range(len(self)):
+            if self[i] != i:
+                print(
+                    (
+                        "IntList -> is_strictly_increasing_from_zero: non"
+                        " increasing index and value: "
+                    ),
+                    i,
+                    self[i],
+                )
+                return False
+        return True
+
     fn insert(self, indices: IntList, values: IntList) -> IntList:
         if len(indices) != len(values):
             abort("IntList -> insert: indices and values must be same length")
@@ -446,10 +461,13 @@ struct IntList(Sized & Copyable):
         n = len(self)
         m = len(indices)
         if n == 0:
+            if m == 0:
+                return IntList()
             # Ensure indices = [0, 1, ..., m-1]
-            for i in range(m):
-                if indices[i] != i:
-                    abort("IntList -> insert: invalid index for empty list: " + String(indices[i]))
+            if not indices.is_strictly_increasing_from_zero():
+                abort(
+                    "IntList -> insert: invalid idices for empty list insertion"
+                )
             return values
 
         # Step 1: Validate indices

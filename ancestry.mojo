@@ -69,10 +69,6 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
     fn __len__(self) -> Int:
         return self.size
 
-    fn append_all(mut self, *addresses: UnsafePointer[Tensor[dtype]]):
-        for address in addresses:
-            self.append(address)
-
     fn append(mut self, address: UnsafePointer[Tensor[dtype]]):
         if self.size == self.capacity:
             new_capacity = max(1, self.capacity * 2)
@@ -80,17 +76,10 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
         (self.ancestors + self.size)[] = address
         self.size += 1
 
-    fn add_ancestry(mut self, left: Tensor[dtype], right: Tensor[dtype]):
-        if left.requires_grad and right.requires_grad:
-            self.append_all(left.address(), right.address())
-        elif left.requires_grad:
-            self.append(left.address())
-        elif right.requires_grad:
-            self.append(right.address())
-
-    fn add_ancestry(mut self, tensor: Tensor[dtype]):
-        if tensor.requires_grad:
-            self.append(tensor.address())
+    fn add_ancestry(mut self, tensors: VariadicListMem[Tensor[dtype]]):
+        for tensor in tensors:
+            if tensor.requires_grad:
+                self.append(tensor.address())
 
     fn resize(mut self, new_capacity: Int):
         self.reserve(new_capacity)
