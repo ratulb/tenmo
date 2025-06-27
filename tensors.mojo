@@ -1,3 +1,62 @@
+fn test_grad_copy_on_reshape() raises:
+    a = Tensor.of(1.0, 2.0, 3.0, requires_grad=True)
+    b = a + 1.0
+    b.sum().backward()
+
+    # At this point, a.grad should be [1.0, 1.0, 1.0]
+    reshaped = a.reshape(Shape.of(3))
+    reshaped.grad[].print()  # Should be [1.0, 1.0, 1.0]
+
+    # Further ops from reshaped still accumulate to a
+    (reshaped * 2).sum().backward()
+    a.grad[].print()  # Should now be [3.0, 3.0, 3.0]
+
+fn test_reshape_preserves_grad_accumulation() raises:
+    # Chained reshape should still accumulate gradients
+    a = Tensor.of(1.0, 2.0, 3.0, requires_grad=True)
+    b = a.reshape(Shape.of(3))
+    c = b.reshape(Shape.of(1, 3))
+
+    d = c.sum()
+    d.backward()
+
+    a.grad[].print()  # Should be [1.0, 1.0, 1.0]
+
+fn test_multi_dimensional_reshape() raises:
+    # (2, 3) → (3, 2)
+    a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    b = a.reshape(Shape.of(3, 2))
+
+    assert_true(b.shape == Shape.of(3, 2))
+    d = b.sum()
+    d.backward()
+
+    a.grad[].print()  # Should be [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]
+
+fn test_reshape_tensor_to_scalar() raises:
+    # (1,) → reshape to scalar
+    a = Tensor.of(42.0, requires_grad=True)
+    b = a.reshape(Shape.Void)
+
+    assert_true(b.is_scalar())
+    assert_true(b[IntList()] == Scalar(42.0))
+
+    c = b * 2
+    c.backward()
+
+    a.grad[].print()  # Should be [2.0]
+
+
+fn test_reshape_scalar_to_tensor() raises:
+    # Scalar → reshape to (1,)
+    a = Tensor.scalar(42.0, requires_grad=True)
+    b = a.reshape(Shape.of(1))  # should share data and allow backprop
+
+    assert_true(b[0] == Scalar(42.0))
+    c = b * 3
+    c.backward()
+    a.grad[].print()  # Should be [3.0]
+
 fn test_miscellaneous() raises:
     a = Tensor.of(1.0, 2.0, 3.0, requires_grad=True)
     b = Tensor.scalar(5.0)
@@ -307,8 +366,18 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 def main():
+    test_mul_by_factor()
+    test_random()
+    test_transpose_matmul()
+    test_factor_mul_by()
+    test_add_value()
+    _="""test_grad_copy_on_reshape()
+    test_reshape_preserves_grad_accumulation()
+    test_multi_dimensional_reshape()
+    test_reshape_tensor_to_scalar()
+    test_reshape_scalar_to_tensor()
     test_miscellaneous()
-    _ = """test_mean()
+    test_mean()
     test_sum()
     test_arange()
     test_broadcast_add_2_tensors()
@@ -318,11 +387,6 @@ def main():
     test_tensor_of_list()
     test_add_2_tensors()
     test_item()
-    test_mul_by_factor()
-    test_random()
-    test_transpose_matmul()
-    test_add_value()
-    test_factor_mul_by()
     test_view()"""
 
 
@@ -906,22 +970,35 @@ struct Tensor[dtype: DType = DType.float32](
     fn __add__(self, other: Self) -> Tensor[dtype]:
         if self.address() == other.address():
             return self.__mul__(2)
-        if not self.address()[].broadcastable(other.address()[]):
+        #if not self.address()[].broadcastable(other.address()[]):
+        if not self.broadcastable(other):
             abort(
                 "__add__ -> Dimension mismatch: "
-                + self.address()[].shape.__str__()
+                #+ self.address()[].shape.__str__()
+                + self.shape.__str__()
                 + " <=> "
-                + other.address()[].shape.__str__()
+                #+ other.address()[].shape.__str__()
+                + other.shape.__str__()
             )
 
-        if self.address()[].shape != other.address()[].shape:
+        _="""if self.address()[].shape != other.address()[].shape:
             return self.address()[].broadcast_add(other.address()[])
 
         var out = __tensor_op_tensor__[dtype, AddTensor](
             self.address()[], other.address()[]
         )
 
-        if self.address()[].requires_grad or other.address()[].requires_grad:
+        if self.address()[].requires_grad or other.address()[].requires_grad:"""
+
+
+        if self.shape != other.shape:
+            return self.broadcast_add(other)
+
+        var out = __tensor_op_tensor__[dtype, AddTensor](
+            self, other
+        )
+
+        if self.requires_grad or other.requires_grad:
 
             fn grad_fn() raises -> None:
                 out_grad = out.address()[].grad[]
@@ -944,10 +1021,12 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __add__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, AddScalar](
-            self.address()[], scalar
+            #self.address()[], scalar
+            self, scalar
         )
 
-        if self.address()[].requires_grad:
+        #if self.address()[].requires_grad:
+        if self.requires_grad:
 
             fn grad_fn() raises -> None:
                 self_grad = self.address()[].grad[]
