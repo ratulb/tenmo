@@ -773,7 +773,7 @@ struct IntList(Sized & Copyable):
         Returns:
             A copy of the value.
         """
-        var copy = Self.with_capacity(capacity=self.capacity)
+        var copy = Self.with_capacity(capacity=len(self))
         for e in self:
             copy.append(e)
         return copy^

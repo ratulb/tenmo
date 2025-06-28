@@ -492,13 +492,9 @@ struct Shape(Sized & Writable & Copyable & Movable):
                 abort("Shape dimension not valid")
 
     fn intlist(self) -> IntList:
-        result = IntList.with_capacity(len(self))
-        for i in range(len(self)):
-            result.append(self[i])
-        return result
-
-    fn into(self) -> IntList:
-        return self.intlist()
+        return self.axes_spans.copy()
+    fn product(self) -> Int:
+        return self.axes_spans.product()
 
     @staticmethod
     fn of(*dims: Int) -> Shape:
