@@ -13,7 +13,9 @@ fn test_empty_shape() raises:
     shape = Shape(IntList.Empty)
     assert_true(shape[0] == -1, "Empty shape __getitem__ assertion failed")
     for each in shape:
-        assert_true(each == IntList.Empty, "Empty shape iteration assertion failed")
+        assert_true(
+            each == IntList.Empty, "Empty shape iteration assertion failed"
+        )
     tensor = Tensor[DType.bool](shape)
     assert_true(
         tensor[IntList.Empty] == False, "Scalar tensor get assertion 1 failed"
@@ -101,6 +103,25 @@ fn test_broadcast_shape() raises:
     result = Shape.broadcast_shape(Shape.of(2, 1), Shape.of(4, 2, 5))
     assert_true(
         result == Shape.of(4, 2, 5), "Shape broadcast 5 assertion failed"
+    )
+
+    tensor1 = Tensor.d2([[1, 2, 3], [4, 5, 6]])
+    tensor2 = Tensor.d2([[1, 1, 1]])
+
+    shape1 = tensor1.broadcast_shape(tensor2)
+    shape2 = tensor2.broadcast_shape(tensor1)
+    shape3 = tensor1.broadcast_shape(tensor1)
+    shape4 = tensor2.broadcast_shape(tensor2)
+    print(shape1, shape2, shape3, shape3)
+    assert_true(
+        shape1 == Shape.of(2, 3)
+        and shape2 == Shape.of(2, 3)
+        and shape3 == Shape.of(2, 3)
+        and shape4 == Shape.of(1, 3),
+        (
+            "Tensor broadcast shape assertion failed for tensor sizes 2 by 3"
+            " and 1 by 3"
+        ),
     )
 
 
@@ -245,7 +266,9 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
         return self.shape[].num_elements() - self.index > 0
 
 
-struct Shape(Sized & Writable & Copyable & Movable):
+struct Shape(
+    Sized & Stringable & Writable & Representable & Copyable & Movable
+):
     alias Unit = Shape.of(1)
     alias Void = Shape(IntList.Empty)
     var axes_spans: IntList
@@ -493,6 +516,7 @@ struct Shape(Sized & Writable & Copyable & Movable):
 
     fn intlist(self) -> IntList:
         return self.axes_spans.copy()
+
     fn product(self) -> Int:
         return self.axes_spans.product()
 
