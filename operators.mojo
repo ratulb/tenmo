@@ -15,6 +15,8 @@ alias MulScalar = 3
 alias MulTensor = 4
 alias AddTensor = 5
 alias SubtractTensor = 6
+alias Power = 7
+
 
 
 fn sum_3d[
@@ -286,12 +288,20 @@ fn __tensor_op_scalar__[
             idx, this.data.load[width=simd_width](idx) * scalar
         )
 
+    @parameter
+    fn powered_by_scalar[simd_width: Int](idx: Int):
+        out.data.store[width=simd_width](
+            idx, this.data.load[width=simd_width](idx).__pow__(scalar)
+        )
+
     if op == MulScalar:
         vectorize[mul_by_scalar, simdwidthof[dtype]()](out.numels())
     elif op == AddScalar:
         vectorize[add_scalar, simdwidthof[dtype]()](out.numels())
     elif op == SubtractScalar:
         vectorize[subtract_scalar, simdwidthof[dtype]()](out.numels())
+    elif op == Power:
+        vectorize[powered_by_scalar, simdwidthof[dtype]()](out.numels())
 
     return out
 

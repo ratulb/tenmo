@@ -1,4 +1,5 @@
 from shapes import Shape
+from tensors import Tensor
 from testing import assert_true
 from sys.param_env import env_get_string
 from logger import Level, Logger
@@ -18,6 +19,28 @@ fn log_info(msg: String):
 
 fn log_warning(msg: String):
     log.warning(msg)
+
+
+# Helper
+def do_assert[
+    dtype: DType, //
+](a: Tensor[dtype], b: Tensor[dtype], msg: String):
+    shape_mismatch = String("{0}: shape mismatch {1} vs {2}")
+    tensors_not_equal = String("{}: values mismatch")
+    assert_true(
+        a.shape == b.shape, shape_mismatch.format(msg, a.shape, b.shape)
+    )
+    assert_true((a == b).all_true(), tensors_not_equal.format(msg))
+
+
+# Helper
+def assert_grad[
+    dtype: DType, //
+](t: Tensor[dtype], expected: Tensor[dtype], label: String):
+    assert_true(
+        (t.grad[] == expected).all_true(),
+        String("grad assertion failed for {0}").format(label),
+    )
 
 
 fn variadiclist_as_str(list: VariadicList[Int]) -> String:
@@ -87,6 +110,6 @@ struct IdGen:
 
 
 fn main() raises:
-    vl = piped(3, 1)
-    for e in vl:
-        print(e)
+    a = Tensor.of(1, 2, 3)
+    b = Tensor.of(2)
+    do_assert(a, b, "boom")

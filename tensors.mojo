@@ -1,15 +1,568 @@
+from common_utils import do_assert, assert_grad
+
+
+fn test_broadcast_mul() raises:
+    # 1. Scalar * Scalar
+    a = Tensor.scalar(3, requires_grad=True)
+    b = Tensor.scalar(4, requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.scalar(4), "Scalar * Scalar -> a")
+    assert_grad(b, Tensor.scalar(3), "Scalar * Scalar -> b")
+    do_assert(c, Tensor.scalar(12), "Scalar * Scalar")
+
+    # 2. Scalar * 1D
+    a = Tensor.scalar(2, requires_grad=True)
+    b = Tensor.d1([1, 2, 3], requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.scalar(6), "Scalar * 1D -> a")
+    assert_grad(b, Tensor.d1([2, 2, 2]), "Scalar * 1D -> b")
+    do_assert(c, Tensor.d1([2, 4, 6]), "Scalar * 1D")
+
+    # 3. 1D * Scalar
+    a = Tensor.d1([1, 2, 3], requires_grad=True)
+    b = Tensor.scalar(2, requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([2, 2, 2]), "1D * Scalar -> a")
+    assert_grad(b, Tensor.scalar(6), "1D * Scalar -> b")
+    do_assert(c, Tensor.d1([2, 4, 6]), "1D * Scalar")
+
+    # 4. 1D * 1D
+    a = Tensor.d1([1, 2, 3], requires_grad=True)
+    b = Tensor.d1([4, 5, 6], requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([4, 5, 6]), "1D * 1D -> a")
+    assert_grad(b, Tensor.d1([1, 2, 3]), "1D * 1D -> b")
+    do_assert(c, Tensor.d1([4, 10, 18]), "1D * 1D")
+
+    # 5. 2D * Scalar
+    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    b = Tensor.scalar(3, requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d2([[3, 3], [3, 3]]), "2D * Scalar -> a")
+    assert_grad(b, Tensor.scalar(10), "2D * Scalar -> b")
+    do_assert(c, Tensor.d2([[3, 6], [9, 12]]), "2D * Scalar")
+
+    # 6. Scalar * 2D
+    a = Tensor.scalar(3, requires_grad=True)
+    b = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.scalar(10), "Scalar * 2D -> a")
+    assert_grad(b, Tensor.d2([[3, 3], [3, 3]]), "Scalar * 2D -> b")
+    do_assert(c, Tensor.d2([[3, 6], [9, 12]]), "Scalar * 2D")
+
+    # 7. 2D * 1D (row-wise broadcasting)
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    b = Tensor.d1([10, 20, 30], requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d2([[10, 20, 30], [10, 20, 30]]), "2D * 1D -> a")
+    assert_grad(b, Tensor.d1([5, 7, 9]), "2D * 1D -> b")
+    do_assert(c, Tensor.d2([[10, 40, 90], [40, 100, 180]]), "2D * 1D")
+
+    # 8. 1D * 2D (reverse broadcast)
+    a = Tensor.d1([10, 20, 30], requires_grad=True)
+    b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([5, 7, 9]), "1D * 2D -> a")
+    assert_grad(b, Tensor.d2([[10, 20, 30], [10, 20, 30]]), "1D * 2D -> b")
+    do_assert(c, Tensor.d2([[10, 40, 90], [40, 100, 180]]), "1D * 2D")
+
+    # 9. 3D * 1D (broadcast on last dim)
+    a = Tensor.d3(
+        [
+            [[1, 2], [3, 4]],
+            [[5, 6], [7, 8]],
+        ],
+        requires_grad=True,
+    )
+    b = Tensor.d1([10, 20], requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(
+        a,
+        Tensor.d3(
+            [
+                [[10, 20], [10, 20]],
+                [[10, 20], [10, 20]],
+            ]
+        ),
+        "3D * 1D -> a",
+    )
+    assert_grad(b, Tensor.d1([16, 20]), "3D * 1D -> b")
+    do_assert(
+        c,
+        Tensor.d3(
+            [
+                [[10, 40], [30, 80]],
+                [[50, 120], [70, 160]],
+            ]
+        ),
+        "3D * 1D",
+    )
+
+    # 10. 3D * 2D (broadcast over batch dim)
+    a = Tensor.d3(
+        [
+            [[1, 2], [3, 4]],
+            [[5, 6], [7, 8]],
+        ],
+        requires_grad=True,
+    )
+    b = Tensor.d2([[10, 20], [30, 40]], requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(
+        a,
+        Tensor.d3(
+            [
+                [[10, 20], [30, 40]],
+                [[10, 20], [30, 40]],
+            ]
+        ),
+        "3D * 2D -> a",
+    )
+    assert_grad(
+        b,
+        Tensor.d2(
+            [
+                [6, 8],
+                [10, 12],
+            ]
+        ),
+        "3D * 2D -> b",
+    )
+    do_assert(
+        c,
+        Tensor.d3(
+            [
+                [[10, 40], [90, 160]],
+                [[50, 120], [210, 320]],
+            ]
+        ),
+        "3D * 2D",
+    )
+
+    # 11. 3D * Scalar
+    a = Tensor.d3(
+        [
+            [[1, 2], [3, 4]],
+            [[5, 6], [7, 8]],
+        ],
+        requires_grad=True,
+    )
+    b = Tensor.scalar(10, requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(
+        a,
+        Tensor.d3(
+            [
+                [[10, 10], [10, 10]],
+                [[10, 10], [10, 10]],
+            ]
+        ),
+        "3D * Scalar -> a",
+    )
+    assert_grad(b, Tensor.scalar(36), "3D * Scalar -> b")
+    do_assert(
+        c,
+        Tensor.d3(
+            [
+                [[10, 20], [30, 40]],
+                [[50, 60], [70, 80]],
+            ]
+        ),
+        "3D * Scalar",
+    )
+
+    # 12. Degenerate broadcast: (1,) * (3,)
+    a = Tensor.d1([5], requires_grad=True)
+    b = Tensor.d1([1, 2, 3], requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([6]), "(1,) * (3,) -> a")
+    assert_grad(b, Tensor.d1([5, 5, 5]), "(1,) * (3,) -> b")
+    do_assert(c, Tensor.d1([5, 10, 15]), "(1,) * (3,)")
+
+    # 13. Degenerate broadcast: (1,1) * (2,3)
+    a = Tensor.d2([[2]], requires_grad=True)
+    b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    c = a * b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d2([[21]]), "(1,1) * (2,3) -> a")
+    assert_grad(b, Tensor.d2([[2, 2, 2], [2, 2, 2]]), "(1,1) * (2,3) -> b")
+    do_assert(c, Tensor.d2([[2, 4, 6], [8, 10, 12]]), "(1,1) * (2,3)")
+
+
+fn test_broadcast_sub() raises:
+    # 1. Scalar - Scalar
+    a = Tensor.scalar(5, requires_grad=True)
+    b = Tensor.scalar(3, requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.scalar(1), "Scalar - Scalar -> a")
+    assert_grad(b, Tensor.scalar(-1), "Scalar - Scalar -> b")
+    do_assert(c, Tensor.scalar(2), "Scalar - Scalar")
+
+    # 2. Scalar - 1D
+    a = Tensor.scalar(10, requires_grad=True)
+    b = Tensor.d1([1, 2, 3], requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.scalar(3), "Scalar - 1D -> a")
+    assert_grad(b, Tensor.d1([-1, -1, -1]), "Scalar - 1D -> b")
+    do_assert(c, Tensor.d1([9, 8, 7]), "Scalar - 1D")
+
+    # 3. 1D - Scalar
+    a = Tensor.d1([1, 2, 3], requires_grad=True)
+    b = Tensor.scalar(10, requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([1, 1, 1]), "1D - Scalar -> a")
+    assert_grad(b, Tensor.scalar(-3), "1D - Scalar -> b")
+    do_assert(c, Tensor.d1([-9, -8, -7]), "1D - Scalar")
+
+    # 4. 1D - 1D (same shape)
+    a = Tensor.d1([5, 6, 7], requires_grad=True)
+    b = Tensor.d1([1, 2, 3], requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([1, 1, 1]), "1D - 1D -> a")
+    assert_grad(b, Tensor.d1([-1, -1, -1]), "1D - 1D -> b")
+    do_assert(c, Tensor.d1([4, 4, 4]), "1D - 1D (same shape)")
+
+    # 5. 2D - Scalar
+    a = Tensor.d2([[10, 20], [30, 40]], requires_grad=True)
+    b = Tensor.scalar(5, requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d2([[1, 1], [1, 1]]), "2D - Scalar -> a")
+    assert_grad(b, Tensor.scalar(-4), "2D - Scalar -> b")
+    do_assert(c, Tensor.d2([[5, 15], [25, 35]]), "2D - Scalar")
+
+    # 6. Scalar - 2D
+    a = Tensor.scalar(100, requires_grad=True)
+    b = Tensor.d2([[10, 20], [30, 40]], requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.scalar(4), "Scalar - 2D -> a")
+    assert_grad(b, Tensor.d2([[-1, -1], [-1, -1]]), "Scalar - 2D -> b")
+    do_assert(c, Tensor.d2([[90, 80], [70, 60]]), "Scalar - 2D")
+
+    # 7. 2D - 1D (broadcast over rows)
+    a = Tensor.d2([[10, 20, 30], [40, 50, 60]], requires_grad=True)
+    b = Tensor.d1([1, 2, 3], requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d2([[1, 1, 1], [1, 1, 1]]), "2D - 1D -> a")
+    assert_grad(b, Tensor.d1([-2, -2, -2]), "2D - 1D -> b")
+    do_assert(c, Tensor.d2([[9, 18, 27], [39, 48, 57]]), "2D - 1D")
+
+    # 8. 1D - 2D (reverse broadcast over rows)
+    a = Tensor.d1([100, 200, 300], requires_grad=True)
+    b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([2, 2, 2]), "1D - 2D -> a")
+    assert_grad(b, Tensor.d2([[-1, -1, -1], [-1, -1, -1]]), "1D - 2D -> b")
+    do_assert(c, Tensor.d2([[99, 198, 297], [96, 195, 294]]), "1D - 2D")
+
+    # 9. 3D - 1D (broadcast over last dim)
+    a = Tensor.d3(
+        [
+            [[10, 20], [30, 40]],
+            [[50, 60], [70, 80]],
+        ],
+        requires_grad=True,
+    )
+    b = Tensor.d1([1, 2], requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(
+        a,
+        Tensor.d3(
+            [
+                [[1, 1], [1, 1]],
+                [[1, 1], [1, 1]],
+            ]
+        ),
+        "3D - 1D -> a",
+    )
+    assert_grad(b, Tensor.d1([-4, -4]), "3D - 1D -> b")
+    do_assert(
+        c,
+        Tensor.d3(
+            [
+                [[9, 18], [29, 38]],
+                [[49, 58], [69, 78]],
+            ]
+        ),
+        "3D - 1D",
+    )
+
+    # 10. 3D - 2D (broadcast over batch dim)
+    a = Tensor.d3(
+        [
+            [[10, 20], [30, 40]],
+            [[50, 60], [70, 80]],
+        ],
+        requires_grad=True,
+    )
+    b = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(
+        a,
+        Tensor.d3(
+            [
+                [[1, 1], [1, 1]],
+                [[1, 1], [1, 1]],
+            ]
+        ),
+        "3D - 2D -> a",
+    )
+    assert_grad(b, Tensor.d2([[-2.0, -2.0], [-2.0, -2.0]]), "3D - 2D -> b")
+    c.print()
+    do_assert(
+        c,
+        Tensor.d3(
+            [
+                [[9, 18], [27, 36]],
+                [[49, 58], [67, 76]],
+            ]
+        ),
+        "3D - 2D",
+    )
+
+    # 11. 3D - Scalar
+    a = Tensor.d3(
+        [
+            [[10, 20], [30, 40]],
+            [[50, 60], [70, 80]],
+        ],
+        requires_grad=True,
+    )
+    b = Tensor.scalar(5, requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(
+        a,
+        Tensor.d3(
+            [
+                [[1, 1], [1, 1]],
+                [[1, 1], [1, 1]],
+            ]
+        ),
+        "3D - Scalar -> a",
+    )
+    assert_grad(b, Tensor.scalar(-8), "3D - Scalar -> b")
+    do_assert(
+        c,
+        Tensor.d3(
+            [
+                [[5, 15], [25, 35]],
+                [[45, 55], [65, 75]],
+            ]
+        ),
+        "3D - Scalar",
+    )
+
+    # 12. Degenerate shape: (1,) - (N,)
+    a = Tensor.d1([100], requires_grad=True)
+    b = Tensor.d1([1, 2, 3], requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([3]), "(1,) - (3,) -> a")
+    assert_grad(b, Tensor.d1([-1, -1, -1]), "(1,) - (3,) -> b")
+    do_assert(c, Tensor.d1([99, 98, 97]), "(1,) - (3,)")
+
+    # 13. Degenerate broadcast: (1, 1) - (2, 3)
+    a = Tensor.d2([[100]], requires_grad=True)
+    b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    c = a - b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d2([[6]]), "(1,1) - (2,3) -> a")
+    assert_grad(
+        b, Tensor.d2([[-1, -1, -1], [-1, -1, -1]]), "(1,1) - (2,3) -> b"
+    )
+    do_assert(c, Tensor.d2([[99, 98, 97], [96, 95, 94]]), "(1,1) - (2,3)")
+
+
+fn test_broadcast_add() raises:
+    # 1. Scalar + Scalar
+    a = Tensor.scalar(5, requires_grad=True)
+    b = Tensor.scalar(3, requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.scalar(1), "Scalar + Scalar -> a")
+    assert_grad(b, Tensor.scalar(1), "Scalar + Scalar -> b")
+    do_assert(c, Tensor.scalar(8), "Scalar + Scalar")
+
+    # 2. Scalar + 1D
+    a = Tensor.scalar(2, requires_grad=True)
+    b = Tensor.d1([1, 2, 3], requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.scalar(3), "Scalar + 1D -> a")
+    assert_grad(b, Tensor.d1([1, 1, 1]), "Scalar + 1D -> b")
+    do_assert(c, Tensor.d1([3, 4, 5]), "Scalar + 1D")
+
+    # 3. 1D + Scalar (reverse)
+    a = Tensor.d1([1, 2, 3], requires_grad=True)
+    b = Tensor.scalar(2, requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([1, 1, 1]), "1D + Scalar -> a")
+    assert_grad(b, Tensor.scalar(3), "1D + Scalar -> b")
+    do_assert(c, Tensor.d1([3, 4, 5]), "1D + Scalar")
+
+    # 4. 1D + 1D (same shape)
+    a = Tensor.d1([1, 2, 3], requires_grad=True)
+    b = Tensor.d1([4, 5, 6], requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([1, 1, 1]), "1D + 1D -> a")
+    assert_grad(b, Tensor.d1([1, 1, 1]), "1D + 1D -> b")
+    do_assert(c, Tensor.d1([5, 7, 9]), "1D + 1D (same shape)")
+
+    # 5. 2D + Scalar
+    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    b = Tensor.scalar(10, requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d2([[1, 1], [1, 1]]), "2D + Scalar -> a")
+    assert_grad(b, Tensor.scalar(4), "2D + Scalar -> b")
+    do_assert(c, Tensor.d2([[11, 12], [13, 14]]), "2D + Scalar")
+
+    # 6. Scalar + 2D (reverse)
+    a = Tensor.scalar(10, requires_grad=True)
+    b = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.scalar(4), "Scalar + 2D -> a")
+    assert_grad(b, Tensor.d2([[1, 1], [1, 1]]), "Scalar + 2D -> b")
+    do_assert(c, Tensor.d2([[11, 12], [13, 14]]), "Scalar + 2D")
+
+    # 7. 2D + 1D (broadcast over rows)
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    b = Tensor.d1([10, 20, 30], requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d2([[1, 1, 1], [1, 1, 1]]), "2D + 1D -> a")
+    assert_grad(b, Tensor.d1([2, 2, 2]), "2D + 1D -> b")
+    do_assert(c, Tensor.d2([[11, 22, 33], [14, 25, 36]]), "2D + 1D row-wise")
+
+    # 8. 1D + 2D (reverse broadcast over rows)
+    a = Tensor.d1([10, 20, 30], requires_grad=True)
+    b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([2, 2, 2]), "1D + 2D -> a")
+    assert_grad(b, Tensor.d2([[1, 1, 1], [1, 1, 1]]), "1D + 2D -> b")
+    do_assert(c, Tensor.d2([[11, 22, 33], [14, 25, 36]]), "1D + 2D row-wise")
+
+    # 9. 3D + 1D (broadcast over last dim)
+    a = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
+    b = Tensor.d1([10, 20], requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(
+        a, Tensor.d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]]), "3D + 1D -> a"
+    )
+    assert_grad(b, Tensor.d1([4, 4]), "3D + 1D -> b")
+    do_assert(
+        c,
+        Tensor.d3([[[11, 22], [13, 24]], [[15, 26], [17, 28]]]),
+        "3D + 1D last-dim broadcast",
+    )
+
+    # 10. 3D + 2D (broadcast over batch dim)
+    a = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
+    b = Tensor.d2([[10, 20], [30, 40]], requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(
+        a, Tensor.d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]]), "3D + 2D -> a"
+    )
+    assert_grad(b, Tensor.d2([[2, 2], [2, 2]]), "3D + 2D -> b")
+    do_assert(
+        c,
+        Tensor.d3([[[11, 22], [33, 44]], [[15, 26], [37, 48]]]),
+        "3D + 2D batch-dim broadcast",
+    )
+
+    # 11. 3D + Scalar
+    a = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
+    b = Tensor.scalar(100, requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(
+        a, Tensor.d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]]), "3D + Scalar -> a"
+    )
+    assert_grad(b, Tensor.scalar(8), "3D + Scalar -> b")
+    do_assert(
+        c,
+        Tensor.d3([[[101, 102], [103, 104]], [[105, 106], [107, 108]]]),
+        "3D + Scalar",
+    )
+
+    # 12. Broadcast shape mismatch (should fail)
+    _ = """try:
+        a = Tensor.d2([[1, 2], [3, 4]])
+        b = Tensor.d1([1, 2, 3])
+        _c = a + b
+        assert_true(False, "Shape mismatch not caught")
+    except BroadcastError:
+        pass  # expected"""
+
+    # 13. Degenerate shape: (1,) + (N,)
+    a = Tensor.d1([1], requires_grad=True)
+    b = Tensor.d1([10, 20, 30], requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d1([3]), "(1,) + (3,) -> a")
+    assert_grad(b, Tensor.d1([1, 1, 1]), "(1,) + (3,) -> b")
+    do_assert(c, Tensor.d1([11, 21, 31]), "(1,) + (3,)")
+
+    # 14. Degenerate broadcast: (1, 1) + (2, 3)
+    a = Tensor.d2([[5]], requires_grad=True)
+    b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    c = a + b
+    Tensor.walk_backward(c)
+    assert_grad(a, Tensor.d2([[6]]), "(1,1) + (2,3) -> a")
+    assert_grad(b, Tensor.d2([[1, 1, 1], [1, 1, 1]]), "(1,1) + (2,3) -> b")
+    do_assert(c, Tensor.d2([[6, 7, 8], [9, 10, 11]]), "(1,1) + (2,3)")
+
+
+fn test_power() raises:
+    tensor = Tensor.arange(24).reshape(2, 3, 4)
+    tensor.print()
+    result = tensor**2
+    result.print()
+
+
 fn test_grad_copy_on_reshape() raises:
     a = Tensor.of(1.0, 2.0, 3.0, requires_grad=True)
     b = a + 1.0
     b.sum().backward()
-
+    assert_true((a.grad[] == Tensor.of(1.0, 1, 1)).all_true())
     # At this point, a.grad should be [1.0, 1.0, 1.0]
     reshaped = a.reshape(Shape.of(3))
-    reshaped.grad[].print()  # Should be [1.0, 1.0, 1.0]
+    # reshaped.grad[].print()  # Should be [1.0, 1.0, 1.0]
+    assert_true((reshaped.grad[] == Tensor.of(1.0, 1, 1)).all_true())
 
     # Further ops from reshaped still accumulate to a
     (reshaped * 2).sum().backward()
     a.grad[].print()  # Should now be [3.0, 3.0, 3.0]
+    assert_true((a.grad[] == Tensor.of(3.0, 3, 3)).all_true())
+
 
 fn test_reshape_preserves_grad_accumulation() raises:
     # Chained reshape should still accumulate gradients
@@ -21,6 +574,8 @@ fn test_reshape_preserves_grad_accumulation() raises:
     d.backward()
 
     a.grad[].print()  # Should be [1.0, 1.0, 1.0]
+    assert_true((a.grad[] == Tensor.of(1.0, 1, 1)).all_true())
+
 
 fn test_multi_dimensional_reshape() raises:
     # (2, 3) → (3, 2)
@@ -32,6 +587,7 @@ fn test_multi_dimensional_reshape() raises:
     d.backward()
 
     a.grad[].print()  # Should be [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]
+
 
 fn test_reshape_tensor_to_scalar() raises:
     # (1,) → reshape to scalar
@@ -56,6 +612,7 @@ fn test_reshape_scalar_to_tensor() raises:
     c = b * 3
     c.backward()
     a.grad[].print()  # Should be [3.0]
+
 
 fn test_miscellaneous() raises:
     a = Tensor.of(1.0, 2.0, 3.0, requires_grad=True)
@@ -217,12 +774,10 @@ fn test_broadcast_add_2_tensors() raises:
     tensor2 = Tensor.of(6, requires_grad=True)
 
     result = tensor1 + tensor2
-
     assert_true(
         (result == Tensor.of(7, 8, 9, 10)).all_true(),
         "broadcast add assertion 1 failed",
     )
-    # result.backward()
     Tensor.walk_backward(result)
 
     assert_true(
@@ -366,27 +921,39 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 def main():
+    test_broadcast_mul()
+    # test_broadcast_sub()
+    # test_broadcast_add()
+    test_reshape()
+    # test_grad_copy_on_reshape()
+    # test_reshape_preserves_grad_accumulation()
+    _ = """
+    test_power()
+
+    test_add_2_tensors()
+    test_broadcast_add_2_tensors()
+
+    test_tensor_of_list()
+    test_grad_copy_on_reshape()
     test_mul_by_factor()
-    test_random()
-    test_transpose_matmul()
-    test_factor_mul_by()
+    test_mean()
+    test_sum()
+    test_arange()
+    test_reshape()
+
+
+    test_scalar_tensor()
     test_add_value()
-    _="""test_grad_copy_on_reshape()
+    test_sum()
+    test_item()
     test_reshape_preserves_grad_accumulation()
     test_multi_dimensional_reshape()
     test_reshape_tensor_to_scalar()
     test_reshape_scalar_to_tensor()
     test_miscellaneous()
-    test_mean()
-    test_sum()
-    test_arange()
-    test_broadcast_add_2_tensors()
-    test_sum()
-    test_reshape()
-    test_scalar_tensor()
-    test_tensor_of_list()
-    test_add_2_tensors()
-    test_item()
+    test_random()
+    test_transpose_matmul()
+    test_factor_mul_by()
     test_view()"""
 
 
@@ -416,6 +983,8 @@ from operators import (
     MulScalar,
     sum_across_rows,
     sum_across_cols,
+    Power,
+    # forward_op_sum, grad_rule_identical,
 )
 from collections import Set
 
@@ -431,17 +1000,36 @@ struct Tensor[dtype: DType = DType.float32](
     var grad: Self.GradBox
     var ancestors: Ancestors[dtype]
     var grad_fn: Optional[fn () escaping raises -> None]
+    var parent_grad_contrib: UnsafePointer[
+        Tensor[dtype]
+    ]  # Only allocated for reshaped Tensors
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
         self = Self(shape, requires_grad)
+
+    fn __init__(
+        out self,
+        shape: Shape,
+        data: UnsafePointer[Scalar[dtype]],
+        requires_grad: Bool = False,
+    ):
+        Shape.validate(shape)
+        self.shape = shape
+        self.requires_grad = requires_grad
+        self.ancestors = Ancestors[dtype].untracked()
+        self.grad_fn = None
+        self.grad = UnsafePointer[__type_of(self)]()
+        self.parent_grad_contrib = UnsafePointer[Tensor[dtype]]()
+        self.data = data
+        self.init_gradbox()
 
     fn __init__(out self, shape: Shape, requires_grad: Bool = False):
         Shape.validate(shape)
         self.shape = shape
         self.requires_grad = requires_grad
         self.ancestors = Ancestors[dtype].untracked()
-
+        self.parent_grad_contrib = UnsafePointer[Tensor[dtype]]()
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
         if shape.ndim == 0:  # Tensor with Shape ()
@@ -572,6 +1160,7 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
         self.grad = other.grad
+        self.parent_grad_contrib = other.parent_grad_contrib
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
 
@@ -581,6 +1170,7 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
         self.grad = other.grad
+        self.parent_grad_contrib = other.parent_grad_contrib
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
         self.init_gradbox()
@@ -779,7 +1369,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         vectorize[add_elems, simdwidthof[dtype]()](self.numels())
 
-    fn exp(self) raises -> Tensor[dtype]:
+    fn exp(self) -> Tensor[dtype]:
         requires_grad = self.requires_grad
         result = Tensor[dtype](self.shape, requires_grad)
 
@@ -790,6 +1380,19 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         vectorize[exp_elems, simdwidthof[dtype]()](result.numels())
+        return result
+
+    fn __neg__(self) -> Tensor[dtype]:
+        requires_grad = self.requires_grad
+        result = Tensor[dtype](self.shape, requires_grad)
+
+        @parameter
+        fn negate_elems[simd_width: Int](idx: Int):
+            result.data.store[width=simd_width](
+                idx, self.data.load[width=simd_width](idx).__neg__()
+            )
+
+        vectorize[negate_elems, simdwidthof[dtype]()](result.numels())
         return result
 
     fn __ne__(self, other: Self) raises -> Tensor[DType.bool]:
@@ -829,10 +1432,11 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __mul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, MulScalar](
-            self.address()[], scalar
+            self,
+            scalar,
         )
 
-        if self.address()[].requires_grad:
+        if self.requires_grad:
 
             fn grad_fn() raises -> None:
                 out_grad_scaled = __tensor_op_scalar__[dtype, MulScalar](
@@ -847,49 +1451,32 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    # Element wise multiplication of two tensors
-    fn __mul__(self, other: Self) raises -> Tensor[dtype]:
-        if self.address()[].shape != other.address()[].shape:
-            raise Error(
-                "__mul__self * other -> Dimension mismatch:",
-                self.address()[].shape,
-                other.address()[].shape,
-            )
-        var out = __tensor_op_tensor__[dtype, MulTensor](
-            self.address()[], other.address()[]
+    fn __pow__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        var out = __tensor_op_scalar__[dtype, Power](
+            self,
+            scalar,
         )
 
-        if self.address()[].requires_grad or other.address()[].requires_grad:
+        if self.requires_grad:
 
             fn grad_fn() raises -> None:
-                out_grad = out.address()[].grad[]
+                self_powed_one_less = __tensor_op_scalar__[dtype, Power](
+                    self.address()[], scalar - 1
+                )
+                self_powed_one_less_scaled = __tensor_op_scalar__[
+                    dtype, MulScalar
+                ](self_powed_one_less, scalar)
 
-                if self.address()[].requires_grad:
-                    requires_grad_original = other.address()[].requires_grad
-                    other.address()[].requires_grad = (
-                        False  # Prevent requires_grad for grads
-                    )
-                    product = __tensor_op_tensor__[dtype, MulTensor](
-                        out_grad, other.address()[]
-                    )
-                    other.address()[].requires_grad = requires_grad_original
-                    self.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](self.address()[].grad[], product)
+                product = __tensor_op_tensor__[dtype, MulTensor](
+                    out.address()[].grad[], self_powed_one_less_scaled
+                )
 
-                if other.address()[].requires_grad:
-                    requires_grad_original = self.address()[].requires_grad
-                    self.address()[].requires_grad = False
-                    product = __tensor_op_tensor__[dtype, MulTensor](
-                        out_grad, self.address()[]
-                    )
-                    self.address()[].requires_grad = requires_grad_original
-                    other.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](other.address()[].grad[], product)
+                self.address()[].grad[] = __tensor_op_tensor__[
+                    dtype, AddTensor
+                ](self.address()[].grad[], product)
 
-            out.add_ancestry(self, other)
             out.grad_fn = Optional(grad_fn)
+            out.add_ancestry(self)
 
         return out
 
@@ -910,6 +1497,17 @@ struct Tensor[dtype: DType = DType.float32](
             out[idx] = self[src_idx]
 
         return out
+
+    @staticmethod
+    fn grad_unreduced(
+        tensor: Tensor[dtype], upstream_grad: Tensor[dtype]
+    ) -> Tensor[dtype]:
+        upstream_grad_shape = upstream_grad.shape
+        tensor_view = tensor.view(upstream_grad_shape)
+        result = Tensor[dtype](upstream_grad_shape)
+        for indices in upstream_grad_shape:
+            result[indices] = upstream_grad[indices] * tensor_view[indices]
+        return result
 
     @always_inline
     fn broadcast_shape(self, other: Self) -> Shape:
@@ -939,64 +1537,148 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad or other.requires_grad:
 
             fn grad_fn() raises -> None:
-                out_grad = result.address()[].grad[]
+                this = self.address()[]
+                that = other.address()[]
+                output = result.address()[]
 
-                if self.address()[].requires_grad:
-                    grad_self = out_grad.sum(
-                        axes=self.address()[]
-                        .broadcast_mask(result.address()[].shape)
-                        .indices_of(1),
-                        keepdims=True,
-                    ).reshape(self.address()[].shape)
-                    self.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](self.address()[].grad[], grad_self)
+                upstream_grad = output.grad[]
 
-                if other.address()[].requires_grad:
-                    grad_other = out_grad.sum(
-                        axes=other.address()[]
-                        .broadcast_mask(result.address()[].shape)
-                        .indices_of(1),
+                if this.requires_grad:
+                    grad_contrib = upstream_grad.sum(
+                        axes=this.broadcast_mask(output.shape).indices_of(1),
                         keepdims=True,
-                    ).reshape(other.address()[].shape)
-                    other.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](other.address()[].grad[], grad_other)
+                    ).reshape(this.shape)
+                    this.grad[] = __tensor_op_tensor__[dtype, AddTensor](
+                        this.grad[], grad_contrib
+                    )
+
+                if that.requires_grad:
+                    grad_contrib = upstream_grad.sum(
+                        axes=that.broadcast_mask(output.shape).indices_of(1),
+                        keepdims=True,
+                    ).reshape(that.shape)
+                    that.grad[] = __tensor_op_tensor__[dtype, AddTensor](
+                        that.grad[], grad_contrib
+                    )
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
         return result
 
+    fn broadcast_subtract(self, other: Self) -> Tensor[dtype]:
+        result_shape = self.broadcast_shape(other)
+        mask1 = self.broadcast_mask(result_shape)
+        mask2 = other.broadcast_mask(result_shape)
+        requires_grad = self.requires_grad or other.requires_grad
+        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
+        for indices in result_shape:
+            self_indices = self.translate_index(indices, mask1, result_shape)
+            other_indices = other.translate_index(indices, mask2, result_shape)
+            result[indices] = self[self_indices] - other[other_indices]
+
+        if self.requires_grad or other.requires_grad:
+
+            fn grad_fn() raises -> None:
+                this = self.address()[]
+                that = other.address()[]
+                output = result.address()[]
+
+                upstream_grad = output.grad[]
+
+                if this.requires_grad:
+                    grad_contrib = upstream_grad.sum(
+                        axes=this.broadcast_mask(output.shape).indices_of(1),
+                        keepdims=True,
+                    ).reshape(this.shape)
+                    this.grad[] = __tensor_op_tensor__[dtype, AddTensor](
+                        this.grad[], grad_contrib
+                    )
+
+                if that.requires_grad:
+                    grad_contrib = upstream_grad.sum(
+                        axes=that.broadcast_mask(output.shape).indices_of(1),
+                        keepdims=True,
+                    ).reshape(that.shape)
+                    that.grad[] = __tensor_op_tensor__[dtype, SubtractTensor](
+                        that.grad[], grad_contrib
+                    )
+
+            result.grad_fn = Optional(grad_fn)
+            result.add_ancestry(self, other)
+        return result
+
+    fn broadcast_mul(
+        self: Self,
+        other: Self,
+    ) -> Tensor[dtype]:
+        result_shape = self.broadcast_shape(other)
+        mask1 = self.broadcast_mask(result_shape)
+        mask2 = other.broadcast_mask(result_shape)
+        requires_grad = self.requires_grad or other.requires_grad
+
+        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
+
+        for idx in result_shape:
+            this_idx = self.translate_index(idx, mask1, result_shape)
+            that_idx = other.translate_index(idx, mask2, result_shape)
+            result[idx] = self[this_idx] * other[that_idx]
+
+        if requires_grad:
+
+            fn grad_fn() raises -> None:
+                this = self.address()[]
+                that = other.address()[]
+                output = result.address()[]
+                output_shape = output.shape
+
+                upstream_grad = output.grad[]
+
+                if this.requires_grad:
+                    unreduced_grad = Self.grad_unreduced(that, upstream_grad)
+
+                    reduced_and_reshaped = unreduced_grad.sum(
+                        axes=this.broadcast_mask(output_shape).indices_of(1),
+                        keepdims=True,
+                    ).reshape(this.shape)
+
+                    this.grad[] = __tensor_op_tensor__[dtype, AddTensor](
+                        this.grad[], reduced_and_reshaped
+                    )
+
+                if that.requires_grad:
+                    unreduced_grad = Self.grad_unreduced(this, upstream_grad)
+
+                    reduced_and_reshaped = unreduced_grad.sum(
+                        axes=that.broadcast_mask(output_shape).indices_of(1),
+                        keepdims=True,
+                    ).reshape(that.shape)
+
+                    that.grad[] = __tensor_op_tensor__[dtype, AddTensor](
+                        that.grad[], reduced_and_reshaped
+                    )
+
+            result.grad_fn = Optional(grad_fn)
+            result.add_ancestry(self, other)
+
+        return result
+
     fn __add__(self, other: Self) -> Tensor[dtype]:
         if self.address() == other.address():
             return self.__mul__(2)
-        #if not self.address()[].broadcastable(other.address()[]):
         if not self.broadcastable(other):
             abort(
                 "__add__ -> Dimension mismatch: "
-                #+ self.address()[].shape.__str__()
                 + self.shape.__str__()
                 + " <=> "
-                #+ other.address()[].shape.__str__()
                 + other.shape.__str__()
             )
 
-        _="""if self.address()[].shape != other.address()[].shape:
-            return self.address()[].broadcast_add(other.address()[])
-
-        var out = __tensor_op_tensor__[dtype, AddTensor](
-            self.address()[], other.address()[]
-        )
-
-        if self.address()[].requires_grad or other.address()[].requires_grad:"""
-
-
         if self.shape != other.shape:
-            return self.broadcast_add(other)
+            return self.broadcast_add(
+                other,
+            )
 
-        var out = __tensor_op_tensor__[dtype, AddTensor](
-            self, other
-        )
+        var out = __tensor_op_tensor__[dtype, AddTensor](self, other)
 
         if self.requires_grad or other.requires_grad:
 
@@ -1021,11 +1703,10 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __add__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, AddScalar](
-            #self.address()[], scalar
-            self, scalar
+            self,
+            scalar,
         )
 
-        #if self.address()[].requires_grad:
         if self.requires_grad:
 
             fn grad_fn() raises -> None:
@@ -1083,21 +1764,75 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(self)
         return out
 
+    # Element wise multiplication of two tensors
+    fn __mul__(self, other: Self) raises -> Tensor[dtype]:
+        if not self.broadcastable(other):
+            abort(
+                "__mul__(self * other) -> Dimension mismatch: "
+                + self.shape.__str__()
+                + " <=> "
+                + other.shape.__str__()
+            )
+
+        if self.shape != other.shape:
+            return self.broadcast_mul(other)
+
+        var out = __tensor_op_tensor__[dtype, MulTensor](
+            self,
+            other,
+        )
+
+        if self.requires_grad or other.requires_grad:
+
+            fn grad_fn() raises -> None:
+                out_grad = out.address()[].grad[]
+
+                if self.address()[].requires_grad:
+                    requires_grad_original = other.address()[].requires_grad
+                    other.address()[].requires_grad = (
+                        False  # Prevent requires_grad for grads
+                    )
+                    product = __tensor_op_tensor__[dtype, MulTensor](
+                        out_grad, other.address()[]
+                    )
+                    other.address()[].requires_grad = requires_grad_original
+                    self.address()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](self.address()[].grad[], product)
+
+                if other.address()[].requires_grad:
+                    requires_grad_original = self.address()[].requires_grad
+                    self.address()[].requires_grad = False
+                    product = __tensor_op_tensor__[dtype, MulTensor](
+                        out_grad, self.address()[]
+                    )
+                    self.address()[].requires_grad = requires_grad_original
+                    other.address()[].grad[] = __tensor_op_tensor__[
+                        dtype, AddTensor
+                    ](other.address()[].grad[], product)
+
+            out.add_ancestry(self, other)
+            out.grad_fn = Optional(grad_fn)
+
+        return out
+
     fn __sub__(self, other: Self) -> Tensor[dtype]:
         requires_grad = (
             self.address()[].requires_grad or other.address()[].requires_grad
         )
         if self.address() == other.address():
             out = Tensor[dtype].zeros_like(self.address()[], requires_grad)
-            out.add_ancestry(self)
             return out
-        if self.address()[].shape != other.address()[].shape:
+        if not self.broadcastable(other):
             abort(
-                "Tensor ->__sub__(other) - Dimension mismatch:"
-                + self.address()[].shape.__str__()
-                + ", "
-                + other.address()[].shape.__str__()
+                "__sub__ -> Dimension mismatch: "
+                + self.shape.__str__()
+                + " <=> "
+                + other.shape.__str__()
             )
+
+        if self.shape != other.shape:
+            return self.broadcast_subtract(other)
 
         out = __tensor_op_tensor__[dtype, SubtractTensor](
             self.address()[], other.address()[]
@@ -1263,23 +1998,30 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         requires_grad = self.requires_grad
-        var result = Tensor[dtype](new_shape, requires_grad=requires_grad)
-
-        # Point to same data buffer
-        result.data = self.data
+        result = Tensor[dtype](
+            new_shape, self.data, requires_grad=requires_grad
+        )
 
         if requires_grad:
-            # If original has grad populated, copy reshaped version
-            result.grad[] = self.grad[].reshape(new_shape)
+            # Only allocate parent_grad_contrib if needed
+            parent_grad_contrib = Tensor[dtype].zeros(self.shape)
+            result.parent_grad_contrib = UnsafePointer[Tensor[dtype]].alloc(1)
+            result.parent_grad_contrib.init_pointee_move(parent_grad_contrib^)
 
-            # Setup gradient function
             fn grad_fn() raises -> None:
-                grad_out = result.address()[].grad[]
-                reshaped_grad = grad_out.reshape(self.address()[].shape)
-
+                upstream_grad = (
+                    result.address()[].grad[].reshape(self.address()[].shape)
+                )
+                # Calculate new contribution (exclude already accumulated)
+                new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
+                    upstream_grad, result.address()[].parent_grad_contrib[]
+                )
+                # Update parent gradient
                 self.address()[].grad[] = __tensor_op_tensor__[
                     dtype, AddTensor
-                ](self.address()[].grad[], reshaped_grad)
+                ](self.address()[].grad[], new_contrib)
+                # Update accumulator
+                result.address()[].parent_grad_contrib[] = upstream_grad
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self)
@@ -1411,9 +2153,6 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 else:
                     full_idx = out_idx.insert(sorted_axes, red_idx)
-                    _ = """full_idx = Self.merge_indices(
-                        red_idx, out_idx, sorted_axes, self.shape.rank()
-                    )"""
                 summ += self[full_idx]
 
             out[out_idx] = summ
@@ -1444,25 +2183,6 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(self)
 
         return out
-
-    @staticmethod
-    fn merge_indices(
-        red_idx: IntList,  # values for the reduced axes
-        out_idx: IntList,  # values for the retained axes
-        sorted_axes: IntList,  # reduced axes
-        total_rank: Int,  # original tensor rank
-    ) -> IntList:
-        var full_idx = IntList.with_capacity(total_rank)
-        var red_cursor = 0
-        var out_cursor = 0
-        for i in range(total_rank):
-            if i in sorted_axes:
-                full_idx.append(red_idx[red_cursor])
-                red_cursor += 1
-            else:
-                full_idx.append(out_idx[out_cursor])
-                out_cursor += 1
-        return full_idx
 
     @staticmethod
     fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
@@ -1978,9 +2698,14 @@ struct Tensor[dtype: DType = DType.float32](
     fn free_all[dtype: DType, //](*tensors: Tensor[dtype]):
         for each in tensors:
             each.free()
+            _ = each
 
-    fn view(ref self) -> View[__origin_of(self), self.dtype]:
-        return View(Pointer(to=self))
+    fn view(
+        ref self, target_shape: Shape
+    ) -> View[__origin_of(self), self.dtype]:
+        concrete = True if target_shape == self.shape else False
+        mask = self.shape.broadcast_mask(target_shape)
+        return View(Pointer(to=self), concrete, mask, target_shape)
 
 
 @fieldwise_init
@@ -1990,6 +2715,18 @@ struct View[
     dtype: DType = DType.float32,
 ]:
     var target: Pointer[Tensor[dtype], origin]
+    var concrete: Bool
+    var mask: IntList
+    var target_shape: Shape
+
+    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
+        if self.concrete:
+            return self.target[][indices]
+        else:
+            target_idx = self.target[].shape.translate_index(
+                indices, self.mask, self.target_shape
+            )
+            return self.target[][target_idx]
 
 
 from testing import assert_true
@@ -1998,40 +2735,28 @@ from testing import assert_true
 fn test_add_2_tensors() raises:
     print("test_add_2_tensors")
 
-    tensor1 = Tensor.rand(1024, 1024, requires_grad=True)
-    tensor2 = Tensor.rand(1024, 1024, requires_grad=True)
+    tensor_a = Tensor.rand(256, 256, requires_grad=True)
+    tensor_b = Tensor.rand(256, 256, requires_grad=True)
     assert_true(
-        tensor1.shape == tensor2.shape,
+        tensor_a.shape == tensor_b.shape,
         "Input tensors shape match assertion failed",
     )
-    out_tensor = tensor1 + tensor2
+    out_tensor = tensor_a + tensor_b
     assert_true(
-        tensor1.shape == out_tensor.shape,
+        tensor_a.shape == out_tensor.shape,
         "Input/output tensors shape match assertion failed",
     )
-    print("Tensor1 grad shape: ", tensor1.open_gradbox().shape)
-    print("Tensor2 grad shape: ", tensor2.open_gradbox().shape)
-    print("Out tensor grad shape: ", out_tensor.open_gradbox().shape)
     parent1 = out_tensor.ancestors.get(0)[]
     parent2 = out_tensor.ancestors.get(1)[]
-    left_parent_is_tensor1 = (parent1 == tensor1).all_true()
-    right_parent_is_tensor2 = (parent2 == tensor2).all_true()
+    left_parent_is_tensor1 = (parent1 == tensor_a).all_true()
+    right_parent_is_tensor2 = (parent2 == tensor_b).all_true()
     assert_true(
         left_parent_is_tensor1 == True and right_parent_is_tensor2 == True,
         "Output tensor ancestry validation failed",
     )
-    print("The following is out tensor gradient")
-    out_tensor.open_gradbox().print()
-    print("Before invoking grad_fn")
-    print("Tensor1 grad shape: ", tensor1.open_gradbox().shape)
-    print("Tensor2 grad shape: ", tensor2.open_gradbox().shape)
-    print("Out tensor grad shape: ", out_tensor.open_gradbox().shape)
 
     out_tensor.invoke_grad_fn()
-    out_tensor.free()
-    tensor1.free()
-    tensor2.free()
-    Tensor.free_all(tensor1, tensor1, out_tensor)
+    Tensor.free_all(tensor_a, tensor_b, out_tensor)
 
 
 fn test_factor_mul_by() raises:
@@ -2142,7 +2867,7 @@ fn test_item() raises:
 
 fn test_view() raises:
     tensor = Tensor.rand(2, 4, 5)
-    view = tensor.view()
+    view = tensor.view(Shape.Void)
     assert_true(
         tensor.shape == view.target[].shape,
         "Tensor and view shape equality asserttion failed",
@@ -2196,10 +2921,21 @@ fn test_reshape() raises:
     tensor = Tensor.rand(3, 3)
     reshaped = tensor.reshape(9)
     assert_true(
-        tensor[2, 2] == reshaped[8], "reshape __getitem__ assertion failed"
+        tensor[2, 2] == reshaped[8], "reshape __getitem__ assertion 1 failed"
     )
+    assert_true(
+        tensor.reshape(1, 9)[0, 8] == tensor[2, 2],
+        "reshape __getitem__ assertion 2 failed",
+    )
+    assert_true(
+        tensor.reshape(9, 1)[0, 0] == tensor[0, 0],
+        "reshape __getitem__ assertion 3 failed",
+    )
+
     tensor = Tensor.of(42)
-    assert_true(tensor.shape == Shape.Unit, "Tensor shape assertion failure")
+    assert_true(
+        tensor.shape == Shape.Unit, "Unit tensor shape assertion failure"
+    )
     reshaped = tensor.reshape(1, 1)
     assert_true(
         reshaped.shape == Shape.of(1, 1) and reshaped[0, 0] == tensor[0],
@@ -2216,9 +2952,37 @@ fn test_reshape() raises:
         reshaped.shape == Shape.Unit and reshaped[0] == tensor.item(),
         "post reshape 2 - shape and get assertion failed for scalar tensor",
     )
+    assert_true(
+        reshaped.reshape(1, 1, 1, 1)[0, 0, 0, 0] == tensor.item(),
+        "post reshape 3 - item assertion failed for scalar tensor",
+    )
+
     tensor = Tensor.rand(1, 1)
     reshaped = tensor.reshape()
     assert_true(
         reshaped.shape == Shape.Void and reshaped.item() == tensor[0, 0],
         "post reshape random tensor - shape and get assertion failed",
     )
+    tensor = Tensor.scalar(42, requires_grad=True)
+    result = tensor * 3
+    # Tensor.walk_backward(result)
+    result.backward()
+    assert_true(tensor.grad[].item() == 3.0)
+    tensor2 = tensor.reshape(1)
+    tensor.print_grad()
+    result = tensor2 * 42
+    tensor.print_grad()
+    tensor2.print_grad()
+    # Tensor.walk_backward(result)
+    result.backward()
+    tensor.print_grad()
+    tensor2.print_grad()
+    # tensor3 = tensor2.reshape(1,1,1,1,1)
+    tensor3 = tensor2.reshape(1, 1, 1, 1, 1)
+    result = tensor3 * 12
+    # Tensor.walk_backward(result)
+    result.backward()
+
+    tensor3.print_grad()
+    tensor2.print_grad()
+    tensor.print_grad()
