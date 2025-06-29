@@ -9,6 +9,10 @@ from tensors import Tensor
 from testing import assert_true, assert_raises
 
 
+fn test_equivalence() raises:
+    assert_true(Shape(IntList(1, 4)) == Shape.of(1, 4), "Not equivalent")
+
+
 fn test_empty_shape() raises:
     shape = Shape(IntList.Empty)
     assert_true(shape[0] == -1, "Empty shape __getitem__ assertion failed")
@@ -222,6 +226,7 @@ fn test_zip_reversed() raises:
 
 
 fn main() raises:
+    test_equivalence()
     test_empty_shape()
     test_replace()
     test_broadcastable()
@@ -274,6 +279,9 @@ struct Shape(
     var axes_spans: IntList
     var ndim: Int
     var numels: Int
+
+    _ = """fn __init__(out self):
+        self = Self.Void"""
 
     fn __init__(out self, dims: VariadicList[Int]):
         _dims = IntList.with_capacity(len(dims))
@@ -512,13 +520,13 @@ struct Shape(
     fn validate(shape: Shape):
         for idx in range(shape.ndim):
             if shape.axes_spans[idx] < 1:
-                abort("Shape dimension not valid")
+                abort(
+                    "Shape -> validate - Shape dimension not valid: "
+                    + String(shape.axes_spans[idx])
+                )
 
     fn intlist(self) -> IntList:
         return self.axes_spans.copy()
-
-    fn product(self) -> Int:
-        return self.axes_spans.product()
 
     @staticmethod
     fn of(*dims: Int) -> Shape:

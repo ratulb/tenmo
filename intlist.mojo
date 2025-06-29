@@ -275,7 +275,31 @@ fn test_replace() raises:
     assert_true(il == IntList(1, 2, 3), "replace assertion failed")
 
 
+fn test_init() raises:
+    fn create_2(*elems: Int) raises:
+        il = IntList.with_capacity(len(elems))
+        for each in elems:
+            il.append(each)
+        assert_true(
+            len(il) == 3 and il == IntList(1, 2, 3),
+            "IntList init from runtime variadic elems assertion 1 failed",
+        )
+
+    create_2(1, 2, 3)
+
+    fn create_1(*elems: Int) raises:
+        length = len(elems)
+        il = IntList(length)
+        assert_true(
+            len(il) == 1 and il == IntList(3),
+            "IntList init from runtime variadic elems assertion 2 failed",
+        )
+
+    create_1(1, 2, 3)
+
+
 fn main() raises:
+    test_init()
     test_range_list()
     test_new()
     test_has_duplicates()
