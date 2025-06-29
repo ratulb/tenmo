@@ -5,11 +5,91 @@ from os import abort
 
 
 fn main() raises:
+    shape = Shape()
+    print(shape)
+    tensor1 = Tensor.of(1, 2, 3, 4, requires_grad=True)
+    tensor2 = Tensor.of(6, requires_grad=True)
+    result = tensor1 + tensor2
+    Tensor.walk_backward(result)
+    print("*****************************")
+    print("*****************************")
+    print("*****************************")
+    print("*****************************")
+    negated = -tensor1
+    negated.print()
+
+
+
+
+
+    scalar = Tensor.scalar(42, requires_grad=True)
+    result = scalar * 2
+
+    scalar.grad[].print()  # 0.0
+
+    Tensor.walk_backward(result)
+
+    scalar.grad[].print()  # 2.0
+
+    reshaped = scalar.reshape()
+
+    reshaped.grad[].print()  # 2.0
+
+    result2 = reshaped * 3
+
+    Tensor.walk_backward(result2)
+
+    scalar.grad[].print()  # 7.0
+
+    reshaped.grad[].print()  # 5.0
+
+    print()
+    print()
+    print()
+
+    scalar.print()
+    reshaped.print()
+    _ = """zero = Tensor.zeros(Shape.Void, requires_grad=True)
+    zero.print()
+
+    il = IntList()
+    _= il.insert(IntList(0,1,2), IntList(1,1,1))
+    print("done")
+    print("done")
+    print("done")
+
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    s = a.mean([])
+    s.print()
+    print("here")
+    s.backward()
+    a.grad[].print()
+    print("there")
+
+    scalar = Tensor.scalar(42, requires_grad=True)
+    #scalar = Tensor.scalar(42)
+    result = ((scalar * 3) + 2).mean()
+    scalar.print()
+    result.print()
+    Tensor.walk_backward(result)
+    scalar.grad[].print()
+
+    t = Tensor[DType.uint8].arange(1, 24, 3, requires_grad=True)
+    t.print()
+    out_idx = IntList()
+    sorted_axes = IntList(0)
+    red_idx = IntList(0)
+    for i in range(len(sorted_axes)):
+        out_idx = out_idx.insert(sorted_axes[i], red_idx[i])
+    print("*********")
+    out_idx.print()
+
+    print("*********")
     tensor = Tensor.of(1, 2, 3, 4, 5, 6, 7, 8)
     tensor.print()
     summed = sum(tensor, keepdim=True)
     # summed = sum(tensor, axes=[0], keepdim=False)
-    summed.print()
+    summed.print()"""
 
 
 fn sum[
