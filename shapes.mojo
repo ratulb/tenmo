@@ -325,6 +325,14 @@ struct Shape(
     fn broadcast_mask(self, target_shape: Shape) -> IntList:
         mask = IntList.with_capacity(target_shape.ndim)
         offset = target_shape.ndim - self.ndim
+        if offset < 0:
+            abort(
+                "Shape -> broadcast_mask -> target_shape.ndim is smaller than"
+                " self.ndim: "
+                + String(target_shape.ndim)
+                + ", "
+                + String(self.ndim)
+            )
 
         for i in range(target_shape.ndim):
             if i < offset:
@@ -471,7 +479,7 @@ struct Shape(
             stride *= dim
         return index
 
-    fn translate_index(
+    _ = """fn translate_index(
         self, indices: IntList, mask: IntList, broadcast_shape: Shape
     ) -> IntList:
         translated = IntList.with_capacity(self.ndim)
@@ -481,6 +489,41 @@ struct Shape(
             broadcast_axis = i + offset
             if mask[broadcast_axis] == 1:
                 translated.append(0)
+            else:
+                translated.append(indices[broadcast_axis])
+
+        return translated"""
+
+    fn translate_index(
+        self, indices: IntList, mask: IntList, broadcast_shape: Shape
+    ) -> IntList:
+        """Translate broadcasted indices to original tensor indices.
+
+        Args:
+            indices: Position in broadcasted tensor.
+            mask: 1 for broadcasted dims, 0 for original.
+            broadcast_shape: Shape after broadcasting.
+
+        Returns:
+            Indices in original tensor's space.
+        """
+        if not self.ndim <= broadcast_shape.ndim:
+            abort("Original dims > broadcast dims")
+        if not mask.size == broadcast_shape.ndim:
+            abort("Mask/broadcast shape mismatch")
+        if not indices.size == broadcast_shape.ndim:
+            abort("Indices/broadcast shape mismatch")
+
+        translated = IntList.with_capacity(self.ndim)
+        offset = broadcast_shape.ndim - self.ndim
+
+        for i in range(self.ndim):
+            broadcast_axis = i + offset
+            if not broadcast_axis < mask.size:
+                abort("Invalid axis")
+
+            if mask[broadcast_axis] == 1:
+                translated.append(0)  # Broadcasted dim
             else:
                 translated.append(indices[broadcast_axis])
 

@@ -5,6 +5,23 @@ from common_utils import log_debug
 from testing import assert_true, assert_false
 
 
+fn test_deduplicate() raises:
+    il = IntList(9, 2, 9, 1, 4, 3, 1, 5, 7, 2, 1, 4, 7)
+    il.sort_and_deduplicate()
+    assert_true(
+        il==IntList(
+            1,
+            2,
+            3,
+            4,
+            5,
+            7,
+            9,
+        ),
+        "deduplicate assertion failed",
+    )
+
+
 fn test_new() raises:
     l = List(1, 2, 3)
     il = IntList.new(l)
@@ -299,6 +316,7 @@ fn test_init() raises:
 
 
 fn main() raises:
+    test_deduplicate()
     test_init()
     test_range_list()
     test_new()
@@ -416,6 +434,17 @@ struct IntList(Sized & Copyable):
                 return True
 
         return False
+
+    fn sort_and_deduplicate(mut self):
+        if len(self) == 0:
+            return
+        self.sort()
+        write_index = 1
+        for read_index in range(1, len(self)):
+            if self[read_index] != self[write_index - 1]:
+                self[write_index] = self[read_index]
+                write_index += 1
+        self.size = write_index
 
     fn sorted(self, asc: Bool = True) -> IntList:
         copied = self.copy()
