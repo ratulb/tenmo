@@ -1,6 +1,26 @@
 from common_utils import do_assert, assert_grad
 
 
+fn test_transpose_gradients() raises:
+    # Case 1: Simple 2D transpose
+    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    b = a.T()  # (2, 2) → (2, 2)
+    Tensor.walk_backward(b.sum())
+    assert_true((a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
+
+    # Case 2: Transpose + reshape with non-square
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2, 3)
+    b = a.T().reshape(Shape.of(2, 3))  # (3, 2) → (2, 3)
+    Tensor.walk_backward(b.sum())
+    assert_true((a.grad[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())
+
+    # Case 3: Chain transposes (A.T().T())
+    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    b = a.T().T()  # Should equal A
+    Tensor.walk_backward(b.sum())
+    assert_true((a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
+
+
 fn test_reshape_grad_flow() raises:
     """Test suite for gradient flow through reshape operations."""
 
@@ -1117,6 +1137,7 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 fn main() raises:
+    test_transpose_gradients()
     test_reshape_grad_flow()
     _ = """test_reshape_gradient()
     test_broadcast_mul()
