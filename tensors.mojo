@@ -1139,12 +1139,12 @@ fn test_broadcast_add_2_tensors() raises:
 fn main() raises:
     test_transpose_gradients()
     test_reshape_grad_flow()
-    _ = """test_reshape_gradient()
+    test_reshape_gradient()
     test_broadcast_mul()
     test_broadcast_sub()
     test_broadcast_add()
     test_reshape()
-    test_grad_flow_through_reshape()"""
+    test_grad_flow_through_reshape()
     # test_reshape_preserves_grad_accumulation()
     _ = """
     test_power()
@@ -1290,29 +1290,8 @@ struct Tensor[dtype: DType = DType.float32](
         traced = Ancestors[dtype]()
         Self.trace_ancestry(tensor, visited, traced)
         tensor.grad[].fill(start_grad)
-        count: Int = 1
         for each in traced.__reversed__():
-            if count == 1:
-                print("\nBack propagation started\n")
-            print(
-                "\nThe current tensor #: ",
-                count,
-                "invoking it's grad function\n",
-            )
-            each[].print()
-            print("\nPrinting each tensor's ancestors\n")
-            for _ancestor in each[].ancestors:
-                print()
-                _ancestor[].print()
-                print()
-            print()
             each[].invoke_grad_fn(verbose)
-            print(
-                "\nTensor #:",
-                count,
-                " has completed it's grad function execution\n",
-            )
-            count += 1
 
     fn backward(
         self,
@@ -1320,6 +1299,9 @@ struct Tensor[dtype: DType = DType.float32](
         start: Bool = True,
         verbose: Bool = False,
     ) raises:
+        if not self.requires_grad:
+            print("Tensor -> backward: calling backward on a tensor that does not require grad has no effect")
+            return
         if start:
             self.grad[].fill(start_grad)
         self.invoke_grad_fn(verbose)
@@ -1417,6 +1399,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
         self.init_gradbox()
+
 
     fn copy(self) -> Self:
         result = Tensor[dtype](self.shape, requires_grad=self.requires_grad)
@@ -1666,6 +1649,13 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn has_grad(self) -> Bool:
         return self.grad.__as_bool__() == True
+
+    fn grad_is_zero(self) -> Bool:
+        if not self.requires_grad:
+            abort("Tensor -> grad_is_zero: checking grad on a tensor that does have grad")
+        fn all_zero(val: Scalar[dtype]) -> Bool:
+            return val == Scalar[dtype](0)
+        return self.has_grad() and self.grad[].for_all(all_zero)
 
     fn zero_grad(self):
         if self.grad_required() and self.has_grad():
@@ -1984,9 +1974,6 @@ struct Tensor[dtype: DType = DType.float32](
                 that = other.address()[]
                 output = result.address()[]
                 output_shape = output.shape
-                print("The great this in grad_fn mul")
-                this.print()
-                that.print()
                 upstream_grad = output.grad[]
 
                 if this.requires_grad:
@@ -2225,6 +2212,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self.data
 
+    fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
+        return ((self - target) ** 2).mean()
+
+
     fn matmal(self, other: Self) -> Tensor[dtype]:
         start = perf_counter_ns()
         if self.shape[1] != other.shape[0]:
@@ -2344,12 +2335,7 @@ struct Tensor[dtype: DType = DType.float32](
                 "Only tensor with single element can be reshaped to scalar"
                 " tensor"
             )
-        reshaped = self.reshape(Shape.Void)
-        print("\n\n\nWhat did you get? \n\n\n")
-        self.print()
-        reshaped.print()
-        print("\n\n\nThat was it\n\n\n")
-        return reshaped
+        return self.reshape(Shape.Void)
 
     fn reshape(self, *newdims: Int) -> Tensor[dtype]:
         if len(newdims) == 1 and newdims[0] == 0:
@@ -2358,12 +2344,6 @@ struct Tensor[dtype: DType = DType.float32](
         return self.reshape(Shape(newdims))
 
     fn reshape(self, new_shape: Shape) -> Tensor[dtype]:
-        print(
-            "\nwithin reshape - self shape and new_shape: ",
-            self.shape,
-            new_shape,
-            "\n",
-        )
         if self.numels() != new_shape.num_elements():
             # if self.shape.product() != new_shape.product():
             abort(

@@ -1,19 +1,16 @@
 from tensors import Tensor
-from shapes import Shape
 
 
 fn main() raises:
     # Training data (x: inputs, y: targets)
-    var x = Tensor.of(1.0, 2.0, 3.0, 4.0).to_dtype[DType.float32]()
-    var y = Tensor.of(5.0, 7.0, 9.0, 11.0).to_dtype[
-        DType.float32
-    ]()  # y = 2x + 3
+    var x = Tensor.of(1.0, 2.0, 3.0, 4.0)
+    var y = Tensor.of(5.0, 7.0, 9.0, 11.0)  # y = 2x + 3
 
     # Parameters to learn (initialized arbitrarily)
-    var w = Tensor.rand(1, requires_grad=True)
-    var b = Tensor.rand(1, requires_grad=True)
+    var w = Tensor.scalar(0.955, requires_grad=True)
+    var b = Tensor.scalar(0.955, requires_grad=True)
 
-    var learning_rate: Scalar[DType.float32] = 0.01555
+    var learning_rate = 0.01555
 
     for epoch in range(1500):  # More epochs → better convergence
         # Forward pass: predict
@@ -28,22 +25,22 @@ fn main() raises:
         # Print progress
         if epoch % 100 == 0:
             print("Loss:")
-            print(loss.item())
+            loss.print()
 
         # SGD update
-        w.data[] -= learning_rate * w.grad[].data[]
-        b.data[] -= learning_rate * b.grad[].data[]
+        w = w - learning_rate * w.grad[]
+        b = b - learning_rate * b.grad[]
 
         # Zero gradients for next step
-        w.zero_grad()
-        b.zero_grad()
+        w.grad[].fill(0.0)
+        b.grad[].fill(0.0)
 
-    print()
     print()
     print()
     print()
 
     print("w:")
     w.print()
-    b.print()
+    print()
     print("b:")
+    b.print()
