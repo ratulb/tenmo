@@ -375,7 +375,7 @@ struct Shape(
         axes = self.intlist()[:axis] + self.intlist()[axis + 1 :]
         return Shape(axes)
 
-    @staticmethod
+    _="""@staticmethod
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
         if shape1 == shape2:
             return shape1, shape2
@@ -384,6 +384,38 @@ struct Shape(
         max_len = max(len1, len2)
         padded1 = one * (max_len - len1) + shape1.intlist()
         padded2 = one * (max_len - len2) + shape2.intlist()
+        return Shape(padded1), Shape(padded2)"""
+    @staticmethod
+    fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
+        # Handle scalar cases first
+        if shape1 == Shape.Void and shape2 == Shape.Void:
+            return Shape.Void, Shape.Void
+        one = IntList(1)
+        if shape1 == Shape.Void:
+            #return Shape(1) * len(shape2), shape2  # Scalar becomes [1,1...] of matching rank
+            return Shape(one * len(shape2)), shape2  # Scalar becomes [1,1...] of matching rank
+        if shape2 == Shape.Void:
+            #return shape1, Shape(1) * len(shape1)  # Same for other side
+            return shape1, Shape(one * len(shape1))  # Same for other side
+
+        # Now handle empty tensor case explicitly
+        if 0 in shape1.intlist() or 0 in shape2.intlist():
+            abort("Cannot broadcast shapes with zero dimensions")
+        # Normal case for non-scalars
+        if shape1 == shape2:
+            return shape1, shape2
+
+        len1, len2 = len(shape1), len(shape2)
+        max_len = max(len1, len2)
+
+        # Pad with 1s (never 0s)
+        padded1 = one * (max_len - len1) + shape1.intlist()
+        padded2 = one * (max_len - len2) + shape2.intlist()
+
+        # Validate no zero dimensions
+        if 0 in padded1 or 0 in padded2:
+            abort("Invalid shape padding: resulted in zero dimension")
+
         return Shape(padded1), Shape(padded2)
 
     @staticmethod
@@ -395,6 +427,11 @@ struct Shape(
                 + " <=> "
                 + that.__str__()
             )
+        # Explicitly handle true scalars (Shape.Void)
+        if this == Shape.Void:
+            return that  # Scalar + Tensor -> Tensor's shape
+        if that == Shape.Void:
+            return this  # Tensor + Scalar -> Tensor's shape
         shape1, shape2 = Self.pad_shapes(this, that)
         result_shape = IntList.with_capacity(len(shape1))
         s1 = shape1.intlist()
