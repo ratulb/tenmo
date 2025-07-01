@@ -301,7 +301,13 @@ struct Shape(
             return
         for i in range(_ndims):
             if dims[i] < 1:
-                abort("Shape -> __init__: Wrong shape dimension")
+                abort(
+                    "Shape -> __init__: Wrong shape dimension."
+                    + "Dim = "
+                    + String(dims[i])
+                    + " at index = "
+                    + String(i)
+                )
         _numels = 1
         for idx in range(_ndims):
             _numels *= dims[idx]
@@ -375,7 +381,7 @@ struct Shape(
         axes = self.intlist()[:axis] + self.intlist()[axis + 1 :]
         return Shape(axes)
 
-    _="""@staticmethod
+    _ = """@staticmethod
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
         if shape1 == shape2:
             return shape1, shape2
@@ -385,6 +391,7 @@ struct Shape(
         padded1 = one * (max_len - len1) + shape1.intlist()
         padded2 = one * (max_len - len2) + shape2.intlist()
         return Shape(padded1), Shape(padded2)"""
+
     @staticmethod
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
         # Handle scalar cases first
@@ -392,10 +399,13 @@ struct Shape(
             return Shape.Void, Shape.Void
         one = IntList(1)
         if shape1 == Shape.Void:
-            #return Shape(1) * len(shape2), shape2  # Scalar becomes [1,1...] of matching rank
-            return Shape(one * len(shape2)), shape2  # Scalar becomes [1,1...] of matching rank
+            # return Shape(1) * len(shape2), shape2  # Scalar becomes [1,1...] of matching rank
+            return (
+                Shape(one * len(shape2)),
+                shape2,
+            )  # Scalar becomes [1,1...] of matching rank
         if shape2 == Shape.Void:
-            #return shape1, Shape(1) * len(shape1)  # Same for other side
+            # return shape1, Shape(1) * len(shape1)  # Same for other side
             return shape1, Shape(one * len(shape1))  # Same for other side
 
         # Now handle empty tensor case explicitly
