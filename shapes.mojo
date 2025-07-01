@@ -9,6 +9,13 @@ from tensors import Tensor
 from testing import assert_true, assert_raises
 
 
+fn test_reverse() raises:
+    shape = Shape.of(1, 2, 3)
+    assert_true(
+        shape.reverse() == Shape.of(3, 2, 1), "Shape reversal assertion failed"
+    )
+
+
 fn test_equivalence() raises:
     assert_true(Shape(IntList(1, 4)) == Shape.of(1, 4), "Not equivalent")
 
@@ -226,6 +233,7 @@ fn test_zip_reversed() raises:
 
 
 fn main() raises:
+    test_reverse()
     test_equivalence()
     test_empty_shape()
     test_replace()
@@ -352,6 +360,11 @@ struct Shape(
                     mask.append(0)  # match or both 1 → not broadcasted
 
         return mask
+
+    fn reverse(self) -> Self:
+        dims = self.intlist()
+        dims.reverse()
+        return Shape(dims)
 
     fn replace(self, axis: Int, extent: Int) -> Shape:
         if axis < 0 or axis >= self.ndim:
