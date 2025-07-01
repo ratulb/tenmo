@@ -16,7 +16,24 @@ alias MulTensor = 4
 alias AddTensor = 5
 alias SubtractTensor = 6
 alias Power = 7
+alias Add = 8
+alias Subtract = 9
+alias Multiply = 10
 
+
+fn scalar_ops[
+    dtype: DType, op: Int
+](lhs: Scalar[dtype], rhs: Scalar[dtype]) -> Scalar[dtype]:
+    result = Scalar[dtype](0)
+    if op == Add:
+        result = lhs + rhs
+    elif op == Subtract:
+        result = lhs - rhs
+    elif op == Multiply:
+        result = lhs * rhs
+    else:
+        abort("operators -> scalar_ops: unsupported operation")
+    return result
 
 
 fn sum_3d[
