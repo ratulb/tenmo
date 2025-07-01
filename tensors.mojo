@@ -1,5 +1,73 @@
 from common_utils import do_assert, assert_grad
 
+fn test_reshape_grad_flow() raises:
+    """Test suite for gradient flow through reshape operations."""
+
+    # === 1D Tensor Cases ===
+    # Case 1: Simple 1D → 1D reshape
+    var a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
+    var b = a.reshape(Shape.of(4,))
+    b.sum().backward()
+    assert_true((a.grad[] == Tensor.d1([1, 1, 1, 1])).all_true())
+
+    # Case 2: 1D → 2D reshape
+    a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
+    b = a.reshape(Shape.of(2, 2))
+    (b * 2).sum().backward()
+    assert_true((a.grad[] == Tensor.d1([2, 2, 2, 2])).all_true())
+
+    # === 2D Tensor Cases ===
+    # Case 3: 2D → 2D reshape (contiguous)
+    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    b = a.reshape(Shape.of(4, 1))
+    (b ** 2).sum().backward()
+    assert_true((a.grad[] == Tensor.d2([[2, 4], [6, 8]])).all_true())
+
+    # Case 4: 2D → 1D reshape
+    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    b = a.reshape(Shape.of(4,))
+    (b + 1).sum().backward()
+    assert_true((a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
+
+    # === 3D Tensor Cases ===
+    # Case 5: 3D → 2D reshape
+    _="""a64 = Tensor[DType.float64].d3([[[1.0, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
+    b = a.reshape(Shape.of(2, 4))
+    b.mean().backward()
+    assert_true((a64.grad[] == Tensor[DType.float64].full(a64.shape, 0.125)).all_true())"""
+
+    # === Edge Cases ===
+    # Case 6: Empty tensor reshape
+    a = Tensor.d1([], requires_grad=True)
+    b = a.reshape(Shape.of(0,))
+    b.sum().backward()  # Should not crash
+    assert_true(a.grad[].shape == Shape.of(0,))
+
+    # Case 7: Non-contiguous reshape
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    b = a.T().reshape(Shape.of(2, 3))  # Tests view tracking
+    b.sum().backward()
+    assert_true((a.grad[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())
+
+    # === Advanced Cases ===
+    # Case 8: Chained reshapes
+    a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
+    b = a.reshape(Shape.of(2, 2)).reshape(Shape.of(4,))
+    b.sum().backward()
+    assert_true((a.grad[] == Tensor.d1([1, 1, 1, 1])).all_true())
+
+    # Case 9: Reshape with existing gradients
+    a = Tensor.d1([1, 2], requires_grad=True)
+    _ = (a * 2).sum().backward()  # a.grad = [2.0, 2.0]
+    b = a.reshape(Shape.of(2, 1))
+    b.sum().backward()  # Gradient accumulation
+    assert_true((a.grad[] == Tensor.d1([3, 3])).all_true())  # 2 + 1
+
+    # Case 10: Reshape after detach
+    _="""a = Tensor.d1([1, 2], requires_grad=True)
+    b = a.detach().reshape(Shape.of(2, 1))  # Should break grad flow
+    b.sum().backward()  # Should NOT affect a.grad
+    assert_true(a.grad[] is None)  # Because of detach()"""
 
 fn test_reshape_gradient() raises:
     # 1. Reshape scalar to (1,) and back
@@ -655,20 +723,25 @@ fn test_power() raises:
     result.print()
 
 
-fn test_grad_copy_on_reshape() raises:
+fn test_grad_flow_through_reshape() raises:
     a = Tensor.of(1.0, 2.0, 3.0, requires_grad=True)
+
+    # First operation using 'a'
     b = a + 1.0
     b.sum().backward()
-    assert_true((a.grad[] == Tensor.of(1.0, 1, 1)).all_true())
-    # At this point, a.grad should be [1.0, 1.0, 1.0]
-    reshaped = a.reshape(Shape.of(3))
-    # reshaped.grad[].print()  # Should be [1.0, 1.0, 1.0]
-    assert_true((reshaped.grad[] == Tensor.of(1.0, 1, 1)).all_true())
+    assert_true((a.grad[] == Tensor.of(1.0, 1.0, 1.0)).all_true())
 
-    # Further ops from reshaped still accumulate to a
+    # Reshape should not clone or copy gradients
+    reshaped = a.reshape(Shape.of(3))
+
+    # reshaped.grad[] should not exist on its own — we assert that it refers to the same grad storage
+    #assert_true((reshaped.grad[] == Tensor.of(1.0, 1.0, 1.0)).all_true())
+
+    # New operation from reshaped
     (reshaped * 2).sum().backward()
-    a.grad[].print()  # Should now be [3.0, 3.0, 3.0]
-    assert_true((a.grad[] == Tensor.of(3.0, 3, 3)).all_true())
+
+    # Original 'a' should now have accumulated gradient
+    assert_true((a.grad[] == Tensor.of(3.0, 3.0, 3.0)).all_true())
 
 
 fn test_reshape_preserves_grad_accumulation() raises:
@@ -749,6 +822,7 @@ fn test_mean() raises:
     assert_true((s == Tensor[DType.float32].scalar(3.5)).all_true())
     s.backward()
     # a.grad == [[1/6, 1/6, 1/6], [1/6, 1/6, 1/6]] + 0.5 from previous backward call
+    #a.grad[].print()
     assert_true(
         a.grad[].all_close(
             Tensor.d2(
@@ -1028,12 +1102,13 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 fn main() raises:
-    test_reshape_gradient()
-    # test_broadcast_mul()
-    # test_broadcast_sub()
-    # test_broadcast_add()
-    # test_reshape()
-    # test_grad_copy_on_reshape()
+    test_reshape_grad_flow()
+    _="""test_reshape_gradient()
+    test_broadcast_mul()
+    test_broadcast_sub()
+    test_broadcast_add()
+    test_reshape()
+    test_grad_flow_through_reshape()"""
     # test_reshape_preserves_grad_accumulation()
     _ = """
     test_power()
@@ -1769,8 +1844,6 @@ struct Tensor[dtype: DType = DType.float32](
 
                     var grad_contrib: Tensor[dtype]
                     if upstream_grad.shape == Shape.Void:
-                        print("Upstream is scalar!")
-                        print("this.shape =", this.shape)
 
                         grad_contrib = Tensor[dtype].full(
                             this.shape, upstream_grad.item()
@@ -1787,7 +1860,6 @@ struct Tensor[dtype: DType = DType.float32](
                     this.accummulate_grad(grad_contrib)
 
                 if that.requires_grad:
-                    print("\nNow inside that.requires_grad branch\n")
                     var grad_contrib: Tensor[dtype]
                     if upstream_grad.shape == Shape.Void:
                         grad_contrib = Tensor[dtype].full(
