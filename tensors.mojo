@@ -1,6 +1,112 @@
 from common_utils import do_assert, assert_grad
 
 
+fn test_tensor_mean() raises:
+    a = Tensor.scalar(5.0, requires_grad=True)
+    m = a.mean([])
+    m.backward()
+    assert_true(m.item() == 5.0)
+    assert_true(a.grad[].item() == 1.0)
+
+    a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    m = a.mean()
+    assert_true(m.item() == 2.0)
+    m.backward()
+    assert_true(a.grad[].all_close(Tensor.d1([1 / 3, 1 / 3, 1 / 3])))
+
+    A = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    M = A.mean([])
+    assert_true(M.item() == 2.5)
+    M.backward()
+    expected = Tensor.d2([[0.25, 0.25], [0.25, 0.25]])
+    assert_true(A.grad[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])))
+
+    a1 = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    m1 = a1.mean(axes=[0], keepdims=False)
+    assert_true(m1.all_close(Tensor.d1([2.0, 3.0]).to_dtype[DType.float32]()))
+    m1.backward()
+    assert_true(
+        a1.grad[].all_close(
+            Tensor.d2([[0.5, 0.5], [0.5, 0.5]]).to_dtype[DType.float32]()
+        )
+    )
+
+    AA = Tensor.d2([[1.0, 2.0], [3.0, 5.0]], requires_grad=True)
+    MM = AA.mean(axes=[1], keepdims=False)
+    assert_true(MM.all_close(Tensor.d1([1.5, 4.0]).to_dtype[DType.float32]()))
+    MM.backward()
+    assert_true(AA.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
+
+    C = Tensor.d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
+    mm = C.mean(axes=[1], keepdims=True)
+    assert_true(mm.all_close(Tensor.d2([[2.0], [3.0]])))
+    mm.backward()
+    assert_true(C.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
+
+    A3 = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    )
+    m12 = A3.mean(axes=[1, 2], keepdims=False)  # shape: (2,)
+    assert_true(m12.all_close(Tensor.d1([2.5, 6.5]).to_dtype[DType.float32]()))
+    m12.backward()
+    expected_grad = Tensor.d3(
+        [[[0.25, 0.25], [0.25, 0.25]], [[0.25, 0.25], [0.25, 0.25]]]
+    )
+    assert_true(A3.grad[].all_close(expected_grad))
+
+
+fn test_forward_multivariate_prediction() raises:
+    # x.shape = (3, 2), w.shape = (2, 1)
+    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    var w = Tensor.d2([[1.0], [2.0]])  # So y = x @ w = [[5], [11], [17]]
+    var y_pred = x.matmul(w)
+
+    assert_true((y_pred == Tensor.d2([[5.0], [11.0], [17.0]])).all_true())
+    var b = Tensor.d1([1.0]).to_dtype[DType.float32]()
+    var y = x.matmul(w) + b
+    assert_true((y == Tensor.d2([[6.0], [12.0], [18.0]])).all_true())
+
+
+fn test_weights_bias_gradients() raises:
+    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var w = Tensor.d2([[0.1], [0.2]], requires_grad=True)
+    var b = Tensor[DType.float32].d1([0.5], requires_grad=True)
+    var target = Tensor.d2([[1.0], [2.0]])
+
+    var y_pred = x.matmul(w) + b
+    var loss = ((y_pred - target) ** 2).mean([])
+    Tensor.walk_backward(loss)
+
+    # Gradient should flow to w and b
+    assert_true(w.grad[].shape == w.shape)
+    assert_true(b.grad[].shape == b.shape)
+
+
+fn test_training_convergence() raises:
+    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    var y = Tensor.d2([[13.0], [23.0], [33.0]])
+
+    var w = Tensor.rand(2, 1, requires_grad=True)
+    var b = Tensor.rand(1, requires_grad=True)
+
+    for epoch in range(10000):
+        var y_pred = x.matmul(w) + b
+        var loss = ((y_pred - y) ** 2).mean([])
+        Tensor.walk_backward(loss)
+
+        # SGD
+        w.data[] -= 0.01 * w.grad[].data[]
+        b.data[] -= 0.01 * b.grad[].data[]
+        w.zero_grad()
+        b.zero_grad()
+
+    # After training
+    w.print()
+    b.print()
+    # assert_true(w.all_close(Tensor.d2([[2.0], [3.0]])))
+    # assert_true(b.all_close(Tensor[DType.float32].d1([5.0])))
+
+
 fn test_transpose_gradients() raises:
     # Case 1: Simple 2D transpose
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
@@ -1137,7 +1243,11 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 fn main() raises:
-    test_transpose_gradients()
+    test_tensor_mean()
+    _ = """test_forward_multivariate_prediction()
+    test_weights_bias_gradients()
+    test_training_convergence()"""
+    _ = """test_transpose_gradients()
     test_reshape_grad_flow()
     test_reshape_gradient()
     test_broadcast_mul()
@@ -1146,7 +1256,6 @@ fn main() raises:
     test_reshape()
     test_grad_flow_through_reshape()
     # test_reshape_preserves_grad_accumulation()
-    _ = """
     test_power()
 
     test_add_2_tensors()
@@ -1300,7 +1409,10 @@ struct Tensor[dtype: DType = DType.float32](
         verbose: Bool = False,
     ) raises:
         if not self.requires_grad:
-            print("Tensor -> backward: calling backward on a tensor that does not require grad has no effect")
+            print(
+                "Tensor -> backward: calling backward on a tensor that does not"
+                " require grad has no effect"
+            )
             return
         if start:
             self.grad[].fill(start_grad)
@@ -1399,7 +1511,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
         self.init_gradbox()
-
 
     fn copy(self) -> Self:
         result = Tensor[dtype](self.shape, requires_grad=self.requires_grad)
@@ -1652,9 +1763,14 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn grad_is_zero(self) -> Bool:
         if not self.requires_grad:
-            abort("Tensor -> grad_is_zero: checking grad on a tensor that does have grad")
+            abort(
+                "Tensor -> grad_is_zero: checking grad on a tensor that does"
+                " have grad"
+            )
+
         fn all_zero(val: Scalar[dtype]) -> Bool:
             return val == Scalar[dtype](0)
+
         return self.has_grad() and self.grad[].for_all(all_zero)
 
     fn zero_grad(self):
@@ -2215,8 +2331,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
 
-
-    fn matmal(self, other: Self) -> Tensor[dtype]:
+    fn matmal_v1(self, other: Self) -> Tensor[dtype]:
         start = perf_counter_ns()
         if self.shape[1] != other.shape[0]:
             abort("matmul - Dim mismatch")
@@ -2268,8 +2383,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    fn mat(self, other: Self) raises -> Tensor[dtype]:
-        start = perf_counter_ns()
+    fn matmul(self, other: Self) raises -> Tensor[dtype]:
         if self.shape[1] != other.shape[0]:
             abort(
                 "Tensor -> mat - Dim mismatch: "
@@ -2295,8 +2409,6 @@ struct Tensor[dtype: DType = DType.float32](
                         print(e)
 
                 vectorize[dot, 2 * simdwidthof[dtype]()](other.shape[1])
-        end = perf_counter_ns()
-        print("Total: ", end - start)
 
         return result
 
@@ -2414,7 +2526,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         # Perform sum
         summed = self.sum(sorted_axes, keepdims)
-
+        print("\nsummed\n")
+        summed.print()
         # Divide by count
         var result = summed / Scalar[dtype](count)
 
@@ -2504,7 +2617,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         out = Tensor[dtype].zeros(out_shape, requires_grad=self.requires_grad)
         reduced_shape = Shape(self.shape.axes_spans.select(_axes))
-
+        print("reduced_shape: ", reduced_shape, "out_shape: ", out_shape)
+        _axes.print()
         # FIX 3: Special handling for full reduction case
         if reducing_all and not keepdims:
             summ = Scalar[dtype](0)
@@ -2518,7 +2632,12 @@ struct Tensor[dtype: DType = DType.float32](
                     if keepdims:
                         full_idx = out_idx.replace(_axes, red_idx)
                     else:
+                        print("check1")
+                        out_idx.print()
+                        _axes.print()
+                        red_idx.print()
                         full_idx = out_idx.insert(_axes, red_idx)
+                        print("check2")
                     summ += self[full_idx]
                 out[out_idx] = summ
 
@@ -3245,8 +3364,8 @@ fn test_transpose_matmul() raises:
     A.print()
     A_T.print()
     B = Tensor.rand(3, 3)
-    C = A.matmal(B)
-    D = A.mat(B)
+    C = A.matmul(B)
+    D = A.matmul(B)
     R = C == D
     C.print()
     D.print()

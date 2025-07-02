@@ -494,6 +494,8 @@ struct IntList(Sized & Copyable):
 
     @always_inline
     fn is_strictly_increasing_from_zero(self) -> Bool:
+        print("is_strictly_increasing_from_zero")
+        self.print()
         for i in range(len(self)):
             if self[i] != i:
                 print(
@@ -508,6 +510,8 @@ struct IntList(Sized & Copyable):
         return True
 
     fn insert(self, indices: IntList, values: IntList) -> IntList:
+        print("indices: ")
+        indices.print()
         if len(indices) != len(values):
             abort("IntList -> insert: indices and values must be same length")
 
@@ -525,10 +529,12 @@ struct IntList(Sized & Copyable):
 
         # Step 1: Validate indices
         seen = IntList.with_capacity(n + 1, -1)
-
+        print("What are you here? ")
+        indices.print()
         for i in range(m):
             idx = indices[i]
             if idx < 0 or idx > n:
+                print("aborting here: idx -> ", idx, n )
                 abort("IntList -> insert: index out of bounds: " + String(idx))
             if seen[idx] == 1:
                 abort(
