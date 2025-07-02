@@ -3,7 +3,7 @@ from common_utils import do_assert, assert_grad
 
 fn test_tensor_mean() raises:
     a = Tensor.scalar(5.0, requires_grad=True)
-    m = a.mean([])
+    m = a.mean()
     m.backward()
     assert_true(m.item() == 5.0)
     assert_true(a.grad[].item() == 1.0)
@@ -15,7 +15,7 @@ fn test_tensor_mean() raises:
     assert_true(a.grad[].all_close(Tensor.d1([1 / 3, 1 / 3, 1 / 3])))
 
     A = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-    M = A.mean([])
+    M = A.mean()
     assert_true(M.item() == 2.5)
     M.backward()
     expected = Tensor.d2([[0.25, 0.25], [0.25, 0.25]])
@@ -54,6 +54,14 @@ fn test_tensor_mean() raises:
     )
     assert_true(A3.grad[].all_close(expected_grad))
 
+    A2 = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    m2 = A2.mean(axes=[-1])  # same as axis=1
+    assert_true(m2.all_close(Tensor[DType.float32].d1([1.5, 3.5])))
+
+    a2 = Tensor.d2([[10.0, 20.0], [30.0, 40.0]], requires_grad=True)
+    m_ = a2.mean(axes=IntList.Empty)
+    assert_true(m_.item() == 25.0)
+
 
 fn test_forward_multivariate_prediction() raises:
     # x.shape = (3, 2), w.shape = (2, 1)
@@ -89,9 +97,10 @@ fn test_training_convergence() raises:
     var w = Tensor.rand(2, 1, requires_grad=True)
     var b = Tensor.rand(1, requires_grad=True)
 
-    for epoch in range(10000):
+    for epoch in range(1000):
         var y_pred = x.matmul(w) + b
-        var loss = ((y_pred - y) ** 2).mean([])
+        var loss = ((y_pred - y) ** 2).mean()
+        loss.print()
         Tensor.walk_backward(loss)
 
         # SGD
@@ -1243,10 +1252,11 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 fn main() raises:
-    test_tensor_mean()
+    test_training_convergence()
+    # test_tensor_mean()
     _ = """test_forward_multivariate_prediction()
     test_weights_bias_gradients()
-    test_training_convergence()"""
+    """
     _ = """test_transpose_gradients()
     test_reshape_grad_flow()
     test_reshape_gradient()
@@ -1947,15 +1957,19 @@ struct Tensor[dtype: DType = DType.float32](
                         grad_contrib = Tensor[dtype].full(
                             self.address()[].shape,
                             result.address()[].grad[].item(),
+                            requires_grad=False,
                         )
                     else:
-                        grad_contrib = upstream_grad.sum(
-                            axes=self.address()[]
-                            .broadcast_mask(result.address()[].shape)
-                            .indices_of(1),
-                            keepdims=True,
-                        ).reshape(self.address()[].shape)
-
+                        if result.address()[].shape != result.address()[].shape:
+                            grad_contrib = upstream_grad.sum(
+                                axes=self.address()[]
+                                .broadcast_mask(result.address()[].shape)
+                                .indices_of(1),
+                                keepdims=True,
+                            ).reshape(self.address()[].shape)
+                        else:
+                            grad_contrib = result.address()[].grad[]
+                        grad_contrib.requires_grad = False
                     self.address()[].accummulate_grad(grad_contrib)
 
                 if other.address()[].requires_grad:
@@ -1963,9 +1977,10 @@ struct Tensor[dtype: DType = DType.float32](
                         grad_contrib = Tensor[dtype].full(
                             other.address()[].shape,
                             result.address()[].grad[].item(),
+                            requires_grad=False,
                         )
                     else:
-                        grad_contrib = (
+                        _ = """grad_contrib = (
                             result.address()[]
                             .grad[]
                             .sum(
@@ -1976,7 +1991,28 @@ struct Tensor[dtype: DType = DType.float32](
                             )
                             .reshape(other.address()[].shape)
                         )
+                    grad_contrib.requires_grad = False
+                    other.address()[].accummulate_grad(grad_contrib)"""
+                        axes = (
+                            other.address()[]
+                            .broadcast_mask(result.address()[].shape)
+                            .indices_of(1)
+                        )
+                        reduced = (
+                            result.address()[]
+                            .grad[]
+                            .sum(axes=axes, keepdims=True)
+                        )
+                        reduced = (
+                            result.address()[]
+                            .grad[]
+                            .sum(axes=axes, keepdims=True)
+                        )
+                        if reduced.shape != other.address()[].shape:
+                            reduced = reduced.reshape(other.address()[].shape)
 
+                        grad_contrib = reduced
+                    grad_contrib.requires_grad = False
                     other.address()[].accummulate_grad(grad_contrib)
 
                 _ = """if this.requires_grad:
@@ -2091,7 +2127,7 @@ struct Tensor[dtype: DType = DType.float32](
                 output = result.address()[]
                 output_shape = output.shape
                 upstream_grad = output.grad[]
-
+                print("All encompassing check1")
                 if this.requires_grad:
                     unreduced_grad = Self.grad_unreduced(that, upstream_grad)
 
@@ -2115,6 +2151,8 @@ struct Tensor[dtype: DType = DType.float32](
                     that.grad[] = __tensor_op_tensor__[dtype, AddTensor](
                         that.grad[], reduced_and_reshaped
                     )
+
+                print("All encompassing check2")
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
@@ -2331,84 +2369,150 @@ struct Tensor[dtype: DType = DType.float32](
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
 
-    fn matmal_v1(self, other: Self) -> Tensor[dtype]:
-        start = perf_counter_ns()
+    fn matmul_v1(self, other: Self) -> Tensor[dtype]:
         if self.shape[1] != other.shape[0]:
-            abort("matmul - Dim mismatch")
+            abort("Tensor matmul_v1 - Dim mismatch")
         result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
         for i in range(self.shape[0]):
             for j in range(other.shape[1]):
                 for k in range(self.shape[1]):
                     result[i, j] += self[i, k] * other[k, j]
-        end = perf_counter_ns()
-        print("Total: ", end - start)
         return result
 
-    fn load[
-        nelts: Int = 1
-    ](self, rows: Int, cols: Int) raises -> SIMD[dtype, nelts]:
-        from testing import assert_equal
-
-        try:
-            assert_equal(2, self.ndim(), "load is supported only for 2d tensor")
-        except e:
-            raise e
+    fn load[nelts: Int = 1](self, rows: Int, cols: Int) -> SIMD[dtype, nelts]:
+        if not self.ndim() == 2:
+            abort("Tensor - load is supported only for 2d tensor")
         return self.data.load[width=nelts](rows * self.shape[1] + cols)
 
     fn store[
         nelts: Int = 1
-    ](self, rows: Int, cols: Int, val: SIMD[dtype, nelts]) raises:
-        from testing import assert_equal
-
-        try:
-            assert_equal(
-                2, self.ndim(), "store is supported only for 2d tensor"
-            )
-        except e:
-            raise e
+    ](self, rows: Int, cols: Int, val: SIMD[dtype, nelts]):
+        if not self.ndim() == 2:
+            abort("Tensor - store is supported only for 2d tensor")
         self.data.store(rows * self.shape[1] + cols, val)
 
-    fn matmal_v2(self, other: Self) -> Tensor[dtype]:
-        start = perf_counter_ns()
+    fn matmul_v2(self, other: Self) -> Tensor[dtype]:
         if self.shape[1] != other.shape[0]:
-            abort("matmul - Dim mismatch")
+            abort("Tensor matmul_v2 - Dim mismatch")
+        requires_grad = self.requires_grad or other.requires_grad
 
-        result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
+        result = Tensor[dtype].zeros(
+            self.shape[0], other.shape[1], requires_grad=requires_grad
+        )
+
         for i in range(self.shape[0]):
             for j in range(self.shape[1]):
                 for k in range(other.shape[1]):
                     result[i, k] += self[i, j] * other[j, k]
-        end = perf_counter_ns()
-        print("Total: ", end - start)
+        if requires_grad:
+
+            fn grad_fn() raises -> None:
+                a = self.address()[]
+                b = other.address()[]
+                out = result.address()[]
+                upstream = out.grad[]
+
+                if a.requires_grad:
+                    a_grad = upstream.matmul(b.T())
+                    a.grad[] = a.grad[] + a_grad
+
+                if b.requires_grad:
+                    b_grad = a.T().matmul(upstream)
+                    b.grad[] = b.grad[] + b_grad
+
+            result.grad_fn = Optional(grad_fn)
+            result.add_ancestry(self, other)
 
         return result
 
-    fn matmul(self, other: Self) raises -> Tensor[dtype]:
-        if self.shape[1] != other.shape[0]:
+    _ = """fn matmul(self, other: Self) -> Tensor[dtype]:
+        rows, cols = self.shape[0], self.shape[1]
+        other_rows, other_cols = other.shape[0], other.shape[1]
+
+        if cols != other_rows:
             abort(
-                "Tensor -> mat - Dim mismatch: "
+                "Tensor -> matmul - Dim mismatch: "
                 + self.shape.__str__()
                 + ", "
                 + other.shape.__str__()
             )
-
-        result = Tensor[dtype].zeros(self.shape[0], other.shape[1])
+        requires_grad = self.requires_grad or other.requires_grad
+        result = Tensor[dtype].zeros(self.shape[0], other.shape[1], requires_grad=requires_grad)
         for i in range(self.shape[0]):
             for j in range(self.shape[1]):
 
                 @parameter
                 fn dot[simd_width: Int](idx: Int):
-                    try:
-                        result.store[simd_width](
-                            i,
-                            idx,
-                            result.load[simd_width](i, idx)
-                            + self[i, j] * other.load[simd_width](j, idx),
-                        )
-                    except e:
-                        print(e)
+                    result.store[simd_width](
+                        i,
+                        idx,
+                        result.load[simd_width](i, idx)
+                        + self[i, j] * other.load[simd_width](j, idx),
+                    )
 
                 vectorize[dot, 2 * simdwidthof[dtype]()](other.shape[1])
+
+        if requires_grad:
+            fn grad_fn() raises -> None:
+                a = self.address()[]
+                b = other.address()[]
+                out = result.address()[]
+                upstream = out.grad[]
+
+                if a.requires_grad:
+                    a_grad = upstream.matmul(b.T())
+                    a.grad[] = a.grad[] + a_grad
+
+                if b.requires_grad:
+                    b_grad = a.T().matmul(upstream)
+                    b.grad[] = b.grad[] + b_grad
+
+            result.grad_fn = Optional(grad_fn)
+            result.add_ancestry(self, other)
+
+
+
+        return result"""
+
+    fn matmul(self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
+        if not self.shape.rank() == 2:
+            abort("Only supports 2D matmul for now")
+        if not other.shape.rank() == 2:
+            abort("Other must be 2D")
+        if not self.shape[1] == other.shape[0]:
+            abort("Incompatible shapes")
+
+        m, k = self.shape[0], self.shape[1]
+        n = other.shape[1]
+
+        requires_grad = self.requires_grad or other.requires_grad
+        var result = Tensor[dtype](m, n, requires_grad=requires_grad)
+
+        for i in range(m):
+            for j in range(n):
+                var summ = Scalar[dtype](0)
+                for p in range(k):
+                    summ += self[IntList(i, p)] * other[IntList(p, j)]
+                result[IntList(i, j)] = summ
+
+        if requires_grad:
+
+            fn grad_fn() raises -> None:
+                a = self.address()[]
+                b = other.address()[]
+                out = result.address()[]
+                upstream = out.grad[]
+
+                if a.requires_grad:
+                    a_grad = upstream.matmul(b.T())
+                    a.accummulate_grad(a_grad)
+
+                if b.requires_grad:
+                    b_grad = a.T().matmul(upstream)
+                    b.accummulate_grad(b_grad)
+
+            result.grad_fn = Optional(grad_fn)
+            result.add_ancestry(self, other)
 
         return result
 
@@ -2501,17 +2605,17 @@ struct Tensor[dtype: DType = DType.float32](
         return result
 
     fn mean(
-        self, axes: List[Int] = [-1], keepdims: Bool = False
+        self, axes: List[Int] = [], keepdims: Bool = False
     ) -> Tensor[dtype]:
-        _rank = self.shape.rank()
+        _ = """_rank = self.shape.rank()
         _axes = IntList()
         if axes == [-1]:
             _axes = IntList(_rank - 1)
         elif len(axes) == 0:
             _axes = IntList.range_list(_rank)
         else:
-            _axes = IntList.new(axes)
-        return self.mean(_axes, keepdims)
+            _axes = IntList.new(axes)"""
+        return self.mean(IntList.new(axes), keepdims)
 
     fn mean(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
         sorted_axes = Self.validate_and_normalize_axes(self.shape, axes)
@@ -2526,8 +2630,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         # Perform sum
         summed = self.sum(sorted_axes, keepdims)
-        print("\nsummed\n")
-        summed.print()
         # Divide by count
         var result = summed / Scalar[dtype](count)
 
@@ -2535,12 +2637,24 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
 
             fn grad_fn() raises -> None:
-                out_grad = result.address()[].grad[]
-                var expanded = out_grad
+                upstream_grad = result.address()[].grad[]
+                if upstream_grad.shape == Shape.Void:
+                    scalar_grad = (
+                        upstream_grad.item()
+                        / self.address()[].shape.num_elements()
+                    )
+                    grad_contrib = Tensor[dtype].full(
+                        self.address()[].shape, scalar_grad, requires_grad=False
+                    )
+                    self.address()[].accummulate_grad(grad_contrib)
+                    return
+
+                var expanded = upstream_grad
+
                 if not keepdims:
-                    expanded = out_grad.reshape(
+                    expanded = upstream_grad.reshape(
                         Shape(
-                            out_grad.shape.intlist().insert(
+                            upstream_grad.shape.intlist().insert(
                                 sorted_axes,
                                 IntList.with_capacity(len(sorted_axes), 1),
                             )
@@ -2548,7 +2662,9 @@ struct Tensor[dtype: DType = DType.float32](
                     )
 
                 # Broadcast and divide
+                print("You here vomitting?")
                 broadcasted = expanded.broadcast_to(self.address()[].shape)
+                print("You here not vomitting?")
                 scaled = broadcasted / Scalar[dtype](count)
                 self.address()[].grad[] = __tensor_op_tensor__[
                     dtype, AddTensor
@@ -2562,19 +2678,17 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    fn sum(
-        self, axes: List[Int] = [-1], keepdims: Bool = False
-    ) -> Tensor[dtype]:
-        _rank = self.shape.rank()
+    fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
+        _ = """_rank = self.shape.rank()
         _axes = IntList()
         if axes == [-1]:
             _axes = IntList(_rank - 1)
         elif len(axes) == 0:
             _axes = IntList.range_list(_rank)
         else:
-            _axes = IntList.new(axes)
+            _axes = IntList.new(axes)"""
 
-        return self.sum(_axes, keepdims)
+        return self.sum(IntList.new(axes), keepdims)
 
     fn sum(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
         _axes = Self.validate_and_normalize_axes(self.shape, axes)
@@ -2617,8 +2731,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         out = Tensor[dtype].zeros(out_shape, requires_grad=self.requires_grad)
         reduced_shape = Shape(self.shape.axes_spans.select(_axes))
-        print("reduced_shape: ", reduced_shape, "out_shape: ", out_shape)
-        _axes.print()
         # FIX 3: Special handling for full reduction case
         if reducing_all and not keepdims:
             summ = Scalar[dtype](0)
@@ -2632,12 +2744,7 @@ struct Tensor[dtype: DType = DType.float32](
                     if keepdims:
                         full_idx = out_idx.replace(_axes, red_idx)
                     else:
-                        print("check1")
-                        out_idx.print()
-                        _axes.print()
-                        red_idx.print()
                         full_idx = out_idx.insert(_axes, red_idx)
-                        print("check2")
                     summ += self[full_idx]
                 out[out_idx] = summ
 
@@ -2664,7 +2771,7 @@ struct Tensor[dtype: DType = DType.float32](
                     if out_grad.shape == Shape.Void:
                         # Scalar → reduce over all axes
                         expanded = Tensor[dtype].full(
-                            input_shape, out_grad.item()
+                            input_shape, out_grad.item(), requires_grad=False
                         )
                     else:
                         # Expand dims on the reduced axes
@@ -2722,6 +2829,8 @@ struct Tensor[dtype: DType = DType.float32](
             return IntList()  # Scalar sum over [] is valid
 
         # sorted_axes = axes.sorted()
+        if len(axes) == 0:
+            return IntList.range_list(rank)
         normalized = IntList.with_capacity(len(axes))
         for _axis in axes:
             axis = _axis
@@ -2738,15 +2847,6 @@ struct Tensor[dtype: DType = DType.float32](
         # Sort and deduplicate
         normalized.sort_and_deduplicate()
         return normalized
-
-        _ = """for i in range(len(sorted_axes) - 1):
-            if sorted_axes[i] == sorted_axes[i + 1]:
-                abort(
-                    "Tensor -> validate_and_normalize_axes - duplicate axes"
-                    " specified."
-                )
-
-        return sorted_axes"""
 
     _ = """fn sum(self, axis: Int = -1, keepdim: Bool = False) -> Tensor[dtype]:
         _axis = axis

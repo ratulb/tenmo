@@ -9,7 +9,8 @@ fn test_deduplicate() raises:
     il = IntList(9, 2, 9, 1, 4, 3, 1, 5, 7, 2, 1, 4, 7)
     il.sort_and_deduplicate()
     assert_true(
-        il==IntList(
+        il
+        == IntList(
             1,
             2,
             3,
@@ -316,6 +317,8 @@ fn test_init() raises:
 
 
 fn main() raises:
+    il = IntList(1, 2, 99)
+    print(il[0], il[1], il[2])
     test_deduplicate()
     test_init()
     test_range_list()
@@ -485,7 +488,7 @@ struct IntList(Sized & Copyable):
                 result.append(i)
         return result
 
-    fn occurence(self, elem: Int) -> Int:
+    fn count(self, elem: Int) -> Int:
         times = 0
         for each in self:
             if each == elem:
@@ -494,8 +497,6 @@ struct IntList(Sized & Copyable):
 
     @always_inline
     fn is_strictly_increasing_from_zero(self) -> Bool:
-        print("is_strictly_increasing_from_zero")
-        self.print()
         for i in range(len(self)):
             if self[i] != i:
                 print(
@@ -510,8 +511,6 @@ struct IntList(Sized & Copyable):
         return True
 
     fn insert(self, indices: IntList, values: IntList) -> IntList:
-        print("indices: ")
-        indices.print()
         if len(indices) != len(values):
             abort("IntList -> insert: indices and values must be same length")
 
@@ -527,33 +526,11 @@ struct IntList(Sized & Copyable):
                 )
             return values
 
-        # Step 1: Validate indices
-        seen = IntList.with_capacity(n + 1, -1)
-        print("What are you here? ")
-        indices.print()
-        for i in range(m):
-            idx = indices[i]
-            if idx < 0 or idx > n:
-                print("aborting here: idx -> ", idx, n )
-                abort("IntList -> insert: index out of bounds: " + String(idx))
-            if seen[idx] == 1:
-                abort(
-                    "IntList -> insert: duplicate insert index at "
-                    + String(idx)
-                )
-            seen[idx] = 1
-
-        # Step 2: Verify no gaps after inserts
-        insert_count = seen.occurence(1)
-        if insert_count != m:
-            abort("IntList -> insert: mismatch in seen insert count vs values")
-
         final_size = n + m
         # Step 3: Create dense result
         result = IntList.with_capacity(final_size)
         insert_cursor = 0
         original_cursor = 0
-
         for i in range(final_size):
             if insert_cursor < m and indices[insert_cursor] == i:
                 result.append(values[insert_cursor])
