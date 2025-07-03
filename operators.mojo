@@ -243,31 +243,31 @@ fn __tensor_op_tensor__[
 
     @parameter
     fn mul_elems[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
+        out.data.store[width=simd_width, volatile=True](
             idx,
             (
-                this.data.load[width=simd_width](idx)
-                * that.data.load[width=simd_width](idx)
+                this.data.load[width=simd_width, volatile=True](idx)
+                * that.data.load[width=simd_width, volatile=True](idx)
             ),
         )
 
     @parameter
     fn add_elems[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
+        out.data.store[width=simd_width, volatile=True](
             idx,
             (
-                this.data.load[width=simd_width](idx)
-                + that.data.load[width=simd_width](idx)
+                this.data.load[width=simd_width, volatile=True](idx)
+                + that.data.load[width=simd_width, volatile=True](idx)
             ),
         )
 
     @parameter
     fn subtract_elems[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
+        out.data.store[width=simd_width, volatile=True](
             idx,
             (
-                this.data.load[width=simd_width](idx)
-                - that.data.load[width=simd_width](idx)
+                this.data.load[width=simd_width, volatile=True](idx)
+                - that.data.load[width=simd_width, volatile=True](idx)
             ),
         )
 
@@ -289,26 +289,29 @@ fn __tensor_op_scalar__[
 
     @parameter
     fn add_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
-            idx, this.data.load[width=simd_width](idx) + scalar
+        out.data.store[width=simd_width, volatile=True](
+            idx, this.data.load[width=simd_width, volatile=True](idx) + scalar
         )
 
     @parameter
     fn subtract_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
-            idx, this.data.load[width=simd_width](idx) - scalar
+        out.data.store[width=simd_width, volatile=True](
+            idx, this.data.load[width=simd_width, volatile=True](idx) - scalar
         )
 
     @parameter
     fn mul_by_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
-            idx, this.data.load[width=simd_width](idx) * scalar
+        out.data.store[width=simd_width, volatile=True](
+            idx, this.data.load[width=simd_width, volatile=True](idx) * scalar
         )
 
     @parameter
     fn powered_by_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
-            idx, this.data.load[width=simd_width](idx).__pow__(scalar)
+        out.data.store[width=simd_width, volatile=True](
+            idx,
+            this.data.load[width=simd_width, volatile=True](idx).__pow__(
+                scalar
+            ),
         )
 
     if op == MulScalar:
