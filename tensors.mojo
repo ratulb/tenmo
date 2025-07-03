@@ -1370,6 +1370,7 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 fn main() raises:
+    test_broadcast_sub()
     _ = """test_scalar_mul_scalar()
     test_1d_mul_1d_same_shape()
     test_2d_mul_2d_same_shape()
@@ -1391,7 +1392,6 @@ fn main() raises:
     test_reshape_grad_flow()
     test_reshape_gradient()
     test_broadcast_mul()
-    test_broadcast_sub()
     test_reshape()
     # test_reshape_preserves_grad_accumulation()
     test_power()
@@ -2065,14 +2065,13 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    fn accummulate_grad(self, grad_contrib: Tensor[dtype]):
-        self.grad[] = __tensor_op_tensor__[dtype, AddTensor](
-            self.grad[], grad_contrib
-        )
+    fn update_grad[op: Int](self, incoming: Tensor[dtype]):
+        self.grad[] = __tensor_op_tensor__[dtype, op](self.grad[], incoming)
 
-    fn broadcast_add(self, other: Self) -> Tensor[dtype]:
-        result = self.broadcast_op(other, scalar_ops[dtype, Add])
-
+    fn broadcast_operation[
+        element_wise_op: Int, tensor_op_first: Int, tensor_op_second: Int
+    ](self, other: Self) -> Tensor[dtype]:
+        result = self.broadcast_op(other, scalar_ops[dtype, element_wise_op])
         if self.requires_grad or other.requires_grad:
             self_ptr = self.address()
             that_ptr = other.address()
@@ -2101,7 +2100,7 @@ struct Tensor[dtype: DType = DType.float32](
                         else:
                             grad_contrib = upstream_grad
                     grad_contrib.requires_grad = False
-                    this.accummulate_grad(grad_contrib)
+                    this.update_grad[tensor_op_first](grad_contrib)
 
                 if that.requires_grad:
                     upstream_grad = result.address()[].grad[]
@@ -2122,52 +2121,7 @@ struct Tensor[dtype: DType = DType.float32](
                         else:
                             grad_contrib = upstream_grad
                     grad_contrib.requires_grad = False
-                    that.accummulate_grad(grad_contrib)
-
-            result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
-        return result
-
-    fn broadcast_subtract(self, other: Self) -> Tensor[dtype]:
-        result_shape = self.broadcast_shape(other)
-        mask1 = self.broadcast_mask(result_shape)
-        mask2 = other.broadcast_mask(result_shape)
-        requires_grad = self.requires_grad or other.requires_grad
-        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
-        for indices in result_shape:
-            self_indices = self.translate_index(indices, mask1, result_shape)
-            other_indices = other.translate_index(indices, mask2, result_shape)
-            result[indices] = self[self_indices] - other[other_indices]
-
-        if self.requires_grad or other.requires_grad:
-
-            fn grad_fn() raises -> None:
-                this = self.address()[]
-                that = other.address()[]
-                output = result.address()[]
-                print("The great this in grad_fn subtract")
-                this.print()
-                that.print()
-
-                upstream_grad = output.grad[]
-
-                if this.requires_grad:
-                    grad_contrib = upstream_grad.sum(
-                        axes=this.broadcast_mask(output.shape).indices_of(1),
-                        keepdims=True,
-                    ).reshape(this.shape)
-                    this.grad[] = __tensor_op_tensor__[dtype, AddTensor](
-                        this.grad[], grad_contrib
-                    )
-
-                if that.requires_grad:
-                    grad_contrib = upstream_grad.sum(
-                        axes=that.broadcast_mask(output.shape).indices_of(1),
-                        keepdims=True,
-                    ).reshape(that.shape)
-                    that.grad[] = __tensor_op_tensor__[dtype, SubtractTensor](
-                        that.grad[], grad_contrib
-                    )
+                    that.update_grad[tensor_op_second](grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
@@ -2251,7 +2205,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         if self.shape != other.shape:
-            return self.broadcast_add(
+            return self.broadcast_operation[Add, AddTensor, AddTensor](
                 other,
             )
 
@@ -2332,8 +2286,6 @@ struct Tensor[dtype: DType = DType.float32](
                     dtype, AddTensor
                 ](self_grad, out_grad)
 
-                print("in __sub__(scalar) grad_fn")
-
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self)
         return out
@@ -2406,7 +2358,9 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         if self.shape != other.shape:
-            return self.broadcast_subtract(other)
+            return self.broadcast_operation[
+                Subtract, AddTensor, SubtractTensor
+            ](other)
 
         out = __tensor_op_tensor__[dtype, SubtractTensor](
             self.address()[], other.address()[]
@@ -2548,12 +2502,12 @@ struct Tensor[dtype: DType = DType.float32](
                 if self_ref[].requires_grad:
                     transposed = other_ref[].T()
                     grad = upstream_grad.matmul_optim(transposed)
-                    self_ref[].accummulate_grad(grad)
+                    self_ref[].update_grad[AddTensor](grad)
 
                 if other_ref[].requires_grad:
                     transposed = self_ref[].T()
                     grad = transposed.matmul_optim(upstream_grad)
-                    other.address()[].accummulate_grad(grad)
+                    other.address()[].update_grad[AddTensor](grad)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
@@ -2591,11 +2545,11 @@ struct Tensor[dtype: DType = DType.float32](
 
                 if a.requires_grad:
                     a_grad = upstream.matmul(b.T())
-                    a.accummulate_grad(a_grad)
+                    a.update_grad[AddTensor](a_grad)
 
                 if b.requires_grad:
                     b_grad = a.T().matmul(upstream)
-                    b.accummulate_grad(b_grad)
+                    b.update_grad[AddTensor](b_grad)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
@@ -2620,7 +2574,7 @@ struct Tensor[dtype: DType = DType.float32](
 
             fn grad_fn() raises:
                 upstream_grad = result.address()[].grad[]
-                self.address()[].accummulate_grad(upstream_grad.T())
+                self.address()[].update_grad[AddTensor](upstream_grad.T())
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self)
@@ -2729,7 +2683,7 @@ struct Tensor[dtype: DType = DType.float32](
                     grad_contrib = Tensor[dtype].full(
                         self.address()[].shape, scalar_grad, requires_grad=False
                     )
-                    self.address()[].accummulate_grad(grad_contrib)
+                    self.address()[].update_grad[AddTensor](grad_contrib)
                     return
 
                 var expanded = upstream_grad
