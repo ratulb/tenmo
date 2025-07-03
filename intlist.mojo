@@ -4,6 +4,10 @@ from common_utils import log_debug
 
 from testing import assert_true, assert_false
 
+fn test_slice() raises:
+    il = IntList.range_list(15)
+    sliced = il[2::3]
+    assert_true(sliced == IntList(2, 5, 8, 11, 14), "slice assertion failed")
 
 fn test_deduplicate() raises:
     il = IntList(9, 2, 9, 1, 4, 3, 1, 5, 7, 2, 1, 4, 7)
@@ -62,9 +66,9 @@ fn test_indices_of() raises:
     assert_true(indices == IntList.Empty, "indices_of assertion 4 failed")
 
 
-fn test_occurence() raises:
+fn test_count() raises:
     il = IntList(0, 3, 0, 5, 0)
-    assert_true(il.occurence(0) == 3, "occurence assertion failed")
+    assert_true(il.count(0) == 3, "count assertion failed")
 
 
 fn test_bulk_replace() raises:
@@ -317,8 +321,7 @@ fn test_init() raises:
 
 
 fn main() raises:
-    il = IntList(1, 2, 99)
-    print(il[0], il[1], il[2])
+    test_slice()
     test_deduplicate()
     test_init()
     test_range_list()
@@ -326,7 +329,7 @@ fn main() raises:
     test_has_duplicates()
     test_indices_of()
     test_bulk_replace()
-    test_occurence()
+    test_count()
     test_bulk_insert()
     test_with_capacity_fill()
     test_select()

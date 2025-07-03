@@ -1,18 +1,134 @@
 from common_utils import do_assert, assert_grad
 
 
+fn test_scalar_mul_scalar() raises:
+    var a = Tensor.scalar(3.0, requires_grad=True)
+    var b = Tensor.scalar(4.0, requires_grad=True)
+
+    var c = a * b
+    Tensor.walk_backward(c)
+
+    assert_true(c.item() == 12.0)
+    assert_true(a.grad[].item() == 4.0)
+    assert_true(b.grad[].item() == 3.0)
+
+
+fn test_1d_mul_1d_same_shape() raises:
+    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var b = Tensor.d1([4.0, 5.0, 6.0], requires_grad=True)
+
+    var c = a * b
+    c.sum().backward()
+
+    assert_true((c == Tensor.d1([4.0, 10.0, 18.0])).all_true())
+    assert_true(a.grad[].all_close(Tensor.d1([4.0, 5.0, 6.0])))
+    assert_true(b.grad[].all_close(Tensor.d1([1.0, 2.0, 3.0])))
+
+
+fn test_2d_mul_2d_same_shape() raises:
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor.d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
+
+    var c = a * b
+    c.sum().backward()
+
+    assert_true((c == Tensor.d2([[5.0, 12.0], [21.0, 32.0]])).all_true())
+    assert_true(a.grad[].all_close(b))
+    assert_true(b.grad[].all_close(a))
+
+
+fn test_broadcast_2d_1d_mul() raises:
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor.d1([5.0, 6.0], requires_grad=True).to_dtype[DType.float32]()
+
+    var c = a * b  # broadcasts b along rows
+    c.sum().backward()
+
+    assert_true((c == Tensor.d2([[5.0, 12.0], [15.0, 24.0]])).all_true())
+    assert_true(a.grad[].all_close(Tensor.d2([[5.0, 6.0], [5.0, 6.0]])))
+
+    # b.grad should sum over rows
+    assert_true(
+        b.grad[].all_close(Tensor.d1([4.0, 6.0]).to_dtype[DType.float32]())
+    )
+
+
+fn test_broadcast_1d_2d_mul() raises:
+    var a = Tensor.d1([2.0, 3.0], requires_grad=True).to_dtype[DType.float32]()
+    var b = Tensor.d2([[4.0, 5.0], [6.0, 7.0]], requires_grad=True)
+
+    var c = a * b  # a broadcasts over rows
+    c.sum().backward()
+
+    assert_true((c == Tensor.d2([[8.0, 15.0], [12.0, 21.0]])).all_true())
+
+    assert_true(
+        a.grad[].all_close(Tensor.d1([10.0, 12.0]).to_dtype[DType.float32]())
+    )
+    assert_true(b.grad[].all_close(Tensor.d2([[2.0, 3.0], [2.0, 3.0]])))
+
+
+fn test_3d_broadcast_mul() raises:
+    var a = Tensor.d3(
+        [[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True
+    )  # shape (2, 2, 1)
+    var b = Tensor.d3([[[5.0, 6.0]]], requires_grad=True)  # shape (1, 1, 2)
+
+    var c = a * b  # result shape (2, 2, 2)
+    c.sum().backward()
+
+    assert_true(c.shape == Shape.of(2, 2, 2))
+    assert_true(a.grad[].shape == Shape.of(2, 2, 1))
+    assert_true(b.grad[].shape == Shape.of(1, 1, 2))
+
+
+fn test_mul_one_requires_grad() raises:
+    var a = Tensor.d1([1.0, 2.0, 3.0])  # no grad
+    var b = Tensor.d1([4.0, 5.0, 6.0], requires_grad=True)
+
+    var c = a * b
+    c.sum().backward()
+
+    assert_true(b.grad[].all_close(a))
+
+
+fn test_scalar_tensor_mul() raises:
+    var a = Tensor.scalar(2.0, requires_grad=True)
+    var b = Tensor.d1([1.0, 2.0, 3.0])
+
+    var c = a * b
+    c.sum().backward()
+
+    assert_true(a.grad[].item() == 6.0)  # sum of b
+
+
+fn test_unsqueeze() raises:
+    _ = """tensor = Tensor.rand(2,3, requires_grad=True)
+    tensor2 = tensor.unsqueeze(0)
+    tensor.print()
+    tensor2.target[].print()
+    tensor2[IntList(0, 0, 0)] = 100
+    tensor.print()
+    tensor2.target[].print()"""
+    pass
+
+
 fn test_tensor_mean() raises:
     a = Tensor.scalar(5.0, requires_grad=True)
     m = a.mean()
     m.backward()
     assert_true(m.item() == 5.0)
     assert_true(a.grad[].item() == 1.0)
+    a.free()
+    m.free()
 
     a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     m = a.mean()
     assert_true(m.item() == 2.0)
     m.backward()
     assert_true(a.grad[].all_close(Tensor.d1([1 / 3, 1 / 3, 1 / 3])))
+    a.free()
+    m.free()
 
     A = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     M = A.mean()
@@ -20,6 +136,8 @@ fn test_tensor_mean() raises:
     M.backward()
     expected = Tensor.d2([[0.25, 0.25], [0.25, 0.25]])
     assert_true(A.grad[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])))
+    A.free()
+    M.free()
 
     a1 = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     m1 = a1.mean(axes=[0], keepdims=False)
@@ -76,18 +194,18 @@ fn test_forward_multivariate_prediction() raises:
 
 
 fn test_weights_bias_gradients() raises:
-    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
-    var w = Tensor.d2([[0.1], [0.2]], requires_grad=True)
-    var b = Tensor[DType.float32].d1([0.5], requires_grad=True)
-    var target = Tensor.d2([[1.0], [2.0]])
+    var xx = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var ww = Tensor.d2([[0.1], [0.2]], requires_grad=True)
+    var bb = Tensor[DType.float32].d1([0.5], requires_grad=True)
+    var target_ = Tensor.d2([[1.0], [2.0]])
 
-    var y_pred = x.matmul(w) + b
-    var loss = ((y_pred - target) ** 2).mean([])
-    Tensor.walk_backward(loss)
+    var y_prediction = xx.matmul(ww) + bb
+    var _loss = ((y_prediction - target_) ** 2).mean([])
+    Tensor.walk_backward(_loss)
 
     # Gradient should flow to w and b
-    assert_true(w.grad[].shape == w.shape)
-    assert_true(b.grad[].shape == b.shape)
+    assert_true(ww.grad[].shape == ww.shape)
+    assert_true(bb.grad[].shape == bb.shape)
 
 
 fn test_training_convergence() raises:
@@ -100,7 +218,7 @@ fn test_training_convergence() raises:
     for epoch in range(1000):
         var y_pred = x.matmul(w) + b
         var loss = ((y_pred - y) ** 2).mean()
-        loss.print()
+        # loss.print()
         Tensor.walk_backward(loss)
 
         # SGD
@@ -1252,21 +1370,29 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 fn main() raises:
-    # test_transpose_matmul()
-    test_matmul_optim()
-    # test_training_convergence()
+    _ = """test_scalar_mul_scalar()
+    test_1d_mul_1d_same_shape()
+    test_2d_mul_2d_same_shape()
+    test_broadcast_2d_1d_mul()
+    test_broadcast_1d_2d_mul()
+    test_3d_broadcast_mul()
+    test_scalar_tensor_mul()
+    test_mul_one_requires_grad()
+    test_transpose_matmul()
+    #test_matmul_optim()
+    test_training_convergence()"""
+    test_broadcast_add()
     # test_tensor_mean()
-    _ = """test_forward_multivariate_prediction()
-    test_weights_bias_gradients()
-    """
+    # test_grad_flow_through_reshape()
+    # test_forward_multivariate_prediction()
+    # test_weights_bias_gradients()
+
     _ = """test_transpose_gradients()
     test_reshape_grad_flow()
     test_reshape_gradient()
     test_broadcast_mul()
     test_broadcast_sub()
-    test_broadcast_add()
     test_reshape()
-    test_grad_flow_through_reshape()
     # test_reshape_preserves_grad_accumulation()
     test_power()
 
@@ -1343,9 +1469,7 @@ struct Tensor[dtype: DType = DType.float32](
     var grad: Self.GradBox
     var ancestors: Ancestors[dtype]
     var grad_fn: Optional[fn () escaping raises -> None]
-    var parent_grad_contrib: UnsafePointer[
-        Tensor[dtype]
-    ]  # Only allocated for reshaped Tensors
+    var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -1363,7 +1487,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.ancestors = Ancestors[dtype].untracked()
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
-        self.parent_grad_contrib = UnsafePointer[Tensor[dtype]]()
+        self.base = UnsafePointer[Tensor[dtype]]()
         self.data = data
         self.init_gradbox()
 
@@ -1372,7 +1496,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.shape = shape
         self.requires_grad = requires_grad
         self.ancestors = Ancestors[dtype].untracked()
-        self.parent_grad_contrib = UnsafePointer[Tensor[dtype]]()
+        self.base = UnsafePointer[Tensor[dtype]]()
         self.grad_fn = None
         self.grad = UnsafePointer[__type_of(self)]()
         if shape.ndim == 0:  # Tensor with Shape ()
@@ -1414,7 +1538,7 @@ struct Tensor[dtype: DType = DType.float32](
         for each in traced.__reversed__():
             each[].invoke_grad_fn(verbose)
 
-    fn backward(
+    _ = """fn backward(
         self,
         start_grad: Scalar[dtype] = 1.0,
         start: Bool = True,
@@ -1430,7 +1554,10 @@ struct Tensor[dtype: DType = DType.float32](
             self.grad[].fill(start_grad)
         self.invoke_grad_fn(verbose)
         for ancestor in self.ancestors:
-            ancestor[].backward(start=False)
+            ancestor[].backward(start=False)"""
+
+    fn backward(self) raises:
+        Tensor.walk_backward(self)
 
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
@@ -1509,7 +1636,7 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
         self.grad = other.grad
-        self.parent_grad_contrib = other.parent_grad_contrib
+        self.base = other.base
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
 
@@ -1519,7 +1646,7 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
         self.grad = other.grad
-        self.parent_grad_contrib = other.parent_grad_contrib
+        self.base = other.base
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
         self.init_gradbox()
@@ -1948,113 +2075,54 @@ struct Tensor[dtype: DType = DType.float32](
 
         if self.requires_grad or other.requires_grad:
             self_ptr = self.address()
+            that_ptr = other.address()
 
             fn grad_fn() raises -> None:
                 this = self_ptr[]
+                that = that_ptr[]
                 var grad_contrib: Tensor[dtype]
 
-                if self.address()[].requires_grad:
+                if this.requires_grad:
                     upstream_grad = result.address()[].grad[]
-                    if result.address()[].grad[].shape == Shape.Void:
-                        grad_contrib = Tensor[dtype].full(
-                            self.address()[].shape,
-                            result.address()[].grad[].item(),
-                            requires_grad=False,
-                        )
-                    else:
-                        if result.address()[].shape != result.address()[].shape:
-                            grad_contrib = upstream_grad.sum(
-                                axes=self.address()[]
-                                .broadcast_mask(result.address()[].shape)
-                                .indices_of(1),
-                                keepdims=True,
-                            ).reshape(self.address()[].shape)
-                        else:
-                            grad_contrib = result.address()[].grad[]
-                        grad_contrib.requires_grad = False
-                    self.address()[].accummulate_grad(grad_contrib)
-
-                if other.address()[].requires_grad:
-                    if result.address()[].grad[].shape == Shape.Void:
-                        grad_contrib = Tensor[dtype].full(
-                            other.address()[].shape,
-                            result.address()[].grad[].item(),
-                            requires_grad=False,
-                        )
-                    else:
-                        _ = """grad_contrib = (
-                            result.address()[]
-                            .grad[]
-                            .sum(
-                                axes=other.address()[]
-                                .broadcast_mask(result.address()[].shape)
-                                .indices_of(1),
-                                keepdims=True,
-                            )
-                            .reshape(other.address()[].shape)
-                        )
-                    grad_contrib.requires_grad = False
-                    other.address()[].accummulate_grad(grad_contrib)"""
-                        axes = (
-                            other.address()[]
-                            .broadcast_mask(result.address()[].shape)
-                            .indices_of(1)
-                        )
-                        reduced = (
-                            result.address()[]
-                            .grad[]
-                            .sum(axes=axes, keepdims=True)
-                        )
-                        reduced = (
-                            result.address()[]
-                            .grad[]
-                            .sum(axes=axes, keepdims=True)
-                        )
-                        if reduced.shape != other.address()[].shape:
-                            reduced = reduced.reshape(other.address()[].shape)
-
-                        grad_contrib = reduced
-                    grad_contrib.requires_grad = False
-                    other.address()[].accummulate_grad(grad_contrib)
-
-                _ = """if this.requires_grad:
-                    print("upstream.shape =", upstream_grad.shape)
-                    print("this.shape =", this.shape)
-                    print("forward_shape =", forward_shape)
-
-                    var grad_contrib: Tensor[dtype]
                     if upstream_grad.shape == Shape.Void:
-
                         grad_contrib = Tensor[dtype].full(
-                            this.shape, upstream_grad.item()
+                            this.shape,
+                            upstream_grad.item(),
+                            requires_grad=False,
                         )
                     else:
-                        axes = this.broadcast_mask(forward_shape).indices_of(1)
-                        var summed = upstream_grad.sum(axes=axes, keepdims=True)
-
-                        if summed.shape != this.shape:
-                            summed = summed.broadcast_to(this.shape)
-
-                        grad_contrib = summed
-
+                        if this.shape != upstream_grad.shape:
+                            grad_contrib = upstream_grad.sum(
+                                axes=this.broadcast_mask(
+                                    upstream_grad.shape
+                                ).indices_of(1),
+                                keepdims=True,
+                            ).reshape(this.shape)
+                        else:
+                            grad_contrib = upstream_grad
+                    grad_contrib.requires_grad = False
                     this.accummulate_grad(grad_contrib)
 
                 if that.requires_grad:
-                    var grad_contrib: Tensor[dtype]
+                    upstream_grad = result.address()[].grad[]
                     if upstream_grad.shape == Shape.Void:
                         grad_contrib = Tensor[dtype].full(
-                            that.shape, upstream_grad.item()
+                            that.shape,
+                            upstream_grad.item(),
+                            requires_grad=False,
                         )
                     else:
-                        axes = that.broadcast_mask(forward_shape).indices_of(1)
-                        var summed = upstream_grad.sum(axes=axes, keepdims=True)
-
-                        if summed.shape != that.shape:
-                            summed = summed.broadcast_to(that.shape)
-
-                        grad_contrib = summed
-
-                    that.accummulate_grad(grad_contrib)"""
+                        if that.shape != upstream_grad.shape:
+                            grad_contrib = upstream_grad.sum(
+                                axes=that.broadcast_mask(
+                                    upstream_grad.shape
+                                ).indices_of(1),
+                                keepdims=True,
+                            ).reshape(that.shape)
+                        else:
+                            grad_contrib = upstream_grad
+                    grad_contrib.requires_grad = False
+                    that.accummulate_grad(grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
@@ -2129,27 +2197,37 @@ struct Tensor[dtype: DType = DType.float32](
                 output = result.address()[]
                 output_shape = output.shape
                 upstream_grad = output.grad[]
+                var grad_contrib: Tensor[dtype]
                 print("All encompassing check1")
                 if this.requires_grad:
                     unreduced_grad = Self.grad_unreduced(that, upstream_grad)
-
+                    print(
+                        "All encompassing check1 ",
+                        unreduced_grad.shape,
+                        output_shape,
+                        this.shape,
+                        that.shape,
+                    )
                     reduced_and_reshaped = unreduced_grad.sum(
                         axes=this.broadcast_mask(output_shape).indices_of(1),
                         keepdims=True,
                     ).reshape(this.shape)
-
+                    print("All encompassing check100")
                     this.grad[] = __tensor_op_tensor__[dtype, AddTensor](
                         this.grad[], reduced_and_reshaped
                     )
+                    print("All encompassing check101")
 
                 if that.requires_grad:
                     unreduced_grad = Self.grad_unreduced(this, upstream_grad)
 
+                    print("All encompassing check200")
                     reduced_and_reshaped = unreduced_grad.sum(
                         axes=that.broadcast_mask(output_shape).indices_of(1),
                         keepdims=True,
                     ).reshape(that.shape)
 
+                    print("All encompassing check201")
                     that.grad[] = __tensor_op_tensor__[dtype, AddTensor](
                         that.grad[], reduced_and_reshaped
                     )
@@ -2584,10 +2662,10 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         if requires_grad:
-            # Only allocate parent_grad_contrib if needed
-            parent_grad_contrib = Tensor[dtype].zeros(self.shape)
-            result.parent_grad_contrib = UnsafePointer[Tensor[dtype]].alloc(1)
-            result.parent_grad_contrib.init_pointee_move(parent_grad_contrib^)
+            # Only allocate base if needed
+            base = Tensor[dtype].zeros(self.shape)
+            result.base = UnsafePointer[Tensor[dtype]].alloc(1)
+            result.base.init_pointee_move(base^)
 
             fn grad_fn() raises -> None:
                 upstream_grad = (
@@ -2595,34 +2673,31 @@ struct Tensor[dtype: DType = DType.float32](
                 )
                 # Calculate new contribution (exclude already accumulated)
                 new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
-                    upstream_grad, result.address()[].parent_grad_contrib[]
+                    upstream_grad, result.address()[].base[]
                 )
                 # Update parent gradient
                 self.address()[].grad[] = __tensor_op_tensor__[
                     dtype, AddTensor
                 ](self.address()[].grad[], new_contrib)
                 # Update accumulator
-                # result.address()[].parent_grad_contrib[] = upstream_grad
-                result.address()[].parent_grad_contrib.init_pointee_move(
-                    upstream_grad^
-                )
+                # result.address()[].base[] = upstream_grad
+                result.address()[].base.init_pointee_move(upstream_grad^)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self)
 
         return result
 
+    fn unsqueeze(self, dim: Int) -> View[__origin_of(self), self.dtype]:
+        new_shape = self.shape.intlist().insert(dim, 1)
+        # result = Tensor[dtype](Shape(new_shape), requires_grad=self.requires_grad)
+        # result.data = self.data  # share same data
+        return self.view(Shape(new_shape))
+        # return result
+
     fn mean(
         self, axes: List[Int] = [], keepdims: Bool = False
     ) -> Tensor[dtype]:
-        _ = """_rank = self.shape.rank()
-        _axes = IntList()
-        if axes == [-1]:
-            _axes = IntList(_rank - 1)
-        elif len(axes) == 0:
-            _axes = IntList.range_list(_rank)
-        else:
-            _axes = IntList.new(axes)"""
         return self.mean(IntList.new(axes), keepdims)
 
     fn mean(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
@@ -2670,9 +2745,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
 
                 # Broadcast and divide
-                print("You here vomitting?")
                 broadcasted = expanded.broadcast_to(self.address()[].shape)
-                print("You here not vomitting?")
                 scaled = broadcasted / Scalar[dtype](count)
                 self.address()[].grad[] = __tensor_op_tensor__[
                     dtype, AddTensor
@@ -2687,15 +2760,6 @@ struct Tensor[dtype: DType = DType.float32](
         return result
 
     fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
-        _ = """_rank = self.shape.rank()
-        _axes = IntList()
-        if axes == [-1]:
-            _axes = IntList(_rank - 1)
-        elif len(axes) == 0:
-            _axes = IntList.range_list(_rank)
-        else:
-            _axes = IntList.new(axes)"""
-
         return self.sum(IntList.new(axes), keepdims)
 
     fn sum(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
@@ -2803,18 +2867,6 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(self)
 
         return out
-
-    fn _compute_grad_shape(self, axes: IntList, keepdims: Bool) -> IntList:
-        """Shape for gradient before broadcasting."""
-        rank = self.shape.rank()
-        grad_shape = IntList.with_capacity(rank)
-        for i in range(rank):
-            if i in axes:
-                if keepdims:
-                    grad_shape.append(1)
-            else:
-                grad_shape.append(self.shape[i])
-        return grad_shape
 
     @staticmethod
     fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
@@ -3350,6 +3402,16 @@ struct Tensor[dtype: DType = DType.float32](
         mask = self.shape.broadcast_mask(target_shape)
         return View(Pointer(to=self), concrete, mask, target_shape)
 
+    fn view2(self) -> View2[self.dtype]:
+        return View2(UnsafePointer(to=self))
+
+
+@fieldwise_init
+struct View2[
+    dtype: DType = DType.float32,
+]:
+    var target: UnsafePointer[Tensor[dtype]]
+
 
 @fieldwise_init
 struct View[
@@ -3370,6 +3432,15 @@ struct View[
                 indices, self.mask, self.target_shape
             )
             return self.target[][target_idx]
+
+    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
+        if self.concrete:
+            self.target[].__setitem__(indices, value)
+        else:
+            target_idx = self.target[].shape.translate_index(
+                indices, self.mask, self.target_shape
+            )
+            self.target[].__setitem__(target_idx, value)
 
 
 from testing import assert_true
