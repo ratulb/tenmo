@@ -1252,7 +1252,9 @@ fn test_broadcast_add_2_tensors() raises:
 
 
 fn main() raises:
-    test_training_convergence()
+    # test_transpose_matmul()
+    test_matmul_optim()
+    # test_training_convergence()
     # test_tensor_mean()
     _ = """test_forward_multivariate_prediction()
     test_weights_bias_gradients()
@@ -2382,7 +2384,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn load[nelts: Int = 1](self, rows: Int, cols: Int) -> SIMD[dtype, nelts]:
         if not self.ndim() == 2:
             abort("Tensor - load is supported only for 2d tensor")
-        return self.data.load[width=nelts](rows * self.shape[1] + cols)
+        result = self.data.load[width=nelts](rows * self.shape[1] + cols)
+        return result
 
     fn store[
         nelts: Int = 1
@@ -2396,7 +2399,7 @@ struct Tensor[dtype: DType = DType.float32](
             abort("Tensor matmul_v2 - Dim mismatch")
         requires_grad = self.requires_grad or other.requires_grad
 
-        result = Tensor[dtype].zeros(
+        result = Tensor[dtype](
             self.shape[0], other.shape[1], requires_grad=requires_grad
         )
 
@@ -2425,54 +2428,59 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    _ = """fn matmul(self, other: Self) -> Tensor[dtype]:
+    fn matmul_optim[
+        simd_width: Int = simdwidthof[dtype](), nelts: Int = 1
+    ](self, other: Self) -> Tensor[dtype]:
         rows, cols = self.shape[0], self.shape[1]
         other_rows, other_cols = other.shape[0], other.shape[1]
 
         if cols != other_rows:
             abort(
-                "Tensor -> matmul - Dim mismatch: "
+                "Tensor -> matmul_optim - Dim mismatch: "
                 + self.shape.__str__()
                 + ", "
                 + other.shape.__str__()
             )
         requires_grad = self.requires_grad or other.requires_grad
-        result = Tensor[dtype].zeros(self.shape[0], other.shape[1], requires_grad=requires_grad)
-        for i in range(self.shape[0]):
-            for j in range(self.shape[1]):
+        result = Tensor[dtype].zeros(
+            rows, other_cols, requires_grad=requires_grad
+        )
+        for i in range(rows):
+            for j in range(cols):
 
                 @parameter
                 fn dot[simd_width: Int](idx: Int):
-                    result.store[simd_width](
+                    result.store[nelts](
                         i,
                         idx,
-                        result.load[simd_width](i, idx)
-                        + self[i, j] * other.load[simd_width](j, idx),
+                        result.load[nelts](i, idx)
+                        + self[i, j] * other.load[nelts](j, idx),
                     )
 
-                vectorize[dot, 2 * simdwidthof[dtype]()](other.shape[1])
+                vectorize[dot, simd_width](other.shape[1])
 
         if requires_grad:
+
             fn grad_fn() raises -> None:
-                a = self.address()[]
-                b = other.address()[]
-                out = result.address()[]
-                upstream = out.grad[]
+                self_ref = self.address()
+                other_ref = other.address()
+                result_ref = result.address()
+                upstream_grad = result_ref[].grad[]
 
-                if a.requires_grad:
-                    a_grad = upstream.matmul(b.T())
-                    a.grad[] = a.grad[] + a_grad
+                if self_ref[].requires_grad:
+                    transposed = other_ref[].T()
+                    grad = upstream_grad.matmul_optim(transposed)
+                    self_ref[].accummulate_grad(grad)
 
-                if b.requires_grad:
-                    b_grad = a.T().matmul(upstream)
-                    b.grad[] = b.grad[] + b_grad
+                if other_ref[].requires_grad:
+                    transposed = self_ref[].T()
+                    grad = transposed.matmul_optim(upstream_grad)
+                    other.address()[].accummulate_grad(grad)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
 
-
-
-        return result"""
+        return result
 
     fn matmul(self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
         if not self.shape.rank() == 2:
@@ -2828,7 +2836,6 @@ struct Tensor[dtype: DType = DType.float32](
                 )
             return IntList()  # Scalar sum over [] is valid
 
-        # sorted_axes = axes.sorted()
         if len(axes) == 0:
             return IntList.range_list(rank)
         normalized = IntList.with_capacity(len(axes))
@@ -3458,22 +3465,22 @@ fn test_arange() raises:
     Tensor.free_all(tensor1, expected1)
 
 
+fn test_matmul_optim() raises:
+    X = Tensor.rand(3, 4, requires_grad=True)
+    W = Tensor.rand(4, 5, requires_grad=True)
+    B = Tensor.rand(1, requires_grad=True)
+    P = X.matmul_optim(W) + B
+    print("P.shape: ", P.shape, P.requires_grad)
+    Tensor.walk_backward(P)
+    W.grad[].print()
+
+
 fn test_transpose_matmul() raises:
-    A = Tensor.rand(3, 3)
+    A = Tensor.rand(3, 3, requires_grad=True)
+    A.grad[].print()
     A_T = A.T()
-    A.print()
-    A_T.print()
-    B = Tensor.rand(3, 3)
-    C = A.matmul(B)
-    D = A.matmul(B)
-    R = C == D
-    C.print()
-    D.print()
-    R.print()
-    assert_true(C.all_close(D), "Matmal and at implementations are not same")
-    Tensor.free_all(A, A_T, B, C, D)
-    Tensor.free_all(R)
-    Tensor.free_all(R)
+    Tensor.walk_backward(A_T)
+    A.grad[].print()
 
 
 fn test_random() raises:

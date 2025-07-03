@@ -529,19 +529,19 @@ struct IntList(Sized & Copyable):
         final_size = n + m
         # Step 3: Create dense result
         result = IntList.with_capacity(final_size)
-        insert_cursor = 0
-        original_cursor = 0
+        red_cursor = 0
+        orig_cursor = 0
         for i in range(final_size):
-            if insert_cursor < m and indices[insert_cursor] == i:
-                result.append(values[insert_cursor])
-                insert_cursor += 1
+            if red_cursor < m and indices[red_cursor] == i:
+                result.append(values[red_cursor])
+                red_cursor += 1
             else:
-                if original_cursor >= n:
+                if orig_cursor >= n:
                     abort(
                         "IntList -> insert: ran out of source values too early"
                     )
-                result.append(self[original_cursor])
-                original_cursor += 1
+                result.append(self[orig_cursor])
+                orig_cursor += 1
         return result
 
     fn insert(self, at: Int, value: Int) -> IntList:

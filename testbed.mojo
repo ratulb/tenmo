@@ -12,15 +12,15 @@ fn test_training_convergence() raises:
     var w = Tensor.rand(2, 1, requires_grad=True)
     var b = Tensor.rand(1, requires_grad=True)
 
-    for epoch in range(1000):
+    for epoch in range(10000):
         var y_pred = x.matmul(w) + b
         var loss = ((y_pred - y) ** 2).mean()
-        print("loss: ", loss.item())
+        #print("loss: ", loss.item())
         Tensor.walk_backward(loss)
 
         # SGD
-        w.data[] -= 0.01 * w.grad[].data[]
-        b.data[] -= 0.01 * b.grad[].data[]
+        w.data[] -= 0.011 * w.grad[].data[]
+        b.data[] -= 0.011 * b.grad[].data[]
         w.zero_grad()
         b.zero_grad()
 
@@ -52,3 +52,19 @@ fn main() raises:
     w.grad[].print()
     print("\nb.grad:\n")
     b.grad[].print()"""
+
+    _="""
+    y_pred = x.matmul(w) + b
+        = [[1*1 + 2*1]] + 1 = [[3.0]] + 1 = [[4.0]]
+    loss = (4 - 13)^2 = 81.0"""
+
+    _="""
+    dL/dy_pred = 2 * (y_pred - y) / N = 2 * (4 - 13) = -18.0
+
+    dL/dw = x.T.matmul(dL/dy_pred) = [[1], [2]] * -18.0 = [[-18], [-36]]
+    dL/db = sum(-18.0) = -18.0"""
+
+
+
+
+
