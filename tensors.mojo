@@ -42,7 +42,11 @@ fn test_broadcast_2d_1d_mul() raises:
     var b = Tensor.d1([5.0, 6.0], requires_grad=True).to_dtype[DType.float32]()
 
     var c = a * b  # broadcasts b along rows
-    c.sum().backward()
+    c.print()
+    summ = c.sum()
+    summ.print()
+
+    summ.backward()
 
     assert_true((c == Tensor.d2([[5.0, 12.0], [15.0, 24.0]])).all_true())
     assert_true(a.grad[].all_close(Tensor.d2([[5.0, 6.0], [5.0, 6.0]])))
@@ -646,6 +650,14 @@ fn test_broadcast_mul() raises:
 
 fn test_broadcast_sub() raises:
     # 1. Scalar - Scalar
+    X = Tensor.scalar(100, requires_grad=True)
+    summ = (X - X).sum()
+    summ.backward()
+    assert_grad(X, Tensor.scalar(0), "(X - X) scalars -> a")
+    summ = (X - X - X - X).sum()
+    summ.backward()
+    assert_true(X.grad[].item() == -2)
+    assert_grad(X, Tensor.scalar(-2), "(X - X - X - X) scalars -> a")
     a = Tensor.scalar(5, requires_grad=True)
     b = Tensor.scalar(3, requires_grad=True)
     c = a - b
@@ -1369,9 +1381,8 @@ fn test_broadcast_add_2_tensors() raises:
     )
 
 
-fn main() raises:
-    test_broadcast_sub()
-    _ = """test_scalar_mul_scalar()
+fn test_tensor_multiplications() raises:
+    test_scalar_mul_scalar()
     test_1d_mul_1d_same_shape()
     test_2d_mul_2d_same_shape()
     test_broadcast_2d_1d_mul()
@@ -1379,21 +1390,26 @@ fn main() raises:
     test_3d_broadcast_mul()
     test_scalar_tensor_mul()
     test_mul_one_requires_grad()
-    test_transpose_matmul()
-    #test_matmul_optim()
-    test_training_convergence()"""
-    test_broadcast_add()
-    # test_tensor_mean()
-    # test_grad_flow_through_reshape()
-    # test_forward_multivariate_prediction()
-    # test_weights_bias_gradients()
 
-    _ = """test_transpose_gradients()
+
+fn main() raises:
+    test_tensor_multiplications()
+    test_broadcast_add()
+    test_broadcast_sub()
+    _ = """test_transpose_matmul()
+    #test_matmul_optim()
+    test_training_convergence()
+    test_tensor_mean()
+    test_grad_flow_through_reshape()
+    test_forward_multivariate_prediction()
+    test_weights_bias_gradients()
+
+    test_transpose_gradients()
     test_reshape_grad_flow()
     test_reshape_gradient()
     test_broadcast_mul()
     test_reshape()
-    # test_reshape_preserves_grad_accumulation()
+    test_reshape_preserves_grad_accumulation()
     test_power()
 
     test_add_2_tensors()
@@ -2079,114 +2095,75 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn() raises -> None:
                 this = self_ptr[]
                 that = that_ptr[]
-                var grad_contrib: Tensor[dtype]
 
                 if this.requires_grad:
                     upstream_grad = result.address()[].grad[]
-                    if upstream_grad.shape == Shape.Void:
-                        grad_contrib = Tensor[dtype].full(
-                            this.shape,
-                            upstream_grad.item(),
-                            requires_grad=False,
-                        )
-                    else:
-                        if this.shape != upstream_grad.shape:
-                            grad_contrib = upstream_grad.sum(
-                                axes=this.broadcast_mask(
-                                    upstream_grad.shape
-                                ).indices_of(1),
-                                keepdims=True,
-                            ).reshape(this.shape)
-                        else:
-                            grad_contrib = upstream_grad
-                    grad_contrib.requires_grad = False
+                    grad_contrib = this.backward_grad_contrib(
+                        that, upstream_grad, False
+                    )
+
                     this.update_grad[tensor_op_first](grad_contrib)
 
                 if that.requires_grad:
                     upstream_grad = result.address()[].grad[]
-                    if upstream_grad.shape == Shape.Void:
-                        grad_contrib = Tensor[dtype].full(
-                            that.shape,
-                            upstream_grad.item(),
-                            requires_grad=False,
-                        )
-                    else:
-                        if that.shape != upstream_grad.shape:
-                            grad_contrib = upstream_grad.sum(
-                                axes=that.broadcast_mask(
-                                    upstream_grad.shape
-                                ).indices_of(1),
-                                keepdims=True,
-                            ).reshape(that.shape)
-                        else:
-                            grad_contrib = upstream_grad
-                    grad_contrib.requires_grad = False
+                    grad_contrib = that.backward_grad_contrib(
+                        this, upstream_grad, False
+                    )
+
                     that.update_grad[tensor_op_second](grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
         return result
 
+    fn backward_grad_contrib(
+        self,
+        other: Tensor[dtype],
+        upstream_grad: Tensor[dtype],
+        do_multiply: Bool,
+    ) -> Tensor[dtype]:
+        var grad_contrib: Tensor[dtype]
+
+        if upstream_grad.shape == Shape.Void:
+            grad_contrib = Tensor[dtype].full(
+                self.shape, upstream_grad.item(), requires_grad=False
+            )
+        else:
+            grad_contrib = (
+                upstream_grad * other if do_multiply else upstream_grad
+            )
+            if grad_contrib.shape != self.shape:
+                axes = self.broadcast_mask(grad_contrib.shape).indices_of(1)
+                grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
+            if grad_contrib.shape != self.shape:
+                grad_contrib = grad_contrib.reshape(self.shape)
+            grad_contrib.requires_grad = False
+
+        return grad_contrib
+
     fn broadcast_mul(
         self: Self,
         other: Self,
     ) -> Tensor[dtype]:
-        result_shape = self.broadcast_shape(other)
-        mask1 = self.broadcast_mask(result_shape)
-        mask2 = other.broadcast_mask(result_shape)
+        result = self.broadcast_op(other, scalar_ops[dtype, Multiply])
         requires_grad = self.requires_grad or other.requires_grad
-
-        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
-
-        for idx in result_shape:
-            this_idx = self.translate_index(idx, mask1, result_shape)
-            that_idx = other.translate_index(idx, mask2, result_shape)
-            result[idx] = self[this_idx] * other[that_idx]
-
         if requires_grad:
 
             fn grad_fn() raises -> None:
                 this = self.address()[]
                 that = other.address()[]
                 output = result.address()[]
-                output_shape = output.shape
                 upstream_grad = output.grad[]
-                var grad_contrib: Tensor[dtype]
-                print("All encompassing check1")
                 if this.requires_grad:
-                    unreduced_grad = Self.grad_unreduced(that, upstream_grad)
-                    print(
-                        "All encompassing check1 ",
-                        unreduced_grad.shape,
-                        output_shape,
-                        this.shape,
-                        that.shape,
+                    grad_contrib = this.backward_grad_contrib(
+                        that, upstream_grad, True
                     )
-                    reduced_and_reshaped = unreduced_grad.sum(
-                        axes=this.broadcast_mask(output_shape).indices_of(1),
-                        keepdims=True,
-                    ).reshape(this.shape)
-                    print("All encompassing check100")
-                    this.grad[] = __tensor_op_tensor__[dtype, AddTensor](
-                        this.grad[], reduced_and_reshaped
-                    )
-                    print("All encompassing check101")
-
+                    this.update_grad[AddTensor](grad_contrib)
                 if that.requires_grad:
-                    unreduced_grad = Self.grad_unreduced(this, upstream_grad)
-
-                    print("All encompassing check200")
-                    reduced_and_reshaped = unreduced_grad.sum(
-                        axes=that.broadcast_mask(output_shape).indices_of(1),
-                        keepdims=True,
-                    ).reshape(that.shape)
-
-                    print("All encompassing check201")
-                    that.grad[] = __tensor_op_tensor__[dtype, AddTensor](
-                        that.grad[], reduced_and_reshaped
+                    grad_contrib = that.backward_grad_contrib(
+                        this, upstream_grad, True
                     )
-
-                print("All encompassing check2")
+                    that.update_grad[AddTensor](grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
@@ -2291,7 +2268,7 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     # Element wise multiplication of two tensors
-    fn __mul__(self, other: Self) raises -> Tensor[dtype]:
+    fn __mul__(self, other: Self) -> Tensor[dtype]:
         if not self.broadcastable(other):
             abort(
                 "__mul__(self * other) -> Dimension mismatch: "
@@ -2343,12 +2320,6 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn __sub__(self, other: Self) -> Tensor[dtype]:
-        requires_grad = (
-            self.address()[].requires_grad or other.address()[].requires_grad
-        )
-        if self.address() == other.address():
-            out = Tensor[dtype].zeros_like(self.address()[], requires_grad)
-            return out
         if not self.broadcastable(other):
             abort(
                 "__sub__ -> Dimension mismatch: "
@@ -2361,6 +2332,9 @@ struct Tensor[dtype: DType = DType.float32](
             return self.broadcast_operation[
                 Subtract, AddTensor, SubtractTensor
             ](other)
+        requires_grad = (
+            self.address()[].requires_grad or other.address()[].requires_grad
+        )
 
         out = __tensor_op_tensor__[dtype, SubtractTensor](
             self.address()[], other.address()[]
@@ -2371,13 +2345,9 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn() raises -> None:
                 out_grad = out.address()[].grad[]
                 if self.address()[].requires_grad:
-                    self.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](self.address()[].grad[], out_grad)
+                    self.address()[].update_grad[AddTensor](out_grad)
                 if other.address()[].requires_grad:
-                    other.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, SubtractTensor
-                    ](other.address()[].grad[], out_grad)
+                    other.address()[].update_grad[SubtractTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
 

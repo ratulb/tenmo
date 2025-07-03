@@ -15,16 +15,6 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
         self.capacity = 0
         self.size = 0
 
-    _="""@always_inline("nodebug")
-    fn __init__(out self, *addresses: UnsafePointer[Tensor[dtype]]):
-        self.ancestors = UnsafePointer[UnsafePointer[Tensor[dtype]]].alloc(
-            len(addresses)
-        )
-        self.size = len(addresses)
-        self.capacity = len(addresses)
-        for idx in range(len(addresses)):
-            (self.ancestors + idx)[] = addresses[idx]"""
-
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
         self.size = existing.size
