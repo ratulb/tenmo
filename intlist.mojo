@@ -4,10 +4,27 @@ from common_utils import log_debug
 
 from testing import assert_true, assert_false
 
+
+fn test_prepend() raises:
+    il = IntList()
+    il.prepend(2)
+    assert_true(il == IntList(2) and len(il) == 1, "append assertion 1 failed")
+    il.prepend(1)
+    assert_true(
+        il == IntList(1, 2) and len(il) == 2, "append assertion 2 failed"
+    )
+    il = IntList(2, 3)
+    il.prepend(1)
+    assert_true(
+        il == IntList(1, 2, 3) and len(il) == 3, "append assertion 3 failed"
+    )
+
+
 fn test_slice() raises:
     il = IntList.range_list(15)
     sliced = il[2::3]
     assert_true(sliced == IntList(2, 5, 8, 11, 14), "slice assertion failed")
+
 
 fn test_deduplicate() raises:
     il = IntList(9, 2, 9, 1, 4, 3, 1, 5, 7, 2, 1, 4, 7)
@@ -321,6 +338,7 @@ fn test_init() raises:
 
 
 fn main() raises:
+    test_prepend()
     test_slice()
     test_deduplicate()
     test_init()
@@ -347,7 +365,7 @@ fn main() raises:
 
 
 @register_passable
-struct IntList(Sized & Copyable):
+struct IntList(Sized & Copyable & Stringable & Representable & Writable):
     """A memory-efficient, register-passable, dynamic array of Ints. Would abort on any erroneous condition.
     """
 
@@ -716,6 +734,12 @@ struct IntList(Sized & Copyable):
         s += "]"
         return s
 
+    fn __repr__(self) -> String:
+        return self.__str__()
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
+
     @always_inline("nodebug")
     fn copy_from(
         mut self: IntList,
@@ -774,6 +798,17 @@ struct IntList(Sized & Copyable):
             size: Number of elements to copy.
         """
         self.copy_from(offset, source, 0, size)
+
+    fn prepend(mut self, value: Int):
+        if self.size == self.capacity:
+            new_capacity = max(1, self.capacity * 2)
+            self.resize(new_capacity)
+        # Shift all elements to the right by 1
+        for i in range(self.size, 0, -1):
+            self.data[i] = self.data[i - 1]
+        # Insert the new value at the beginning
+        self.data[0] = value
+        self.size += 1
 
     fn append(mut self, value: Int):
         if self.size == self.capacity:

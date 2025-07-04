@@ -116,26 +116,6 @@ fn test_broadcast_shape() raises:
         result == Shape.of(4, 2, 5), "Shape broadcast 5 assertion failed"
     )
 
-    tensor1 = Tensor.d2([[1, 2, 3], [4, 5, 6]])
-    tensor2 = Tensor.d2([[1, 1, 1]])
-
-    shape1 = tensor1.broadcast_shape(tensor2)
-    shape2 = tensor2.broadcast_shape(tensor1)
-    shape3 = tensor1.broadcast_shape(tensor1)
-    shape4 = tensor2.broadcast_shape(tensor2)
-    print(shape1, shape2, shape3, shape3)
-    assert_true(
-        shape1 == Shape.of(2, 3)
-        and shape2 == Shape.of(2, 3)
-        and shape3 == Shape.of(2, 3)
-        and shape4 == Shape.of(1, 3),
-        (
-            "Tensor broadcast shape assertion failed for tensor sizes 2 by 3"
-            " and 1 by 3"
-        ),
-    )
-
-
 fn test_index_iter() raises:
     shape = Shape.of(1)
     for each in shape:
@@ -288,8 +268,8 @@ struct Shape(
     var ndim: Int
     var numels: Int
 
-    _ = """fn __init__(out self):
-        self = Self.Void"""
+    fn __init__(out self):
+        self = Self.Void
 
     fn __init__(out self, dims: VariadicList[Int]):
         _dims = IntList.with_capacity(len(dims))
@@ -393,17 +373,6 @@ struct Shape(
             return shape
         axes = self.intlist()[:axis] + self.intlist()[axis + 1 :]
         return Shape(axes)
-
-    _ = """@staticmethod
-    fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
-        if shape1 == shape2:
-            return shape1, shape2
-        one = IntList(1)
-        len1, len2 = len(shape1), len(shape2)
-        max_len = max(len1, len2)
-        padded1 = one * (max_len - len1) + shape1.intlist()
-        padded2 = one * (max_len - len2) + shape2.intlist()
-        return Shape(padded1), Shape(padded2)"""
 
     @staticmethod
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
@@ -538,21 +507,6 @@ struct Shape(
             index += idx * stride
             stride *= dim
         return index
-
-    _ = """fn translate_index(
-        self, indices: IntList, mask: IntList, broadcast_shape: Shape
-    ) -> IntList:
-        translated = IntList.with_capacity(self.ndim)
-        offset = broadcast_shape.ndim - self.ndim
-
-        for i in range(self.ndim):
-            broadcast_axis = i + offset
-            if mask[broadcast_axis] == 1:
-                translated.append(0)
-            else:
-                translated.append(indices[broadcast_axis])
-
-        return translated"""
 
     fn translate_index(
         self, indices: IntList, mask: IntList, broadcast_shape: Shape
