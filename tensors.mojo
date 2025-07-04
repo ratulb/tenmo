@@ -1,8 +1,18 @@
 fn main() raises:
-    tensor = Tensor([1, 2, 3])
+    tensor = Tensor([1.0])
     tensor.print()
-    tensor2 = Tensor.arange(20).reshape(2, 2, 5)
+    print(tensor.dtype)
+    tensor2 = Tensor.d2([[1, 2, 3], [4, 5, 6]])
     tensor2.print()
+    print(
+        "Tensor shape, target tensor, tensor ndim, target tensor ndmim: ",
+        tensor.shape,
+        tensor2.shape,
+        tensor.ndim(),
+        tensor2.ndim(),
+    )
+    # mask = tensor2.broadcast_mask(tensor.shape)
+    # mask.print()
 
 
 ### Mojo Tensor
@@ -47,12 +57,11 @@ struct Tensor[dtype: DType = DType.float32](
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
     alias Blocks = List[Self.Block]
-    alias GradBox = UnsafePointer[Self]
     alias Address = UnsafePointer[Tensor[dtype]]
     var shape: Shape
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
-    var grad: Self.GradBox
+    var grad: UnsafePointer[Self]
     var ancestors: Ancestors[dtype]
     var grad_fn: Optional[fn () escaping raises -> None]
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
@@ -483,9 +492,6 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[invert, simdwidthof[DType.bool]()](result.numels())
         return result
 
-    fn grad_required(self) -> Bool:
-        return self.requires_grad
-
     fn has_grad(self) -> Bool:
         return self.grad.__as_bool__() == True
 
@@ -502,7 +508,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.has_grad() and self.grad[].for_all(all_zero)
 
     fn zero_grad(self):
-        if self.grad_required() and self.has_grad():
+        if self.requires_grad and self.has_grad():
             memset_zero(self.grad[].data, self.grad[].numels())
 
     fn add_ancestry(
@@ -526,9 +532,7 @@ struct Tensor[dtype: DType = DType.float32](
                 out_grad_scaled = __tensor_op_scalar__[dtype, MulScalar](
                     out.address()[].grad[], scalar
                 )
-                self.address()[].grad[] = __tensor_op_tensor__[
-                    dtype, AddTensor
-                ](self.address()[].grad[], out_grad_scaled)
+                self.address()[].update_grad[AddTensor](out_grad_scaled)
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self)
@@ -554,10 +558,7 @@ struct Tensor[dtype: DType = DType.float32](
                 product = __tensor_op_tensor__[dtype, MulTensor](
                     out.address()[].grad[], self_powed_one_less_scaled
                 )
-
-                self.address()[].grad[] = __tensor_op_tensor__[
-                    dtype, AddTensor
-                ](self.address()[].grad[], product)
+                self.address()[].update_grad[AddTensor](product)
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self)
@@ -582,7 +583,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    @staticmethod
+    _ = """@staticmethod
     fn grad_unreduced(
         tensor: Tensor[dtype], upstream_grad: Tensor[dtype]
     ) -> Tensor[dtype]:
@@ -591,11 +592,7 @@ struct Tensor[dtype: DType = DType.float32](
         result = Tensor[dtype](upstream_grad_shape)
         for indices in upstream_grad_shape:
             result[indices] = upstream_grad[indices] * tensor_view[indices]
-        return result
-
-    @always_inline
-    fn broadcast_shape(self, other: Self) -> Shape:
-        return Shape.broadcast_shape(self.shape, other.shape)
+        return result"""
 
     @always_inline
     fn broadcast_mask(self, broadcast_shape: Shape) -> IntList:
@@ -766,13 +763,9 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn() raises -> None:
                 out_grad = out.address()[].grad[]
                 if self.address()[].requires_grad:
-                    self.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](self.address()[].grad[], out_grad)
+                    self.address()[].update_grad[AddTensor](out_grad)
                 if other.address()[].requires_grad:
-                    other.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](other.address()[].grad[], out_grad)
+                    other.address()[].update_grad[AddTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self, other)
@@ -790,11 +783,8 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
 
             fn grad_fn() raises -> None:
-                self_grad = self.address()[].grad[]
                 out_grad = out.address()[].grad[]
-                self.address()[].grad[] = __tensor_op_tensor__[
-                    dtype, AddTensor
-                ](self_grad, out_grad)
+                self.address()[].update_grad[AddTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self)
@@ -809,6 +799,11 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         vectorize[add_value, simdwidthof[dtype]()](self.numels())
+
+    fn float(self) -> Tensor[DType.float32]:
+        if self.dtype == DType.float32:
+            return rebind[Tensor[DType.float32]](self)
+        return self.to_dtype[DType.float32]()
 
     fn to_dtype[NewType: DType](self) -> Tensor[NewType]:
         result = Tensor[NewType](self.shape, self.requires_grad)
@@ -830,11 +825,8 @@ struct Tensor[dtype: DType = DType.float32](
         if self.address()[].requires_grad:
 
             fn grad_fn() raises -> None:
-                self_grad = self.address()[].grad[]
                 out_grad = out.address()[].grad[]
-                self.address()[].grad[] = __tensor_op_tensor__[
-                    dtype, AddTensor
-                ](self_grad, out_grad)
+                self.address()[].update_grad[AddTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self)
@@ -872,9 +864,7 @@ struct Tensor[dtype: DType = DType.float32](
                         out_grad, other.address()[]
                     )
                     other.address()[].requires_grad = requires_grad_original
-                    self.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](self.address()[].grad[], product)
+                    self.address()[].update_grad[AddTensor](product)
 
                 if other.address()[].requires_grad:
                     requires_grad_original = self.address()[].requires_grad
@@ -883,9 +873,7 @@ struct Tensor[dtype: DType = DType.float32](
                         out_grad, self.address()[]
                     )
                     self.address()[].requires_grad = requires_grad_original
-                    other.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](other.address()[].grad[], product)
+                    other.address()[].update_grad[AddTensor](product)
 
             out.add_ancestry(self, other)
             out.grad_fn = Optional(grad_fn)
@@ -992,11 +980,13 @@ struct Tensor[dtype: DType = DType.float32](
 
                 if a.requires_grad:
                     a_grad = upstream.matmul(b.T())
-                    a.grad[] = a.grad[] + a_grad
+                    # a.grad[] = a.grad[] + a_grad
+                    a.update_grad[AddTensor](a_grad)
 
                 if b.requires_grad:
                     b_grad = a.T().matmul(upstream)
-                    b.grad[] = b.grad[] + b_grad
+                    # b.grad[] = b.grad[] + b_grad
+                    b.update_grad[AddTensor](b_grad)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self, other)
@@ -1173,11 +1163,8 @@ struct Tensor[dtype: DType = DType.float32](
                     upstream_grad, result.address()[].base[]
                 )
                 # Update parent gradient
-                self.address()[].grad[] = __tensor_op_tensor__[
-                    dtype, AddTensor
-                ](self.address()[].grad[], new_contrib)
+                self.address()[].update_grad[AddTensor](new_contrib)
                 # Update accumulator
-                # result.address()[].base[] = upstream_grad
                 result.address()[].base.init_pointee_move(upstream_grad^)
 
             result.grad_fn = Optional(grad_fn)
@@ -1244,12 +1231,7 @@ struct Tensor[dtype: DType = DType.float32](
                 # Broadcast and divide
                 broadcasted = expanded.broadcast_to(self.address()[].shape)
                 scaled = broadcasted / Scalar[dtype](count)
-                self.address()[].grad[] = __tensor_op_tensor__[
-                    dtype, AddTensor
-                ](
-                    self.address()[].grad[],
-                    scaled,
-                )
+                self.address()[].update_grad[AddTensor](scaled)
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self)
@@ -1272,9 +1254,9 @@ struct Tensor[dtype: DType = DType.float32](
             if self.requires_grad:
 
                 fn scalar_grad_fn() raises -> None:
-                    self.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](self.address()[].grad[], scalar_out.address()[].grad[])
+                    self.address()[].update_grad[AddTensor](
+                        scalar_out.address()[].grad[]
+                    )
 
                 scalar_out.grad_fn = Optional(scalar_grad_fn)
                 scalar_out.add_ancestry(self)
@@ -1300,7 +1282,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         out = Tensor[dtype].zeros(out_shape, requires_grad=self.requires_grad)
         reduced_shape = Shape(self.shape.axes_spans.select(_axes))
-        # FIX 3: Special handling for full reduction case
+        # Special handling for full reduction case
         if reducing_all and not keepdims:
             summ = Scalar[dtype](0)
             for idx in self.shape:
@@ -1320,45 +1302,41 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
 
             fn grad_fn() raises -> None:
-                out_grad = out.address()[].grad[]
-                self_tensor = self.address()[]
-                input_shape = self_tensor.shape
+                outstream_grad = out.address()[].grad[]
+                this = self.address()[]
+                original_shape = this.shape
+                var grad_contrib: Tensor[dtype]
 
-                var expanded: Tensor[dtype]
-                if out_grad.shape == Shape.Void or out_grad.shape.rank() == 0:
-                    # if not keepdims and out_grad.shape == Shape.Void:
-                    gradients = Tensor[dtype].zeros(self.address()[].shape)
-                    gradients.fill(out_grad.item())
+                # Handle scalar gradient case (sum reduced to scalar)
+                if outstream_grad.shape == Shape.Void:
+                    grad_contrib = Tensor[dtype].full(
+                        original_shape,
+                        outstream_grad.item(),
+                        requires_grad=False,
+                    )
+                else:
+                    # Handle keepdims=False case (need to reshape gradient)
+                    if not keepdims:
+                        # Determine axes/unsqueeze (insert dims of size 1)
+                        axes = outstream_grad.shape.intlist().insert(
+                            _axes,
+                            IntList.with_capacity(len(_axes), 1),
+                        )
+                        unsqueezed_shape = Shape(axes)
 
-                    self.address()[].grad[] = __tensor_op_tensor__[
-                        dtype, AddTensor
-                    ](self.address()[].grad[], gradients)
-                    # print("Upstream is scalar, shape:", out_grad.shape)
-                    return
-
-                if not keepdims:
-                    if out_grad.shape == Shape.Void:
-                        # Scalar → reduce over all axes
-                        expanded = Tensor[dtype].full(
-                            input_shape, out_grad.item(), requires_grad=False
+                        unsqueezed_grad = outstream_grad.reshape(
+                            unsqueezed_shape
+                        )
+                        grad_contrib = unsqueezed_grad.broadcast_to(
+                            original_shape
                         )
                     else:
-                        # Expand dims on the reduced axes
-                        inserted_shape = Shape(
-                            out_grad.shape.intlist().insert(
-                                _axes,
-                                IntList.with_capacity(len(_axes), 1),
-                            )
+                        # keepdims=True: shapes match except for broadcasting
+                        grad_contrib = outstream_grad.broadcast_to(
+                            original_shape
                         )
-                        expanded = out_grad.reshape(inserted_shape)
-                else:
-                    # keepdims=True → shapes align in rank, can broadcast directly
-                    expanded = out_grad
-
-                self_tensor.grad[] = __tensor_op_tensor__[dtype, AddTensor](
-                    self_tensor.grad[],
-                    expanded.broadcast_to(input_shape),
-                )
+                grad_contrib.requires_grad = False
+                this.update_grad[AddTensor](grad_contrib)
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self)
@@ -1447,7 +1425,6 @@ struct Tensor[dtype: DType = DType.float32](
             seed()
         shape = Shape(axes_spans)
         tensor = Tensor[dtype](shape, requires_grad)
-        # randn(tensor.data, tensor.numels())
         for i in range(tensor.numels()):  # vectorize?
             tensor.data.store[volatile=True](
                 i,
@@ -1663,7 +1640,6 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn of(
-        # elems: List[Scalar[Self.dtype]], requires_grad: Bool = False
         elems: Self.Row,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
