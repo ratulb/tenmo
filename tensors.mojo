@@ -1,6 +1,8 @@
 fn main() raises:
-    print("Starting tensor test cases")
-    print("Finished running tensor test cases")
+    tensor = Tensor([1, 2, 3])
+    tensor.print()
+    tensor2 = Tensor.arange(20).reshape(2, 2, 5)
+    tensor2.print()
 
 
 ### Mojo Tensor
@@ -41,6 +43,10 @@ from collections import Set
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable
 ):
+    alias Row = List[Scalar[dtype]]
+    alias Rows = List[Self.Row]
+    alias Block = List[Self.Rows]
+    alias Blocks = List[Self.Block]
     alias GradBox = UnsafePointer[Self]
     alias Address = UnsafePointer[Tensor[dtype]]
     var shape: Shape
@@ -54,6 +60,9 @@ struct Tensor[dtype: DType = DType.float32](
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
         self = Self(shape, requires_grad)
+
+    fn __init__(out self, row: Self.Row, requires_grad: Bool = False):
+        self = Self.d1(row, requires_grad=requires_grad)
 
     fn __init__(
         out self,
@@ -1524,8 +1533,6 @@ struct Tensor[dtype: DType = DType.float32](
         memset_zero(out.data, out.numels())
         return out
 
-    alias Row = List[Scalar[dtype]]
-
     @staticmethod
     fn d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[dtype]:
         Self.validate_dtype_consistency(dtype, requires_grad, "d1")
@@ -1548,8 +1555,6 @@ struct Tensor[dtype: DType = DType.float32](
         memcpy(tensor.data, flattened.data, tensor.numels())
         return tensor
 
-    alias Rows = List[Self.Row]
-
     @staticmethod
     fn d3(
         blocks: List[Self.Rows], requires_grad: Bool = False
@@ -1569,8 +1574,6 @@ struct Tensor[dtype: DType = DType.float32](
         tensor = Tensor[dtype](shape, requires_grad)
         memcpy(tensor.data, flattened.data, tensor.numels())
         return tensor
-
-    alias Block = List[Self.Rows]
 
     @staticmethod
     fn d4(
@@ -1607,8 +1610,6 @@ struct Tensor[dtype: DType = DType.float32](
         tensor = Tensor[dtype](shape, requires_grad)
         memcpy(tensor.data, flattened.data, tensor.numels())
         return tensor
-
-    alias Blocks = List[Self.Block]
 
     @staticmethod
     fn d5(
@@ -1738,103 +1739,95 @@ struct Tensor[dtype: DType = DType.float32](
         level: Int,
         num_first: Int = 10,
         num_last: Int = 10,
-    ) raises:
-        try:
-            if self.ndim() == 0:  # Tensor with Shape ()
-                print(self[IntList.Empty])
-                return
-            current_dim = len(indices)
-            indent = " " * (level * 2)
-            # Defensive check
-            if current_dim >= self.ndim():
-                # if current_dim > self.ndim():
-                print(
-                    "ERROR: current_dim (",
-                    current_dim,
-                    ") >= ndim (",
-                    self.ndim(),
-                    ")",
-                )
-                return
+    ):
+        if self.ndim() == 0:  # Tensor with Shape ()
+            print(self[IntList.Empty])
+            return
+        current_dim = len(indices)
+        indent = " " * (level * 2)
+        # Defensive check
+        if current_dim >= self.ndim():
+            # if current_dim > self.ndim():
+            print(
+                "ERROR: current_dim (",
+                current_dim,
+                ") >= ndim (",
+                self.ndim(),
+                ")",
+            )
+            return
 
-            size = self.shape[current_dim]
+        size = self.shape[current_dim]
 
-            # Size sanity check
-            if size < 0 or size > 1_000_000:
-                print(
-                    "ERROR: suspicious size: ",
-                    size,
-                    "at dim ",
-                    current_dim,
-                    self.shape.__str__(),
-                )
-                return
+        # Size sanity check
+        if size < 0 or size > 1_000_000:
+            print(
+                "ERROR: suspicious size: ",
+                size,
+                "at dim ",
+                current_dim,
+                self.shape.__str__(),
+            )
+            return
 
-            # Base case: last dimension (print actual elements)
-            if current_dim == self.ndim() - 1:
-                print(indent + "[", end="")
+        # Base case: last dimension (print actual elements)
+        if current_dim == self.ndim() - 1:
+            print(indent + "[", end="")
 
-                for i in range(size):
-                    if i < num_first:
-                        indices.append(i)
-                        print(
-                            self[indices],
-                            end=", " if (
-                                i != num_first - 1
-                                or size > num_first + num_last
-                            ) else "",
-                        )
-                        _ = indices.pop()
-                    elif i == num_first:
-                        if size > num_first + num_last:
-                            print("..., ", end="")
-                    elif i >= size - num_last:
-                        indices.append(i)
-                        print(self[indices], end=", " if i != size - 1 else "")
-                        _ = indices.pop()
-                    else:
-                        # Handles middle region not explicitly caught
-                        continue
+            for i in range(size):
+                if i < num_first:
+                    indices.append(i)
+                    print(
+                        self[indices],
+                        end=", " if (
+                            i != num_first - 1 or size > num_first + num_last
+                        ) else "",
+                    )
+                    _ = indices.pop()
+                elif i == num_first:
+                    if size > num_first + num_last:
+                        print("..., ", end="")
+                elif i >= size - num_last:
+                    indices.append(i)
+                    print(self[indices], end=", " if i != size - 1 else "")
+                    _ = indices.pop()
+                else:
+                    # Handles middle region not explicitly caught
+                    continue
 
-                print("]", end="")
+            print("]", end="\n")
 
-            else:
-                print(indent + "[")
-                for i in range(size):
-                    if i < num_first:
-                        indices.append(i)
-                        self.print_tensor_recursive(indices, level + 1)
-                        _ = indices.pop()
-                        if i != num_first - 1 or size > num_first + num_last:
-                            print(",")
-                    elif i == num_first:
-                        if size > num_first + num_last:
-                            print(indent + "  ...,")
-                    elif i >= size - num_last:
-                        indices.append(i)
-                        self.print_tensor_recursive(indices, level + 1)
-                        _ = indices.pop()
-                        if i != size - 1:
-                            print(",")
-                    else:
-                        # This path was previously missing, which caused silent looping!
-                        continue
+        else:
+            print(indent + "[")
+            for i in range(size):
+                if i < num_first:
+                    indices.append(i)
+                    self.print_tensor_recursive(indices, level + 1)
+                    _ = indices.pop()
+                    if i != num_first - 1 or size > num_first + num_last:
+                        print(",")
+                elif i == num_first:
+                    if size > num_first + num_last:
+                        print(indent + "  ...,")
+                elif i >= size - num_last:
+                    indices.append(i)
+                    self.print_tensor_recursive(indices, level + 1)
+                    _ = indices.pop()
+                    if i != size - 1:
+                        print(",")
+                else:
+                    # This path was previously missing, which caused silent looping!
+                    continue
 
-                print(indent + "]", end="")
+                print(indent + "]", end="\n")
                 # print("\n")
 
-        except e:
-            print("ERROR during tensor printing: ", e)
-
     fn print(self, num_first: Int = 10, num_last: Int = 10):
-        print(self.__str__())
+        print(self.__str__(), end="\n")
         empty = IntList()
-        try:
-            self.print_tensor_recursive(
-                empty, 1, num_first=num_first, num_last=num_last
-            )
-        except e:
-            print(e)
+        self.print_tensor_recursive(
+            empty, 1, num_first=num_first, num_last=num_last
+        )
 
     @staticmethod
     fn free_all[dtype: DType, //](*tensors: Tensor[dtype]):
