@@ -715,6 +715,15 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         """
         return self.size
 
+    @always_inline("nodebug")
+    fn len(self) -> Int:
+        """Get the number of elements in the array.
+
+        Returns:
+            The number of elements in the array.
+        """
+        return self.size
+
     fn __eq__(self: IntList, other: IntList) -> Bool:
         if len(self) != len(other):
             return False
