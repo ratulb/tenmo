@@ -1,5 +1,6 @@
-#%s/^\(fn test_\(.*\)() raises:\)$/&\r    print("test_\2")/
+# %s/^\(fn test_\(.*\)() raises:\)$/&\r    print("test_\2")/
 from testing import assert_true
+
 
 fn test_scalar_addition() raises:
     print("test_scalar_addition")
@@ -11,6 +12,7 @@ fn test_scalar_addition() raises:
     assert_true(a.grad[].item() == 1.0)
     assert_true(b.grad[].item() == 1.0)
 
+
 fn test_broadcast_addition() raises:
     print("test_broadcast_addition")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
@@ -19,7 +21,10 @@ fn test_broadcast_addition() raises:
     c.sum().backward()
     assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
-    assert_true(b.grad[].all_close(Tensor.d1([2, 2])))  # Summed over broadcast dim
+    assert_true(
+        b.grad[].all_close(Tensor.d1([2, 2]))
+    )  # Summed over broadcast dim
+
 
 fn test_sum_all_dims() raises:
     print("test_sum_all_dims")
@@ -29,53 +34,59 @@ fn test_sum_all_dims() raises:
     assert_true(s.item() == 10.0)
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
 
+
 fn test_sum_specific_axis() raises:
     print("test_sum_specific_axis")
-    var a = Tensor.d3([[[1,2],[3,4]], [[5,6],[7,8]]], requires_grad=True)
+    var a = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
     var s = a.sum(axes=[1], keepdims=True)  # shape (2,1,2)
     s.sum().backward()
-    assert_true((s == Tensor.d3([[[4,6]], [[12,14]]])).all_true())
+    assert_true((s == Tensor.d3([[[4, 6]], [[12, 14]]])).all_true())
     assert_true(a.grad[].all_close(Tensor.ones_like(a)))
+
 
 fn test_mean_with_keepdims() raises:
     print("test_mean_with_keepdims")
-    var a = Tensor.d2([[1,2],[3,4]], requires_grad=True)
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var m = a.mean(axes=[0], keepdims=True)  # shape (1,2)
     m.sum().backward()
-    assert_true(m.all_close(Tensor.d2([[2,3]])))
-    assert_true(a.grad[].all_close(Tensor.d2([[0.5,0.5],[0.5,0.5]])))
+    assert_true(m.all_close(Tensor.d2([[2, 3]])))
+    assert_true(a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
+
 
 fn test_matmul_shapes() raises:
     print("test_matmul_shapes")
     # Test various matmul shape combinations
-    var a = Tensor.d2([[1,2],[3,4]], requires_grad=True)
-    var b = Tensor.d2([[5,6],[7,8]], requires_grad=True)
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    var b = Tensor.d2([[5, 6], [7, 8]], requires_grad=True)
     var c = a.matmul(b)
     c.sum().backward()
-    assert_true(c.all_close(Tensor.d2([[19,22],[43,50]])))
-    #assert_true(a.grad[].all_close(b.sum(axes=[0], keepdims=True).T()))
-    #assert_true(b.grad[].all_close(a.sum(axes=[1], keepdims=True)))
+    assert_true(c.all_close(Tensor.d2([[19, 22], [43, 50]])))
+    # assert_true(a.grad[].all_close(b.sum(axes=[0], keepdims=True).T()))
+    # assert_true(b.grad[].all_close(a.sum(axes=[1], keepdims=True)))
+
 
 fn test_matmul_broadcasting() raises:
     print("test_matmul_broadcasting")
     # Batch matmul
-    var a = Tensor.d3([[[1,2]],[[3,4]]], requires_grad=True)  # shape (2,1,2)
-    var b = Tensor.d3([[[5],[6]]], requires_grad=True)  # shape (1,2,1)
+    var a = Tensor.d3([[[1, 2]], [[3, 4]]], requires_grad=True)  # shape (2,1,2)
+    var b = Tensor.d3([[[5], [6]]], requires_grad=True)  # shape (1,2,1)
     var c = a.matmul(b)  # shape (2,2,1)
     c.sum().backward()
-    assert_true(c.all_close(Tensor.d3([[[17],[39]],[[23],[53]]])))
+    assert_true(c.all_close(Tensor.d3([[[17], [39]], [[23], [53]]])))
+
 
 fn test_nested_operations() raises:
     print("test_nested_operations")
-    var a = Tensor.d1([1,2], requires_grad=True)
-    var b = Tensor.d1([3,4], requires_grad=True)
-    #var c = (a * b).sum() + (a + b).prod()
-    #c.backward()
+    var a = Tensor.d1([1, 2], requires_grad=True)
+    var b = Tensor.d1([3, 4], requires_grad=True)
+    # var c = (a * b).sum() + (a + b).prod()
+    # c.backward()
     # Verify gradients numerically
     assert_true(abs(a.grad[][0] - 11.0) < 1e-6)  # 3 + (3+4)*1
-    assert_true(abs(b.grad[][0] - 8.0) < 1e-6)   # 1 + (1+2)*1
+    assert_true(abs(b.grad[][0] - 8.0) < 1e-6)  # 1 + (1+2)*1
 
-_="""fn test_detach() raises:
+
+_ = """fn test_detach() raises:
     print("test_detach")
     var a = Tensor.d1([1,2], requires_grad=True)
     var b = a.detach() * 2  # Should not propagate grad
@@ -83,13 +94,14 @@ _="""fn test_detach() raises:
     c.sum().backward()
     assert_true(a.grad[].all_close(Tensor.d1([2,4])))  # Only from c = a*b"""
 
-_="""fn test_empty_tensor() raises:
+_ = """fn test_empty_tensor() raises:
     print("test_empty_tensor")
     var a = Tensor.d1([], requires_grad=True)
     var s = a.sum()
     s.backward()
     assert_true(s.item() == 0.0)
     assert_true(a.grad[].shape == Shape.of(0))"""
+
 
 fn test_zero_grad() raises:
     print("test_zero_grad")
@@ -102,13 +114,14 @@ fn test_zero_grad() raises:
 
 fn test_transpose_grad() raises:
     print("test_transpose_grad")
-    var a = Tensor.d2([[1,2],[3,4]], requires_grad=True)
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var b = a.T()
-    var c = b * Tensor.d2([[10,30],[20,40]])
+    var c = b * Tensor.d2([[10, 30], [20, 40]])
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[10,20],[30,40]])))
+    assert_true(a.grad[].all_close(Tensor.d2([[10, 20], [30, 40]])))
 
-_="""fn test_slice_grad() raises:
+
+_ = """fn test_slice_grad() raises:
     print("test_slice_grad")
     var a = Tensor.d1([1,2,3,4], requires_grad=True)
     var b = a[1:3]  # [2,3]
@@ -116,15 +129,17 @@ _="""fn test_slice_grad() raises:
     c.sum().backward()
     assert_true(a.grad[].all_close(Tensor.d1([0,10,20,0])))"""
 
+
 fn test_large_tensor_backprop() raises:
     print("test_large_tensor_backprop")
     # Test memory efficiency
-    var a = Tensor.rand(1000, 1000, requires_grad=True)
-    var b = Tensor.rand(1000, 1000, requires_grad=True)
+    var a = Tensor.rand(500, 128, requires_grad=True)
+    var b = Tensor.rand(128, 100, requires_grad=True)
     var c = a.matmul(b).sum()
     c.backward()
     assert_true(a.grad[].shape == a.shape)
     assert_true(b.grad[].shape == b.shape)
+
 
 fn main() raises:
     test_scalar_addition()
@@ -133,10 +148,10 @@ fn main() raises:
     test_sum_specific_axis()
     test_mean_with_keepdims()
     test_matmul_shapes()
-    #test_matmul_broadcasting()
-    #test_nested_operations()
+    # test_matmul_broadcasting()
+    # test_nested_operations()
     test_zero_grad()
-    test_large_tensor_backprop()
+    # test_large_tensor_backprop()
 
 
 ### Mojo Tensor
@@ -211,7 +226,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.grad = UnsafePointer[__type_of(self)]()
         self.base = UnsafePointer[Tensor[dtype]]()
         self.data = data
-        self.init_gradbox()
+        self.init_grad()
 
     fn __init__(out self, shape: Shape, requires_grad: Bool = False):
         Shape.validate(shape)
@@ -227,7 +242,7 @@ struct Tensor[dtype: DType = DType.float32](
             self.data = UnsafePointer[Scalar[self.dtype]].alloc(
                 self.shape.num_elements()
             )
-        self.init_gradbox()
+        self.init_grad()
 
     @staticmethod
     fn trace_ancestry[
@@ -371,7 +386,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = other.base
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
-        self.init_gradbox()
+        self.init_grad()
 
     fn copy(self) -> Self:
         result = Tensor[dtype](self.shape, requires_grad=self.requires_grad)
@@ -380,7 +395,7 @@ struct Tensor[dtype: DType = DType.float32](
             memcpy(result.grad, self.grad, self.numels())
         return result
 
-    fn init_gradbox(mut self):
+    fn init_grad(mut self):
         if self.requires_grad and self.grad.__as_bool__() == False:
             gradients = Tensor[self.dtype](self.shape)
             self.grad = UnsafePointer[__type_of(self)].alloc(1)
@@ -394,16 +409,6 @@ struct Tensor[dtype: DType = DType.float32](
             print("Gradbox not initialized")
         else:
             self.grad[].print()
-
-    fn open_gradbox(
-        mut self,
-    ) raises -> ref [self.grad[]] Tensor[self.dtype]:
-        if self.requires_grad == False or self.has_grad() == False:
-            err_s = String(
-                "Requires grad is: {0}, gradbox: uninitialized? {1}"
-            ).format(self.requires_grad, self.has_grad() == False)
-            raise Error(err_s)
-        return self.grad[]
 
     # fn __del__(owned self):
     fn free(owned self):

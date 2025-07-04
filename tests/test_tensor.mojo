@@ -1452,7 +1452,6 @@ fn test_factor_mul_by() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.open_gradbox().print()
     Tensor.free_all(tensor, out_tensor)
 
 
@@ -1467,12 +1466,10 @@ fn test_mul_by_factor() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.open_gradbox().print()
     Tensor.free_all(tensor, out_tensor)
 
 
 fn test_add_value() raises:
-    print("test_add_value")
     print("test_add_value")
 
     tensor = Tensor.rand(1024, 64, requires_grad=True)
@@ -1483,7 +1480,6 @@ fn test_add_value() raises:
     )
     out_tensor.invoke_grad_fn()
     print("The following is out tensor gradient")
-    out_tensor.open_gradbox().print()
     Tensor.free_all(tensor, out_tensor)
 
 
