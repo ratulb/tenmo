@@ -116,6 +116,7 @@ fn test_broadcast_shape() raises:
         result == Shape.of(4, 2, 5), "Shape broadcast 5 assertion failed"
     )
 
+
 fn test_index_iter() raises:
     shape = Shape.of(1)
     for each in shape:
@@ -482,15 +483,15 @@ struct Shape(
         if self.ndim == 0:
             if len(indices) != 0:
                 abort(
-                    "Shape.flatten_index: Scalar tensor should receive no"
-                    " indices"
+                    "Shape.flatten_index: Scalar tensor should receive empty"
+                    " indices[IntList]"
                 )
             return 0
         if len(indices) != self.ndim:
             print(
                 (
                     "Shape fltatten_index -> shape mismatch len(indices) !="
-                    " self.ndim"
+                    " self.ndim[self.rank() | len(self)"
                 ),
                 len(indices),
                 self.ndim,
