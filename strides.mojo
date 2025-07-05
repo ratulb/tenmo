@@ -2,12 +2,14 @@ from shapes import Shape
 from intlist import IntList
 from os import abort
 
+
 fn main():
     st = Strides.of(4, 1, 2)
     print(st)
     st.print()
     shape = Shape()
     print(shape, shape.rank(), shape.num_elements())
+
 
 @register_passable
 struct Strides(Sized & Copyable & Stringable & Representable & Writable):
@@ -26,6 +28,18 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
             existing: The Strides to copy from.
         """
         self.strides = existing.strides
+
+    fn is_contiguous(self, shape: Shape) -> Bool:
+        if shape.rank() != self.strides.size:
+            return False
+
+        var expected_stride = 1
+        for i in reversed(range(shape.rank())):
+            if self.strides[i] != expected_stride:
+                return False
+            expected_stride *= shape[i]
+
+        return True
 
     @staticmethod
     fn of(*values: Int) -> Self:
@@ -101,4 +115,3 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
                     abort("broadcast_to: incompatible shape")
 
         return Strides(result)
-

@@ -1,17 +1,16 @@
 from memory import UnsafePointer, memcpy, Pointer
 from os import abort
-from tensors import Tensor
-from common_utils import log_debug
+from common_utils import TensorLike, log_debug
 
 
 @register_passable
-struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
-    var ancestors: UnsafePointer[UnsafePointer[Tensor[dtype]]]
+struct Ancestors[dtype: DType](Sized & Copyable):
+    var ancestors: UnsafePointer[UnsafePointer[TensorLike[dtype]]]
     var size: Int
     var capacity: Int
 
     fn __init__(out self):
-        self.ancestors = UnsafePointer[UnsafePointer[Tensor[dtype]]]()
+        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
         self.capacity = 0
         self.size = 0
 
@@ -19,7 +18,7 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
     fn __copyinit__(out self, existing: Self):
         self.size = existing.size
         self.capacity = existing.capacity
-        self.ancestors = UnsafePointer[UnsafePointer[Tensor[dtype]]].alloc(
+        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
             existing.capacity
         )
         memcpy(self.ancestors, existing.ancestors, existing.size)
@@ -31,7 +30,7 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
     @staticmethod
     fn with_capacity(capacity: Int) -> Ancestors[dtype]:
         array = Self()
-        array.ancestors = UnsafePointer[UnsafePointer[Tensor[dtype]]].alloc(
+        array.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
             capacity
         )
         array.capacity = capacity
@@ -48,7 +47,7 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
             self.ancestors.free()
 
     @always_inline("nodebug")
-    fn get(self, idx: Int) -> UnsafePointer[Tensor[dtype]]:
+    fn get(self, idx: Int) -> UnsafePointer[TensorLike[dtype]]:
         if idx < 0 or idx >= len(self):
             abort("Ancestors get -> Out-of-bounds read")
         address = (self.ancestors + idx)[]
@@ -59,17 +58,17 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
     fn __len__(self) -> Int:
         return self.size
 
-    fn append(mut self, address: UnsafePointer[Tensor[dtype]]):
+    fn append(mut self, address: UnsafePointer[TensorLike[dtype]]):
         if self.size == self.capacity:
             new_capacity = max(1, self.capacity * 2)
             self.resize(new_capacity)
         (self.ancestors + self.size)[] = address
         self.size += 1
 
-    fn add_ancestry(mut self, tensors: VariadicListMem[Tensor[dtype]]):
-        for tensor in tensors:
-            if tensor.requires_grad:
-                self.append(tensor.address())
+    fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
+        for tensor_like in tensor_likes:
+            if tensor_like.requires_grad():
+                self.append(tensor_like.address())
 
     fn resize(mut self, new_capacity: Int):
         self.reserve(new_capacity)
@@ -77,7 +76,7 @@ struct Ancestors[dtype: DType = DType.float32](Sized & Copyable):
     fn reserve(mut self, new_capacity: Int):
         if new_capacity <= self.capacity:
             return
-        new_ancestors = UnsafePointer[UnsafePointer[Tensor[dtype]]].alloc(
+        new_ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
             new_capacity
         )
         if self.size > 0:
@@ -120,7 +119,7 @@ struct _AncestorsIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(mut self) -> UnsafePointer[Tensor[dtype]]:
+    fn __next__(mut self) -> UnsafePointer[TensorLike[dtype]]:
         @parameter
         if forward:
             self.index += 1
@@ -142,6 +141,4 @@ struct _AncestorsIter[
 
 
 fn main():
-    tensor = Tensor.rand(5, 3)
-    print(tensor.address())
-    print(Int(tensor.address()))
+    print("So good")

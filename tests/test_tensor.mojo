@@ -1554,6 +1554,8 @@ fn test_view() raises:
     print("test_view")
     tensor = Tensor.rand(1).reshape()
     view = tensor.view(Shape.Void)
+    view.strides.print()
+    print("From view: ", view[IntList()])
     assert_true(
         tensor.shape == view.target[].shape,
         "Tensor and view shape equality asserttion failed",

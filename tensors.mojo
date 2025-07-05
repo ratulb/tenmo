@@ -168,7 +168,9 @@ from memory import UnsafePointer, memcpy, memset, memset_zero
 from shapes import Shape
 from intlist import IntList
 from ancestry import Ancestors
-from common_utils import log_debug, piped
+from views import TensorView
+from strides import Strides
+from common_utils import TensorLike, Differentiable, log_debug, piped
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
@@ -190,13 +192,13 @@ from collections import Set
 
 
 struct Tensor[dtype: DType = DType.float32](
-    Copyable & Movable & Sized & Stringable
+    Copyable & Movable & Sized & Stringable & Differentiable
 ):
+    alias datatype: DType = dtype
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
     alias Blocks = List[Self.Block]
-    alias Address = UnsafePointer[Tensor[dtype]]
     var shape: Shape
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
@@ -244,6 +246,12 @@ struct Tensor[dtype: DType = DType.float32](
             )
         self.init_grad()
 
+    fn is_contiguous(self) -> Bool:
+        return True
+
+    fn as_tensor_like(self) -> TensorLike[dtype]:
+        return TensorLike(self.address())
+
     @staticmethod
     fn trace_ancestry[
         dtype: DType, //
@@ -262,7 +270,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn walk_backward[
         dtype: DType, //
     ](
-        tensor: Tensor[dtype],
+        #tensor: Tensor[dtype],
+        tensor: Differentiable,
         start_grad: Scalar[dtype] = 1.0,
         verbose: Bool = False,
     ) raises:
@@ -275,6 +284,8 @@ struct Tensor[dtype: DType = DType.float32](
         for each in traced.__reversed__():
             each[].invoke_grad_fn(verbose)
 
+    fn ancestry(self) -> Ancestors[dtype]:
+        return self.ancestors
     _ = """fn backward(
         self,
         start_grad: Scalar[dtype] = 1.0,
@@ -299,11 +310,28 @@ struct Tensor[dtype: DType = DType.float32](
     fn grad_func(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
 
-    @always_inline
+    fn view(self, shape: Shape) -> TensorView[dtype]:
+        if shape == self.shape and self.is_contiguous():
+            return TensorView(
+                UnsafePointer(to=self),
+                self.shape,
+                Strides.default(self.shape),
+                offset=0  # or self.offset if needed
+            )
+        if not self.shape.num_elements() == shape.num_elements(): abort("Mismatch in elements for view")
+        return TensorView(
+            UnsafePointer(to=self),
+            shape,
+            Strides.default(shape),
+            offset=0
+    )
+
+
+    #@always_inline
     fn address(self) -> UnsafePointer[Self]:
         return UnsafePointer(to=self)
 
-    @always_inline
+    #@always_inline
     fn int_addr(self) -> Int:
         return Int(self.address())
 
@@ -642,7 +670,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn add_ancestry(
         mut self,
-        *tensors: Tensor[dtype],
+        *tensors: TensorLike[dtype],
     ):
         self.ancestors.add_ancestry(tensors)
 
@@ -664,7 +692,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](out_grad_scaled)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(self.as_tensor_like())
 
         return out
 
@@ -690,7 +718,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](product)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(self.as_tensor_like())
 
         return out
 
@@ -812,7 +840,7 @@ struct Tensor[dtype: DType = DType.float32](
                     that.update_grad[tensor_op_second](grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.as_tensor_like(), other.as_tensor_like())
         return result
 
     fn backward_grad_contrib(
@@ -865,7 +893,7 @@ struct Tensor[dtype: DType = DType.float32](
                     that.update_grad[AddTensor](grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.as_tensor_like(), other.as_tensor_like())
 
         return result
 
@@ -897,7 +925,7 @@ struct Tensor[dtype: DType = DType.float32](
                     other.address()[].update_grad[AddTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self, other)
+            out.add_ancestry(self.as_tensor_like(), other.as_tensor_like())
 
         return out
 
@@ -916,7 +944,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(self.as_tensor_like())
 
         return out
 
@@ -958,7 +986,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(self.as_tensor_like())
         return out
 
     # Element wise multiplication of two tensors
@@ -1004,7 +1032,7 @@ struct Tensor[dtype: DType = DType.float32](
                     self.address()[].requires_grad = requires_grad_original
                     other.address()[].update_grad[AddTensor](product)
 
-            out.add_ancestry(self, other)
+            out.add_ancestry(self.as_tensor_like(), other.as_tensor_like())
             out.grad_fn = Optional(grad_fn)
 
         return out
@@ -1041,7 +1069,7 @@ struct Tensor[dtype: DType = DType.float32](
 
             out.grad_fn = Optional(grad_fn)
 
-            out.add_ancestry(self, other)
+            out.add_ancestry(self.as_tensor_like(), other.as_tensor_like())
 
         return out
 
@@ -1109,16 +1137,14 @@ struct Tensor[dtype: DType = DType.float32](
 
                 if a.requires_grad:
                     a_grad = upstream.matmul(b.T())
-                    # a.grad[] = a.grad[] + a_grad
                     a.update_grad[AddTensor](a_grad)
 
                 if b.requires_grad:
                     b_grad = a.T().matmul(upstream)
-                    # b.grad[] = b.grad[] + b_grad
                     b.update_grad[AddTensor](b_grad)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.as_tensor_like(), other.as_tensor_like())
 
         return result
 
@@ -1172,7 +1198,7 @@ struct Tensor[dtype: DType = DType.float32](
                     other.address()[].update_grad[AddTensor](grad)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.as_tensor_like(), other.as_tensor_like())
 
         return result
 
@@ -1214,7 +1240,7 @@ struct Tensor[dtype: DType = DType.float32](
                     b.update_grad[AddTensor](b_grad)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.as_tensor_like(), other.as_tensor_like())
 
         return result
 
@@ -1239,7 +1265,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](upstream_grad.T())
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self)
+            result.add_ancestry(self.as_tensor_like())
 
         return result
 
@@ -1297,16 +1323,16 @@ struct Tensor[dtype: DType = DType.float32](
                 result.address()[].base.init_pointee_move(upstream_grad^)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self)
+            result.add_ancestry(self.as_tensor_like())
 
         return result
 
-    fn unsqueeze(self, dim: Int) -> View[__origin_of(self), self.dtype]:
+    _="""fn unsqueeze(self, dim: Int) -> View[__origin_of(self), self.dtype]:
         new_shape = self.shape.intlist().insert(dim, 1)
         # result = Tensor[dtype](Shape(new_shape), requires_grad=self.requires_grad)
         # result.data = self.data  # share same data
         return self.view(Shape(new_shape))
-        # return result
+        # return result"""
 
     fn mean(
         self, axes: List[Int] = [], keepdims: Bool = False
@@ -1363,7 +1389,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](scaled)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self)
+            result.add_ancestry(self.as_tensor_like())
 
         return result
 
@@ -1388,7 +1414,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
 
                 scalar_out.grad_fn = Optional(scalar_grad_fn)
-                scalar_out.add_ancestry(self)
+                scalar_out.add_ancestry(self.as_tensor_like())
             return scalar_out
 
         # FIX 1: Handle full reduction case explicitly
@@ -1468,7 +1494,7 @@ struct Tensor[dtype: DType = DType.float32](
                 this.update_grad[AddTensor](grad_contrib)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(self.as_tensor_like())
 
         return out
 
@@ -1947,12 +1973,12 @@ struct Tensor[dtype: DType = DType.float32](
             each.free()
             _ = each
 
-    fn view(
+    _="""fn view(
         ref self, target_shape: Shape
     ) -> View[__origin_of(self), self.dtype]:
         concrete = True if target_shape == self.shape else False
         mask = self.shape.broadcast_mask(target_shape)
-        return View(Pointer(to=self), concrete, mask, target_shape)
+        return View(Pointer(to=self), concrete, mask, target_shape)"""
 
     fn view2(self) -> View2[self.dtype]:
         return View2(UnsafePointer(to=self))

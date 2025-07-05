@@ -1,9 +1,18 @@
 from tensors import Tensor
+from views import TensorView
 from intlist import IntList
 from shapes import Shape
 from os import abort
 from testing import assert_true
+from memory import UnsafePointer
+from utils import Variant
 
+fn main() raises:
+
+    #test_training_convergence()
+    #test_step_once()
+    alias Predecessor = Variant[Shape, Tensor[DType]]
+    _ptr = UnsafePointer[Predecessor].alloc(1)
 
 fn test_training_convergence() raises:
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -12,7 +21,7 @@ fn test_training_convergence() raises:
     var w = Tensor.rand(2, 1, requires_grad=True)
     var b = Tensor.rand(1, requires_grad=True)
 
-    for epoch in range(10000):
+    for epoch in range(1000):
         var y_pred = x.matmul(w) + b
         var loss = ((y_pred - y) ** 2).mean()
         #print("loss: ", loss.item())
@@ -31,10 +40,9 @@ fn test_training_convergence() raises:
     # assert_true(b.all_close(Tensor[DType.float32].d1([5.0])))
     (x.matmul(w) + b).print()
 
+fn test_step_once() raises:
 
-fn main() raises:
-    test_training_convergence()
-    _ = """x = Tensor.d2([[1.0, 2.0]])
+    x = Tensor.d2([[1.0, 2.0]])
     y = Tensor.d2([[13.0]])
 
     w = Tensor.d2([[1.0], [1.0]], requires_grad=True)
@@ -51,7 +59,7 @@ fn main() raises:
     print("\nw.grad:\n")
     w.grad[].print()
     print("\nb.grad:\n")
-    b.grad[].print()"""
+    b.grad[].print()
 
     _="""
     y_pred = x.matmul(w) + b
@@ -63,7 +71,5 @@ fn main() raises:
 
     dL/dw = x.T.matmul(dL/dy_pred) = [[1], [2]] * -18.0 = [[-18], [-36]]
     dL/db = sum(-18.0) = -18.0"""
-
-
 
 
