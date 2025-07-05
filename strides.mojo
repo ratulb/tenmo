@@ -2,6 +2,11 @@ from shapes import Shape
 from intlist import IntList
 from os import abort
 
+fn main():
+    st = Strides.of(4, 1, 2)
+    print(st)
+    shape = Shape()
+    print(shape, shape.rank(), shape.num_elements())
 
 @register_passable
 struct Strides(Sized & Copyable & Stringable & Representable & Writable):
@@ -28,7 +33,7 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
             s += String(self.strides[i])
             if i < len(self) - 1:
                 s += ", "
-            s += ")"
+        s += ")"
         return s
 
     fn __repr__(self) -> String:
@@ -93,6 +98,3 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
 
         return Strides(result)
 
-
-fn main():
-    pass
