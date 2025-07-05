@@ -5,6 +5,7 @@ from os import abort
 fn main():
     st = Strides.of(4, 1, 2)
     print(st)
+    st.print()
     shape = Shape()
     print(shape, shape.rank(), shape.num_elements())
 
@@ -14,6 +15,9 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
 
     fn __init__(out self, values: IntList):
         self.strides = values
+
+    fn __eq__(self, other: Self) -> Bool:
+        return self.strides == other.strides
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
@@ -58,19 +62,19 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     fn clone(self) -> Self:
         return Strides(self.strides.copy())
 
-    _ = """fn print(self):
-        print("Strides(", self.strides, ")")"""
+    fn print(self):
+        print("Strides(" + self.strides.__str__() + ")")
 
     # Reorder dimensions (for transpose/permute)
-    fn permute(self, dims: IntList) -> Self:
-        result = IntList.with_capacity(len(dims))
-        for i in dims:
-            result.append(self[i])
+    fn permute(self, axes: IntList) -> Self:
+        result = IntList.with_capacity(axes.len())
+        for axis in axes:
+            result.append(self[axis])
         return Strides(result)
 
     # Compute strides from shape in row-major order
     @staticmethod
-    fn from_shape(shape: Shape) -> Self:
+    fn default(shape: Shape) -> Self:
         var strides = IntList.with_capacity(shape.rank())
         var acc = 1
         for i in reversed(range(shape.rank())):
