@@ -5,7 +5,7 @@ from memory import UnsafePointer
 from ancestry import Ancestors
 
 
-trait Differentiable:
+_="""trait Differentiable:
     alias datatype: DType
 
     fn id(self) -> Int:
@@ -20,11 +20,29 @@ trait Differentiable:
     fn seed_grad(self, value: Scalar[datatype]):
         ...
     fn into_tensorlike(self) -> TensorLike[datatype]:
+        ..."""
+trait Differentiable:
+
+    fn id(self) -> Int:
         ...
 
-# struct TensorLike[dtype: DType](Copyable & Movable):
-@register_passable
-struct TensorLike[dtype: DType](Copyable):
+    fn _requires_grad(self) -> Bool:
+        ...
+
+    fn ancestry[datatype: DType](self) -> Ancestors[datatype]:
+        ...
+
+    fn seed_grad[datatype: DType](self, value: Scalar[datatype]):
+        ...
+    fn into_tensorlike[datatype: DType](self) -> TensorLike[datatype]:
+        ...
+
+
+
+
+struct TensorLike[dtype: DType](Copyable & Movable):
+#@register_passable
+#struct TensorLike[dtype: DType](Copyable):
     alias TensorAddress = UnsafePointer[Tensor[dtype]]
     alias ViewAddress = UnsafePointer[TensorView[dtype]]
     var kind: Int
@@ -41,8 +59,11 @@ struct TensorLike[dtype: DType](Copyable):
         self.tensor_address = Self.TensorAddress()
         self.view_address = _view_address
 
-    _ = """fn __moveinit__(out self, owned other: Self):
-        self.pointee = other.pointee"""
+    fn __moveinit__(out self, owned other: Self):
+        self.kind = 1
+        self.tensor_address = other.tensor_address
+        self.view_address = other.view_address
+
 
     fn __copyinit__(out self, other: Self):
         self.kind = other.kind
@@ -68,7 +89,7 @@ struct TensorLike[dtype: DType](Copyable):
         return self.tensor().id() if self.is_tensor() else self.view().id()
 
     fn ancestry(self) -> Ancestors[dtype]:
-        return self.tensor().ancestry() if self.is_tensor() else self.view().ancestry()
+        return self.tensor().ancestry[dtype]() if self.is_tensor() else self.view().ancestry[dtype]()
 
 
     fn _requires_grad(self) -> Bool:

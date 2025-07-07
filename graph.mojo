@@ -2,23 +2,19 @@ from shared import Differentiable, TensorLike
 from ancestry import Ancestors
 from collections import Set
 
-
 #fn trace_ancestry[dtype: DType](root: Differentiable) -> Ancestors[dtype]:
-#fn trace_ancestry[dtype: DType, //](root: Differentiable) -> Ancestors[dtype]:
-fn trace_ancestry(root: Differentiable) -> Ancestors[Differentiable.datatype]:
-    #datatype = Differentiable.datatype
-    traced = Ancestors[Differentiable.datatype]()
-    if not root._requires_grad():
+fn trace_ancestry[dtype: DType](node: TensorLike[dtype]) -> Ancestors[dtype]:
+    traced = Ancestors[dtype]()
+    if not node._requires_grad():
         return traced
     visited = Set[Int]()
-    node = rebind[TensorLike[Differentiable.datatype]](root.into_tensorlike())
-    #trace_ancestry[dtype](node, visited, traced)
-    trace_ancestry(node, visited, traced)
+    #node = root.into_tensorlike[dtype]()
+    trace_ancestry[dtype](node, visited, traced)
     return traced
 
 
 fn trace_ancestry[
-    dtype: DType, //
+    dtype: DType
 ](
     node: TensorLike[dtype],
     mut visited: Set[Int],

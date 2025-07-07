@@ -142,7 +142,15 @@ _ = """fn test_large_tensor_backprop() raises:
 
 
 fn main() raises:
-    pass
+    var a = Tensor.scalar(3.0, requires_grad=True)
+    var b = Tensor.scalar(4.0, requires_grad=True)
+    var c = a + b
+    c.backward()
+    assert_true(c.item() == 7.0)
+    assert_true(a.grad[].item() == 1.0)
+    assert_true(b.grad[].item() == 1.0)
+
+
     _ = """test_scalar_addition()
     test_broadcast_addition()
     test_sum_all_dims()
@@ -197,7 +205,7 @@ from graph import trace_ancestry
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Differentiable
 ):
-    alias datatype: DType = dtype
+    #alias datatype: DType = dtype
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
@@ -252,8 +260,9 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return True
 
-    fn into_tensorlike(self) -> TensorLike[dtype]:
-        return TensorLike[dtype](self.address())
+    fn into_tensorlike[datatype: DType](self) -> TensorLike[datatype]:
+        tensor_like = TensorLike[dtype](self.address())
+        return rebind[TensorLike[datatype]](tensor_like)
 
     _="""fn trace_ancestry(
         self,
@@ -275,16 +284,16 @@ struct Tensor[dtype: DType = DType.float32](
         _="""if self.has_grad() == False:
             return
         visited = Set[Int]()
-        traced = Ancestors[dtype]()
-        var root: Differentiable = self"""
-        traced = trace_ancestry(rebind[Differentiable](self))
+        traced = Ancestors[dtype]()"""
+        #var root: Differentiable = rebind[Differentiable](self)
+        traced = trace_ancestry[dtype](self.into_tensorlike[dtype]())
         self.seed_grad(start_grad)
         for each in traced.__reversed__():
             each[].invoke_grad_fn(verbose)
-        pass
 
-    fn ancestry(self) -> Ancestors[dtype]:
-        return self.ancestors
+
+    fn ancestry[datatype: DType](self) -> Ancestors[datatype]:
+        return rebind[Ancestors[datatype]](self.ancestors)
 
     _ = """fn backward(
         self,
@@ -556,9 +565,10 @@ struct Tensor[dtype: DType = DType.float32](
 
         return True
 
-    fn seed_grad(self, value: Scalar[dtype]):
+    fn seed_grad[datatype: DType](self, value: Scalar[datatype]):
+        scalar = rebind[Scalar[dtype]](value)
         if self.has_grad():
-            self.grad[].fill(value)
+            self.grad[].fill(scalar)
 
     fn fill(self, value: Scalar[dtype]):
         @parameter
@@ -670,12 +680,13 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad and self.has_grad():
             memset_zero(self.grad[].data, self.grad[].numels())
 
-    fn add_ancestry(
+    fn add_ancestry[datatype: DType = dtype](
         mut self,
         *tensors: Tensor[dtype],
     ):
         for tensor in tensors:
-            self.ancestors.append(tensor.into_tensorlike().address())
+
+            self.ancestors.append(rebind[UnsafePointer[TensorLike[dtype]]](tensor.into_tensorlike[datatype]().address()))
 
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
