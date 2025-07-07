@@ -1,6 +1,7 @@
 from memory import UnsafePointer, memcpy, Pointer
 from os import abort
-from common_utils import TensorLike, log_debug
+from shared import TensorLike
+from common_utils import log_debug
 
 
 @register_passable
@@ -65,10 +66,10 @@ struct Ancestors[dtype: DType](Sized & Copyable):
         (self.ancestors + self.size)[] = address
         self.size += 1
 
-    fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
+    _="""fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
         for tensor_like in tensor_likes:
             if tensor_like.requires_grad():
-                self.append(tensor_like.address())
+                self.append(tensor_like.address())"""
 
     fn resize(mut self, new_capacity: Int):
         self.reserve(new_capacity)

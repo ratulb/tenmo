@@ -10,7 +10,7 @@ from memory import UnsafePointer
 from ancestry import Ancestors
 
 
-trait Differentiable:
+_ = """trait Differentiable:
     alias datatype: DType
 
     fn has_grad(self) -> Bool:
@@ -21,7 +21,8 @@ trait Differentiable:
 
     fn ancestry(self) -> Ancestors[datatype]:
         ...
-    #fn invoke_grad_fn(self, verbose: Bool = False) raises -> None: ...
+    fn address(self) -> UnsafePointer[TensorLike[datatype]]: ...
+    fn fill(self, value: Scalar[datatype]): ...
 
 struct TensorLike[dtype: DType]:
     alias Inner = Variant[
@@ -58,7 +59,7 @@ struct TensorLike[dtype: DType]:
         if self.is_view():
             self.view().base_tensor[].invoke_grad_fn(verbose)
         else:
-            self.tensor().invoke_grad_fn(verbose)
+            self.tensor().invoke_grad_fn(verbose)"""
 
 alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
 
