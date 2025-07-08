@@ -4,14 +4,14 @@ from intlist import IntList
 from strides import Strides
 from memory import UnsafePointer
 from os import abort
-from shared import TensorLike, Differentiable
+from shared import TensorLike
 from ancestry import Ancestors
 
 fn main():
     pass
 
 
-struct TensorView[dtype: DType = DType.float32](Copyable & Movable & Differentiable):
+struct TensorView[dtype: DType = DType.float32](Copyable & Movable):
     var base_tensor: UnsafePointer[Tensor[dtype]]
     var shape: Shape
     var strides: Strides
@@ -44,8 +44,8 @@ struct TensorView[dtype: DType = DType.float32](Copyable & Movable & Differentia
     fn is_contiguous(self) -> Bool:
         return self.offset == 0 and self.strides.is_contiguous(self.shape)
 
-    fn into_tensorlike[datatype: DType](self) -> TensorLike[datatype]:
-        return rebind[TensorLike[datatype]](TensorLike[dtype](self.address()))
+    fn into_tensorlike(self) -> TensorLike[dtype]:
+        return TensorLike[dtype](self.address())
 
     # Index calculation: flat offset into underlying tensor's data[]
     fn index_offset(self, indices: IntList) -> Int:
@@ -78,10 +78,10 @@ struct TensorView[dtype: DType = DType.float32](Copyable & Movable & Differentia
     fn id(self) -> Int:
         return Int(self.address())
 
-    fn ancestry[datatype: DType](self) -> Ancestors[datatype]:
-        return rebind[Ancestors[datatype]](Ancestors[dtype].untracked())
+    fn ancestry(self) -> Ancestors[dtype]:
+        return Ancestors[dtype].untracked()
 
-    fn seed_grad[datatype: DType](self, value: Scalar[datatype]):
+    fn seed_grad(self, value: Scalar[dtype]):
             self.base_tensor[].seed_grad(value)
 
     fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:

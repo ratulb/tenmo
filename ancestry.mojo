@@ -4,8 +4,8 @@ from shared import TensorLike
 from common_utils import log_debug
 
 
-@register_passable
-struct Ancestors[dtype: DType](Sized & Copyable):
+#@register_passable
+struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     var ancestors: UnsafePointer[UnsafePointer[TensorLike[dtype]]]
     var size: Int
     var capacity: Int
@@ -22,7 +22,21 @@ struct Ancestors[dtype: DType](Sized & Copyable):
         self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
             existing.capacity
         )
-        memcpy(self.ancestors, existing.ancestors, existing.size)
+        #memcpy(self.ancestors, existing.ancestors, existing.size)
+        for idx in range(existing.size):
+            (self.ancestors + idx)[] = (existing.ancestors + idx)[]
+
+    fn __moveinit__(out self, owned existing: Self):
+        self.size = existing.size
+        self.capacity = existing.capacity
+        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
+            existing.capacity
+        )
+        #memcpy(self.ancestors, existing.ancestors, existing.size)
+        for idx in range(existing.size):
+            (self.ancestors + idx)[] = (existing.ancestors + idx)[]
+
+
 
     @staticmethod
     fn untracked() -> Ancestors[dtype]:
@@ -59,17 +73,17 @@ struct Ancestors[dtype: DType](Sized & Copyable):
     fn __len__(self) -> Int:
         return self.size
 
-    fn append(mut self, address: UnsafePointer[TensorLike[dtype]]):
+    fn append(mut self, address_: UnsafePointer[TensorLike[dtype]]):
         if self.size == self.capacity:
             new_capacity = max(1, self.capacity * 2)
             self.resize(new_capacity)
-        (self.ancestors + self.size)[] = address
+        (self.ancestors + self.size)[] = address_
         self.size += 1
 
-    _="""fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
+    fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
         for tensor_like in tensor_likes:
-            if tensor_like.requires_grad():
-                self.append(tensor_like.address())"""
+            if tensor_like._requires_grad():
+                self.append(tensor_like.address())
 
     fn resize(mut self, new_capacity: Int):
         self.reserve(new_capacity)
@@ -89,11 +103,11 @@ struct Ancestors[dtype: DType](Sized & Copyable):
         self.ancestors = new_ancestors
         self.capacity = new_capacity
 
-    fn print(self) raises -> None:
+    fn print(self) -> None:
         total = len(self)
         print("Ancestors[", total, "] = ", end="")
         for i in range(total):
-            print(self.get(i).__str__(), end=" ")
+            print(self.get(i)[].id().__str__(), end=" ")
         print()
 
     fn __iter__(ref self) -> _AncestorsIter[self.dtype, __origin_of(self)]:
@@ -140,6 +154,28 @@ struct _AncestorsIter[
         else:
             return self.index
 
+from tensors import Tensor
+
+fn populate_ancestry[dtype: DType = DType.float32](*tensor_likes: TensorLike[dtype]) -> Ancestors[dtype]:
+    #ancestors1 = Ancestors[dtype].untracked()
+    ancestors1 = Ancestors[dtype].with_capacity(2)
+    #ancestors1.add_ancestry(tensor_likes)
+    for each in tensor_likes:
+        ancestors1.append(each.address())
+    print("ok1")
+    ancestors1.print()
+    return ancestors1
+
 
 fn main():
-    print("So good")
+    ancestors = Ancestors[DType.float32].untracked()
+    print("ok0")
+    ancestors.print()
+    t1 = Tensor([1,2,3], requires_grad=True)
+    t2 = Tensor([4,2,3], requires_grad=True)
+    ancestors2 = populate_ancestry(t1.into_tensorlike(),t2.into_tensorlike())
+    print("ok2")
+    ancestors2.print()
+    copied = ancestors2
+    print("ok3")
+    copied.print()

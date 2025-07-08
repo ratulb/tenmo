@@ -2,7 +2,7 @@
 from testing import assert_true
 
 
-_ = """fn test_scalar_addition() raises:
+fn test_scalar_addition() raises:
     print("test_scalar_addition")
     var a = Tensor.scalar(3.0, requires_grad=True)
     var b = Tensor.scalar(4.0, requires_grad=True)
@@ -83,7 +83,7 @@ fn test_nested_operations() raises:
     # c.backward()
     # Verify gradients numerically
     assert_true(abs(a.grad[][0] - 11.0) < 1e-6)  # 3 + (3+4)*1
-    assert_true(abs(b.grad[][0] - 8.0) < 1e-6)  # 1 + (1+2)*1"""
+    assert_true(abs(b.grad[][0] - 8.0) < 1e-6)  # 1 + (1+2)*1
 
 
 _ = """fn test_detach() raises:
@@ -103,7 +103,7 @@ _ = """fn test_empty_tensor() raises:
     assert_true(a.grad[].shape == Shape.of(0))"""
 
 
-_ = """fn test_zero_grad() raises:
+fn test_zero_grad() raises:
     print("test_zero_grad")
     var a = Tensor.scalar(1.0, requires_grad=True)
     var b = a * 2
@@ -118,7 +118,7 @@ fn test_transpose_grad() raises:
     var b = a.T()
     var c = b * Tensor.d2([[10, 30], [20, 40]])
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[10, 20], [30, 40]])))"""
+    assert_true(a.grad[].all_close(Tensor.d2([[10, 20], [30, 40]])))
 
 
 _ = """fn test_slice_grad() raises:
@@ -142,16 +142,23 @@ _ = """fn test_large_tensor_backprop() raises:
 
 
 fn main() raises:
-    var a = Tensor.scalar(3.0, requires_grad=True)
-    var b = Tensor.scalar(4.0, requires_grad=True)
-    var c = a + b
+    print("test_broadcast_addition")
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    var b = Tensor.d1([10, 20], requires_grad=True)
+    print("Inputs a, b: ", a.id(), b.id())
+    var c = a + b  # shape (2,2)
+    #s = c.sum()
+    #print("Before all s.addr and c.addr: ", s.address(), c.address())
+    print("Before all c.id: ", c.id())
+    #s.backward()
     c.backward()
-    assert_true(c.item() == 7.0)
-    assert_true(a.grad[].item() == 1.0)
-    assert_true(b.grad[].item() == 1.0)
+    assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
+    assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
+    assert_true(
+        b.grad[].all_close(Tensor.d1([2, 2]))
+    )  # Summed over broadcast dim
 
-
-    _ = """test_scalar_addition()
+    _="""test_scalar_addition()
     test_broadcast_addition()
     test_sum_all_dims()
     test_sum_specific_axis()
@@ -203,9 +210,8 @@ from graph import trace_ancestry
 
 
 struct Tensor[dtype: DType = DType.float32](
-    Copyable & Movable & Sized & Stringable & Differentiable
+    Copyable & Movable & Sized & Stringable
 ):
-    #alias datatype: DType = dtype
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
@@ -260,9 +266,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return True
 
-    fn into_tensorlike[datatype: DType](self) -> TensorLike[datatype]:
-        tensor_like = TensorLike[dtype](self.address())
-        return rebind[TensorLike[datatype]](tensor_like)
+    fn into_tensorlike(self) -> TensorLike[dtype]:
+        return TensorLike[dtype](self.address())
 
     _="""fn trace_ancestry(
         self,
@@ -285,15 +290,24 @@ struct Tensor[dtype: DType = DType.float32](
             return
         visited = Set[Int]()
         traced = Ancestors[dtype]()"""
-        #var root: Differentiable = rebind[Differentiable](self)
-        traced = trace_ancestry[dtype](self.into_tensorlike[dtype]())
+        print("**********At the start of backward - printing ancestors************ ")
+        self.ancestors.print()
+        self.into_tensorlike().ancestry().print()
+        traced = trace_ancestry[dtype](self.address()[].into_tensorlike().address())
+        print("After returning from trace_ancestry - printing traced: *******")
+        traced.print()
+        print("$$$$$$$$$$$$$$$$$$$$$$$")
         self.seed_grad(start_grad)
+        print("I am past 1000")
+        self.ancestors.print()
+        self.into_tensorlike().ancestry().print()
         for each in traced.__reversed__():
+            print("I am cruising thru each")
             each[].invoke_grad_fn(verbose)
 
 
-    fn ancestry[datatype: DType](self) -> Ancestors[datatype]:
-        return rebind[Ancestors[datatype]](self.ancestors)
+    fn ancestry(self) -> Ancestors[dtype]:
+        return self.address()[].ancestors
 
     _ = """fn backward(
         self,
@@ -680,13 +694,15 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad and self.has_grad():
             memset_zero(self.grad[].data, self.grad[].numels())
 
-    fn add_ancestry[datatype: DType = dtype](
+    #fn add_ancestry[datatype: DType = dtype](
+    fn add_ancestry(
         mut self,
-        *tensors: Tensor[dtype],
+        *tensor_likes: TensorLike[dtype],
     ):
-        for tensor in tensors:
+        #self.ancestors.add_ancestry(tensor_likes)
+        for tensor in tensor_likes:
 
-            self.ancestors.append(rebind[UnsafePointer[TensorLike[dtype]]](tensor.into_tensorlike[datatype]().address()))
+            self.ancestors.append(tensor.address())
 
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
@@ -706,7 +722,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](out_grad_scaled)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(self.into_tensorlike())
 
         return out
 
@@ -732,7 +748,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](product)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(self.into_tensorlike())
 
         return out
 
@@ -854,7 +870,10 @@ struct Tensor[dtype: DType = DType.float32](
                     that.update_grad[tensor_op_second](grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
+            print("broadcast_operation: result, self, other addrs int->", Int(result.address()), Int(self.address()), Int(other.address()))
+        print("Now printing result's ancestors: ")
+        result.ancestors.print()
         return result
 
     fn backward_grad_contrib(
@@ -907,7 +926,7 @@ struct Tensor[dtype: DType = DType.float32](
                     that.update_grad[AddTensor](grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
 
         return result
 
@@ -939,7 +958,7 @@ struct Tensor[dtype: DType = DType.float32](
                     other.address()[].update_grad[AddTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self, other)
+            out.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
 
         return out
 
@@ -958,7 +977,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(self.into_tensorlike())
 
         return out
 
@@ -1000,7 +1019,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](out_grad)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(self.into_tensorlike())
         return out
 
     # Element wise multiplication of two tensors
@@ -1046,7 +1065,7 @@ struct Tensor[dtype: DType = DType.float32](
                     self.address()[].requires_grad = requires_grad_original
                     other.address()[].update_grad[AddTensor](product)
 
-            out.add_ancestry(self, other)
+            out.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
             out.grad_fn = Optional(grad_fn)
 
         return out
@@ -1083,7 +1102,7 @@ struct Tensor[dtype: DType = DType.float32](
 
             out.grad_fn = Optional(grad_fn)
 
-            out.add_ancestry(self, other)
+            out.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
 
         return out
 
@@ -1158,7 +1177,7 @@ struct Tensor[dtype: DType = DType.float32](
                     b.update_grad[AddTensor](b_grad)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
 
         return result
 
@@ -1212,7 +1231,7 @@ struct Tensor[dtype: DType = DType.float32](
                     other.address()[].update_grad[AddTensor](grad)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
 
         return result
 
@@ -1254,7 +1273,7 @@ struct Tensor[dtype: DType = DType.float32](
                     b.update_grad[AddTensor](b_grad)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
+            result.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
 
         return result
 
@@ -1279,7 +1298,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](upstream_grad.T())
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self)
+            result.add_ancestry(self.into_tensorlike())
 
         return result
 
@@ -1337,7 +1356,7 @@ struct Tensor[dtype: DType = DType.float32](
                 result.address()[].base.init_pointee_move(upstream_grad^)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self)
+            result.add_ancestry(self.into_tensorlike())
 
         return result
 
@@ -1403,7 +1422,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.address()[].update_grad[AddTensor](scaled)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self)
+            result.add_ancestry(self.into_tensorlike())
 
         return result
 
@@ -1428,7 +1447,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
 
                 scalar_out.grad_fn = Optional(scalar_grad_fn)
-                scalar_out.add_ancestry(self)
+                scalar_out.add_ancestry(self.into_tensorlike())
             return scalar_out
 
         # FIX 1: Handle full reduction case explicitly
@@ -1508,8 +1527,8 @@ struct Tensor[dtype: DType = DType.float32](
                 this.update_grad[AddTensor](grad_contrib)
 
             out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
-
+            out.add_ancestry(self.into_tensorlike())
+            print("sum result and self addrs ints: ", Int(out.address()), Int(self.address()))
         return out
 
     @staticmethod
