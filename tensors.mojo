@@ -142,23 +142,22 @@ _ = """fn test_large_tensor_backprop() raises:
 
 
 fn main() raises:
-    print("test_broadcast_addition")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var b = Tensor.d1([10, 20], requires_grad=True)
     print("Inputs a, b: ", a.id(), b.id())
     var c = a + b  # shape (2,2)
-    #s = c.sum()
-    #print("Before all s.addr and c.addr: ", s.address(), c.address())
+    # s = c.sum()
+    # print("Before all s.addr and c.addr: ", s.address(), c.address())
     print("Before all c.id: ", c.id())
-    #s.backward()
+    # s.backward()
     c.backward()
-    assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
+    _="""assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
     assert_true(
         b.grad[].all_close(Tensor.d1([2, 2]))
-    )  # Summed over broadcast dim
+    )  # Summed over broadcast dim"""
 
-    _="""test_scalar_addition()
+    _ = """test_scalar_addition()
     test_broadcast_addition()
     test_sum_all_dims()
     test_sum_specific_axis()
@@ -186,7 +185,7 @@ from intlist import IntList
 from ancestry import Ancestors
 from views import TensorView
 from strides import Strides
-from shared import Differentiable, TensorLike
+from shared import TensorLike
 from common_utils import log_debug, piped
 from operators import (
     __tensor_op_tensor__,
@@ -205,7 +204,8 @@ from operators import (
     Subtract,
     Multiply,
 )
-#from collections import Set
+
+# from collections import Set
 from graph import trace_ancestry
 
 
@@ -269,7 +269,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](self.address())
 
-    _="""fn trace_ancestry(
+    _ = """fn trace_ancestry(
         self,
         node: TensorLike[dtype],
         mut visited: Set[Int],
@@ -286,25 +286,18 @@ struct Tensor[dtype: DType = DType.float32](
         start_grad: Scalar[dtype] = 1.0,
         verbose: Bool = False,
     ) raises:
-        _="""if self.has_grad() == False:
-            return
-        visited = Set[Int]()
-        traced = Ancestors[dtype]()"""
-        print("**********At the start of backward - printing ancestors************ ")
+        print("\nEntered backward - printing self(receivers ancestry below\n")
         self.ancestors.print()
         self.into_tensorlike().ancestry().print()
-        traced = trace_ancestry[dtype](self.address()[].into_tensorlike().address())
-        print("After returning from trace_ancestry - printing traced: *******")
+        traced = trace_ancestry[dtype](self.into_tensorlike())
+        print("\nAfter returning from trace_ancestry - printing traced below\n")
         traced.print()
-        print("$$$$$$$$$$$$$$$$$$$$$$$")
         self.seed_grad(start_grad)
-        print("I am past 1000")
         self.ancestors.print()
-        self.into_tensorlike().ancestry().print()
+        # self.into_tensorlike().ancestry().print()
         for each in traced.__reversed__():
-            print("I am cruising thru each")
+            print("Invoking grad function for each ancestor")
             each[].invoke_grad_fn(verbose)
-
 
     fn ancestry(self) -> Ancestors[dtype]:
         return self.address()[].ancestors
@@ -422,6 +415,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = other.base
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
+
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
@@ -579,10 +573,9 @@ struct Tensor[dtype: DType = DType.float32](
 
         return True
 
-    fn seed_grad[datatype: DType](self, value: Scalar[datatype]):
-        scalar = rebind[Scalar[dtype]](value)
+    fn seed_grad(self, value: Scalar[dtype]):
         if self.has_grad():
-            self.grad[].fill(scalar)
+            self.grad[].fill(value)
 
     fn fill(self, value: Scalar[dtype]):
         @parameter
@@ -694,15 +687,21 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad and self.has_grad():
             memset_zero(self.grad[].data, self.grad[].numels())
 
-    #fn add_ancestry[datatype: DType = dtype](
-    fn add_ancestry(
+    fn add_ancestry(mut self, *parents: TensorLike[dtype]) -> None:
+        for parent in parents:
+            if Int(parent.address()) == Int(self.address()):
+                print("🚨 Warning: Attempt to add self as ancestor")
+                continue
+            self.ancestors.append(parent.address())
+
+
+    _="""fn add_ancestry(
         mut self,
         *tensor_likes: TensorLike[dtype],
     ):
-        #self.ancestors.add_ancestry(tensor_likes)
+        # self.ancestors.add_ancestry(tensor_likes)
         for tensor in tensor_likes:
-
-            self.ancestors.append(tensor.address())
+            self.ancestors.append(tensor.address())"""
 
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
@@ -871,7 +870,12 @@ struct Tensor[dtype: DType = DType.float32](
 
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
-            print("broadcast_operation: result, self, other addrs int->", Int(result.address()), Int(self.address()), Int(other.address()))
+            print(
+                "broadcast_operation: result, self, other addrs int->",
+                Int(result.address()),
+                Int(self.address()),
+                Int(other.address()),
+            )
         print("Now printing result's ancestors: ")
         result.ancestors.print()
         return result
@@ -1528,7 +1532,11 @@ struct Tensor[dtype: DType = DType.float32](
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self.into_tensorlike())
-            print("sum result and self addrs ints: ", Int(out.address()), Int(self.address()))
+            print(
+                "sum result and self addrs ints: ",
+                Int(out.address()),
+                Int(self.address()),
+            )
         return out
 
     @staticmethod

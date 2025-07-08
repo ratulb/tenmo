@@ -1,11 +1,10 @@
 from tensors import Tensor
 from views import TensorView
-from utils import Variant
 from memory import UnsafePointer
 from ancestry import Ancestors
 
 
-trait Differentiable:
+_="""trait Differentiable:
     fn id(self) -> Int:
         ...
 
@@ -19,7 +18,7 @@ trait Differentiable:
         ...
 
     fn into_tensorlike[datatype: DType](self) -> TensorLike[datatype]:
-        ...
+        ..."""
 
 
 struct TensorLike[dtype: DType](Copyable & Movable):
@@ -37,7 +36,7 @@ struct TensorLike[dtype: DType](Copyable & Movable):
     fn __init__(out self, _view_address: UnsafePointer[TensorView[dtype]]):
         self.kind = 1
         self.tensor_address = Self.TensorAddress()
-        self.view_address = _view_address
+        self.view_address = _view_address[].address()
 
     fn __moveinit__(out self, owned other: Self):
         self.kind = 1
@@ -95,6 +94,7 @@ struct TensorLike[dtype: DType](Copyable & Movable):
             return self.address()[].tensor()._requires_grad()
 
     fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:
+        print("Are you invoking?")
         if self.address()[].is_view():
             self.address()[].view().invoke_grad_fn(verbose)
         else:

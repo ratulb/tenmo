@@ -4,7 +4,6 @@ from shared import TensorLike
 from common_utils import log_debug
 
 
-#@register_passable
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     var ancestors: UnsafePointer[UnsafePointer[TensorLike[dtype]]]
     var size: Int
@@ -19,24 +18,28 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     fn __copyinit__(out self, existing: Self):
         self.size = existing.size
         self.capacity = existing.capacity
-        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
-            existing.capacity
-        )
-        #memcpy(self.ancestors, existing.ancestors, existing.size)
-        for idx in range(existing.size):
-            (self.ancestors + idx)[] = (existing.ancestors + idx)[]
+        if existing.size > 0:
+            self.ancestors = UnsafePointer[
+                UnsafePointer[TensorLike[dtype]]
+            ].alloc(existing.size)
+            memcpy(self.ancestors, existing.ancestors, existing.size)
+            _="""for idx in range(existing.size):
+                (self.ancestors + idx)[] = (existing.ancestors + idx)[]"""
+        else:
+            self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
 
     fn __moveinit__(out self, owned existing: Self):
         self.size = existing.size
         self.capacity = existing.capacity
-        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
-            existing.capacity
-        )
-        #memcpy(self.ancestors, existing.ancestors, existing.size)
-        for idx in range(existing.size):
-            (self.ancestors + idx)[] = (existing.ancestors + idx)[]
-
-
+        if existing.size > 0:
+            self.ancestors = UnsafePointer[
+                UnsafePointer[TensorLike[dtype]]
+            ].alloc(existing.size)
+            memcpy(self.ancestors, existing.ancestors, existing.size)
+            _="""for idx in range(existing.size):
+                (self.ancestors + idx)[] = (existing.ancestors + idx)[]"""
+        else:
+            self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
 
     @staticmethod
     fn untracked() -> Ancestors[dtype]:
@@ -80,10 +83,10 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         (self.ancestors + self.size)[] = address_
         self.size += 1
 
-    fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
+    _ = """fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
         for tensor_like in tensor_likes:
             if tensor_like._requires_grad():
-                self.append(tensor_like.address())
+                self.append(tensor_like.address())"""
 
     fn resize(mut self, new_capacity: Int):
         self.reserve(new_capacity)
@@ -154,12 +157,16 @@ struct _AncestorsIter[
         else:
             return self.index
 
+
 from tensors import Tensor
 
-fn populate_ancestry[dtype: DType = DType.float32](*tensor_likes: TensorLike[dtype]) -> Ancestors[dtype]:
-    #ancestors1 = Ancestors[dtype].untracked()
+
+fn populate_ancestry[
+    dtype: DType = DType.float32
+](*tensor_likes: TensorLike[dtype]) -> Ancestors[dtype]:
+    # ancestors1 = Ancestors[dtype].untracked()
     ancestors1 = Ancestors[dtype].with_capacity(2)
-    #ancestors1.add_ancestry(tensor_likes)
+    # ancestors1.add_ancestry(tensor_likes)
     for each in tensor_likes:
         ancestors1.append(each.address())
     print("ok1")
@@ -171,9 +178,9 @@ fn main():
     ancestors = Ancestors[DType.float32].untracked()
     print("ok0")
     ancestors.print()
-    t1 = Tensor([1,2,3], requires_grad=True)
-    t2 = Tensor([4,2,3], requires_grad=True)
-    ancestors2 = populate_ancestry(t1.into_tensorlike(),t2.into_tensorlike())
+    t1 = Tensor([1, 2, 3], requires_grad=True)
+    t2 = Tensor([4, 2, 3], requires_grad=True)
+    ancestors2 = populate_ancestry(t1.into_tensorlike(), t2.into_tensorlike())
     print("ok2")
     ancestors2.print()
     copied = ancestors2
