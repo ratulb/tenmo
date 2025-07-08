@@ -151,7 +151,7 @@ fn main() raises:
     print("Before all c.id: ", c.id())
     # s.backward()
     c.backward()
-    _="""assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
+    _ = """assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
     assert_true(
         b.grad[].all_close(Tensor.d1([2, 2]))
@@ -292,15 +292,23 @@ struct Tensor[dtype: DType = DType.float32](
         traced = trace_ancestry[dtype](self.into_tensorlike())
         print("\nAfter returning from trace_ancestry - printing traced below\n")
         traced.print()
-        self.seed_grad(start_grad)
+        # self.seed_grad(start_grad)
         self.ancestors.print()
+        print(len(traced))
+        for idx in reversed(range(len(traced))):
+            traced.get(idx)[].invoke_grad_fn()
+            _ = traced.get(idx)[].is_tensor()
+            print("hello")
         # self.into_tensorlike().ancestry().print()
-        for each in traced.__reversed__():
+        _ = """_reversed = traced.__reversed__()
+        for each in _reversed:
             print("Invoking grad function for each ancestor")
-            each[].invoke_grad_fn(verbose)
+            if each[].is_tensor():
+                #each[].invoke_grad_fn()
+                print("Yes tensor")"""
 
     fn ancestry(self) -> Ancestors[dtype]:
-        return self.address()[].ancestors
+        return self.ancestors
 
     _ = """fn backward(
         self,
@@ -415,7 +423,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = other.base
         self.ancestors = other.ancestors
         self.grad_fn = other.grad_fn
-
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
@@ -687,15 +694,49 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad and self.has_grad():
             memset_zero(self.grad[].data, self.grad[].numels())
 
+    _ = """fn add_ancestry(mut self, *parents: TensorLike[dtype]) -> None:
+        for parent in parents:
+            parent_id = parent.id()
+            self_id = self.id()  # Int(UnsafePointer(to=self))
+            if parent_id == self_id:
+                print("🚨 Warning: Attempt to add self as ancestor")
+                continue
+            self.ancestors.append(parent.address())"""
+
     fn add_ancestry(mut self, *parents: TensorLike[dtype]) -> None:
+        for parent in parents:
+            parent_id = parent.id()
+            self_id = self.id()
+
+            print(
+                "🔗 Trying to add ancestry: self.id =",
+                self_id,
+                ", parent.id =",
+                parent_id,
+            )
+            print(
+                "🔍 parent.kind =",
+                parent.kind,
+                ", parent.tensor ptr =",
+                Int(parent.tensor_address),
+                ", parent.view ptr =",
+                Int(parent.view_address),
+            )
+
+            if parent_id == self_id:
+                print("🚨 Warning: Attempt to add self as ancestor (skipping)")
+                continue
+
+            self.ancestors.append(parent.address())
+
+    _ = """fn add_ancestry(mut self, *parents: TensorLike[dtype]) -> None:
         for parent in parents:
             if Int(parent.address()) == Int(self.address()):
                 print("🚨 Warning: Attempt to add self as ancestor")
                 continue
-            self.ancestors.append(parent.address())
+            self.ancestors.append(parent.address())"""
 
-
-    _="""fn add_ancestry(
+    _ = """fn add_ancestry(
         mut self,
         *tensor_likes: TensorLike[dtype],
     ):
@@ -869,13 +910,31 @@ struct Tensor[dtype: DType = DType.float32](
                     that.update_grad[tensor_op_second](grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self.into_tensorlike(), other.into_tensorlike())
+            self_tensor_like = self.into_tensorlike()
+            other_tensor_like = other.into_tensorlike()
             print(
-                "broadcast_operation: result, self, other addrs int->",
-                Int(result.address()),
-                Int(self.address()),
-                Int(other.address()),
+                "broadcast_operation: result, self, other's ids ->",
+                result.id(),
+                self.id(),
+                other.id(),
             )
+            print("TensorLike IDs before adding ancestry:")
+            print("  self.into_tensorlike().id(): ", self_tensor_like.id())
+            print("  other.into_tensorlike().id(): ", other_tensor_like.id())
+            print("  result.id(): ", result.id())
+
+            result.add_ancestry(self_tensor_like, other_tensor_like)
+
+            _ = """print(
+                (
+                    "broadcast_operation: result, self, other's ids via"
+                    " tensorlike ->"
+                ),
+                result_tensor_like.id(),
+                self_tensor_like.id(),
+                other_tensor_like.id(),
+            )"""
+
         print("Now printing result's ancestors: ")
         result.ancestors.print()
         return result

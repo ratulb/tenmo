@@ -13,12 +13,7 @@ fn trace_ancestry[dtype: DType](node: TensorLike[dtype]) -> Ancestors[dtype]:
     visited = Set[Int]()
 
     print("trace_ancestry - ok1")
-    do_trace_ancestry[dtype](
-        node,
-        visited,
-        traced,
-        is_root=UnsafePointer(to=Scalar[DType.bool](True)),
-    )  # Mark as root
+    do_trace_ancestry[dtype](node, visited, traced, is_root=True)
     print("trace_ancestry - ok2")
     return traced
 
@@ -29,9 +24,7 @@ fn do_trace_ancestry[
     node: TensorLike[dtype],
     mut visited: Set[Int],
     mut traced: Ancestors[dtype],
-    is_root: UnsafePointer[Scalar[DType.bool]] = UnsafePointer(
-        to=Scalar[DType.bool](False)
-    ),
+    is_root: Bool = False,
 ):
     if node.id() in visited:
         return
@@ -40,29 +33,32 @@ fn do_trace_ancestry[
     print("do_trace_ancestry - ok1 -> node.id() -> ", node.id())
     node.ancestry().print()
     for ancestor in node.ancestry():
-        is_root[] = Scalar[DType.bool](False)
         do_trace_ancestry(
-            ancestor[], visited, traced, is_root
+            ancestor[], visited, traced, False
         )  # Children are not root
     # Only append if NOT the root node
-    if not is_root[]:
-        traced.append(node.address())
+    # if not is_root:
+    traced.append(node.address())
 
 
 from tensors import Tensor
 
 
 fn main() raises:
-    # var a = Tensor.d1([10], requires_grad=True)
-    # var b = Tensor.d1([20], requires_grad=True)
-    #var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var a = Tensor.d1([1, 2], requires_grad=True)
-    var b = Tensor.d1([10, 20], requires_grad=True)
-    print("Inputs a, b: ", a.id(), b.id())
+    var b = Tensor.d3([[[10, 20]]], requires_grad=True)
     var c = a + b
-    print("Before calling backward c.id: ", c.id())
+    print("IDs:")
+    print("a.id:", a.id())
+    print("b.id:", b.id())
+    print("c.id:", c.id())
+
+    print("Ancestors of c:")
+    c.ancestors.print()
 
     c.backward()
+    # a.grad[].print()
+    c.grad[].print()
 
     _ = """A = Tensor.d1([1], requires_grad = True)
     B = Tensor.d1([2], requires_grad = True)

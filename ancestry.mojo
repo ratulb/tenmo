@@ -23,7 +23,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
                 UnsafePointer[TensorLike[dtype]]
             ].alloc(existing.size)
             memcpy(self.ancestors, existing.ancestors, existing.size)
-            _="""for idx in range(existing.size):
+            _ = """for idx in range(existing.size):
                 (self.ancestors + idx)[] = (existing.ancestors + idx)[]"""
         else:
             self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
@@ -36,7 +36,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
                 UnsafePointer[TensorLike[dtype]]
             ].alloc(existing.size)
             memcpy(self.ancestors, existing.ancestors, existing.size)
-            _="""for idx in range(existing.size):
+            _ = """for idx in range(existing.size):
                 (self.ancestors + idx)[] = (existing.ancestors + idx)[]"""
         else:
             self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
@@ -80,7 +80,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         if self.size == self.capacity:
             new_capacity = max(1, self.capacity * 2)
             self.resize(new_capacity)
-        (self.ancestors + self.size)[] = address_
+        (self.ancestors + self.size)[] = address_[].address()
         self.size += 1
 
     _ = """fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
