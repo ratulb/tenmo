@@ -7,7 +7,8 @@ fn test_scalar_addition() raises:
     var a = Tensor.scalar(3.0, requires_grad=True)
     var b = Tensor.scalar(4.0, requires_grad=True)
     var c = a + b
-    # c.backward()
+    c.seed_grad(1.0)
+    Tensor.walk_backward(c.into_tensorlike())
     assert_true(c.item() == 7.0)
     assert_true(a.grad[].item() == 1.0)
     assert_true(b.grad[].item() == 1.0)
@@ -18,7 +19,9 @@ fn test_broadcast_addition() raises:
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var b = Tensor.d1([10, 20], requires_grad=True)
     var c = a + b  # shape (2,2)
-    # c.sum().backward()
+    s = c.sum()
+    s.seed_grad(1.0)
+    Tensor.walk_backward(s.into_tensorlike())
     assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
     assert_true(
@@ -30,7 +33,8 @@ fn test_sum_all_dims() raises:
     print("test_sum_all_dims")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var s = a.sum()  # scalar
-    # s.backward()
+    s.seed_grad(1.0)
+    Tensor.walk_backward(s.into_tensorlike())
     assert_true(s.item() == 10.0)
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
 
@@ -142,18 +146,22 @@ _ = """fn test_large_tensor_backprop() raises:
 
 
 fn main() raises:
-    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    test_scalar_addition()
+    test_broadcast_addition()
+    test_sum_all_dims()
+    _="""var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var b = Tensor.d1([10, 20], requires_grad=True)
     print("Inputs a, b: ", a.id(), b.id())
     var c = a + b  # shape (2,2)
-    # s = c.sum()
+    s = c.sum()
     # print("Before all s.addr and c.addr: ", s.address(), c.address())
     print("Before all c.id: ", c.id())
     # s.backward()
-    Tensor.walk_backward(c.into_tensorlike())
-    _= a^
-    _= b^
-    _ = """assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
+    Tensor.walk_backward(s.into_tensorlike())
+    #_= a^
+    #_= b^
+    #_= c^
+    assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
     assert_true(
         b.grad[].all_close(Tensor.d1([2, 2]))
