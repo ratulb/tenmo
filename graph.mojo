@@ -64,8 +64,9 @@ fn main() raises:
     c.ancestors.print()
     s.seed_grad(1.0)
     Tensor.walk_backward(s.into_tensorlike(), verbose=True)
-    #result = trace_ancestry(s.into_tensorlike())
-    #result.print()
-    #print(c.shape)
-    _= c^
-    #result.free()
+    #print(a.shape, b.shape, c.shape, s.shape)
+    #_= c^
+    a.free()
+    b.free()
+    c.free()
+    s.free()
