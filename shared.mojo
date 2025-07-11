@@ -72,6 +72,9 @@ struct TensorLike[dtype: DType](Copyable & Movable):
         return self.view_address[]
 
     fn id(self) -> Int:
+        return Int(self.address())
+
+    fn inner_id(self) -> Int:
         if self.kind == 0:
             return self.tensor_address[].id()
         else:

@@ -77,7 +77,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         if self.size == self.capacity:
             new_capacity = max(1, self.capacity * 2)
             self.resize(new_capacity)
-        (self.ancestors + self.size)[] = address_[].address()
+        (self.ancestors + self.size)[] = address_
         self.size += 1
 
     _ = """fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
@@ -107,7 +107,8 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         total = len(self)
         print("Ancestors[", total, "] = ", end="")
         for i in range(total):
-            print(self.get(i)[].id().__str__(), end=" ")
+            print(self.get(i)[].inner_id().__str__(), end=" ")
+            #print(self.get(i).__str__(), end=" ")
         print()
 
     fn __iter__(ref self) -> _AncestorsIter[self.dtype, __origin_of(self)]:

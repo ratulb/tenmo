@@ -61,7 +61,9 @@ struct TensorLike[dtype: DType]:
         else:
             self.tensor().invoke_grad_fn(verbose)"""
 
-alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
+alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
+#alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
+alias log = Logger[Level._from_str(LOG_LEVEL)]()
 
 
 fn log_debug(msg: String):

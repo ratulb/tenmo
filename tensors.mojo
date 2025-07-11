@@ -151,6 +151,8 @@ fn main() raises:
     print("Before all c.id: ", c.id())
     # s.backward()
     Tensor.walk_backward(c.into_tensorlike())
+    _= a^
+    _= b^
     _ = """assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
     assert_true(
@@ -206,6 +208,7 @@ from operators import (
 )
 from summ import SumGradFn
 from collections import Set
+
 
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable
@@ -267,75 +270,37 @@ struct Tensor[dtype: DType = DType.float32](
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](self.address())
 
-
     @staticmethod
-    fn trace_ancestry(
+    fn trace_ancestry[
+        dtype: DType, //
+    ](
         node: TensorLike[dtype],
-        mut visited: Set[Int],
+        mut visited: IntList,
         mut traced: Ancestors[dtype],
     ):
         if node.id() not in visited:
-            visited.add(node.id())
-            print("visited: ", visited.__str__())
-            # First add the current node (this ensures 's' is included)
+            visited.append(node.id())
             var ptr = UnsafePointer[TensorLike[dtype]].alloc(1)
             ptr.init_pointee_copy(node)
-            traced.append(ptr)  # Add current node first
-            print(
-                "📌 DAG Node Added: ",
-                node.id(),
-                " => kind:",
-                "Tensor" if ptr[].is_tensor() else "View",
+            traced.append(ptr)
+            msg = String(
+                "DAG node inner id: "
+                + String(node.inner_id())
+                + " => kind:"
+                + "Tensor" if ptr[].is_tensor() else "View"
             )
-            # Then process ancestors (this will build the correct order)
-            for ancestor in node.ancestry():
+            log_debug(msg)
+
+            for ancestor in node.tensor().ancestors:
                 Self.trace_ancestry(ancestor[], visited, traced)
 
     @staticmethod
     fn walk_backward(
-        node: TensorLike[dtype],
-        start_grad: Scalar[dtype] = 1.0,
-        verbose: Bool = False,
-    ) raises:
-        traced = Ancestors[dtype]()
-        visited = Set[Int]()
-        Self.trace_ancestry(node, visited, traced)
-        print("Printing traced")
-        traced.print()
-
-
-    _="""@staticmethod
-    fn trace_ancestry(
-        node: TensorLike[dtype],
-        mut visited: Set[Int],
-        mut traced: Ancestors[dtype],
-    ):
-        if node.id() not in visited:
-            visited.add(node.id())
-            ancestors = node.ancestry()
-            for ancestor in ancestors:
-                print("In loop - ancestor id: ", ancestor[].id())
-                Self.trace_ancestry(ancestor[], visited, traced)
-            node_id = node.id()
-            var ptr = UnsafePointer[TensorLike[dtype]].alloc(1)
-            ptr.init_pointee_move(node)
-            traced.append(ptr)
-            print(
-                "📌 DAG Node Added: ",
-                node_id,
-                " => kind:",
-                "Tensor" if ptr[].is_tensor() else "View",
-            )"""
-
-
-    _="""@staticmethod
-    fn walk_backward(
 
         node: TensorLike[dtype],
         start_grad: Scalar[dtype] = 1.0,
         verbose: Bool = False,
     ) raises:
-        print("Walking backward")
         traced = Ancestors[dtype]()
         visited = IntList()
         Self.trace_ancestry(node, visited, traced)
@@ -343,21 +308,19 @@ struct Tensor[dtype: DType = DType.float32](
         traced.print()
         seen_ids = Set[Int]()
         for each in traced:
-            id = each[].id()
+            id = each[].inner_id()
             if id in seen_ids:
-                print("❗ Duplicate TensorLike id in DAG:", id)
+                print("Duplicate TensorLike id in DAG:", id)
             seen_ids.add(id)
             print("About to call grad_fn for", id)
             ptr = each
             if not ptr.__as_bool__():
-                print("❌ Null pointer found!")
+                print("Null pointer found!")
                 continue
-            else:
-                print("✔️ Pointer OK:", Int(ptr))
 
             node_ = ptr[]
             print(
-                "About to call grad_fn for", node_.id()
+                "About to call grad_fn for", node_.inner_id()
             )  # <-- Match this against `traced.print()`
 
             if each[].is_view():
@@ -366,26 +329,26 @@ struct Tensor[dtype: DType = DType.float32](
                 if v.base_tensor[].grad_fn:
                     # Mojo recommended way for checking Optional
                     print("  grad_fn present")
-                    print("Calling grad_fn on view id:", each[].id())
+                    print("Calling grad_fn on view id:", each[].inner_id())
                     try:
                         each[].invoke_grad_fn(verbose)
                     except e:
-                        print("🔥 grad_fn threw error:", e)
+                        print("grad_fn threw error:", e)
                 else:
-                    print("Skipping empty grad_fn on view id:", each[].id())
+                    print("Skipping empty grad_fn on view id:", each[].inner_id())
             else:
                 print("→ It's a Tensor")
                 t = each[].tensor()
                 if t.grad_fn:
                     print("  grad_fn present")
-                    print("Calling grad_fn on tensor id:", each[].id())
+                    print("Calling grad_fn on tensor id:", each[].inner_id())
                     try:
                         #each[].invoke_grad_fn(verbose)
                         t.grad_fn.value()()
                     except e:
                         print("🔥 grad_fn threw error:", e)
                 else:
-                    print("Skipping empty grad_fn on tensor id:", each[].id())"""
+                    print("Skipping empty grad_fn on tensor id:", each[].inner_id())
 
     fn ancestry(self) -> Ancestors[dtype]:
         return self.ancestors
@@ -753,71 +716,22 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad and self.has_grad():
             memset_zero(self.grad[].data, self.grad[].numels())
 
-    _ = """fn add_ancestry(mut self, *parents: TensorLike[dtype]) -> None:
-        for parent in parents:
-            parent_id = parent.id()
-            self_id = self.id()  # Int(UnsafePointer(to=self))
-            if parent_id == self_id:
-                print("🚨 Warning: Attempt to add self as ancestor")
-                continue
-            self.ancestors.append(parent.address())"""
-
     fn add_ancestry(mut self, *parents: Tensor[dtype]):
         for parent in parents:
-            var stable = TensorLike(
-                parent.address()
-            )  # 👈 safely build heap-stable wrapper
+            stable = parent.into_tensorlike()
             var ptr = UnsafePointer[TensorLike[dtype]].alloc(1)
-            id_stable = stable.id()
-            ptr.init_pointee_copy(stable)
+            ptr.init_pointee_move(stable)
             self.ancestors.append(ptr)
-            print(
-                "📌 DAG Node Added: ",
-                id_stable,
-                " => kind:",
-                "Tensor" if ptr[].is_tensor() else "View",
-            )
-
-    _ = """fn add_ancestry(mut self, *parents: TensorLike[dtype]) -> None:
-        for parent in parents:
-            parent_id = parent.id()
-            self_id = self.id()
-
-            print(
-                "🔗 Trying to add ancestry: self.id =",
-                self_id,
-                ", parent.id =",
-                parent_id,
-            )"""
-    _ = """print(
-                "🔍 parent.kind =",
-                ("tensor" if parent.is_tensor() else "view"),
-                ", parent.tensor ptr =",
-                Int(parent.tensor().address()),
-                ", parent.view ptr =",
-                Int(parent.view().address()),
-            )"""
-
-    _ = """if parent_id == self_id:
-                print("🚨 Warning: Attempt to add self as ancestor (skipping)")
-                continue
-
-            self.ancestors.append(parent.address())"""
-
-    _ = """fn add_ancestry(mut self, *parents: TensorLike[dtype]) -> None:
-        for parent in parents:
-            if Int(parent.address()) == Int(self.address()):
-                print("🚨 Warning: Attempt to add self as ancestor")
-                continue
-            self.ancestors.append(parent.address())"""
-
-    _ = """fn add_ancestry(
-        mut self,
-        *tensor_likes: TensorLike[dtype],
-    ):
-        # self.ancestors.add_ancestry(tensor_likes)
-        for tensor in tensor_likes:
-            self.ancestors.append(tensor.address())"""
+            try:
+                msg = String(
+                    "DAG node inner id: {0}, self id: {1} => kind: "
+                    + "Tensor" if ptr[].is_tensor() else "View"
+                ).format(
+                    stable.inner_id(), self.id()
+                )  # Critical compiler issue c = a + b, s = c.sum(), results in s.id() == b.id() if self.id() is not printed!
+                log_debug(msg)
+            except e:
+                print(e)
 
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
@@ -985,33 +899,7 @@ struct Tensor[dtype: DType = DType.float32](
                     that.update_grad[tensor_op_second](grad_contrib)
 
             result.grad_fn = Optional(grad_fn)
-            _="""self_tensor_like = self.into_tensorlike()
-            other_tensor_like = other.into_tensorlike()
-            print(
-                "broadcast_operation: result, self, other's ids ->",
-                result.id(),
-                self.id(),
-                other.id(),
-            )
-            print("TensorLike IDs before adding ancestry:")
-            print("  self.into_tensorlike().id(): ", self_tensor_like.id())
-            print("  other.into_tensorlike().id(): ", other_tensor_like.id())
-            print("  result.id(): ", result.id())"""
-
             result.add_ancestry(self, other)
-
-            _ = """print(
-                (
-                    "broadcast_operation: result, self, other's ids via"
-                    " tensorlike ->"
-                ),
-                result_tensor_like.id(),
-                self_tensor_like.id(),
-                other_tensor_like.id(),
-            )"""
-
-        print("Now printing result's ancestors: ")
-        result.ancestors.print()
         return result
 
     fn backward_grad_contrib(
@@ -1032,7 +920,13 @@ struct Tensor[dtype: DType = DType.float32](
             )
             if grad_contrib.shape != self.shape:
                 axes = self.broadcast_mask(grad_contrib.shape).indices_of(1)
+                print("Reaching here alright 1", axes)
                 grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
+                print("Reaching here alright 2", axes)
+                grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
+                print("Reaching here alright 3", axes)
+            if grad_contrib.shape != self.shape:
+                print("Reaching here alright 4", grad_contrib.shape, self.shape)
             if grad_contrib.shape != self.shape:
                 grad_contrib = grad_contrib.reshape(self.shape)
             grad_contrib.requires_grad = False
@@ -1575,18 +1469,15 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    fn sum(
-        self, axes: List[Int] = [], keepdims: Bool = False
-    ) -> Tensor[dtype]:
+    fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
         return self.sum(IntList.new(axes), keepdims)
 
-    fn sum(
-        self: Self, axes: IntList, keepdims: Bool = False
-    ) -> Tensor[dtype]:
+    fn sum(self: Self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
         _axes = Self.validate_and_normalize_axes(self.shape, axes)
         requires_grad = self.requires_grad
-        #original_shape = self.shape
+        # original_shape = self.shape
         rank = self.shape.rank()
+        print("rank rank rank rank: ", rank)
 
         # Early scalar return - already correct
         if rank == 0:
@@ -1601,9 +1492,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                 fn scalar_grad_fn() raises -> None:
                     print("Inside scalar_grad_fn")
-                    self_ptr_[].update_grad[AddTensor](
-                        out_ptr_[].grad[]
-                    )
+                    self_ptr_[].update_grad[AddTensor](out_ptr_[].grad[])
 
                 scalar_out.grad_fn = Optional(scalar_grad_fn)
                 scalar_out.add_ancestry(self)
@@ -1649,16 +1538,13 @@ struct Tensor[dtype: DType = DType.float32](
                     summ += self[full_idx]
                 out[out_idx] = summ
 
-
-
-
-
         if requires_grad:
 
             fn grad_fn() raises -> None:
                 outstream_grad = out.address()[].grad[]
                 this = self.address()[]
                 original_shape = this.shape
+                print("sum grad function original shape: ", original_shape)
                 var grad_contrib: Tensor[dtype]
 
                 # Handle scalar gradient case (sum reduced to scalar)
@@ -1691,18 +1577,17 @@ struct Tensor[dtype: DType = DType.float32](
                         )
                 grad_contrib.requires_grad = False
                 this.update_grad[AddTensor](grad_contrib)
+                print("Out of sum grad_fn successfully")
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self)
             print(
-                "sum result and self addrs ints: ",
-                Int(out.address()),
-                Int(self.address()),
+                "sum result and self ids: ",
+                Int(out.id()),
+                Int(self.id()),
             )
 
         print("Gone out of sum")
-        #out.print()
-        #self.print()
         return out
 
     @staticmethod
