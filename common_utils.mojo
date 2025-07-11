@@ -139,6 +139,9 @@ fn next_power_of_2(n: Int) raises -> Int:
     return power
 
 
+fn is_null[dtype: DType](addr: UnsafePointer[Tensor[dtype]]) -> Bool:
+    return addr.__as_bool__() == False
+
 from os import Atomic
 from memory import UnsafePointer
 

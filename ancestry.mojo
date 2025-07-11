@@ -14,6 +14,13 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         self.capacity = 0
         self.size = 0
 
+    fn __init__(out self, capacity: Int):
+        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(capacity)
+        self.capacity = capacity
+        self.size = 0
+
+
+
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
         self.size = existing.size
@@ -44,16 +51,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     @staticmethod
     fn untracked() -> Ancestors[dtype]:
         return Self()
-
-    @staticmethod
-    fn with_capacity(capacity: Int) -> Ancestors[dtype]:
-        array = Self()
-        array.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
-            capacity
-        )
-        array.capacity = capacity
-        array.size = 0
-        return array
 
     @always_inline("nodebug")
     # fn __del__(owned self):
@@ -164,25 +161,72 @@ from tensors import Tensor
 fn populate_ancestry[
     dtype: DType = DType.float32
 ](*tensor_likes: TensorLike[dtype]) -> Ancestors[dtype]:
-    # ancestors1 = Ancestors[dtype].untracked()
-    ancestors1 = Ancestors[dtype].with_capacity(2)
-    # ancestors1.add_ancestry(tensor_likes)
+    #ancestors1 = Ancestors[dtype].untracked()
+    ancestors1 = Ancestors[dtype](5)
     for each in tensor_likes:
         ancestors1.append(each.address())
-    print("ok1")
-    ancestors1.print()
+    print("ok1 *************")
+    #ancestors1.print()
     return ancestors1
 
 
 fn main():
-    ancestors = Ancestors[DType.float32].untracked()
+    GiverAndTaker.give()
+    _="""ancestors = Ancestors[DType.float32].untracked()
     print("ok0")
     ancestors.print()
-    t1 = Tensor([1, 2, 3], requires_grad=True)
-    t2 = Tensor([4, 2, 3], requires_grad=True)
-    ancestors2 = populate_ancestry(t1.into_tensorlike(), t2.into_tensorlike())
+    t1 = Tensor([1], requires_grad=True)
+    t2 = Tensor([2], requires_grad=True)
+    t3 = Tensor([3], requires_grad=True)
+    t4 = Tensor([4], requires_grad=True)
+    t5 = Tensor([5], requires_grad=True)
+    ancestors2 = populate_ancestry(t1.into_tensorlike(), t2.into_tensorlike(), t3.into_tensorlike(),t4.into_tensorlike(),t5.into_tensorlike())
     print("ok2")
     ancestors2.print()
     copied = ancestors2
     print("ok3")
     copied.print()
+    print()
+    print()
+    print(t1.id(), t2.id(), t3.id(), t4.id(), t5.id())
+
+    ancestors.append(t1.into_tensorlike().address())
+    ancestors.append(t2.into_tensorlike().address())
+    ancestors.append(t3.into_tensorlike().address())
+    ancestors.append(t4.into_tensorlike().address())
+    ancestors.append(t5.into_tensorlike().address())
+
+    print()
+    length = len(ancestors)
+    for i in range(length):
+        ancestors.get(i)[].tensor().print()"""
+
+
+
+struct GiverAndTaker:
+    @staticmethod
+    fn take(mut traced: Ancestors[DType.float32]):
+        print("Taking")
+        t1 = Tensor[DType.float32]([1], requires_grad=True)
+        t2 = Tensor[DType.float32]([2], requires_grad=True)
+        t3 = Tensor[DType.float32]([3], requires_grad=True)
+        t4 = Tensor[DType.float32]([4], requires_grad=True)
+        t5 = Tensor[DType.float32]([5], requires_grad=True)
+
+        print(t1.id(), t2.id(), t3.id(), t4.id(), t5.id())
+        traced.append(t1.into_tensorlike().address())
+        traced.append(t2.into_tensorlike().address())
+        traced.append(t3.into_tensorlike().address())
+        traced.append(t4.into_tensorlike().address())
+        traced.append(t5.into_tensorlike().address())
+
+
+    @staticmethod
+    fn give():
+        traced = Ancestors[DType.float32].untracked()
+        Self.take(traced)
+        traced.print()
+
+
+
+
