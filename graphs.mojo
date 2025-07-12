@@ -4,6 +4,7 @@ from ancestry import Ancestors
 from memory import UnsafePointer
 from common_utils import log_debug
 from tensors import Tensor
+from views import TensorView
 
 
 fn main():
@@ -11,18 +12,14 @@ fn main():
     a = Tensor.d2([[2, 3]], requires_grad=True)
     b = Tensor.d1([10])
     c = a + b
-    s = c.sum()
+    s = c.mean()
     s.ancestors.print()
-    graph = Graph()
-    graph.walk_backward(s)
+    s.backward()
     s.free()
     c.free()
     a.free()
     b.free()
-    graph.free_graph()
-    print("Again")
-    a.print()
-    graph.walk_backward(s)
+
 
 struct Graph[dtype: DType = DType.float32](Copyable & Movable):
     var traced: Ancestors[dtype]
@@ -74,16 +71,27 @@ struct Graph[dtype: DType = DType.float32](Copyable & Movable):
         start_grad: Scalar[dtype] = 1.0,
         verbose: Bool = False,
     ):
+        if not node._requires_grad():
+            return
         if self.freed:
             self.traced = Ancestors[dtype]()
         visited = IntList()
+        var tensor_like: TensorLike[dtype]
         if node.is_tensor():
             var tensor: Tensor[dtype] = rebind[Tensor[dtype]](
                 node.into_tensor()
             )
-            tensor.seed_grad(start_grad)
-            tensor_like: TensorLike[dtype] = tensor.into_tensorlike()
-            self.trace_ancestry(tensor_like, visited)
+            tensor_like = tensor.into_tensorlike()
+        elif node.is_view():
+            var view: TensorView[dtype] = rebind[TensorView[dtype]](
+                node.into_view()
+            )
+            tensor_like = view.into_tensorlike()
+        else:
+            print("Not Differentiable")
+            return
+        tensor_like.seed_grad(start_grad)
+        self.trace_ancestry(tensor_like, visited)
         print("Printing traced")
         self.traced.print()
         for each in self.traced:

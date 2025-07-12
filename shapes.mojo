@@ -576,6 +576,7 @@ struct Shape(
 
     @staticmethod
     fn validate(shape: Shape):
+        print("The shape: ", shape)
         for idx in range(shape.ndim):
             if shape.axes_spans[idx] < 1:
                 abort(

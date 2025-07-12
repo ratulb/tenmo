@@ -19,6 +19,10 @@ trait Differentiable:
 
     fn into_tensor(self) -> Tensor[datatype]:
         ...
+
+    fn into_view(self) -> TensorView[datatype]:
+        ...
+
     fn is_tensor(self) -> Bool:
         ...
     fn is_view(self) -> Bool:
@@ -96,6 +100,12 @@ struct TensorLike[dtype: DType](Copyable & Movable):
             self.tensor_address[].ancestry() if self.kind
             == 0 else self.view_address[].ancestry()
         )
+
+    fn seed_grad(self, value: Scalar[dtype]):
+        if self.is_tensor():
+            self.tensor().seed_grad(value)
+        else:
+            self.view().seed_grad(value)
 
     fn requires_grad(self) -> Bool:
         return (

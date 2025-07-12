@@ -6,13 +6,19 @@ from memory import UnsafePointer
 from os import abort
 from shared import Differentiable, TensorLike
 from ancestry import Ancestors
+from graphs import Graph
 
 fn main():
-    pass
+    _strides = Strides(IntList.Empty)
 
 
-struct TensorView[dtype: DType = DType.float32](Copyable & Movable & Differentiable):
+struct TensorView[dtype: DType = DType.float32](
+    Copyable & Movable & Differentiable
+):
     alias datatype: DType = dtype
+    alias Blank: TensorView[dtype] = Self(
+        UnsafePointer[Tensor[dtype]](), Shape.Void, Strides(IntList.Empty), 0
+    )
     var base_tensor: UnsafePointer[Tensor[dtype]]
     var shape: Shape
     var strides: Strides
@@ -45,6 +51,10 @@ struct TensorView[dtype: DType = DType.float32](Copyable & Movable & Differentia
     fn is_contiguous(self) -> Bool:
         return self.offset == 0 and self.strides.is_contiguous(self.shape)
 
+    fn backward(self):
+        graph = Graph[dtype]()
+        graph.walk_backward(self)
+
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](self.address())
 
@@ -67,6 +77,7 @@ struct TensorView[dtype: DType = DType.float32](Copyable & Movable & Differentia
         self.base_tensor[].data.store[volatile=True](
             self.index_offset(indices), value
         )
+
     fn has_grad(self) -> Bool:
         return self.base_tensor[].has_grad()
 
@@ -101,14 +112,13 @@ struct TensorView[dtype: DType = DType.float32](Copyable & Movable & Differentia
     fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:
         print("Will do it for sure!")
 
+
 @fieldwise_init
 struct View[
     mutability: Bool, //,
     origin: Origin[mutability],
     dtype: DType = DType.float32,
 ]:
-
-
     var target: Pointer[Tensor[dtype], origin]
     var concrete: Bool
     var mask: IntList
