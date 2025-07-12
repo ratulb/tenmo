@@ -4,22 +4,33 @@ from memory import UnsafePointer
 from ancestry import Ancestors
 from utils import Variant
 
+fn main():
+    print("Starting of the begining!")
+    tensor = Tensor.scalar(1)
+    _p = Possible[Tensor](tensor.address())
 
-_ = """trait Differentiable:
+
+
+trait Differentiable:
+    alias datatype: DType
+
     fn id(self) -> Int:
+        ...
+
+    fn into_tensor(self) -> Tensor[datatype]:
+        ...
+    fn is_tensor(self) -> Bool:
+        ...
+    fn is_view(self) -> Bool:
         ...
 
     fn _requires_grad(self) -> Bool:
         ...
 
-    fn ancestry[datatype: DType](self) -> Ancestors[datatype]:
+    fn into_tensorlike(self) -> TensorLike[datatype]:
         ...
-
-    fn seed_grad[datatype: DType](self, value: Scalar[datatype]):
+    fn seed_grad(self, value: Scalar[datatype]):
         ...
-
-    fn into_tensorlike[datatype: DType](self) -> TensorLike[datatype]:
-        ..."""
 
 
 struct TensorLike[dtype: DType](Copyable & Movable):
@@ -99,11 +110,6 @@ struct TensorLike[dtype: DType](Copyable & Movable):
         else:
             self.tensor().invoke_grad_fn(verbose)
 
-
-fn main():
-    print("Starting of the begining!")
-
-
 _="""struct TensorLike[dtype: DType](Copyable & Movable):
     alias TensorAddress = UnsafePointer[Tensor[dtype]]
     alias ViewAddress = UnsafePointer[TensorView[dtype]]
@@ -172,3 +178,15 @@ _="""struct TensorLike[dtype: DType](Copyable & Movable):
             self.view().base_tensor[].invoke_grad_fn(verbose)
         else:
             self.tensor().invoke_grad_fn(verbose)"""
+
+struct Possible[dtype: DType, //, T: Differentiable](Copyable & Movable):
+    alias Address = UnsafePointer[T]
+    alias TensorAddress = UnsafePointer[Tensor[dtype]]
+    alias ViewAddress = UnsafePointer[TensorView[dtype]]
+    var address: Self.Address
+
+    fn __init__(out self, tensor_addr: Self.TensorAddress):
+        self.address = rebind[Self.Address](tensor_addr)
+        print("Do a reconstruction")
+        self.address[].into_tensor().print()
+

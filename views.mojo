@@ -4,14 +4,15 @@ from intlist import IntList
 from strides import Strides
 from memory import UnsafePointer
 from os import abort
-from shared import TensorLike
+from shared import Differentiable, TensorLike
 from ancestry import Ancestors
 
 fn main():
     pass
 
 
-struct TensorView[dtype: DType = DType.float32](Copyable & Movable):
+struct TensorView[dtype: DType = DType.float32](Copyable & Movable & Differentiable):
+    alias datatype: DType = dtype
     var base_tensor: UnsafePointer[Tensor[dtype]]
     var shape: Shape
     var strides: Strides
@@ -78,11 +79,55 @@ struct TensorView[dtype: DType = DType.float32](Copyable & Movable):
     fn id(self) -> Int:
         return Int(self.address())
 
+    fn is_view(self) -> Bool:
+        return True
+
+    fn is_tensor(self) -> Bool:
+        return False
+
+    fn into_view(self) -> TensorView[dtype]:
+        return self
+
+    fn into_tensor(self) -> Tensor[dtype]:
+        abort("TensorView -> into_tensor(self) - not supported")
+        return Tensor[dtype]([])
+
     fn ancestry(self) -> Ancestors[dtype]:
         return Ancestors[dtype].untracked()
 
     fn seed_grad(self, value: Scalar[dtype]):
-            self.base_tensor[].seed_grad(value)
+        self.base_tensor[].seed_grad(value)
 
     fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:
         print("Will do it for sure!")
+
+@fieldwise_init
+struct View[
+    mutability: Bool, //,
+    origin: Origin[mutability],
+    dtype: DType = DType.float32,
+]:
+
+
+    var target: Pointer[Tensor[dtype], origin]
+    var concrete: Bool
+    var mask: IntList
+    var target_shape: Shape
+
+    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
+        if self.concrete:
+            return self.target[][indices]
+        else:
+            target_idx = self.target[].shape.translate_index(
+                indices, self.mask, self.target_shape
+            )
+            return self.target[][target_idx]
+
+    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
+        if self.concrete:
+            self.target[].__setitem__(indices, value)
+        else:
+            target_idx = self.target[].shape.translate_index(
+                indices, self.mask, self.target_shape
+            )
+            self.target[].__setitem__(target_idx, value)

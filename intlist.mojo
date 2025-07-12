@@ -404,6 +404,9 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         for idx in range(len(elems)):
             (self.data + idx)[] = elems[idx]
 
+    fn address(self) -> UnsafePointer[IntList]:
+        return UnsafePointer(to=self)
+
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
         """Initialize by copying an existing `IntList`.
@@ -428,6 +431,10 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         for i in range(n):
             out.append(i)
         return out
+
+    @staticmethod
+    fn filled(length: Int, value: Int) -> IntList:
+        return Self.with_capacity(length, Optional(value))
 
     @staticmethod
     fn with_capacity(capacity: Int, fill: Optional[Int] = None) -> IntList:

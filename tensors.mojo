@@ -20,7 +20,7 @@ fn test_broadcast_addition() raises:
     var b = Tensor.d1([10, 20], requires_grad=True)
     var c = a + b  # shape (2,2)
     s = c.sum()
-    s.seed_grad(1.0)
+    s.seed_grad(1)
     Tensor.walk_backward(s.into_tensorlike())
     assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
@@ -33,7 +33,7 @@ fn test_sum_all_dims() raises:
     print("test_sum_all_dims")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var s = a.sum()  # scalar
-    s.seed_grad(1.0)
+    s.seed_grad(1)
     Tensor.walk_backward(s.into_tensorlike())
     assert_true(s.item() == 10.0)
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
@@ -195,7 +195,7 @@ from intlist import IntList
 from ancestry import Ancestors
 from views import TensorView
 from strides import Strides
-from shared import TensorLike
+from shared import TensorLike, Differentiable
 from common_utils import log_debug, piped, is_null
 from operators import (
     __tensor_op_tensor__,
@@ -219,8 +219,9 @@ from collections import Set
 
 
 struct Tensor[dtype: DType = DType.float32](
-    Copyable & Movable & Sized & Stringable
+    Copyable & Movable & Sized & Stringable & Differentiable
 ):
+    alias datatype: DType = dtype
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
@@ -255,6 +256,15 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = UnsafePointer[Tensor[dtype]]()
         self.data = data
         self.init_grad()
+
+    fn is_tensor(self) -> Bool:
+        return True
+
+    fn is_view(self) -> Bool:
+        return False
+
+    fn into_tensor(self) -> Tensor[dtype]:
+        return self
 
     fn __init__(out self, shape: Shape, requires_grad: Bool = False):
         Shape.validate(shape)
@@ -1035,6 +1045,11 @@ struct Tensor[dtype: DType = DType.float32](
             return rebind[Tensor[DType.float32]](self)
         return self.to_dtype[DType.float32]()
 
+    fn float64(self) -> Tensor[DType.float64]:
+        if self.dtype == DType.float64:
+            return rebind[Tensor[DType.float64]](self)
+        return self.to_dtype[DType.float64]()
+
     fn to_dtype[NewType: DType](self) -> Tensor[NewType]:
         result = Tensor[NewType](self.shape, self.requires_grad)
 
@@ -1548,7 +1563,10 @@ struct Tensor[dtype: DType = DType.float32](
 
         if requires_grad:
 
+
             fn grad_fn() raises -> None:
+                #sum_grad_fn = SumGradFn(self.address(), out.address(), keepdims, _axes.address())
+                #sum_grad_fn()
                 outstream_grad = out.address()[].grad[]
                 this = self.address()[]
                 original_shape = this.shape
