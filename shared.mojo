@@ -1,14 +1,15 @@
 from tensors import Tensor
+from shapes import Shape
 from views import TensorView
 from memory import UnsafePointer
 from ancestry import Ancestors
 from utils import Variant
 
+
 fn main():
     print("Starting of the begining!")
     tensor = Tensor.scalar(1)
     _p = Possible[Tensor](tensor.address())
-
 
 
 trait Differentiable:
@@ -25,6 +26,7 @@ trait Differentiable:
 
     fn is_tensor(self) -> Bool:
         ...
+
     fn is_view(self) -> Bool:
         ...
 
@@ -33,6 +35,7 @@ trait Differentiable:
 
     fn into_tensorlike(self) -> TensorLike[datatype]:
         ...
+
     fn seed_grad(self, value: Scalar[datatype]):
         ...
 
@@ -95,6 +98,12 @@ struct TensorLike[dtype: DType](Copyable & Movable):
         else:
             return self.view_address[].id()
 
+    fn shape(self) -> Shape:
+        if self.kind == 0:
+            return self.tensor_address[].shape
+        else:
+            return self.view_address[].shape
+
     fn ancestry(self) -> Ancestors[dtype]:
         return (
             self.tensor_address[].ancestry() if self.kind
@@ -106,6 +115,12 @@ struct TensorLike[dtype: DType](Copyable & Movable):
             self.tensor().seed_grad(value)
         else:
             self.view().seed_grad(value)
+
+    fn seed_grad(self, with_tensor: Tensor[dtype]):
+        if self.is_tensor():
+            self.tensor().seed_grad(with_tensor)
+        else:
+            self.view().seed_grad(with_tensor)
 
     fn requires_grad(self) -> Bool:
         return (
@@ -120,7 +135,8 @@ struct TensorLike[dtype: DType](Copyable & Movable):
         else:
             self.tensor().invoke_grad_fn(verbose)
 
-_="""struct TensorLike[dtype: DType](Copyable & Movable):
+
+_ = """struct TensorLike[dtype: DType](Copyable & Movable):
     alias TensorAddress = UnsafePointer[Tensor[dtype]]
     alias ViewAddress = UnsafePointer[TensorView[dtype]]
 
@@ -189,6 +205,7 @@ _="""struct TensorLike[dtype: DType](Copyable & Movable):
         else:
             self.tensor().invoke_grad_fn(verbose)"""
 
+
 struct Possible[dtype: DType, //, T: Differentiable](Copyable & Movable):
     alias Address = UnsafePointer[T]
     alias TensorAddress = UnsafePointer[Tensor[dtype]]
@@ -199,4 +216,3 @@ struct Possible[dtype: DType, //, T: Differentiable](Copyable & Movable):
         self.address = rebind[Self.Address](tensor_addr)
         print("Do a reconstruction")
         self.address[].into_tensor().print()
-
