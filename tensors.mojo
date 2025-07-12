@@ -7,8 +7,7 @@ fn test_scalar_addition() raises:
     var a = Tensor.scalar(3.0, requires_grad=True)
     var b = Tensor.scalar(4.0, requires_grad=True)
     var c = a + b
-    c.seed_grad(1.0)
-    Tensor.walk_backward(c.into_tensorlike())
+    c.backward()
     assert_true(c.item() == 7.0)
     assert_true(a.grad[].item() == 1.0)
     assert_true(b.grad[].item() == 1.0)
@@ -20,8 +19,7 @@ fn test_broadcast_addition() raises:
     var b = Tensor.d1([10, 20], requires_grad=True)
     var c = a + b  # shape (2,2)
     s = c.sum()
-    s.seed_grad(1)
-    Tensor.walk_backward(s.into_tensorlike())
+    s.backward()
     assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
     assert_true(
@@ -33,8 +31,7 @@ fn test_sum_all_dims() raises:
     print("test_sum_all_dims")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var s = a.sum()  # scalar
-    s.seed_grad(1)
-    Tensor.walk_backward(s.into_tensorlike())
+    s.backward()
     assert_true(s.item() == 10.0)
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
 
@@ -149,7 +146,7 @@ fn main() raises:
     test_scalar_addition()
     test_broadcast_addition()
     test_sum_all_dims()
-    _="""var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    _ = """var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var b = Tensor.d1([10, 20], requires_grad=True)
     print("Inputs a, b: ", a.id(), b.id())
     var c = a + b  # shape (2,2)
@@ -215,7 +212,9 @@ from operators import (
     Multiply,
 )
 from summ import SumGradFn
-from collections import Set
+
+# from collections import Set
+from graphs import Graph
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -263,6 +262,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_view(self) -> Bool:
         return False
 
+    fn into_view(self) -> TensorView[dtype]:
+        abort("Tensor -> into_view(self) - not supported")
+        return TensorView[dtype].Blank
+
     fn into_tensor(self) -> Tensor[dtype]:
         return self
 
@@ -288,7 +291,11 @@ struct Tensor[dtype: DType = DType.float32](
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](self.address())
 
-    @staticmethod
+    fn backward(self):
+        graph = Graph[dtype]()
+        graph.walk_backward(self)
+
+    _ = """@staticmethod
     fn trace_ancestry[
         dtype: DType, //
     ](
@@ -366,7 +373,7 @@ struct Tensor[dtype: DType = DType.float32](
                     except e:
                         print("🔥 grad_fn threw error:", e)
                 else:
-                    print("Skipping empty grad_fn on tensor id:", each[].inner_id())
+                    print("Skipping empty grad_fn on tensor id:", each[].inner_id())"""
 
     fn ancestry(self) -> Ancestors[dtype]:
         return self.ancestors
@@ -1563,10 +1570,9 @@ struct Tensor[dtype: DType = DType.float32](
 
         if requires_grad:
 
-
             fn grad_fn() raises -> None:
-                #sum_grad_fn = SumGradFn(self.address(), out.address(), keepdims, _axes.address())
-                #sum_grad_fn()
+                # sum_grad_fn = SumGradFn(self.address(), out.address(), keepdims, _axes.address())
+                # sum_grad_fn()
                 outstream_grad = out.address()[].grad[]
                 this = self.address()[]
                 original_shape = this.shape
