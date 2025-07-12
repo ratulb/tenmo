@@ -5,6 +5,76 @@ from common_utils import log_debug
 from testing import assert_true, assert_false
 
 
+fn test_large_list() raises:
+    var big = IntList()
+    for i in range(100, 0, -1):  # 100 to 1
+        big.append(i)
+    big.sort()
+
+    for i in range(1, 101):
+        assert_true(i in big)
+    assert_true(0 not in big)
+    assert_true(101 not in big)
+
+
+fn test_contains_unsorted() raises:
+    var raw = IntList()
+    raw.append(10)
+    raw.append(3)
+    raw.append(99)
+
+    assert_true(10 in raw)
+    assert_true(3 in raw)
+    assert_true(99 in raw)
+    assert_true(1 not in raw)
+
+
+fn test_negative_and_duplicates() raises:
+    var nums = IntList()
+    nums.append(-10)
+    nums.append(0)
+    nums.append(-5)
+    nums.append(-10)
+    nums.append(5)
+    nums.sort()
+
+    assert_true(-10 in nums)
+    assert_true(-5 in nums)
+    assert_true(0 in nums)
+    assert_true(5 in nums)
+    assert_true(1 not in nums)
+
+
+fn test_edge_cases() raises:
+    var empty = IntList()
+    assert_true(42 not in empty)
+
+    var single = IntList()
+    single.append(7)
+    assert_true(7 in single)
+    assert_true(8 not in single)
+
+    single.sort()
+    assert_true(single[0] == 7)
+
+
+fn test_sorted_contains() raises:
+    var list = IntList()
+    list.append(5)
+    list.append(1)
+    list.append(3)
+    list.sort(asc=True)
+
+    assert_true(list[0] == 1)
+    assert_true(list[1] == 3)
+    assert_true(list[2] == 5)
+
+    assert_true(1 in list)
+    assert_true(3 in list)
+    assert_true(5 in list)
+    assert_true(2 not in list)
+
+
 fn test_prepend() raises:
     il = IntList()
     il.prepend(2)
@@ -338,6 +408,11 @@ fn test_init() raises:
 
 
 fn main() raises:
+    test_large_list()
+    test_contains_unsorted()
+    test_negative_and_duplicates()
+    test_edge_cases()
+    test_sorted_contains()
     test_prepend()
     test_slice()
     test_deduplicate()
