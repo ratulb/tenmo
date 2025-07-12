@@ -2,13 +2,20 @@ from shapes import Shape
 from intlist import IntList
 from os import abort
 
+from testing import assert_true
 
-fn main():
-    st = Strides.of(4, 1, 2)
-    print(st)
-    st.print()
-    shape = Shape()
-    print(shape, shape.rank(), shape.num_elements())
+
+fn test_compute_default_strides() raises:
+    shape = Shape.of(2, 3, 4)
+    strides = Strides.default(shape)
+    assert_true(
+        strides == Strides(IntList(12, 4, 1)),
+        "stride compute assertion 1 failed",
+    )
+
+
+fn main() raises:
+    test_compute_default_strides()
 
 
 @register_passable
@@ -86,7 +93,16 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
             result.append(self[axis])
         return Strides(result)
 
-    # Compute strides from shape in row-major order
+    @staticmethod
+    fn default(shape: Shape) -> Strides:
+        var strides_list = IntList.filled(shape.rank(), 1)
+
+        for i in reversed(range(shape.rank() - 1)):
+            strides_list[i] = strides_list[i + 1] * shape[i + 1]
+
+        return Strides(strides_list)
+
+    _ = """# Compute strides from shape in row-major order
     @staticmethod
     fn default(shape: Shape) -> Self:
         var strides = IntList.with_capacity(shape.rank())
@@ -94,7 +110,7 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
         for i in reversed(range(shape.rank())):
             strides.prepend(acc)
             acc *= shape[i]
-        return Strides(strides)
+        return Strides(strides)"""
 
     # Adjust strides for broadcasting to a new shape
     fn broadcast_to(self, from_shape: Shape, to_shape: Shape) -> Self:
