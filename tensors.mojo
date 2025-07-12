@@ -40,7 +40,7 @@ fn test_sum_specific_axis() raises:
     print("test_sum_specific_axis")
     var a = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
     var s = a.sum(axes=[1], keepdims=True)  # shape (2,1,2)
-    # s.sum().backward()
+    s.backward()
     assert_true((s == Tensor.d3([[[4, 6]], [[12, 14]]])).all_true())
     assert_true(a.grad[].all_close(Tensor.ones_like(a)))
 
@@ -49,9 +49,18 @@ fn test_mean_with_keepdims() raises:
     print("test_mean_with_keepdims")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var m = a.mean(axes=[0], keepdims=True)  # shape (1,2)
-    # m.sum().backward()
+    print("Ok here1")
+    m.print()
+    s = m.sum()
+    s.print()
+    print("Ok here2")
+    s.backward()
+    print("Ok here3")
     assert_true(m.all_close(Tensor.d2([[2, 3]])))
     assert_true(a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
+    s.free()
+    m.free()
+    a.free()
 
 
 fn test_matmul_shapes() raises:
@@ -143,9 +152,12 @@ _ = """fn test_large_tensor_backprop() raises:
 
 
 fn main() raises:
-    test_scalar_addition()
+    test_mean_with_keepdims()
+    _="""test_scalar_addition()
     test_broadcast_addition()
     test_sum_all_dims()
+    test_sum_specific_axis()"""
+
     _ = """var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var b = Tensor.d1([10, 20], requires_grad=True)
     print("Inputs a, b: ", a.id(), b.id())
@@ -1465,6 +1477,7 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
 
             fn grad_fn() raises -> None:
+                print("This is the place")
                 upstream_grad = result.address()[].grad[]
                 if upstream_grad.shape == Shape.Void:
                     scalar_grad = (
@@ -1573,6 +1586,7 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn() raises -> None:
                 # sum_grad_fn = SumGradFn(self.address(), out.address(), keepdims, _axes.address())
                 # sum_grad_fn()
+                print("Actually this is place")
                 outstream_grad = out.address()[].grad[]
                 this = self.address()[]
                 original_shape = this.shape
