@@ -291,7 +291,7 @@ struct Shape(
         for i in range(_ndims):
             if dims[i] < 1:
                 abort(
-                    "Shape -> __init__: Wrong shape dimension."
+                    "Shape → __init__: negative dimensions are not allowed"
                     + "Dim = "
                     + String(dims[i])
                     + " at index = "
@@ -322,7 +322,7 @@ struct Shape(
         offset = target_shape.ndim - self.ndim
         if offset < 0:
             abort(
-                "Shape -> broadcast_mask -> target_shape.ndim is smaller than"
+                "Shape → broadcast_mask → target_shape.ndim is smaller than"
                 " self.ndim: "
                 + String(target_shape.ndim)
                 + ", "
@@ -350,13 +350,13 @@ struct Shape(
     fn replace(self, axis: Int, extent: Int) -> Shape:
         if axis < 0 or axis >= self.ndim:
             abort(
-                "Shape -> replace: Invalid axis: "
+                "Shape → replace: Invalid axis: "
                 + String(axis)
                 + " for shape: "
                 + self.__str__()
             )
         if extent < 1:
-            abort("Shape -> replace: Invalid extent: " + String(extent))
+            abort("Shape → replace: Invalid extent: " + String(extent))
         axes = self.intlist()
         axes[axis] = extent
         return Shape(axes)
@@ -364,7 +364,7 @@ struct Shape(
     fn drop_axis(self, axis: Int) -> Shape:
         if axis < 0 or axis >= self.ndim:
             abort(
-                "Shape -> drop_axis: Invalid axis: "
+                "Shape → drop_axis: Invalid axis: "
                 + String(axis)
                 + " for shape: "
                 + self.__str__()
@@ -415,7 +415,7 @@ struct Shape(
     fn broadcast_shape(this: Shape, that: Shape) -> Shape:
         if not this.broadcastable(that):
             abort(
-                "Shape -> broadcast_shape - not broadcastable: "
+                "Shape → broadcast_shape - not broadcastable: "
                 + this.__str__()
                 + " <=> "
                 + that.__str__()
@@ -439,7 +439,7 @@ struct Shape(
                 result_shape.append(dims[0])
             else:
                 abort(
-                    "Shape -> broadcast_shape - cannot broadcast shapes: "
+                    "Shape → broadcast_shape - cannot broadcast shapes: "
                     + this.__str__()
                     + ", "
                     + that.__str__()
@@ -490,7 +490,7 @@ struct Shape(
         if len(indices) != self.ndim:
             print(
                 (
-                    "Shape fltatten_index -> shape mismatch len(indices) !="
+                    "Shape fltatten_index → shape mismatch len(indices) !="
                     " self.ndim[self.rank() | len(self)"
                 ),
                 len(indices),
@@ -503,7 +503,7 @@ struct Shape(
             idx = indices[i]
             dim = self.axes_spans[i]
             if idx >= dim:
-                print("Shape fltatten_index -> index >= dim span", idx, dim)
+                print("Shape fltatten_index → index >= dim span", idx, dim)
                 return -1
             index += idx * stride
             stride *= dim
@@ -579,7 +579,7 @@ struct Shape(
         for idx in range(shape.ndim):
             if shape.axes_spans[idx] < 1:
                 abort(
-                    "Shape -> validate - Shape dimension not valid: "
+                    "Shape → validate - Shape dimension not valid: "
                     + String(shape.axes_spans[idx])
                 )
 
