@@ -1,3 +1,5 @@
+# %s/Tensor\.walk_backward(\([^)]*\))/\1.backward()/g
+
 from testing import assert_true
 from common_utils import do_assert, assert_grad
 from tensors import Tensor
@@ -6,13 +8,14 @@ from shapes import Shape
 from ancestry import Ancestors
 from common_utils import *
 
+
 fn test_scalar_mul_scalar() raises:
     print("test_scalar_mul_scalar")
     var a = Tensor.scalar(3.0, requires_grad=True)
     var b = Tensor.scalar(4.0, requires_grad=True)
 
     var c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
 
     assert_true(c.item() == 12.0)
     assert_true(a.grad[].item() == 4.0)
@@ -222,7 +225,7 @@ fn test_weights_bias_gradients() raises:
 
     var y_prediction = xx.matmul(ww) + bb
     var _loss = ((y_prediction - target_) ** 2).mean([])
-    Tensor.walk_backward(_loss)
+    _loss.backward()
 
     # Gradient should flow to w and b
     assert_true(ww.grad[].shape == ww.shape)
@@ -241,7 +244,7 @@ fn test_training_convergence() raises:
         var y_pred = x.matmul(w) + b
         var loss = ((y_pred - y) ** 2).mean()
         # loss.print()
-        Tensor.walk_backward(loss)
+        loss.backward()
 
         # SGD
         w.data[] -= 0.01 * w.grad[].data[]
@@ -261,19 +264,19 @@ fn test_transpose_gradients() raises:
     # Case 1: Simple 2D transpose
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     b = a.T()  # (2, 2) -> (2, 2)
-    Tensor.walk_backward(b.sum())
+    b.sum().backward()
     assert_true((a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
 
     # Case 2: Transpose + reshape with non-square
     a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2, 3)
     b = a.T().reshape(Shape.of(2, 3))  # (3, 2) → (2, 3)
-    Tensor.walk_backward(b.sum())
+    b.sum().backward()
     assert_true((a.grad[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())
 
     # Case 3: Chain transposes (A.T().T())
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     b = a.T().T()  # Should equal A
-    Tensor.walk_backward(b.sum())
+    b.sum().backward()
     assert_true((a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
 
 
@@ -289,20 +292,20 @@ fn test_reshape_grad_flow() raises:
             4,
         )
     )
-    Tensor.walk_backward(b.sum())
+    b.sum().backward()
     assert_true((a.grad[] == Tensor.d1([1, 1, 1, 1])).all_true())
 
     # Case 2: 1D → 2D reshape
     a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
     b = a.reshape(Shape.of(2, 2))
-    Tensor.walk_backward((b * 2).sum())
+    (b * 2).sum().backward()
     assert_true((a.grad[] == Tensor.d1([2, 2, 2, 2])).all_true())
 
     # === 2D Tensor Cases ===
     # Case 3: 2D → 2D reshape (contiguous)
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     b = a.reshape(Shape.of(4, 1))
-    Tensor.walk_backward((b**2).sum())
+    (b**2).sum().backward()
     assert_true((a.grad[] == Tensor.d2([[2, 4], [6, 8]])).all_true())
 
     # Case 4: 2D → 1D reshape
@@ -312,7 +315,7 @@ fn test_reshape_grad_flow() raises:
             4,
         )
     )
-    Tensor.walk_backward((b + 1).sum())
+    (b + 1).sum().backward()
     assert_true((a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
 
     # === 3D Tensor Cases ===
@@ -326,7 +329,7 @@ fn test_reshape_grad_flow() raises:
     # Case 6: Empty tensor reshape
     a = Tensor.d1([], requires_grad=True)
     b = a.reshape(Shape.of(0,))
-    Tensor.walk_backward(b.sum())  # Should not crash
+    b.sum().backward()  # Should not crash
     assert_true(a.grad[].shape == Shape.of(0,))"""
 
     # Case 7: Non-contiguous reshape
@@ -368,7 +371,7 @@ fn test_reshape_gradient() raises:
     b = a.reshape(Shape.of(1))
     c = b.reshape(Shape.of(1))  # back to scalar
     d = c * Tensor.scalar(2)
-    Tensor.walk_backward(d)
+    d.backward()
     a.grad[].print()
     assert_grad(a, Tensor.scalar(2), "scalar reshape chain → a")
 
@@ -381,7 +384,7 @@ fn test_reshape_gradient() raises:
         )
     )
     d = c * Tensor.d1([10, 20, 30, 40])
-    # Tensor.walk_backward(d)
+    # d.backward()
     d.backward()
     a.grad[].print()
     assert_grad(a, Tensor.d1([10, 20, 30, 40]), "1D → 2D → 1D grad")
@@ -394,7 +397,7 @@ fn test_reshape_gradient() raises:
         )
     )
     c = b * Tensor.d1([10, 20, 30, 40])
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[10, 20], [30, 40]]), "2D → 1D grad")
 
     # 4. Reshape 3D to 1D and back
@@ -413,7 +416,7 @@ fn test_reshape_gradient() raises:
             [[50, 60], [70, 80]],
         ]
     )
-    Tensor.walk_backward(d)
+    d.backward()
     a.grad[].print()
     assert_grad(
         a,
@@ -430,7 +433,7 @@ fn test_reshape_gradient() raises:
     a = Tensor.d1([1, 2, 3, 4], requires_grad=True)  # shape (4,)
     b = a.reshape(Shape.of(2, 2))
     c = b.sum()  # scalar
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([1, 1, 1, 1]), "reshape → sum → backward")
 
     # 6. Reshape with degenerate axis: (4,) → (1, 4) → (4,)
@@ -442,7 +445,7 @@ fn test_reshape_gradient() raises:
         )
     )
     d = c * Tensor.d1([1, 2, 3, 4])
-    Tensor.walk_backward(d)
+    d.backward()
     a.grad[].print()
     a.print()
     assert_grad(a, Tensor.d1([1, 2, 3, 4]), "reshape with (1,4) roundtrip")
@@ -456,7 +459,7 @@ fn test_reshape_gradient() raises:
     b = a.reshape(Shape.of(2, 2))
     c = b + Tensor.scalar(10)  # broadcast add
     d = c.sum()
-    Tensor.walk_backward(d)
+    d.backward()
     a.grad[].print()
     assert_grad(a, Tensor.d1([1, 1, 1, 1]), "reshape + broadcast add + sum")
 
@@ -475,7 +478,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.scalar(3, requires_grad=True)
     b = Tensor.scalar(4, requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.scalar(4), "Scalar * Scalar → a")
     assert_grad(b, Tensor.scalar(3), "Scalar * Scalar → b")
     do_assert(c, Tensor.scalar(12), "Scalar * Scalar")
@@ -484,7 +487,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.scalar(2, requires_grad=True)
     b = Tensor.d1([1, 2, 3], requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.scalar(6), "Scalar * 1D → a")
     assert_grad(b, Tensor.d1([2, 2, 2]), "Scalar * 1D → b")
     do_assert(c, Tensor.d1([2, 4, 6]), "Scalar * 1D")
@@ -493,7 +496,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.d1([1, 2, 3], requires_grad=True)
     b = Tensor.scalar(2, requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([2, 2, 2]), "1D * Scalar → a")
     assert_grad(b, Tensor.scalar(6), "1D * Scalar → b")
     do_assert(c, Tensor.d1([2, 4, 6]), "1D * Scalar")
@@ -502,7 +505,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.d1([1, 2, 3], requires_grad=True)
     b = Tensor.d1([4, 5, 6], requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([4, 5, 6]), "1D * 1D → a")
     assert_grad(b, Tensor.d1([1, 2, 3]), "1D * 1D → b")
     do_assert(c, Tensor.d1([4, 10, 18]), "1D * 1D")
@@ -511,7 +514,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     b = Tensor.scalar(3, requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[3, 3], [3, 3]]), "2D * Scalar → a")
     assert_grad(b, Tensor.scalar(10), "2D * Scalar → b")
     do_assert(c, Tensor.d2([[3, 6], [9, 12]]), "2D * Scalar")
@@ -520,7 +523,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.scalar(3, requires_grad=True)
     b = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.scalar(10), "Scalar * 2D → a")
     assert_grad(b, Tensor.d2([[3, 3], [3, 3]]), "Scalar * 2D → b")
     do_assert(c, Tensor.d2([[3, 6], [9, 12]]), "Scalar * 2D")
@@ -529,7 +532,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     b = Tensor.d1([10, 20, 30], requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[10, 20, 30], [10, 20, 30]]), "2D * 1D → a")
     assert_grad(b, Tensor.d1([5, 7, 9]), "2D * 1D → b")
     do_assert(c, Tensor.d2([[10, 40, 90], [40, 100, 180]]), "2D * 1D")
@@ -538,7 +541,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.d1([10, 20, 30], requires_grad=True)
     b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([5, 7, 9]), "1D * 2D → a")
     assert_grad(b, Tensor.d2([[10, 20, 30], [10, 20, 30]]), "1D * 2D → b")
     do_assert(c, Tensor.d2([[10, 40, 90], [40, 100, 180]]), "1D * 2D")
@@ -553,7 +556,7 @@ fn test_broadcast_mul() raises:
     )
     b = Tensor.d1([10, 20], requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(
         a,
         Tensor.d3(
@@ -586,7 +589,7 @@ fn test_broadcast_mul() raises:
     )
     b = Tensor.d2([[10, 20], [30, 40]], requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(
         a,
         Tensor.d3(
@@ -628,7 +631,7 @@ fn test_broadcast_mul() raises:
     )
     b = Tensor.scalar(10, requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(
         a,
         Tensor.d3(
@@ -655,7 +658,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.d1([5], requires_grad=True)
     b = Tensor.d1([1, 2, 3], requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([6]), "(1,) * (3,) → a")
     assert_grad(b, Tensor.d1([5, 5, 5]), "(1,) * (3,) → b")
     do_assert(c, Tensor.d1([5, 10, 15]), "(1,) * (3,)")
@@ -664,7 +667,7 @@ fn test_broadcast_mul() raises:
     a = Tensor.d2([[2]], requires_grad=True)
     b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     c = a * b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[21]]), "(1,1) * (2,3) → a")
     assert_grad(b, Tensor.d2([[2, 2, 2], [2, 2, 2]]), "(1,1) * (2,3) → b")
     do_assert(c, Tensor.d2([[2, 4, 6], [8, 10, 12]]), "(1,1) * (2,3)")
@@ -684,7 +687,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.scalar(5, requires_grad=True)
     b = Tensor.scalar(3, requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.scalar(1), "Scalar - Scalar → a")
     assert_grad(b, Tensor.scalar(-1), "Scalar - Scalar → b")
     do_assert(c, Tensor.scalar(2), "Scalar - Scalar")
@@ -693,7 +696,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.scalar(10, requires_grad=True)
     b = Tensor.d1([1, 2, 3], requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.scalar(3), "Scalar - 1D → a")
     assert_grad(b, Tensor.d1([-1, -1, -1]), "Scalar - 1D → b")
     do_assert(c, Tensor.d1([9, 8, 7]), "Scalar - 1D")
@@ -702,7 +705,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.d1([1, 2, 3], requires_grad=True)
     b = Tensor.scalar(10, requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([1, 1, 1]), "1D - Scalar → a")
     assert_grad(b, Tensor.scalar(-3), "1D - Scalar → b")
     do_assert(c, Tensor.d1([-9, -8, -7]), "1D - Scalar")
@@ -711,7 +714,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.d1([5, 6, 7], requires_grad=True)
     b = Tensor.d1([1, 2, 3], requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([1, 1, 1]), "1D - 1D → a")
     assert_grad(b, Tensor.d1([-1, -1, -1]), "1D - 1D → b")
     do_assert(c, Tensor.d1([4, 4, 4]), "1D - 1D (same shape)")
@@ -720,7 +723,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.d2([[10, 20], [30, 40]], requires_grad=True)
     b = Tensor.scalar(5, requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[1, 1], [1, 1]]), "2D - Scalar → a")
     assert_grad(b, Tensor.scalar(-4), "2D - Scalar → b")
     do_assert(c, Tensor.d2([[5, 15], [25, 35]]), "2D - Scalar")
@@ -729,7 +732,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.scalar(100, requires_grad=True)
     b = Tensor.d2([[10, 20], [30, 40]], requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.scalar(4), "Scalar - 2D → a")
     assert_grad(b, Tensor.d2([[-1, -1], [-1, -1]]), "Scalar - 2D → b")
     do_assert(c, Tensor.d2([[90, 80], [70, 60]]), "Scalar - 2D")
@@ -738,7 +741,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.d2([[10, 20, 30], [40, 50, 60]], requires_grad=True)
     b = Tensor.d1([1, 2, 3], requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[1, 1, 1], [1, 1, 1]]), "2D - 1D → a")
     assert_grad(b, Tensor.d1([-2, -2, -2]), "2D - 1D → b")
     do_assert(c, Tensor.d2([[9, 18, 27], [39, 48, 57]]), "2D - 1D")
@@ -747,7 +750,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.d1([100, 200, 300], requires_grad=True)
     b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([2, 2, 2]), "1D - 2D → a")
     assert_grad(b, Tensor.d2([[-1, -1, -1], [-1, -1, -1]]), "1D - 2D → b")
     do_assert(c, Tensor.d2([[99, 198, 297], [96, 195, 294]]), "1D - 2D")
@@ -762,7 +765,7 @@ fn test_broadcast_sub() raises:
     )
     b = Tensor.d1([1, 2], requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(
         a,
         Tensor.d3(
@@ -795,7 +798,7 @@ fn test_broadcast_sub() raises:
     )
     b = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(
         a,
         Tensor.d3(
@@ -829,7 +832,7 @@ fn test_broadcast_sub() raises:
     )
     b = Tensor.scalar(5, requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(
         a,
         Tensor.d3(
@@ -856,7 +859,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.d1([100], requires_grad=True)
     b = Tensor.d1([1, 2, 3], requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([3]), "(1,) - (3,) → a")
     assert_grad(b, Tensor.d1([-1, -1, -1]), "(1,) - (3,) → b")
     do_assert(c, Tensor.d1([99, 98, 97]), "(1,) - (3,)")
@@ -865,7 +868,7 @@ fn test_broadcast_sub() raises:
     a = Tensor.d2([[100]], requires_grad=True)
     b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     c = a - b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[6]]), "(1,1) - (2,3) → a")
     assert_grad(b, Tensor.d2([[-1, -1, -1], [-1, -1, -1]]), "(1,1) - (2,3) → b")
     do_assert(c, Tensor.d2([[99, 98, 97], [96, 95, 94]]), "(1,1) - (2,3)")
@@ -877,7 +880,7 @@ fn test_broadcast_add() raises:
     a = Tensor.scalar(5, requires_grad=True)
     b = Tensor.scalar(3, requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.scalar(1), "Scalar + Scalar → a")
     assert_grad(b, Tensor.scalar(1), "Scalar + Scalar → b")
     do_assert(c, Tensor.scalar(8), "Scalar + Scalar")
@@ -886,7 +889,7 @@ fn test_broadcast_add() raises:
     a = Tensor.scalar(2, requires_grad=True)
     b = Tensor.d1([1, 2, 3], requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.scalar(3), "Scalar + 1D → a")
     assert_grad(b, Tensor.d1([1, 1, 1]), "Scalar + 1D → b")
     do_assert(c, Tensor.d1([3, 4, 5]), "Scalar + 1D")
@@ -895,7 +898,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d1([1, 2, 3], requires_grad=True)
     b = Tensor.scalar(2, requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([1, 1, 1]), "1D + Scalar → a")
     assert_grad(b, Tensor.scalar(3), "1D + Scalar → b")
     do_assert(c, Tensor.d1([3, 4, 5]), "1D + Scalar")
@@ -904,7 +907,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d1([1, 2, 3], requires_grad=True)
     b = Tensor.d1([4, 5, 6], requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([1, 1, 1]), "1D + 1D → a")
     assert_grad(b, Tensor.d1([1, 1, 1]), "1D + 1D → b")
     do_assert(c, Tensor.d1([5, 7, 9]), "1D + 1D (same shape)")
@@ -913,7 +916,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     b = Tensor.scalar(10, requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[1, 1], [1, 1]]), "2D + Scalar → a")
     assert_grad(b, Tensor.scalar(4), "2D + Scalar → b")
     do_assert(c, Tensor.d2([[11, 12], [13, 14]]), "2D + Scalar")
@@ -922,7 +925,7 @@ fn test_broadcast_add() raises:
     a = Tensor.scalar(10, requires_grad=True)
     b = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.scalar(4), "Scalar + 2D → a")
     assert_grad(b, Tensor.d2([[1, 1], [1, 1]]), "Scalar + 2D → b")
     do_assert(c, Tensor.d2([[11, 12], [13, 14]]), "Scalar + 2D")
@@ -931,7 +934,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     b = Tensor.d1([10, 20, 30], requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[1, 1, 1], [1, 1, 1]]), "2D + 1D → a")
     assert_grad(b, Tensor.d1([2, 2, 2]), "2D + 1D → b")
     do_assert(c, Tensor.d2([[11, 22, 33], [14, 25, 36]]), "2D + 1D row-wise")
@@ -940,7 +943,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d1([10, 20, 30], requires_grad=True)
     b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([2, 2, 2]), "1D + 2D → a")
     assert_grad(b, Tensor.d2([[1, 1, 1], [1, 1, 1]]), "1D + 2D → b")
     do_assert(c, Tensor.d2([[11, 22, 33], [14, 25, 36]]), "1D + 2D row-wise")
@@ -949,7 +952,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
     b = Tensor.d1([10, 20], requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(
         a, Tensor.d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]]), "3D + 1D → a"
     )
@@ -964,7 +967,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
     b = Tensor.d2([[10, 20], [30, 40]], requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(
         a, Tensor.d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]]), "3D + 2D → a"
     )
@@ -979,7 +982,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
     b = Tensor.scalar(100, requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(
         a, Tensor.d3([[[1, 1], [1, 1]], [[1, 1], [1, 1]]]), "3D + Scalar → a"
     )
@@ -1003,7 +1006,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d1([1], requires_grad=True)
     b = Tensor.d1([10, 20, 30], requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d1([3]), "(1,) + (3,) → a")
     assert_grad(b, Tensor.d1([1, 1, 1]), "(1,) + (3,) → b")
     do_assert(c, Tensor.d1([11, 21, 31]), "(1,) + (3,)")
@@ -1012,7 +1015,7 @@ fn test_broadcast_add() raises:
     a = Tensor.d2([[5]], requires_grad=True)
     b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     c = a + b
-    Tensor.walk_backward(c)
+    c.backward()
     assert_grad(a, Tensor.d2([[6]]), "(1,1) + (2,3) → a")
     assert_grad(b, Tensor.d2([[1, 1, 1], [1, 1, 1]]), "(1,1) + (2,3) → b")
     do_assert(c, Tensor.d2([[6, 7, 8], [9, 10, 11]]), "(1,1) + (2,3)")
@@ -1190,7 +1193,7 @@ fn test_sum() raises:
     # 5. Gradient Checks
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     b = a.sum([1])  # b shape (2,)
-    Tensor.walk_backward(b)
+    b.backward()
     # Now a.grad should be Tensor.of([[1, 1], [1, 1]])
     assert_true(
         (b == Tensor.of(3, 7)).all_true()
@@ -1201,7 +1204,7 @@ fn test_sum() raises:
     # 6. Broadcasting Compatibility
     a = Tensor.d2([[1, 2, 3]], requires_grad=True)  # (1,3)
     b = a.sum([0], keepdims=False)  # (3,)
-    Tensor.walk_backward(b)
+    b.backward()
     # a.grad == Tensor.of([[1, 1, 1]])
     assert_true(
         (b == Tensor.of(1, 2, 3)).all_true()
@@ -1211,7 +1214,7 @@ fn test_sum() raises:
     tensor = Tensor.of(1, 2, 3, 4, requires_grad=True)
     result = tensor.sum(axes=[], keepdims=False)
     assert_true((result == Tensor.scalar(10)).all_true())
-    Tensor.walk_backward(result)
+    result.backward()
     assert_true(
         (
             tensor.grad[] == Tensor[DType.float32].of(1.0, 1.0, 1.0, 1.0)
@@ -1271,7 +1274,7 @@ fn test_broadcast_add_2_tensors() raises:
         (result == Tensor.of(7, 8, 9, 10)).all_true(),
         "broadcast add assertion 1 failed",
     )
-    Tensor.walk_backward(result)
+    result.backward()
 
     assert_true(
         (
@@ -1298,7 +1301,7 @@ fn test_broadcast_add_2_tensors() raises:
 
     result = tensor1 + tensor2
 
-    Tensor.walk_backward(result)
+    result.backward()
 
     assert_true(
         (result == Tensor.of[3](7, 8, 9, 10, 11, 12)).all_true(),
@@ -1338,7 +1341,7 @@ fn test_broadcast_add_2_tensors() raises:
 
     result = tensor1 + tensor2
 
-    Tensor.walk_backward(result)
+    result.backward()
 
     assert_true(
         (
@@ -1412,6 +1415,7 @@ fn test_broadcast_add_2_tensors() raises:
         "grad check 6 - assertion failed",
     )
 
+
 fn test_add_2_tensors() raises:
     print("test_add_2_tensors")
     print("test_add_2_tensors")
@@ -1427,8 +1431,8 @@ fn test_add_2_tensors() raises:
         tensor_a.shape == out_tensor.shape,
         "Input/output tensors shape match assertion failed",
     )
-    parent1 = out_tensor.ancestors.get(0)[]
-    parent2 = out_tensor.ancestors.get(1)[]
+    parent1 = out_tensor.ancestors.get(0)[].tensor()
+    parent2 = out_tensor.ancestors.get(1)[].tensor()
     left_parent_is_tensor1 = (parent1 == tensor_a).all_true()
     right_parent_is_tensor2 = (parent2 == tensor_b).all_true()
     assert_true(
@@ -1447,7 +1451,7 @@ fn test_factor_mul_by() raises:
     tensor = Tensor.rand(256, 256, requires_grad=True)
     out_tensor = 2 * tensor
     assert_true(
-        len(out_tensor.ancestors.get(0)[]) == 65536,
+        len(out_tensor.ancestors.get(0)[].tensor()) == 65536,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
@@ -1461,7 +1465,7 @@ fn test_mul_by_factor() raises:
     tensor = Tensor.rand(128, 256, requires_grad=True)
     out_tensor = tensor * 100
     assert_true(
-        len(out_tensor.ancestors.get(0)[]) == 32768,
+        len(out_tensor.ancestors.get(0)[].tensor()) == 32768,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
@@ -1475,7 +1479,7 @@ fn test_add_value() raises:
     tensor = Tensor.rand(1024, 64, requires_grad=True)
     out_tensor = 2 * tensor
     assert_true(
-        len(out_tensor.ancestors.get(0)[]) == 65536,
+        len(out_tensor.ancestors.get(0)[].tensor()) == 65536,
         "Output tensor ancestors length validation failed",
     )
     out_tensor.invoke_grad_fn()
@@ -1510,7 +1514,7 @@ fn test_matmul_optim() raises:
     B = Tensor.rand(1, requires_grad=True)
     P = X.matmul_optim(W) + B
     print("P.shape: ", P.shape, P.requires_grad)
-    Tensor.walk_backward(P)
+    P.backward()
     W.grad[].print()
 
 
@@ -1519,7 +1523,7 @@ fn test_transpose_matmul() raises:
     A = Tensor.rand(3, 3, requires_grad=True)
     A.grad[].print()
     A_T = A.T()
-    Tensor.walk_backward(A_T)
+    A_T.backward()
     A.grad[].print()
 
 
@@ -1557,7 +1561,7 @@ fn test_view() raises:
     view.strides.print()
     print("From view: ", view[IntList()])
     assert_true(
-        tensor.shape == view.target[].shape,
+        tensor.shape == view.base_tensor[].shape,
         "Tensor and view shape equality asserttion failed",
     )
 
@@ -1656,7 +1660,7 @@ fn test_reshape() raises:
     )
     tensor = Tensor.scalar(42, requires_grad=True)
     result = tensor * 3
-    # Tensor.walk_backward(result)
+    # result.backward()
     result.backward()
     assert_true(tensor.grad[].item() == 3.0)
     tensor2 = tensor.reshape(1)
@@ -1664,19 +1668,20 @@ fn test_reshape() raises:
     result = tensor2 * 42
     tensor.print_grad()
     tensor2.print_grad()
-    # Tensor.walk_backward(result)
+    # result.backward()
     result.backward()
     tensor.print_grad()
     tensor2.print_grad()
     # tensor3 = tensor2.reshape(1,1,1,1,1)
     tensor3 = tensor2.reshape(1, 1, 1, 1, 1)
     result = tensor3 * 12
-    # Tensor.walk_backward(result)
+    # result.backward()
     result.backward()
 
     tensor3.print_grad()
     tensor2.print_grad()
     tensor.print_grad()
+
 
 fn test_tensor_multiplications() raises:
     print("test_tensor_multiplications")
@@ -1692,10 +1697,10 @@ fn test_tensor_multiplications() raises:
 
 fn main() raises:
     print("Starting tensor test cases")
+    test_broadcast_sub()
     test_sum()
     test_tensor_multiplications()
     test_broadcast_add()
-    test_broadcast_sub()
     test_tensor_mean()
     test_training_convergence()
     test_grad_flow_through_reshape()
@@ -1705,7 +1710,7 @@ fn main() raises:
     test_reshape_grad_flow()
     test_broadcast_mul()
     test_transpose_matmul()
-    #test_matmul_optim()
+    # test_matmul_optim()
 
     test_reshape_gradient()
     test_reshape()
@@ -1716,7 +1721,7 @@ fn main() raises:
     test_broadcast_add_2_tensors()
 
     test_tensor_of_list()
-    #test_grad_copy_on_reshape()
+    # test_grad_copy_on_reshape()
     test_mul_by_factor()
     test_mean()
     test_arange()
@@ -1735,8 +1740,3 @@ fn main() raises:
     test_factor_mul_by()
     test_view()
     print("Finished running tensor test cases")
-
-
-
-
-

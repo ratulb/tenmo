@@ -890,13 +890,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
             if grad_contrib.shape != self.shape:
                 axes = self.broadcast_mask(grad_contrib.shape).indices_of(1)
-                print("Reaching here alright 1", axes)
                 grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
-                print("Reaching here alright 2", axes)
-                grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
-                print("Reaching here alright 3", axes)
-            if grad_contrib.shape != self.shape:
-                print("Reaching here alright 4", grad_contrib.shape, self.shape)
             if grad_contrib.shape != self.shape:
                 grad_contrib = grad_contrib.reshape(self.shape)
             grad_contrib.requires_grad = False
@@ -1584,12 +1578,12 @@ struct Tensor[dtype: DType = DType.float32](
             scalar_out[IntList.Empty] = self[IntList.Empty]
 
             if self.requires_grad:
-                self_ptr_ = UnsafePointer(to=self)
-                out_ptr_ = UnsafePointer(to=scalar_out)
 
                 fn scalar_grad_fn() raises -> None:
                     print("Inside scalar_grad_fn")
-                    self_ptr_[].update_grad[AddTensor](out_ptr_[].grad[])
+                    this = self.address()[]
+                    result = scalar_out.address()[]
+                    this.update_grad[AddTensor](result.grad[])
 
                 scalar_out.grad_fn = Optional(scalar_grad_fn)
                 scalar_out.add_ancestry(self)
