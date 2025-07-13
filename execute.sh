@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensor|view]"
+    echo "Usage: $0 [tensor|view|graph]"
     exit 1
 fi
 
@@ -14,6 +14,9 @@ case $1 in
         ;;
     view)
         mojo -I . tests/test_view.mojo
+        ;;
+    graph)
+        mojo -I . tests/test_graph.mojo
         ;;
     *)
         echo "Error: Unknown test '$1'"
