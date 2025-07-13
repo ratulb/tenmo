@@ -73,17 +73,24 @@ struct TensorView[dtype: DType = DType.float32](
 
     # Element access
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
-        return self.base_tensor[][self.index_offset(indices)]
+        return self.base_tensor[].data.load[volatile=True](
+            self.index_offset(indices)
+        )
 
     fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
-        self.base_tensor[][self.index_offset(indices)] = value
+        self.base_tensor[].data.store[volatile=True](
+            self.index_offset(indices), value
+        )
 
     fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
-        return self.base_tensor[][self.index_offset(IntList(indices))]
+        return self.base_tensor[].data.load[volatile=True](
+            self.index_offset(IntList(indices))
+        )
 
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
-        self.base_tensor[][self.index_offset(IntList(indices))] = value
-
+        self.base_tensor[].data.store[volatile=True](
+            self.index_offset(IntList(indices)), value
+        )
 
     fn has_grad(self) -> Bool:
         return self.base_tensor[].has_grad()
