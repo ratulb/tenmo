@@ -1,7 +1,6 @@
 from shared import TensorLike
 from intlist import IntList
 from ancestry import Ancestors
-from memory import UnsafePointer
 from common_utils import log_debug
 from os import abort
 
@@ -234,7 +233,6 @@ struct Graph[dtype: DType = DType.float32](Copyable & Movable):
                 log_debug("→ It's a TensorView")
                 v = each[].view()
                 if v.base_tensor[].grad_fn:
-                    # Mojo recommended way for checking Optional
                     log_debug("  grad_fn present")
                     log_debug(
                         "Calling grad_fn on view id: "

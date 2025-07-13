@@ -4,7 +4,6 @@ from intlist import IntList
 from shapes import Shape
 from os import abort
 from testing import assert_true
-from memory import UnsafePointer
 from utils import Variant
 
 

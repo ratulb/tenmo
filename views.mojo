@@ -2,7 +2,6 @@ from tensors import Tensor
 from shapes import Shape
 from intlist import IntList
 from strides import Strides
-from memory import UnsafePointer
 from os import abort
 from shared import Differentiable, TensorLike
 from ancestry import Ancestors
@@ -52,9 +51,13 @@ struct TensorView[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return self.offset == 0 and self.strides.is_contiguous(self.shape)
 
-    fn backward(self):
+    fn backward(self, start_grad: Scalar[dtype] = 1.0):
         graph = Graph[dtype]()
-        graph.walk_backward(self.into_tensorlike())
+        graph.walk_backward(self.into_tensorlike(), start_grad)
+
+    fn backward(self, with_tensor: Tensor[dtype]):
+        graph = Graph[dtype]()
+        graph.walk_backward(self.into_tensorlike(), with_tensor)
 
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](self.address())
@@ -70,14 +73,17 @@ struct TensorView[dtype: DType = DType.float32](
 
     # Element access
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
-        return self.base_tensor[].data.load[volatile=True](
-            self.index_offset(indices)
-        )
+        return self.base_tensor[][self.index_offset(indices)]
 
     fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
-        self.base_tensor[].data.store[volatile=True](
-            self.index_offset(indices), value
-        )
+        self.base_tensor[][self.index_offset(indices)] = value
+
+    fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
+        return self.base_tensor[][self.index_offset(IntList(indices))]
+
+    fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
+        self.base_tensor[][self.index_offset(IntList(indices))] = value
+
 
     fn has_grad(self) -> Bool:
         return self.base_tensor[].has_grad()

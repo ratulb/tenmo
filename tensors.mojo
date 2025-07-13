@@ -49,12 +49,10 @@ fn test_mean_with_keepdims() raises:
     print("test_mean_with_keepdims")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var m = a.mean(axes=[0], keepdims=True)  # shape (1,2)
-    m.print()
     s = m.sum()
     s.backward()
     assert_true(m.all_close(Tensor.d2([[2, 3]])))
     assert_true(a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
-    s.free()
     m.free()
     a.free()
 
@@ -65,10 +63,10 @@ fn test_matmul_shapes() raises:
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var b = Tensor.d2([[5, 6], [7, 8]], requires_grad=True)
     var c = a.matmul(b)
-    # c.sum().backward()
+    c.sum().backward()
     assert_true(c.all_close(Tensor.d2([[19, 22], [43, 50]])))
-    # assert_true(a.grad[].all_close(b.sum(axes=[0], keepdims=True).T()))
-    # assert_true(b.grad[].all_close(a.sum(axes=[1], keepdims=True)))
+    assert_true(a.grad[].all_close(Tensor.d2([[11, 15], [11, 15]])))
+    assert_true(b.grad[].all_close(Tensor.d2([[4, 4], [6, 6]])))
 
 
 fn test_matmul_broadcasting() raises:
@@ -77,7 +75,7 @@ fn test_matmul_broadcasting() raises:
     var a = Tensor.d3([[[1, 2]], [[3, 4]]], requires_grad=True)  # shape (2,1,2)
     var b = Tensor.d3([[[5], [6]]], requires_grad=True)  # shape (1,2,1)
     var c = a.matmul(b)  # shape (2,2,1)
-    # c.sum().backward()
+    c.sum().backward()
     assert_true(c.all_close(Tensor.d3([[[17], [39]], [[23], [53]]])))
 
 
@@ -148,9 +146,11 @@ _ = """fn test_large_tensor_backprop() raises:
 
 
 fn main() raises:
-    test_mean_with_keepdims()
+    # test_matmul_broadcasting()
+    # test_matmul_shapes()
+    # test_mean_with_keepdims()
     # test_scalar_addition()
-    # test_sum_all_dims()
+    test_sum_all_dims()
     # test_broadcast_addition()
     # test_sum_specific_axis()
 
@@ -194,7 +194,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from utils.numerics import max_finite
 from os import abort
-from memory import UnsafePointer, memcpy, memset, memset_zero
+from memory import memcpy, memset, memset_zero
 from shapes import Shape
 from intlist import IntList
 from ancestry import Ancestors
@@ -271,8 +271,12 @@ struct Tensor[dtype: DType = DType.float32](
         return False
 
     fn into_view(self) -> TensorView[dtype]:
-        abort("Tensor -> into_view(self) - not supported")
-        return TensorView[dtype].Blank
+        return TensorView(
+            UnsafePointer(to=self),
+            self.shape,
+            Strides.default(self.shape),
+            offset=0,
+        )
 
     fn into_tensor(self) -> Tensor[dtype]:
         return self
@@ -313,19 +317,48 @@ struct Tensor[dtype: DType = DType.float32](
     fn backward_fn(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
 
-    fn view(self, shape: Shape) -> TensorView[dtype]:
-        if shape == self.shape and self.is_contiguous():
-            return TensorView(
-                UnsafePointer(to=self),
-                self.shape,
-                Strides.default(self.shape),
-                offset=0,  # or self.offset if needed
+    fn view(self, shape: Shape, offset: Int = 0) raises -> TensorView[dtype]:
+        if offset < 0 or offset >= self.numels():
+            raise (
+                "Tensor → view(shape): offset out of bounds: offset => "
+                + String(offset)
+                + "and self.numels() => "
+                + String(self.numels())
             )
-        if not self.shape.num_elements() == shape.num_elements():
-            abort("Mismatch in elements for view")
+        if shape == self.shape and offset == 0:  # Tensor offset is always 0
+            return self.into_view()
+        if shape.num_elements() + offset > self.numels():
+            raise (
+                "Tensor → view(shape): shape numels exceeds base tensor size"
+            )
+
         return TensorView(
-            UnsafePointer(to=self), shape, Strides.default(shape), offset=0
+            UnsafePointer(to=self), shape, Strides.default(shape), offset=offset
         )
+
+    fn view(
+        self, shape: Shape, strides: Strides, offset: Int = 0
+    ) raises -> TensorView[dtype]:
+        if offset < 0 or offset >= self.numels():
+            raise ("Tensor → view: offset out of bounds")
+
+        if strides.rank() != shape.rank():
+            raise ("Tensor → view: shape and strides must have same rank")
+
+        var min_index = offset
+        var max_index = offset
+        for i in range(shape.rank()):
+            stride = strides[i]
+            extent = (shape[i] - 1) * stride
+            if extent > 0:
+                max_index += extent
+            else:
+                min_index += extent
+
+        if min_index < 0 or max_index >= self.numels():
+            raise ("Tensor → view: requested view accesses out-of-bounds data")
+
+        return TensorView(UnsafePointer(to=self), shape, strides, offset=offset)
 
     fn address(self) -> UnsafePointer[Tensor[dtype]]:
         return UnsafePointer(to=self)
@@ -1404,7 +1437,6 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
 
             fn grad_fn() raises -> None:
-                print("This is the place")
                 upstream_grad = result.address()[].grad[]
                 if upstream_grad.shape == Shape.Void:
                     scalar_grad = (
@@ -1678,7 +1710,6 @@ struct Tensor[dtype: DType = DType.float32](
                 Int(self.id()),
             )
 
-        print("Gone out of sum")
         return out
 
     @staticmethod
@@ -2169,16 +2200,6 @@ struct Tensor[dtype: DType = DType.float32](
         concrete = True if target_shape == self.shape else False
         mask = self.shape.broadcast_mask(target_shape)
         return View(Pointer(to=self), concrete, mask, target_shape)"""
-
-    fn view2(self) -> View2[self.dtype]:
-        return View2(UnsafePointer(to=self))
-
-
-@fieldwise_init
-struct View2[
-    dtype: DType = DType.float32,
-]:
-    var target: UnsafePointer[Tensor[dtype]]
 
 
 @fieldwise_init

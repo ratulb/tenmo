@@ -1,4 +1,4 @@
-from memory import UnsafePointer, memcpy, Pointer
+from memory import memcpy, Pointer
 from os import abort
 from shared import TensorLike
 from common_utils import log_debug

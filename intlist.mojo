@@ -1,4 +1,4 @@
-from memory import UnsafePointer, memcpy, memset, Pointer
+from memory import memcpy, memset, Pointer
 from os import abort
 from common_utils import log_debug
 
