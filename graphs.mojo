@@ -71,8 +71,8 @@ struct Graph[dtype: DType = DType.float32](Copyable & Movable):
         visited = IntList()
         node.seed_grad(with_tensor)
         self.trace_ancestry(node, visited)
-        print("Printing traced")
-        self.traced.print()
+        #print("Printing traced")
+        #self.traced.print()
         seen_ids = IntList()
         for each in self.traced:
             id = each[].inner_id()

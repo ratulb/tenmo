@@ -3,26 +3,21 @@ from shapes import Shape
 from intlist import IntList
 from strides import Strides
 from os import abort
-from shared import Differentiable, TensorLike
+from shared import TensorLike
 from ancestry import Ancestors
 from graphs import Graph
 
 
-fn main():
-    _strides = Strides(IntList.Empty)
-
-
 struct TensorView[dtype: DType = DType.float32](
-    Copyable & Movable & Differentiable
+    Copyable & Movable
 ):
-    alias datatype: DType = dtype
     alias Blank: TensorView[dtype] = Self(
         UnsafePointer[Tensor[dtype]](), Shape.Void, Strides(IntList.Empty), 0
     )
     var base_tensor: UnsafePointer[Tensor[dtype]]
     var shape: Shape
     var strides: Strides
-    var offset: Int  # default 0
+    var offset: Int
 
     fn __init__(
         out self,
@@ -128,33 +123,3 @@ struct TensorView[dtype: DType = DType.float32](
 
     fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:
         print("Will do it for sure!")
-
-
-@fieldwise_init
-struct View[
-    mutability: Bool, //,
-    origin: Origin[mutability],
-    dtype: DType = DType.float32,
-]:
-    var target: Pointer[Tensor[dtype], origin]
-    var concrete: Bool
-    var mask: IntList
-    var target_shape: Shape
-
-    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
-        if self.concrete:
-            return self.target[][indices]
-        else:
-            target_idx = self.target[].shape.translate_index(
-                indices, self.mask, self.target_shape
-            )
-            return self.target[][target_idx]
-
-    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
-        if self.concrete:
-            self.target[].__setitem__(indices, value)
-        else:
-            target_idx = self.target[].shape.translate_index(
-                indices, self.mask, self.target_shape
-            )
-            self.target[].__setitem__(target_idx, value)
