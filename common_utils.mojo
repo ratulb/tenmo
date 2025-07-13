@@ -62,7 +62,7 @@ struct TensorLike[dtype: DType]:
             self.tensor().invoke_grad_fn(verbose)"""
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
-#alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
+# alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
 
 
@@ -143,6 +143,7 @@ fn next_power_of_2(n: Int) raises -> Int:
 
 fn is_null[dtype: DType](addr: UnsafePointer[Tensor[dtype]]) -> Bool:
     return addr.__as_bool__() == False
+
 
 from os import Atomic
 from memory import UnsafePointer

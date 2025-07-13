@@ -1,11 +1,12 @@
 from python import Python, PythonObject
 from max.tensor import Tensor, TensorShape, TensorSpec
 from memory import UnsafePointer
-from max.driver.tensor import Tensor as MT 
+from max.driver.tensor import Tensor as MT
+
 
 fn main():
-    #var image: MT[DType.float32, 3] = Tensor[DType.float32](TensorShape(40, 80, 3))
-    #var image: MT[DType.float32, 2] = Tensor[DType.float32](TensorShape(40, 80))
+    # var image: MT[DType.float32, 3] = Tensor[DType.float32](TensorShape(40, 80, 3))
+    # var image: MT[DType.float32, 2] = Tensor[DType.float32](TensorShape(40, 80))
     try:
         np = Python.import_module("numpy")
         gpt2_weights = np.load("gpt2_weights.npz")
@@ -30,4 +31,3 @@ fn numpy_data_pointer[
     return numpy_array.__array_interface__["data"][0].unsafe_get_as_pointer[
         dtype
     ]()
-

@@ -8,6 +8,7 @@ from shared import Differentiable, TensorLike
 from ancestry import Ancestors
 from graphs import Graph
 
+
 fn main():
     _strides = Strides(IntList.Empty)
 
@@ -53,7 +54,7 @@ struct TensorView[dtype: DType = DType.float32](
 
     fn backward(self):
         graph = Graph[dtype]()
-        graph.walk_backward(self)
+        graph.walk_backward(self.into_tensorlike())
 
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](self.address())
@@ -108,6 +109,9 @@ struct TensorView[dtype: DType = DType.float32](
 
     fn seed_grad(self, value: Scalar[dtype]):
         self.base_tensor[].seed_grad(value)
+
+    fn seed_grad(self, with_tensor: Tensor[dtype]):
+        self.base_tensor[].seed_grad(with_tensor)
 
     fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:
         print("Will do it for sure!")

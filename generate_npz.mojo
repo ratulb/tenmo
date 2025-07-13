@@ -1,7 +1,8 @@
-### This file generates "gpt2_weights.npz" file after checkpoint files have been downloaded 
+### This file generates "gpt2_weights.npz" file after checkpoint files have been downloaded
 ### by running the "fetch_gpt2_weights.mojo" file.
 
 from python import Python
+
 
 fn main():
     try:
@@ -17,5 +18,3 @@ fn main():
         np.savez("gpt2_weights.npz", **weights)
     except e:
         print(e)
-
-

@@ -9,6 +9,7 @@ from common_utils import is_null
 fn main():
     pass
 
+
 struct SumGradFn[dtype: DType](Copyable & Movable):
     alias Address = UnsafePointer[Tensor[dtype]]
     alias Axes = UnsafePointer[IntList]
@@ -30,13 +31,11 @@ struct SumGradFn[dtype: DType](Copyable & Movable):
         self.axes = axes
         print("I have been created")
 
-
     fn __moveinit__(out self, owned other: Self):
         self.in_addr = other.in_addr
         self.out_addr = other.out_addr
         self.keepdims = other.keepdims
         self.axes = other.axes
-
 
     fn __copyinit__(out self, other: Self):
         self.in_addr = other.in_addr
@@ -44,10 +43,11 @@ struct SumGradFn[dtype: DType](Copyable & Movable):
         self.keepdims = other.keepdims
         self.axes = other.axes
 
-
     fn __call__(self):
         print("You are reaching here alright")
-        print("Inside call check 1", is_null(self.out_addr), is_null(self.in_addr))
+        print(
+            "Inside call check 1", is_null(self.out_addr), is_null(self.in_addr)
+        )
         var result = self.out_addr[]
         print("Inside call check 2", result.shape)
         this = self.in_addr[]
@@ -64,8 +64,9 @@ struct SumGradFn[dtype: DType](Copyable & Movable):
         else:
             if not self.keepdims:
                 var inserted_axes = outstream_grad.shape.intlist().insert(
-                    #self.axes, IntList.with_capacity(len(self.axes), 1)
-                    axes, IntList.with_capacity(len(axes), 1)
+                    # self.axes, IntList.with_capacity(len(self.axes), 1)
+                    axes,
+                    IntList.with_capacity(len(axes), 1),
                 )
                 var unsqueezed_shape = Shape(inserted_axes)
 
@@ -76,5 +77,3 @@ struct SumGradFn[dtype: DType](Copyable & Movable):
 
         grad_contrib.requires_grad = False
         this.update_grad[AddTensor](grad_contrib)
-
-

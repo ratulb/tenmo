@@ -340,8 +340,5 @@ struct _DynArrayIter[
 
 
 fn main() raises:
-    da = DynArray[Scalar[DType.float32]](1,2,3)
+    da = DynArray[Scalar[DType.float32]](1, 2, 3)
     da.print()
-
-
-

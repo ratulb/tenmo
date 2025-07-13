@@ -2,6 +2,7 @@ from python import Python, PythonObject
 from tensors import Tensor
 from memory import UnsafePointer, memcpy
 
+
 fn numpy_dtype(dtype: DType) raises -> PythonObject:
     np = Python.import_module("numpy")
     if dtype == DType.float32:

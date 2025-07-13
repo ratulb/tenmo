@@ -133,7 +133,7 @@ struct TensorLike[dtype: DType](Copyable & Movable):
         if self.is_view():
             self.view().invoke_grad_fn(verbose)
         else:
-            self.tensor().invoke_grad_fn(verbose)
+            self.tensor_address[].invoke_grad_fn(verbose)
 
 
 _ = """struct TensorLike[dtype: DType](Copyable & Movable):

@@ -67,7 +67,7 @@ struct TensorMap[dtype: DType = DType.float32](Copyable & Movable):
             old_values.free()
             old_occupied.free()
 
-    #fn insert(mut self, key: Int, value: UnsafePointer[Tensor[dtype]]) -> None:
+    # fn insert(mut self, key: Int, value: UnsafePointer[Tensor[dtype]]) -> None:
     fn insert(mut self, key: Int, tensor: Tensor[dtype]) -> None:
         if self.count * 2 >= self.capacity:
             self._resize()

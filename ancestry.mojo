@@ -15,11 +15,11 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         self.size = 0
 
     fn __init__(out self, capacity: Int):
-        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(capacity)
+        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
+            capacity
+        )
         self.capacity = capacity
         self.size = 0
-
-
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
@@ -108,7 +108,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         print("Ancestors[", total, "] = ", end="")
         for i in range(total):
             print(self.get(i)[].inner_id().__str__(), end=" ")
-            #print(self.get(i).__str__(), end=" ")
+            # print(self.get(i).__str__(), end=" ")
         print()
 
     fn __iter__(ref self) -> _AncestorsIter[self.dtype, __origin_of(self)]:
@@ -162,18 +162,18 @@ from tensors import Tensor
 fn populate_ancestry[
     dtype: DType = DType.float32
 ](*tensor_likes: TensorLike[dtype]) -> Ancestors[dtype]:
-    #ancestors1 = Ancestors[dtype].untracked()
+    # ancestors1 = Ancestors[dtype].untracked()
     ancestors1 = Ancestors[dtype](5)
     for each in tensor_likes:
         ancestors1.append(each.address())
     print("ok1 *************")
-    #ancestors1.print()
+    # ancestors1.print()
     return ancestors1
 
 
 fn main():
     GiverAndTaker.give()
-    _="""ancestors = Ancestors[DType.float32].untracked()
+    _ = """ancestors = Ancestors[DType.float32].untracked()
     print("ok0")
     ancestors.print()
     t1 = Tensor([1], requires_grad=True)
@@ -203,7 +203,6 @@ fn main():
         ancestors.get(i)[].tensor().print()"""
 
 
-
 struct GiverAndTaker:
     @staticmethod
     fn take(mut traced: Ancestors[DType.float32]):
@@ -221,13 +220,8 @@ struct GiverAndTaker:
         traced.append(t4.into_tensorlike().address())
         traced.append(t5.into_tensorlike().address())
 
-
     @staticmethod
     fn give():
         traced = Ancestors[DType.float32].untracked()
         Self.take(traced)
         traced.print()
-
-
-
-
