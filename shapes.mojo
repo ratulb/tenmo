@@ -346,7 +346,7 @@ struct Shape(
         self.numels = other.numels
 
     fn free(owned self):
-        log_debug("Shape free kicking in alright")
+        log_debug("Freeing Shape")
         self.axes_spans.free()
         _ = self^
 
