@@ -9,6 +9,92 @@ from ancestry import Ancestors
 from common_utils import *
 
 
+fn test_tensor_shared_multiple_paths() raises:
+    print("test_tensor_shared_multiple_paths")
+    var x = Tensor.scalar(2.0, requires_grad=True)
+    var y = x * 3              # 6
+    var z = x + 4              # 6
+    var out = y + z            # 12
+
+    out.backward()
+
+    # ∂out/∂x = ∂y/∂x + ∂z/∂x = 3 + 1 = 4
+    assert_true(out.item() == 12.0, "Value check")
+    assert_true(x.grad[].item() == 4.0, "Correct accumulated gradient")
+
+
+fn test_tensor_reuse_broadcasting() raises:
+    print("test_tensor_reuse_broadcasting")
+    var x = Tensor.d1([1, 2, 3], requires_grad=True)
+    var y = x + x  # [2, 4, 6]
+
+    y.sum().backward()
+
+    assert_true(x.grad[].all_close(Tensor.d1([2, 2, 2])), "Gradient doubles due to reuse")
+
+
+
+fn test_tensor_reuse_deep_chain() raises:
+    print("test_tensor_reuse_deep_chain")
+    var x = Tensor.scalar(2.0, requires_grad=True)
+    var y = x + 1           # 3
+    var z = y * x           # 3 * 2 = 6
+    var w = z + x           # 6 + 2 = 8
+
+    w.backward()
+
+    assert_true(w.item() == 8.0, "Value check")
+    # ∂w/∂x = ∂z/∂x + 1
+    # z = (x + 1) * x → ∂z/∂x = (1)*x + (x+1)*1 = x + x + 1 = 2x + 1 = 5
+    assert_true(x.grad[].item() == 5 + 1, "∂w/∂x = ∂z/∂x + ∂x/∂x = 6")
+
+
+fn test_tensor_reuse_in_two_branches() raises:
+    print("test_tensor_reuse_in_two_branches")
+    var x = Tensor.scalar(2.0, requires_grad=True)
+    var y1 = x + 1    # 3
+    var y2 = x * 5    # 10
+    var z = y1 + y2   # 13
+
+    z.backward()
+
+    assert_true(z.item() == 13.0, "Value check")
+    assert_true(x.grad[].item() == 1 + 5, "∂z/∂x = 1 (from y1) + 5 (from y2)")
+
+
+fn test_tensor_reuse_mixed() raises:
+    print("test_tensor_reuse_mixed")
+    var x = Tensor.scalar(3.0, requires_grad=True)
+    var y = x * x + x  # 3 * 3 + 3 = 12
+
+    y.backward()
+
+    assert_true(y.item() == 12.0, "Value check")
+    assert_true(x.grad[].item() == 2 * 3 + 1, "∂y/∂x = 2x + 1 = 6 + 1 = 7")
+
+
+fn test_tensor_reuse_add() raises:
+    print("test_tensor_reuse_add")
+    var x = Tensor.scalar(2.0, requires_grad=True)
+    var y = x + x  # 2 + 2 = 4
+
+    y.backward()
+
+    assert_true(y.item() == 4.0, "Value check")
+    assert_true(x.grad[].item() == 2.0, "∂y/∂x = 1 + 1 = 2 (reuse)")
+
+
+fn test_simple_chain() raises:
+    print("test_simple_chain")
+    var a = Tensor.scalar(2.0, requires_grad=True)
+    var b = Tensor.scalar(3.0, requires_grad=True)
+    var c = a * b  # 2 * 3 = 6
+    var d = c + b  # 6 + 3 = 9
+
+    d.backward()
+    assert_true(d.item() == 9.0, "Value check")
+    assert_true(a.grad[].item() == 3.0, "∂d/∂a = b = 3")
+
 fn test_scalar_mul_scalar() raises:
     print("test_scalar_mul_scalar")
     var a = Tensor.scalar(3.0, requires_grad=True)
@@ -1697,6 +1783,14 @@ fn test_tensor_multiplications() raises:
 
 fn main() raises:
     print("Starting tensor test cases")
+    test_simple_chain()
+    test_tensor_reuse_add()
+    test_tensor_reuse_mixed()
+    test_tensor_reuse_in_two_branches()
+    test_tensor_reuse_deep_chain()
+    test_tensor_reuse_broadcasting()
+    test_tensor_shared_multiple_paths()
+
     test_broadcast_sub()
     test_sum()
     test_tensor_multiplications()
@@ -1740,3 +1834,5 @@ fn main() raises:
     test_factor_mul_by()
     test_view()
     print("Finished running tensor test cases")
+
+

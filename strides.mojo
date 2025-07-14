@@ -88,7 +88,9 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
 
     # Reorder dimensions (for transpose/permute)
     fn permute(self, axes: IntList) -> Self:
-        result = IntList.with_capacity(axes.len())
+        if not len(axes) == len(self):
+             abort("Strides -> permute: axes length not equal to strides' length")
+        result = IntList.with_capacity(len(axes))
         for axis in axes:
             result.append(self[axis])
         return Strides(result)
