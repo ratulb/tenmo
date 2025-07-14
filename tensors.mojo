@@ -189,7 +189,6 @@ fn main() raises:
 
 from math import iota, exp, floor
 from random import seed, random_float64
-from time import perf_counter_ns
 from algorithm import vectorize
 from sys import simdwidthof
 from utils.numerics import max_finite
@@ -200,7 +199,7 @@ from intlist import IntList
 from ancestry import Ancestors
 from views import TensorView
 from strides import Strides
-from shared import TensorLike, Differentiable
+from shared import TensorLike
 from common_utils import log_debug, piped, is_null
 from operators import (
     __tensor_op_tensor__,
@@ -221,14 +220,12 @@ from operators import (
 )
 from summ import SumGradFn
 
-# from collections import Set
 from graphs import Graph
 
 
 struct Tensor[dtype: DType = DType.float32](
-    Copyable & Movable & Sized & Stringable & Differentiable
+    Copyable & Movable & Sized & Stringable
 ):
-    alias datatype: DType = dtype
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
@@ -317,9 +314,9 @@ struct Tensor[dtype: DType = DType.float32](
     fn backward_fn(self) -> Optional[fn () escaping raises -> None]:
         return self.grad_fn
 
-    fn view(self, shape: Shape, offset: Int = 0) raises -> TensorView[dtype]:
+    fn view(self, shape: Shape, offset: Int = 0) -> TensorView[dtype]:
         if offset < 0 or offset >= self.numels():
-            raise (
+            abort(
                 "Tensor → view(shape): offset out of bounds: offset => "
                 + String(offset)
                 + "and self.numels() => "
@@ -328,9 +325,7 @@ struct Tensor[dtype: DType = DType.float32](
         if shape == self.shape and offset == 0:  # Tensor offset is always 0
             return self.into_view()
         if shape.num_elements() + offset > self.numels():
-            raise (
-                "Tensor → view(shape): shape numels exceeds base tensor size"
-            )
+            abort("Tensor → view(shape): shape numels exceeds base tensor size")
 
         return TensorView(
             UnsafePointer(to=self), shape, Strides.default(shape), offset=offset
@@ -338,12 +333,12 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn view(
         self, shape: Shape, strides: Strides, offset: Int = 0
-    ) raises -> TensorView[dtype]:
+    ) -> TensorView[dtype]:
         if offset < 0 or offset >= self.numels():
-            raise ("Tensor → view: offset out of bounds")
+            abort("Tensor → view: offset out of bounds")
 
         if strides.rank() != shape.rank():
-            raise ("Tensor → view: shape and strides must have same rank")
+            abort("Tensor → view: shape and strides must have same rank")
 
         var min_index = offset
         var max_index = offset
@@ -356,7 +351,7 @@ struct Tensor[dtype: DType = DType.float32](
                 min_index += extent
 
         if min_index < 0 or max_index >= self.numels():
-            raise ("Tensor → view: requested view accesses out-of-bounds data")
+            abort("Tensor → view: requested view accesses out-of-bounds data")
 
         return TensorView(UnsafePointer(to=self), shape, strides, offset=offset)
 
@@ -499,6 +494,9 @@ struct Tensor[dtype: DType = DType.float32](
         return self.shape.num_elements()
 
     fn ndim(self) -> Int:
+        return self.shape.ndim
+
+    fn rank(self) -> Int:
         return self.shape.ndim
 
     @always_inline
@@ -801,17 +799,6 @@ struct Tensor[dtype: DType = DType.float32](
             out[idx] = self[src_idx]
 
         return out
-
-    _ = """@staticmethod
-    fn grad_unreduced(
-        tensor: Tensor[dtype], upstream_grad: Tensor[dtype]
-    ) -> Tensor[dtype]:
-        upstream_grad_shape = upstream_grad.shape
-        tensor_view = tensor.view(upstream_grad_shape)
-        result = Tensor[dtype](upstream_grad_shape)
-        for indices in upstream_grad_shape:
-            result[indices] = upstream_grad[indices] * tensor_view[indices]
-        return result"""
 
     @always_inline
     fn broadcast_mask(self, broadcast_shape: Shape) -> IntList:
@@ -1347,6 +1334,25 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
+    fn transpose(self, axes: List[Int] = []) -> TensorView[dtype]:
+        return self.transpose(IntList.new(axes))
+
+    fn transpose(self, axes: IntList = IntList.Empty) -> TensorView[dtype]:
+        _axes = axes
+        if len(_axes) == 0:
+            if not self.rank() == 2:
+                abort("Default transpose only valid for 2D")
+            _axes = IntList(1, 0)
+
+        if len(_axes) != self.rank():
+            abort("transpose: axes must match tensor rank")
+
+        # Permute shape and create strides
+        var new_shape = self.shape.permute(_axes)
+        var new_strides = Strides.default(self.shape).permute(_axes)
+        result = self.view(new_shape, new_strides)
+        return result
+
     @always_inline
     fn is_scalar(self) -> Bool:
         return self.numels() == 1 and self.shape == Shape.Void
@@ -1361,7 +1367,6 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn reshape(self, *newdims: Int) -> Tensor[dtype]:
         if len(newdims) == 1 and newdims[0] == 0:
-            print("reshape *newdims: ", len(newdims), newdims[0])
             return self.reshape()
         return self.reshape(Shape(newdims))
 
@@ -1474,133 +1479,11 @@ struct Tensor[dtype: DType = DType.float32](
     fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
         return self.sum(IntList.new(axes), keepdims)
 
-    _ = """fn sum(self: Self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
-        _axes = Self.validate_and_normalize_axes(self.shape, axes)
-        requires_grad = self.requires_grad
-        # original_shape = self.shape
-        rank = self.shape.rank()
-        print("rank rank rank rank: ", rank)
-
-        # Early scalar return - already correct
-        if rank == 0:
-            scalar_out = Tensor[dtype].zeros(
-                Shape.Void, requires_grad=self.requires_grad
-            )
-            scalar_out[IntList.Empty] = self[IntList.Empty]
-
-            if self.requires_grad:
-                self_ptr_ = UnsafePointer(to=self)
-                out_ptr_ = UnsafePointer(to=scalar_out)
-
-                fn scalar_grad_fn() raises -> None:
-                    print("Inside scalar_grad_fn")
-                    self_ptr_[].update_grad[AddTensor](out_ptr_[].grad[])
-
-                scalar_out.grad_fn = Optional(scalar_grad_fn)
-                scalar_out.add_ancestry(self)
-                print("returned scalar_out")
-            return scalar_out
-
-        # FIX 1: Handle full reduction case explicitly
-        var out_shape: Shape
-        reducing_all = len(_axes) == rank
-        if reducing_all and not keepdims:
-            # Explicit scalar output for full reduction
-            out_shape = Shape.Void
-        else:
-            spans = IntList.with_capacity(rank)
-            for i in range(rank):
-                if i in _axes:
-                    if keepdims:
-                        spans.append(1)
-                    else:
-                        continue
-                else:
-                    spans.append(self.shape[i])
-            out_shape = Shape(spans)
-        print("requires_grad requires_grad: ", requires_grad)
-        out = Tensor[dtype].zeros(out_shape, requires_grad=requires_grad)
-        result_addr = out.address()
-        print("The address of result: ", result_addr, Int(result_addr))
-        reduced_shape = Shape(self.shape.axes_spans.select(_axes))
-        # Special handling for full reduction case
-        if reducing_all and not keepdims:
-            summ = Scalar[dtype](0)
-            for idx in self.shape:
-                summ += self[idx]
-            out[IntList.Empty] = summ
-        else:
-            for out_idx in out_shape:
-                summ = Scalar[dtype](0)
-                for red_idx in reduced_shape:
-                    if keepdims:
-                        full_idx = out_idx.replace(_axes, red_idx)
-                    else:
-                        full_idx = out_idx.insert(_axes, red_idx)
-                    summ += self[full_idx]
-                out[out_idx] = summ
-
-        if requires_grad:
-
-            fn grad_fn() raises -> None:
-                # sum_grad_fn = SumGradFn(self.address(), out.address(), keepdims, _axes.address())
-                # sum_grad_fn()
-                print("Actually this is place")
-                outstream_grad = out.address()[].grad[]
-                this = self.address()[]
-                original_shape = this.shape
-                print("sum grad function original shape: ", original_shape)
-                var grad_contrib: Tensor[dtype]
-
-                # Handle scalar gradient case (sum reduced to scalar)
-                if outstream_grad.shape == Shape.Void:
-                    grad_contrib = Tensor[dtype].full(
-                        original_shape,
-                        outstream_grad.item(),
-                        requires_grad=False,
-                    )
-                else:
-                    # Handle keepdims=False case (need to reshape gradient)
-                    if not keepdims:
-                        # Determine axes/unsqueeze (insert dims of size 1)
-                        axes = outstream_grad.shape.intlist().insert(
-                            _axes,
-                            IntList.with_capacity(len(_axes), 1),
-                        )
-                        unsqueezed_shape = Shape(axes)
-
-                        unsqueezed_grad = outstream_grad.reshape(
-                            unsqueezed_shape
-                        )
-                        grad_contrib = unsqueezed_grad.broadcast_to(
-                            original_shape
-                        )
-                    else:
-                        # keepdims=True: shapes match except for broadcasting
-                        grad_contrib = outstream_grad.broadcast_to(
-                            original_shape
-                        )
-                grad_contrib.requires_grad = False
-                this.update_grad[AddTensor](grad_contrib)
-                print("Out of sum grad_fn successfully")
-
-            out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
-            print(
-                "sum result and self ids: ",
-                Int(out.address()),
-                Int(self.address()),
-            )
-
-        print("Gone out of sum")
-        return out"""
-
     fn sum(self: Self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
         _axes = Self.validate_and_normalize_axes(self.shape, axes)
         requires_grad = self.requires_grad
         # original_shape = self.shape
         rank = self.shape.rank()
-        print("rank rank rank rank: ", rank)
 
         # Early scalar return - already correct
         if rank == 0:
@@ -1619,7 +1502,6 @@ struct Tensor[dtype: DType = DType.float32](
 
                 scalar_out.grad_fn = Optional(scalar_grad_fn)
                 scalar_out.add_ancestry(self)
-                print("returned scalar_out")
             return scalar_out
 
         # FIX 1: Handle full reduction case explicitly
@@ -1639,10 +1521,7 @@ struct Tensor[dtype: DType = DType.float32](
                 else:
                     spans.append(self.shape[i])
             out_shape = Shape(spans)
-        print("requires_grad requires_grad: ", requires_grad)
         out = Tensor[dtype].zeros(out_shape, requires_grad=requires_grad)
-        result_addr = out.address()
-        print("The address of result: ", result_addr, Int(result_addr))
         reduced_shape = Shape(self.shape.axes_spans.select(_axes))
         # Special handling for full reduction case
         if reducing_all and not keepdims:
@@ -1667,7 +1546,6 @@ struct Tensor[dtype: DType = DType.float32](
                 outstream_grad = out.address()[].grad[]
                 this = self.address()[]
                 original_shape = this.shape
-                print("sum grad function original shape: ", original_shape)
                 var grad_contrib: Tensor[dtype]
 
                 # Handle scalar gradient case (sum reduced to scalar)
@@ -1700,15 +1578,9 @@ struct Tensor[dtype: DType = DType.float32](
                         )
                 grad_contrib.requires_grad = False
                 this.update_grad[AddTensor](grad_contrib)
-                print("Out of sum grad_fn successfully")
 
             out.grad_fn = Optional(grad_fn)
             out.add_ancestry(self)
-            print(
-                "sum result and self ids: ",
-                Int(out.id()),
-                Int(self.id()),
-            )
 
         return out
 
@@ -2193,40 +2065,3 @@ struct Tensor[dtype: DType = DType.float32](
         for each in tensors:
             each.free()
             _ = each
-
-    _ = """fn view(
-        ref self, target_shape: Shape
-    ) -> View[__origin_of(self), self.dtype]:
-        concrete = True if target_shape == self.shape else False
-        mask = self.shape.broadcast_mask(target_shape)
-        return View(Pointer(to=self), concrete, mask, target_shape)"""
-
-
-@fieldwise_init
-struct View[
-    mutability: Bool, //,
-    origin: Origin[mutability],
-    dtype: DType = DType.float32,
-]:
-    var target: Pointer[Tensor[dtype], origin]
-    var concrete: Bool
-    var mask: IntList
-    var target_shape: Shape
-
-    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
-        if self.concrete:
-            return self.target[][indices]
-        else:
-            target_idx = self.target[].shape.translate_index(
-                indices, self.mask, self.target_shape
-            )
-            return self.target[][target_idx]
-
-    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
-        if self.concrete:
-            self.target[].__setitem__(indices, value)
-        else:
-            target_idx = self.target[].shape.translate_index(
-                indices, self.mask, self.target_shape
-            )
-            self.target[].__setitem__(target_idx, value)
