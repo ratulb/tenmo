@@ -1,7 +1,6 @@
 from tensors import Tensor
 from shapes import Shape
 from views import TensorView
-from memory import UnsafePointer
 from ancestry import Ancestors
 
 
@@ -58,6 +57,38 @@ struct TensorLike[dtype: DType](Copyable & Movable):
     fn view(self) -> TensorView[dtype]:
         return self.view_address[]
 
+    fn has_grad(self) -> Bool:
+        return (
+            self.tensor_address[]
+            .has_grad() if self.is_tensor() else self.view_address[]
+            .base_tensor[]
+            .has_grad()
+        )
+
+    fn has_grad_fn(self) -> Bool:
+        return (
+            self.tensor_address[]
+            .has_grad_fn() if self.is_tensor() else self.view_address[]
+            .base_tensor[]
+            .has_grad_fn()
+        )
+
+    fn grad_fn(self) -> UnsafePointer[Tensor[dtype].BackwardFn]:
+        return (
+            self.tensor_address[]
+            .backward_fn() if self.is_tensor() else self.view_address[]
+            .base_tensor[]
+            .backward_fn()
+        )
+
+    fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
+        return (
+            self.tensor_address[]
+            .gradients() if self.is_tensor() else self.view_address[]
+            .base_tensor[]
+            .gradients()
+        )
+
     fn id(self) -> Int:
         return Int(self.address())
 
@@ -85,6 +116,12 @@ struct TensorLike[dtype: DType](Copyable & Movable):
         else:
             self.view().seed_grad(value)
 
+    fn update_grad[opcode: Int](self, incoming: Tensor[dtype]):
+        if self.is_tensor():
+            self.tensor().update_grad[opcode](incoming)
+        else:
+            self.view().base_tensor[].update_grad[opcode](incoming)
+
     fn seed_grad(self, with_tensor: Tensor[dtype]):
         if self.is_tensor():
             self.tensor().seed_grad(with_tensor)
@@ -98,9 +135,8 @@ struct TensorLike[dtype: DType](Copyable & Movable):
             ._requires_grad()
         )
 
-    fn invoke_grad_fn(self, verbose: Bool = False) raises:
+    _ = """fn invoke_grad_fn(self, verbose: Bool = False) raises:
         if self.is_view():
             self.view().invoke_grad_fn(verbose)
         else:
-            self.tensor_address[].invoke_grad_fn(verbose)
-
+            self.tensor_address[].invoke_grad_fn(verbose)"""

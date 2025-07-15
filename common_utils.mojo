@@ -1,68 +1,11 @@
 from shapes import Shape
 from tensors import Tensor
-from views import TensorView
 from testing import assert_true
 from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
-from utils import Variant
-from memory import UnsafePointer
-from ancestry import Ancestors
-
-
-_ = """trait Differentiable:
-    alias datatype: DType
-
-    fn has_grad(self) -> Bool:
-        ...
-
-    fn int_addr(self) -> Int:
-        ...
-
-    fn ancestry(self) -> Ancestors[datatype]:
-        ...
-    fn address(self) -> UnsafePointer[TensorLike[datatype]]: ...
-    fn fill(self, value: Scalar[datatype]): ...
-
-struct TensorLike[dtype: DType]:
-    alias Inner = Variant[
-        UnsafePointer[Tensor[dtype]], UnsafePointer[TensorView[dtype]]
-    ]
-    var pointee: Self.Inner
-
-    fn __init__(out self, tensor: UnsafePointer[Tensor[dtype]]):
-        self.pointee = Self.Inner(tensor)
-
-    fn __init__(out self, tensor_view: UnsafePointer[TensorView[dtype]]):
-        self.pointee = Self.Inner(tensor_view)
-
-    fn is_view(self) -> Bool:
-        return self.pointee.isa[UnsafePointer[TensorView[dtype]]]()
-
-    fn tensor(self) -> Tensor[dtype]:
-        return self.pointee[UnsafePointer[Tensor[dtype]]][]
-
-    fn view(self) -> TensorView[dtype]:
-        return self.pointee[UnsafePointer[TensorView[dtype]]][]
-
-    @always_inline
-    fn address(self) -> UnsafePointer[Self]:
-        return UnsafePointer(to=self)
-
-    fn requires_grad(self) -> Bool:
-        if self.is_view():
-            return self.view().base_tensor[].requires_grad
-        else:
-            return self.tensor().requires_grad
-
-    fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:
-        if self.is_view():
-            self.view().base_tensor[].invoke_grad_fn(verbose)
-        else:
-            self.tensor().invoke_grad_fn(verbose)"""
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
-# alias log = Logger[Level._from_str(env_get_string["LOGGING_LEVEL", "INFO"]())]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
 
 
