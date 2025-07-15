@@ -4,6 +4,7 @@ from testing import assert_true
 from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
+from os import abort
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -61,8 +62,17 @@ fn variadiclist_as_intlist(vlist: VariadicList[Int]) -> IntList:
     return list^
 
 
-# Create a single element VariadicList
-fn piped(m: Int, n: Int = -1) -> VariadicList[Int]:
+fn exit(*s: String):
+    combined = String()
+    for i in range(len(s)):
+        combined += s[i]
+        if i < len(s) - 1:
+            combined += ", "
+    abort(combined)
+
+
+# Create a single or two element(s) VariadicList
+fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int]:
     fn create_variadic_list(*elems: Int) -> VariadicList[Int]:
         return elems
 
@@ -114,4 +124,4 @@ struct IdGen:
 
 
 fn main() raises:
-    print("So far so good")
+    print("So", "far", "so good")
