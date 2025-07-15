@@ -14,21 +14,92 @@ fn main() raises:
     # test_matmul_broadcasting()
     # test_nested_operations()
     # test_large_tensor_backprop()
+    test_reshape_gradient_2d()
+    test_reshape_gradient_flatten()
+    test_multiple_reshapes()
+    test_reshape_noop()
+    # test_reshape_reused_twice_correct_grad()
     test_tensor_div_scalar_2d()
     test_tensor_div_scalar_nonuniform()
     test_tensor_div_scalar()
     test_tensor_scalar_subtract()
     test_tensor_scalar_add_mul_pow()
 
+
+fn test_reshape_reused_twice_correct_grad() raises:
+    var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    var r = x.reshape(Shape.of(2, 2))
+    # var y = r + r  # <-- r used twice
+    # y.backward()
+
+    assert_true(
+        x.grad[].all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])),
+        "∂y/∂x should be 2s — not duplicated",
+    )
+
+
+# Basic reshape gradient: forward shape is changed, but grads match original shape
+fn test_reshape_gradient_2d() raises:
+    print("test_reshape_gradient_2d")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = a.reshape(Shape.of(4))  # Flatten
+    b.backward()
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])),
+        "∂b/∂a should be ones reshaped",
+    )
+
+
+fn test_reshape_gradient_flatten() raises:
+    print("test_reshape_gradient_flatten")
+    var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    var y = x.reshape(Shape.of(2, 2))  # Reshape to 2x2
+    var z = y * 2.0
+    z.backward()
+    assert_true(
+        x.grad[].all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])), "∂z/∂x should be 2"
+    )
+
+
+fn test_multiple_reshapes() raises:
+    print("test_multiple_reshapes")
+    var t = Tensor.d1([10.0, 20.0, 30.0, 40.0], requires_grad=True)
+    var t2 = t.reshape(Shape.of(2, 2))
+    var t3 = t2.reshape(Shape.of(4))
+    var y = t3 * 3.0
+    y.backward()
+    assert_true(
+        t.grad[].all_close(Tensor.d1([3.0, 3.0, 3.0, 3.0])),
+        "Chain of reshapes should yield correct grad",
+    )
+
+
+fn test_reshape_noop() raises:
+    print("test_reshape_noop")
+    var m = Tensor.d2([[5.0, 6.0]], requires_grad=True)
+    var reshaped = m.reshape(Shape.of(1, 2))  # No shape change
+    reshaped.backward()
+    assert_true(
+        m.grad[].all_close(Tensor.d2([[1.0, 1.0]])),
+        "No-op reshape still propagates grad",
+    )
+
+
 fn test_tensor_div_scalar_2d() raises:
     print("test_tensor_div_scalar_2d")
     var a = Tensor.d2([[2.0, 4.0], [6.0, 8.0]], requires_grad=True)
     var b = a / 2.0
 
-    assert_true(b.all_close(Tensor.d2([[1.0, 2.0], [3.0, 4.0]])), "Forward division failed")
+    assert_true(
+        b.all_close(Tensor.d2([[1.0, 2.0], [3.0, 4.0]])),
+        "Forward division failed",
+    )
 
     b.backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])), "Gradient should be 1/2"    )
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])),
+        "Gradient should be 1/2",
+    )
 
 
 fn test_tensor_div_scalar_nonuniform() raises:
@@ -132,7 +203,7 @@ from ancestry import Ancestors
 from views import TensorView
 from strides import Strides
 from shared import TensorLike
-from common_utils import log_debug, piped, is_null
+from common_utils import log_debug, variadic1or2, is_null
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
@@ -380,12 +451,12 @@ struct Tensor[dtype: DType = DType.float32](
         self.grad_fn = other.grad_fn
         self.init_grad()
 
-    fn copy(self) -> Self:
+    _ = """fn copy(self) -> Self:
         result = Tensor[dtype](self.shape, requires_grad=self.requires_grad)
         memcpy(result.data, self.data, self.numels())
         if result.requires_grad:
             memcpy(result.grad, self.grad, self.numels())
-        return result
+        return result"""
 
     fn init_grad(mut self):
         if self.requires_grad and self.grad.__as_bool__() == False:
@@ -394,17 +465,18 @@ struct Tensor[dtype: DType = DType.float32](
             self.grad.init_pointee_move(gradients^)
             self.zero_grad()
 
-    fn print_grad(self):
-        if self.requires_grad == False:
-            print("Requires grad? No.")
-        elif self.requires_grad and self.has_grad() == False:
-            print("Gradbox not initialized")
+    fn gprint(self):
+        if not self.requires_grad:
+            print("Tensor is non-differentiable")
+        elif self.requires_grad and self.grad.__as_bool__() == False:
+            print("Requires grad but grad not initialized")
         else:
             self.grad[].print()
 
     # fn __del__(owned self):
     fn free(owned self):
         if self.has_grad_fn():
+            log_debug("Tensor__del__ → freed grad_fn")
             self.grad_fn.destroy_pointee()
             self.grad_fn.free()
         if self.has_grad():
@@ -420,15 +492,26 @@ struct Tensor[dtype: DType = DType.float32](
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
             log_debug("Tensor__del__ → freed self data pointees")
-        log_debug("Tensor__del__ → discarded ancestors")
         self.ancestors.free()
+        log_debug("Tensor__del__ → discarded ancestors")
         self.shape.free()
         if self.data:
             self.data.free()
         log_debug("Tensor__del__ → called free on data")
+        if self.base:
+            self.base[].free()
+            self.base.destroy_pointee()
+            self.base.free()
+            log_debug("Tensor__del__ → called free on base")
         _ = self^
 
     fn __len__(self) -> Int:
+        return self.numels()
+
+    fn len(self) -> Int:
+        return self.numels()
+
+    fn size(self) -> Int:
         return self.numels()
 
     fn numels(self) -> Int:
@@ -502,7 +585,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         if self.shape != other.shape:
             abort(
-                "Tensor → all_close expects same shape 2D tensors: "
+                "Tensor → all_close expects same shaped tensors: "
                 + self.shape.__str__()
                 + ", "
                 + other.shape.__str__()
@@ -648,7 +731,7 @@ struct Tensor[dtype: DType = DType.float32](
         return result
 
     fn has_grad(self) -> Bool:
-        return self.requires_grad and self.grad.__as_bool__() == True
+        return self.requires_grad and self.grad.__as_bool__()
 
     fn _requires_grad(self) -> Bool:
         return self.requires_grad
@@ -983,7 +1066,7 @@ struct Tensor[dtype: DType = DType.float32](
                 ),
             )
         num_rows = len(elems) // row_size
-        axes_spans = piped(num_rows, row_size)
+        axes_spans = variadic1or2(num_rows, row_size)
         shape = Shape(axes_spans)
         tensor = Tensor[dtype](shape, requires_grad)
         for i in range(num_rows):
@@ -1185,8 +1268,7 @@ struct Tensor[dtype: DType = DType.float32](
             abort("Tensor - store is supported only for 2d tensor")
         self.data.store(rows * self.shape[1] + cols, val)
 
-
-    _="""fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+    _ = """fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, DivideScalar](self, scalar)
 
         if self.requires_grad:
@@ -1200,7 +1282,7 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(self)
 
         return out"""
-    _="""
+    _ = """
     fn test_scalar_div_tensor() raises:
         var a = Tensor.d1([2.0, 4.0], requires_grad=True)
         var out = 8.0 / a
@@ -1236,7 +1318,6 @@ struct Tensor[dtype: DType = DType.float32](
             Tensor.d2([[-16.0, -4.0], [-1.0, -0.25]])
         ), "Backward gradient failed")
         """
-
 
     fn __truediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, DivideByScalar](
@@ -1317,8 +1398,10 @@ struct Tensor[dtype: DType = DType.float32](
                 # But self is not mutable - Hence the pointer indirection
                 self.address()[].requires_grad = False
                 # Need to see if base_pow gets a grad_fn or not - we don't want it to have one!
-                #var base_pow = self ** (scalar - 1.0)
-                var base_pow = __tensor_op_scalar__[dtype, Power](self, (scalar - 1.0))
+                # var base_pow = self ** (scalar - 1.0)
+                var base_pow = __tensor_op_scalar__[dtype, Power](
+                    self, (scalar - 1.0)
+                )
                 self.address()[].requires_grad = requires_grad
                 var local_grad = __tensor_op_scalar__[dtype, MulScalar](
                     base_pow, scalar
@@ -1358,6 +1441,57 @@ struct Tensor[dtype: DType = DType.float32](
 
             out.capture_grad_fn(grad_fn)
             out.add_ancestry(self)
+        return out
+
+    fn reshape(self) -> Tensor[dtype]:
+        if self.numels() != 1:
+            abort(
+                "Only tensor with single element can be reshaped to scalar"
+                " tensor"
+            )
+        return self.reshape(Shape.Void)
+
+    fn reshape(self, *newdims: Int) -> Tensor[dtype]:
+        if len(newdims) == 1 and newdims[0] == 0:
+            return self.reshape()
+        return self.reshape(Shape(newdims))
+
+    fn reshape(self, new_shape: Shape) -> Tensor[dtype]:
+        if self.numels() != new_shape.num_elements():
+            # if self.shape.product() != new_shape.product():
+            abort(
+                "Tensor with "
+                + String(self.numels())
+                + " element(s) can't be converted to a tensor containing "
+                + String(new_shape.num_elements())
+                + " element(s)"
+            )
+
+        requires_grad = self.requires_grad
+        out = Tensor[dtype](new_shape, self.data, requires_grad=requires_grad)
+
+        if requires_grad:
+            # Only allocate base if needed
+            base = Tensor[dtype].zeros(self.shape)
+            out.base = UnsafePointer[Tensor[dtype]].alloc(1)
+            out.base.init_pointee_move(base^)
+
+            fn grad_fn(
+                gradients: Self.GradTensor,
+            ) -> Self.GradOutputs:
+                reshaped = gradients.reshape(self.shape)
+                # Deduct already contributed portion
+                new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
+                    reshaped, out.base[]
+                )
+
+                # Update base accumulator
+                out.base.init_pointee_move(reshaped^)
+                return [(self.into_tensorlike(), new_contrib, AddTensor)]
+
+            out.capture_grad_fn(grad_fn)
+            out.add_ancestry(self)
+
         return out
 
     _ = """fn __add__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
@@ -1432,7 +1566,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return TensorView(UnsafePointer(to=self), shape, strides, offset=offset)
 
-    _ = """fn broadcast_to(self, target_shape: Shape) -> Tensor[dtype]:
+    fn broadcast_to(self, target_shape: Shape) -> Tensor[dtype]:
         if not self.shape.broadcastable(target_shape):
             abort(
                 "Tensor → broadcast_to: shape "
@@ -1450,7 +1584,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    @always_inline
     fn broadcast_mask(self, broadcast_shape: Shape) -> IntList:
         return self.shape.broadcast_mask(broadcast_shape)
 
@@ -1506,11 +1639,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-
-
-
-
-    fn broadcast_operation[
+    _ = """fn broadcast_operation[
         element_wise_op: Int, tensor_op_first: Int, tensor_op_second: Int
     ](self, other: Self) -> Tensor[dtype]:
         result = self.broadcast_op(other, scalar_ops[dtype, element_wise_op])
@@ -1899,59 +2028,6 @@ struct Tensor[dtype: DType = DType.float32](
         var new_shape = self.shape.permute(_axes)
         var new_strides = Strides.default(self.shape).permute(_axes)
         result = self.view(new_shape, new_strides)
-        return result
-
-    fn reshape(self) -> Tensor[dtype]:
-        if self.numels() != 1:
-            abort(
-                "Only tensor with single element can be reshaped to scalar"
-                " tensor"
-            )
-        return self.reshape(Shape.Void)
-
-    fn reshape(self, *newdims: Int) -> Tensor[dtype]:
-        if len(newdims) == 1 and newdims[0] == 0:
-            return self.reshape()
-        return self.reshape(Shape(newdims))
-
-    fn reshape(self, new_shape: Shape) -> Tensor[dtype]:
-        if self.numels() != new_shape.num_elements():
-            # if self.shape.product() != new_shape.product():
-            abort(
-                "Tensor with "
-                + String(self.numels())
-                + " element(s) can't be converted to a tensor containing "
-                + String(new_shape.num_elements())
-                + " element(s)"
-            )
-
-        requires_grad = self.requires_grad
-        result = Tensor[dtype](
-            new_shape, self.data, requires_grad=requires_grad
-        )
-
-        if requires_grad:
-            # Only allocate base if needed
-            base = Tensor[dtype].zeros(self.shape)
-            result.base = UnsafePointer[Tensor[dtype]].alloc(1)
-            result.base.init_pointee_move(base^)
-
-            fn grad_fn() raises -> None:
-                upstream_grad = (
-                    result.address()[].grad[].reshape(self.address()[].shape)
-                )
-                # Calculate new contribution (exclude already accumulated)
-                new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
-                    upstream_grad, result.address()[].base[]
-                )
-                # Update parent gradient
-                self.address()[].update_grad[AddTensor](new_contrib)
-                # Update accumulator
-                result.address()[].base.init_pointee_move(upstream_grad^)
-
-            result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self)
-
         return result
 
     fn mean(
