@@ -19,14 +19,59 @@ fn main() raises:
     test_multiple_reshapes()
     test_reshape_noop()
     # test_reshape_reused_twice_correct_grad()
+
     test_tensor_div_scalar_2d()
     test_tensor_div_scalar_nonuniform()
     test_tensor_div_scalar()
     test_tensor_scalar_subtract()
     test_tensor_scalar_add_mul_pow()
+    test_sum_all_elements()
+    test_sum_axis0()
+    test_sum_axis1_keepdims()
+    test_sum_multi_axes()
+    test_sum_all_axes_keepdims()
+    # test_sum_gradient_accumulation()
+    test_scalar_sum_forward()
+    test_scalar_sum_backward()
+    test_scalar_sum_custom_grad()
+    test_scalar_sum_keepdims_true()
+    test_scalar_sum_explicit_axes()
 
 
+fn test_scalar_sum_explicit_axes() raises:
+    print("test_scalar_sum_explicit_axes")
+    var a = Tensor.scalar(10.0)
+    var result = a.sum(axes=[])
+    assert_true(
+        result.item() == 10.0, "Explicit empty axes should work on scalar"
+    )
+
+
+fn test_scalar_sum_keepdims_true() raises:
+    print("test_scalar_sum_keepdims_true")
+    var a = Tensor.scalar(7.0)
+    var result = a.sum(axes=[], keepdims=True)
+    assert_true(
+        result.shape.rank() == 0,
+        "keepdims=True should still return a scalar shape",
+    )
+    assert_true(result.item() == 7.0, "Sum with keepdims on scalar")
+
+
+fn test_scalar_sum_custom_grad() raises:
+    print("test_scalar_sum_custom_grad")
+    var a = Tensor.scalar(2.0, requires_grad=True)
+    var result = a.sum()
+    result.backward(Tensor.scalar(5.0))  # Upstream gradient is 5.0
+    assert_true(
+        a.grad[].item() == 5.0,
+        "Custom upstream grad should be passed correctly",
+    )
+
+
+# This test needs to be enabled
 fn test_reshape_reused_twice_correct_grad() raises:
+    print("test_reshape_reused_twice_correct_grad")
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var r = x.reshape(Shape.of(2, 2))
     # var y = r + r  # <-- r used twice
@@ -36,6 +81,122 @@ fn test_reshape_reused_twice_correct_grad() raises:
         x.grad[].all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])),
         "∂y/∂x should be 2s — not duplicated",
     )
+
+
+# This test need to be enabled
+fn test_sum_gradient_accumulation() raises:
+    print("test_sum_gradient_accumulation")
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    var s1 = a.sum()
+    var s2 = a.sum()
+    # var s = s1 + s2
+    # s.backward()
+
+    # ∂s/∂a = ∂s1/∂a + ∂s2/∂a = 1 + 1 = 2
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[2, 2], [2, 2]])),
+        "Gradient should accumulate from both paths",
+    )
+
+
+fn test_scalar_sum_backward() raises:
+    print("test_scalar_sum_backward")
+    var a = Tensor.scalar(3.14, requires_grad=True)
+    var result = a.sum()  # Should just return a
+    result.backward()
+    assert_true(result.item() == 3.14, "Forward sum check")
+    assert_true(a.grad[].item() == 1.0, "Gradient of scalar sum should be 1.0")
+
+
+fn test_scalar_sum_forward() raises:
+    print("test_scalar_sum_forward")
+    var a = Tensor.scalar(42.0)
+    var result = a.sum()
+    assert_true(
+        result.item() == 42.0, "Scalar sum should return the same value"
+    )
+
+
+fn test_sum_all_axes_keepdims() raises:
+    print("test_sum_all_axes_keepdims")
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    var s = a.sum(axes=[0, 1], keepdims=True)
+    s.backward(Tensor.d2([[100]]))
+
+    assert_true(s.shape == Shape.of(1, 1), "keepdims should preserve (1,1)")
+    assert_true(a.grad[].all_close(Tensor.d2([[100, 100], [100, 100]])))
+
+
+fn test_sum_multi_axes() raises:
+    var a = Tensor.d3(
+        [
+            [[1, 2], [3, 4]],
+            [[5, 6], [7, 8]],
+        ],
+        requires_grad=True,
+    )  # shape: (2,2,2)
+
+    var s = a.sum(axes=[0, 2])
+    s.backward(Tensor.d1([10, 20]))  # shape: (2,)
+
+    # Reduced to shape: (2,)
+    # Incoming grad should be broadcasted back to shape (2,2,2)
+    assert_true(
+        a.grad[].all_close(
+            Tensor.d3(
+                [
+                    [[10, 10], [20, 20]],
+                    [[10, 10], [20, 20]],
+                ]
+            )
+        )
+    )
+
+
+fn test_sum_axis1_nokeepdims() raises:
+    print("test_sum_axis1_nokeepdims")
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    var s = a.sum(axes=[1])
+    s.backward(Tensor.d1([5, 6]))  # shape: (2,)
+    s.print()
+    # Broadcast (2,) to (2,2)
+    assert_true(a.grad[].all_close(Tensor.d2([[5, 5], [6, 6]])))
+
+
+fn test_sum_axis1_keepdims() raises:
+    print("test_sum_axis1_keepdims")
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    var s = a.sum(axes=[1], keepdims=True)
+    s.backward(Tensor.d2([[10], [20]]))
+
+    # ∂s/∂a = [[10, 10], [20, 20]]
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[10, 10], [20, 20]])),
+        "Keepdims should preserve dimension during broadcast",
+    )
+
+
+fn test_sum_axis0() raises:
+    print("test_sum_axis0")
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    var s = a.sum(axes=[0])
+    s.backward(Tensor.d1([10, 20]))  # incoming grad shape must match output
+    assert_true(s.shape == Shape.of(2), "Sum axis=0 → shape (2,)")
+
+    # ∂s/∂a = [[10, 20], [10, 20]]
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[10, 20], [10, 20]])),
+        "Gradient must be broadcast correctly",
+    )
+
+
+fn test_sum_all_elements() raises:
+    print("test_sum_all_elements")
+    var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    var s = a.sum()
+    s.backward()
+    assert_true(s.item() == 10.0, "Sum of all elements should be 10")
+    assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])), "∂s/∂a = ones")
 
 
 # Basic reshape gradient: forward shape is changed, but grads match original shape
@@ -247,7 +408,6 @@ struct Tensor[dtype: DType = DType.float32](
     var requires_grad: Bool
     var grad: UnsafePointer[Self]
     var ancestors: Ancestors[dtype]
-    # var grad_fn: Optional[fn () escaping raises -> None]
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
     var grad_fn: UnsafePointer[Self.BackwardFn]
 
@@ -261,8 +421,13 @@ struct Tensor[dtype: DType = DType.float32](
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         if not self.requires_grad:
             return
+        seed_tensor = Tensor[dtype].full(self.shape, start_grad)
+        self.backward(seed_tensor)
 
-        self.seed_grad(start_grad)
+    fn backward(self, seed_tensor: Tensor[dtype]):
+        if not self.requires_grad:
+            return
+        self.seed_grad(seed_tensor)
 
         visited = IntList.Empty
         stack = [self.into_tensorlike()]
@@ -1494,6 +1659,150 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
+    fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
+        return self.sum(IntList.new(axes), keepdims)
+
+    fn sum(self: Self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
+        _axes = Self.validate_and_normalize_axes(self.shape, axes)
+        requires_grad = self.requires_grad
+        # original_shape = self.shape
+        rank = self.shape.rank()
+
+        # Early scalar return - already correct
+        if rank == 0:
+            scalar_out = Tensor[dtype].zeros(
+                Shape.Void, requires_grad=self.requires_grad
+            )
+            scalar_out[IntList.Empty] = self[IntList.Empty]
+
+            if self.requires_grad:
+
+                fn scalar_grad_fn(
+                    gradients: Self.GradTensor,
+                ) -> Self.GradOutputs:
+                    print("Inside scalar_grad_fn")
+                    return [(self.into_tensorlike(), gradients, AddTensor)]
+
+                scalar_out.capture_grad_fn(scalar_grad_fn)
+                scalar_out.add_ancestry(self)
+            return scalar_out
+
+        # FIX 1: Handle full reduction case explicitly
+        var out_shape: Shape
+        reducing_all = len(_axes) == rank
+        if reducing_all and not keepdims:
+            # Explicit scalar output for full reduction
+            out_shape = Shape.Void
+        else:
+            spans = IntList.with_capacity(rank)
+            for i in range(rank):
+                if i in _axes:
+                    if keepdims:
+                        spans.append(1)
+                    else:
+                        continue
+                else:
+                    spans.append(self.shape[i])
+            out_shape = Shape(spans)
+        out = Tensor[dtype].zeros(out_shape, requires_grad=requires_grad)
+        reduced_shape = Shape(self.shape.axes_spans.select(_axes))
+        # Special handling for full reduction case
+        if reducing_all and not keepdims:
+            summ = Scalar[dtype](0)
+            for idx in self.shape:
+                summ += self[idx]
+            out[IntList.Empty] = summ
+        else:
+            for out_idx in out_shape:
+                summ = Scalar[dtype](0)
+                for red_idx in reduced_shape:
+                    if keepdims:
+                        full_idx = out_idx.replace(_axes, red_idx)
+                    else:
+                        full_idx = out_idx.insert(_axes, red_idx)
+                    summ += self[full_idx]
+                out[out_idx] = summ
+
+        if requires_grad:
+
+            fn grad_fn(
+                gradients: Self.GradTensor,
+            ) -> Self.GradOutputs:
+                this = self.address()[]
+                original_shape = this.shape
+                var grad_contrib: Tensor[dtype]
+
+                # Handle scalar gradient case (sum reduced to scalar)
+                if gradients.shape == Shape.Void:
+                    grad_contrib = Tensor[dtype].full(
+                        original_shape,
+                        gradients.item(),
+                        requires_grad=False,
+                    )
+                else:
+                    # Handle keepdims=False case (need to reshape gradient)
+                    if not keepdims:
+                        # Determine axes/unsqueeze (insert dims of size 1)
+                        axes = gradients.shape.intlist().insert(
+                            _axes,
+                            IntList.with_capacity(len(_axes), 1),
+                        )
+                        unsqueezed_shape = Shape(axes)
+
+                        unsqueezed_grad = gradients.reshape(unsqueezed_shape)
+                        grad_contrib = unsqueezed_grad.broadcast_to(
+                            original_shape
+                        )
+                    else:
+                        # keepdims=True: shapes match except for broadcasting
+                        grad_contrib = gradients.broadcast_to(original_shape)
+                grad_contrib.requires_grad = False
+                return [(this.into_tensorlike(), grad_contrib, AddTensor)]
+
+            out.capture_grad_fn(grad_fn)
+            out.add_ancestry(self)
+
+        return out
+
+    @staticmethod
+    fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
+        # Ensure axes are unique, sorted, and within bounds.
+        rank = shape.rank()
+
+        if rank == 0:
+            if len(axes) == 1 and axes[0] == -1:
+                return (
+                    IntList()
+                )  # Interpret `[-1]` as "reduce all axes" for scalars
+            if len(axes) > 0:
+                abort(
+                    "Tensor → validate_and_normalize_axes - cannot reduce over"
+                    " axes "
+                    + axes.__str__()
+                    + " for scalar tensor with shape: "
+                    + shape.__str__()
+                )
+            return IntList()  # Scalar sum over [] is valid
+
+        if len(axes) == 0:
+            return IntList.range_list(rank)
+        normalized = IntList.with_capacity(len(axes))
+        for _axis in axes:
+            axis = _axis
+            if axis < 0:
+                axis += rank
+            if axis < 0 or axis >= rank:
+                abort(
+                    "Tensor → validate_and_normalize_axes - invalid axis: "
+                    + String(_axis)
+                    + " for tensor shape: "
+                    + shape.__str__()
+                )
+            normalized.append(axis)
+        # Sort and deduplicate
+        normalized.sort_and_deduplicate()
+        return normalized
+
     _ = """fn __add__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, AddScalar](
             self,
@@ -1524,47 +1833,6 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         vectorize[add_value, simdwidthof[dtype]()](self.numels())
-
-    fn view(self, shape: Shape, offset: Int = 0) -> TensorView[dtype]:
-        if offset < 0 or offset >= self.numels():
-            abort(
-                "Tensor → view(shape): offset out of bounds: offset => "
-                + String(offset)
-                + "and self.numels() => "
-                + String(self.numels())
-            )
-        if shape == self.shape and offset == 0:  # Tensor offset is always 0
-            return self.into_view()
-        if shape.num_elements() + offset > self.numels():
-            abort("Tensor → view(shape): shape numels exceeds base tensor size")
-
-        return TensorView(
-            UnsafePointer(to=self), shape, Strides.default(shape), offset=offset
-        )
-
-    fn view(
-        self, shape: Shape, strides: Strides, offset: Int = 0
-    ) -> TensorView[dtype]:
-        if offset < 0 or offset >= self.numels():
-            abort("Tensor → view: offset out of bounds")
-
-        if strides.rank() != shape.rank():
-            abort("Tensor → view: shape and strides must have same rank")
-
-        var min_index = offset
-        var max_index = offset
-        for i in range(shape.rank()):
-            stride = strides[i]
-            extent = (shape[i] - 1) * stride
-            if extent > 0:
-                max_index += extent
-            else:
-                min_index += extent
-
-        if min_index < 0 or max_index >= self.numels():
-            abort("Tensor → view: requested view accesses out-of-bounds data")
-
-        return TensorView(UnsafePointer(to=self), shape, strides, offset=offset)
 
     fn broadcast_to(self, target_shape: Shape) -> Tensor[dtype]:
         if not self.shape.broadcastable(target_shape):
@@ -1843,6 +2111,49 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
 
+    fn view(self, shape: Shape, offset: Int = 0) -> TensorView[dtype]:
+        if offset < 0 or offset >= self.numels():
+            abort(
+                "Tensor → view(shape): offset out of bounds: offset => "
+                + String(offset)
+                + "and self.numels() => "
+                + String(self.numels())
+            )
+        if shape == self.shape and offset == 0:  # Tensor offset is always 0
+            return self.into_view()
+        if shape.num_elements() + offset > self.numels():
+            abort("Tensor → view(shape): shape numels exceeds base tensor size")
+
+        return TensorView(
+            UnsafePointer(to=self), shape, Strides.default(shape), offset=offset
+        )
+
+    fn view(
+        self, shape: Shape, strides: Strides, offset: Int = 0
+    ) -> TensorView[dtype]:
+        if offset < 0 or offset >= self.numels():
+            abort("Tensor → view: offset out of bounds")
+
+        if strides.rank() != shape.rank():
+            abort("Tensor → view: shape and strides must have same rank")
+
+        var min_index = offset
+        var max_index = offset
+        for i in range(shape.rank()):
+            stride = strides[i]
+            extent = (shape[i] - 1) * stride
+            if extent > 0:
+                max_index += extent
+            else:
+                min_index += extent
+
+        if min_index < 0 or max_index >= self.numels():
+            abort("Tensor → view: requested view accesses out-of-bounds data")
+
+        return TensorView(UnsafePointer(to=self), shape, strides, offset=offset)
+
+
+
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
 
@@ -2087,154 +2398,7 @@ struct Tensor[dtype: DType = DType.float32](
             result.grad_fn = Optional(grad_fn)
             result.add_ancestry(self)
 
-        return result
-
-    fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
-        return self.sum(IntList.new(axes), keepdims)
-
-    fn sum(self: Self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
-        _axes = Self.validate_and_normalize_axes(self.shape, axes)
-        requires_grad = self.requires_grad
-        # original_shape = self.shape
-        rank = self.shape.rank()
-
-        # Early scalar return - already correct
-        if rank == 0:
-            scalar_out = Tensor[dtype].zeros(
-                Shape.Void, requires_grad=self.requires_grad
-            )
-            scalar_out[IntList.Empty] = self[IntList.Empty]
-
-            if self.requires_grad:
-
-                fn scalar_grad_fn() raises -> None:
-                    print("Inside scalar_grad_fn")
-                    this = self.address()[]
-                    result = scalar_out.address()[]
-                    this.update_grad[AddTensor](result.grad[])
-
-                scalar_out.grad_fn = Optional(scalar_grad_fn)
-                scalar_out.add_ancestry(self)
-            return scalar_out
-
-        # FIX 1: Handle full reduction case explicitly
-        var out_shape: Shape
-        reducing_all = len(_axes) == rank
-        if reducing_all and not keepdims:
-            # Explicit scalar output for full reduction
-            out_shape = Shape.Void
-        else:
-            spans = IntList.with_capacity(rank)
-            for i in range(rank):
-                if i in _axes:
-                    if keepdims:
-                        spans.append(1)
-                    else:
-                        continue
-                else:
-                    spans.append(self.shape[i])
-            out_shape = Shape(spans)
-        out = Tensor[dtype].zeros(out_shape, requires_grad=requires_grad)
-        reduced_shape = Shape(self.shape.axes_spans.select(_axes))
-        # Special handling for full reduction case
-        if reducing_all and not keepdims:
-            summ = Scalar[dtype](0)
-            for idx in self.shape:
-                summ += self[idx]
-            out[IntList.Empty] = summ
-        else:
-            for out_idx in out_shape:
-                summ = Scalar[dtype](0)
-                for red_idx in reduced_shape:
-                    if keepdims:
-                        full_idx = out_idx.replace(_axes, red_idx)
-                    else:
-                        full_idx = out_idx.insert(_axes, red_idx)
-                    summ += self[full_idx]
-                out[out_idx] = summ
-
-        if requires_grad:
-
-            fn grad_fn() raises -> None:
-                outstream_grad = out.address()[].grad[]
-                this = self.address()[]
-                original_shape = this.shape
-                var grad_contrib: Tensor[dtype]
-
-                # Handle scalar gradient case (sum reduced to scalar)
-                if outstream_grad.shape == Shape.Void:
-                    grad_contrib = Tensor[dtype].full(
-                        original_shape,
-                        outstream_grad.item(),
-                        requires_grad=False,
-                    )
-                else:
-                    # Handle keepdims=False case (need to reshape gradient)
-                    if not keepdims:
-                        # Determine axes/unsqueeze (insert dims of size 1)
-                        axes = outstream_grad.shape.intlist().insert(
-                            _axes,
-                            IntList.with_capacity(len(_axes), 1),
-                        )
-                        unsqueezed_shape = Shape(axes)
-
-                        unsqueezed_grad = outstream_grad.reshape(
-                            unsqueezed_shape
-                        )
-                        grad_contrib = unsqueezed_grad.broadcast_to(
-                            original_shape
-                        )
-                    else:
-                        # keepdims=True: shapes match except for broadcasting
-                        grad_contrib = outstream_grad.broadcast_to(
-                            original_shape
-                        )
-                grad_contrib.requires_grad = False
-                this.update_grad[AddTensor](grad_contrib)
-
-            out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self)
-
-        return out
-
-    @staticmethod
-    fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
-        #Ensure axes are unique, sorted, and within bounds.
-        rank = shape.rank()
-
-        if rank == 0:
-            if len(axes) == 1 and axes[0] == -1:
-                return (
-                    IntList()
-                )  # Interpret `[-1]` as "reduce all axes" for scalars
-            if len(axes) > 0:
-                abort(
-                    "Tensor → validate_and_normalize_axes - cannot reduce over"
-                    " axes "
-                    + axes.__str__()
-                    + " for scalar tensor with shape: "
-                    + shape.__str__()
-                )
-            return IntList()  # Scalar sum over [] is valid
-
-        if len(axes) == 0:
-            return IntList.range_list(rank)
-        normalized = IntList.with_capacity(len(axes))
-        for _axis in axes:
-            axis = _axis
-            if axis < 0:
-                axis += rank
-            if axis < 0 or axis >= rank:
-                abort(
-                    "Tensor → validate_and_normalize_axes - invalid axis: "
-                    + String(_axis)
-                    + " for tensor shape: "
-                    + shape.__str__()
-                )
-            normalized.append(axis)
-        # Sort and deduplicate
-        normalized.sort_and_deduplicate()
-        return normalized"""
+        return result"""
 
 
 _ = """from testing import assert_true
