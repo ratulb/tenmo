@@ -20,6 +20,15 @@ fn main() raises:
     test_reshape_noop()
     # test_reshape_reused_twice_correct_grad()
 
+    test_mean_scalar()
+    test_mean_1d()
+    test_mean_2d_all_axes()
+    test_mean_axis0()
+    test_mean_axis1_keepdims()
+    test_mean_multiple_axes()
+    test_mean_no_axes()
+    test_mean_no_grad()
+
     test_tensor_div_scalar_2d()
     test_tensor_div_scalar_nonuniform()
     test_tensor_div_scalar()
@@ -36,6 +45,93 @@ fn main() raises:
     test_scalar_sum_custom_grad()
     test_scalar_sum_keepdims_true()
     test_scalar_sum_explicit_axes()
+
+
+fn test_mean_scalar() raises:
+    print("test_mean_scalar")
+    var a = Tensor.scalar(4.2, requires_grad=True)
+    var m = a.mean()
+    assert_true(m.item() == 4.2, "Mean of scalar should be the scalar itself")
+    m.backward()
+    assert_true(a.grad[].item() == 1.0, "Grad of scalar mean should be 1.0")
+
+
+fn test_mean_1d() raises:
+    print("test_mean_1d")
+    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var m = a.mean()
+    assert_true(m.item() == 2.0, "Mean of [1, 2, 3] is 2.0")
+    m.backward()
+    assert_true(
+        a.grad[].all_close(Tensor.d1([1 / 3, 1 / 3, 1 / 3])),
+        "Equal gradient distribution",
+    )
+
+
+fn test_mean_2d_all_axes() raises:
+    print("test_mean_2d_all_axes")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var m = a.mean()
+    assert_true(m.item() == 2.5, "Mean of all elements is 2.5")
+    m.backward()
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])),
+        "Each grad is 1/4",
+    )
+
+
+fn test_mean_axis0() raises:
+    print("test_mean_axis0")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var m = a.mean(axes=[0])
+    assert_true(m.all_close(Tensor.d1([2.0, 3.0]).float()), "Mean along axis 0")
+    m.backward()
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])),
+        "Each input contributes 1/2 to mean(axis=0)",
+    )
+
+
+fn test_mean_axis1_keepdims() raises:
+    print("test_mean_axis1_keepdims")
+    var a = Tensor.d2([[2.0, 4.0], [6.0, 8.0]], requires_grad=True)
+    var m = a.mean(axes=[1], keepdims=True)
+    assert_true(m.all_close(Tensor.d2([[3.0], [7.0]])), "Mean across rows")
+    m.backward()
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])),
+        "Row-wise mean: each contributes 1/2",
+    )
+
+
+fn test_mean_multiple_axes() raises:
+    print("test_mean_multiple_axes")
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    )
+    var m = a.mean(axes=[0, 2])
+    assert_true(m.shape == Shape.of(2), "Shape after reducing [0, 2]")
+    m.backward()
+    assert_true(
+        a.grad[].sum().item() == 2.0,
+        "Total gradient distributed across all elements",
+    )
+
+
+fn test_mean_no_axes() raises:
+    print("test_mean_no_axes")
+    var a = Tensor.d2([[2.0, 4.0], [6.0, 8.0]], requires_grad=True)
+    var m = a.mean(axes=[])
+    assert_true(m.item() == 5.0, "Mean of all elements")
+    m.backward()
+    assert_true(a.grad[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])))
+
+
+fn test_mean_no_grad() raises:
+    print("test_mean_no_grad")
+    var a = Tensor.d2([[10.0, 20.0], [30.0, 40.0]], requires_grad=False)
+    var m = a.mean()
+    assert_true(m.item() == 25.0, "Correct mean without grad")
 
 
 fn test_scalar_sum_explicit_axes() raises:
@@ -69,7 +165,7 @@ fn test_scalar_sum_custom_grad() raises:
     )
 
 
-# This test needs to be enabled
+# This test needs to be enabled once sum is migrated
 fn test_reshape_reused_twice_correct_grad() raises:
     print("test_reshape_reused_twice_correct_grad")
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -1665,7 +1761,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn sum(self: Self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
         _axes = Self.validate_and_normalize_axes(self.shape, axes)
         requires_grad = self.requires_grad
-        # original_shape = self.shape
         rank = self.shape.rank()
 
         # Early scalar return - already correct
@@ -1680,7 +1775,6 @@ struct Tensor[dtype: DType = DType.float32](
                 fn scalar_grad_fn(
                     gradients: Self.GradTensor,
                 ) -> Self.GradOutputs:
-                    print("Inside scalar_grad_fn")
                     return [(self.into_tensorlike(), gradients, AddTensor)]
 
                 scalar_out.capture_grad_fn(scalar_grad_fn)
@@ -1758,6 +1852,60 @@ struct Tensor[dtype: DType = DType.float32](
                         grad_contrib = gradients.broadcast_to(original_shape)
                 grad_contrib.requires_grad = False
                 return [(this.into_tensorlike(), grad_contrib, AddTensor)]
+
+            out.capture_grad_fn(grad_fn)
+            out.add_ancestry(self)
+
+        return out
+
+    fn mean(
+        self, axes: List[Int] = [], keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        return self.mean(IntList.new(axes), keepdims)
+
+    fn mean(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
+        sorted_axes = Self.validate_and_normalize_axes(self.shape, axes)
+        # Compute total count of elements being reduced
+        count = self.shape.axes_spans.select(sorted_axes).product()
+
+        # Perform sum and divide by count
+        out = self.sum(sorted_axes, keepdims) / Scalar[dtype](count)
+
+        # Gradient logic
+        if self.requires_grad:
+
+            fn grad_fn(
+                gradients: Self.GradTensor,
+            ) -> Self.GradOutputs:
+                if gradients.shape == Shape.Void:
+                    scalar_grad = gradients.item() / self.address()[].numels()
+                    grad_contrib = Tensor[dtype].full(
+                        self.address()[].shape, scalar_grad, requires_grad=False
+                    )
+                    return [
+                        (
+                            self.address()[].into_tensorlike(),
+                            grad_contrib,
+                            AddTensor,
+                        )
+                    ]
+
+                var expanded = gradients
+
+                if not keepdims:
+                    expanded = gradients.reshape(
+                        Shape(
+                            gradients.shape.intlist().insert(
+                                sorted_axes,
+                                IntList.with_capacity(len(sorted_axes), 1),
+                            )
+                        )
+                    )
+
+                # Broadcast and divide
+                broadcasted = expanded.broadcast_to(self.address()[].shape)
+                scaled = broadcasted / Scalar[dtype](count)
+                return [(self.address()[].into_tensorlike(), scaled, AddTensor)]
 
             out.capture_grad_fn(grad_fn)
             out.add_ancestry(self)
@@ -2339,65 +2487,6 @@ struct Tensor[dtype: DType = DType.float32](
         var new_shape = self.shape.permute(_axes)
         var new_strides = Strides.default(self.shape).permute(_axes)
         result = self.view(new_shape, new_strides)
-        return result
-
-    fn mean(
-        self, axes: List[Int] = [], keepdims: Bool = False
-    ) -> Tensor[dtype]:
-        return self.mean(IntList.new(axes), keepdims)
-
-    fn mean(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
-        sorted_axes = Self.validate_and_normalize_axes(self.shape, axes)
-        # Compute total count of elements being reduced
-        reduce_dims = self.shape.axes_spans.select(sorted_axes)
-        var count = 1
-        for span in reduce_dims:
-            count *= span
-
-        if count == 0:
-            abort("Mean reduction over zero elements not allowed.")
-
-        # Perform sum
-        summed = self.sum(sorted_axes, keepdims)
-        # Divide by count
-        var result = summed / Scalar[dtype](count)
-
-        # Gradient logic
-        if self.requires_grad:
-
-            fn grad_fn() raises -> None:
-                upstream_grad = result.address()[].grad[]
-                if upstream_grad.shape == Shape.Void:
-                    scalar_grad = (
-                        upstream_grad.item()
-                        / self.address()[].shape.num_elements()
-                    )
-                    grad_contrib = Tensor[dtype].full(
-                        self.address()[].shape, scalar_grad, requires_grad=False
-                    )
-                    self.address()[].update_grad[AddTensor](grad_contrib)
-                    return
-
-                var expanded = upstream_grad
-
-                if not keepdims:
-                    expanded = upstream_grad.reshape(
-                        Shape(
-                            upstream_grad.shape.intlist().insert(
-                                sorted_axes,
-                                IntList.with_capacity(len(sorted_axes), 1),
-                            )
-                        )
-                    )
-
-                # Broadcast and divide
-                broadcasted = expanded.broadcast_to(self.address()[].shape)
-                scaled = broadcasted / Scalar[dtype](count)
-                self.address()[].update_grad[AddTensor](scaled)
-
-            result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self)
-
         return result"""
 
 
