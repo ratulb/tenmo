@@ -1,4 +1,3 @@
-from memory import UnsafePointer
 from tensors import Tensor
 from algorithm import vectorize, parallelize
 from sys import simdwidthof
@@ -19,8 +18,12 @@ alias Power = 7
 alias Add = 8
 alias Subtract = 9
 alias Multiply = 10
+alias SubtractFromScalar = 11
+alias DivideByScalar = 12
+alias DivideScalar = 13
 
 
+@always_inline
 fn scalar_ops[
     dtype: DType, op: Int
 ](lhs: Scalar[dtype], rhs: Scalar[dtype]) -> Scalar[dtype]:
@@ -300,6 +303,12 @@ fn __tensor_op_scalar__[
         )
 
     @parameter
+    fn subtract_from_scalar[simd_width: Int](idx: Int):
+        out.data.store[width=simd_width, volatile=True](
+            idx, scalar - this.data.load[width=simd_width, volatile=True](idx)
+        )
+
+    @parameter
     fn mul_by_scalar[simd_width: Int](idx: Int):
         out.data.store[width=simd_width, volatile=True](
             idx, this.data.load[width=simd_width, volatile=True](idx) * scalar
@@ -314,12 +323,37 @@ fn __tensor_op_scalar__[
             ),
         )
 
+    @parameter
+    fn div_by_factor[simd_width: Int](idx: Int):
+        out.data.store[width=simd_width](
+            idx,
+            this.data.load[width=simd_width, volatile=True](idx).__truediv__(
+                scalar
+            ),
+        )
+
+    @parameter
+    fn divide_scalar[simd_width: Int](idx: Int):
+        out.data.store[width=simd_width](
+            idx,
+            this.data.load[width=simd_width, volatile=True](idx).__rtruediv__(
+                scalar
+            ),
+        )
+
     if op == MulScalar:
         vectorize[mul_by_scalar, simdwidthof[dtype]()](out.numels())
     elif op == AddScalar:
         vectorize[add_scalar, simdwidthof[dtype]()](out.numels())
     elif op == SubtractScalar:
         vectorize[subtract_scalar, simdwidthof[dtype]()](out.numels())
+    elif op == SubtractFromScalar:
+        vectorize[subtract_from_scalar, simdwidthof[dtype]()](out.numels())
+    elif op == DivideByScalar:
+        vectorize[div_by_factor, simdwidthof[dtype]()](out.numels())
+    elif op == DivideScalar:
+        vectorize[divide_scalar, simdwidthof[dtype]()](out.numels())
+
     elif op == Power:
         vectorize[powered_by_scalar, simdwidthof[dtype]()](out.numels())
 

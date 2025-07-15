@@ -3,8 +3,10 @@ from intlist import IntList
 from os import abort
 from memory import Pointer
 
+
 fn main():
     pass
+
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
     var shape: Pointer[Shape, origin]
@@ -139,7 +141,7 @@ struct Shape(
         axes[axis] = extent
         return Shape(axes)
 
-    _="""fn drop_axis(self, axis: Int) -> Shape:
+    fn drop_axis(self, axis: Int) -> Shape:
         if axis < 0 or axis >= self.ndim:
             abort(
                 "Shape → drop_axis: Invalid axis: "
@@ -151,7 +153,7 @@ struct Shape(
             shape = self
             return shape
         axes = self.intlist()[:axis] + self.intlist()[axis + 1 :]
-        return Shape(axes)"""
+        return Shape(axes)
 
     @staticmethod
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
@@ -241,7 +243,10 @@ struct Shape(
 
     fn permute(self, axes: IntList) -> Self:
         if not len(axes) == len(self):
-            abort("Shape -> permute: axes length not equal to shape's dimension count")
+            abort(
+                "Shape -> permute: axes length not equal to shape's dimension"
+                " count"
+            )
         result = IntList.with_capacity(len(axes))
         for axis in axes:
             result.append(self[axis])
