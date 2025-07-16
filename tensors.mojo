@@ -791,12 +791,6 @@ from operators import (
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable
 ):
-    alias Opcode = Int
-    alias GradTensor = Tensor[dtype]
-    alias GradOutputs = List[(Ancestor[dtype], Self.GradTensor, Self.Opcode)]
-    alias BackwardFn = fn (
-        gradients: Self.GradTensor
-    ) escaping -> Self.GradOutputs
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
@@ -806,6 +800,12 @@ struct Tensor[dtype: DType = DType.float32](
     var requires_grad: Bool
     var grad: UnsafePointer[Self]
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
+    alias Opcode = Int
+    alias GradTensor = Tensor[dtype]
+    alias GradOutputs = List[(Ancestor[dtype], Self.GradTensor, Self.Opcode)]
+    alias BackwardFn = fn (
+        gradients: Self.GradTensor
+    ) escaping -> Self.GradOutputs
     var grad_fn: UnsafePointer[Self.BackwardFn]
 
     fn gradients(self) -> UnsafePointer[Self]:
