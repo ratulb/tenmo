@@ -369,6 +369,8 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             The number of elements in the array.
         """
         return self.size
+    fn is_empty(self) -> Bool:
+        return len(self) == 0
 
     fn __eq__(self: IntList, other: IntList) -> Bool:
         if len(self) != len(other):
@@ -676,4 +678,7 @@ struct ZipIterator[
 
 
 fn main() raises:
-    print("Go in beauty!")
+    l = IntList.Empty
+    print(l.is_empty())
+    l.prepend(2)
+    print(l.is_empty())
