@@ -764,7 +764,7 @@ from shapes import Shape
 from intlist import IntList
 from views import TensorView
 from strides import Strides
-from shared import TensorLike
+from shared import Ancestor
 from common_utils import log_debug, variadic1or2, is_null
 from operators import (
     __tensor_op_tensor__,
@@ -793,7 +793,7 @@ struct Tensor[dtype: DType = DType.float32](
 ):
     alias Opcode = Int
     alias GradTensor = Tensor[dtype]
-    alias GradOutputs = List[(TensorLike[dtype], Self.GradTensor, Self.Opcode)]
+    alias GradOutputs = List[(Ancestor[dtype], Self.GradTensor, Self.Opcode)]
     alias BackwardFn = fn (
         gradients: Self.GradTensor
     ) escaping -> Self.GradOutputs
@@ -827,7 +827,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.seed_grad(seed_tensor)
 
         visited = IntList.Empty
-        stack = [self.into_tensorlike()]
+        stack = [self.into_ancestor()]
 
         while stack:
             node = stack.pop()
@@ -905,8 +905,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return True
 
-    fn into_tensorlike(self) -> TensorLike[dtype]:
-        return TensorLike[dtype](self.address())
+    fn into_ancestor(self) -> Ancestor[dtype]:
+        return Ancestor[dtype](self.address())
 
     fn backward_fn(self) -> UnsafePointer[Self.BackwardFn]:
         return self.grad_fn
@@ -1819,7 +1819,7 @@ struct Tensor[dtype: DType = DType.float32](
                     dtype, DivideScalar
                 ](base_squared, 1.0)
                 var grad = (gradients * scalar) * base_squared_reciprocal
-                return [(self.into_tensorlike(), grad, SubtractTensor)]
+                return [(self.into_ancestor(), grad, SubtractTensor)]
 
             out.capture_grad_fn(grad_fn)
 
@@ -1837,7 +1837,7 @@ struct Tensor[dtype: DType = DType.float32](
             ) -> Self.GradOutputs:
                 # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
                 var scaled = gradients / scalar
-                return [(self.into_tensorlike(), scaled, AddTensor)]
+                return [(self.into_ancestor(), scaled, AddTensor)]
 
             out.capture_grad_fn(grad_fn)
 
@@ -1855,7 +1855,7 @@ struct Tensor[dtype: DType = DType.float32](
                 gradients: Self.GradTensor,
             ) -> Self.GradOutputs:
                 # Gradient of addition is 1 → just pass through incoming grad
-                return [(self.into_tensorlike(), gradients, AddTensor)]
+                return [(self.into_ancestor(), gradients, AddTensor)]
 
             out.capture_grad_fn(grad_fn)
 
@@ -1878,7 +1878,7 @@ struct Tensor[dtype: DType = DType.float32](
                 scaled_gradients = __tensor_op_scalar__[dtype, MulScalar](
                     gradients, scalar
                 )
-                return [(self.into_tensorlike(), scaled_gradients, AddTensor)]
+                return [(self.into_ancestor(), scaled_gradients, AddTensor)]
 
             out.capture_grad_fn(grad_fn)
 
@@ -1912,7 +1912,7 @@ struct Tensor[dtype: DType = DType.float32](
                 product = __tensor_op_tensor__[dtype, MulTensor](
                     gradients, local_grad
                 )
-                return [(self.into_tensorlike(), product, AddTensor)]
+                return [(self.into_ancestor(), product, AddTensor)]
 
             out.capture_grad_fn(grad_fn)
 
@@ -1925,7 +1925,7 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn(
                 gradients: Self.GradTensor,
             ) -> Self.GradOutputs:
-                return [(self.into_tensorlike(), gradients, SubtractTensor)]
+                return [(self.into_ancestor(), gradients, SubtractTensor)]
 
             out.capture_grad_fn(grad_fn)
         return out
@@ -1938,7 +1938,7 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn(
                 gradients: Self.GradTensor,
             ) -> Self.GradOutputs:
-                return [(self.into_tensorlike(), gradients, AddTensor)]
+                return [(self.into_ancestor(), gradients, AddTensor)]
 
             out.capture_grad_fn(grad_fn)
         return out
@@ -1987,7 +1987,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                 # Update base accumulator
                 out.base.init_pointee_move(reshaped^)
-                return [(self.into_tensorlike(), new_contrib, AddTensor)]
+                return [(self.into_ancestor(), new_contrib, AddTensor)]
 
             out.capture_grad_fn(grad_fn)
 
@@ -2013,7 +2013,7 @@ struct Tensor[dtype: DType = DType.float32](
                 fn scalar_grad_fn(
                     gradients: Self.GradTensor,
                 ) -> Self.GradOutputs:
-                    return [(self.into_tensorlike(), gradients, AddTensor)]
+                    return [(self.into_ancestor(), gradients, AddTensor)]
 
                 scalar_out.capture_grad_fn(scalar_grad_fn)
             return scalar_out
@@ -2090,7 +2090,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                 return [
                     (
-                        self.address()[].into_tensorlike(),
+                        self.address()[].into_ancestor(),
                         grad_contrib,
                         AddTensor,
                     )
@@ -2126,7 +2126,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                     return [
                         (
-                            self.address()[].into_tensorlike(),
+                            self.address()[].into_ancestor(),
                             grad_contrib,
                             AddTensor,
                         )
@@ -2147,7 +2147,7 @@ struct Tensor[dtype: DType = DType.float32](
                 # Broadcast and divide
                 broadcasted = expanded.broadcast_to(self.address()[].shape)
                 scaled = broadcasted / Scalar[dtype](count)
-                return [(self.address()[].into_tensorlike(), scaled, AddTensor)]
+                return [(self.address()[].into_ancestor(), scaled, AddTensor)]
 
             out.capture_grad_fn(grad_fn)
 
@@ -2220,7 +2220,7 @@ struct Tensor[dtype: DType = DType.float32](
                 if self.address()[].requires_grad:
                     grad_outputs.append(
                         (
-                            self.address()[].into_tensorlike(),
+                            self.address()[].into_ancestor(),
                             gradients,
                             AddTensor,
                         )
@@ -2229,7 +2229,7 @@ struct Tensor[dtype: DType = DType.float32](
                 if other.address()[].requires_grad:
                     grad_outputs.append(
                         (
-                            other.address()[].into_tensorlike(),
+                            other.address()[].into_ancestor(),
                             gradients,
                             AddTensor,
                         )
@@ -2268,7 +2268,7 @@ struct Tensor[dtype: DType = DType.float32](
                 if self.address()[].requires_grad:
                     grad_outputs.append(
                         (
-                            self.address()[].into_tensorlike(),
+                            self.address()[].into_ancestor(),
                             gradients,
                             AddTensor,
                         )
@@ -2277,7 +2277,7 @@ struct Tensor[dtype: DType = DType.float32](
                 if other.address()[].requires_grad:
                     grad_outputs.append(
                         (
-                            other.address()[].into_tensorlike(),
+                            other.address()[].into_ancestor(),
                             gradients,
                             SubtractTensor,
                         )
@@ -2307,7 +2307,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                     grad_outputs.append(
                         (
-                            self.address()[].into_tensorlike(),
+                            self.address()[].into_ancestor(),
                             grad_contrib,
                             AddTensor,
                         )
@@ -2319,7 +2319,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                     grad_outputs.append(
                         (
-                            other.address()[].into_tensorlike(),
+                            other.address()[].into_ancestor(),
                             grad_contrib,
                             AddTensor,
                         )
@@ -2366,7 +2366,7 @@ struct Tensor[dtype: DType = DType.float32](
                     other.address()[].requires_grad = requires_grad_original
                     grad_outputs.append(
                         (
-                            self.address()[].into_tensorlike(),
+                            self.address()[].into_ancestor(),
                             product,
                             AddTensor,
                         )
@@ -2381,7 +2381,7 @@ struct Tensor[dtype: DType = DType.float32](
                     self.address()[].requires_grad = requires_grad_original
                     grad_outputs.append(
                         (
-                            other.address()[].into_tensorlike(),
+                            other.address()[].into_ancestor(),
                             product,
                             AddTensor,
                         )
@@ -2410,7 +2410,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                     grad_outputs.append(
                         (
-                            self.address()[].into_tensorlike(),
+                            self.address()[].into_ancestor(),
                             grad_self,
                             tensor_op_first,
                         )
@@ -2422,7 +2422,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                     grad_outputs.append(
                         (
-                            other.address()[].into_tensorlike(),
+                            other.address()[].into_ancestor(),
                             grad_other,
                             tensor_op_second,
                         )

@@ -7,7 +7,7 @@ fn main():
     print("Starting of the begining!")
 
 
-struct TensorLike[dtype: DType](Copyable & Movable):
+struct Ancestor[dtype: DType](Copyable & Movable):
     alias TensorAddress = UnsafePointer[Tensor[dtype]]
     alias ViewAddress = UnsafePointer[TensorView[dtype]]
 
@@ -97,13 +97,6 @@ struct TensorLike[dtype: DType](Copyable & Movable):
         else:
             return self.view_address[].id()
 
-    fn inner_address(self) -> String:
-        if self.kind == 0:
-            return String(self.tensor_address)
-        else:
-            return String(self.view_address)
-
-
     fn shape(self) -> Shape:
         if self.kind == 0:
             return self.tensor_address[].shape
@@ -135,8 +128,3 @@ struct TensorLike[dtype: DType](Copyable & Movable):
             ._requires_grad()
         )
 
-    _ = """fn invoke_grad_fn(self, verbose: Bool = False) raises:
-        if self.is_view():
-            self.view().invoke_grad_fn(verbose)
-        else:
-            self.tensor_address[].invoke_grad_fn(verbose)"""
