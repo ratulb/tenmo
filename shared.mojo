@@ -98,6 +98,13 @@ struct TensorLike[dtype: DType](Copyable & Movable):
         else:
             return self.view_address[].id()
 
+    fn inner_address(self) -> String:
+        if self.kind == 0:
+            return String(self.tensor_address)
+        else:
+            return String(self.view_address)
+
+
     fn shape(self) -> Shape:
         if self.kind == 0:
             return self.tensor_address[].shape

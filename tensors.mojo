@@ -1,5 +1,5 @@
 # %s/^\(fn test_\(.*\)() raises:\)$/&\r    print("test_\2")/
-from testing import assert_true
+from testing import assert_true, assert_raises
 
 
 fn main() raises:
@@ -45,6 +45,127 @@ fn main() raises:
     test_scalar_sum_custom_grad()
     test_scalar_sum_keepdims_true()
     test_scalar_sum_explicit_axes()
+
+    test_add_scalar_scalar()
+    test_add_scalar_1d()
+    test_add_1d_1d()
+    test_add_2d_scalar()
+    test_add_2d_1d()
+    test_add_3d_1d()
+    test_add_3d_2d()
+    test_add_broadcast_degenerate()
+    test_add_mismatch_shapes()
+
+
+fn test_add_scalar_scalar() raises:
+    print("test_add_scalar_scalar")
+    var a = Tensor.scalar(2.0, requires_grad=True)
+    var b = Tensor.scalar(3.0, requires_grad=True)
+    var c = a + b
+    assert_true(c.item() == 5.0, "Scalar addition failed")
+    c.backward()
+    assert_true(a.grad[].item() == 1.0)
+    assert_true(b.grad[].item() == 1.0)
+
+fn test_add_scalar_1d() raises:
+    print("test_add_scalar_1d")
+    var a = Tensor.scalar(2.0, requires_grad=True)
+    var b = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var c = a + b
+    assert_true(c.all_close(Tensor.d1([3.0, 4.0, 5.0])))
+    c.sum().backward()
+    a.print()
+    a.grad[].print()
+    b.grad[].print()
+    #assert_true(a.grad[].item() == 3.0, "a broadcast to 3 elements")
+    #assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+
+fn test_add_1d_1d() raises:
+    print("test_add_1d_1d")
+    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var b = Tensor.d1([4.0, 5.0, 6.0], requires_grad=True)
+    var c = a + b
+    assert_true(c.all_close(Tensor.d1([5.0, 7.0, 9.0])))
+    c.sum().backward()
+    #assert_true(a.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    #assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+
+
+fn test_add_2d_scalar() raises:
+    print("test_add_2d_scalar")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor.scalar(5.0, requires_grad=True).float()
+    var c = a + b
+    assert_true(c.all_close(Tensor.d2([[6.0, 7.0], [8.0, 9.0]])))
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.grad[].item() == 4.0, "b broadcast to 4 elements")
+
+
+fn test_add_2d_1d() raises:
+    print("test_add_2d_1d")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor.d1([10.0, 20.0], requires_grad=True).float()
+    var c = a + b  # b gets broadcasted to both rows
+    assert_true(c.all_close(Tensor.d2([[11.0, 22.0], [13.0, 24.0]])))
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.grad[].all_close(Tensor.d1([2.0, 2.0]).float()))
+
+
+fn test_add_3d_1d() raises:
+    print("test_add_3d_1d")
+    var a = Tensor.d3([
+        [[1.0, 2.0], [3.0, 4.0]],
+        [[5.0, 6.0], [7.0, 8.0]]
+    ], requires_grad=True)
+
+    var b = Tensor.d1([10.0, 20.0], requires_grad=True).float()
+
+    var c = a + b  # shape (2, 2, 2)
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.full(a.shape, 1.0).float()))
+    assert_true(b.grad[].all_close(Tensor.d1([4.0, 4.0]).float()))
+
+
+fn test_add_3d_2d() raises:
+    print("test_add_3d_2d")
+    var a = Tensor.d3([
+        [[1.0, 2.0], [3.0, 4.0]],
+        [[5.0, 6.0], [7.0, 8.0]]
+    ], requires_grad=True)
+
+    var b = Tensor.d2([[10.0, 20.0], [30.0, 40.0]], requires_grad=True)
+
+    var c = a + b  # b gets broadcast along dim 0
+    assert_true(c.shape == a.shape)
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.full(a.shape, 1.0).float()))
+    assert_true(b.grad[].all_close(Tensor.full(b.shape, 2.0).float()))  # repeated twice
+
+
+fn test_add_broadcast_degenerate() raises:
+    print("test_add_broadcast_degenerate")
+    var a = Tensor.d3([
+        [[1.0], [2.0]],
+        [[3.0], [4.0]]
+    ], requires_grad=True)  # Shape (2, 2, 1)
+
+    var b = Tensor.d1([5.0], requires_grad=True).float()  # Shape (1,)
+
+    var c = a + b
+    assert_true(c.shape == a.shape)
+    c.sum().backward()
+    assert_true(b.grad[].item() == 4.0, "Broadcasted across 4 elements")
+
+
+fn test_add_mismatch_shapes() raises:
+    print("test_add_mismatch_shapes")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var b = Tensor.d2([[1.0], [2.0], [3.0]])  # Shape mismatch
+
+    with assert_raises():
+        _ = a + b
 
 
 fn test_mean_scalar() raises:
@@ -512,7 +633,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn capture_grad_fn(mut self, grad_fn: Self.BackwardFn):
         self.grad_fn = UnsafePointer[Self.BackwardFn].alloc(1)
-        self.grad_fn.init_pointee_copy(grad_fn)
+        self.grad_fn.init_pointee_move(grad_fn)
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         if not self.requires_grad:
@@ -525,15 +646,18 @@ struct Tensor[dtype: DType = DType.float32](
             return
         self.seed_grad(seed_tensor)
 
-        visited = IntList.Empty
+        visited = Set[Int]()
         stack = [self.into_tensorlike()]
 
         while stack:
             node = stack.pop()
+            print("visiting node", node.inner_id(), "has grad_fn:", node.has_grad_fn())
+
             if node.has_grad_fn():
                 for ancestor, local_grad, opcode in node.grad_fn()[](
                     node.gradients()[]
                 ):
+                    print("Inside for each ancestor", ancestor.inner_id())
                     if opcode == AddTensor:
                         ancestor.update_grad[AddTensor](local_grad)
                     elif opcode == SubtractTensor:
@@ -541,7 +665,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                     if ancestor.inner_id() not in visited:
                         stack.append(ancestor)
-                        visited.append(ancestor.inner_id())
+                        visited.add(ancestor.inner_id())
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -1756,15 +1880,20 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
+
+        print("Inside sum fn user self.id() and got grad_fn?: ", self.id(), self.has_grad_fn())
         return self.sum(IntList.new(axes), keepdims)
 
     fn sum(self: Self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
+
         _axes = Self.validate_and_normalize_axes(self.shape, axes)
         requires_grad = self.requires_grad
+        print("Entered sum fn self.id(), requires_grad and got grad_fn?: ", self.id(), requires_grad, self.has_grad_fn())
         rank = self.shape.rank()
 
         # Early scalar return - already correct
         if rank == 0:
+            print("Have we entered scalar territory?")
             scalar_out = Tensor[dtype].zeros(
                 Shape.Void, requires_grad=self.requires_grad
             )
@@ -1818,12 +1947,15 @@ struct Tensor[dtype: DType = DType.float32](
                 out[out_idx] = summ
 
         if requires_grad:
+            print("In sum requires_grad block")
 
             fn grad_fn(
                 gradients: Self.GradTensor,
             ) -> Self.GradOutputs:
-                this = self.address()[]
-                original_shape = this.shape
+                print("Inside sum grad fn self.id(): ", self.id())
+                #this = self.address()[]
+                print("Inside sum grad fn self.address()[]: ", self.address()[].id())
+                original_shape = self.address()[].shape
                 var grad_contrib: Tensor[dtype]
 
                 # Handle scalar gradient case (sum reduced to scalar)
@@ -1851,9 +1983,13 @@ struct Tensor[dtype: DType = DType.float32](
                         # keepdims=True: shapes match except for broadcasting
                         grad_contrib = gradients.broadcast_to(original_shape)
                 grad_contrib.requires_grad = False
-                return [(this.into_tensorlike(), grad_contrib, AddTensor)]
+                tl = self.address()[].into_tensorlike()
 
-            out.capture_grad_fn(grad_fn)
+                print("Returning from sum grad_fn: self.address()[].id(), tl.id(), tl.inner_id()", self.address()[].id(), tl.id(), tl.inner_id())
+                return [(tl, grad_contrib, AddTensor)]
+            print("Inside sum - has self.id() got a grad_fn: ", self.id(), self.has_grad_fn())
+            var function: Self.BackwardFn = grad_fn
+            out.capture_grad_fn(function^)
             out.add_ancestry(self)
 
         return out
@@ -1950,6 +2086,138 @@ struct Tensor[dtype: DType = DType.float32](
         # Sort and deduplicate
         normalized.sort_and_deduplicate()
         return normalized
+
+    fn __add__(self, other: Self) -> Tensor[dtype]:
+        if self.address() == other.address():
+            return self.__mul__(2)
+        if not self.broadcastable(other):
+            abort(
+                "__add__ → Dimension mismatch: "
+                + self.shape.__str__()
+                + " <=> "
+                + other.shape.__str__()
+            )
+
+        if self.shape != other.shape:
+            return self.broadcast_operation[Add, AddTensor, AddTensor](
+                other,
+            )
+
+        var out = __tensor_op_tensor__[dtype, AddTensor](self, other)
+
+        if self.requires_grad or other.requires_grad:
+            fn grad_fn(
+                gradients: Self.GradTensor,
+            ) -> Self.GradOutputs:
+                grad_outputs = Self.GradOutputs()
+
+                #out_grad = out.address()[].grad[]
+                if self.address()[].requires_grad:
+                    grad_outputs.append(
+                        (self.address()[].into_tensorlike(), gradients, AddTensor)
+                    )
+
+                    #self.address()[].update_grad[AddTensor](out_grad)
+                if other.address()[].requires_grad:
+                     grad_outputs.append(
+                        (other.address()[].into_tensorlike(), gradients, AddTensor)
+                    )
+                   #other.address()[].update_grad[AddTensor](out_grad)
+                return grad_outputs
+
+            var function: Self.BackwardFn = grad_fn
+            out.capture_grad_fn(function^)
+
+            out.add_ancestry(self, other)
+
+        return out
+
+    fn broadcast_operation[
+            element_wise_op: Int, tensor_op_first: Int, tensor_op_second: Int
+        ](self, other: Self) -> Tensor[dtype]:
+
+        var result = self.broadcast_op(other, scalar_ops[dtype, element_wise_op])
+
+        if self.requires_grad or other.requires_grad:
+            var self_ptr = self.address()
+            var other_ptr = other.address()
+
+            print("Inside  broadcast add operation: self.id(), other.id()", self.id(), other.id())
+            fn grad_fn(incoming: Self.GradTensor) -> Self.GradOutputs:
+                print("Coming inside broadcast_operation")
+                #var this = self.address()[]
+                #var that = other.address()[]
+
+                var output: Self.GradOutputs = []
+
+                if self.address()[].requires_grad:
+                    var grad_self = self.address()[].backward_grad_contrib(
+                        other.address()[], incoming, False
+                    )
+                    output.append((self.address()[].into_tensorlike(), grad_self, tensor_op_first))
+
+                if other.address()[].requires_grad:
+                    var grad_other = other.address()[].backward_grad_contrib(
+                        self.address()[], incoming, False
+                    )
+                    output.append((other.address()[].into_tensorlike(), grad_other, tensor_op_second))
+
+                return output
+
+            result.capture_grad_fn(grad_fn)
+            print("→ __add__ grad_fn for result is set: ", result.grad_fn.__as_bool__())
+            print("→ __add__ result has grad_fn?: ", result.has_grad_fn())
+            print("→ __add__ result id: ", result.id())
+            print("→ __add__ self.id and other.id: ", self.id(), other.id())
+
+            result.add_ancestry(self, other)
+
+        return result
+
+
+    _="""fn broadcast_operation[
+        element_wise_op: Int, tensor_op_first: Int, tensor_op_second: Int
+    ](self, other: Self) -> Tensor[dtype]:
+        out = self.broadcast_op(other, scalar_ops[dtype, element_wise_op])
+
+        print("Coming inside broadcast_operation alright")
+        if self.requires_grad or other.requires_grad:
+            #self_ptr = self.address()
+            #that_ptr = other.address()
+
+            print("Coming inside broadcast_operation alright: ", self.requires_grad, other.requires_grad)
+            fn grad_fn(
+                gradients: Self.GradTensor,
+            ) -> Self.GradOutputs:
+                #this = self.address()[]
+                #that = other.address()[]
+                print("Coming inside gran_fn alright")
+                grad_outputs = Self.GradOutputs()
+                if self.address()[].requires_grad:
+                    # upstream_grad = out.address()[].grad[]
+                    grad_contrib = self.address()[].backward_grad_contrib(
+                        other.address()[], gradients, False
+                    )
+                    # this.update_grad[tensor_op_first](grad_contrib)
+                    grad_outputs.append(
+                        (self.address()[].into_tensorlike(), grad_contrib, tensor_op_first)
+                    )
+
+                if other.address()[].requires_grad:
+                    # upstream_grad = out.address()[].grad[]
+                    grad_contrib = other.address()[].backward_grad_contrib(
+                        self.address()[], gradients, False
+                    )
+
+                    grad_outputs.append(
+                        (other.address()[].into_tensorlike(), grad_contrib, tensor_op_second)
+                    )
+                    # that.update_grad[tensor_op_second](grad_contrib)
+                return grad_outputs
+
+            out.capture_grad_fn(grad_fn)
+            out.add_ancestry(self.address()[], other.address()[])
+        return out"""
 
     _ = """fn __add__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, AddScalar](
@@ -2055,38 +2323,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    _ = """fn broadcast_operation[
-        element_wise_op: Int, tensor_op_first: Int, tensor_op_second: Int
-    ](self, other: Self) -> Tensor[dtype]:
-        result = self.broadcast_op(other, scalar_ops[dtype, element_wise_op])
-        if self.requires_grad or other.requires_grad:
-            self_ptr = self.address()
-            that_ptr = other.address()
-
-            fn grad_fn() raises -> None:
-                this = self_ptr[]
-                that = that_ptr[]
-
-                if this.requires_grad:
-                    upstream_grad = result.address()[].grad[]
-                    grad_contrib = this.backward_grad_contrib(
-                        that, upstream_grad, False
-                    )
-
-                    this.update_grad[tensor_op_first](grad_contrib)
-
-                if that.requires_grad:
-                    upstream_grad = result.address()[].grad[]
-                    grad_contrib = that.backward_grad_contrib(
-                        this, upstream_grad, False
-                    )
-
-                    that.update_grad[tensor_op_second](grad_contrib)
-
-            result.grad_fn = Optional(grad_fn)
-            result.add_ancestry(self, other)
-        return result
-
     fn backward_grad_contrib(
         self,
         other: Tensor[dtype],
@@ -2094,14 +2330,15 @@ struct Tensor[dtype: DType = DType.float32](
         do_multiply: Bool,
     ) -> Tensor[dtype]:
         var grad_contrib: Tensor[dtype]
-
+        print("Coming inside backward_grad_contrib")
         if upstream_grad.shape == Shape.Void:
             grad_contrib = Tensor[dtype].full(
                 self.shape, upstream_grad.item(), requires_grad=False
             )
         else:
             grad_contrib = (
-                upstream_grad * other if do_multiply else upstream_grad
+                # upstream_grad * other if do_multiply else upstream_grad
+                upstream_grad
             )
             if grad_contrib.shape != self.shape:
                 axes = self.broadcast_mask(grad_contrib.shape).indices_of(1)
@@ -2112,7 +2349,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return grad_contrib
 
-    fn broadcast_mul(
+    _ = """fn broadcast_mul(
         self: Self,
         other: Self,
     ) -> Tensor[dtype]:
@@ -2141,37 +2378,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    fn __add__(self, other: Self) -> Tensor[dtype]:
-        if self.address() == other.address():
-            return self.__mul__(2)
-        if not self.broadcastable(other):
-            abort(
-                "__add__ → Dimension mismatch: "
-                + self.shape.__str__()
-                + " <=> "
-                + other.shape.__str__()
-            )
-
-        if self.shape != other.shape:
-            return self.broadcast_operation[Add, AddTensor, AddTensor](
-                other,
-            )
-
-        var out = __tensor_op_tensor__[dtype, AddTensor](self, other)
-
-        if self.requires_grad or other.requires_grad:
-
-            fn grad_fn() raises -> None:
-                out_grad = out.address()[].grad[]
-                if self.address()[].requires_grad:
-                    self.address()[].update_grad[AddTensor](out_grad)
-                if other.address()[].requires_grad:
-                    other.address()[].update_grad[AddTensor](out_grad)
-
-            out.grad_fn = Optional(grad_fn)
-            out.add_ancestry(self, other)
-
-        return out
 
 
     # Element wise multiplication of two tensors
