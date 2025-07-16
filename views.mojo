@@ -4,9 +4,8 @@ from intlist import IntList
 from strides import Strides
 from os import abort
 from shared import TensorLike
-from ancestry import Ancestors
-from graphs import Graph
-
+fn main():
+    pass
 
 struct TensorView[dtype: DType = DType.float32](
     Copyable & Movable
@@ -46,13 +45,13 @@ struct TensorView[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return self.offset == 0 and self.strides.is_contiguous(self.shape)
 
-    fn backward(self, start_grad: Scalar[dtype] = 1.0):
+    _="""fn backward(self, start_grad: Scalar[dtype] = 1.0):
         graph = Graph[dtype]()
         graph.walk_backward(self.into_tensorlike(), start_grad)
 
     fn backward(self, with_tensor: Tensor[dtype]):
         graph = Graph[dtype]()
-        graph.walk_backward(self.into_tensorlike(), with_tensor)
+        graph.walk_backward(self.into_tensorlike(), with_tensor)"""
 
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](self.address())
@@ -111,9 +110,6 @@ struct TensorView[dtype: DType = DType.float32](
     fn into_tensor(self) -> Tensor[dtype]:
         abort("TensorView -> into_tensor(self) - not supported")
         return Tensor[dtype]([])
-
-    fn ancestry(self) -> Ancestors[dtype]:
-        return Ancestors[dtype].untracked()
 
     fn seed_grad(self, value: Scalar[dtype]):
         self.base_tensor[].seed_grad(value)

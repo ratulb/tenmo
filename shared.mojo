@@ -1,7 +1,6 @@
 from tensors import Tensor
 from shapes import Shape
 from views import TensorView
-from ancestry import Ancestors
 
 
 fn main():
@@ -110,12 +109,6 @@ struct TensorLike[dtype: DType](Copyable & Movable):
             return self.tensor_address[].shape
         else:
             return self.view_address[].shape
-
-    fn ancestry(self) -> Ancestors[dtype]:
-        return (
-            self.tensor_address[].ancestry() if self.kind
-            == 0 else self.view_address[].ancestry()
-        )
 
     fn seed_grad(self, value: Scalar[dtype]):
         if self.is_tensor():
