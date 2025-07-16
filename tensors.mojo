@@ -908,14 +908,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](self.address())
 
-    _ = """fn backward(self, start_grad: Scalar[dtype] = 1.0):
-        graph = Graph[dtype]()
-        graph.walk_backward(self.into_tensorlike(), start_grad)
-
-    fn backward(self, with_tensor: Tensor[dtype]):
-        graph = Graph[dtype]()
-        graph.walk_backward(self.into_tensorlike(), with_tensor)"""
-
     fn backward_fn(self) -> UnsafePointer[Self.BackwardFn]:
         return self.grad_fn
 
@@ -927,16 +919,6 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn id(self) -> Int:
         return Int(self.address())
-
-    _ = """fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:
-        if self.grad_fn:
-            if verbose:
-                print("\nInvoking  grad_fn\n")
-            self.grad_fn.value()()
-        else:
-            if verbose:
-                print("\nNo grad_fn\n")
-            pass"""
 
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
         if self.shape.ndim == 0 and len(indices) != 0:  # Tensor with Shape ()
@@ -1006,13 +988,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = other.base
         self.grad_fn = other.grad_fn
         self.init_grad()
-
-    _ = """fn copy(self) -> Self:
-        result = Tensor[dtype](self.shape, requires_grad=self.requires_grad)
-        memcpy(result.data, self.data, self.numels())
-        if result.requires_grad:
-            memcpy(result.grad, self.grad, self.numels())
-        return result"""
 
     fn init_grad(mut self):
         if self.requires_grad and self.grad.__as_bool__() == False:
@@ -2326,18 +2301,10 @@ struct Tensor[dtype: DType = DType.float32](
             ) -> Self.GradOutputs:
                 grad_outputs = Self.GradOutputs()
 
-                # fn grad_fn() raises -> None:
-                # this = self.address()[]
-                # that = other.address()[]
-                # output = result.address()[]
-                # upstream_grad = output.grad[]
-
                 if self.address()[].requires_grad:
-                    # if this.requires_grad:
                     grad_contrib = self.address()[].backward_grad_contrib(
                         other.address()[], gradients, True
                     )
-                    # this.update_grad[AddTensor](grad_contrib)
                     grad_outputs.append(
                         (
                             self.address()[].into_tensorlike(),
@@ -2360,12 +2327,6 @@ struct Tensor[dtype: DType = DType.float32](
                 return grad_outputs
 
             out.capture_grad_fn(grad_fn)
-
-            _ = """if that.requires_grad:
-                    grad_contrib = that.backward_grad_contrib(
-                        this, upstream_grad, True
-                    )
-                    that.update_grad[AddTensor](grad_contrib)"""
 
         return out
 
@@ -2411,8 +2372,6 @@ struct Tensor[dtype: DType = DType.float32](
                         )
                     )
 
-                    # self.address()[].update_grad[AddTensor](product)
-
                 if other.address()[].requires_grad:
                     requires_grad_original = self.address()[].requires_grad
                     self.address()[].requires_grad = False
@@ -2420,7 +2379,6 @@ struct Tensor[dtype: DType = DType.float32](
                         gradients, self.address()[]
                     )
                     self.address()[].requires_grad = requires_grad_original
-                    # other.address()[].update_grad[AddTensor](product)
                     grad_outputs.append(
                         (
                             other.address()[].into_tensorlike(),
@@ -2475,64 +2433,6 @@ struct Tensor[dtype: DType = DType.float32](
             result.capture_grad_fn(grad_fn)
 
         return result
-
-    _ = """fn broadcast_operation[
-        element_wise_op: Int, tensor_op_first: Int, tensor_op_second: Int
-    ](self, other: Self) -> Tensor[dtype]:
-        out = self.broadcast_op(other, scalar_ops[dtype, element_wise_op])
-
-        print("Coming inside broadcast_operation alright")
-        if self.requires_grad or other.requires_grad:
-            #self_ptr = self.address()
-            #that_ptr = other.address()
-
-            print("Coming inside broadcast_operation alright: ", self.requires_grad, other.requires_grad)
-            fn grad_fn(
-                gradients: Self.GradTensor,
-            ) -> Self.GradOutputs:
-                #this = self.address()[]
-                #that = other.address()[]
-                print("Coming inside gran_fn alright")
-                grad_outputs = Self.GradOutputs()
-                if self.address()[].requires_grad:
-                    # upstream_grad = out.address()[].grad[]
-                    grad_contrib = self.address()[].backward_grad_contrib(
-                        other.address()[], gradients, False
-                    )
-                    # this.update_grad[tensor_op_first](grad_contrib)
-                    grad_outputs.append(
-                        (self.address()[].into_tensorlike(), grad_contrib, tensor_op_first)
-                    )
-
-                if other.address()[].requires_grad:
-                    # upstream_grad = out.address()[].grad[]
-                    grad_contrib = other.address()[].backward_grad_contrib(
-                        self.address()[], gradients, False
-                    )
-
-                    grad_outputs.append(
-                        (other.address()[].into_tensorlike(), grad_contrib, tensor_op_second)
-                    )
-                    # that.update_grad[tensor_op_second](grad_contrib)
-                return grad_outputs
-
-            out.capture_grad_fn(grad_fn)
-        return out"""
-
-    _ = """fn __add__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
-        var out = __tensor_op_scalar__[dtype, AddScalar](
-            self,
-            scalar,
-        )
-        if self.requires_grad:
-
-            fn grad_fn() raises -> None:
-                out_grad = out.address()[].grad[]
-                self.address()[].update_grad[AddTensor](out_grad)
-
-            out.grad_fn = Optional(grad_fn)
-
-        return out"""
 
     fn __iadd__(self, value: Scalar[dtype]):
         if self.is_leaf():
