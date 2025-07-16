@@ -61,6 +61,71 @@ fn main() raises:
     test_sub_scalar_tensor()
     test_sub_tensor_scalar()
     test_sub_broadcast_col()
+    # __mul__
+    test_mul_broadcast_col()
+    test_mul_broadcast_row()
+    test_mul_scalar_tensor()
+    test_mul_tensor_scalar()
+    test_mul_same_shape()
+
+
+fn test_mul_same_shape() raises:
+    print("test_mul_same_shape")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor.d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
+    var c = a * b
+    assert_true(c.all_close(Tensor.d2([[5.0, 12.0], [21.0, 32.0]])))
+    c.sum().backward()
+    assert_true(a.grad[].all_close(b))
+    assert_true(b.grad[].all_close(a))
+
+
+fn test_mul_tensor_scalar() raises:
+    print("test_mul_tensor_scalar")
+    var a = Tensor.d2([[2.0, 4.0], [6.0, 8.0]], requires_grad=True)
+    var b = Tensor.scalar(3, requires_grad=True)
+    var c = a * b
+    assert_true(c.all_close(Tensor.d2([[6.0, 12.0], [18.0, 24.0]])))
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d2([[3.0, 3.0], [3.0, 3.0]])))
+    assert_true(b.grad[].item() == 20.0)  # 2+4+6+8 = 20
+
+
+fn test_mul_scalar_tensor() raises:
+    print("test_mul_scalar_tensor")
+    var a = Tensor.scalar(5, requires_grad=True)
+    var b = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var c = a * b
+    assert_true(c.all_close(Tensor.d2([[5.0, 10.0], [15.0, 20.0]])))
+    c.sum().backward()
+    assert_true(a.grad[].item() == 10.0)  # 1+2+3+4
+    assert_true(b.grad[].all_close(Tensor.d2([[5.0, 5.0], [5.0, 5.0]])))
+
+
+fn test_mul_broadcast_row() raises:
+    print("test_mul_broadcast_row")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor.d1([10, 20], requires_grad=True)
+    var c = a * b  # row-wise broadcast
+    assert_true(c.all_close(Tensor.d2([[10.0, 40.0], [30.0, 80.0]])))
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d2([[10.0, 20.0], [10.0, 20.0]])))
+    assert_true(b.grad[].all_close(Tensor.d1([4, 6])))  # col sums: [1+3, 2+4]
+
+
+fn test_mul_broadcast_col() raises:
+    print("test_mul_broadcast_col")
+    var a = Tensor.d2([[1.0], [2.0], [3.0]], requires_grad=True)  # shape [3,1]
+    var b = Tensor.d2([[4.0, 5.0]], requires_grad=True)  # shape [1,2]
+    var c = a * b  # broadcast to [3,2]
+    assert_true(c.all_close(Tensor.d2([[4.0, 5.0], [8.0, 10.0], [12.0, 15.0]])))
+    c.sum().backward()
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[9.0], [9.0], [9.0]]))
+    )  # sum along row for each col
+    assert_true(
+        b.grad[].all_close(Tensor.d2([[6.0, 6.0]]))
+    )  # sum along col for each row
 
 
 fn test_sub_same_shape() raises:
@@ -1143,6 +1208,35 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[negate_elems, simdwidthof[dtype]()](result.numels())
         return result
 
+    fn __invert__(self: Tensor[DType.bool]) -> Tensor[DType.bool]:
+        result = Tensor[DType.bool](self.shape)
+
+        @parameter
+        fn invert_elems[simd_width: Int](idx: Int):
+            result.data.store[width=simd_width](
+                idx, ~self.data.load[width=simd_width](idx)
+            )
+
+        vectorize[invert_elems, simdwidthof[DType.bool]()](result.numels())
+        return result
+
+    fn __abs__(self) -> Tensor[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Tensor → __abs__ is for numeric data types only",
+        ]()
+
+        result = Tensor[dtype](self.shape, requires_grad=self.requires_grad)
+
+        @parameter
+        fn absolute_value[simd_width: Int](idx: Int):
+            result.data.store[width=simd_width](
+                idx, self.data.load[width=simd_width](idx).__abs__()
+            )
+
+        vectorize[absolute_value, simdwidthof[dtype]()](result.numels())
+        return result
+
     fn __ne__(self, other: Self) -> Tensor[DType.bool]:
         if self.shape != other.shape:
             abort(
@@ -1994,7 +2088,6 @@ struct Tensor[dtype: DType = DType.float32](
                         # keepdims=True: shapes match except for broadcasting
                         grad_contrib = gradients.broadcast_to(original_shape)
                 grad_contrib.requires_grad = False
-                tl = self.address()[].into_tensorlike()
 
                 return [
                     (
@@ -2188,6 +2281,127 @@ struct Tensor[dtype: DType = DType.float32](
                             other.address()[].into_tensorlike(),
                             gradients,
                             SubtractTensor,
+                        )
+                    )
+                return grad_outputs
+
+            out.capture_grad_fn(grad_fn)
+
+        return out
+
+    fn broadcast_mul(
+        self: Self,
+        other: Self,
+    ) -> Tensor[dtype]:
+        out = self.broadcast_op(other, scalar_ops[dtype, Multiply])
+        requires_grad = self.requires_grad or other.requires_grad
+        if requires_grad:
+
+            fn grad_fn(
+                gradients: Self.GradTensor,
+            ) -> Self.GradOutputs:
+                grad_outputs = Self.GradOutputs()
+
+                # fn grad_fn() raises -> None:
+                # this = self.address()[]
+                # that = other.address()[]
+                # output = result.address()[]
+                # upstream_grad = output.grad[]
+
+                if self.address()[].requires_grad:
+                    # if this.requires_grad:
+                    grad_contrib = self.address()[].backward_grad_contrib(
+                        other.address()[], gradients, True
+                    )
+                    # this.update_grad[AddTensor](grad_contrib)
+                    grad_outputs.append(
+                        (
+                            self.address()[].into_tensorlike(),
+                            grad_contrib,
+                            AddTensor,
+                        )
+                    )
+                if other.address()[].requires_grad:
+                    grad_contrib = other.address()[].backward_grad_contrib(
+                        self.address()[], gradients, True
+                    )
+
+                    grad_outputs.append(
+                        (
+                            other.address()[].into_tensorlike(),
+                            grad_contrib,
+                            AddTensor,
+                        )
+                    )
+                return grad_outputs
+
+            out.capture_grad_fn(grad_fn)
+
+            _ = """if that.requires_grad:
+                    grad_contrib = that.backward_grad_contrib(
+                        this, upstream_grad, True
+                    )
+                    that.update_grad[AddTensor](grad_contrib)"""
+
+        return out
+
+    # Element wise multiplication of two tensors
+    fn __mul__(self, other: Self) -> Tensor[dtype]:
+        if not self.broadcastable(other):
+            abort(
+                "__mul__(self * other) → Dimension mismatch: "
+                + self.shape.__str__()
+                + " <=> "
+                + other.shape.__str__()
+            )
+
+        if self.shape != other.shape:
+            return self.broadcast_mul(other)
+
+        var out = __tensor_op_tensor__[dtype, MulTensor](
+            self,
+            other,
+        )
+
+        if self.requires_grad or other.requires_grad:
+
+            fn grad_fn(
+                gradients: Self.GradTensor,
+            ) -> Self.GradOutputs:
+                grad_outputs = Self.GradOutputs()
+
+                if self.address()[].requires_grad:
+                    requires_grad_original = other.address()[].requires_grad
+                    other.address()[].requires_grad = (
+                        False  # Prevent requires_grad for grads
+                    )
+                    product = __tensor_op_tensor__[dtype, MulTensor](
+                        gradients, other.address()[]
+                    )
+                    other.address()[].requires_grad = requires_grad_original
+                    grad_outputs.append(
+                        (
+                            self.address()[].into_tensorlike(),
+                            product,
+                            AddTensor,
+                        )
+                    )
+
+                    # self.address()[].update_grad[AddTensor](product)
+
+                if other.address()[].requires_grad:
+                    requires_grad_original = self.address()[].requires_grad
+                    self.address()[].requires_grad = False
+                    product = __tensor_op_tensor__[dtype, MulTensor](
+                        gradients, self.address()[]
+                    )
+                    self.address()[].requires_grad = requires_grad_original
+                    # other.address()[].update_grad[AddTensor](product)
+                    grad_outputs.append(
+                        (
+                            other.address()[].into_tensorlike(),
+                            product,
+                            AddTensor,
                         )
                     )
                 return grad_outputs
@@ -2397,8 +2611,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
         else:
             grad_contrib = (
-                # upstream_grad * other if do_multiply else upstream_grad
-                upstream_grad
+                upstream_grad * other if do_multiply else upstream_grad
             )
             if grad_contrib.shape != self.shape:
                 axes = self.broadcast_mask(grad_contrib.shape).indices_of(1)
@@ -2409,86 +2622,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return grad_contrib
 
-    _ = """fn broadcast_mul(
-        self: Self,
-        other: Self,
-    ) -> Tensor[dtype]:
-        result = self.broadcast_op(other, scalar_ops[dtype, Multiply])
-        requires_grad = self.requires_grad or other.requires_grad
-        if requires_grad:
-
-            fn grad_fn() raises -> None:
-                this = self.address()[]
-                that = other.address()[]
-                output = result.address()[]
-                upstream_grad = output.grad[]
-                if this.requires_grad:
-                    grad_contrib = this.backward_grad_contrib(
-                        that, upstream_grad, True
-                    )
-                    this.update_grad[AddTensor](grad_contrib)
-                if that.requires_grad:
-                    grad_contrib = that.backward_grad_contrib(
-                        this, upstream_grad, True
-                    )
-                    that.update_grad[AddTensor](grad_contrib)
-
-            result.grad_fn = Optional(grad_fn)
-
-        return result
-
-
-
-    # Element wise multiplication of two tensors
-    fn __mul__(self, other: Self) -> Tensor[dtype]:
-        if not self.broadcastable(other):
-            abort(
-                "__mul__(self * other) → Dimension mismatch: "
-                + self.shape.__str__()
-                + " <=> "
-                + other.shape.__str__()
-            )
-
-        if self.shape != other.shape:
-            return self.broadcast_mul(other)
-
-        var out = __tensor_op_tensor__[dtype, MulTensor](
-            self,
-            other,
-        )
-
-        if self.requires_grad or other.requires_grad:
-
-            fn grad_fn() raises -> None:
-                out_grad = out.address()[].grad[]
-
-                if self.address()[].requires_grad:
-                    requires_grad_original = other.address()[].requires_grad
-                    other.address()[].requires_grad = (
-                        False  # Prevent requires_grad for grads
-                    )
-                    product = __tensor_op_tensor__[dtype, MulTensor](
-                        out_grad, other.address()[]
-                    )
-                    other.address()[].requires_grad = requires_grad_original
-                    self.address()[].update_grad[AddTensor](product)
-
-                if other.address()[].requires_grad:
-                    requires_grad_original = self.address()[].requires_grad
-                    self.address()[].requires_grad = False
-                    product = __tensor_op_tensor__[dtype, MulTensor](
-                        out_grad, self.address()[]
-                    )
-                    self.address()[].requires_grad = requires_grad_original
-                    other.address()[].update_grad[AddTensor](product)
-
-            out.grad_fn = Optional(grad_fn)
-
-        return out
-
-
-
-    fn view(self, shape: Shape, offset: Int = 0) -> TensorView[dtype]:
+    _ = """fn view(self, shape: Shape, offset: Int = 0) -> TensorView[dtype]:
         if offset < 0 or offset >= self.numels():
             abort(
                 "Tensor → view(shape): offset out of bounds: offset => "
