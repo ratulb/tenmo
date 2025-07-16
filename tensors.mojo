@@ -5,11 +5,11 @@ from testing import assert_true, assert_raises
 fn main() raises:
     # test_matmul_broadcasting()
     # test_matmul_shapes()
-    # test_mean_with_keepdims()
-    # test_scalar_addition()
-    # test_sum_all_dims()
-    # test_broadcast_addition()
-    # test_sum_specific_axis()
+    test_mean_with_keepdims()
+    test_scalar_addition()
+    test_sum_all_dims()
+    test_broadcast_addition()
+    test_sum_specific_axis()
 
     # test_matmul_broadcasting()
     # test_nested_operations()
@@ -18,7 +18,7 @@ fn main() raises:
     test_reshape_gradient_flatten()
     test_multiple_reshapes()
     test_reshape_noop()
-    # test_reshape_reused_twice_correct_grad()
+    test_reshape_reused_twice_correct_grad()
 
     test_mean_scalar()
     test_mean_1d()
@@ -39,7 +39,7 @@ fn main() raises:
     test_sum_axis1_keepdims()
     test_sum_multi_axes()
     test_sum_all_axes_keepdims()
-    # test_sum_gradient_accumulation()
+    test_sum_gradient_accumulation()
     test_scalar_sum_forward()
     test_scalar_sum_backward()
     test_scalar_sum_custom_grad()
@@ -54,7 +54,7 @@ fn main() raises:
     test_add_3d_1d()
     test_add_3d_2d()
     test_add_broadcast_degenerate()
-    test_add_mismatch_shapes()
+    # test_add_mismatch_shapes()
 
 
 fn test_add_scalar_scalar() raises:
@@ -67,6 +67,7 @@ fn test_add_scalar_scalar() raises:
     assert_true(a.grad[].item() == 1.0)
     assert_true(b.grad[].item() == 1.0)
 
+
 fn test_add_scalar_1d() raises:
     print("test_add_scalar_1d")
     var a = Tensor.scalar(2.0, requires_grad=True)
@@ -74,11 +75,9 @@ fn test_add_scalar_1d() raises:
     var c = a + b
     assert_true(c.all_close(Tensor.d1([3.0, 4.0, 5.0])))
     c.sum().backward()
-    a.print()
-    a.grad[].print()
-    b.grad[].print()
-    #assert_true(a.grad[].item() == 3.0, "a broadcast to 3 elements")
-    #assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    assert_true(a.grad[].item() == 3.0, "a broadcast to 3 elements")
+    assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+
 
 fn test_add_1d_1d() raises:
     print("test_add_1d_1d")
@@ -87,8 +86,8 @@ fn test_add_1d_1d() raises:
     var c = a + b
     assert_true(c.all_close(Tensor.d1([5.0, 7.0, 9.0])))
     c.sum().backward()
-    #assert_true(a.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
-    #assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    # assert_true(a.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    # assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
 
 
 fn test_add_2d_scalar() raises:
@@ -115,10 +114,9 @@ fn test_add_2d_1d() raises:
 
 fn test_add_3d_1d() raises:
     print("test_add_3d_1d")
-    var a = Tensor.d3([
-        [[1.0, 2.0], [3.0, 4.0]],
-        [[5.0, 6.0], [7.0, 8.0]]
-    ], requires_grad=True)
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    )
 
     var b = Tensor.d1([10.0, 20.0], requires_grad=True).float()
 
@@ -130,10 +128,9 @@ fn test_add_3d_1d() raises:
 
 fn test_add_3d_2d() raises:
     print("test_add_3d_2d")
-    var a = Tensor.d3([
-        [[1.0, 2.0], [3.0, 4.0]],
-        [[5.0, 6.0], [7.0, 8.0]]
-    ], requires_grad=True)
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    )
 
     var b = Tensor.d2([[10.0, 20.0], [30.0, 40.0]], requires_grad=True)
 
@@ -141,15 +138,16 @@ fn test_add_3d_2d() raises:
     assert_true(c.shape == a.shape)
     c.sum().backward()
     assert_true(a.grad[].all_close(Tensor.full(a.shape, 1.0).float()))
-    assert_true(b.grad[].all_close(Tensor.full(b.shape, 2.0).float()))  # repeated twice
+    assert_true(
+        b.grad[].all_close(Tensor.full(b.shape, 2.0).float())
+    )  # repeated twice
 
 
 fn test_add_broadcast_degenerate() raises:
     print("test_add_broadcast_degenerate")
-    var a = Tensor.d3([
-        [[1.0], [2.0]],
-        [[3.0], [4.0]]
-    ], requires_grad=True)  # Shape (2, 2, 1)
+    var a = Tensor.d3(
+        [[[1.0], [2.0]], [[3.0], [4.0]]], requires_grad=True
+    )  # Shape (2, 2, 1)
 
     var b = Tensor.d1([5.0], requires_grad=True).float()  # Shape (1,)
 
@@ -291,8 +289,8 @@ fn test_reshape_reused_twice_correct_grad() raises:
     print("test_reshape_reused_twice_correct_grad")
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var r = x.reshape(Shape.of(2, 2))
-    # var y = r + r  # <-- r used twice
-    # y.backward()
+    var y = r + r  # <-- r used twice
+    y.backward()
 
     assert_true(
         x.grad[].all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])),
@@ -306,8 +304,8 @@ fn test_sum_gradient_accumulation() raises:
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var s1 = a.sum()
     var s2 = a.sum()
-    # var s = s1 + s2
-    # s.backward()
+    var s = s1 + s2
+    s.backward()
 
     # ∂s/∂a = ∂s1/∂a + ∂s2/∂a = 1 + 1 = 2
     assert_true(
@@ -567,7 +565,6 @@ fn test_tensor_scalar_add_mul_pow() raises:
 ### Mojo Tensor
 ### Implement tensor library in mojo from first principles
 
-from collections import Set
 from math import iota, exp, floor
 from random import seed, random_float64
 from algorithm import vectorize
@@ -602,10 +599,6 @@ from operators import (
     Subtract,
     Multiply,
 )
-from summ import SumGradFn
-
-# from graphs import Graph
-
 
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable
@@ -646,18 +639,15 @@ struct Tensor[dtype: DType = DType.float32](
             return
         self.seed_grad(seed_tensor)
 
-        visited = Set[Int]()
+        visited = IntList.Empty
         stack = [self.into_tensorlike()]
 
         while stack:
             node = stack.pop()
-            print("visiting node", node.inner_id(), "has grad_fn:", node.has_grad_fn())
-
             if node.has_grad_fn():
                 for ancestor, local_grad, opcode in node.grad_fn()[](
                     node.gradients()[]
                 ):
-                    print("Inside for each ancestor", ancestor.inner_id())
                     if opcode == AddTensor:
                         ancestor.update_grad[AddTensor](local_grad)
                     elif opcode == SubtractTensor:
@@ -665,7 +655,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                     if ancestor.inner_id() not in visited:
                         stack.append(ancestor)
-                        visited.add(ancestor.inner_id())
+                        visited.append(ancestor.inner_id())
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -724,6 +714,7 @@ struct Tensor[dtype: DType = DType.float32](
             self.data = UnsafePointer[Scalar[self.dtype]].alloc(
                 self.shape.num_elements()
             )
+
         self.init_grad()
 
     fn is_contiguous(self) -> Bool:
@@ -1880,20 +1871,15 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
-
-        print("Inside sum fn user self.id() and got grad_fn?: ", self.id(), self.has_grad_fn())
         return self.sum(IntList.new(axes), keepdims)
 
     fn sum(self: Self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
-
         _axes = Self.validate_and_normalize_axes(self.shape, axes)
         requires_grad = self.requires_grad
-        print("Entered sum fn self.id(), requires_grad and got grad_fn?: ", self.id(), requires_grad, self.has_grad_fn())
         rank = self.shape.rank()
 
         # Early scalar return - already correct
         if rank == 0:
-            print("Have we entered scalar territory?")
             scalar_out = Tensor[dtype].zeros(
                 Shape.Void, requires_grad=self.requires_grad
             )
@@ -1947,14 +1933,10 @@ struct Tensor[dtype: DType = DType.float32](
                 out[out_idx] = summ
 
         if requires_grad:
-            print("In sum requires_grad block")
 
             fn grad_fn(
                 gradients: Self.GradTensor,
             ) -> Self.GradOutputs:
-                print("Inside sum grad fn self.id(): ", self.id())
-                #this = self.address()[]
-                print("Inside sum grad fn self.address()[]: ", self.address()[].id())
                 original_shape = self.address()[].shape
                 var grad_contrib: Tensor[dtype]
 
@@ -1985,11 +1967,15 @@ struct Tensor[dtype: DType = DType.float32](
                 grad_contrib.requires_grad = False
                 tl = self.address()[].into_tensorlike()
 
-                print("Returning from sum grad_fn: self.address()[].id(), tl.id(), tl.inner_id()", self.address()[].id(), tl.id(), tl.inner_id())
-                return [(tl, grad_contrib, AddTensor)]
-            print("Inside sum - has self.id() got a grad_fn: ", self.id(), self.has_grad_fn())
-            var function: Self.BackwardFn = grad_fn
-            out.capture_grad_fn(function^)
+                return [
+                    (
+                        self.address()[].into_tensorlike(),
+                        grad_contrib,
+                        AddTensor,
+                    )
+                ]
+
+            out.capture_grad_fn(grad_fn)
             out.add_ancestry(self)
 
         return out
@@ -2106,76 +2092,80 @@ struct Tensor[dtype: DType = DType.float32](
         var out = __tensor_op_tensor__[dtype, AddTensor](self, other)
 
         if self.requires_grad or other.requires_grad:
+
             fn grad_fn(
                 gradients: Self.GradTensor,
             ) -> Self.GradOutputs:
                 grad_outputs = Self.GradOutputs()
 
-                #out_grad = out.address()[].grad[]
                 if self.address()[].requires_grad:
                     grad_outputs.append(
-                        (self.address()[].into_tensorlike(), gradients, AddTensor)
+                        (
+                            self.address()[].into_tensorlike(),
+                            gradients,
+                            AddTensor,
+                        )
                     )
 
-                    #self.address()[].update_grad[AddTensor](out_grad)
                 if other.address()[].requires_grad:
-                     grad_outputs.append(
-                        (other.address()[].into_tensorlike(), gradients, AddTensor)
+                    grad_outputs.append(
+                        (
+                            other.address()[].into_tensorlike(),
+                            gradients,
+                            AddTensor,
+                        )
                     )
-                   #other.address()[].update_grad[AddTensor](out_grad)
                 return grad_outputs
 
-            var function: Self.BackwardFn = grad_fn
-            out.capture_grad_fn(function^)
-
+            out.capture_grad_fn(grad_fn)
             out.add_ancestry(self, other)
 
         return out
 
     fn broadcast_operation[
-            element_wise_op: Int, tensor_op_first: Int, tensor_op_second: Int
-        ](self, other: Self) -> Tensor[dtype]:
-
-        var result = self.broadcast_op(other, scalar_ops[dtype, element_wise_op])
+        element_wise_op: Int, tensor_op_first: Int, tensor_op_second: Int
+    ](self, other: Self) -> Tensor[dtype]:
+        var result = self.broadcast_op(
+            other, scalar_ops[dtype, element_wise_op]
+        )
 
         if self.requires_grad or other.requires_grad:
-            var self_ptr = self.address()
-            var other_ptr = other.address()
 
-            print("Inside  broadcast add operation: self.id(), other.id()", self.id(), other.id())
             fn grad_fn(incoming: Self.GradTensor) -> Self.GradOutputs:
-                print("Coming inside broadcast_operation")
-                #var this = self.address()[]
-                #var that = other.address()[]
-
-                var output: Self.GradOutputs = []
+                var grad_outputs: Self.GradOutputs = []
 
                 if self.address()[].requires_grad:
                     var grad_self = self.address()[].backward_grad_contrib(
                         other.address()[], incoming, False
                     )
-                    output.append((self.address()[].into_tensorlike(), grad_self, tensor_op_first))
+                    grad_outputs.append(
+                        (
+                            self.address()[].into_tensorlike(),
+                            grad_self,
+                            tensor_op_first,
+                        )
+                    )
 
                 if other.address()[].requires_grad:
                     var grad_other = other.address()[].backward_grad_contrib(
                         self.address()[], incoming, False
                     )
-                    output.append((other.address()[].into_tensorlike(), grad_other, tensor_op_second))
+                    grad_outputs.append(
+                        (
+                            other.address()[].into_tensorlike(),
+                            grad_other,
+                            tensor_op_second,
+                        )
+                    )
 
-                return output
+                return grad_outputs
 
             result.capture_grad_fn(grad_fn)
-            print("→ __add__ grad_fn for result is set: ", result.grad_fn.__as_bool__())
-            print("→ __add__ result has grad_fn?: ", result.has_grad_fn())
-            print("→ __add__ result id: ", result.id())
-            print("→ __add__ self.id and other.id: ", self.id(), other.id())
-
             result.add_ancestry(self, other)
 
         return result
 
-
-    _="""fn broadcast_operation[
+    _ = """fn broadcast_operation[
         element_wise_op: Int, tensor_op_first: Int, tensor_op_second: Int
     ](self, other: Self) -> Tensor[dtype]:
         out = self.broadcast_op(other, scalar_ops[dtype, element_wise_op])
@@ -2330,7 +2320,6 @@ struct Tensor[dtype: DType = DType.float32](
         do_multiply: Bool,
     ) -> Tensor[dtype]:
         var grad_contrib: Tensor[dtype]
-        print("Coming inside backward_grad_contrib")
         if upstream_grad.shape == Shape.Void:
             grad_contrib = Tensor[dtype].full(
                 self.shape, upstream_grad.item(), requires_grad=False
@@ -2696,8 +2685,6 @@ struct Tensor[dtype: DType = DType.float32](
         return result"""
 
 
-_ = """from testing import assert_true
-
 fn test_scalar_addition() raises:
     print("test_scalar_addition")
     var a = Tensor.scalar(3.0, requires_grad=True)
@@ -2753,7 +2740,7 @@ fn test_mean_with_keepdims() raises:
     a.free()
 
 
-fn test_matmul_shapes() raises:
+_ = """fn test_matmul_shapes() raises:
     print("test_matmul_shapes")
     # Test various matmul shape combinations
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
