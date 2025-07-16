@@ -67,6 +67,63 @@ fn main() raises:
     test_mul_scalar_tensor()
     test_mul_tensor_scalar()
     test_mul_same_shape()
+    # __truediv__/__rtruediv__
+    test_scalar_div_tensor()
+    test_scalar_div_tensor_multiple()
+    test_scalar_div_tensor_2d()
+
+
+fn test_scalar_div_tensor() raises:
+    var a = Tensor.d1([2.0, 4.0], requires_grad=True)
+    var out = 8.0 / a
+
+    assert_true(
+        out.all_close(Tensor.d1([4.0, 2.0])),
+        "Forward: scalar / tensor incorrect",
+    )
+
+    out.sum().backward()
+
+    # dz/da = -8 / a^2 ⇒ [-2.0, -0.5]
+    assert_true(
+        a.grad[].all_close(Tensor.d1([-2.0, -0.5])),
+        "Backward gradient incorrect",
+    )
+
+
+fn test_scalar_div_tensor_multiple() raises:
+    var a = Tensor.d1([1.0, 2.0, 4.0], requires_grad=True)
+    var out = 8.0 / a
+
+    assert_true(
+        out.all_close(Tensor.d1([8.0, 4.0, 2.0])), "Forward scalar / tensor"
+    )
+
+    out.sum().backward()
+
+    # ∂/∂a: -8 / a^2 ⇒ [-8.0, -2.0, -0.5]
+    assert_true(
+        a.grad[].all_close(Tensor.d1([-8.0, -2.0, -0.5])),
+        "Backward grad mismatch",
+    )
+
+
+fn test_scalar_div_tensor_2d() raises:
+    var a = Tensor.d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
+    var out = 16.0 / a
+
+    assert_true(
+        out.all_close(Tensor.d2([[16.0, 8.0], [4.0, 2.0]])),
+        "Forward output incorrect",
+    )
+
+    out.sum().backward()
+
+    # Gradient: -16 / a^2
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[-16.0, -4.0], [-1.0, -0.25]])),
+        "Backward gradient failed",
+    )
 
 
 fn test_mul_same_shape() raises:
@@ -1776,55 +1833,22 @@ struct Tensor[dtype: DType = DType.float32](
             abort("Tensor - store is supported only for 2d tensor")
         self.data.store(rows * self.shape[1] + cols, val)
 
-    _ = """fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+    fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, DivideScalar](self, scalar)
 
         if self.requires_grad:
+
             fn grad_fn(gradients: Self.GradTensor) -> Self.GradOutputs:
                 var base_squared = self.__pow__(2)
-                base_squared_reciprocal =  __tensor_op_scalar__[dtype, DivideScalar](base_squared, 1.0)
+                base_squared_reciprocal = __tensor_op_scalar__[
+                    dtype, DivideScalar
+                ](base_squared, 1.0)
                 var grad = (gradients * scalar) * base_squared_reciprocal
                 return [(self.into_tensorlike(), grad, SubtractTensor)]
 
             out.capture_grad_fn(grad_fn)
 
-        return out"""
-    _ = """
-    fn test_scalar_div_tensor() raises:
-        var a = Tensor.d1([2.0, 4.0], requires_grad=True)
-        var out = 8.0 / a
-
-        assert_true(out.all_close(Tensor.d1([4.0, 2.0])), "Forward: scalar / tensor incorrect")
-
-        out.sum().backward()
-
-        # dz/da = -8 / a^2 ⇒ [-2.0, -0.5]
-        assert_true(a.grad[].all_close(Tensor.d1([-2.0, -0.5])), "Backward gradient incorrect")
-
-    fn test_scalar_div_tensor_multiple() raises:
-        var a = Tensor.d1([1.0, 2.0, 4.0], requires_grad=True)
-        var out = 8.0 / a
-
-        assert_true(out.all_close(Tensor.d1([8.0, 4.0, 2.0])), "Forward scalar / tensor")
-
-        out.sum().backward()
-
-        # ∂/∂a: -8 / a^2 ⇒ [-8.0, -2.0, -0.5]
-        assert_true(a.grad[].all_close(Tensor.d1([-8.0, -2.0, -0.5])), "Backward grad mismatch")
-
-    fn test_scalar_div_tensor_2d() raises:
-        var a = Tensor.d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
-        var out = 16.0 / a
-
-        assert_true(out.all_close(Tensor.d2([[16.0, 8.0], [4.0, 2.0]])), "Forward output incorrect")
-
-        out.sum().backward()
-
-        # Gradient: -16 / a^2
-        assert_true(a.grad[].all_close(
-            Tensor.d2([[-16.0, -4.0], [-1.0, -0.25]])
-        ), "Backward gradient failed")
-        """
+        return out
 
     fn __truediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, DivideByScalar](
