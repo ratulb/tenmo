@@ -8,9 +8,19 @@ from utils import Variant
 
 
 fn main() raises:
+    tensor = Tensor.rand(10)
+    print("tensor.id(), tensor.id(), tensor.address()[].id(), tensor.address()[].id(): ", tensor.id(), tensor.id(), tensor.address()[].id(), tensor.address()[].id())
+    print(tensor.into_tensorlike().inner_id(),tensor.into_tensorlike().inner_id())
+
     #test_mean_with_keepdims()
-    a = Tensor.rand(3, 2, 4)
+    a = -Tensor.rand(3, 2, 4)
+    a.print()
     b = Tensor.rand(3, 2, 4)
+    c = Tensor[DType.bool].rand(3,2)
+    c.print()
+    inverted = ~c
+    inverted.print()
+    abs_ = inverted.__abs__()
     print(a.all_close(b))
     print(Shape.Unit.intlist().product())
     print(Shape.Void.intlist().product())
