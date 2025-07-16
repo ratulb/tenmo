@@ -20,7 +20,7 @@ fn main() raises:
         loss = ((y_pred - y) ** 2).mean()
 
         # Backward pass
-        Tensor.walk_backward(loss)
+        loss.backward()
 
         # Print progress
         if epoch % 100 == 0:
