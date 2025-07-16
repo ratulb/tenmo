@@ -55,6 +55,72 @@ fn main() raises:
     test_add_3d_2d()
     test_add_broadcast_degenerate()
     # test_add_mismatch_shapes()
+    # __sub__
+    test_sub_same_shape()
+    test_sub_broadcast_row()
+    test_sub_scalar_tensor()
+    test_sub_tensor_scalar()
+    test_sub_broadcast_col()
+
+
+fn test_sub_same_shape() raises:
+    print("test_sub_same_shape")
+    var a = Tensor.d2([[3.0, 4.0], [5.0, 6.0]], requires_grad=True)
+    var b = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var c = a - b
+    assert_true(c.all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
+
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.grad[].all_close(Tensor.d2([[-1.0, -1.0], [-1.0, -1.0]])))
+
+
+fn test_sub_broadcast_row() raises:
+    print("test_sub_broadcast_row")
+    var a = Tensor.d2([[10.0, 20.0], [30.0, 40.0]], requires_grad=True)
+    var b = Tensor.d1([1.0, 2.0], requires_grad=True).float()
+    var c = a - b
+    assert_true(c.all_close(Tensor.d2([[9.0, 18.0], [29.0, 38.0]])))
+
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.grad[].all_close(Tensor.d1([-2.0, -2.0]).float()))
+
+
+fn test_sub_scalar_tensor() raises:
+    print("test_sub_scalar_tensor")
+    var a = Tensor.scalar(10, requires_grad=True)
+    var b = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var c = a - b
+    assert_true(c.all_close(Tensor.d2([[9.0, 8.0], [7.0, 6.0]])))
+
+    c.sum().backward()
+    assert_true(a.grad[].item() == 4.0)  # 4 elements
+    assert_true(b.grad[].all_close(Tensor.d2([[-1.0, -1.0], [-1.0, -1.0]])))
+
+
+fn test_sub_tensor_scalar() raises:
+    print("test_sub_tensor_scalar")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor.scalar(1.5, requires_grad=True).float()
+    var c = a - b
+    assert_true(c.all_close(Tensor.d2([[-0.5, 0.5], [1.5, 2.5]])))
+
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.grad[].item() == -4.0)
+
+
+fn test_sub_broadcast_col() raises:
+    print("test_sub_broadcast_col")
+    var a = Tensor.d2([[10.0], [20.0]], requires_grad=True)  # shape: [2, 1]
+    var b = Tensor.d2([[1.0, 2.0]], requires_grad=True)  # shape: [1, 2]
+    var c = a - b  # broadcast to [2, 2]
+    assert_true(c.all_close(Tensor.d2([[9.0, 8.0], [19.0, 18.0]])))
+
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d2([[2.0], [2.0]])))
+    assert_true(b.grad[].all_close(Tensor.d2([[-2.0, -2.0]])))
 
 
 fn test_add_scalar_scalar() raises:
