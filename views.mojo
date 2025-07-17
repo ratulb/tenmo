@@ -155,3 +155,7 @@ struct TensorView[dtype: DType = DType.float32](
 
     fn numels(self) -> Int:
         return self.shape.num_elements()
+
+    fn print(self, num_first: Int = 10, num_last: Int = 10):
+        tensor_like = self.into_tensorlike()
+        tensor_like.print(num_first, num_last)

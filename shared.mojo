@@ -253,10 +253,3 @@ struct TensorLike[dtype: DType](
             self.view_address[]
         )
 
-
-fn main():
-    a = Tensor.rand(5, 2, 3).into_view()
-    tl = a.into_tensorlike()
-    print(tl)
-    print(tl.shape())
-    print(tl[IntList(1, 1, 1)])
