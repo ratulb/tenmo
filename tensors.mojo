@@ -1810,21 +1810,33 @@ struct Tensor[dtype: DType = DType.float32](
     fn transpose(self, axes: List[Int] = []) -> TensorView[dtype]:
         return self.transpose(IntList.new(axes))
 
-    fn transpose(self, axes: IntList = IntList.Empty) -> TensorView[dtype]:
-        _axes = axes
-        if len(_axes) == 0:
-            if not self.rank() == 2:
-                abort("Default transpose only valid for 2D")
-            _axes = IntList(1, 0)
+    fn transpose(self, axes: IntList) -> TensorView[dtype]:
+        var rank = self.rank()
 
-        if len(_axes) != self.rank():
-            abort("transpose: axes must match tensor rank")
+        var actual_axes = axes
+        if axes.is_empty():
+            actual_axes = IntList.range_list(rank)
+            actual_axes.reverse()
+
+        Validator.validate_axes(actual_axes, rank)
 
         # Permute shape and create strides
-        var new_shape = self.shape.permute(_axes)
-        var new_strides = Strides.default(self.shape).permute(_axes)
+        var new_shape = self.shape.permute(actual_axes)
+        var new_strides = Strides.default(self.shape).permute(actual_axes)
         result = self.view(new_shape, new_strides)
         return result
+
+
+fn main() raises:
+    # a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    # a.print()
+    # t = a.transpose()
+    # t.print()
+    a1 = Tensor.arange(24).reshape(2, 3, 4)
+    b1 = a1.transpose([1, 0, 2])
+    a1.print()
+    print()
+    b1.print()
 
 
 _ = """fn test_slice_grad() raises:
@@ -1871,7 +1883,3 @@ fn test_empty_tensor() raises:
     s.backward()
     assert_true(s.item() == 0.0)
     assert_true(a.grad[].shape == Shape.of(0))"""
-
-
-fn main() raises:
-    print("passing smoothly")
