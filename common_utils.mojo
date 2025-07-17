@@ -152,7 +152,8 @@ struct Validator:
                         "transpose axes must have length {0}, but got {1}"
                     ).format(rank, axes.len())
                 )
-            var seen = IntList.filled(rank, 0)  # Mutable int array of size rank
+            var seen = IntList.filled(rank, 0)
+            # Normalize/validate/check duplicate
             for axis in axes:
                 normalized_axis = axis
                 if normalized_axis < 0:
