@@ -123,13 +123,15 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_view(self) -> Bool:
         return False
 
-    fn into_view(self, requires_grad: Bool = False) -> TensorView[dtype]:
+    fn into_view(
+        self, requires_grad: Optional[Bool] = None
+    ) -> TensorView[dtype]:
         return TensorView(
             UnsafePointer(to=self),
             self.shape,
             Strides.default(self.shape),
             offset=0,
-            requires_grad=self.requires_grad,
+            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
 
     fn into_tensor(self) -> Tensor[dtype]:
