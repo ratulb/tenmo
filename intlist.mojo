@@ -332,6 +332,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         result[idx] = value
         return result
 
+    @staticmethod
     fn invert_permutation(perm: IntList) -> Self:
         n = perm.size
         inverted = IntList.filled(n, 0)

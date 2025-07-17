@@ -1807,10 +1807,14 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn transpose(self, axes: List[Int] = []) -> TensorView[dtype]:
+    fn transpose(
+        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
+    ) -> TensorView[dtype]:
         return self.transpose(IntList.new(axes))
 
-    fn transpose(self, axes: IntList) -> TensorView[dtype]:
+    fn transpose(
+        self, axes: IntList, requires_grad: Optional[Bool] = None
+    ) -> TensorView[dtype]:
         var rank = self.rank()
 
         var actual_axes = axes
@@ -1818,13 +1822,28 @@ struct Tensor[dtype: DType = DType.float32](
             actual_axes = IntList.range_list(rank)
             actual_axes.reverse()
 
-        Validator.validate_axes(actual_axes, rank)
+        var normalized_axes = Validator.validate_axes(actual_axes, rank)
 
-        # Permute shape and create strides
-        var new_shape = self.shape.permute(actual_axes)
-        var new_strides = Strides.default(self.shape).permute(actual_axes)
-        result = self.view(new_shape, new_strides)
-        return result
+        # Permute shape and create default strides and permute
+        var new_shape = self.shape.permute(normalized_axes)
+        var new_strides = Strides.default(self.shape).permute(normalized_axes)
+        out = self.view(
+            new_shape,
+            new_strides,
+            offset=0,
+            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
+        )
+        _="""if self.requires_grad:
+
+            fn grad_fn(gradients: Self.GradTensor) -> Self.GradOutputs:
+                inverted_axes = IntList.invert_permutation(normalized_axes)
+                grad_transposed = gradients.transpose(inverted_axes)
+
+                return [(self.into_tensorlike(), grad_transposed, AddTensor)]
+
+            #out.capture_grad_fn(grad_fn)"""
+
+        return out
 
 
 fn main() raises:
