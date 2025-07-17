@@ -3,7 +3,7 @@ from shapes import Shape
 from intlist import IntList
 from strides import Strides
 from os import abort
-from shared import Ancestor
+from shared import TensorLike
 fn main():
     pass
 
@@ -45,8 +45,8 @@ struct TensorView[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return self.offset == 0 and self.strides.is_contiguous(self.shape)
 
-    fn into_ancestor(self) -> Ancestor[dtype]:
-        return Ancestor[dtype](self.address())
+    fn into_tensorlike(self) -> TensorLike[dtype]:
+        return TensorLike[dtype](self.address())
 
     # Index calculation: flat offset into underlying tensor's data[]
     fn index_offset(self, indices: IntList) -> Int:

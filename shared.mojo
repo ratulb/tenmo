@@ -7,7 +7,7 @@ fn main():
     print("Starting of the begining!")
 
 
-struct Ancestor[dtype: DType](Copyable & Movable):
+struct TensorLike[dtype: DType](Copyable & Movable):
     alias TensorAddress = UnsafePointer[Tensor[dtype]]
     alias ViewAddress = UnsafePointer[TensorView[dtype]]
 
