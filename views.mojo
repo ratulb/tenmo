@@ -54,7 +54,7 @@ struct TensorView[dtype: DType = DType.float32](
         return self.offset == 0 and self.strides.is_contiguous(self.shape)
 
     fn into_tensorlike(self) -> TensorLike[dtype]:
-        return TensorLike[dtype](self.address())
+        return TensorLike[dtype](UnsafePointer(to=self))
 
     # Index calculation: flat offset into underlying tensor's data[]
     fn index_offset(self, indices: IntList) -> Int:
