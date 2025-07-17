@@ -231,7 +231,9 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
     fn free(owned self):
         """Destroy the `IntList` and free its memory."""
         if self.data:
-            log_debug("IntList __del__ is kicking in alright")
+            log_debug("Calling IntList __del__")
+            for i in range(len(self)):
+                (self.data + i).destroy_pointee()
             self.data.free()
 
     fn __mul__(self: IntList, factor: Int) -> IntList:
@@ -325,13 +327,20 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         else:
             (self.data + idx)[] = value
 
-    @always_inline
     fn replace(self, idx: Int, value: Int) -> Self:
         result = self
         result[idx] = value
         return result
 
-    fn replace(self: IntList, indices: IntList, values: IntList) -> IntList:
+    fn invert_permutation(perm: IntList) -> Self:
+        n = perm.size
+        inverted = IntList.filled(n, 0)
+        for i in range(n):
+            inverted[perm[i]] = i
+
+        return inverted
+
+    fn replace(self: IntList, indices: IntList, values: IntList) -> Self:
         n = len(self)
         m = len(indices)
 
@@ -369,6 +378,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             The number of elements in the array.
         """
         return self.size
+
     fn is_empty(self) -> Bool:
         return len(self) == 0
 
