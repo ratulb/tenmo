@@ -37,7 +37,7 @@ from operators import (
 
 
 struct Tensor[dtype: DType = DType.float32](
-    Copyable & Movable & Sized & Stringable
+    Copyable & Movable & Sized & Stringable & Representable & Writable
 ):
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
@@ -123,12 +123,13 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_view(self) -> Bool:
         return False
 
-    fn into_view(self) -> TensorView[dtype]:
+    fn into_view(self, requires_grad: Bool = False) -> TensorView[dtype]:
         return TensorView(
             UnsafePointer(to=self),
             self.shape,
             Strides.default(self.shape),
             offset=0,
+            requires_grad=self.requires_grad,
         )
 
     fn into_tensor(self) -> Tensor[dtype]:
@@ -154,7 +155,7 @@ struct Tensor[dtype: DType = DType.float32](
         return True
 
     fn into_tensorlike(self) -> TensorLike[dtype]:
-        return TensorLike[dtype](self.address())
+        return TensorLike[dtype](UnsafePointer(to=self))
 
     fn backward_fn(self) -> UnsafePointer[Self.BackwardFn]:
         return self.grad_fn
@@ -583,6 +584,12 @@ struct Tensor[dtype: DType = DType.float32](
         s += ", requires_grad: " + String(self.requires_grad)
         s += "]"
         return s
+
+    fn __repr__(self) -> String:
+        return self.__str__()
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
 
     @staticmethod
     fn full_like(
@@ -1817,14 +1824,20 @@ struct Tensor[dtype: DType = DType.float32](
 
             fn grad_fn(gradients: Self.GradTensor) -> Self.GradOutputs:
                 return [
-                    (self.address()[].into_tensorlike(), gradients.T(), AddTensor)
+                    (
+                        self.address()[].into_tensorlike(),
+                        gradients.T(),
+                        AddTensor,
+                    )
                 ]
 
             out.capture_grad_fn(grad_fn)
 
         return out
 
-    fn view(self, shape: Shape, offset: Int = 0) -> TensorView[dtype]:
+    fn view(
+        self, shape: Shape, offset: Int = 0, requires_grad: Bool = False
+    ) -> TensorView[dtype]:
         if offset < 0 or offset >= self.numels():
             abort(
                 "Tensor → view(shape): offset out of bounds: offset => "
@@ -1833,16 +1846,24 @@ struct Tensor[dtype: DType = DType.float32](
                 + String(self.numels())
             )
         if shape == self.shape and offset == 0:  # Tensor offset is always 0
-            return self.into_view()
+            return self.into_view(requires_grad=requires_grad)
         if shape.num_elements() + offset > self.numels():
             abort("Tensor → view(shape): shape numels exceeds base tensor size")
 
         return TensorView(
-            UnsafePointer(to=self), shape, Strides.default(shape), offset=offset
+            UnsafePointer(to=self),
+            shape,
+            Strides.default(shape),
+            offset=offset,
+            requires_grad=requires_grad,
         )
 
     fn view(
-        self, shape: Shape, strides: Strides, offset: Int = 0
+        self,
+        shape: Shape,
+        strides: Strides,
+        offset: Int = 0,
+        requires_grad: Bool = False,
     ) -> TensorView[dtype]:
         if offset < 0 or offset >= self.numels():
             abort("Tensor → view: offset out of bounds")
@@ -1863,7 +1884,13 @@ struct Tensor[dtype: DType = DType.float32](
         if min_index < 0 or max_index >= self.numels():
             abort("Tensor → view: requested view accesses out-of-bounds data")
 
-        return TensorView(UnsafePointer(to=self), shape, strides, offset=offset)
+        return TensorView(
+            UnsafePointer(to=self),
+            shape,
+            strides,
+            offset=offset,
+            requires_grad=requires_grad,
+        )
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
@@ -1898,7 +1925,11 @@ struct Tensor[dtype: DType = DType.float32](
                     self_grad = gradients.matmul(other.address()[].T())
                     self_grad.requires_grad = False
                     grad_outputs.append(
-                        (self.address()[].into_tensorlike(), self_grad, AddTensor)
+                        (
+                            self.address()[].into_tensorlike(),
+                            self_grad,
+                            AddTensor,
+                        )
                     )
                 if other.address()[].requires_grad:
                     other_grad = self.address()[].T().matmul(gradients)

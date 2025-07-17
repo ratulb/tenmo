@@ -9,21 +9,33 @@ from utils import Variant
 
 fn main() raises:
     tensor = Tensor.rand(10)
-    print("tensor.id(), tensor.id(), tensor.address()[].id(), tensor.address()[].id(): ", tensor.id(), tensor.id(), tensor.address()[].id(), tensor.address()[].id())
-    print(tensor.into_tensorlike().inner_id(),tensor.into_tensorlike().inner_id())
+    print(
+        (
+            "tensor.id(), tensor.id(), tensor.address()[].id(),"
+            " tensor.address()[].id(): "
+        ),
+        tensor.id(),
+        tensor.id(),
+        tensor.address()[].id(),
+        tensor.address()[].id(),
+    )
+    print(tensor.into_ancestor().inner_id(), tensor.into_ancestor().inner_id())
 
-    #test_mean_with_keepdims()
+    # test_mean_with_keepdims()
     a = -Tensor.rand(3, 2, 4)
     a.print()
     b = Tensor.rand(3, 2, 4)
-    c = Tensor[DType.bool].rand(3,2)
+    c = Tensor[DType.bool].rand(3, 2)
     c.print()
     inverted = ~c
+    negated = -c
     inverted.print()
-    abs_ = inverted.__abs__()
+    # abs_ = inverted.__abs__()
+    negated.print()
     print(a.all_close(b))
     print(Shape.Unit.intlist().product())
     print(Shape.Void.intlist().product())
+
 
 fn test_mean_with_keepdims() raises:
     _ = """a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
@@ -32,7 +44,7 @@ fn test_mean_with_keepdims() raises:
     assert_true(s.item() == 10.0)
     assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))"""
 
-    _="""var A = Tensor.scalar(3.0, requires_grad=True)
+    _ = """var A = Tensor.scalar(3.0, requires_grad=True)
     var B = Tensor.scalar(4.0, requires_grad=True)
     var C = A + B
     C.backward()

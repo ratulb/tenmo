@@ -4,11 +4,14 @@ from intlist import IntList
 from strides import Strides
 from os import abort
 from shared import TensorLike
+
+
 fn main():
     pass
 
+
 struct TensorView[dtype: DType = DType.float32](
-    Copyable & Movable
+    Sized & Copyable & Movable & Stringable & Representable & Writable
 ):
     alias Blank: TensorView[dtype] = Self(
         UnsafePointer[Tensor[dtype]](), Shape.Void, Strides(IntList.Empty), 0
@@ -17,6 +20,7 @@ struct TensorView[dtype: DType = DType.float32](
     var shape: Shape
     var strides: Strides
     var offset: Int
+    var requires_grad: Bool
 
     fn __init__(
         out self,
@@ -24,23 +28,27 @@ struct TensorView[dtype: DType = DType.float32](
         shape: Shape,
         strides: Strides,
         offset: Int = 0,
+        requires_grad: Bool = False,
     ):
         self.base_tensor = base_tensor
         self.shape = shape
         self.strides = strides
         self.offset = offset
+        self.requires_grad = requires_grad
 
     fn __moveinit__(out self, owned other: Self):
         self.base_tensor = other.base_tensor
         self.shape = other.shape
         self.strides = other.strides
         self.offset = other.offset
+        self.requires_grad = other.requires_grad
 
     fn __copyinit__(out self, other: Self):
         self.base_tensor = other.base_tensor
         self.shape = other.shape
         self.strides = other.strides
         self.offset = other.offset
+        self.requires_grad = other.requires_grad
 
     fn is_contiguous(self) -> Bool:
         return self.offset == 0 and self.strides.is_contiguous(self.shape)
@@ -82,7 +90,7 @@ struct TensorView[dtype: DType = DType.float32](
         return self.base_tensor[].has_grad()
 
     fn _requires_grad(self) -> Bool:
-        return self.base_tensor[]._requires_grad()
+        return self.requires_grad
 
     fn address(self) -> UnsafePointer[Self]:
         return UnsafePointer(to=self)
@@ -109,5 +117,41 @@ struct TensorView[dtype: DType = DType.float32](
     fn seed_grad(self, with_tensor: Tensor[dtype]):
         self.base_tensor[].seed_grad(with_tensor)
 
-    fn invoke_grad_fn(self, verbose: Bool = False) raises -> None:
-        print("Will do it for sure!")
+    fn __str__(self) -> String:
+        dims = len(self.shape)
+        s = String("[")
+        if dims == 1:
+            s += "1D View"
+        elif dims == 2:
+            s += "2D View"
+        elif dims == 3:
+            s += "3D View"
+        elif dims == 4:
+            s += "4D View"
+        elif dims == 5:
+            s += "5D View"
+        else:
+            s += "View"
+        s += self.shape.__str__()
+        s += ", Type: " + self.dtype.__str__()
+        s += ", requires_grad: " + String(self.requires_grad)
+        s += "]"
+        return s
+
+    fn __repr__(self) -> String:
+        return self.__str__()
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
+
+    fn __len__(self) -> Int:
+        return self.numels()
+
+    fn len(self) -> Int:
+        return self.numels()
+
+    fn size(self) -> Int:
+        return self.numels()
+
+    fn numels(self) -> Int:
+        return self.shape.num_elements()
