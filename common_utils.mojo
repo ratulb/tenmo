@@ -143,7 +143,8 @@ struct Validator:
         return normalized
 
     @staticmethod
-    fn validate_axes(axes: IntList, rank: Int):
+    fn validate_axes(axes: IntList, rank: Int) -> IntList:
+        var normalized_axes = IntList.Empty
         try:
             if axes.len() != rank:
                 raise (
@@ -152,9 +153,11 @@ struct Validator:
                     ).format(rank, axes.len())
                 )
             var seen = IntList.filled(rank, 0)  # Mutable int array of size rank
-
             for axis in axes:
-                if axis < 0 or axis >= rank:
+                normalized_axis = axis
+                if normalized_axis < 0:
+                    normalized_axis += rank
+                if normalized_axis < 0 or normalized_axis >= rank:
                     raise (
                         String(
                             "Invalid axis {0} in transpose: must be in range"
@@ -162,13 +165,15 @@ struct Validator:
                         ).format(axis, rank - 1)
                     )
 
-                if seen[axis] == 1:
+                if seen[normalized_axis] == 1:
                     raise (
                         String(
                             "Duplicate axis {0} found in transpose axes"
                         ).format(axis)
                     )
 
-                seen[axis] = 1
+                seen[normalized_axis] = 1
+                normalized_axes.append(normalized_axis)
         except e:
             abort(e.__str__())
+        return normalized_axes
