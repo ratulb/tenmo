@@ -13,7 +13,7 @@ from intlist import IntList
 from views import TensorView
 from strides import Strides
 from shared import TensorLike
-from common_utils import log_debug, variadic1or2, is_null
+from common_utils import Validator, log_debug, variadic1or2, is_null
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
@@ -716,7 +716,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[dtype]:
-        Self.validate_dtype_consistency(dtype, requires_grad, "d1")
+        Validator.validate_dtype_consistency(dtype, requires_grad, "d1")
         shape = Shape(IntList(len(row)))
         tensor = Tensor[dtype](shape, requires_grad)
         memcpy(tensor.data, row.data, len(row))
@@ -724,7 +724,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn d2(rows: List[Self.Row], requires_grad: Bool = False) -> Tensor[dtype]:
-        Self.validate_dtype_consistency(dtype, requires_grad, "d2")
+        Validator.validate_dtype_consistency(dtype, requires_grad, "d2")
         dims = IntList(len(rows), len(rows[0]))
         flattened = List[Scalar[dtype]](capacity=dims.product())
         for row in rows:
@@ -740,7 +740,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn d3(
         blocks: List[Self.Rows], requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        Self.validate_dtype_consistency(dtype, requires_grad, "d3")
+        Validator.validate_dtype_consistency(dtype, requires_grad, "d3")
         dims = IntList(len(blocks), len(blocks[0]), len(blocks[0][0]))
         flattened = List[Scalar[dtype]](capacity=dims.product())
         for block in blocks:
@@ -760,7 +760,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn d4(
         blockgrid: List[Self.Block], requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        Self.validate_dtype_consistency(dtype, requires_grad, "d4")
+        Validator.validate_dtype_consistency(dtype, requires_grad, "d4")
         dims = IntList(
             len(blockgrid),
             len(blockgrid[0]),
@@ -796,7 +796,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn d5(
         blockhive: List[Self.Blocks], requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        Self.validate_dtype_consistency(dtype, requires_grad, "d5")
+        Validator.validate_dtype_consistency(dtype, requires_grad, "d5")
         dims = IntList(
             len(blockhive),
             len(blockhive[0]),
@@ -834,7 +834,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn of(*elems: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
-        Self.validate_dtype_consistency(dtype, requires_grad, "of(*elems)")
+        Validator.validate_dtype_consistency(dtype, requires_grad, "of(*elems)")
         # shape = Shape.of(len(elems))
         shape = Shape(IntList(len(elems)))
         tensor = Tensor[dtype](shape, requires_grad)
@@ -847,7 +847,7 @@ struct Tensor[dtype: DType = DType.float32](
         elems: Self.Row,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        Self.validate_dtype_consistency(dtype, requires_grad, "of(elems)")
+        Validator.validate_dtype_consistency(dtype, requires_grad, "of(elems)")
         shape = Shape.of(len(elems))
         tensor = Tensor[Self.dtype](shape, requires_grad)
         for i in range(len(elems)):
@@ -858,7 +858,9 @@ struct Tensor[dtype: DType = DType.float32](
     fn of[
         row_size: Int
     ](*elems: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
-        Self.validate_dtype_consistency(dtype, requires_grad, "of[row_size]")
+        Validator.validate_dtype_consistency(
+            dtype, requires_grad, "of[row_size]"
+        )
 
         if not (row_size >= 1 and row_size <= len(elems)):
             abort(
@@ -899,19 +901,6 @@ struct Tensor[dtype: DType = DType.float32](
         for i in range(tensor.numels()):
             tensor.data.store(i, value)
         return tensor
-
-    @staticmethod
-    fn validate_dtype_consistency(
-        dtype: DType, requires_grad: Bool, label: String
-    ):
-        if requires_grad:
-            if not (dtype.is_floating_point()):
-                abort(
-                    "Tensor → "
-                    + label
-                    + " → requires_grad=True is only supported for floating"
-                    " point types. "
-                )
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         tensor_like = self.into_tensorlike()
@@ -1167,7 +1156,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.sum(IntList.new(axes), keepdims)
 
     fn sum(self: Self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
-        _axes = Self.validate_and_normalize_axes(self.shape, axes)
+        _axes = Validator.validate_and_normalize_axes(self.shape, axes)
         requires_grad = self.requires_grad
         rank = self.shape.rank()
 
@@ -1276,7 +1265,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.mean(IntList.new(axes), keepdims)
 
     fn mean(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
-        sorted_axes = Self.validate_and_normalize_axes(self.shape, axes)
+        sorted_axes = Validator.validate_and_normalize_axes(self.shape, axes)
         # Compute total count of elements being reduced
         count = self.shape.axes_spans.select(sorted_axes).product()
 
@@ -1322,45 +1311,6 @@ struct Tensor[dtype: DType = DType.float32](
             out.capture_grad_fn(grad_fn)
 
         return out
-
-    @staticmethod
-    fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
-        # Ensure axes are unique, sorted, and within bounds.
-        rank = shape.rank()
-
-        if rank == 0:
-            if len(axes) == 1 and axes[0] == -1:
-                return (
-                    IntList()
-                )  # Interpret `[-1]` as "reduce all axes" for scalars
-            if len(axes) > 0:
-                abort(
-                    "Tensor → validate_and_normalize_axes - cannot reduce over"
-                    " axes "
-                    + axes.__str__()
-                    + " for scalar tensor with shape: "
-                    + shape.__str__()
-                )
-            return IntList()  # Scalar sum over [] is valid
-
-        if len(axes) == 0:
-            return IntList.range_list(rank)
-        normalized = IntList.with_capacity(len(axes))
-        for _axis in axes:
-            axis = _axis
-            if axis < 0:
-                axis += rank
-            if axis < 0 or axis >= rank:
-                abort(
-                    "Tensor → validate_and_normalize_axes - invalid axis: "
-                    + String(_axis)
-                    + " for tensor shape: "
-                    + shape.__str__()
-                )
-            normalized.append(axis)
-        # Sort and deduplicate
-        normalized.sort_and_deduplicate()
-        return normalized
 
     fn __add__(self, other: Self) -> Tensor[dtype]:
         if self.address() == other.address():

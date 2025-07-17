@@ -81,47 +81,94 @@ fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int]:
     return create_variadic_list(m, n)
 
 
-# Get next power of 2 for n
-fn next_power_of_2(n: Int) raises -> Int:
-    assert_true(n > 0, "Next power of 2 is supported for >= 1")
-    if n.is_power_of_two():
-        return n
-    if n == 1:
-        return 1
-    var power = 1
-    while power < n:
-        power *= 2
-    return power
-
-
 fn is_null[dtype: DType](addr: UnsafePointer[Tensor[dtype]]) -> Bool:
     return addr.__as_bool__() == False
 
 
-from os import Atomic
-from memory import UnsafePointer
-
-
-@fieldwise_init
-struct IdGen:
-    var tensor_ids: UnsafePointer[UInt64]
-
-    fn __init__(out self):
-        self.tensor_ids = UnsafePointer[UInt64].alloc(1)
-
-    fn __copyinit__(out self, existing: Self):
-        self.tensor_ids = existing.tensor_ids
-
-    fn __enter__(mut self) -> Self:
-        self.tensor_ids[] = 0
-        return self
-
-    fn __exit__(mut self):
-        print("Exiting IdGen")
-
-    fn next(self) -> UInt64:
-        return Atomic.fetch_add(self.tensor_ids, 1)
-
-
 fn main() raises:
     print("So", "far", "so good")
+
+
+struct Validator:
+    @staticmethod
+    fn validate_dtype_consistency(
+        dtype: DType, requires_grad: Bool, label: String
+    ):
+        if requires_grad:
+            if not (dtype.is_floating_point()):
+                abort(
+                    "Tensor → "
+                    + label
+                    + " → requires_grad=True is only supported for floating"
+                    " point types. "
+                )
+
+    @staticmethod
+    fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
+        # Ensure axes are unique, sorted, and within bounds.
+        rank = shape.rank()
+
+        if rank == 0:
+            if len(axes) == 1 and axes[0] == -1:
+                return (
+                    IntList()
+                )  # Interpret `[-1]` as "reduce all axes" for scalars
+            if len(axes) > 0:
+                abort(
+                    "Tensor → validate_and_normalize_axes - cannot reduce over"
+                    " axes "
+                    + axes.__str__()
+                    + " for scalar tensor with shape: "
+                    + shape.__str__()
+                )
+            return IntList()  # Scalar sum over [] is valid
+
+        if len(axes) == 0:
+            return IntList.range_list(rank)
+        normalized = IntList.with_capacity(len(axes))
+        for _axis in axes:
+            axis = _axis
+            if axis < 0:
+                axis += rank
+            if axis < 0 or axis >= rank:
+                abort(
+                    "Tensor → validate_and_normalize_axes - invalid axis: "
+                    + String(_axis)
+                    + " for tensor shape: "
+                    + shape.__str__()
+                )
+            normalized.append(axis)
+        # Sort and deduplicate
+        normalized.sort_and_deduplicate()
+        return normalized
+
+    @staticmethod
+    fn validate_axes(axes: IntList, rank: Int):
+        try:
+            if axes.len() != rank:
+                raise (
+                    String(
+                        "transpose axes must have length {0}, but got {1}"
+                    ).format(rank, axes.len())
+                )
+            var seen = IntList.filled(rank, 0)  # Mutable int array of size rank
+
+            for axis in axes:
+                if axis < 0 or axis >= rank:
+                    raise (
+                        String(
+                            "Invalid axis {0} in transpose: must be in range"
+                            " [0, {1}]"
+                        ).format(axis, rank - 1)
+                    )
+
+                if seen[axis] == 1:
+                    raise (
+                        String(
+                            "Duplicate axis {0} found in transpose axes"
+                        ).format(axis)
+                    )
+
+                seen[axis] = 1
+        except e:
+            abort(e.__str__())
