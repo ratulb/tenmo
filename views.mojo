@@ -11,6 +11,113 @@ fn main():
     pass
 
 
+from testing import assert_true
+
+
+fn test_into_tensor_full_view_copy() raises:
+    print("test_into_tensor_full_view_copy")
+    var t = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var v = t.view(Shape.of(2, 2))
+    var out = v.into_tensor()
+    assert_true(out.all_close(t))
+    assert_true(out.data != t.data)  # Ensure deep copy
+
+
+fn test_into_tensor_transposed_view() raises:
+    print("test_into_tensor_transposed_view")
+    var t = Tensor.d2([[1, 2, 3], [4, 5, 6]])
+    var v = t.transpose()
+    var out = v.into_tensor()
+    assert_true(out.all_close(Tensor.d2([[1, 4], [2, 5], [3, 6]])))
+
+
+fn test_into_tensor_offset_view() raises:
+    print("test_into_tensor_offset_view")
+    var t = Tensor.d1([0, 1, 2, 3, 4, 5])
+    var v = t.view(Shape.of(2), offset=3)
+    var out = v.into_tensor()
+    assert_true(out.all_close(Tensor.d1([3, 4])))
+
+
+fn test_into_tensor_scalar_view() raises:
+    print("test_into_tensor_scalar_view")
+    var t = Tensor.scalar(42)
+    var v = t.view(Shape.Void)
+    var out = v.into_tensor()
+    assert_true(out.shape == Shape.Void)
+    assert_true(out.item() == 42)
+
+
+fn test_into_tensor_empty_view() raises:
+    print("test_into_tensor_empty_view")
+    var t = Tensor[DType.float32](Shape.of(0, 3))
+    var v = t.view(Shape.of(0, 3))
+    var out = v.into_tensor()
+    assert_true(out.shape == Shape.of(0, 3))
+    # assert_true(out.data.len() == 0)
+
+
+fn test_into_tensor_grad_flag_true() raises:
+    print("test_into_tensor_grad_flag_true")
+    var t = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = t.view(Shape.of(2, 2))
+    var out = v.into_tensor()
+    assert_true(out.requires_grad == True)
+
+
+fn test_into_tensor_grad_flag_false() raises:
+    print("test_into_tensor_grad_flag_false")
+    var t = Tensor.d2([[1, 2], [3, 4]], requires_grad=False)
+    var v = t.view(Shape.of(2, 2))
+    var out = v.into_tensor()
+    assert_true(out.requires_grad == False)
+
+
+fn test_into_tensor_large_contiguous_copy() raises:
+    print("test_into_tensor_large_contiguous_copy")
+    N = 1024 * 1024
+    var t = Tensor[DType.float32](Shape.of(N))
+    for i in range(N):
+        t[i] = i
+    var v = t.view(Shape.of(N))
+    var out = v.into_tensor()
+    assert_true(out.shape == Shape.of(N))
+    assert_true(out[123456] == 123456)
+
+
+_ = """fn test_into_tensor_isolated_memory() raises:
+    print("test_into_tensor_isolated_memory")
+    var t = Tensor.d1([1, 2, 3, 4])
+    var v = t.slice(1, 3)  # [2, 3]
+    var out = v.into_tensor()
+    v[0] = 999
+    assert_true(out.all_close(Tensor.d1([2, 3])))  # Unaffected by view mutation
+
+fn test_into_tensor_strided_view_rows() raises:
+    print("test_into_tensor_strided_view_rows")
+    var t = Tensor.d2([[1, 2], [3, 4], [5, 6], [7, 8]])
+    var v = t.slice_rows(0, 4, 2)  # Should give rows [0, 2]
+    var out = v.into_tensor()
+    assert_true(out.all_close(Tensor.d2([[1, 2], [5, 6]])))
+
+fn test_into_tensor_contiguous_slice_1d() raises:
+    print("test_into_tensor_contiguous_slice_1d")
+    var t = Tensor.d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    var v = t.slice(2, 7)
+    var out = v.into_tensor()
+    assert_true(out.all_close(Tensor.d1([2, 3, 4, 5, 6])))
+
+
+
+fn test_into_tensor_nested_view() raises:
+    print("test_into_tensor_nested_view")
+    var t = Tensor.d1([10, 20, 30, 40, 50])
+    var v1 = t.slice(1, 5)           # [20, 30, 40, 50]
+    var v2 = v1.slice(1, 3)          # [30, 40]
+    var out = v2.into_tensor()
+    assert_true(out.all_close(Tensor.d1([30, 40])))"""
+
+
 struct TensorView[dtype: DType = DType.float32](
     Sized & Copyable & Movable & Stringable & Representable & Writable
 ):
