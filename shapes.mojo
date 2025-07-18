@@ -4,8 +4,27 @@ from os import abort
 from memory import Pointer
 
 
-fn main():
-    pass
+fn main() raises:
+    test_slice_from()
+
+
+from testing import assert_true
+
+
+fn test_slice_from() raises:
+    shape = Shape.of(2, 3, 4)
+    assert_true(
+        shape.slice_from(0) == shape,
+        "slice_from assertion from beginning failed",
+    )
+    assert_true(
+        shape.slice_from(1) == Shape.of(3, 4),
+        "slice_from assertion from from index 1 failed",
+    )
+    assert_true(
+        shape.slice_from(2) == Shape.of(4),
+        "slice_from assertion from from index 2 failed",
+    )
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
