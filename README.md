@@ -28,6 +28,8 @@ A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modu
 | ✅ Gradient Tracking      | 🧪     | In progress |
 | ✅ Unit Testing           | ✔️     | Custom test suite |
 
+Tensor.arange(6, requires_grad=True).reshape(2, 3).print()
+
 [2D Tensor(2, 3), Type: float32, requires_grad: True]
   [
     [0.0, 1.0, 2.0, ],
