@@ -4,11 +4,51 @@ from intlist import IntList
 from shapes import Shape
 from os import abort
 from testing import assert_true
+
 from utils import Variant
+
+alias IndexArg = Variant[Int, Slice]
+
+
+@fieldwise_init
+struct S:
+    fn __getitem__(self, *slices: Slice) -> None:
+             for slice in slices:
+                print(slice)
+
 
 
 fn main() raises:
-    tensor = Tensor.rand(10)
+    s = S()
+    _ = s[:] # slice(None, None, None)
+    _ = s[:, ::-1] # slice(None, None, None), slice(None, None, -1)
+    _ = s[::] # slice(None, None, None)
+    _ = s[1:] # slice(None, None, None)
+
+    _="""a =  Tensor[DType.bool]([], requires_grad=False)
+    a.print()
+    shape = Shape.of(2,3, 4)
+
+    # Slow path: general indexing using shape walk (no recursion)
+    idx = IntList.filled(shape.rank(), 0)
+
+    for _ in range(shape.num_elements()):
+        # Copy value at current index from view to out
+        print("idx: ", idx)
+
+        # Increment multi-dimensional index (manual shape walker)
+        var carry = True
+        for dim in reversed(range(shape.rank())):
+            if carry:
+                idx[dim] += 1
+                if idx[dim] >= shape[dim]:
+                    idx[dim] = 0  # Carry over
+                    carry = True
+                else:
+                    carry = False
+            print("inside inner idx: ", idx)"""
+
+    _="""tensor = Tensor.rand(10)
     print(
         (
             "tensor.id(), tensor.id(), tensor.address()[].id(),"
@@ -34,7 +74,7 @@ fn main() raises:
     negated.print()
     print(a.all_close(b))
     print(Shape.Unit.intlist().product())
-    print(Shape.Void.intlist().product())
+    print(Shape.Void.intlist().product())"""
 
 
 fn test_mean_with_keepdims() raises:
