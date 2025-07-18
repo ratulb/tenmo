@@ -25,6 +25,10 @@ fn test_slice_from() raises:
         shape.slice_from(2) == Shape.of(4),
         "slice_from assertion from from index 2 failed",
     )
+    assert_true(
+        shape.slice_from(3) == Shape.Void,
+        "slice_from assertion from from index 3 failed",
+    )
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
