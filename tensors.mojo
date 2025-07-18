@@ -223,6 +223,51 @@ struct Tensor[dtype: DType = DType.float32](
             )
         return self[0] if self.shape == Shape.Unit else self[IntList.Empty]
 
+    fn __getitem__(self, indices: List[Int]) -> TensorView[dtype]:
+        rank = self.shape.rank()
+        index_len = len(indices)
+
+        if index_len > rank:
+            abort(
+                String("__getitem__(List[Int]): Too many indices (")
+                + String(index_len)
+                + ") for tensor of rank "
+                + String(rank)
+            )
+
+        normalized_indices = IntList.with_capacity(index_len)
+        for i in range(index_len):
+            idx = indices[i]
+            dim = self.shape[i]
+
+            # 🔁 Handle negative indexing
+            if idx < 0:
+                idx += dim
+
+            if idx < 0 or idx >= dim:
+                abort(
+                    String("__getitem__(List[Int]): Index ")
+                    + String(indices[i])
+                    + " out of bound s for axis "
+                    + String(i)
+                    + " with size "
+                    + String(dim)
+                )
+
+            normalized_indices.append(idx)
+
+        offset = self.shape.flatten_index(normalized_indices)
+        new_shape = self.shape.slice_from(index_len)
+        new_strides = Strides.default(self.shape).slice_from(index_len)
+
+        return TensorView[dtype](
+            UnsafePointer(to=self),
+            shape=new_shape,
+            strides=new_strides,
+            offset=offset,
+            requires_grad=self.requires_grad,
+        )
+
     fn __moveinit__(out self, owned other: Self):
         self.shape = other.shape
         self.data = UnsafePointer[Scalar[other.dtype]].alloc(other.numels())
