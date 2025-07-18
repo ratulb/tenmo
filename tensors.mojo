@@ -50,7 +50,9 @@ struct Tensor[dtype: DType = DType.float32](
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
     alias Opcode = Int
     alias GradTensor = Tensor[dtype]
-    alias GradOutputs = List[(TensorLike[dtype], Self.GradTensor, Self.Opcode)]
+    alias Ancestor = TensorLike[dtype]
+    alias Triple = (Self.Ancestor, Self.GradTensor, Self.Opcode)
+    alias GradOutputs = List[Self.Triple]
     alias BackwardFn = fn (
         gradients: Self.GradTensor
     ) escaping -> Self.GradOutputs
@@ -1833,7 +1835,7 @@ struct Tensor[dtype: DType = DType.float32](
             offset=0,
             requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
-        _="""if self.requires_grad:
+        _ = """if self.requires_grad:
 
             fn grad_fn(gradients: Self.GradTensor) -> Self.GradOutputs:
                 inverted_axes = IntList.invert_permutation(normalized_axes)
