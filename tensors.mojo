@@ -255,13 +255,10 @@ struct Tensor[dtype: DType = DType.float32](
                 )
 
             normalized_indices.append(idx)
-        print("normalized_indices")
-        print(normalized_indices)
         strides = Strides.default(self.shape)
         offset = 0
         for i in range(len(normalized_indices)):
             offset += normalized_indices[i] * strides[i]
-        # offset = self.shape.flatten_index(normalized_indices)
         new_shape = self.shape.slice_from(index_len)
         new_strides = Strides.default(self.shape).slice_from(index_len)
 
@@ -432,16 +429,12 @@ struct Tensor[dtype: DType = DType.float32](
             vector2 = other.data.load[width=simd_width](i * simd_width)
             diff = abs(vector1 - vector2)
             tolerance = atol + rtol * abs(vector2)
-            all_checks_out = (diff < tolerance).reduce_and()
-            if all_checks_out == False:
+            if (diff > tolerance).reduce_or():
                 return False
         for k in range(remaining):
             value1 = self.data.load[width=1](simd_blocks * simd_width + k)
             value2 = other.data.load[width=1](simd_blocks * simd_width + k)
-            value_diff = abs(value1 - value2)
-            value_tolerance = atol + rtol * abs(value2)
-            checks_out = value_diff < value_tolerance
-            if checks_out == False:
+            if abs(value1 - value2) > atol + rtol * abs(value2):
                 return False
 
         return True
@@ -775,7 +768,6 @@ struct Tensor[dtype: DType = DType.float32](
                 min_finite[dtype](), requires_grad=requires_grad
             )
         shape = Shape(IntList(len(row)))
-        print(shape)
         tensor = Tensor[dtype](shape, requires_grad)
         memcpy(tensor.data, row.data, len(row))
         return tensor

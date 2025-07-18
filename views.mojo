@@ -11,6 +11,7 @@ fn main() raises:
     test_getitem_list_empty_indices_returns_full_view()
     test_into_tensor_full_view_copy()
     test_into_tensor_transposed_view()
+    test_into_tensor_offset_view()
 
 
 from testing import assert_true
@@ -19,13 +20,11 @@ from testing import assert_true
 fn test_getitem_list_empty_indices_returns_full_view() raises:
     print("test_getitem_list_empty_indices_returns_full_view")
     a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-    v = a.__getitem__(List[Int]())
-    v.print()
-    print(v.offset)
+    #v = a.__getitem__(List[Int]())
+    v = a[[]]
     assert_true(v.shape == a.shape)
     assert_true(v.offset == 0)
-    assert_true(v.into_tensor().all_close(a))
-    # _= a^
+    assert_true(v.all_close(a))
 
 
 # Following are older test cases - needs to be verified and run
@@ -261,6 +260,35 @@ struct TensorView[dtype: DType = DType.float32](
                     else:
                         carry = False
         return out
+
+    fn all_close(
+        self,
+        tensor: Tensor[dtype],
+        rtol: Scalar[dtype] = 1e-5,
+        atol: Scalar[dtype] = 1e-8,
+    ) -> Bool:
+        if not self.shape.num_elements() + self.offset <= tensor.numels():
+            abort(
+                "TensorView -> all_close(tensor) -> TensorView exceeds bounds"
+                " of base Tensor: "
+                + String(self.shape.num_elements())
+                + "(no of elemets in view)  + "
+                + String(self.offset)
+                + "(view offset) > "
+                + String(tensor.numels())
+                + "(no of elements in tensor)"
+            )
+
+        for idx in self.shape:
+            v = self[idx]
+            t = tensor[idx]
+            diff = abs(v - t)
+            tol = atol + rtol * abs(t)
+
+            if diff > tol:
+                return False
+
+        return True
 
     fn seed_grad(self, value: Scalar[dtype]):
         self.base_tensor[].seed_grad(value)
