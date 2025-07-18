@@ -87,6 +87,18 @@ struct Shape(
     fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
         return ShapeIndexIter(Pointer(to=self))
 
+    fn slice_from(self, axis: Int) -> Shape:
+        if axis < 0 or axis > self.rank():
+            abort(
+                "Shape -> slice_from: axis "
+                + String(axis)
+                + " out of bounds for ndim "
+                + String(self.ndim)
+            )
+
+        new_axes_spans = self.axes_spans[axis:]
+        return Shape(new_axes_spans)
+
     fn broadcastable(self, to: Shape) -> Bool:
         dims1 = self.intlist()
         dims2 = to.intlist()
