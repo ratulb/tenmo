@@ -1746,7 +1746,10 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn view(
-        self, shape: Shape, offset: Int = 0, requires_grad: Bool = False
+        self,
+        shape: Shape,
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
     ) -> TensorView[dtype]:
         if offset < 0 or offset >= self.numels():
             abort(
@@ -1755,6 +1758,9 @@ struct Tensor[dtype: DType = DType.float32](
                 + "and self.numels() => "
                 + String(self.numels())
             )
+        _requires_grad = (
+            requires_grad.value() if requires_grad else self.requires_grad
+        )
         if shape == self.shape and offset == 0:  # Tensor offset is always 0
             return self.into_view(requires_grad=requires_grad)
         if shape.num_elements() + offset > self.numels():
@@ -1765,7 +1771,7 @@ struct Tensor[dtype: DType = DType.float32](
             shape,
             Strides.default(shape),
             offset=offset,
-            requires_grad=requires_grad,
+            requires_grad=_requires_grad,
         )
 
     fn view(
@@ -1773,7 +1779,7 @@ struct Tensor[dtype: DType = DType.float32](
         shape: Shape,
         strides: Strides,
         offset: Int = 0,
-        requires_grad: Bool = False,
+        requires_grad: Optional[Bool] = None,
     ) -> TensorView[dtype]:
         if offset < 0 or offset >= self.numels():
             abort("Tensor → view: offset out of bounds")
@@ -1799,7 +1805,7 @@ struct Tensor[dtype: DType = DType.float32](
             shape,
             strides,
             offset=offset,
-            requires_grad=requires_grad,
+            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:

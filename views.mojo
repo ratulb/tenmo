@@ -12,6 +12,9 @@ fn main() raises:
     test_into_tensor_full_view_copy()
     test_into_tensor_transposed_view()
     test_into_tensor_offset_view()
+    test_into_tensor_scalar_view()
+    #test_into_tensor_empty_view()
+    test_into_tensor_grad_flag_true()
 
 
 from testing import assert_true
