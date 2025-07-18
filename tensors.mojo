@@ -255,8 +255,13 @@ struct Tensor[dtype: DType = DType.float32](
                 )
 
             normalized_indices.append(idx)
-
-        offset = self.shape.flatten_index(normalized_indices)
+        print("normalized_indices")
+        print(normalized_indices)
+        strides = Strides.default(self.shape)
+        offset = 0
+        for i in range(len(normalized_indices)):
+            offset += normalized_indices[i] * strides[i]
+        # offset = self.shape.flatten_index(normalized_indices)
         new_shape = self.shape.slice_from(index_len)
         new_strides = Strides.default(self.shape).slice_from(index_len)
 

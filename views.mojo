@@ -7,13 +7,28 @@ from shared import TensorLike
 from memory import memcpy
 
 
-fn main():
-    pass
+fn main() raises:
+    test_getitem_list_empty_indices_returns_full_view()
+    test_into_tensor_full_view_copy()
+    test_into_tensor_transposed_view()
 
 
 from testing import assert_true
 
 
+fn test_getitem_list_empty_indices_returns_full_view() raises:
+    print("test_getitem_list_empty_indices_returns_full_view")
+    a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    v = a.__getitem__(List[Int]())
+    v.print()
+    print(v.offset)
+    assert_true(v.shape == a.shape)
+    assert_true(v.offset == 0)
+    assert_true(v.into_tensor().all_close(a))
+    # _= a^
+
+
+# Following are older test cases - needs to be verified and run
 fn test_into_tensor_full_view_copy() raises:
     print("test_into_tensor_full_view_copy")
     var t = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
