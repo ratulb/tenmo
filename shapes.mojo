@@ -94,7 +94,7 @@ struct Shape(
         for i in range(_ndims):
             if dims[i] < 1:
                 abort(
-                    "Shape → __init__: negative dimensions are not allowed →"
+                    "Shape → __init__: negative or zero sized dimension(s) are not allowed →"
                     + " Dim = "
                     + String(dims[i])
                     + " at index = "
