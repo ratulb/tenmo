@@ -4,6 +4,7 @@ from intlist import IntList
 from strides import Strides
 from os import abort
 from shared import TensorLike
+from memory import memcpy
 
 
 fn main():
@@ -51,7 +52,7 @@ struct TensorView[dtype: DType = DType.float32](
         self.requires_grad = other.requires_grad
 
     fn is_contiguous(self) -> Bool:
-        #return self.offset == 0 and self.strides.is_contiguous(self.shape)
+        # return self.offset == 0 and self.strides.is_contiguous(self.shape)
         return self.strides.is_contiguous(self.shape)
 
     fn into_tensorlike(self) -> TensorLike[dtype]:
@@ -109,8 +110,35 @@ struct TensorView[dtype: DType = DType.float32](
         return self
 
     fn into_tensor(self) -> Tensor[dtype]:
-        abort("TensorView -> into_tensor(self) - not supported")
-        return Tensor[dtype]([])
+        out = Tensor[dtype](self.shape, requires_grad=self.requires_grad)
+        numels = self.shape.num_elements()
+
+        if self.is_contiguous():
+            # Fast path: single memcpy from base tensor
+            memcpy[Scalar[dtype]](
+                out.data, self.base_tensor[].data + self.offset, numels
+            )
+            return out
+
+        # Slow path: general indexing using shape
+        rank = self.shape.rank()
+        indices = IntList.filled(rank, 0)
+
+        for _ in range(numels):
+            # Copy value at current index from view to out
+            out[indices] = self[indices]
+
+            # Increment multi-dimensional index (manual shape walker)
+            var carry = True
+            for dim in reversed(range(rank)):
+                if carry:
+                    indices[dim] += 1
+                    if indices[dim] >= self.shape[dim]:
+                        indices[dim] = 0  # Carry over
+                        carry = True
+                    else:
+                        carry = False
+        return out
 
     fn seed_grad(self, value: Scalar[dtype]):
         self.base_tensor[].seed_grad(value)
