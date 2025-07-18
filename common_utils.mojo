@@ -61,16 +61,6 @@ fn variadiclist_as_intlist(vlist: VariadicList[Int]) -> IntList:
         list.append(each)
     return list^
 
-
-fn exit(*s: String):
-    combined = String()
-    for i in range(len(s)):
-        combined += s[i]
-        if i < len(s) - 1:
-            combined += ", "
-    abort(combined)
-
-
 # Create a single or two element(s) VariadicList
 fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int]:
     fn create_variadic_list(*elems: Int) -> VariadicList[Int]:

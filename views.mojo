@@ -51,7 +51,8 @@ struct TensorView[dtype: DType = DType.float32](
         self.requires_grad = other.requires_grad
 
     fn is_contiguous(self) -> Bool:
-        return self.offset == 0 and self.strides.is_contiguous(self.shape)
+        #return self.offset == 0 and self.strides.is_contiguous(self.shape)
+        return self.strides.is_contiguous(self.shape)
 
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](UnsafePointer(to=self))

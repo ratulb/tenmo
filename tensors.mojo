@@ -5,7 +5,7 @@ from math import iota, exp, floor
 from random import seed, random_float64
 from algorithm import vectorize
 from sys import simdwidthof
-from utils.numerics import max_finite
+from utils.numerics import max_finite, min_finite
 from os import abort
 from memory import memcpy, memset, memset_zero
 from shapes import Shape
@@ -719,7 +719,13 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "d1")
+        # Gotchas - watch out
+        if len(row) == 0:
+            return Tensor[dtype].scalar(
+                min_finite[dtype](), requires_grad=requires_grad
+            )
         shape = Shape(IntList(len(row)))
+        print(shape)
         tensor = Tensor[dtype](shape, requires_grad)
         memcpy(tensor.data, row.data, len(row))
         return tensor
