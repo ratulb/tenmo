@@ -2,13 +2,13 @@
 
 A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modular.com/mojo), with full support for:
 
-- 🧮 N-dimensional Tensors  
-- 🔁 Broadcasting  
-- 🔢 Autodiff (automatic differentiation)  
-- 🧠 Scalar & elementwise operations  
-- 🧬 SIMD vectorization  
-- 🪜 Views and slicing  
-- 🧪 Comprehensive test coverage  
+- 🧮 N-dimensional Tensors
+- 🔁 Broadcasting
+- 🔢 Autodiff (automatic differentiation)
+- 🧠 Scalar & elementwise operations
+- 🧬 SIMD vectorization
+- 🪜 Views and slicing
+- 🧪 Comprehensive test coverage
 
 > 🚧 **Work in Progress** – This project is a deep dive into Mojo internals, systems programming, and the foundation of modern deep learning libraries. Built with ❤️ from scratch — no NumPy, PyTorch, or TensorFlow under the hood.
 
@@ -28,6 +28,13 @@ A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modu
 | ✅ Gradient Tracking      | 🧪     | In progress |
 | ✅ Unit Testing           | ✔️     | Custom test suite |
 
+---
+
+## 📦 Example
+
+```mojo
+from tensors import Tensor
+
 Tensor.arange(6, requires_grad=True).reshape(2, 3).print()
 
 [2D Tensor(2, 3), Type: float32, requires_grad: True]
@@ -36,15 +43,6 @@ Tensor.arange(6, requires_grad=True).reshape(2, 3).print()
     [3.0, 4.0, 5.0, ],
   ]
 
----
-
-## 📦 Example
-
-```mojo
-from tensors import Tensor
-
-t = Tensor.d1([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-t.print()
 
 # Broadcasting + elementwise op
 t2 = t + 1.0
@@ -62,13 +60,13 @@ t.grad[].print()
 
 ```
 .
-├── tensor.mojo           # Core Tensor implementation
-├── tensor_view.mojo      # TensorView (slicing/view logic)
-├── autodiff.mojo         # Autograd engine (WIP)
-├── shape.mojo            # Shape logic and utilities
-├── simd_utils.mojo       # Vectorized ops
-├── test_tensor.mojo      # Unit tests
-└── README.md             # You're here!
+├── tensors.mojo                # Core Tensor implementation
+├── views.mojo                  # TensorView (slicing/view logic)
+├── shapes.mojo                 # Shape logic and utilities
+├── intlist.mojo                # Light Intger list backing many operations
+├── operators.mojo              # Vectorized ops
+├── tests/test_tensors.mojo     # Unit tests
+└── README.md                   # You're here!
 ```
 
 ---
