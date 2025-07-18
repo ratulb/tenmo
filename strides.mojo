@@ -48,6 +48,18 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
 
         return True
 
+    fn slice_from(self, axis: Int) -> Strides:
+        if axis < 0 or axis > self.rank():
+            abort(
+                "Strides -> slice_from: axis "
+                + String(axis)
+                + " out of bounds for strides "
+                + self.strides.__str__()
+            )
+
+        new_strides = self.strides[axis:]
+        return Strides(new_strides)
+
     @staticmethod
     fn of(*values: Int) -> Self:
         return Self(IntList(values))
@@ -89,7 +101,9 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     # Reorder dimensions (for transpose/permute)
     fn permute(self, axes: IntList) -> Self:
         if not len(axes) == len(self):
-             abort("Strides -> permute: axes length not equal to strides' length")
+            abort(
+                "Strides -> permute: axes length not equal to strides' length"
+            )
         result = IntList.with_capacity(len(axes))
         for axis in axes:
             result.append(self[axis])
