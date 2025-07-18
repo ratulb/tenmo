@@ -13,8 +13,10 @@ fn main() raises:
     test_into_tensor_transposed_view()
     test_into_tensor_offset_view()
     test_into_tensor_scalar_view()
-    #test_into_tensor_empty_view()
+    # test_into_tensor_empty_view()
     test_into_tensor_grad_flag_true()
+    test_into_tensor_grad_flag_false()
+    test_into_tensor_large_contiguous_copy()
 
 
 from testing import assert_true
@@ -23,7 +25,7 @@ from testing import assert_true
 fn test_getitem_list_empty_indices_returns_full_view() raises:
     print("test_getitem_list_empty_indices_returns_full_view")
     a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-    #v = a.__getitem__(List[Int]())
+    # v = a.__getitem__(List[Int]())
     v = a[[]]
     assert_true(v.shape == a.shape)
     assert_true(v.offset == 0)
@@ -93,7 +95,7 @@ fn test_into_tensor_grad_flag_false() raises:
 fn test_into_tensor_large_contiguous_copy() raises:
     print("test_into_tensor_large_contiguous_copy")
     N = 1024 * 1024
-    var t = Tensor[DType.float32](Shape.of(N))
+    var t = Tensor(Shape.of(N))
     for i in range(N):
         t[i] = i
     var v = t.view(Shape.of(N))
