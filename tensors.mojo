@@ -50,8 +50,8 @@ struct Tensor[dtype: DType = DType.float32](
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
     alias Opcode = Int
     alias GradTensor = Tensor[dtype]
-    alias Ancestor = TensorLike[dtype]
-    alias Triple = (Self.Ancestor, Self.GradTensor, Self.Opcode)
+    alias Recipient = TensorLike[dtype]
+    alias Triple = (Self.Recipient, Self.GradTensor, Self.Opcode)
     alias GradOutputs = List[Self.Triple]
     alias BackwardFn = fn (
         gradients: Self.GradTensor
