@@ -34,7 +34,7 @@ from operators import (
     Subtract,
     Multiply,
 )
-
+from backpropagation import BackwardFn
 
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Representable & Writable
@@ -57,13 +57,14 @@ struct Tensor[dtype: DType = DType.float32](
         gradients: Self.GradTensor
     ) escaping -> Self.GradOutputs
     var grad_fn: UnsafePointer[Self.BackwardFn]
+    var _backward_fn: UnsafePointer[BackwardFn[dtype]]
 
     fn gradients(self) -> UnsafePointer[Self]:
         return self.grad
 
-    fn capture_grad_fn(mut self, grad_fn: Self.BackwardFn):
-        self.grad_fn = UnsafePointer[Self.BackwardFn].alloc(1)
-        self.grad_fn.init_pointee_move(grad_fn)
+    fn capture_backward_fn(mut self, backward_fn: BackwardFn[dtype]):
+        self._backward_fn = UnsafePointer[BackwardFn[dtype]].alloc(1)
+        self._backward_fn.init_pointee_copy(backward_fn)
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         if not self.requires_grad:
@@ -110,7 +111,7 @@ struct Tensor[dtype: DType = DType.float32](
         Shape.validate(shape)
         self.shape = shape
         self.requires_grad = requires_grad
-        self.grad_fn = UnsafePointer[Self.BackwardFn]()
+        self._backward_fn = UnsafePointer[BackwardFn[dtype]]()
         self.grad = UnsafePointer[__type_of(self)]()
         self.base = UnsafePointer[Tensor[dtype]]()
         self.data = data
@@ -144,7 +145,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.shape = shape
         self.requires_grad = requires_grad
         self.base = UnsafePointer[Tensor[dtype]]()
-        self.grad_fn = UnsafePointer[Self.BackwardFn]()
+        self._backward_fn = UnsafePointer[BackwardFn[dtype]]()
         self.grad = UnsafePointer[__type_of(self)]()
         if shape.ndim == 0:  # Tensor with Shape ()
             self.data = UnsafePointer[Scalar[self.dtype]].alloc(1)
@@ -164,8 +165,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn into_recipient(self) -> TensorLike[dtype]:
         return TensorLike[dtype](UnsafePointer(to=self))
 
-    fn backward_fn(self) -> UnsafePointer[Self.BackwardFn]:
-        return self.grad_fn
+    fn backward_fn(self) -> UnsafePointer[BackwardFn[dtype]]:
+        return self._backward_fn
 
     fn has_grad_fn(self) -> Bool:
         return self.backward_fn().__as_bool__()
@@ -280,7 +281,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = other.requires_grad
         self.grad = other.grad
         self.base = other.base
-        self.grad_fn = other.grad_fn
+        self._backward_fn = other._backward_fn
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
@@ -289,7 +290,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = other.requires_grad
         self.grad = other.grad
         self.base = other.base
-        self.grad_fn = other.grad_fn
+        self._backward_fn = other._backward_fn
         self.init_grad()
 
     fn init_grad(mut self):
@@ -311,8 +312,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn free(owned self):
         if self.has_grad_fn():
             log_debug("Tensor__del__ → freed grad_fn")
-            self.grad_fn.destroy_pointee()
-            self.grad_fn.free()
+            self._backward_fn.destroy_pointee()
+            self._backward_fn.free()
         if self.has_grad():
             for i in range(self.numels()):
                 (self.data + i).destroy_pointee()
@@ -987,8 +988,8 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[cast_values, simdwidthof[NewType]()](result.numels())
         return result
 
-    fn update_grad[opcode: Int](self, incoming: Tensor[dtype]):
-        self.grad[] = __tensor_op_tensor__[dtype, opcode](self.grad[], incoming)
+    fn update_grad[opcode: Int](self, gradients: Tensor[dtype]):
+        self.grad[] = __tensor_op_tensor__[dtype, opcode](self.grad[], gradients)
 
     fn is_scalar(self) -> Bool:
         return self.numels() == 1 and self.shape == Shape.Void
@@ -1025,7 +1026,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         if self.requires_grad:
 
-            fn grad_fn(gradients: Self.GradTensor) -> Self.GradOutputs:
+            fn grad_fn(gradients: Self.GradTensor) escaping -> Self.GradOutputs:
                 var base_squared = self.__pow__(2)
                 base_squared_reciprocal = __tensor_op_scalar__[
                     dtype, DivideScalar
@@ -1033,7 +1034,7 @@ struct Tensor[dtype: DType = DType.float32](
                 var grad = (gradients * scalar) * base_squared_reciprocal
                 return [(self.into_recipient(), grad, SubtractTensor)]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1051,7 +1052,7 @@ struct Tensor[dtype: DType = DType.float32](
                 var scaled = gradients / scalar
                 return [(self.into_recipient(), scaled, AddTensor)]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1069,7 +1070,7 @@ struct Tensor[dtype: DType = DType.float32](
                 # Gradient of addition is 1 → just pass through incoming grad
                 return [(self.into_recipient(), gradients, AddTensor)]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1092,7 +1093,7 @@ struct Tensor[dtype: DType = DType.float32](
                 )
                 return [(self.into_recipient(), scaled_gradients, AddTensor)]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1126,7 +1127,7 @@ struct Tensor[dtype: DType = DType.float32](
                 )
                 return [(self.into_recipient(), product, AddTensor)]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1139,7 +1140,7 @@ struct Tensor[dtype: DType = DType.float32](
             ) -> Self.GradOutputs:
                 return [(self.into_recipient(), gradients, SubtractTensor)]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
         return out
 
     fn __sub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
@@ -1152,7 +1153,7 @@ struct Tensor[dtype: DType = DType.float32](
             ) -> Self.GradOutputs:
                 return [(self.into_recipient(), gradients, AddTensor)]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
         return out
 
     fn reshape(self) -> Tensor[dtype]:
@@ -1201,7 +1202,7 @@ struct Tensor[dtype: DType = DType.float32](
                 out.base.init_pointee_move(reshaped^)
                 return [(self.into_recipient(), new_contrib, AddTensor)]
 
-            out.capture_grad_fn(grad_fn)
+            #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1227,7 +1228,8 @@ struct Tensor[dtype: DType = DType.float32](
                 ) -> Self.GradOutputs:
                     return [(self.into_recipient(), gradients, AddTensor)]
 
-                scalar_out.capture_grad_fn(scalar_grad_fn)
+                #scalar_out.capture_grad_fn(scalar_grad_fn)
+                scalar_out.capture_backward_fn(BackwardFn[dtype](scalar_grad_fn))
             return scalar_out
 
         # FIX 1: Handle full reduction case explicitly
@@ -1308,7 +1310,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 ]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1361,7 +1363,7 @@ struct Tensor[dtype: DType = DType.float32](
                 scaled = broadcasted / Scalar[dtype](count)
                 return [(self.address()[].into_recipient(), scaled, AddTensor)]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1409,7 +1411,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 return grad_outputs
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1457,7 +1459,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 return grad_outputs
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1499,7 +1501,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 return grad_outputs
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1561,7 +1563,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 return grad_outputs
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1574,12 +1576,12 @@ struct Tensor[dtype: DType = DType.float32](
 
         if self.requires_grad or other.requires_grad:
 
-            fn grad_fn(incoming: Self.GradTensor) -> Self.GradOutputs:
+            fn grad_fn(gradients: Self.GradTensor) -> Self.GradOutputs:
                 var grad_outputs: Self.GradOutputs = []
 
                 if self.address()[].requires_grad:
                     var grad_self = self.address()[].backward_grad_contrib(
-                        other.address()[], incoming, False
+                        other.address()[], gradients, False
                     )
                     grad_outputs.append(
                         (
@@ -1591,7 +1593,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                 if other.address()[].requires_grad:
                     var grad_other = other.address()[].backward_grad_contrib(
-                        self.address()[], incoming, False
+                        self.address()[], gradients, False
                     )
                     grad_outputs.append(
                         (
@@ -1603,7 +1605,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                 return grad_outputs
 
-            result.capture_grad_fn(grad_fn)
+            result.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return result
 
@@ -1744,7 +1746,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 ]
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1862,7 +1864,7 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 return grad_outputs
 
-            out.capture_grad_fn(grad_fn)
+            out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
@@ -1900,40 +1902,41 @@ struct Tensor[dtype: DType = DType.float32](
 
                 return [(self.into_recipient(), grad_transposed, AddTensor)]
 
-            #out.capture_grad_fn(grad_fn)"""
+            #out.capture_backward_fn(BackwardFn[dtype](grad_fn))"""
 
         return out
 
 
 fn main() raises:
-    # a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     # a.print()
     # t = a.transpose()
     # t.print()
-    a1 = Tensor.arange(24).reshape(2, 3, 4)
-    b1 = a1.transpose([1, 0, 2])
-    a1.print()
-    print()
-    b1.print()
+    #a1 = Tensor.arange(24).reshape(2, 3, 4)
+    #b1 = a1.transpose([1, 0, 2])
+    #a1.print()
+    #print()
+    #b1.print()
 
+from testing import assert_true
 
-_ = """fn test_slice_grad() raises:
+fn test_slice_grad() raises:
     print("test_slice_grad")
     var a = Tensor.d1([1,2,3,4], requires_grad=True)
-    var b = a[1:3]  # [2,3]
+    _="""var b = a[1:3]  # [2,3]
     var c = b * Tensor.d1([10,20])
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d1([0,10,20,0])))
+    assert_true(a.grad[].all_close(Tensor.d1([0,10,20,0])))"""
 
 fn test_nested_operations() raises:
     print("test_nested_operations")
     var a = Tensor.d1([1, 2], requires_grad=True)
     var b = Tensor.d1([3, 4], requires_grad=True)
-    var c = (a * b).sum() + (a + b).prod()
+    _="""var c = (a * b).sum() + (a + b).prod()
     c.backward()
     # Verify gradients numerically
     assert_true(abs(a.grad[][0] - 11.0) < 1e-6)  # 3 + (3+4)*1
-    assert_true(abs(b.grad[][0] - 8.0) < 1e-6)  # 1 + (1+2)*1
+    assert_true(abs(b.grad[][0] - 8.0) < 1e-6)  # 1 + (1+2)*1"""
 
 
 fn test_large_tensor_backprop() raises:
@@ -1948,11 +1951,11 @@ fn test_large_tensor_backprop() raises:
 
 fn test_detach() raises:
     print("test_detach")
-    var a = Tensor.d1([1,2], requires_grad=True)
+    _="""var a = Tensor.d1([1,2], requires_grad=True)
     var b = a.detach() * 2  # Should not propagate grad
     var c = a * b
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d1([2,4])))  # Only from c = a*b
+    assert_true(a.grad[].all_close(Tensor.d1([2,4])))  # Only from c = a*b"""
 
 fn test_empty_tensor() raises:
     print("test_empty_tensor")
@@ -1960,4 +1963,4 @@ fn test_empty_tensor() raises:
     var s = a.sum()
     s.backward()
     assert_true(s.item() == 0.0)
-    assert_true(a.grad[].shape == Shape.of(0))"""
+    assert_true(a.grad[].shape == Shape.of(0))

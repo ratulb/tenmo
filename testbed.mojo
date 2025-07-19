@@ -13,19 +13,41 @@ alias IndexArg = Variant[Int, Slice]
 @fieldwise_init
 struct S:
     fn __getitem__(self, *slices: Slice) -> None:
-             for slice in slices:
-                print(slice)
+        for slice in slices:
+            print(slice)
 
+
+@fieldwise_init
+struct T(Copyable & Movable):
+    alias InnerFn = fn (input: String) -> String
+    var inner_fn: UnsafePointer[Self.InnerFn]
+
+    fn __init__(out self):
+        self.inner_fn = UnsafePointer[Self.InnerFn]()
+
+    fn do_it(self) -> Self:
+        fn some_inner_fn(input: String) -> String:
+            return input.upper()
+
+        result = T()
+        function = some_inner_fn
+        result.inner_fn = UnsafePointer[Self.InnerFn].alloc(1)
+        result.inner_fn.init_pointee_copy(UnsafePointer(to=function)[])
+        return result
 
 
 fn main() raises:
-    s = S()
-    _ = s[:] # slice(None, None, None)
-    _ = s[:, ::-1] # slice(None, None, None), slice(None, None, -1)
-    _ = s[::] # slice(None, None, None)
-    _ = s[1:] # slice(None, None, None)
+    t = T()
+    result = t.do_it()
+    from_inner = result.inner_fn[]("some input")
 
-    _="""a =  Tensor[DType.bool]([], requires_grad=False)
+    s = S()
+    _ = s[:]  # slice(None, None, None)
+    _ = s[:, ::-1]  # slice(None, None, None), slice(None, None, -1)
+    _ = s[::]  # slice(None, None, None)
+    _ = s[1:]  # slice(None, None, None)
+
+    _ = """a =  Tensor[DType.bool]([], requires_grad=False)
     a.print()
     shape = Shape.of(2,3, 4)
 
@@ -48,7 +70,7 @@ fn main() raises:
                     carry = False
             print("inside inner idx: ", idx)"""
 
-    _="""tensor = Tensor.rand(10)
+    _ = """tensor = Tensor.rand(10)
     print(
         (
             "tensor.id(), tensor.id(), tensor.address()[].id(),"

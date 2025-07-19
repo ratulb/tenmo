@@ -118,7 +118,7 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
 
         return Strides(strides_list)
 
-    _ = """# Compute strides from shape in row-major order
+        _ = """# Compute strides from shape in row-major order
     @staticmethod
     fn default(shape: Shape) -> Self:
         var strides = IntList.with_capacity(shape.rank())

@@ -104,7 +104,7 @@ fn test_into_tensor_large_contiguous_copy() raises:
     assert_true(out[123456] == 123456)
 
 
-_ = """fn test_into_tensor_isolated_memory() raises:
+    _ = """fn test_into_tensor_isolated_memory() raises:
     print("test_into_tensor_isolated_memory")
     var t = Tensor.d1([1, 2, 3, 4])
     var v = t.slice(1, 3)  # [2, 3]

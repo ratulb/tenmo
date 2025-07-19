@@ -188,7 +188,7 @@ fn sum_across_cols[  # sum axis = 0
     return out
 
 
-_ = """fn sum_across_cols[# sum axis = 0
+fn sum_across_cols1[# sum axis = 0
     dtype: DType = DType.float32
 ](tensor: Tensor[dtype]) -> Tensor[dtype]:
     COLS = tensor.shape[1]
@@ -204,7 +204,7 @@ _ = """fn sum_across_cols[# sum axis = 0
 
     parallelize[sum_cols](COLS)
     return out
-fn sum_across_cols[# sum axis = 0
+fn sum_across_cols2[# sum axis = 0
     dtype: DType = DType.float32
 ](tensor: Tensor[dtype]) -> Tensor[dtype]:
     COLS = tensor.shape[1]
@@ -225,7 +225,7 @@ fn sum_across_cols[# sum axis = 0
             out[col] += col_start.strided_load[width = simd_width](COLS).reduce_add()
 
     parallelize[sum_chunk](num_threads)
-    return out"""
+    return out
 
 
 # Element wise operatorns
