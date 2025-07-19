@@ -2,7 +2,10 @@ from tensors import Tensor
 from shapes import Shape
 from views import TensorView
 from intlist import IntList
+from backpropagation import BackwardFn
 
+fn main() raises:
+    print("Hello")
 
 struct TensorLike[dtype: DType](
     Sized & Stringable & Representable & Writable & Copyable & Movable
@@ -68,15 +71,15 @@ struct TensorLike[dtype: DType](
             indices
         ] if self.is_tensor() else self.view_address[][indices]
 
-    fn has_grad_fn(self) -> Bool:
+    fn has_backward_fn(self) -> Bool:
         return (
             self.tensor_address[]
-            .has_grad_fn() if self.is_tensor() else self.view_address[]
+            .has_backward_fn() if self.is_tensor() else self.view_address[]
             .base_tensor[]
-            .has_grad_fn()
+            .has_backward_fn()
         )
 
-    fn grad_fn(self) -> UnsafePointer[Tensor[dtype].BackwardFn]:
+    fn backward_fn(self) -> BackwardFn[dtype]:
         return (
             self.tensor_address[]
             .backward_fn() if self.is_tensor() else self.view_address[]

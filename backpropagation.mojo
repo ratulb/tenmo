@@ -1,19 +1,70 @@
 from tensors import Tensor
 from shared import TensorLike
+from operators import __tensor_op_tensor__, AddTensor, SubtractTensor
+from functional import Differentiable
+from utils import Variant
+from os import abort
+
+alias GradFn[dtype: DType] = Variant[ReshapeBackward[dtype]]
+
+
+struct BackwardFn[dtype: DType](Copyable & Movable):
+    var grad_fn: GradFn[dtype]
+
+    fn __init__(out self, grad_fn: GradFn[dtype]):
+        self.grad_fn = grad_fn
+
+    fn __moveinit__(out self, owned other: Self):
+        self.grad_fn = other.grad_fn
+
+    fn __copyinit__(out self, other: Self):
+        self.grad_fn = other.grad_fn
+
+    fn __call__(
+        self, out_ptr: UnsafePointer[Tensor[dtype]]
+    ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
+        if self.grad_fn.isa[ReshapeBackward[dtype]]():
+            return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](out_ptr)
+        else:
+            abort("I am not here to receive you")
+        return [(Tensor[dtype]([]).into_tensorlike(), Tensor[dtype]([]), -1)]
+
+struct ReshapeBackward[dtype: DType](Copyable & Movable & Differentiable):
+    fn __init__(out self):
+        pass
+
+    fn __moveinit__(out self, owned other: Self):
+        pass
+
+    fn __copyinit__(out self, other: Self):
+        pass
+
+    fn backward[dtype: DType](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ]:
+        output = out_ptr[]
+        output.print()
+        print("output.id(): ", output.id())
+        gradients = output.grad[]
+        ancestor = output.ancestors.get(0)[]
+        ancestor.print()
+        s, i, ii = ancestor.shape(), ancestor.id(), ancestor.inner_id()
+        print("All the way here? ancestor.id(), ancestor.inner_id(): ", s, i, ii)
+        reshaped = gradients.reshape(ancestor.shape())
+        reshaped.print()
+        print("reshaped.id(): ", reshaped.id())
+        # Deduct already contributed portion
+        new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
+            reshaped, output.base[]
+        )
+
+        # Update base accumulator
+        output.base.init_pointee_move(reshaped^)
+        print("All the way there?")
+        return [(ancestor, new_contrib, AddTensor)]
+
+    fn into_backward_fn(self) -> BackwardFn[dtype]:
+        return BackwardFn[dtype](GradFn[dtype](self))
 
 fn main():
-    pass
-
-@fieldwise_init
-struct BackwardFn[dtype: DType](Movable & Copyable):
-    alias Opcode = Int
-    alias GradTensor = Tensor[dtype]
-    alias Recipient = TensorLike[dtype]
-    alias Triple = (Self.Recipient, Self.GradTensor, Self.Opcode)
-    alias GradOutputs = List[Self.Triple]
-    alias GradFn = fn(gradients: Self.GradTensor) escaping -> Self.GradOutputs
-
-    var grad_fn: Self.GradFn
-
-    fn __call__(self, gradients: Self.GradTensor) -> Self.GradOutputs:
-        return self.grad_fn(gradients)
+    print("Yes")
