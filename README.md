@@ -25,7 +25,7 @@ A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modu
 | ✅ Pretty-printing        | ✔️     | Recursive + aligned |
 | ✅ Slicing & Views        | ✔️     | Offset-aware `TensorView` |
 | ✅ Autodiff               | 🧪     | Scalar ops + graph-based backprop |
-| ✅ Gradient Tracking      | 🧪     | In progress |
+| ✅ Gradient Tracking      | 🧪     | In progress full swing |
 | ✅ Unit Testing           | ✔️     | Custom test suite |
 
 ---
