@@ -37,8 +37,6 @@ struct TensorLike[dtype: DType](
         self.tensor_address = other.tensor_address
         self.view_address = other.view_address
 
-    fn address(self) -> UnsafePointer[Self]:
-        return UnsafePointer(to=self)
 
     fn is_view(self) -> Bool:
         return self.kind == 1
@@ -95,14 +93,18 @@ struct TensorLike[dtype: DType](
             .gradients()
         )
 
-    fn id(self) -> Int:
-        return Int(self.address())
+    fn inner_address(self) -> UnsafePointer[Tensor[dtype]]:
+        if self.kind == 0:
+            return self.tensor_address
+        else:
+            return self.view_address[].base_tensor #base pointer address
+
 
     fn inner_id(self) -> Int:
         if self.kind == 0:
-            return self.tensor_address[].id()
+            return Tensor.id(self.tensor_address)
         else:
-            return self.view_address[].id()
+            return TensorView.id(self.view_address) # View id!
 
     fn rank(self) -> Int:
         return self.shape().rank()

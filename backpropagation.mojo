@@ -27,7 +27,7 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](out_ptr)
         else:
             abort("I am not here to receive you")
-        return [(Tensor[dtype]([]).into_tensorlike(), Tensor[dtype]([]), -1)]
+        return [(Tensor.into_tensorlike(UnsafePointer(to=Tensor[dtype]([]))), Tensor[dtype]([]), -1)]
 
 struct ReshapeBackward[dtype: DType](Copyable & Movable & Differentiable):
     fn __init__(out self):
@@ -43,16 +43,9 @@ struct ReshapeBackward[dtype: DType](Copyable & Movable & Differentiable):
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        output.print()
-        print("output.id(): ", output.id())
         gradients = output.grad[]
         ancestor = output.ancestors.get(0)[]
-        ancestor.print()
-        s, i, ii = ancestor.shape(), ancestor.id(), ancestor.inner_id()
-        print("All the way here? ancestor.id(), ancestor.inner_id(): ", s, i, ii)
         reshaped = gradients.reshape(ancestor.shape())
-        reshaped.print()
-        print("reshaped.id(): ", reshaped.id())
         # Deduct already contributed portion
         new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
             reshaped, output.base[]
@@ -60,7 +53,6 @@ struct ReshapeBackward[dtype: DType](Copyable & Movable & Differentiable):
 
         # Update base accumulator
         output.base.init_pointee_move(reshaped^)
-        print("All the way there?")
         return [(ancestor, new_contrib, AddTensor)]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:

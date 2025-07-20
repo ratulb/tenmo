@@ -220,11 +220,9 @@ struct TensorView[dtype: DType = DType.float32](
     fn _requires_grad(self) -> Bool:
         return self.requires_grad
 
-    fn address(self) -> UnsafePointer[Self]:
-        return UnsafePointer(to=self)
-
-    fn id(self) -> Int:
-        return Int(self.address())
+    @staticmethod
+    fn id(ptr: UnsafePointer[Self]) -> Int:
+        return Int(ptr)
 
     fn is_view(self) -> Bool:
         return True

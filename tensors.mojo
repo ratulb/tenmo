@@ -72,22 +72,23 @@ struct Tensor[dtype: DType = DType.float32](
         self.seed_grad(seed_tensor)
 
         visited = IntList.Empty
-        stack = [self.into_recipient()]
+        stack = [Tensor.into_recipient(UnsafePointer(to=self))]
 
         while stack:
             node = stack.pop()
+            #For view -> Currently everything is going base tensor
             if node.has_backward_fn():
-                for recepient, grad_share, opcode in node.backward_fn()(
-                    node.address()[].tensor().address()
+                for recipient, grad_share, opcode in node.backward_fn()(
+                    node.inner_address()
                 ):
                     if opcode == AddTensor:
-                        recepient.update_grad[AddTensor](grad_share)
+                        recipient.update_grad[AddTensor](grad_share)
                     elif opcode == SubtractTensor:
-                        recepient.update_grad[SubtractTensor](grad_share)
+                        recipient.update_grad[SubtractTensor](grad_share)
 
-                    if recepient.inner_id() not in visited:
-                        stack.append(recepient)
-                        visited.append(recepient.inner_id())
+                    if recipient.inner_id() not in visited:
+                        stack.append(recipient)
+                        visited.append(recipient.inner_id())
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -155,11 +156,13 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return True
 
-    fn into_tensorlike(self) -> TensorLike[dtype]:
-        return TensorLike[dtype](UnsafePointer(to=self))
+    @staticmethod
+    fn into_tensorlike(self_ptr: UnsafePointer[Tensor[dtype]]) -> TensorLike[dtype]:
+        return TensorLike[dtype](self_ptr)
 
-    fn into_recipient(self) -> TensorLike[dtype]:
-        return TensorLike[dtype](UnsafePointer(to=self))
+    @staticmethod
+    fn into_recipient(self_ptr: UnsafePointer[Tensor[dtype]]) -> TensorLike[dtype]:
+        return Self.into_tensorlike(self_ptr)
 
     # Check if it has a backward fn before calling this API
     fn backward_fn(self) -> BackwardFn[dtype]:
@@ -167,12 +170,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn has_backward_fn(self) -> Bool:
         return self.backwardFn is not None
-
-    fn address(self) -> UnsafePointer[Tensor[dtype]]:
-        return UnsafePointer(to=self)
-
-    fn id(self) -> Int:
-        return Int(self.address())
+    @staticmethod
+    fn id(ptr: UnsafePointer[Self]) -> Int:
+        return Int(ptr)
 
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
         if self.shape.ndim == 0 and len(indices) != 0:  # Tensor with Shape ()
@@ -307,13 +307,12 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.grad[].print()
 
-    fn add_ancestry(mut self, *parents: Tensor[dtype]):
+    fn add_ancestry(mut self, *parents: TensorLike[dtype]):
         for parent in parents:
-            stable = parent.into_tensorlike()
             var ptr = UnsafePointer[TensorLike[dtype]].alloc(1)
-            ptr.init_pointee_move(stable)
+            ptr.init_pointee_copy(parent)
             self.ancestors.append(ptr)
-            try:
+            _="""try:
                 msg = String(
                     "Tensor -> add_ancestry -> DAG node inner id(ancestor):"
                     " {0}, self id(descendant): {1} => kind: "
@@ -323,7 +322,7 @@ struct Tensor[dtype: DType = DType.float32](
                 )  # Critical compiler issue c = a + b, s = c.sum(), results in s.id() == b.id() if self.id() is not printed!
                 log_debug(msg)
             except e:
-                print(e)
+                print(e)"""
 
     fn ancestry(self) -> Ancestors[dtype]:
         return self.ancestors
@@ -974,7 +973,7 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
-        tensor_like = self.into_recipient()
+        tensor_like = Self.into_recipient(UnsafePointer(to=self))
         tensor_like.print(num_first, num_last)
 
     @staticmethod
@@ -1049,7 +1048,7 @@ struct Tensor[dtype: DType = DType.float32](
                     dtype, DivideScalar
                 ](base_squared, 1.0)
                 var grad = (gradients * scalar) * base_squared_reciprocal
-                return [(self.into_recipient(), grad, SubtractTensor)]
+                return [(Self.into_recipient(UnsafePointer(to=self)), grad, SubtractTensor)]
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
@@ -1067,7 +1066,7 @@ struct Tensor[dtype: DType = DType.float32](
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
                 var scaled = gradients / scalar
-                return [(self.into_recipient(), scaled, AddTensor)]
+                return [(Self.into_recipient(UnsafePointer(to=self)), scaled, AddTensor)]
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
@@ -1085,7 +1084,7 @@ struct Tensor[dtype: DType = DType.float32](
                 gradients: Tensor[dtype],
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 # Gradient of addition is 1 → just pass through incoming grad
-                return [(self.into_recipient(), gradients, AddTensor)]
+                return [(Self.into_recipient(UnsafePointer(to=self)), gradients, AddTensor)]
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
@@ -1108,7 +1107,7 @@ struct Tensor[dtype: DType = DType.float32](
                 scaled_gradients = __tensor_op_scalar__[dtype, MulScalar](
                     gradients, scalar
                 )
-                return [(self.into_recipient(), scaled_gradients, AddTensor)]
+                return [(Self.into_recipient(UnsafePointer(to=self)), scaled_gradients, AddTensor)]
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
@@ -1126,23 +1125,19 @@ struct Tensor[dtype: DType = DType.float32](
                 gradients: Tensor[dtype],
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 # ∂(x**n)/∂x = n * x**(n-1)
-                requires_grad = self.requires_grad
-                # Set requires_grad to False and restore it back - requires self to be mutable
-                # But self is not mutable - Hence the pointer indirection
-                self.address()[].requires_grad = False
                 # Need to see if base_pow gets a grad_fn or not - we don't want it to have one!
                 # var base_pow = self ** (scalar - 1.0)
-                var base_pow = __tensor_op_scalar__[dtype, Power](
-                    self, (scalar - 1.0)
+                base_pow = __tensor_op_scalar__[dtype, Power](
+                    UnsafePointer(to=self)[], (scalar - 1.0)
                 )
-                self.address()[].requires_grad = requires_grad
+                base_pow.requires_grad = False
                 var local_grad = __tensor_op_scalar__[dtype, MulScalar](
                     base_pow, scalar
                 )
                 product = __tensor_op_tensor__[dtype, MulTensor](
                     gradients, local_grad
                 )
-                return [(self.into_recipient(), product, AddTensor)]
+                return [(Self.into_recipient(UnsafePointer(to=self)), product, AddTensor)]
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
@@ -1155,7 +1150,7 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn(
                 gradients: Tensor[dtype],
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                return [(self.into_recipient(), gradients, SubtractTensor)]
+                return [(Self.into_recipient(UnsafePointer(to=self)), gradients, SubtractTensor)]
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
         return out
@@ -1168,7 +1163,7 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn(
                 gradients: Tensor[dtype],
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                return [(self.into_recipient(), gradients, AddTensor)]
+                return [(Self.into_recipient(UnsafePointer(to=self)), gradients, AddTensor)]
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
         return out
@@ -1206,32 +1201,11 @@ struct Tensor[dtype: DType = DType.float32](
             out.base = UnsafePointer[Tensor[dtype]].alloc(1)
             out.base.init_pointee_move(base^)
 
-            _="""fn grad_fn(
-                gradients: Tensor[dtype],
-            ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                reshaped = gradients.reshape(self.shape)
-                # Deduct already contributed portion
-                new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
-                    reshaped, out.base[]
-                )
-
-                # Update base accumulator
-                out.base.init_pointee_move(reshaped^)
-                return [(self.into_recipient(), new_contrib, AddTensor)]
-
-            #out.capture_backward_fn(BackwardFn[dtype](grad_fn))"""
-            #reshaped_grad_fn = ReshapeGradFn[dtype](self.address(), out.address())
-            #function = reshaped_grad_fn
-            #out.capture_backward_fn(BackwardFn[dtype](reshaped_grad_fn))
             backward_fn = ReshapeBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            pointer = UnsafePointer(to=self)
+            out.add_ancestry(Self.into_tensorlike(pointer))
 
-            _="""out.capture_backward_fn(
-                BackwardFn[dtype](
-                    make_reshape_grad_fn[dtype](self.address(), out.address())
-                )
-            )"""
         return out
 
     fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
@@ -1254,7 +1228,7 @@ struct Tensor[dtype: DType = DType.float32](
                 fn scalar_grad_fn(
                     gradients: Tensor[dtype],
                 ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                    return [(self.into_recipient(), gradients, AddTensor)]
+                    return [(Self.into_recipient(UnsafePointer(to=self)), gradients, AddTensor)]
 
                 #scalar_out.capture_grad_fn(scalar_grad_fn)
                 #scalar_out.capture_backward_fn(BackwardFn[dtype](scalar_grad_fn))
@@ -1301,7 +1275,7 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn(
                 gradients: Tensor[dtype],
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                original_shape = self.address()[].shape
+                original_shape = UnsafePointer(to=self)[].shape
                 var grad_contrib: Tensor[dtype]
 
                 # Handle scalar gradient case (sum reduced to scalar)
@@ -1332,7 +1306,7 @@ struct Tensor[dtype: DType = DType.float32](
 
                 return [
                     (
-                        self.address()[].into_recipient(),
+                        Self.into_recipient(UnsafePointer(to=self)),
                         grad_contrib,
                         AddTensor,
                     )
@@ -1362,13 +1336,13 @@ struct Tensor[dtype: DType = DType.float32](
                 gradients: Tensor[dtype],
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 if gradients.shape == Shape.Void:
-                    scalar_grad = gradients.item() / self.address()[].numels()
+                    scalar_grad = gradients.item() / UnsafePointer(to=self)[].numels()
                     grad_contrib = Tensor[dtype].full(
-                        self.address()[].shape, scalar_grad, requires_grad=False
+                        UnsafePointer(to=self)[].shape, scalar_grad, requires_grad=False
                     )
                     return [
                         (
-                            self.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=self)),
                             grad_contrib,
                             AddTensor,
                         )
@@ -1387,16 +1361,16 @@ struct Tensor[dtype: DType = DType.float32](
                     )
 
                 # Broadcast and divide
-                broadcasted = expanded.broadcast_to(self.address()[].shape)
+                broadcasted = expanded.broadcast_to(UnsafePointer(to=self)[].shape)
                 scaled = broadcasted / Scalar[dtype](count)
-                return [(self.address()[].into_recipient(), scaled, AddTensor)]
+                return [(Self.into_recipient(UnsafePointer(to=self)), scaled, AddTensor)]
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
         return out
 
     fn __add__(self, other: Self) -> Tensor[dtype]:
-        if self.address() == other.address():
+        if UnsafePointer(to=self) == UnsafePointer(to=other):
             return self.__mul__(2)
         if not self.broadcastable(other):
             abort(
@@ -1420,19 +1394,19 @@ struct Tensor[dtype: DType = DType.float32](
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 grad_outputs = List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]()
 
-                if self.address()[].requires_grad:
+                if UnsafePointer(to=self)[].requires_grad:
                     grad_outputs.append(
                         (
-                            self.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=self)),
                             gradients,
                             AddTensor,
                         )
                     )
 
-                if other.address()[].requires_grad:
+                if UnsafePointer(to=other)[].requires_grad:
                     grad_outputs.append(
                         (
-                            other.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=other)),
                             gradients,
                             AddTensor,
                         )
@@ -1458,7 +1432,7 @@ struct Tensor[dtype: DType = DType.float32](
             ](other)
 
         out = __tensor_op_tensor__[dtype, SubtractTensor](
-            self.address()[], other.address()[]
+            UnsafePointer(to=self)[], UnsafePointer(to=other)[]
         )
 
         if self.requires_grad or other.requires_grad:
@@ -1468,19 +1442,19 @@ struct Tensor[dtype: DType = DType.float32](
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 grad_outputs = List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]()
 
-                if self.address()[].requires_grad:
+                if UnsafePointer(to=self)[].requires_grad:
                     grad_outputs.append(
                         (
-                            self.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=self)),
                             gradients,
                             AddTensor,
                         )
                     )
 
-                if other.address()[].requires_grad:
+                if UnsafePointer(to=other)[].requires_grad:
                     grad_outputs.append(
                         (
-                            other.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=other)),
                             gradients,
                             SubtractTensor,
                         )
@@ -1504,25 +1478,25 @@ struct Tensor[dtype: DType = DType.float32](
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 grad_outputs = List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]()
 
-                if self.address()[].requires_grad:
-                    grad_contrib = self.address()[].backward_grad_contrib(
-                        other.address()[], gradients, True
+                if UnsafePointer(to=self)[].requires_grad:
+                    grad_contrib = UnsafePointer(to=self)[].backward_grad_contrib(
+                        UnsafePointer(to=other)[], gradients, True
                     )
                     grad_outputs.append(
                         (
-                            self.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=self)),
                             grad_contrib,
                             AddTensor,
                         )
                     )
-                if other.address()[].requires_grad:
-                    grad_contrib = other.address()[].backward_grad_contrib(
-                        self.address()[], gradients, True
+                if UnsafePointer(to=other)[].requires_grad:
+                    grad_contrib = UnsafePointer(to=other)[].backward_grad_contrib(
+                        UnsafePointer(to=self)[], gradients, True
                     )
 
                     grad_outputs.append(
                         (
-                            other.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=other)),
                             grad_contrib,
                             AddTensor,
                         )
@@ -1558,33 +1532,27 @@ struct Tensor[dtype: DType = DType.float32](
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 grad_outputs = List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]()
 
-                if self.address()[].requires_grad:
-                    requires_grad_original = other.address()[].requires_grad
-                    other.address()[].requires_grad = (
-                        False  # Prevent requires_grad for grads
-                    )
+                if UnsafePointer(to=self)[].requires_grad:
                     product = __tensor_op_tensor__[dtype, MulTensor](
-                        gradients, other.address()[]
+                        gradients, UnsafePointer(to=other)[]
                     )
-                    other.address()[].requires_grad = requires_grad_original
+                    product.requires_grad = False
                     grad_outputs.append(
                         (
-                            self.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=self)),
                             product,
                             AddTensor,
                         )
                     )
 
-                if other.address()[].requires_grad:
-                    requires_grad_original = self.address()[].requires_grad
-                    self.address()[].requires_grad = False
+                if UnsafePointer(to=other)[].requires_grad:
                     product = __tensor_op_tensor__[dtype, MulTensor](
-                        gradients, self.address()[]
+                        gradients, UnsafePointer(to=self)[]
                     )
-                    self.address()[].requires_grad = requires_grad_original
+                    product.requires_grad = False
                     grad_outputs.append(
                         (
-                            other.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=other)),
                             product,
                             AddTensor,
                         )
@@ -1607,25 +1575,25 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn(gradients: Tensor[dtype]) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 var grad_outputs: List[Tuple[TensorLike[dtype], Tensor[dtype], Int]] = []
 
-                if self.address()[].requires_grad:
-                    var grad_self = self.address()[].backward_grad_contrib(
-                        other.address()[], gradients, False
+                if UnsafePointer(to=self)[].requires_grad:
+                    var grad_self = UnsafePointer(to=self)[].backward_grad_contrib(
+                        UnsafePointer(to=other)[], gradients, False
                     )
                     grad_outputs.append(
                         (
-                            self.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=self)),
                             grad_self,
                             tensor_op_first,
                         )
                     )
 
-                if other.address()[].requires_grad:
-                    var grad_other = other.address()[].backward_grad_contrib(
-                        self.address()[], gradients, False
+                if UnsafePointer(to=other)[].requires_grad:
+                    var grad_other = UnsafePointer(to=other)[].backward_grad_contrib(
+                        UnsafePointer(to=self)[], gradients, False
                     )
                     grad_outputs.append(
                         (
-                            other.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=other)),
                             grad_other,
                             tensor_op_second,
                         )
@@ -1768,7 +1736,7 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn(gradients: Tensor[dtype]) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 return [
                     (
-                        self.address()[].into_recipient(),
+                        Self.into_recipient(UnsafePointer(to=self)),
                         gradients.T(),
                         AddTensor,
                     )
@@ -1870,22 +1838,22 @@ struct Tensor[dtype: DType = DType.float32](
             fn grad_fn(gradients: Tensor[dtype]) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 var grad_outputs: List[Tuple[TensorLike[dtype], Tensor[dtype], Int]] = []
 
-                if self.address()[].requires_grad:
-                    self_grad = gradients.matmul(other.address()[].T())
+                if UnsafePointer(to=self)[].requires_grad:
+                    self_grad = gradients.matmul(UnsafePointer(to=other)[].T())
                     self_grad.requires_grad = False
                     grad_outputs.append(
                         (
-                            self.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=self)),
                             self_grad,
                             AddTensor,
                         )
                     )
-                if other.address()[].requires_grad:
-                    other_grad = self.address()[].T().matmul(gradients)
+                if UnsafePointer(to=other)[].requires_grad:
+                    other_grad = UnsafePointer(to=self)[].T().matmul(gradients)
                     other_grad.requires_grad = False
                     grad_outputs.append(
                         (
-                            other.address()[].into_recipient(),
+                            Self.into_recipient(UnsafePointer(to=other)),
                             other_grad,
                             AddTensor,
                         )
@@ -1928,7 +1896,7 @@ struct Tensor[dtype: DType = DType.float32](
                 inverted_axes = IntList.invert_permutation(normalized_axes)
                 grad_transposed = gradients.transpose(inverted_axes)
 
-                return [(self.into_recipient(), grad_transposed, AddTensor)]
+                return [(Self.into_recipient(UnsafePointer(to=self)), grad_transposed, AddTensor)]
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))"""
 
@@ -1937,13 +1905,14 @@ struct Tensor[dtype: DType = DType.float32](
 
 fn main() raises:
     a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
-
     a.print()
-    print("a.id(): ", a.id())
+    print("a.id(): ", Tensor.id(UnsafePointer(to=a)))
     r = a.reshape(6)
     r.print()
-    print("r.id(): ", r.id())
+    print("r.id(): ", Tensor.id(UnsafePointer(to=r)))
     r.backward()
+    #_= a
+    Tensor.free_all(r, a)
     #a1 = Tensor.arange(24).reshape(2, 3, 4)
     #b1 = a1.transpose([1, 0, 2])
     #a1.print()
