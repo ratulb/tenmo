@@ -51,7 +51,7 @@ t2.print()
 # Gradient tracking
 y = t * 2.0
 y.backward()
-t.grad[].print()
+t.grad[].print() or t.gprint()
 ```
 
 ---
