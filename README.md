@@ -4,7 +4,7 @@ A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modu
 
 - 🧮 N-dimensional Tensors
 - 🔁 Broadcasting
-- 🔢 Autodiff (automatic differentiation)
+- 🔢 Automatic differentiation
 - 🧠 Scalar & elementwise operations
 - 🧬 SIMD vectorization
 - 🪜 Views and slicing
