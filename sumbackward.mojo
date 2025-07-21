@@ -32,7 +32,6 @@ struct SumBackward[dtype: DType](Copyable & Movable):
         ancestor = output.ancestors.get(0)[]
         rank = ancestor.rank()
         if rank == 0:
-            print("I took a shortcut from here!")
             return [(ancestor, gradients, AddTensor)]
         shape = ancestor.shape()
 
@@ -61,7 +60,6 @@ struct SumBackward[dtype: DType](Copyable & Movable):
                 # keepdims=True: shapes match except for broadcasting
                 grad_contrib = gradients.broadcast_to(shape)
         grad_contrib.requires_grad = False
-        print("I came all the way here!")
         return [
             (
                 ancestor,

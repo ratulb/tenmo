@@ -4,8 +4,9 @@ from operators import __tensor_op_tensor__, AddTensor, SubtractTensor
 from utils import Variant
 from os import abort
 from sumbackward import SumBackward
+from meanbackward import MeanBackward
 
-alias Delegate[dtype: DType] = Variant[ReshapeBackward[dtype], SumBackward[dtype]]
+alias Delegate[dtype: DType] = Variant[ReshapeBackward[dtype], SumBackward[dtype], MeanBackward[dtype]]
 
 
 struct BackwardFn[dtype: DType](Copyable & Movable):
@@ -23,10 +24,16 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     fn __call__(
         self, out_ptr: UnsafePointer[Tensor[dtype]]
     ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
+
         if self.grad_fn.isa[ReshapeBackward[dtype]]():
             return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](out_ptr)
+
         elif self.grad_fn.isa[SumBackward[dtype]]():
             return self.grad_fn[SumBackward[dtype]].backward[dtype](out_ptr)
+
+        elif self.grad_fn.isa[MeanBackward[dtype]]():
+            return self.grad_fn[MeanBackward[dtype]].backward[dtype](out_ptr)
+
         else:
             abort("I am not here to receive you")
         return []
