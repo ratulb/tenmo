@@ -1,17 +1,16 @@
 from tensors import Tensor
 from shared import TensorLike
 from operators import __tensor_op_tensor__, AddTensor, SubtractTensor
-from functional import Differentiable
 from utils import Variant
 from os import abort
 
-alias GradFn[dtype: DType] = Variant[ReshapeBackward[dtype]]
+alias Delegate[dtype: DType] = Variant[ReshapeBackward[dtype]]
 
 
 struct BackwardFn[dtype: DType](Copyable & Movable):
-    var grad_fn: GradFn[dtype]
+    var grad_fn: Delegate[dtype]
 
-    fn __init__(out self, grad_fn: GradFn[dtype]):
+    fn __init__(out self, grad_fn: Delegate[dtype]):
         self.grad_fn = grad_fn
 
     fn __moveinit__(out self, owned other: Self):
@@ -27,9 +26,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](out_ptr)
         else:
             abort("I am not here to receive you")
-        return [(Tensor.into_tensorlike(UnsafePointer(to=Tensor[dtype]([]))), Tensor[dtype]([]), -1)]
+        return []
 
-struct ReshapeBackward[dtype: DType](Copyable & Movable & Differentiable):
+struct ReshapeBackward[dtype: DType](Copyable & Movable):
     fn __init__(out self):
         pass
 
@@ -56,7 +55,7 @@ struct ReshapeBackward[dtype: DType](Copyable & Movable & Differentiable):
         return [(ancestor, new_contrib, AddTensor)]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](GradFn[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self))
 
 fn main():
     print("Yes")
