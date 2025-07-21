@@ -5,7 +5,7 @@ from utils import Variant
 from os import abort
 from sumbackward import SumBackward
 from meanbackward import MeanBackward
-from addbackward import AddBackward
+from addbackward import AddBackward, AddBackwardScalar
 from subbackward import SubBackward
 
 alias Delegate[dtype: DType] = Variant[
@@ -13,6 +13,7 @@ alias Delegate[dtype: DType] = Variant[
     SumBackward[dtype],
     MeanBackward[dtype],
     AddBackward[dtype],
+    AddBackwardScalar[dtype],
     SubBackward[dtype],
 ]
 
@@ -44,6 +45,11 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.grad_fn.isa[AddBackward[dtype]]():
             return self.grad_fn[AddBackward[dtype]].backward[dtype](out_ptr)
 
+        elif self.grad_fn.isa[AddBackwardScalar[dtype]]():
+            return self.grad_fn[AddBackwardScalar[dtype]].backward[dtype](
+                out_ptr
+            )
+
         elif self.grad_fn.isa[SubBackward[dtype]]():
             return self.grad_fn[SubBackward[dtype]].backward[dtype](out_ptr)
 
@@ -51,16 +57,8 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             abort("I am not here to receive you")
         return []
 
-
+@fieldwise_init
 struct ReshapeBackward[dtype: DType](Copyable & Movable):
-    fn __init__(out self):
-        pass
-
-    fn __moveinit__(out self, owned other: Self):
-        pass
-
-    fn __copyinit__(out self, other: Self):
-        pass
 
     fn backward[
         dtype: DType
