@@ -1,4 +1,4 @@
-# 🧠 Mojo Tensor
+# 🧠 Mojo Tensor(tenmo)
 
 A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modular.com/mojo), with full support for:
 
