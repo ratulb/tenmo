@@ -1,6 +1,10 @@
-# 🧠 Mojo Tensor
+# 🧠 Mojo Tensor(tenmo)
 
 A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modular.com/mojo), with full support for:
+
+> ⚠️ **Warning:** This library is in **rapid progress**.  
+> The API is evolving and may break between Mojo versions.  
+> If you encounter issues, please consult the issue tracker and feel free to report or submit a PR.
 
 - 🧮 N-dimensional Tensors
 - 🔁 Broadcasting
@@ -134,7 +138,7 @@ MIT License – do what you love. Attribution appreciated, not required.
 
 ## 👋 Author
 
-**Ratul Buragohain** — Machine learning enthusiast, and autodiff explorer 🐁
+**Ratul Buragohain** — Machine learning enthusiast, and a polyglot programmer with interest in all things under the sun! 🐁
 
 ---
 
