@@ -3,7 +3,6 @@ from os import abort
 from shared import TensorLike
 from common_utils import log_debug
 
-
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     var ancestors: UnsafePointer[UnsafePointer[TensorLike[dtype]]]
     var size: Int
@@ -30,8 +29,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
                 UnsafePointer[TensorLike[dtype]]
             ].alloc(existing.size)
             memcpy(self.ancestors, existing.ancestors, existing.size)
-            #for idx in range(existing.size):
-                #(self.ancestors + idx)[] = (existing.ancestors + idx)[]
         else:
             self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
 
@@ -43,8 +40,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
                 UnsafePointer[TensorLike[dtype]]
             ].alloc(existing.size)
             memcpy(self.ancestors, existing.ancestors, existing.size)
-            _ = """for idx in range(existing.size):
-                (self.ancestors + idx)[] = (existing.ancestors + idx)[]"""
         else:
             self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
 
@@ -56,7 +51,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     # fn __del__(owned self):
     fn free(owned self):
         if self.ancestors:
-            log_debug("Ancestors __del__ is kicking in alright")
+            log_debug("Ancestors __del__ called")
             for idx in range(len(self)):
                 (self.ancestors + idx).destroy_pointee()
             self.ancestors.free()
@@ -74,8 +69,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         return self.size
 
     fn append(mut self, addr: UnsafePointer[TensorLike[dtype]]):
-        if not addr[].requires_grad():
-            return
         if self.size == self.capacity:
             new_capacity = max(1, self.capacity * 2)
             self.resize(new_capacity)
@@ -151,74 +144,3 @@ struct _AncestorsIter[
             return len(self.src[]) - self.index
         else:
             return self.index
-
-
-from tensors import Tensor
-
-
-fn populate_ancestry[
-    dtype: DType = DType.float32
-](*tensor_likes: TensorLike[dtype]) -> Ancestors[dtype]:
-    # ancestors1 = Ancestors[dtype].untracked()
-    ancestors1 = Ancestors[dtype](5)
-    for each in tensor_likes:
-        ancestors1.append(each.address())
-    print("ok1 *************")
-    # ancestors1.print()
-    return ancestors1
-
-
-fn main():
-    GiverAndTaker.give()
-    _ = """ancestors = Ancestors[DType.float32].untracked()
-    print("ok0")
-    ancestors.print()
-    t1 = Tensor([1], requires_grad=True)
-    t2 = Tensor([2], requires_grad=True)
-    t3 = Tensor([3], requires_grad=True)
-    t4 = Tensor([4], requires_grad=True)
-    t5 = Tensor([5], requires_grad=True)
-    ancestors2 = populate_ancestry(t1.into_tensorlike(), t2.into_tensorlike(), t3.into_tensorlike(),t4.into_tensorlike(),t5.into_tensorlike())
-    print("ok2")
-    ancestors2.print()
-    copied = ancestors2
-    print("ok3")
-    copied.print()
-    print()
-    print()
-    print(t1.id(), t2.id(), t3.id(), t4.id(), t5.id())
-
-    ancestors.append(t1.into_tensorlike().address())
-    ancestors.append(t2.into_tensorlike().address())
-    ancestors.append(t3.into_tensorlike().address())
-    ancestors.append(t4.into_tensorlike().address())
-    ancestors.append(t5.into_tensorlike().address())
-
-    print()
-    length = len(ancestors)
-    for i in range(length):
-        ancestors.get(i)[].tensor().print()"""
-
-
-struct GiverAndTaker:
-    @staticmethod
-    fn take(mut traced: Ancestors[DType.float32]):
-        print("Taking")
-        t1 = Tensor[DType.float32]([1], requires_grad=True)
-        t2 = Tensor[DType.float32]([2], requires_grad=True)
-        t3 = Tensor[DType.float32]([3], requires_grad=True)
-        t4 = Tensor[DType.float32]([4], requires_grad=True)
-        t5 = Tensor[DType.float32]([5], requires_grad=True)
-
-        print(t1.id(), t2.id(), t3.id(), t4.id(), t5.id())
-        traced.append(t1.into_tensorlike().address())
-        traced.append(t2.into_tensorlike().address())
-        traced.append(t3.into_tensorlike().address())
-        traced.append(t4.into_tensorlike().address())
-        traced.append(t5.into_tensorlike().address())
-
-    @staticmethod
-    fn give():
-        traced = Ancestors[DType.float32].untracked()
-        Self.take(traced)
-        traced.print()
