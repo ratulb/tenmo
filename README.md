@@ -2,6 +2,10 @@
 
 A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modular.com/mojo), with full support for:
 
+> ⚠️ **Warning:** This library is in **rapid progress**.  
+> The API is evolving and may break between Mojo versions.  
+> If you encounter issues, please consult the issue tracker and feel free to report or submit a PR.
+
 - 🧮 N-dimensional Tensors
 - 🔁 Broadcasting
 - 🔢 Automatic differentiation
