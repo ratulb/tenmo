@@ -73,17 +73,14 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     fn __len__(self) -> Int:
         return self.size
 
-    fn append(mut self, address_: UnsafePointer[TensorLike[dtype]]):
+    fn append(mut self, addr: UnsafePointer[TensorLike[dtype]]):
+        if not addr[].requires_grad():
+            return
         if self.size == self.capacity:
             new_capacity = max(1, self.capacity * 2)
             self.resize(new_capacity)
-        (self.ancestors + self.size)[] = address_
+        (self.ancestors + self.size)[] = addr
         self.size += 1
-
-        _ = """fn add_ancestry(mut self, tensor_likes: VariadicListMem[TensorLike[dtype]]):
-        for tensor_like in tensor_likes:
-            if tensor_like._requires_grad():
-                self.append(tensor_like.address())"""
 
     fn resize(mut self, new_capacity: Int):
         self.reserve(new_capacity)

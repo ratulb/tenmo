@@ -6,12 +6,14 @@ from os import abort
 from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addbackward import AddBackward
+from subbackward import SubBackward
 
 alias Delegate[dtype: DType] = Variant[
     ReshapeBackward[dtype],
     SumBackward[dtype],
     MeanBackward[dtype],
     AddBackward[dtype],
+    SubBackward[dtype],
 ]
 
 
@@ -41,6 +43,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[AddBackward[dtype]]():
             return self.grad_fn[AddBackward[dtype]].backward[dtype](out_ptr)
+
+        elif self.grad_fn.isa[SubBackward[dtype]]():
+            return self.grad_fn[SubBackward[dtype]].backward[dtype](out_ptr)
 
         else:
             abort("I am not here to receive you")

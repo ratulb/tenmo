@@ -38,6 +38,8 @@ from operators import (
 from backpropagation import BackwardFn, ReshapeBackward
 from sumbackward import SumBackward
 from meanbackward import MeanBackward
+from addbackward import AddBackward
+from subbackward import SubBackward
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -307,6 +309,7 @@ struct Tensor[dtype: DType = DType.float32](
             self.grad.init_pointee_move(gradients^)
             self.zero_grad()
 
+    # Always use this to print grad to avoid surprises of segmentation fault!
     fn gprint(self):
         if not self.requires_grad:
             print("Tensor is non-differentiable")
@@ -317,6 +320,8 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn add_ancestry(mut self, *parents: TensorLike[dtype]):
         for parent in parents:
+            if not parent.requires_grad():
+                continue
             var ptr = UnsafePointer[TensorLike[dtype]].alloc(1)
             ptr.init_pointee_copy(parent)
             self.ancestors.append(ptr)
@@ -1379,34 +1384,12 @@ struct Tensor[dtype: DType = DType.float32](
         var out = __tensor_op_tensor__[dtype, AddTensor](self, other)
 
         if self.requires_grad or other.requires_grad:
-
-            fn grad_fn(
-                gradients: Tensor[dtype],
-            ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                grad_outputs = List[
-                    Tuple[TensorLike[dtype], Tensor[dtype], Int]
-                ]()
-
-                if UnsafePointer(to=self)[].requires_grad:
-                    grad_outputs.append(
-                        (
-                            Self.into_recipient(UnsafePointer(to=self)),
-                            gradients,
-                            AddTensor,
-                        )
-                    )
-
-                if UnsafePointer(to=other)[].requires_grad:
-                    grad_outputs.append(
-                        (
-                            Self.into_recipient(UnsafePointer(to=other)),
-                            gradients,
-                            AddTensor,
-                        )
-                    )
-                return grad_outputs
-
-            # out.capture_backward_fn(BackwardFn[dtype](grad_fn))
+            backward_fn = AddBackward[dtype]().into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            if self.requires_grad:
+                out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
+            if other.requires_grad:
+                out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=other)))
 
         return out
 
@@ -1429,35 +1412,15 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         if self.requires_grad or other.requires_grad:
-
-            fn grad_fn(
-                gradients: Tensor[dtype],
-            ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                grad_outputs = List[
-                    Tuple[TensorLike[dtype], Tensor[dtype], Int]
-                ]()
-
-                if UnsafePointer(to=self)[].requires_grad:
-                    grad_outputs.append(
-                        (
-                            Self.into_recipient(UnsafePointer(to=self)),
-                            gradients,
-                            AddTensor,
-                        )
-                    )
-
-                if UnsafePointer(to=other)[].requires_grad:
-                    grad_outputs.append(
-                        (
-                            Self.into_recipient(UnsafePointer(to=other)),
-                            gradients,
-                            SubtractTensor,
-                        )
-                    )
-                return grad_outputs
-
-            # out.capture_backward_fn(BackwardFn[dtype](grad_fn))
-
+            sub_backward = SubBackward[dtype]()
+            if self.requires_grad:
+                out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
+                sub_backward.negate(False)
+            if other.requires_grad:
+                out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=other)))
+                sub_backward.negate(True)
+            backward_fn = sub_backward.into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
         return out
 
     fn broadcast_mul(
@@ -1919,7 +1882,8 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=False)
+    b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     a.print()
     print("a.id(): ", Tensor.id(UnsafePointer(to=a)))
     r = a.reshape(6)
@@ -1928,12 +1892,23 @@ fn main() raises:
     s = r.mean()
     s.backward(start_grad=5)
     a.print()
+    s.print()
     # a1 = Tensor.arange(24).reshape(2, 3, 4)
     # b1 = a1.transpose([1, 0, 2])
     # a1.print()
     # print()
     # b1.print()
-    a.grad[].print()
+    a.gprint()
+
+    print("===========here========")
+    a.print()
+    b.print()
+    c = a - b
+    c.print()
+    c.backward(start_grad=10)
+    b.gprint()
+    a.gprint()
+    c.print()
 
 
 from testing import assert_true
