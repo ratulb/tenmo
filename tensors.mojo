@@ -56,15 +56,10 @@ struct Tensor[dtype: DType = DType.float32](
     var grad: UnsafePointer[Self]
     var ancestors: Ancestors[dtype]
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
-    alias Recipient = TensorLike[dtype]
     var backwardFn: Optional[BackwardFn[dtype]]
 
     fn gradients(self) -> UnsafePointer[Self]:
         return self.grad
-
-    # fn capture_backward_fn(mut self, backward_fn: BackwardFn[dtype]):
-    # self._backward_fn = UnsafePointer[BackwardFn[dtype]].alloc(1)
-    # self._backward_fn.init_pointee_copy(backward_fn)"""
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         if not self.requires_grad:
