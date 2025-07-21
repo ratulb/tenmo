@@ -3,8 +3,9 @@ from shared import TensorLike
 from operators import __tensor_op_tensor__, AddTensor, SubtractTensor
 from utils import Variant
 from os import abort
+from sumbackward import SumBackward
 
-alias Delegate[dtype: DType] = Variant[ReshapeBackward[dtype]]
+alias Delegate[dtype: DType] = Variant[ReshapeBackward[dtype], SumBackward[dtype]]
 
 
 struct BackwardFn[dtype: DType](Copyable & Movable):
@@ -24,6 +25,8 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
         if self.grad_fn.isa[ReshapeBackward[dtype]]():
             return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](out_ptr)
+        elif self.grad_fn.isa[SumBackward[dtype]]():
+            return self.grad_fn[SumBackward[dtype]].backward[dtype](out_ptr)
         else:
             abort("I am not here to receive you")
         return []

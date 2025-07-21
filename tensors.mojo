@@ -36,6 +36,7 @@ from operators import (
     Multiply,
 )
 from backpropagation import BackwardFn, ReshapeBackward
+from sumbackward import SumBackward
 
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Representable & Writable
@@ -1203,8 +1204,7 @@ struct Tensor[dtype: DType = DType.float32](
 
             backward_fn = ReshapeBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            pointer = UnsafePointer(to=self)
-            out.add_ancestry(Self.into_tensorlike(pointer))
+            out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
 
         return out
 
@@ -1225,10 +1225,14 @@ struct Tensor[dtype: DType = DType.float32](
 
             if self.requires_grad:
 
-                fn scalar_grad_fn(
+                _="""fn scalar_grad_fn(
                     gradients: Tensor[dtype],
                 ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                    return [(Self.into_recipient(UnsafePointer(to=self)), gradients, AddTensor)]
+                    return [(Self.into_recipient(UnsafePointer(to=self)), gradients, AddTensor)]"""
+                backward_fn = SumBackward[dtype]().into_backward_fn()
+                scalar_out.backwardFn = Optional(backward_fn)
+                scalar_out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
+
 
                 #scalar_out.capture_grad_fn(scalar_grad_fn)
                 #scalar_out.capture_backward_fn(BackwardFn[dtype](scalar_grad_fn))
@@ -1272,7 +1276,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         if requires_grad:
 
-            fn grad_fn(
+            _="""fn grad_fn(
                 gradients: Tensor[dtype],
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 original_shape = UnsafePointer(to=self)[].shape
@@ -1310,7 +1314,13 @@ struct Tensor[dtype: DType = DType.float32](
                         grad_contrib,
                         AddTensor,
                     )
-                ]
+                ]"""
+            _axes_ = _axes.copy()
+            _keepdims_ = keepdims
+            backward_fn = SumBackward[dtype](_axes_, _keepdims_).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
+
 
             #out.capture_backward_fn(BackwardFn[dtype](grad_fn))
 
@@ -1910,15 +1920,15 @@ fn main() raises:
     r = a.reshape(6)
     r.print()
     print("r.id(): ", Tensor.id(UnsafePointer(to=r)))
-    r.backward()
-    #_= a
-    Tensor.free_all(r, a)
+    s = r.sum()
+    s.backward(start_grad=5)
+    a.print()
     #a1 = Tensor.arange(24).reshape(2, 3, 4)
     #b1 = a1.transpose([1, 0, 2])
     #a1.print()
     #print()
     #b1.print()
-
+    a.grad[].print()
 from testing import assert_true
 
 fn test_slice_grad() raises:
