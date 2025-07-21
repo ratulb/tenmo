@@ -4,16 +4,27 @@ from shared import TensorLike
 from backpropagation import Delegate, BackwardFn
 
 
+@fieldwise_init
+struct AddBackwardScalar[dtype: DType](Copyable & Movable):
+    fn into_backward_fn(self) -> BackwardFn[dtype]:
+        return BackwardFn[dtype](Delegate[dtype](self))
+
+    fn backward[
+        dtype: DType
+    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ]:
+        output = out_ptr[]
+        gradients = output.grad[]
+        ancestor = output.ancestors.get(0)[]
+        if ancestor.shape() != gradients.shape:
+            gradients = gradients.reshape(ancestor.shape())
+        # Gradient of addition is 1 → just pass through incoming grad
+        return [(ancestor, gradients, AddTensor)]
+
+
+@fieldwise_init
 struct AddBackward[dtype: DType](Copyable & Movable):
-    fn __init__(out self):
-        pass
-
-    fn __moveinit__(out self, var other: Self):
-        pass
-
-    fn __copyinit__(out self, other: Self):
-        pass
-
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
