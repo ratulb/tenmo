@@ -1,7 +1,41 @@
 from tensors import Tensor
 from shared import TensorLike
 from backpropagation import Delegate, BackwardFn
-from operators import AddTensor, MulTensor, __tensor_op_tensor__
+from operators import (
+    AddTensor,
+    MulTensor,
+    __tensor_op_tensor__,
+    __tensor_op_scalar__,
+    MulScalar,
+)
+
+
+@fieldwise_init
+struct MulBackwardScalar[dtype: DType](Copyable & Movable):
+    var factor: Scalar[dtype]
+
+    fn into_backward_fn(self) -> BackwardFn[dtype]:
+        return BackwardFn[dtype](Delegate[dtype](self))
+
+    fn backward[
+        dtype: DType
+    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ]:
+        output = out_ptr[]
+        gradients = output.grad[]
+        var value: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
+        ancestor = output.ancestors.get(0)[]
+        scaled_gradients = __tensor_op_scalar__[dtype, MulScalar](
+            gradients, value
+        )
+        return [
+            (
+                ancestor,
+                scaled_gradients,
+                AddTensor,
+            )
+        ]
 
 
 @fieldwise_init

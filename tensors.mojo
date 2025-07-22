@@ -42,7 +42,7 @@ from addbackward import AddBackward, AddBackwardScalar
 from subbackward import SubBackward
 from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
-from mulbackward import MultiplyBackward
+from mulbackward import MultiplyBackward, MulBackwardScalar
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -1112,29 +1112,16 @@ struct Tensor[dtype: DType = DType.float32](
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
 
-    fn __mul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+    fn __mul__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, MulScalar](
             self,
-            scalar,
+            factor,
         )
 
         if self.requires_grad:
-
-            fn grad_fn(
-                gradients: Tensor[dtype],
-            ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                scaled_gradients = __tensor_op_scalar__[dtype, MulScalar](
-                    gradients, scalar
-                )
-                return [
-                    (
-                        Self.into_recipient(UnsafePointer(to=self)),
-                        scaled_gradients,
-                        AddTensor,
-                    )
-                ]
-
-            # out.capture_backward_fn(BackwardFn[dtype](grad_fn))
+            backward_fn = MulBackwardScalar[dtype](factor).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
 
         return out
 
@@ -1818,14 +1805,14 @@ fn main() raises:
     a = Tensor.arange(24, requires_grad=True)
     r = a.reshape(2, 3, 4)
 
-    b = 100 + r
+    b = r * 100
     b.backward()
     _ = r
     _ = a
     print("Equal size")
     A = Tensor.d1([9, 2, 3], requires_grad=True)
     B = Tensor.d1([1, 2, 3], requires_grad=True)
-    C = A * B
+    C = A * 200
     C.backward()
     _ = A
     _ = B
