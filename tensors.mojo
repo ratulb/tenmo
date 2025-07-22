@@ -39,7 +39,7 @@ from backpropagation import BackwardFn
 from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar
-from subbackward import SubBackward
+from subbackward import SubBackward, SubLeftRightBackwardScalar
 from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
@@ -1149,8 +1149,13 @@ struct Tensor[dtype: DType = DType.float32](
     fn __rsub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out = __tensor_op_scalar__[dtype, SubtractFromScalar](self, scalar)
         if self.requires_grad:
+            backward_fn = SubLeftRightBackwardScalar[dtype](
+                True
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
 
-            fn grad_fn(
+            _ = """fn grad_fn(
                 gradients: Tensor[dtype],
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 return [
@@ -1159,7 +1164,7 @@ struct Tensor[dtype: DType = DType.float32](
                         gradients,
                         SubtractTensor,
                     )
-                ]
+                ]"""
 
         return out
 
@@ -1167,8 +1172,13 @@ struct Tensor[dtype: DType = DType.float32](
         var out = __tensor_op_scalar__[dtype, SubtractScalar](self, scalar)
 
         if self.requires_grad:
+            backward_fn = SubLeftRightBackwardScalar[dtype](
+                False
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
 
-            fn grad_fn(
+            _ = """fn grad_fn(
                 gradients: Tensor[dtype],
             ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 return [
@@ -1177,9 +1187,8 @@ struct Tensor[dtype: DType = DType.float32](
                         gradients,
                         AddTensor,
                     )
-                ]
+                ]"""
 
-            # out.capture_backward_fn(BackwardFn[dtype](grad_fn))
         return out
 
     fn reshape(self) -> Tensor[dtype]:
@@ -1231,7 +1240,7 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad = self.requires_grad
         rank = self.shape.rank()
 
-        # Early scalar return - already correct
+        # Early scalar return
         if rank == 0:
             scalar_out = Tensor[dtype].zeros(
                 Shape.Void, requires_grad=self.requires_grad
@@ -1581,8 +1590,6 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 ]
 
-            # out.capture_backward_fn(BackwardFn[dtype](grad_fn))
-
         return out
 
     fn view(
@@ -1704,8 +1711,6 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 return grad_outputs
 
-            # out.capture_backward_fn(BackwardFn[dtype](grad_fn))
-
         return out
 
     fn transpose(
@@ -1796,7 +1801,7 @@ fn main() raises:
     print("Equal size")
     A = Tensor.d1([9, 2, 3], requires_grad=True)
     B = Tensor.d1([1, 2, 3], requires_grad=True)
-    C = A**3
+    C = 0 - A
     C.backward()
     _ = A
     _ = B

@@ -49,5 +49,25 @@ struct SubBackward[dtype: DType](Copyable & Movable):
         return grad_outputs
 
 
+@fieldwise_init
+struct SubLeftRightBackwardScalar[dtype: DType](Copyable & Movable):
+    var negate: Bool
+
+    fn into_backward_fn(self) -> BackwardFn[dtype]:
+        return BackwardFn[dtype](Delegate[dtype](self))
+
+    fn backward[
+        dtype: DType
+    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ]:
+        output = out_ptr[]
+        gradients = output.grad[]
+        ancestor = output.ancestors.get(0)[]
+        return [
+            (ancestor, gradients, SubtractTensor if self.negate else AddTensor)
+        ]
+
+
 fn main():
     print("passes")

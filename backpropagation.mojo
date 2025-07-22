@@ -6,7 +6,7 @@ from os import abort
 from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar
-from subbackward import SubBackward
+from subbackward import SubBackward, SubLeftRightBackwardScalar
 from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
@@ -19,6 +19,7 @@ alias Delegate[dtype: DType] = Variant[
     AddBackward[dtype],
     AddBackwardScalar[dtype],
     SubBackward[dtype],
+    SubLeftRightBackwardScalar[dtype],
     MultiplyBackward[dtype],
     MulBackwardScalar[dtype],
     ExponientionBackward[dtype],
@@ -62,6 +63,11 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[SubBackward[dtype]]():
             return self.grad_fn[SubBackward[dtype]].backward[dtype](out_ptr)
+
+        elif self.grad_fn.isa[SubLeftRightBackwardScalar[dtype]]():
+            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward[
+                dtype
+            ](out_ptr)
 
         elif self.grad_fn.isa[MultiplyBackward[dtype]]():
             return self.grad_fn[MultiplyBackward[dtype]].backward[dtype](
