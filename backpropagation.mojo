@@ -7,7 +7,7 @@ from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar
 from subbackward import SubBackward
-from broadcast_operation import BroadcastAddSubtractBackward
+from broadcast_operation import BroadcastBackward
 
 alias Delegate[dtype: DType] = Variant[
     ReshapeBackward[dtype],
@@ -16,8 +16,9 @@ alias Delegate[dtype: DType] = Variant[
     AddBackward[dtype],
     AddBackwardScalar[dtype],
     SubBackward[dtype],
-    BroadcastAddSubtractBackward[dtype, AddTensor, AddTensor],
-    BroadcastAddSubtractBackward[dtype, AddTensor, SubtractTensor],
+    BroadcastBackward[dtype, AddTensor, AddTensor, False],
+    BroadcastBackward[dtype, AddTensor, AddTensor, True],
+    BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
 ]
 
 
@@ -57,17 +58,25 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[SubBackward[dtype]].backward[dtype](out_ptr)
 
         elif self.grad_fn.isa[
-            BroadcastAddSubtractBackward[dtype, AddTensor, AddTensor]
+            BroadcastBackward[dtype, AddTensor, AddTensor, False]
         ]():
             return self.grad_fn[
-                BroadcastAddSubtractBackward[dtype, AddTensor, AddTensor]
+                BroadcastBackward[dtype, AddTensor, AddTensor, False]
             ].backward[dtype](out_ptr)
 
         elif self.grad_fn.isa[
-            BroadcastAddSubtractBackward[dtype, AddTensor, SubtractTensor]
+            BroadcastBackward[dtype, AddTensor, AddTensor, True]
         ]():
             return self.grad_fn[
-                BroadcastAddSubtractBackward[dtype, AddTensor, SubtractTensor]
+                BroadcastBackward[dtype, AddTensor, AddTensor, True]
+            ].backward[dtype](out_ptr)
+
+
+        elif self.grad_fn.isa[
+            BroadcastBackward[dtype, AddTensor, SubtractTensor, False]
+        ]():
+            return self.grad_fn[
+                BroadcastBackward[dtype, AddTensor, SubtractTensor, False]
             ].backward[dtype](out_ptr)
 
         else:
