@@ -1707,6 +1707,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
 
+    # Note - matmul has not been optimized at all - once everything is place - revisit this
     fn matmul(self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
         if not self.shape.rank() == 2:
             abort("Only supports 2D matmul for now")
