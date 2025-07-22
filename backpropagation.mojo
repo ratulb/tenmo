@@ -1,6 +1,6 @@
 from tensors import Tensor
 from shared import TensorLike
-from operators import __tensor_op_tensor__, AddTensor, SubtractTensor
+from operators import AddTensor, SubtractTensor
 from utils import Variant
 from os import abort
 from sumbackward import SumBackward
@@ -10,6 +10,7 @@ from subbackward import SubBackward
 from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
+from exponientionbackward import ExponientionBackward
 
 alias Delegate[dtype: DType] = Variant[
     ReshapeBackward[dtype],
@@ -20,6 +21,7 @@ alias Delegate[dtype: DType] = Variant[
     SubBackward[dtype],
     MultiplyBackward[dtype],
     MulBackwardScalar[dtype],
+    ExponientionBackward[dtype],
     BroadcastBackward[dtype, AddTensor, AddTensor, False],
     BroadcastBackward[dtype, AddTensor, AddTensor, True],
     BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
@@ -71,6 +73,11 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
                 out_ptr
             )
 
+        elif self.grad_fn.isa[ExponientionBackward[dtype]]():
+            return self.grad_fn[ExponientionBackward[dtype]].backward[dtype](
+                out_ptr
+            )
+
         elif self.grad_fn.isa[
             BroadcastBackward[dtype, AddTensor, AddTensor, False]
         ]():
@@ -98,4 +105,4 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
 
 fn main():
-    print("Yes")
+    pass

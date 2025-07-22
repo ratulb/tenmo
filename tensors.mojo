@@ -43,6 +43,7 @@ from subbackward import SubBackward
 from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
+from exponientionbackward import ExponientionBackward
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -1125,39 +1126,23 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn __pow__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+    fn __pow__(self, exponent: Scalar[dtype]) -> Tensor[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Tensor → __pow__ is for numeric data types only",
+        ]()
+
         var out = __tensor_op_scalar__[dtype, Power](
             self,
-            scalar,
+            exponent,
         )
 
         if self.requires_grad:
-
-            fn grad_fn(
-                gradients: Tensor[dtype],
-            ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                # ∂(x**n)/∂x = n * x**(n-1)
-                # Need to see if base_pow gets a grad_fn or not - we don't want it to have one!
-                # var base_pow = self ** (scalar - 1.0)
-                base_pow = __tensor_op_scalar__[dtype, Power](
-                    UnsafePointer(to=self)[], (scalar - 1.0)
-                )
-                base_pow.requires_grad = False
-                var local_grad = __tensor_op_scalar__[dtype, MulScalar](
-                    base_pow, scalar
-                )
-                product = __tensor_op_tensor__[dtype, MulTensor](
-                    gradients, local_grad
-                )
-                return [
-                    (
-                        Self.into_recipient(UnsafePointer(to=self)),
-                        product,
-                        AddTensor,
-                    )
-                ]
-
-            # out.capture_backward_fn(BackwardFn[dtype](grad_fn))
+            backward_fn = ExponientionBackward[dtype](
+                exponent
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
 
         return out
 
@@ -1176,7 +1161,6 @@ struct Tensor[dtype: DType = DType.float32](
                     )
                 ]
 
-            # out.capture_backward_fn(BackwardFn[dtype](grad_fn))
         return out
 
     fn __sub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
@@ -1812,7 +1796,7 @@ fn main() raises:
     print("Equal size")
     A = Tensor.d1([9, 2, 3], requires_grad=True)
     B = Tensor.d1([1, 2, 3], requires_grad=True)
-    C = A * 200
+    C = A**3
     C.backward()
     _ = A
     _ = B
