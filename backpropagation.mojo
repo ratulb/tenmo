@@ -11,6 +11,7 @@ from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
 from exponientionbackward import ExponientionBackward
+from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
 
 alias Delegate[dtype: DType] = Variant[
     ReshapeBackward[dtype],
@@ -22,6 +23,8 @@ alias Delegate[dtype: DType] = Variant[
     SubLeftRightBackwardScalar[dtype],
     MultiplyBackward[dtype],
     MulBackwardScalar[dtype],
+    TrueDivBackwardScalar[dtype],
+    RightTrueDivBackwardScalar[dtype],
     ExponientionBackward[dtype],
     BroadcastBackward[dtype, AddTensor, AddTensor, False],
     BroadcastBackward[dtype, AddTensor, AddTensor, True],
@@ -78,6 +81,16 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[MulBackwardScalar[dtype]].backward[dtype](
                 out_ptr
             )
+
+        elif self.grad_fn.isa[TrueDivBackwardScalar[dtype]]():
+            return self.grad_fn[TrueDivBackwardScalar[dtype]].backward[dtype](
+                out_ptr
+            )
+
+        elif self.grad_fn.isa[RightTrueDivBackwardScalar[dtype]]():
+            return self.grad_fn[RightTrueDivBackwardScalar[dtype]].backward[
+                dtype
+            ](out_ptr)
 
         elif self.grad_fn.isa[ExponientionBackward[dtype]]():
             return self.grad_fn[ExponientionBackward[dtype]].backward[dtype](
