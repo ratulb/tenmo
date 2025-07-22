@@ -40,8 +40,9 @@ from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar
 from subbackward import SubBackward
-from broadcast_operation import BroadcastBackward
+from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
+from mulbackward import MultiplyBackward
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -1407,6 +1408,7 @@ struct Tensor[dtype: DType = DType.float32](
                 sub_backward.negate(True)
             backward_fn = sub_backward.into_backward_fn()
             out.backwardFn = Optional(backward_fn)
+
         return out
 
     fn broadcast_mul_operation(
@@ -1419,8 +1421,8 @@ struct Tensor[dtype: DType = DType.float32](
             backward_fn = BroadcastBackward[
                 dtype, AddTensor, AddTensor, True
             ]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
 
+            out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
             out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=other)))
 
@@ -1445,42 +1447,11 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         if self.requires_grad or other.requires_grad:
+            backward_fn = MultiplyBackward[dtype]().into_backward_fn()
 
-            fn grad_fn(
-                gradients: Tensor[dtype],
-            ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
-                grad_outputs = List[
-                    Tuple[TensorLike[dtype], Tensor[dtype], Int]
-                ]()
-
-                if UnsafePointer(to=self)[].requires_grad:
-                    product = __tensor_op_tensor__[dtype, MulTensor](
-                        gradients, UnsafePointer(to=other)[]
-                    )
-                    product.requires_grad = False
-                    grad_outputs.append(
-                        (
-                            Self.into_recipient(UnsafePointer(to=self)),
-                            product,
-                            AddTensor,
-                        )
-                    )
-
-                if UnsafePointer(to=other)[].requires_grad:
-                    product = __tensor_op_tensor__[dtype, MulTensor](
-                        gradients, UnsafePointer(to=self)[]
-                    )
-                    product.requires_grad = False
-                    grad_outputs.append(
-                        (
-                            Self.into_recipient(UnsafePointer(to=other)),
-                            product,
-                            AddTensor,
-                        )
-                    )
-                return grad_outputs
-
-            # out.capture_backward_fn(BackwardFn[dtype](grad_fn))
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
+            out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=other)))
 
         return out
 
@@ -1493,10 +1464,11 @@ struct Tensor[dtype: DType = DType.float32](
             backward_fn = BroadcastBackward[
                 dtype, Tensor_Op_First, Tensor_Op_Second, False
             ]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
 
+            out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=self)))
             out.add_ancestry(Self.into_tensorlike(UnsafePointer(to=other)))
+
         return out
 
     fn __iadd__(self, value: Scalar[dtype]):
@@ -1850,8 +1822,8 @@ fn main() raises:
     b.backward()
     _ = r
     _ = a
-    print("broadcasting")
-    A = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    print("Equal size")
+    A = Tensor.d1([9, 2, 3], requires_grad=True)
     B = Tensor.d1([1, 2, 3], requires_grad=True)
     C = A * B
     C.backward()

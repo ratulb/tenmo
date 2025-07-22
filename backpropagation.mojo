@@ -7,8 +7,9 @@ from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar
 from subbackward import SubBackward
-from broadcast_operation import BroadcastBackward
+from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
+from mulbackward import MultiplyBackward
 
 alias Delegate[dtype: DType] = Variant[
     ReshapeBackward[dtype],
@@ -17,6 +18,7 @@ alias Delegate[dtype: DType] = Variant[
     AddBackward[dtype],
     AddBackwardScalar[dtype],
     SubBackward[dtype],
+    MultiplyBackward[dtype],
     BroadcastBackward[dtype, AddTensor, AddTensor, False],
     BroadcastBackward[dtype, AddTensor, AddTensor, True],
     BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
@@ -57,6 +59,10 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[SubBackward[dtype]]():
             return self.grad_fn[SubBackward[dtype]].backward[dtype](out_ptr)
+
+        elif self.grad_fn.isa[MultiplyBackward[dtype]]():
+            return self.grad_fn[MultiplyBackward[dtype]].backward[dtype](out_ptr)
+
 
         elif self.grad_fn.isa[
             BroadcastBackward[dtype, AddTensor, AddTensor, False]
