@@ -5,7 +5,7 @@ from tensors import Tensor
 from intlist import IntList
 from shapes import Shape
 from common_utils import *
-
+from utils.numerics import min_finite
 
 fn test_tensor_shared_multiple_paths() raises:
     print("test_tensor_shared_multiple_paths")
@@ -2478,6 +2478,57 @@ fn test_tensor_scalar_add_mul_pow() raises:
     assert_true(h.item() == 8.0, "2.0 ** 3.0 = 8.0")
     assert_true(g.grad[].item() == 12.0, "∂(g ** 3)/∂g = 3 * g^2 = 3 * 4 = 12")
 
+fn test_slice_grad() raises:
+    print("test_slice_grad")
+    _="""var a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
+    var b = a[1:3]  # [2,3]
+    var c = b * Tensor.d1([10,20])
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d1([0,10,20,0])))"""
+
+
+fn test_nested_operations() raises:
+    print("test_nested_operations")
+    _="""var a = Tensor.d1([1, 2], requires_grad=True)
+    var b = Tensor.d1([3, 4], requires_grad=True)
+    var c = (a * b).sum() + (a + b).prod()
+    c.backward()
+    # Verify gradients numerically
+    assert_true(abs(a.grad[][0] - 11.0) < 1e-6)  # 3 + (3+4)*1
+    assert_true(abs(b.grad[][0] - 8.0) < 1e-6)  # 1 + (1+2)*1"""
+
+
+fn test_large_tensor_backprop() raises:
+    print("test_large_tensor_backprop")
+    # Test memory efficiency
+    var a = Tensor.rand(500, 128, requires_grad=True)
+    var b = Tensor.rand(128, 100, requires_grad=True)
+    var c = a.matmul(b).sum()
+    c.backward()
+    assert_true(a.grad[].shape == a.shape)
+    assert_true(b.grad[].shape == b.shape)
+    c.free()
+    b.free()
+    a.free()
+
+
+fn test_detach() raises:
+    print("test_detach")
+    _ = """var a = Tensor.d1([1,2], requires_grad=True)
+    var b = a.detach() * 2  # Should not propagate grad
+    var c = a * b
+    c.sum().backward()
+    assert_true(a.grad[].all_close(Tensor.d1([2,4])))  # Only from c = a*b"""
+
+
+fn test_empty_tensor() raises:
+    print("test_empty_tensor")
+    var a = Tensor.d1([], requires_grad=True)
+    var s = a.sum()
+    s.backward()
+    print(s.item())
+    assert_true(s.item() == min_finite[DType.float32]())
+    assert_true(a.grad[].shape == Shape.Void)
 
 fn main() raises:
     print("Starting tensor test cases")
@@ -2597,5 +2648,10 @@ fn main() raises:
     test_scalar_div_tensor()
     test_scalar_div_tensor_multiple()
     test_scalar_div_tensor_2d()
+    test_empty_tensor()
+    test_large_tensor_backprop()
+    #test_nested_operations()
+    #test_detach()
     print("Finished running tensor test cases")
+
 

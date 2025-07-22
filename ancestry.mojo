@@ -3,26 +3,10 @@ from os import abort
 from shared import TensorLike
 from common_utils import log_debug
 
-from testing import assert_true
-from tensors import Tensor
-
-
-fn test_contains() raises:
-    a = Tensor.scalar(10)
-    tl1 = TensorLike(UnsafePointer(to=a))
-    tl2 = TensorLike(UnsafePointer(to=a))
-    ancestors = Ancestors[DType.float32].untracked()
-    ancestors.append(UnsafePointer(to=tl1))
-    print(ancestors.__contains__(tl2))
-    # print(ancestors.get(0)[].inner_id())
-    # print(tl1 == tl2)
-    for each in ancestors:
-        print(each[].inner_id())
-    # Ancestors.display(ancestors)
 
 
 fn main() raises:
-    test_contains()
+    pass
 
 
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
@@ -68,13 +52,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     @staticmethod
     fn untracked() -> Ancestors[dtype]:
         return Self()
-
-    @staticmethod
-    fn display(ancestors: Ancestors[dtype]):
-        for each in ancestors:
-            entry = each[]
-            inner_id = entry.inner_id()
-            print(inner_id, end="\n")
 
     @always_inline("nodebug")
     # fn __del__(owned self):
