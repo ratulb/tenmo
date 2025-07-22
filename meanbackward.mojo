@@ -65,7 +65,6 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
         count = ancestor.shape().axes_spans.select(self.axes).product()
 
         scaled = broadcasted / Scalar[dtype](count)
-        print("Did I not come here?")
         return [
             (
                 ancestor,

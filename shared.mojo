@@ -4,8 +4,41 @@ from views import TensorView
 from intlist import IntList
 from backpropagation import BackwardFn
 
+from testing import assert_true, assert_false
+
+
+fn test_equality_when_inner_is_tensor() raises:
+    a = Tensor.d1([1, 2, 3])
+    tl1 = TensorLike(UnsafePointer(to=a))
+    tl2 = TensorLike(UnsafePointer(to=a))
+    assert_true(
+        tl1 == tl2, "Equality assertion failed when pointing to same lvalue"
+    )
+    b = a
+    tl3 = TensorLike(UnsafePointer(to=b))
+    assert_false(
+        tl1 == tl3,
+        "Inequality assertion failed when pointing to different lvalues",
+    )
+    print(tl1.inner_id(), tl2.inner_id(), tl3.inner_id())
+
+    assert_true(
+        tl1.inner_id() == tl2.inner_id(),
+        "Inner id equality assertion failed when pointing to same lvalue",
+    )
+
+    assert_false(
+        tl1.inner_id() == tl3.inner_id(),
+        (
+            "Inner id inequality assertion failed when pointing to different"
+            " lvalues"
+        ),
+    )
+
+
 fn main() raises:
-    print("Hello")
+    test_equality_when_inner_is_tensor()
+
 
 struct TensorLike[dtype: DType](
     Sized & Stringable & Representable & Writable & Copyable & Movable
@@ -37,6 +70,18 @@ struct TensorLike[dtype: DType](
         self.tensor_address = other.tensor_address
         self.view_address = other.view_address
 
+    fn __eq__(self, other: Self) -> Bool:
+        if self.kind != other.kind:
+            return False
+        return (
+            self.tensor_address
+            == other.tensor_address if self.kind
+            == 0 else self.view_address
+            == other.view_address
+        )
+
+    fn __ne__(self, other: Self) -> Bool:
+        return not self.__eq__(other)
 
     fn is_view(self) -> Bool:
         return self.kind == 1
@@ -49,6 +94,18 @@ struct TensorLike[dtype: DType](
 
     fn view_ptr(self) -> Self.ViewAddress:
         return self.view_address
+
+    fn inner_address(self) -> UnsafePointer[Tensor[dtype]]:
+        if self.kind == 0:
+            return self.tensor_address
+        else:
+            return self.view_address[].base_tensor  # base pointer address
+
+    fn inner_id(self) -> Int:
+        if self.kind == 0:
+            return Tensor.id(self.tensor_address)
+        else:
+            return TensorView.id(self.view_address)  # View id!
 
     fn tensor(self) -> Tensor[dtype]:
         return self.tensor_address[]
@@ -92,19 +149,6 @@ struct TensorLike[dtype: DType](
             .base_tensor[]
             .gradients()
         )
-
-    fn inner_address(self) -> UnsafePointer[Tensor[dtype]]:
-        if self.kind == 0:
-            return self.tensor_address
-        else:
-            return self.view_address[].base_tensor #base pointer address
-
-
-    fn inner_id(self) -> Int:
-        if self.kind == 0:
-            return Tensor.id(self.tensor_address)
-        else:
-            return TensorView.id(self.view_address) # View id!
 
     fn rank(self) -> Int:
         return self.shape().rank()
@@ -257,4 +301,3 @@ struct TensorLike[dtype: DType](
         return len(self.tensor_address[]) if self.kind == 0 else len(
             self.view_address[]
         )
-

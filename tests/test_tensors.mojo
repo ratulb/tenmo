@@ -2003,8 +2003,8 @@ fn test_add_1d_1d() raises:
     var c = a + b
     assert_true(c.all_close(Tensor.d1([5.0, 7.0, 9.0])))
     c.sum().backward()
-    # assert_true(a.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
-    # assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    assert_true(a.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
 
 
 fn test_add_2d_scalar() raises:

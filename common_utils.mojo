@@ -61,6 +61,7 @@ fn variadiclist_as_intlist(vlist: VariadicList[Int]) -> IntList:
         list.append(each)
     return list^
 
+
 # Create a single or two element(s) VariadicList
 fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int]:
     fn create_variadic_list(*elems: Int) -> VariadicList[Int]:

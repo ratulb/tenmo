@@ -3,6 +3,28 @@ from os import abort
 from shared import TensorLike
 from common_utils import log_debug
 
+from testing import assert_true
+from tensors import Tensor
+
+
+fn test_contains() raises:
+    a = Tensor.scalar(10)
+    tl1 = TensorLike(UnsafePointer(to=a))
+    tl2 = TensorLike(UnsafePointer(to=a))
+    ancestors = Ancestors[DType.float32].untracked()
+    ancestors.append(UnsafePointer(to=tl1))
+    print(ancestors.__contains__(tl2))
+    # print(ancestors.get(0)[].inner_id())
+    # print(tl1 == tl2)
+    for each in ancestors:
+        print(each[].inner_id())
+    # Ancestors.display(ancestors)
+
+
+fn main() raises:
+    test_contains()
+
+
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     var ancestors: UnsafePointer[UnsafePointer[TensorLike[dtype]]]
     var size: Int
@@ -46,6 +68,13 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     @staticmethod
     fn untracked() -> Ancestors[dtype]:
         return Self()
+
+    @staticmethod
+    fn display(ancestors: Ancestors[dtype]):
+        for each in ancestors:
+            entry = each[]
+            inner_id = entry.inner_id()
+            print(inner_id, end="\n")
 
     @always_inline("nodebug")
     # fn __del__(owned self):
@@ -97,9 +126,19 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         total = len(self)
         print("Ancestors[", total, "] = ", end="")
         for i in range(total):
-            print(self.get(i)[].inner_id().__str__(), end=" ")
+            each = self.get(i)[]
+            inner_id = each.inner_id()
+            print(String(inner_id), end=" ")
             # print(self.get(i).__str__(), end=" ")
         print()
+
+    fn __contains__(self, tensor_like: TensorLike[dtype]) -> Bool:
+        for i in range(len(self)):
+            tensor_like_inside = self.get(i)[]
+            inner_id = tensor_like_inside.inner_id()
+            if inner_id == tensor_like.inner_id():
+                return True
+        return False
 
     fn __iter__(ref self) -> _AncestorsIter[self.dtype, __origin_of(self)]:
         return _AncestorsIter[self.dtype](0, Pointer(to=self))

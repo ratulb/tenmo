@@ -12,8 +12,11 @@ from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
 from exponientionbackward import ExponientionBackward
 from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
+from transposebackward import TBackward
+from matmulbackward import MatmulBackward
 
 alias Delegate[dtype: DType] = Variant[
+    MatmulBackward[dtype],
     ReshapeBackward[dtype],
     SumBackward[dtype],
     MeanBackward[dtype],
@@ -26,6 +29,7 @@ alias Delegate[dtype: DType] = Variant[
     TrueDivBackwardScalar[dtype],
     RightTrueDivBackwardScalar[dtype],
     ExponientionBackward[dtype],
+    TBackward[dtype],
     BroadcastBackward[dtype, AddTensor, AddTensor, False],
     BroadcastBackward[dtype, AddTensor, AddTensor, True],
     BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
@@ -47,6 +51,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     fn __call__(
         self, out_ptr: UnsafePointer[Tensor[dtype]]
     ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
+        if self.grad_fn.isa[MatmulBackward[dtype]]():
+            return self.grad_fn[MatmulBackward[dtype]].backward[dtype](out_ptr)
+
         if self.grad_fn.isa[ReshapeBackward[dtype]]():
             return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](out_ptr)
 
@@ -96,6 +103,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[ExponientionBackward[dtype]].backward[dtype](
                 out_ptr
             )
+
+        elif self.grad_fn.isa[TBackward[dtype]]():
+            return self.grad_fn[TBackward[dtype]].backward[dtype](out_ptr)
 
         elif self.grad_fn.isa[
             BroadcastBackward[dtype, AddTensor, AddTensor, False]
