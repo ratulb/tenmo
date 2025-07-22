@@ -8,6 +8,7 @@ from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar
 from subbackward import SubBackward
 from broadcast_operation import BroadcastBackward
+from reshapebackward import ReshapeBackward
 
 alias Delegate[dtype: DType] = Variant[
     ReshapeBackward[dtype],
@@ -71,7 +72,6 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
                 BroadcastBackward[dtype, AddTensor, AddTensor, True]
             ].backward[dtype](out_ptr)
 
-
         elif self.grad_fn.isa[
             BroadcastBackward[dtype, AddTensor, SubtractTensor, False]
         ]():
@@ -82,30 +82,6 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         else:
             abort("I am not here to receive you")
         return []
-
-
-@fieldwise_init
-struct ReshapeBackward[dtype: DType](Copyable & Movable):
-    fn backward[
-        dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
-    ]:
-        output = out_ptr[]
-        gradients = output.grad[]
-        ancestor = output.ancestors.get(0)[]
-        reshaped = gradients.reshape(ancestor.shape())
-        # Deduct already contributed portion
-        new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
-            reshaped, output.base[]
-        )
-
-        # Update base accumulator
-        output.base.init_pointee_move(reshaped^)
-        return [(ancestor, new_contrib, AddTensor)]
-
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
 
 
 fn main():

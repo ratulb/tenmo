@@ -35,12 +35,13 @@ from operators import (
     Subtract,
     Multiply,
 )
-from backpropagation import BackwardFn, ReshapeBackward
+from backpropagation import BackwardFn
 from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar
 from subbackward import SubBackward
 from broadcast_operation import BroadcastBackward
+from reshapebackward import ReshapeBackward
 
 
 struct Tensor[dtype: DType = DType.float32](
