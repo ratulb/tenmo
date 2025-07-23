@@ -14,7 +14,7 @@ A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modu
 - 🪜 Views and slicing
 - 🧪 Comprehensive test coverage
 
-> 🚧 **Work in Progress** – This project is being developed as mojo is evolving! Expect breaking changes! Also, mojo provides serving side of a tensor/deep learning framework. We might go and meet it there and cookie cut the good parts from each other but right now it is being built from scratch — no NumPy, PyTorch, or TensorFlow under the hood.
+> 🚧 **Work in Progress** – This project is being developed as mojo is evolving! Expect breaking changes! Also, mojo provides serving side of a tensor/deep learning framework. We might go and meet it there and cookie cut the good parts from each other but right now it is being built from scratch — no NumPy, PyTorch, or TensorFlow under the hood. We intend keep it simple, light and make it as fast as possible!
 
 ---
 
