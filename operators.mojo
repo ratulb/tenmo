@@ -376,7 +376,6 @@ fn test_sum_1d() raises:
 
     summ = sum_1d(tensor, -1)
     assert_true(summ.item() == 8, "sum_1d start_index = -1 assertion failed")
-    Tensor.free_all(tensor)
 
 
 fn test_sum_across_rows() raises:
@@ -403,7 +402,6 @@ fn test_sum_across_rows() raises:
         (summ == expect).all_true(),
         "operators -> sum_across_rows assertion failed",
     )
-    Tensor.free_all(summ, tensor)
 
 
 fn test_sum_across_cols() raises:
@@ -430,7 +428,6 @@ fn test_sum_across_cols() raises:
         (summ == expect).all_true(),
         "operators -> sum_across_cols assertion failed",
     )
-    Tensor.free_all(summ, tensor)
 
 
 fn main() raises:

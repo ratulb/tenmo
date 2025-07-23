@@ -35,18 +35,7 @@ from operators import (
     Subtract,
     Multiply,
 )
-from backpropagation import BackwardFn
-from matmulbackward import MatmulBackward
-from sumbackward import SumBackward
-from meanbackward import MeanBackward
-from addbackward import AddBackward, AddBackwardScalar
-from subbackward import SubBackward, SubLeftRightBackwardScalar
-from broadcastbackward import BroadcastBackward
-from reshapebackward import ReshapeBackward
-from mulbackward import MultiplyBackward, MulBackwardScalar
-from exponientionbackward import ExponientionBackward
-from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
-from transposebackward import TBackward
+from walkback import *
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -113,7 +102,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.shape = shape
         self.requires_grad = requires_grad
         self.backwardFn = None
-        self.grad = UnsafePointer[__type_of(self)]()
+        self.grad = UnsafePointer[Self]()
         self.ancestors = Ancestors[dtype].untracked()
         self.base = UnsafePointer[Tensor[dtype]]()
         self.data = data
@@ -148,12 +137,12 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.base = UnsafePointer[Tensor[dtype]]()
         self.backwardFn = None
-        self.grad = UnsafePointer[__type_of(self)]()
+        self.grad = UnsafePointer[Self]()
         self.ancestors = Ancestors[dtype].untracked()
         if shape.ndim == 0:  # Tensor with Shape ()
-            self.data = UnsafePointer[Scalar[self.dtype]].alloc(1)
+            self.data = UnsafePointer[Scalar[dtype]].alloc(1)
         else:
-            self.data = UnsafePointer[Scalar[self.dtype]].alloc(
+            self.data = UnsafePointer[Scalar[dtype]].alloc(
                 self.shape.num_elements()
             )
 
@@ -224,7 +213,7 @@ struct Tensor[dtype: DType = DType.float32](
             abort("__setitem__(IntList): Invalid indices")
         self.data.store[volatile=True](index, value)
 
-    fn item(self) -> Scalar[self.dtype]:
+    fn item(self) -> Scalar[dtype]:
         if (
             self.shape != Shape.Unit and self.shape.ndim != 0
         ):  # Tensor with Shape ()
@@ -507,7 +496,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         vectorize[set_value, simdwidthof[dtype]()](self.numels())
 
-    fn __eq__(self, other: Tensor[self.dtype]) -> Tensor[DType.bool]:
+    fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
             abort(
                 "Tensor __eq__ → Dimension mismatch: "
@@ -672,7 +661,7 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             s += "Tensor"
         s += self.shape.__str__()
-        s += ", Type: " + self.dtype.__str__()
+        s += ", Type: " + dtype.__str__()
         s += ", requires_grad: " + String(self.requires_grad)
         s += "]"
         return s
@@ -1002,12 +991,12 @@ struct Tensor[dtype: DType = DType.float32](
         tensor_like.print(num_first, num_last)
 
     fn float(self) -> Tensor[DType.float32]:
-        if self.dtype == DType.float32:
+        if dtype == DType.float32:
             return rebind[Tensor[DType.float32]](self)
         return self.to_dtype[DType.float32]()
 
     fn float64(self) -> Tensor[DType.float64]:
-        if self.dtype == DType.float64:
+        if dtype == DType.float64:
             return rebind[Tensor[DType.float64]](self)
         return self.to_dtype[DType.float64]()
 
