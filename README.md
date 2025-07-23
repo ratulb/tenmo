@@ -126,7 +126,7 @@ Perfect for understanding what deep learning libraries **actually do under the h
 
 > Build from scratch. Understand deeply. Control everything. Optimize aggressively.
 
-This is a **learning-first** project: correctness first, performance next, scale later.
+This is a **learning-first** project: correctness first(we entertain no exceptions - we simply abort if expectations are not regarded with precise messages!), performance next, scale later.
 
 ---
 
