@@ -65,16 +65,15 @@ struct TensorLike[dtype: DType](
         return self.view_address
 
     fn inner_address(self) -> UnsafePointer[Tensor[dtype]]:
-        if self.kind == 0:
-            return self.tensor_address
-        else:
-            return self.view_address[].base_tensor  # base pointer address
+        return (
+            self.tensor_address if self.kind
+            == 0 else self.view_address[].base_tensor
+        )  # base pointer address
 
     fn inner_id(self) -> Int:
-        if self.kind == 0:
-            return Tensor.id(self.tensor_address)
-        else:
-            return TensorView.id(self.view_address)  # View id!
+        return Int(self.tensor_address) if self.kind == 0 else Int(
+            self.view_address
+        )
 
     fn tensor(self) -> Tensor[dtype]:
         return self.tensor_address[]
