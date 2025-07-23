@@ -7,12 +7,97 @@ from shapes import Shape
 from common_utils import *
 from utils.numerics import min_finite
 
+
+fn test_matmul_scalar_output() raises:
+    print("test_matmul_scalar_output")
+    var a = Tensor.d2([[1.0, 2.0]])
+    var b = Tensor.d2([[3.0], [4.0]])
+    var out = a.matmul(b)  # [[1*3 + 2*4]] = [[11]]
+    assert_true((out == Tensor.d2([[11.0]])).all_true())
+
+
+fn test_matmul_tensor_tensor() raises:
+    print("test_matmul_tensor_tensor")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var b = Tensor.d2([[5.0], [6.0]])
+    var out = a.matmul(b)
+    assert_true((out == Tensor.d2([[17.0], [39.0]])).all_true())
+
+
+fn test_matmul_tensor_view() raises:
+    print("test_matmul_tensor_view")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var b = Tensor.d2([[5.0], [6.0]])
+    var view_b = b.view(shape=[2, 1], strides=[1, 1], offset=0)
+    var out = a.matmul(view_b)
+    assert_true((out == Tensor.d2([[17.0], [39.0]])).all_true())
+
+
+fn test_matmul_view_tensor() raises:
+    print("test_matmul_view_tensor")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var b = Tensor.d2([[5.0], [6.0]])
+    var view_a = a.view(shape=[2, 2], strides=[2, 1], offset=0)
+    var out = view_a.matmul(b)
+    assert_true((out == Tensor.d2([[17.0], [39.0]])).all_true())
+
+
+fn test_matmul_view_view() raises:
+    print("test_matmul_view_view")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var b = Tensor.d2([[5.0], [6.0]])
+    var view_a = a.view(shape=[2, 2], strides=[2, 1], offset=0)
+    var view_b = b.view(shape=[2, 1], strides=[1, 1], offset=0)
+    var out = view_a.matmul(view_b)
+    assert_true((out == Tensor.d2([[17.0], [39.0]])).all_true())
+    _ = a
+    _ = b
+
+
+fn test_matmul_transposed_tensor_tensor() raises:
+    print("test_matmul_transposed_tensor_tensor")
+    var a = Tensor.d2([[1.0, 2.0, 3.0]])  # shape (1,3)
+    var b = Tensor.d2([[4.0], [5.0], [6.0]])  # shape (3,1)
+    var out = a.matmul(b)
+    assert_true((out == Tensor.d2([[32.0]])).all_true())
+
+
+fn test_matmul_transposed_tensor_view() raises:
+    print("test_matmul_transposed_tensor_view")
+    var a = Tensor.d2([[1.0, 2.0, 3.0]])
+    var b = Tensor.d2([[4.0], [5.0], [6.0]])
+    var view_b = b.view(shape=[3, 1], strides=[1, 1], offset=0)
+    var out = a.matmul(view_b)
+    assert_true((out == Tensor.d2([[32.0]])).all_true())
+
+
+fn test_matmul_transposed_view_tensor() raises:
+    print("test_matmul_transposed_view_tensor")
+    var a = Tensor.d2([[1.0, 2.0, 3.0]])
+    var b = Tensor.d2([[4.0], [5.0], [6.0]])
+    var view_a = a.view(shape=[1, 3], strides=[3, 1], offset=0)
+    var out = view_a.matmul(b)
+    assert_true((out == Tensor.d2([[32.0]])).all_true())
+
+
+fn test_matmul_transposed_view_view() raises:
+    print("test_matmul_transposed_view_view")
+    var a = Tensor.d2([[1.0, 2.0, 3.0]])
+    var b = Tensor.d2([[4.0], [5.0], [6.0]])
+    var view_a = a.view(shape=[1, 3], strides=[3, 1], offset=0)
+    var view_b = b.view(shape=[3, 1], strides=[1, 1], offset=0)
+    var out = view_a.matmul(view_b)
+    assert_true((out == Tensor.d2([[32.0]])).all_true())
+    _ = a
+    _ = b
+
+
 fn test_tensor_shared_multiple_paths() raises:
     print("test_tensor_shared_multiple_paths")
     var x = Tensor.scalar(2.0, requires_grad=True)
-    var y = x * 3              # 6
-    var z = x + 4              # 6
-    var out = y + z            # 12
+    var y = x * 3  # 6
+    var z = x + 4  # 6
+    var out = y + z  # 12
 
     out.backward()
 
@@ -28,16 +113,18 @@ fn test_tensor_reuse_broadcasting() raises:
 
     y.sum().backward()
 
-    assert_true(x.grad[].all_close(Tensor.d1([2, 2, 2])), "Gradient doubles due to reuse")
-
+    assert_true(
+        x.grad[].all_close(Tensor.d1([2, 2, 2])),
+        "Gradient doubles due to reuse",
+    )
 
 
 fn test_tensor_reuse_deep_chain() raises:
     print("test_tensor_reuse_deep_chain")
     var x = Tensor.scalar(2.0, requires_grad=True)
-    var y = x + 1           # 3
-    var z = y * x           # 3 * 2 = 6
-    var w = z + x           # 6 + 2 = 8
+    var y = x + 1  # 3
+    var z = y * x  # 3 * 2 = 6
+    var w = z + x  # 6 + 2 = 8
 
     w.backward()
 
@@ -50,9 +137,9 @@ fn test_tensor_reuse_deep_chain() raises:
 fn test_tensor_reuse_in_two_branches() raises:
     print("test_tensor_reuse_in_two_branches")
     var x = Tensor.scalar(2.0, requires_grad=True)
-    var y1 = x + 1    # 3
-    var y2 = x * 5    # 10
-    var z = y1 + y2   # 13
+    var y1 = x + 1  # 3
+    var y2 = x * 5  # 10
+    var z = y1 + y2  # 13
 
     z.backward()
 
@@ -92,6 +179,7 @@ fn test_simple_chain() raises:
     d.backward()
     assert_true(d.item() == 9.0, "Value check")
     assert_true(a.grad[].item() == 3.0, "∂d/∂a = b = 3")
+
 
 fn test_scalar_mul_scalar() raises:
     print("test_scalar_mul_scalar")
@@ -1540,6 +1628,7 @@ fn test_arange() raises:
     tensor1.free()
     expected1.free()
 
+
 fn test_random() raises:
     print("test_random")
     rand_tensor = Tensor.rand(10)
@@ -1622,6 +1711,7 @@ fn test_scalar_tensor() raises:
         "Scalar tensor item and shape assertion failed",
     )
 
+
 fn test_reshape() raises:
     print("test_reshape")
     tensor = Tensor.rand(3, 3)
@@ -1691,6 +1781,7 @@ fn test_reshape() raises:
     tensor3.gprint()
     tensor2.gprint()
     tensor.gprint()
+
 
 fn test_tensor_multiplications() raises:
     print("test_tensor_multiplications")
@@ -2475,9 +2566,10 @@ fn test_tensor_scalar_add_mul_pow() raises:
     assert_true(h.item() == 8.0, "2.0 ** 3.0 = 8.0")
     assert_true(g.grad[].item() == 12.0, "∂(g ** 3)/∂g = 3 * g^2 = 3 * 4 = 12")
 
+
 fn test_slice_grad() raises:
     print("test_slice_grad")
-    _="""var a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
+    _ = """var a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
     var b = a[1:3]  # [2,3]
     var c = b * Tensor.d1([10,20])
     c.sum().backward()
@@ -2486,7 +2578,7 @@ fn test_slice_grad() raises:
 
 fn test_nested_operations() raises:
     print("test_nested_operations")
-    _="""var a = Tensor.d1([1, 2], requires_grad=True)
+    _ = """var a = Tensor.d1([1, 2], requires_grad=True)
     var b = Tensor.d1([3, 4], requires_grad=True)
     var c = (a * b).sum() + (a + b).prod()
     c.backward()
@@ -2525,6 +2617,7 @@ fn test_empty_tensor() raises:
     s.backward()
     assert_true(s.item() == min_finite[DType.float32]())
     assert_true(a.grad[].shape == Shape.Void)
+
 
 fn main() raises:
     print("Starting tensor test cases")
@@ -2573,9 +2666,7 @@ fn main() raises:
     test_random()
     test_view()
 
-
-
-    #test_matmul_broadcasting()
+    # test_matmul_broadcasting()
     test_transpose_grad()
     test_zero_grad()
     test_matmul_shapes()
@@ -2646,8 +2737,17 @@ fn main() raises:
     test_scalar_div_tensor_2d()
     test_empty_tensor()
     test_large_tensor_backprop()
-    #test_nested_operations()
-    #test_detach()
+    # test_nested_operations()
+    # test_detach()
+    # View tensor multiplication
+    test_matmul_scalar_output()
+    test_matmul_tensor_tensor()
+    test_matmul_tensor_view()
+    test_matmul_view_tensor()
+    test_matmul_view_view()
+    test_matmul_transposed_tensor_tensor()
+    test_matmul_transposed_tensor_view()
+    test_matmul_transposed_view_tensor()
+    test_matmul_transposed_view_view()
+
     print("Finished running tensor test cases")
-
-

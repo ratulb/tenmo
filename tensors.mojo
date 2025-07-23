@@ -1521,6 +1521,16 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn view(
         self,
+        shape: List[Int],
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> TensorView[dtype]:
+        return self.view(
+            shape=Shape(shape), offset=offset, requires_grad=requires_grad
+        )
+
+    fn view(
+        self,
         shape: Shape,
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
@@ -1546,6 +1556,20 @@ struct Tensor[dtype: DType = DType.float32](
             Strides.default(shape),
             offset=offset,
             requires_grad=_requires_grad,
+        )
+
+    fn view(
+        self,
+        shape: List[Int],
+        strides: List[Int],
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> TensorView[dtype]:
+        return self.view(
+            shape=Shape(shape),
+            strides=Strides(strides),
+            offset=offset,
+            requires_grad=requires_grad,
         )
 
     fn view(
@@ -1586,33 +1610,27 @@ struct Tensor[dtype: DType = DType.float32](
         return ((self - target) ** 2).mean()
 
     # Note - matmul has not been optimized at all - once everything is place - revisit this
-    fn matmul(self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
-        if not self.shape.rank() == 2:
-            abort("Only supports 2D matmul for now")
-        if not other.shape.rank() == 2:
-            abort("Other must be 2D")
-        if not self.shape[1] == other.shape[0]:
-            abort("Incompatible shapes")
-
-        m, k = self.shape[0], self.shape[1]
-        n = other.shape[1]
-
-        requires_grad = self.requires_grad or other.requires_grad
-        var out = Tensor[dtype](m, n, requires_grad=requires_grad)
-
-        for i in range(m):
-            for j in range(n):
-                var summ = Scalar[dtype](0)
-                for p in range(k):
-                    summ += self[IntList(i, p)] * other[IntList(p, j)]
-                out[IntList(i, j)] = summ
-
-        if requires_grad:
+    fn matmul(self, other: Self) -> Self:
+        this = TensorLike.from_tensor(self)
+        that = TensorLike.from_tensor(other)
+        out = this.matmul(that)
+        if out.requires_grad:
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
-
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-            out.add_ancestry(Self.Ancestor_of(other))
+            out.add_ancestry(this)
+            out.add_ancestry(that)
+
+        return out
+
+    fn matmul(self, other: TensorView[dtype]) -> Self:
+        this = TensorLike.from_tensor(self)
+        that = TensorLike.from_view(other)
+        out = this.matmul(that)
+        if out.requires_grad:
+            backward_fn = MatmulBackward[dtype]().into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(this)
+            out.add_ancestry(that)
 
         return out
 
@@ -1645,7 +1663,9 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
             normalized_axes_copy = normalized_axes.copy()
 
-            backward_fn = TransposeBackward[dtype](normalized_axes_copy).into_backward_fn()
+            backward_fn = TransposeBackward[dtype](
+                normalized_axes_copy
+            ).into_backward_fn()
 
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
@@ -1653,13 +1673,8 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
 
+from testing import assert_true
+
+
 fn main() raises:
-    orig = Tensor.arange(6, requires_grad=True)
-    print("orig")
-    orig.print()
-    reshaped = orig.reshape(1, 2, 3)
-    print("reshaped")
-    reshaped.print()
-    transposed = reshaped.transpose([0, 2, 1])
-    print("transposed")
-    transposed.print()
+    pass

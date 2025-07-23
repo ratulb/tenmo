@@ -81,6 +81,9 @@ struct Shape(
             _dims.append(each)
         self = Self(_dims)
 
+    fn __init__(out self, dims: List[Int]):
+        self = Self(IntList.new(dims))
+
     fn __init__(out self, dims: IntList):
         _ = """if len(dims) < 1:
             abort("Shape -> __init__: Shape dimension count should be > 0")"""
@@ -94,7 +97,8 @@ struct Shape(
         for i in range(_ndims):
             if dims[i] < 1:
                 abort(
-                    "Shape → __init__: negative or zero sized dimension(s) are not allowed →"
+                    "Shape → __init__: negative or zero sized dimension(s) are"
+                    " not allowed →"
                     + " Dim = "
                     + String(dims[i])
                     + " at index = "

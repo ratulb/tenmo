@@ -6,6 +6,16 @@ from testing import assert_true, assert_false, assert_raises, assert_equal
 
 
 fn main() raises:
+    test_getitem_list_empty_indices_returns_full_view()
+    test_into_tensor_full_view_copy()
+    test_into_tensor_transposed_view()
+    test_into_tensor_offset_view()
+    test_into_tensor_scalar_view()
+    # test_into_tensor_empty_view()
+    test_into_tensor_grad_flag_true()
+    test_into_tensor_grad_flag_false()
+    test_into_tensor_large_contiguous_copy()
+
     test_negative_offset_fails()
     test_large_stride_out_of_bounds()
     test_invalid_offset()
@@ -29,6 +39,7 @@ fn main() raises:
     test_view_identity()
     test_view_stride_bounds_overflow()
 
+
 fn test_negative_offset_fails() raises:
     print("test_negative_offset_fails")
     var t = Tensor.d1([1, 2, 3])
@@ -36,6 +47,7 @@ fn test_negative_offset_fails() raises:
     var strides = Strides.of(1)
     with assert_raises():
         _ = t.view(shape, strides, offset=-1)  # offset < 0
+
 
 fn test_large_stride_out_of_bounds() raises:
     print("test_large_stride_out_of_bounds")
@@ -64,13 +76,18 @@ fn test_invalid_stride_overflow() raises:
     # Now bump shape to (2, 3)
     shape = Shape.of(2, 3)
     with assert_raises():
-        _ = t.view(shape, strides)  # Accesses up to 0 + 4 + 6 = 10 ❌ (== numels)
+        _ = t.view(
+            shape, strides
+        )  # Accesses up to 0 + 4 + 6 = 10 ❌ (== numels)
+
 
 fn test_valid_3d_view() raises:
     print("test_valid_3d_view")
     var t = Tensor.d1(List[Float32](0) * 24)
-    var shape = Shape.of(2, 3, 4)           # Total 24 elements
-    var strides = Strides.of(12, 4, 1)      # Standard 3D contiguous row-major layout
+    var shape = Shape.of(2, 3, 4)  # Total 24 elements
+    var strides = Strides.of(
+        12, 4, 1
+    )  # Standard 3D contiguous row-major layout
     var view = t.view(shape, strides)
     assert_true(view.shape == shape)
 
@@ -78,10 +95,13 @@ fn test_valid_3d_view() raises:
 fn test_valid_2d_view() raises:
     print("test_valid_2d_view")
     var t = Tensor.d1([0, 1, 2, 3, 4, 5])
-    var shape = Shape.of(2, 3)              # 2 rows, 3 cols
-    var strides = Strides.of(3, 1)          # Row major: step 3 to next row, step 1 for next col
+    var shape = Shape.of(2, 3)  # 2 rows, 3 cols
+    var strides = Strides.of(
+        3, 1
+    )  # Row major: step 3 to next row, step 1 for next col
     var view = t.view(shape, strides)
     assert_true(view.shape == shape)
+
 
 fn test_view_offset_out_of_bounds() raises:
     print("test_view_offset_out_of_bounds")
@@ -115,8 +135,9 @@ fn test_view_2d_strides_valid() raises:
 
     var v = t.view(shape, strides, offset)
     assert_true(v.shape == shape, "2D view shape matches")
-    v[1,1] = 100
-    assert_equal(t[2,1], 100.0, "Base tensor update failed via view")
+    v[1, 1] = 100
+    assert_equal(t[2, 1], 100.0, "Base tensor update failed via view")
+
 
 fn test_view_2d_strides_overflow() raises:
     print("test_view_2d_strides_overflow")
@@ -124,9 +145,10 @@ fn test_view_2d_strides_overflow() raises:
     var shape = Shape.of(3, 3)
     var strides = Strides.of(4, 1)  # row-major
     var offset = 4  # starts at 2nd row, so largest index will be:
-                    # 4 + (3-1)*4 + (3-1)*1 = 4 + 8 + 2 = 14 ❌
+    # 4 + (3-1)*4 + (3-1)*1 = 4 + 8 + 2 = 14 ❌
     with assert_raises():
-        _= t.view(shape, strides, offset)
+        _ = t.view(shape, strides, offset)
+
 
 fn test_view_3d_valid() raises:
     print("test_view_3d_valid")
@@ -137,6 +159,7 @@ fn test_view_3d_valid() raises:
 
     var v = t.view(shape, strides, offset)
     assert_true(v.shape == shape, "3D valid view shape matches")
+
 
 fn test_view_3d_invalid_strides() raises:
     print("test_view_3d_invalid_strides")
@@ -237,3 +260,117 @@ fn test_view_stride_bounds_overflow() raises:
     # with assert_raises():
     # _ = t.view(shape, strides)  # 0 + 3*(2-1) = 3 ✅ but add one more -> 4 ➝ overflow
     assert_true(t.view(shape, strides)[1] == 4, "get item assertion failed")
+
+
+fn test_getitem_list_empty_indices_returns_full_view() raises:
+    print("test_getitem_list_empty_indices_returns_full_view")
+    a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    # v = a.__getitem__(List[Int]())
+    v = a[[]]
+    assert_true(v.shape == a.shape)
+    assert_true(v.offset == 0)
+    assert_true(v.all_close(a))
+
+
+# Following are older test cases - needs to be verified and run
+fn test_into_tensor_full_view_copy() raises:
+    print("test_into_tensor_full_view_copy")
+    var t = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var v = t.view(Shape.of(2, 2))
+    var out = v.into_tensor()
+    assert_true(out.all_close(t))
+    assert_true(out.data != t.data)  # Ensure deep copy
+
+
+fn test_into_tensor_transposed_view() raises:
+    print("test_into_tensor_transposed_view")
+    var t = Tensor.d2([[1, 2, 3], [4, 5, 6]])
+    var v = t.transpose()
+    var out = v.into_tensor()
+    assert_true(out.all_close(Tensor.d2([[1, 4], [2, 5], [3, 6]])))
+
+
+fn test_into_tensor_offset_view() raises:
+    print("test_into_tensor_offset_view")
+    var t = Tensor.d1([0, 1, 2, 3, 4, 5])
+    var v = t.view(Shape.of(2), offset=3)
+    var out = v.into_tensor()
+    assert_true(out.all_close(Tensor.d1([3, 4])))
+
+
+fn test_into_tensor_scalar_view() raises:
+    print("test_into_tensor_scalar_view")
+    var t = Tensor.scalar(42)
+    var v = t.view(Shape.Void)
+    var out = v.into_tensor()
+    assert_true(out.shape == Shape.Void)
+    assert_true(out.item() == 42)
+
+
+fn test_into_tensor_empty_view() raises:
+    print("test_into_tensor_empty_view")
+    var t = Tensor[DType.float32](Shape.of(0, 3))
+    var v = t.view(Shape.of(0, 3))
+    var out = v.into_tensor()
+    assert_true(out.shape == Shape.of(0, 3))
+    # assert_true(out.data.len() == 0)
+
+
+fn test_into_tensor_grad_flag_true() raises:
+    print("test_into_tensor_grad_flag_true")
+    var t = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = t.view(Shape.of(2, 2))
+    var out = v.into_tensor()
+    assert_true(out.requires_grad == True)
+
+
+fn test_into_tensor_grad_flag_false() raises:
+    print("test_into_tensor_grad_flag_false")
+    var t = Tensor.d2([[1, 2], [3, 4]], requires_grad=False)
+    var v = t.view(Shape.of(2, 2))
+    var out = v.into_tensor()
+    assert_true(out.requires_grad == False)
+
+
+fn test_into_tensor_large_contiguous_copy() raises:
+    print("test_into_tensor_large_contiguous_copy")
+    N = 1024 * 1024
+    var t = Tensor(Shape.of(N))
+    for i in range(N):
+        t[i] = i
+    var v = t.view(Shape.of(N))
+    var out = v.into_tensor()
+    assert_true(out.shape == Shape.of(N))
+    assert_true(out[123456] == 123456)
+
+    _ = """fn test_into_tensor_isolated_memory() raises:
+    print("test_into_tensor_isolated_memory")
+    var t = Tensor.d1([1, 2, 3, 4])
+    var v = t.slice(1, 3)  # [2, 3]
+    var out = v.into_tensor()
+    v[0] = 999
+    assert_true(out.all_close(Tensor.d1([2, 3])))  # Unaffected by view mutation
+
+fn test_into_tensor_strided_view_rows() raises:
+    print("test_into_tensor_strided_view_rows")
+    var t = Tensor.d2([[1, 2], [3, 4], [5, 6], [7, 8]])
+    var v = t.slice_rows(0, 4, 2)  # Should give rows [0, 2]
+    var out = v.into_tensor()
+    assert_true(out.all_close(Tensor.d2([[1, 2], [5, 6]])))
+
+fn test_into_tensor_contiguous_slice_1d() raises:
+    print("test_into_tensor_contiguous_slice_1d")
+    var t = Tensor.d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    var v = t.slice(2, 7)
+    var out = v.into_tensor()
+    assert_true(out.all_close(Tensor.d1([2, 3, 4, 5, 6])))
+
+
+
+fn test_into_tensor_nested_view() raises:
+    print("test_into_tensor_nested_view")
+    var t = Tensor.d1([10, 20, 30, 40, 50])
+    var v1 = t.slice(1, 5)           # [20, 30, 40, 50]
+    var v2 = v1.slice(1, 3)          # [30, 40]
+    var out = v2.into_tensor()
+    assert_true(out.all_close(Tensor.d1([30, 40])))"""

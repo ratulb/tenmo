@@ -3,6 +3,7 @@ from shapes import Shape
 from views import TensorView
 from intlist import IntList
 from backpropagation import BackwardFn
+from os import abort
 
 
 fn main() raises:
@@ -277,3 +278,27 @@ struct TensorLike[dtype: DType](
         return len(self.tensor_address[]) if self.kind == 0 else len(
             self.view_address[]
         )
+
+    # Note - matmul has not been optimized at all - once everything is place - revisit this
+    fn matmul(self, other: Self) -> Tensor[dtype]:
+        if not self.rank() == 2:
+            abort("TesorLike  → matmul: Only supports 2D matmul for now")
+        if not other.rank() == 2:
+            abort("TesorLike  → matmul: Other must be 2D")
+        if not self.shape()[1] == other.shape()[0]:
+            abort("TesorLike  → matmul: Incompatible shapes")
+
+        m, k = self.shape()[0], self.shape()[1]
+        n = other.shape()[1]
+
+        requires_grad = self.requires_grad() or other.requires_grad()
+        var out = Tensor[dtype](m, n, requires_grad=requires_grad)
+
+        for i in range(m):
+            for j in range(n):
+                var summ = Scalar[dtype](0)
+                for p in range(k):
+                    summ += self[IntList(i, p)] * other[IntList(p, j)]
+                out[IntList(i, j)] = summ
+
+        return out

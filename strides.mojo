@@ -2,9 +2,17 @@ from shapes import Shape
 from intlist import IntList
 from os import abort
 
+
+fn main():
+    pass
+
+
 @register_passable
 struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     var strides: IntList
+
+    fn __init__(out self, values: List[Int]):
+        self.strides = IntList.new(values)
 
     fn __init__(out self, values: IntList):
         self.strides = values
@@ -96,7 +104,7 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     # Compute strides from shape in row-major order
     @staticmethod
     fn default(shape: Shape) -> Self:
-        _="""var strides_list = IntList.filled(shape.rank(), 1)
+        _ = """var strides_list = IntList.filled(shape.rank(), 1)
         for i in reversed(range(shape.rank() - 1)):
             strides_list[i] = strides_list[i + 1] * shape[i + 1]
         return Strides(strides_list)"""
