@@ -67,7 +67,7 @@ struct Tensor[dtype: DType = DType.float32](
             return
         self.seed_grad(seed_tensor)
         visited = IntList.Empty
-        stack = [Tensor.into_recipient(UnsafePointer(to=self))]
+        stack = [TensorLike.from_tensor(self)]
 
         while stack:
             node = stack.pop()
@@ -151,19 +151,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return True
 
-    @staticmethod
-    fn into_tensorlike(
-        self_ptr: UnsafePointer[Tensor[dtype]],
-    ) -> TensorLike[dtype]:
-        return TensorLike[dtype](self_ptr)
-
     alias Ancestor_of = TensorLike.from_tensor
-
-    @staticmethod
-    fn into_recipient(
-        self_ptr: UnsafePointer[Tensor[dtype]],
-    ) -> TensorLike[dtype]:
-        return TensorLike[dtype](self_ptr)
 
     # Check if it has a backward fn before calling this API
     fn backward_fn(self) -> BackwardFn[dtype]:
@@ -959,7 +947,7 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
-        tensor_like = Self.into_recipient(UnsafePointer(to=self))
+        tensor_like = TensorLike.from_tensor(self)
         tensor_like.print(num_first, num_last)
 
     fn float(self) -> Tensor[DType.float32]:
@@ -1193,8 +1181,7 @@ struct Tensor[dtype: DType = DType.float32](
             if self.requires_grad and track_grad:
                 backward_fn = SumBackward[dtype]().into_backward_fn()
                 scalar_out.backwardFn = Optional(backward_fn)
-                self_pointer = UnsafePointer(to=self)
-                scalar_out.add_ancestry(Self.into_tensorlike(self_pointer))
+                scalar_out.add_ancestry(Self.Ancestor_of(self))
 
             return scalar_out
 
@@ -1243,8 +1230,7 @@ struct Tensor[dtype: DType = DType.float32](
                 _axes, _keepdims
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            self_pointer = UnsafePointer(to=self)
-            out.add_ancestry(Self.into_tensorlike(self_pointer))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
