@@ -306,41 +306,15 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.grad[].print()
 
-    @staticmethod
-    fn contains_parent(
-        ancestors: Ancestors[dtype], tensor_like: TensorLike[dtype]
-    ) -> Bool:
-        for each in ancestors:
-            entry = each[]
-            inner_id = entry.inner_id()
-            if inner_id == tensor_like.inner_id():
-                print("Ancestor already present: ", inner_id)
-                return False
-        return False
-
     fn add_ancestry(mut self, *parents: TensorLike[dtype]):
         for parent in parents:
-            if Self.contains_parent(self.ancestors, parent):
-                continue
             var ptr = UnsafePointer[TensorLike[dtype]].alloc(1)
             ptr.init_pointee_copy(parent)
             self.ancestors.append(ptr)
-            _ = """try:
-                msg = String(
-                    "Tensor -> add_ancestry -> DAG node inner id(ancestor):"
-                    " {0}, self id(descendant): {1} => kind: "
-                    + "Tensor" if ptr[].is_tensor() else "View"
-                ).format(
-                    stable.inner_id(), self.id()
-                )  # Critical compiler issue c = a + b, s = c.sum(), results in s.id() == b.id() if self.id() is not printed!
-                log_debug(msg)
-            except e:
-                print(e)"""
 
     fn ancestry(self) -> Ancestors[dtype]:
         return self.ancestors
 
-    # fn __del__(owned self):
     fn free(owned self):
         if self.has_grad():
             for i in range(self.numels()):
@@ -1682,18 +1656,33 @@ struct Tensor[dtype: DType = DType.float32](
             offset=0,
             requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
-        _ = """if self.requires_grad:
+        _="""if self.requires_grad:
 
-            fn grad_fn(gradients: Tensor[dtype]) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
+            fn grad_fn(
+                gradients: Tensor[dtype],
+            ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
                 inverted_axes = IntList.invert_permutation(normalized_axes)
                 grad_transposed = gradients.transpose(inverted_axes)
 
-                return [(Self.into_recipient(UnsafePointer(to=self)), grad_transposed, AddTensor)]
-
-            #out.capture_backward_fn(BackwardFn[dtype](grad_fn))"""
+                return [
+                    (
+                        Self.as_ancestor(UnsafePointer(to=self)),
+                        grad_transposed,
+                        AddTensor,
+                    )
+                ]"""
 
         return out
 
 
 fn main() raises:
-    pass
+    orig = Tensor.arange(6, requires_grad=True)
+    print("orig")
+    orig.print()
+    reshaped = orig.reshape(1, 2, 3)
+    print("reshaped")
+    reshaped.print()
+    transposed = reshaped.transpose([0, 2, 1])
+    print("transposed")
+    transposed.print()
+
