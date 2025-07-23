@@ -1650,21 +1650,6 @@ struct Tensor[dtype: DType = DType.float32](
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
 
-            _="""fn grad_fn(
-                gradients: Tensor[dtype],
-            ) -> List[Tuple[TensorLike[dtype], TensorLike[dtype], Int]]:
-                inverted_axes = IntList.invert_permutation(normalized_axes)
-                grad_transposed = gradients.transpose(inverted_axes)
-                grad_output = TensorLike(UnsafePointer(to=grad_transposed))
-
-                return [
-                    (
-                        Self.Ancestor_of(self),
-                        grad_output,
-                        AddTensor,
-                    )
-                ]"""
-
         return out
 
 
