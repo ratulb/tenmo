@@ -304,9 +304,9 @@ struct Tensor[dtype: DType = DType.float32](
         self.init_grad()
 
     fn init_grad(mut self):
-        if self.requires_grad and self.grad.__as_bool__() == False:
-            gradients = Tensor[self.dtype](self.shape)
-            self.grad = UnsafePointer[__type_of(self)].alloc(1)
+        if self.requires_grad and not self.grad.__as_bool__():
+            gradients = Tensor[dtype](self.shape)
+            self.grad = UnsafePointer[Self].alloc(1)
             self.grad.init_pointee_move(gradients^)
             self.zero_grad()
 
@@ -380,13 +380,13 @@ struct Tensor[dtype: DType = DType.float32](
         _ = self^
 
     fn __len__(self) -> Int:
-        return self.numels()
+        return self.shape.num_elements()
 
     fn len(self) -> Int:
-        return self.numels()
+        return self.shape.num_elements()
 
     fn size(self) -> Int:
-        return self.numels()
+        return self.shape.num_elements()
 
     fn numels(self) -> Int:
         return self.shape.num_elements()
@@ -712,7 +712,7 @@ struct Tensor[dtype: DType = DType.float32](
             seed()
         shape = Shape(axes_spans)
         tensor = Tensor[dtype](shape, requires_grad)
-        for i in range(tensor.numels()):  # vectorize?
+        for i in range(tensor.numels()):  # To be vectorized
             tensor.data.store[volatile=True](
                 i,
                 random_float64(
@@ -1000,12 +1000,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         tensor_like = Self.into_recipient(UnsafePointer(to=self))
         tensor_like.print(num_first, num_last)
-
-    @staticmethod
-    fn free_all[dtype: DType, //](*tensors: Tensor[dtype]):
-        for each in tensors:
-            each.free()
-            _ = each
 
     fn float(self) -> Tensor[DType.float32]:
         if self.dtype == DType.float32:

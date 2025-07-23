@@ -1516,19 +1516,20 @@ fn test_add_2_tensors() raises:
         "Input/output tensors shape match assertion failed",
     )
 
-    Tensor.free_all(tensor_a, tensor_b, out_tensor)
+    tensor_a.free()
+    tensor_b.free()
+    out_tensor.free()
 
 
 fn test_arange() raises:
     print("test_arange")
     tensor = Tensor.arange(0, 10)
-    # expected = Tensor.of(0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0)
     expected = Tensor.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-    # print(tensor.dtype, expected.dtype)
     is_true = (tensor == expected).all_true()
     assert_true(is_true, "arange gen check assertion failed")
 
-    Tensor.free_all(tensor, expected)
+    tensor.free()
+    expected.free()
 
     tensor1 = Tensor.arange(0, -5, -0.5)
     expected1 = Tensor.of(
@@ -1536,7 +1537,8 @@ fn test_arange() raises:
     )
     is_true = (tensor1 == expected1).all_true()
     assert_true(is_true, "arange negative step assertion failed")
-    Tensor.free_all(tensor1, expected1)
+    tensor1.free()
+    expected1.free()
 
 fn test_random() raises:
     print("test_random")
@@ -1556,7 +1558,8 @@ fn test_random() raises:
 
     holds_true = rand_tensor2.for_all(each2)
     assert_true(holds_true, "rand min(-2) and max(2) range assertion failed")
-    Tensor.free_all(rand_tensor, rand_tensor2)
+    rand_tensor.free()
+    rand_tensor2.free()
 
 
 fn test_item() raises:
@@ -1569,8 +1572,6 @@ fn test_view() raises:
     print("test_view")
     tensor = Tensor.rand(1).reshape()
     view = tensor.view(Shape.Void)
-    view.strides.print()
-    print("From view: ", view[IntList()])
     assert_true(
         tensor.shape == view.base_tensor[].shape,
         "Tensor and view shape equality asserttion failed",
@@ -1621,7 +1622,6 @@ fn test_scalar_tensor() raises:
         "Scalar tensor item and shape assertion failed",
     )
 
-
 fn test_reshape() raises:
     print("test_reshape")
     tensor = Tensor.rand(3, 3)
@@ -1671,7 +1671,6 @@ fn test_reshape() raises:
     )
     tensor = Tensor.scalar(42, requires_grad=True)
     result = tensor * 3
-    # result.backward()
     result.backward()
     assert_true(tensor.grad[].item() == 3.0)
     tensor2 = tensor.reshape(1)
@@ -1679,20 +1678,19 @@ fn test_reshape() raises:
     result = tensor2 * 42
     tensor.gprint()
     tensor2.gprint()
-    # result.backward()
+
     result.backward()
     tensor.gprint()
     tensor2.gprint()
-    # tensor3 = tensor2.reshape(1,1,1,1,1)
+
     tensor3 = tensor2.reshape(1, 1, 1, 1, 1)
     result = tensor3 * 12
-    # result.backward()
+
     result.backward()
 
     tensor3.gprint()
     tensor2.gprint()
     tensor.gprint()
-
 
 fn test_tensor_multiplications() raises:
     print("test_tensor_multiplications")
@@ -1704,7 +1702,6 @@ fn test_tensor_multiplications() raises:
     test_3d_broadcast_mul()
     test_scalar_tensor_mul()
     test_mul_one_requires_grad()
-
 
 
 fn test_scalar_addition() raises:
@@ -2526,7 +2523,6 @@ fn test_empty_tensor() raises:
     var a = Tensor.d1([], requires_grad=True)
     var s = a.sum()
     s.backward()
-    print(s.item())
     assert_true(s.item() == min_finite[DType.float32]())
     assert_true(a.grad[].shape == Shape.Void)
 
