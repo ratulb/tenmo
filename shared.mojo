@@ -52,6 +52,14 @@ struct TensorLike[dtype: DType](
     fn __ne__(self, other: Self) -> Bool:
         return not self.__eq__(other)
 
+    @staticmethod
+    fn from_tensor(tensor: Tensor[dtype]) -> Self:
+        return Self(UnsafePointer(to=tensor))
+
+    @staticmethod
+    fn from_view(view: TensorView[dtype]) -> Self:
+        return Self(UnsafePointer(to=view))
+
     fn is_view(self) -> Bool:
         return self.kind == 1
 

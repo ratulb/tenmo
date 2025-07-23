@@ -157,13 +157,13 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> TensorLike[dtype]:
         return TensorLike[dtype](self_ptr)
 
-    alias as_ancestor = Self.into_tensorlike
+    alias Ancestor_of = TensorLike.from_tensor
 
     @staticmethod
     fn into_recipient(
         self_ptr: UnsafePointer[Tensor[dtype]],
     ) -> TensorLike[dtype]:
-        return Self.into_tensorlike(self_ptr)
+        return TensorLike[dtype](self_ptr)
 
     # Check if it has a backward fn before calling this API
     fn backward_fn(self) -> BackwardFn[dtype]:
@@ -1032,7 +1032,7 @@ struct Tensor[dtype: DType = DType.float32](
                 scalar
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1053,7 +1053,7 @@ struct Tensor[dtype: DType = DType.float32](
                 scalar
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1066,7 +1066,7 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
             backward_fn = AddBackwardScalar[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1082,7 +1082,7 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
             backward_fn = MulBackwardScalar[dtype](factor).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1102,7 +1102,7 @@ struct Tensor[dtype: DType = DType.float32](
                 exponent
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1113,7 +1113,7 @@ struct Tensor[dtype: DType = DType.float32](
                 True
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1125,7 +1125,7 @@ struct Tensor[dtype: DType = DType.float32](
                 False
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1164,7 +1164,7 @@ struct Tensor[dtype: DType = DType.float32](
 
             backward_fn = ReshapeBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1274,7 +1274,7 @@ struct Tensor[dtype: DType = DType.float32](
                 _axes, _keepdims
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1302,9 +1302,9 @@ struct Tensor[dtype: DType = DType.float32](
             backward_fn = AddBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             if self.requires_grad:
-                out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+                out.add_ancestry(Self.Ancestor_of(self))
             if other.requires_grad:
-                out.add_ancestry(Self.as_ancestor(UnsafePointer(to=other)))
+                out.add_ancestry(Self.Ancestor_of(other))
 
         return out
 
@@ -1329,10 +1329,10 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad or other.requires_grad:
             sub_backward = SubBackward[dtype]()
             if self.requires_grad:
-                out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+                out.add_ancestry(Self.Ancestor_of(self))
                 sub_backward.negate(False)
             if other.requires_grad:
-                out.add_ancestry(Self.as_ancestor(UnsafePointer(to=other)))
+                out.add_ancestry(Self.Ancestor_of(other))
                 sub_backward.negate(True)
             backward_fn = sub_backward.into_backward_fn()
             out.backwardFn = Optional(backward_fn)
@@ -1351,8 +1351,8 @@ struct Tensor[dtype: DType = DType.float32](
             ]().into_backward_fn()
 
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=other)))
+            out.add_ancestry(Self.Ancestor_of(self))
+            out.add_ancestry(Self.Ancestor_of(other))
 
         return out
 
@@ -1378,8 +1378,8 @@ struct Tensor[dtype: DType = DType.float32](
             backward_fn = MultiplyBackward[dtype]().into_backward_fn()
 
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=other)))
+            out.add_ancestry(Self.Ancestor_of(self))
+            out.add_ancestry(Self.Ancestor_of(other))
 
         return out
 
@@ -1394,8 +1394,8 @@ struct Tensor[dtype: DType = DType.float32](
             ]().into_backward_fn()
 
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=other)))
+            out.add_ancestry(Self.Ancestor_of(self))
+            out.add_ancestry(Self.Ancestor_of(other))
 
         return out
 
@@ -1529,7 +1529,7 @@ struct Tensor[dtype: DType = DType.float32](
             backward_fn = TBackward[dtype]().into_backward_fn()
 
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 
@@ -1625,8 +1625,8 @@ struct Tensor[dtype: DType = DType.float32](
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
 
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=self)))
-            out.add_ancestry(Self.as_ancestor(UnsafePointer(to=other)))
+            out.add_ancestry(Self.Ancestor_of(self))
+            out.add_ancestry(Self.Ancestor_of(other))
 
         return out
 
@@ -1656,18 +1656,25 @@ struct Tensor[dtype: DType = DType.float32](
             offset=0,
             requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
-        _="""if self.requires_grad:
+        if self.requires_grad:
+            normalized_axes_copy = normalized_axes.copy()
 
-            fn grad_fn(
+            backward_fn = TransposeBackward[dtype](normalized_axes_copy).into_backward_fn()
+
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+
+            _="""fn grad_fn(
                 gradients: Tensor[dtype],
-            ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
+            ) -> List[Tuple[TensorLike[dtype], TensorLike[dtype], Int]]:
                 inverted_axes = IntList.invert_permutation(normalized_axes)
                 grad_transposed = gradients.transpose(inverted_axes)
+                grad_output = TensorLike(UnsafePointer(to=grad_transposed))
 
                 return [
                     (
-                        Self.as_ancestor(UnsafePointer(to=self)),
-                        grad_transposed,
+                        Self.Ancestor_of(self),
+                        grad_output,
                         AddTensor,
                     )
                 ]"""
@@ -1685,4 +1692,3 @@ fn main() raises:
     transposed = reshaped.transpose([0, 2, 1])
     print("transposed")
     transposed.print()
-

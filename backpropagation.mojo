@@ -12,7 +12,7 @@ from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
 from exponientionbackward import ExponientionBackward
 from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
-from transposebackward import TBackward
+from transposebackward import TBackward, TransposeBackward
 from matmulbackward import MatmulBackward
 
 alias Delegate[dtype: DType] = Variant[
@@ -29,6 +29,7 @@ alias Delegate[dtype: DType] = Variant[
     TrueDivBackwardScalar[dtype],
     RightTrueDivBackwardScalar[dtype],
     ExponientionBackward[dtype],
+    TransposeBackward[dtype],
     TBackward[dtype],
     BroadcastBackward[dtype, AddTensor, AddTensor, False],
     BroadcastBackward[dtype, AddTensor, AddTensor, True],

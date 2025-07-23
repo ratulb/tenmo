@@ -9,4 +9,4 @@ from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
 from exponientionbackward import ExponientionBackward
 from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
-from transposebackward import TBackward
+from transposebackward import TBackward, TransposeBackward

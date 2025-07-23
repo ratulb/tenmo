@@ -4,7 +4,9 @@ from intlist import IntList
 from strides import Strides
 from os import abort
 from shared import TensorLike
+from ancestry import Ancestors
 from memory import memcpy
+from walkback import BackwardFn
 
 
 fn main() raises:
@@ -148,6 +150,8 @@ struct TensorView[dtype: DType = DType.float32](
     var strides: Strides
     var offset: Int
     var requires_grad: Bool
+    var ancestors: Ancestors[dtype]
+    var backwardFn: Optional[BackwardFn[dtype]]
 
     fn __init__(
         out self,
@@ -162,6 +166,8 @@ struct TensorView[dtype: DType = DType.float32](
         self.strides = strides
         self.offset = offset
         self.requires_grad = requires_grad
+        self.ancestors = Ancestors[dtype].untracked()
+        self.backwardFn = None
 
     fn __moveinit__(out self, owned other: Self):
         self.base_tensor = other.base_tensor
@@ -169,6 +175,8 @@ struct TensorView[dtype: DType = DType.float32](
         self.strides = other.strides
         self.offset = other.offset
         self.requires_grad = other.requires_grad
+        self.ancestors = other.ancestors
+        self.backwardFn = other.backwardFn
 
     fn __copyinit__(out self, other: Self):
         self.base_tensor = other.base_tensor
@@ -176,6 +184,8 @@ struct TensorView[dtype: DType = DType.float32](
         self.strides = other.strides
         self.offset = other.offset
         self.requires_grad = other.requires_grad
+        self.ancestors = other.ancestors
+        self.backwardFn = other.backwardFn
 
     fn is_contiguous(self) -> Bool:
         # return self.offset == 0 and self.strides.is_contiguous(self.shape)
@@ -216,6 +226,21 @@ struct TensorView[dtype: DType = DType.float32](
 
     fn has_grad(self) -> Bool:
         return self.base_tensor[].has_grad()
+    # Check if it has a backward fn before calling this API
+    fn backward_fn(self) -> BackwardFn[dtype]:
+        return self.backwardFn.value()
+
+    fn has_backward_fn(self) -> Bool:
+        return self.backwardFn is not None
+
+    fn add_ancestry(mut self, *parents: TensorLike[dtype]):
+        for parent in parents:
+            var ptr = UnsafePointer[TensorLike[dtype]].alloc(1)
+            ptr.init_pointee_copy(parent)
+            self.ancestors.append(ptr)
+
+    fn ancestry(self) -> Ancestors[dtype]:
+        return self.ancestors
 
     fn _requires_grad(self) -> Bool:
         return self.requires_grad
