@@ -2425,6 +2425,7 @@ fn test_reshape_gradient_2d() raises:
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.reshape(Shape.of(4))  # Flatten
     b.backward()
+    a.grad[].print()
     assert_true(
         a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])),
         "∂b/∂a should be ones reshaped",
@@ -2460,6 +2461,7 @@ fn test_reshape_noop() raises:
     var m = Tensor.d2([[5.0, 6.0]], requires_grad=True)
     var reshaped = m.reshape(Shape.of(1, 2))  # No shape change
     reshaped.backward()
+    m.grad[].print()
     assert_true(
         m.grad[].all_close(Tensor.d2([[1.0, 1.0]])),
         "No-op reshape still propagates grad",
@@ -2621,6 +2623,9 @@ fn test_empty_tensor() raises:
 
 fn main() raises:
     print("Starting tensor test cases")
+    test_reshape_gradient_2d()
+    test_reshape_noop()
+
     test_simple_chain()
     test_tensor_reuse_add()
     test_tensor_reuse_mixed()
@@ -2678,10 +2683,9 @@ fn main() raises:
 
     # test_nested_operations()
     # test_large_tensor_backprop()
-    test_reshape_gradient_2d()
+    # These need to be enabled
     test_reshape_gradient_flatten()
     test_multiple_reshapes()
-    test_reshape_noop()
     test_reshape_reused_twice_correct_grad()
 
     test_mean_scalar()

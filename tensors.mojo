@@ -57,33 +57,10 @@ struct Tensor[dtype: DType = DType.float32](
         return self.grad
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
-        if not self.requires_grad:
-            return
-        seed_tensor = Tensor[dtype].full(self.shape, start_grad)
-        self.backward(seed_tensor)
+        TensorLike.from_tensor(self).backward(start_grad)
 
     fn backward(self, seed_tensor: Tensor[dtype]):
-        if not self.requires_grad:
-            return
-        self.seed_grad(seed_tensor)
-        visited = IntList.Empty
-        stack = [TensorLike.from_tensor(self)]
-
-        while stack:
-            node = stack.pop()
-            # For view -> Currently everything is going base tensor
-            if node.has_backward_fn():
-                for recipient, grad_share, opcode in node.backward_fn()(
-                    node.inner_address()
-                ):
-                    if opcode == AddTensor:
-                        recipient.update_grad[AddTensor](grad_share)
-                    elif opcode == SubtractTensor:
-                        recipient.update_grad[SubtractTensor](grad_share)
-
-                    if recipient.inner_id() not in visited:
-                        stack.append(recipient)
-                        visited.append(recipient.inner_id())
+        TensorLike.from_tensor(self).backward(seed_tensor)
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -1676,5 +1653,141 @@ struct Tensor[dtype: DType = DType.float32](
 from testing import assert_true
 
 
+fn test_shared_tensor_twice() raises:
+    print("test_shared_tensor_twice")
+
+    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+
+    # a is used in two places
+    var b = a * 2  # ∂b/∂a = 2
+    var c = a * 3  # ∂c/∂a = 3
+
+    var d = b + c  # ∂d/∂a = ∂b/∂a + ∂c/∂a = 2 + 3 = 5
+
+    d.backward()
+
+    # Final grad: ∂d/∂a = [5, 5, 5]
+    assert_true(a.grad[].all_close(Tensor.d1([5.0, 5.0, 5.0])), "∂d/∂a = 5")
+
+
+fn test_broadcast_and_reuse() raises:
+    print("test_broadcast_and_reuse")
+
+    var a = Tensor.d2([[1.0], [2.0], [3.0]], requires_grad=True)  # shape: (3,1)
+
+    var b = a + 1  # ∂b/∂a = 1
+    var c = a * 2  # ∂c/∂a = 2
+
+    var d = b + c  # ∂d/∂a = 1 + 2 = 3
+
+    var loss = d.sum()
+    loss.backward()
+
+    # Expected gradient: shape (3,1), all 3's
+    assert_true(
+        a.grad[].all_close(Tensor.d2([[3.0], [3.0], [3.0]])), "∂loss/∂a = 3"
+    )
+
+
+fn test_branching_square_add() raises:
+    print("test_branching_square_add")
+
+    var a = Tensor.d1([2.0], requires_grad=True)
+
+    var b = a * a  # b = a²      → ∂b/∂a = 2a = 4
+    var c = a + a  # c = 2a      → ∂c/∂a = 2
+
+    var d = b + c  # d = a² + 2a
+    d.backward()
+
+    # ∂d/∂a = ∂b/∂a + ∂c/∂a = 4 + 2 = 6
+    assert_true(a.grad[].all_close(Tensor.d1([6.0])), "∂d/∂a = 6")
+
+
+fn test_merge_of_dependent_branches() raises:
+    print("test_merge_of_dependent_branches")
+
+    var a = Tensor.d1([1.0], requires_grad=True)
+
+    var b = a + 1  # b = a + 1       → ∂b/∂a = 1
+    # var c = b * a         # c = (a + 1) * a → ∂c/∂a = b + a = 1 + 1 = 2
+    var c = a * b  # c = (a + 1) * a → ∂c/∂a = b + a = 1 + 1 = 2
+
+    c.backward()
+
+    # ∂c/∂a = b + a = 3
+    assert_true(a.grad[].all_close(Tensor.d1([3.0])), "∂c/∂a = b + a = 3")
+
+
+fn test_square_and_identity_path() raises:
+    print("test_square_and_identity_path")
+
+    var a = Tensor.d1([3.0], requires_grad=True)
+
+    var sq = a * a  # ∂sq/∂a = 2a = 6
+    var id = a  # ∂id/∂a = 1
+
+    var out = sq + id  # ∂out/∂a = 6 + 1 = 7
+    out.backward()
+
+    assert_true(a.grad[].all_close(Tensor.d1([7.0])), "∂out/∂a = 7")
+
+
+fn test_shared_dependency_multiple_paths() raises:
+    print("test_shared_dependency_multiple_paths")
+    var a = Tensor.d1([1.0], requires_grad=True)
+    var b = a + 1  # ∂b/∂a = 1
+    var c = a * 2  # ∂c/∂a = 2
+    var d = b + c  # ∂d/∂a = ∂d/∂b * ∂b/∂a + ∂d/∂c * ∂c/∂a = 1 + 1 = 2
+    d.backward()
+
+    # Correct gradient: ∂d/∂a = 1 (from b) + 2 (from c) = 3
+    assert_true(a.grad[].all_close(Tensor.d1([3.0])), "∂d/∂a should be 2")
+
+
+fn test_diamond_dependency() raises:
+    print("test_diamond_dependency")
+    var a = Tensor.d1([1.0], requires_grad=True)
+    var b = a + 1  # ∂b/∂a = 1
+    var c = a * 2  # ∂c/∂a = 2
+    var d = b * c  # ∂d/∂a = c * ∂b/∂a + b * ∂c/∂a = 2*1 + 2*2 = 6
+
+    d.backward()
+
+    # Correct gradient: ∂d/∂a = 2 + 4 = 6
+    assert_true(a.grad[].all_close(Tensor.d1([6.0])), "∂d/∂a should be 6")
+
+
+fn test_repeated_tensor_use() raises:
+    print("test_repeated_tensor_use")
+    var a = Tensor.d1([2.0], requires_grad=True)
+    var b = a * a  # ∂b/∂a = a + a = 4 (since ∂(a²)/∂a = 2a)
+
+    b.backward()
+
+    # Correct gradient: ∂b/∂a = 2a = 4
+    assert_true(a.grad[].all_close(Tensor.d1([4.0])), "∂b/∂a should be 4")
+
+
+fn test_topological_sort_required() raises:
+    print("test_topological_sort_required")
+    var a = Tensor.d1([1.0], requires_grad=True)
+    var b = a * 2  # ∂b/∂a = 2
+    var c = a + 1  # ∂c/∂a = 1
+    var d = b * c  # ∂d/∂a = c*∂b/∂a + b*∂c/∂a = 2*2 + 2*1 = 6
+    d.backward()
+    assert_true(
+        a.grad[].all_close(Tensor.d1([6.0]))
+    )  # Might fail without topological sort!
+
+
 fn main() raises:
-    pass
+    test_repeated_tensor_use()
+    test_diamond_dependency()
+    test_shared_dependency_multiple_paths()
+    test_shared_tensor_twice()
+    test_broadcast_and_reuse()
+    test_branching_square_add()
+    test_merge_of_dependent_branches()
+    test_square_and_identity_path()
+    test_topological_sort_required()

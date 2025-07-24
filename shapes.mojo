@@ -272,7 +272,7 @@ struct Shape(
 
     @always_inline
     fn rank(self) -> Int:
-        return len(self)
+        return self.ndim
 
     fn __getitem__(self, idx: Int) -> Int:
         if 0 <= idx < self.ndim:

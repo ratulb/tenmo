@@ -9,10 +9,6 @@ from memory import memcpy
 from walkback import BackwardFn, MatmulBackward
 
 
-fn main():
-    pass
-
-
 struct TensorView[dtype: DType = DType.float32](
     Sized & Copyable & Movable & Stringable & Representable & Writable
 ):
@@ -24,6 +20,7 @@ struct TensorView[dtype: DType = DType.float32](
     var strides: Strides
     var offset: Int
     var requires_grad: Bool
+    var grad: UnsafePointer[Tensor[dtype]]
     var ancestors: Ancestors[dtype]
     var backwardFn: Optional[BackwardFn[dtype]]
 
@@ -40,6 +37,7 @@ struct TensorView[dtype: DType = DType.float32](
         self.strides = strides
         self.offset = offset
         self.requires_grad = requires_grad
+        self.grad = UnsafePointer[Tensor[dtype]]()
         self.ancestors = Ancestors[dtype].untracked()
         self.backwardFn = None
 
@@ -49,6 +47,7 @@ struct TensorView[dtype: DType = DType.float32](
         self.strides = other.strides
         self.offset = other.offset
         self.requires_grad = other.requires_grad
+        self.grad = other.grad
         self.ancestors = other.ancestors
         self.backwardFn = other.backwardFn
 
@@ -58,8 +57,77 @@ struct TensorView[dtype: DType = DType.float32](
         self.strides = other.strides
         self.offset = other.offset
         self.requires_grad = other.requires_grad
+        self.grad = other.grad
         self.ancestors = other.ancestors
         self.backwardFn = other.backwardFn
+
+    fn view(self, shape: List[Int]) -> TensorView[dtype]:
+        return self.view(Shape(shape))
+
+    fn view(self, new_shape: Shape) -> TensorView[dtype]:
+        if not self.shape.num_elements() == new_shape.num_elements():
+            abort(
+                "TensorView → view: shape"
+                + new_shape.__str__()
+                + " is invalid: total number of elements("
+                + String(self.shape.num_elements())
+                + ") must match"
+            )
+
+        new_strides = Strides.default(new_shape)
+
+        return TensorView[dtype](
+            base_tensor=self.base_tensor,
+            shape=new_shape,
+            strides=new_strides,
+            offset=self.offset,
+            requires_grad=self.requires_grad,
+        )
+
+    # Fully custom shape/strides/offset
+    fn view(
+        self,
+        new_shape: List[Int],
+        new_strides: List[Int],
+        new_offset: Optional[Int] = None,
+    ) -> TensorView[dtype]:
+        offset = new_offset.value() if new_offset else self.offset
+        return self.view(Shape(new_shape), Strides(new_strides), offset)
+
+    fn view(
+        self, new_shape: Shape, new_strides: Strides, new_offset: Int
+    ) -> TensorView[dtype]:
+        if not new_shape.rank() == new_strides.rank():
+            abort(
+                "TensorView → view: shape"
+                + new_shape.__str__()
+                + " and strides"
+                + new_strides.__str__()
+                + " must have the same rank"
+            )
+
+        # Basic bounds checking: ensure the view doesn't go out of bounds
+        numels = new_shape.num_elements()
+        max_index = 0
+        for i in range(new_shape.rank()):
+            max_index += (new_shape[i] - 1) * new_strides[i]
+        total_offset = new_offset + max_index
+        num_elems = self.shape.num_elements()
+        if not total_offset < num_elems:
+            abort(
+                "TensorView → view: Call exceeds base view's total"
+                " number of elements("
+                + String(num_elems)
+                + ")"
+            )
+
+        return TensorView[dtype](
+            base_tensor=self.base_tensor,
+            shape=new_shape,
+            strides=new_strides,
+            offset=new_offset,
+            requires_grad=self.requires_grad,
+        )
 
     fn is_contiguous(self) -> Bool:
         # return self.offset == 0 and self.strides.is_contiguous(self.shape)
@@ -99,7 +167,7 @@ struct TensorView[dtype: DType = DType.float32](
         )
 
     fn has_grad(self) -> Bool:
-        return self.base_tensor[].has_grad()
+        return self.grad.__as_bool__()
 
     # Check if it has a backward fn before calling this API
     fn backward_fn(self) -> BackwardFn[dtype]:
@@ -172,7 +240,7 @@ struct TensorView[dtype: DType = DType.float32](
     ) -> Bool:
         if not self.shape.num_elements() + self.offset <= tensor.numels():
             abort(
-                "TensorView -> all_close(tensor) -> TensorView exceeds bounds"
+                "TensorView → all_close(tensor) → TensorView exceeds bounds"
                 " of base Tensor: "
                 + String(self.shape.num_elements())
                 + "(no of elemets in view)  + "
@@ -193,10 +261,31 @@ struct TensorView[dtype: DType = DType.float32](
 
         return True
 
-    fn seed_grad(self, value: Scalar[dtype]):
-        self.base_tensor[].seed_grad(value)
+    fn seed_grad(mut self, value: Scalar[dtype]):
+        if self.requires_grad:
+            if not self.has_grad():
+                gradients = Tensor[dtype].full(self.shape, value)
+                self.grad = UnsafePointer[Tensor[dtype]].alloc(1)
+                self.grad.init_pointee_move(gradients^)
+            else:
+                self.grad[].fill(value)
 
-    fn seed_grad(self, with_tensor: Tensor[dtype]):
+    fn seed_grad(mut self, with_tensor: Tensor[dtype]):
+        if not self.shape == with_tensor.shape:
+            abort(
+                "TensorView → seed_grad: view shape"
+                + self.shape.__str__()
+                + " and seed tensor shape"
+                + with_tensor.shape.__str__()
+                + "does not match"
+            )
+        if self.requires_grad:
+            if not self.has_grad():
+                self.grad = UnsafePointer[Tensor[dtype]].alloc(1)
+                self.grad.init_pointee_copy(with_tensor)
+            else:
+                memcpy(self.grad[].data, with_tensor.data, with_tensor.numels())
+
         self.base_tensor[].seed_grad(with_tensor)
 
     fn __str__(self) -> String:
@@ -266,3 +355,10 @@ struct TensorView[dtype: DType = DType.float32](
             out.add_ancestry(that)
 
         return out
+
+
+fn main():
+    a = Tensor.rand(2, 3, 4)
+    v = a.into_view()
+    v1 = v.view([4, 3, 2], [3, 2, 4])
+    print(a[0, 0, 0], v[IntList(0, 0, 0)], v1[IntList(0, 0, 0)])

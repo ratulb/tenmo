@@ -3,7 +3,9 @@ from shapes import Shape
 from views import TensorView
 from intlist import IntList
 from backpropagation import BackwardFn
+from operators import AddTensor, SubtractTensor
 from os import abort
+from ancestry import Ancestors
 
 
 fn main() raises:
@@ -90,6 +92,12 @@ struct TensorLike[dtype: DType](
     fn view(self) -> TensorView[dtype]:
         return self.view_address[]
 
+    fn ancestry(self) -> Ancestors[dtype]:
+        return (
+            self.tensor_address[].ancestors if self.kind
+            == 0 else self.view_address[].ancestors
+        )
+
     fn has_grad(self) -> Bool:
         return (
             self.tensor_address[]
@@ -140,7 +148,7 @@ struct TensorLike[dtype: DType](
         if self.is_tensor():
             self.tensor().seed_grad(value)
         else:
-            self.view().seed_grad(value)
+            self.view_address[].seed_grad(value)
 
     fn update_grad[opcode: Int](self, incoming: Tensor[dtype]):
         if self.is_tensor():
@@ -152,7 +160,7 @@ struct TensorLike[dtype: DType](
         if self.is_tensor():
             self.tensor().seed_grad(with_tensor)
         else:
-            self.view().seed_grad(with_tensor)
+            self.view_address[].seed_grad(with_tensor)
 
     fn requires_grad(self) -> Bool:
         return (
@@ -302,3 +310,43 @@ struct TensorLike[dtype: DType](
                 out[IntList(i, j)] = summ
 
         return out
+
+    fn backward(self, start_grad: Scalar[dtype] = 1.0):
+        if not self.requires_grad():
+            return
+        seed_tensor = Tensor[dtype].full(self.shape(), start_grad)
+        self.backward(seed_tensor)
+
+    fn backward(self, seed_tensor: Tensor[dtype]):
+        if not self.requires_grad():
+            return
+        self.seed_grad(seed_tensor)
+        visited = IntList.Empty
+        topo_order = List[Self]()  # Stores nodes in topological order
+
+        # --- (1) Perform topological sort (DFS-based) ---
+        stack = [(self, False)]  # (node, processed)
+        while stack:
+            node, processed = stack.pop()
+            if processed:
+                topo_order.append(node)
+                continue
+            if node.inner_id() in visited:
+                continue
+            visited.append(node.inner_id())
+            stack.append((node, True))  # Mark for post-processing
+            # Push Ancestors (dependents) onto the stack
+            for ancestor in node.ancestry():
+                stack.append((ancestor[], False))
+
+        # --- (2) Process in reverse topological order ---
+        visited = IntList.Empty  # Reset for gradient accumulation
+        for node in reversed(topo_order):
+            if node.has_backward_fn():
+                for recipient, grad_share, opcode in node.backward_fn()(
+                    node.inner_address()
+                ):
+                    if opcode == AddTensor:
+                        recipient.update_grad[AddTensor](grad_share)
+                    elif opcode == SubtractTensor:
+                        recipient.update_grad[SubtractTensor](grad_share)
