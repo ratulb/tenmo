@@ -23,7 +23,7 @@ struct MatmulBackward[dtype: DType](Copyable & Movable):
         ancestor_2 = output.ancestors.get(1)[]
 
         if ancestor_1.requires_grad():
-            ancestor_1_grad_share = gradients.matmul(ancestor_2.tensor().T())
+            ancestor_1_grad_share = gradients.matmul(ancestor_2.tensor().transpose())
             ancestor_1_grad_share.requires_grad = False
             grad_outputs.append(
                 (
@@ -34,7 +34,7 @@ struct MatmulBackward[dtype: DType](Copyable & Movable):
             )
 
         if ancestor_2.requires_grad():
-            ancestor_2_grad_share = ancestor_1.tensor().T().matmul(gradients)
+            ancestor_2_grad_share = ancestor_1.tensor().transpose().matmul(gradients)
             ancestor_2_grad_share.requires_grad = False
             grad_outputs.append(
                 (
