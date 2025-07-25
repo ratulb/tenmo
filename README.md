@@ -138,9 +138,4 @@ MIT License – do what you love. Attribution appreciated, not required.
 
 ---
 
-## 👋 Author
-
-**Ratul Buragohain** — Machine learning enthusiast, and a polyglot programmer with interest in all things under the sun! 🐁
-
----
 
