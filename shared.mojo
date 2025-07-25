@@ -75,16 +75,35 @@ struct TensorLike[dtype: DType](
     fn view_ptr(self) -> Self.ViewAddress:
         return self.view_address
 
-    fn inner_address(self) -> UnsafePointer[Tensor[dtype]]:
-        return (
-            self.tensor_address if self.kind
-            == 0 else self.view_address[].base_tensor
-        )  # base pointer address
+    # fn inner_address(self) -> UnsafePointer[Tensor[dtype]]:
+    # return (
+    # self.tensor_address if self.kind == 0 else self.view_address
+    # )  # base pointer address
 
     fn inner_id(self) -> Int:
         return Int(self.tensor_address) if self.kind == 0 else Int(
             self.view_address
         )
+
+    # We ask this question during backward pass on TensorLike when it encapsulates a TensorView
+    fn parent_is_tensor(self) -> Bool:
+        is_tensor = False
+        if self.kind == 0:
+            abort(
+                "TensorLike → parent_is_view: invoked on TensorLike"
+                " encapsulating a Tensor"
+            )
+        else:
+            ancestors = self.view_address[].ancestors
+            if (
+                len(ancestors) == 0 or len(ancestors) > 1
+            ):  # How did I materialize? Should not happen
+                abort(
+                    "TensorLike → parent_is_view: view with untraceable origin"
+                )
+            is_tensor = ancestors.get(0)[].is_tensor()
+        print("parent is tensor: ", is_tensor)
+        return is_tensor
 
     fn tensor(self) -> Tensor[dtype]:
         return self.tensor_address[]
@@ -102,7 +121,6 @@ struct TensorLike[dtype: DType](
         return (
             self.tensor_address[]
             .has_grad() if self.is_tensor() else self.view_address[]
-            .base_tensor[]
             .has_grad()
         )
 
@@ -115,7 +133,6 @@ struct TensorLike[dtype: DType](
         return (
             self.tensor_address[]
             .has_backward_fn() if self.is_tensor() else self.view_address[]
-            .base_tensor[]
             .has_backward_fn()
         )
 
@@ -123,16 +140,13 @@ struct TensorLike[dtype: DType](
         return (
             self.tensor_address[]
             .backward_fn() if self.is_tensor() else self.view_address[]
-            .base_tensor[]
             .backward_fn()
         )
 
     fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
         return (
-            self.tensor_address[]
-            .gradients() if self.is_tensor() else self.view_address[]
-            .base_tensor[]
-            .gradients()
+            self.tensor_address[].grad if self.kind
+            == 0 else self.view_address[].grad
         )
 
     fn rank(self) -> Int:
@@ -290,11 +304,11 @@ struct TensorLike[dtype: DType](
     # Note - matmul has not been optimized at all - once everything is place - revisit this
     fn matmul(self, other: Self) -> Tensor[dtype]:
         if not self.rank() == 2:
-            abort("TesorLike  → matmul: Only supports 2D matmul for now")
+            abort("TensorLike → matmul: Only supports 2D matmul for now")
         if not other.rank() == 2:
-            abort("TesorLike  → matmul: Other must be 2D")
+            abort("TensorLike → matmul: Other must be 2D")
         if not self.shape()[1] == other.shape()[0]:
-            abort("TesorLike  → matmul: Incompatible shapes")
+            abort("TensorLike → matmul: Incompatible shapes")
 
         m, k = self.shape()[0], self.shape()[1]
         n = other.shape()[1]
@@ -344,9 +358,15 @@ struct TensorLike[dtype: DType](
         for node in reversed(topo_order):
             if node.has_backward_fn():
                 for recipient, grad_share, opcode in node.backward_fn()(
-                    node.inner_address()
+                    UnsafePointer(to=node)
                 ):
-                    if opcode == AddTensor:
-                        recipient.update_grad[AddTensor](grad_share)
-                    elif opcode == SubtractTensor:
-                        recipient.update_grad[SubtractTensor](grad_share)
+                    if recipient.is_tensor() or (
+                        recipient.is_view() and recipient.parent_is_tensor()
+                    ):
+                        recipient.update_grad[AddTensor](
+                            grad_share
+                        ) if opcode == AddTensor else recipient.update_grad[
+                            SubtractTensor
+                        ](
+                            grad_share
+                        )

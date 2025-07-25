@@ -14,7 +14,7 @@ from ancestry import Ancestors
 from views import TensorView
 from strides import Strides
 from shared import TensorLike
-from common_utils import Validator, log_debug, variadic1or2, is_null
+from common_utils import Validator, log_debug, variadic1or2, is_null, id
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
@@ -52,9 +52,6 @@ struct Tensor[dtype: DType = DType.float32](
     var ancestors: Ancestors[dtype]
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
     var backwardFn: Optional[BackwardFn[dtype]]
-
-    fn gradients(self) -> UnsafePointer[Self]:
-        return self.grad
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         TensorLike.from_tensor(self).backward(start_grad)
@@ -97,13 +94,20 @@ struct Tensor[dtype: DType = DType.float32](
     fn into_view(
         self, requires_grad: Optional[Bool] = None
     ) -> TensorView[dtype]:
-        return TensorView(
+        out = TensorView(
             UnsafePointer(to=self),
             self.shape,
             Strides.default(self.shape),
             offset=0,
             requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
+        if self.requires_grad:
+            backward_fn = ViewBackward[dtype]().into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+            print("ViewBackward fn added")
+
+        return out
 
     fn into_tensor(self) -> Tensor[dtype]:
         return self
@@ -415,9 +419,9 @@ struct Tensor[dtype: DType = DType.float32](
             return
         if self.shape != with_tensor.shape:
             abort(
-                "Tensor -> seed_grad: Shapes not equal -> "
+                "Tensor → seed_grad: Shapes not equal -> "
                 + self.shape.__str__()
-                + "<=>"
+                + " ≠ "
                 + with_tensor.shape.__str__()
             )
         memcpy(self.grad[].data, with_tensor.data, with_tensor.numels())
@@ -1128,6 +1132,7 @@ struct Tensor[dtype: DType = DType.float32](
             out.base.init_pointee_move(base^)
 
             backward_fn = ReshapeBackward[dtype]().into_backward_fn()
+            print("ReshapedBackward being added")
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
 
@@ -1651,5 +1656,9 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
-
+    a = Tensor.arange(12, requires_grad=True)
+    v = a.view([12])
+    v.print()
+    print(v.has_backward_fn())
+    v.backward()
+    a.gprint()

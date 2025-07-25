@@ -11,12 +11,12 @@ struct AddBackwardScalar[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
-        ancestor = output.ancestors.get(0)[]
+        gradients = output.gradients()[]
+        ancestor = output.ancestry().get(0)[]
         if ancestor.shape() != gradients.shape:
             gradients = gradients.reshape(ancestor.shape())
         # Gradient of addition is 1 → just pass through incoming grad
@@ -30,17 +30,17 @@ struct AddBackward[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
-        count = len(output.ancestors)
+        gradients = output.gradients()[]
+        count = len(output.ancestry())
         grad_outputs = List[Tuple[TensorLike[dtype], Tensor[dtype], Int]](
             capacity=count
         )
         for i in range(count):
-            ancestor = output.ancestors.get(i)[]
+            ancestor = output.ancestry().get(i)[]
             grad_outputs.append((ancestor, gradients, AddTensor))
         return grad_outputs
 

@@ -10,7 +10,9 @@ struct SumBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     var keepdims: Bool
 
-    fn __init__(out self, axes: IntList=IntList.Empty, keepdims: Bool = False):
+    fn __init__(
+        out self, axes: IntList = IntList.Empty, keepdims: Bool = False
+    ):
         self.axes = axes
         self.keepdims = keepdims
 
@@ -24,12 +26,12 @@ struct SumBackward[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
-        ancestor = output.ancestors.get(0)[]
+        gradients = output.gradients()[]
+        ancestor = output.ancestry().get(0)[]
         rank = ancestor.rank()
         if rank == 0:
             return [(ancestor, gradients, AddTensor)]

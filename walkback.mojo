@@ -10,3 +10,4 @@ from mulbackward import MultiplyBackward, MulBackwardScalar
 from exponientionbackward import ExponientionBackward
 from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
 from transposebackward import TBackward, TransposeBackward
+from viewbackward import ViewBackward

@@ -19,13 +19,13 @@ struct MulBackwardScalar[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
+        gradients = output.gradients()[]
         var value: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
-        ancestor = output.ancestors.get(0)[]
+        ancestor = output.ancestry().get(0)[]
         scaled_gradients = __tensor_op_scalar__[dtype, MulScalar](
             gradients, value
         )
@@ -45,16 +45,16 @@ struct MultiplyBackward[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
+        gradients = output.gradients()[]
         var grad_outputs: List[
             Tuple[TensorLike[dtype], Tensor[dtype], Int]
         ] = []
-        ancestor_1 = output.ancestors.get(0)[]
-        ancestor_2 = output.ancestors.get(1)[]
+        ancestor_1 = output.ancestry().get(0)[]
+        ancestor_2 = output.ancestry().get(1)[]
 
         if ancestor_1.requires_grad():
             product = __tensor_op_tensor__[dtype, MulTensor](

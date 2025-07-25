@@ -26,12 +26,12 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
-        ancestor = output.ancestors.get(0)[]
+        gradients = output.gradients()[]
+        ancestor = output.ancestry().get(0)[]
         if gradients.shape == Shape.Void:
             scalar_grad = gradients.item() / ancestor.shape().num_elements()
             grad_contrib = Tensor[dtype].full(

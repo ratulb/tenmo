@@ -14,10 +14,12 @@ from exponientionbackward import ExponientionBackward
 from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
 from transposebackward import TBackward, TransposeBackward
 from matmulbackward import MatmulBackward
+from viewbackward import ViewBackward
 
 alias Delegate[dtype: DType] = Variant[
     MatmulBackward[dtype],
     ReshapeBackward[dtype],
+    ViewBackward[dtype],
     SumBackward[dtype],
     MeanBackward[dtype],
     AddBackward[dtype],
@@ -50,13 +52,16 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         self.grad_fn = other.grad_fn
 
     fn __call__(
-        self, out_ptr: UnsafePointer[Tensor[dtype]]
+        self, out_ptr: UnsafePointer[TensorLike[dtype]]
     ) -> List[Tuple[TensorLike[dtype], Tensor[dtype], Int]]:
         if self.grad_fn.isa[MatmulBackward[dtype]]():
             return self.grad_fn[MatmulBackward[dtype]].backward[dtype](out_ptr)
 
         if self.grad_fn.isa[ReshapeBackward[dtype]]():
             return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](out_ptr)
+
+        if self.grad_fn.isa[ViewBackward[dtype]]():
+            return self.grad_fn[ViewBackward[dtype]].backward[dtype](out_ptr)
 
         elif self.grad_fn.isa[SumBackward[dtype]]():
             return self.grad_fn[SumBackward[dtype]].backward[dtype](out_ptr)

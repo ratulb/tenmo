@@ -21,13 +21,13 @@ struct ExponientionBackward[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
+        gradients = output.gradients()[]
         var exponent: Scalar[dtype] = rebind[Scalar[dtype]](self.exponent)
-        ancestor = output.ancestors.get(0)[]
+        ancestor = output.ancestry().get(0)[]
 
         # ∂(x**n)/∂x = n * x**(n-1)
         # Need to see if base_pow gets a grad_fn or not - we don't want it to have one!
@@ -47,3 +47,7 @@ struct ExponientionBackward[dtype: DType](Copyable & Movable):
                 AddTensor,
             )
         ]
+
+
+fn main():
+    pass

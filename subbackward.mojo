@@ -28,17 +28,17 @@ struct SubBackward[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
-        count = len(output.ancestors)
+        gradients = output.gradients()[]
+        count = len(output.ancestry())
         grad_outputs = List[Tuple[TensorLike[dtype], Tensor[dtype], Int]](
             capacity=count
         )
         for i in range(count):
-            ancestor = output.ancestors.get(i)[]
+            ancestor = output.ancestry().get(i)[]
             grad_outputs.append(
                 (
                     ancestor,
@@ -58,12 +58,12 @@ struct SubLeftRightBackwardScalar[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
-        ancestor = output.ancestors.get(0)[]
+        gradients = output.gradients()[]
+        ancestor = output.ancestry().get(0)[]
         return [
             (ancestor, gradients, SubtractTensor if self.negate else AddTensor)
         ]

@@ -176,6 +176,12 @@ struct TensorView[dtype: DType = DType.float32](
     fn has_backward_fn(self) -> Bool:
         return self.backwardFn is not None
 
+    fn backward(self, start_grad: Scalar[dtype] = 1.0):
+        TensorLike.from_view(self).backward(start_grad)
+
+    fn backward(self, seed_tensor: Tensor[dtype]):
+        TensorLike.from_view(self).backward(seed_tensor)
+
     fn add_ancestry(mut self, *parents: TensorLike[dtype]):
         for parent in parents:
             var ptr = UnsafePointer[TensorLike[dtype]].alloc(1)
@@ -187,10 +193,6 @@ struct TensorView[dtype: DType = DType.float32](
 
     fn _requires_grad(self) -> Bool:
         return self.requires_grad
-
-    @staticmethod
-    fn id(ptr: UnsafePointer[Self]) -> Int:
-        return Int(ptr)
 
     fn is_view(self) -> Bool:
         return True
@@ -285,8 +287,6 @@ struct TensorView[dtype: DType = DType.float32](
                 self.grad.init_pointee_copy(with_tensor)
             else:
                 memcpy(self.grad[].data, with_tensor.data, with_tensor.numels())
-
-        self.base_tensor[].seed_grad(with_tensor)
 
     fn __str__(self) -> String:
         dims = len(self.shape)

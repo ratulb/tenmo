@@ -7,22 +7,22 @@ from backpropagation import Delegate, BackwardFn
 struct BroadcastBackward[
     dtype: DType, Tensor_Op_First: Int, Tensor_Op_Second: Int, Multiply: Bool
 ](Copyable & Movable):
-
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
+        gradients = output.gradients()[]
         var grad_outputs: List[
             Tuple[TensorLike[dtype], Tensor[dtype], Int]
         ] = []
-        ancestor_1 = output.ancestors.get(0)[]
-        ancestor_2 = output.ancestors.get(1)[]
+        ancestors = output.ancestry()
+        ancestor_1 = ancestors.get(0)[]
+        ancestor_2 = ancestors.get(1)[]
 
         if ancestor_1.requires_grad():
             ancestor_1_share = ancestor_1.tensor().backward_grad_contrib(
@@ -48,6 +48,7 @@ struct BroadcastBackward[
                 )
             )
         return grad_outputs
+
 
 fn main():
     pass

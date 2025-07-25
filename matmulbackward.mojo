@@ -11,19 +11,21 @@ struct MatmulBackward[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[Tensor[dtype]]) -> List[
+    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
         Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
-        gradients = output.grad[]
+        gradients = output.gradients()[]
         var grad_outputs: List[
             Tuple[TensorLike[dtype], Tensor[dtype], Int]
         ] = []
-        ancestor_1 = output.ancestors.get(0)[]
-        ancestor_2 = output.ancestors.get(1)[]
+        ancestor_1 = output.ancestry().get(0)[]
+        ancestor_2 = output.ancestry().get(1)[]
 
         if ancestor_1.requires_grad():
-            ancestor_1_grad_share = gradients.matmul(ancestor_2.tensor().transpose())
+            ancestor_1_grad_share = gradients.matmul(
+                ancestor_2.tensor().transpose()
+            )
             ancestor_1_grad_share.requires_grad = False
             grad_outputs.append(
                 (
@@ -34,7 +36,9 @@ struct MatmulBackward[dtype: DType](Copyable & Movable):
             )
 
         if ancestor_2.requires_grad():
-            ancestor_2_grad_share = ancestor_1.tensor().transpose().matmul(gradients)
+            ancestor_2_grad_share = (
+                ancestor_1.tensor().transpose().matmul(gradients)
+            )
             ancestor_2_grad_share.requires_grad = False
             grad_outputs.append(
                 (
