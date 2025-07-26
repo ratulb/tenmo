@@ -132,7 +132,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return True
 
-
     # Check if it has a backward fn before calling this API
     fn backward_fn(self) -> BackwardFn[dtype]:
         return self.backwardFn.value()
@@ -266,13 +265,13 @@ struct Tensor[dtype: DType = DType.float32](
             self.zero_grad()
 
     # Always use this to print grad to avoid surprises of segmentation fault!
-    fn gprint(self):
+    fn gprint(self, num_first: Int = 10, num_last: Int = 10):
         if not self.requires_grad:
             print("Tensor is non-differentiable")
-        elif self.requires_grad and self.grad.__as_bool__() == False:
+        elif self.requires_grad and not self.has_grad():
             print("Requires grad but grad not initialized")
         else:
-            self.grad[].print()
+            self.grad[].print(num_first, num_last)
 
     fn add_ancestry(mut self, *parents: TensorLike[dtype]):
         for parent in parents:
@@ -1545,7 +1544,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-
     fn view(
         self,
         shape: List[Int],
@@ -1665,14 +1663,18 @@ fn main() raises:
     a = Tensor.arange(12, requires_grad=True)
     v1 = a.view([12])
     v2 = v1.view(Shape.of(2, 6))
-    print("id of v2, v1, a: ", id(v2), id(v1), id(a))
-    print("v1's ancestors")
-    v1.ancestors.print()
-    print("v2's ancestors")
-    v2.ancestors.print()
-    v2.backward()
-    a.gprint()
+    print("v2")
+    v2.print()
+    v3 = v2.view([3, 4])
+    v3.backward()
+    print("v3 grad")
+    v3.gprint(12, 12)
+    print("v2 grad")
+    v2.gprint(12, 12)
+    print("v1 grad")
+    v1.gprint(12, 12)
+    print("a grad")
+    a.gprint(12, 12)
     _ = v2
     _ = v1
     _ = a
-

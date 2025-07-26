@@ -5,9 +5,10 @@ from strides import Strides
 from os import abort
 from shared import TensorLike
 from ancestry import Ancestors
-from memory import memcpy
+from memory import memcpy, memset_zero
 from walkback import BackwardFn, MatmulBackward, ViewBackward
-from graph import Graph
+from operators import __tensor_op_tensor__
+
 
 struct TensorView[dtype: DType = DType.float32](
     Sized & Copyable & Movable & Stringable & Representable & Writable
@@ -62,6 +63,22 @@ struct TensorView[dtype: DType = DType.float32](
         self.ancestors = other.ancestors
         self.backwardFn = other.backwardFn
 
+    fn zero_grad(self):
+        if self.requires_grad and self.has_grad():
+            memset_zero(self.grad[].data, self.grad[].numels())
+
+    fn init_grad(mut self):
+        if self.requires_grad and not self.has_grad():
+            gradients = Tensor[dtype](self.shape)
+            self.grad = UnsafePointer[Tensor[dtype]].alloc(1)
+            self.grad.init_pointee_move(gradients^)
+            self.zero_grad()
+
+    fn update_grad[opcode: Int](self, gradients: Tensor[dtype]):
+        self.grad[] = __tensor_op_tensor__[dtype, opcode](
+            self.grad[], gradients
+        )
+
     fn view(self, shape: List[Int]) -> TensorView[dtype]:
         return self.view(Shape(shape))
 
@@ -89,7 +106,6 @@ struct TensorView[dtype: DType = DType.float32](
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
         return out
-
 
     # Fully custom shape/strides/offset
     fn view(
@@ -190,15 +206,6 @@ struct TensorView[dtype: DType = DType.float32](
     fn backward(self, seed_tensor: Tensor[dtype]):
         tensor_like = TensorLike.from_view(self)
         tensor_like.backward(seed_tensor)
-
-    #fn backward(self, start_grad: Scalar[dtype] = 1.0):
-        #graph = Graph[dtype]()
-        #graph.walk_backward(TensorLike.from_view(self), start_grad)
-
-    #fn backward(self, with_tensor: Tensor[dtype]):
-        #graph = Graph[dtype]()
-        #graph.walk_backward(TensorLike.from_view(self), with_tensor)
-
 
     fn add_ancestry(mut self, *parents: TensorLike[dtype]):
         for parent in parents:
@@ -322,7 +329,7 @@ struct TensorView[dtype: DType = DType.float32](
         else:
             s += "View"
         s += self.shape.__str__()
-        s += ", Type: " + self.dtype.__str__()
+        s += ", Type: " + dtype.__str__()
         s += ", requires_grad: " + String(self.requires_grad)
         s += "]"
         return s
@@ -348,6 +355,15 @@ struct TensorView[dtype: DType = DType.float32](
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         tensor_like = self.into_tensorlike()
         tensor_like.print(num_first, num_last)
+
+    # Always use this to print grad to avoid surprises of segmentation fault!
+    fn gprint(self, num_first: Int = 10, num_last: Int = 10):
+        if not self.requires_grad:
+            print("TensorView is non-differentiable")
+        elif self.requires_grad and self.grad.__as_bool__() == False:
+            print("Requires grad but grad not initialized")
+        else:
+            self.grad[].print(num_first, num_last)
 
     # Note - matmul has not been optimized at all - once everything is place - revisit this
     fn matmul(self, other: Self) -> Tensor[dtype]:

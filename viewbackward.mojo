@@ -27,6 +27,5 @@ struct ViewBackward[dtype: DType](Copyable & Movable):
             )
         ]
 
-
 fn main():
     pass
