@@ -4,7 +4,6 @@ from shared import TensorLike
 from common_utils import log_debug
 
 
-
 fn main() raises:
     pass
 
@@ -62,17 +61,24 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
                 (self.ancestors + idx).destroy_pointee()
             self.ancestors.free()
 
-    @always_inline("nodebug")
     fn get(self, idx: Int) -> UnsafePointer[TensorLike[dtype]]:
         if idx < 0 or idx >= len(self):
-            abort("Ancestors get -> Out-of-bounds read")
+            abort("Ancestors get → Out-of-bounds read")
         address = (self.ancestors + idx)[]
         if address.__as_bool__() == False:
-            abort("Ancestors get -> Uninitialized ancestor address")
+            abort("Ancestors get → Uninitialized ancestor address")
         return address
 
     fn __len__(self) -> Int:
         return self.size
+
+    fn __bool__(self) -> Bool:
+        """Checks whether this contains any entry or not.
+
+        Returns:
+            `False` if there is no entry, `True` otherwise.
+        """
+        return len(self) > 0
 
     fn append(mut self, addr: UnsafePointer[TensorLike[dtype]]):
         if self.size == self.capacity:
@@ -99,23 +105,44 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         self.ancestors = new_ancestors
         self.capacity = new_capacity
 
-    fn print(self) -> None:
+    @no_inline
+    fn print(self, id: Bool = True) -> None:
         total = len(self)
         print("Ancestors[", total, "] = ", end="")
         for i in range(total):
-            each = self.get(i)[]
-            inner_id = each.inner_id()
-            print(String(inner_id), end=" ")
-            # print(self.get(i).__str__(), end=" ")
+            each = self.get(i)
+            instance = each[]
+            inner_id = instance.inner_id()
+            if id:
+                print(inner_id, end=" ")
+            else:
+                print(each.__str__(), end=" ")
         print()
 
     fn __contains__(self, tensor_like: TensorLike[dtype]) -> Bool:
-        for i in range(len(self)):
-            tensor_like_inside = self.get(i)[]
-            inner_id = tensor_like_inside.inner_id()
+        for each in self:
+            entry = each[]
+            inner_id = entry.inner_id()
             if inner_id == tensor_like.inner_id():
                 return True
         return False
+
+    fn pop(mut self, index: Int = -1) -> UnsafePointer[TensorLike[dtype]]:
+        if len(self) < 1:
+            abort("Ancestors → pop: empty ancestors")
+
+        var i = index
+        if i < 0:
+            i += self.size
+        if i < 0 or i >= len(self):
+            abort("Ancestors → pop: index out of bounds")
+
+        ancestor = (self.ancestors + i).take_pointee()
+        for j in range(i + 1, self.size):
+            (self.ancestors + j).move_pointee_into(self.ancestors + j - 1)
+
+        self.size -= 1
+        return ancestor
 
     fn __iter__(ref self) -> _AncestorsIter[self.dtype, __origin_of(self)]:
         return _AncestorsIter[self.dtype](0, Pointer(to=self))
