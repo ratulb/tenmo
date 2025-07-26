@@ -6,8 +6,8 @@ from os import abort
 from shared import TensorLike
 from ancestry import Ancestors
 from memory import memcpy
-from walkback import BackwardFn, MatmulBackward
-
+from walkback import BackwardFn, MatmulBackward, ViewBackward
+from graph import Graph
 
 struct TensorView[dtype: DType = DType.float32](
     Sized & Copyable & Movable & Stringable & Representable & Writable
@@ -15,6 +15,7 @@ struct TensorView[dtype: DType = DType.float32](
     alias Blank: TensorView[dtype] = Self(
         UnsafePointer[Tensor[dtype]](), Shape.Void, Strides(IntList.Empty), 0
     )
+    alias Ancestor_of = TensorLike.from_view
     var base_tensor: UnsafePointer[Tensor[dtype]]
     var shape: Shape
     var strides: Strides
@@ -76,13 +77,19 @@ struct TensorView[dtype: DType = DType.float32](
 
         new_strides = Strides.default(new_shape)
 
-        return TensorView[dtype](
+        out = TensorView[dtype](
             base_tensor=self.base_tensor,
             shape=new_shape,
             strides=new_strides,
             offset=self.offset,
             requires_grad=self.requires_grad,
         )
+        if self.requires_grad:
+            backward_fn = ViewBackward[dtype]().into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+        return out
+
 
     # Fully custom shape/strides/offset
     fn view(
@@ -177,10 +184,21 @@ struct TensorView[dtype: DType = DType.float32](
         return self.backwardFn is not None
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
-        TensorLike.from_view(self).backward(start_grad)
+        tensor_like = TensorLike.from_view(self)
+        tensor_like.backward(start_grad)
 
     fn backward(self, seed_tensor: Tensor[dtype]):
-        TensorLike.from_view(self).backward(seed_tensor)
+        tensor_like = TensorLike.from_view(self)
+        tensor_like.backward(seed_tensor)
+
+    #fn backward(self, start_grad: Scalar[dtype] = 1.0):
+        #graph = Graph[dtype]()
+        #graph.walk_backward(TensorLike.from_view(self), start_grad)
+
+    #fn backward(self, with_tensor: Tensor[dtype]):
+        #graph = Graph[dtype]()
+        #graph.walk_backward(TensorLike.from_view(self), with_tensor)
+
 
     fn add_ancestry(mut self, *parents: TensorLike[dtype]):
         for parent in parents:

@@ -3,13 +3,80 @@ from shapes import Shape
 from views import TensorView
 from intlist import IntList
 from backpropagation import BackwardFn
-from operators import AddTensor, SubtractTensor
+from operators import AddTensor, SubtractTensor, Noop
 from os import abort
 from ancestry import Ancestors
-
+from common_utils import is_null
+from collections import Set
 
 fn main() raises:
     pass
+
+
+struct GradStream[dtype: DType](Copyable & Movable):
+    var recipient: TensorLike[dtype]  # Tensor or View
+    var grad: Optional[
+        Tensor[dtype]
+    ]  # Gradient to apply (None if recipient is a tensor)
+    var opcode: Int
+
+    fn __init__(
+        out self,
+        recipient: TensorLike[dtype],
+        grad: Optional[Tensor[dtype]] = None,
+        opcode: Int = Noop,
+    ):
+        self.recipient = recipient
+        self.grad = grad
+        self.opcode = opcode
+
+    fn __copyinit__(out self, other: Self):
+        self.recipient = other.recipient
+        self.grad = other.grad
+        self.opcode = other.opcode
+
+    fn __moveinit__(out self, var other: Self):
+        self.recipient = other.recipient
+        self.grad = other.grad
+        self.opcode = other.opcode
+
+    fn is_view(self) -> Bool:
+        return self.recipient.is_view()
+
+    fn is_tensor(self) -> Bool:
+        return self.recipient.is_tensor()
+
+    fn __eq__(self, other: Self) -> Bool:
+        return self.recipient.__eq__(other.recipient)
+
+    fn __ne__(self, other: Self) -> Bool:
+        return not self.__eq__(other)
+
+    fn sink(self) -> Optional[Tensor[dtype]]:
+        grad_share = self.grad.value()
+        if self.recipient.is_tensor():
+            self.recipient.update_grad[AddTensor](
+                grad_share
+            ) if self.opcode == AddTensor else self.recipient.update_grad[
+                SubtractTensor
+            ](
+                grad_share
+            )
+        else:
+            if self.recipient.parent_is_tensor():
+                parent = self.recipient.parent_tensor()
+                parent.update_grad[AddTensor](
+                    grad_share
+                ) if self.opcode == AddTensor else parent.update_grad[
+                    SubtractTensor
+                ](
+                    grad_share
+                )
+            else:
+                parent_view = self.recipient.parent_view()
+                reshaped_grad = grad_share.reshape(parent_view.shape)
+                return Optional(reshaped_grad)
+        return None
 
 
 struct TensorLike[dtype: DType](
@@ -37,7 +104,7 @@ struct TensorLike[dtype: DType](
         self.tensor_address = other.tensor_address
         self.view_address = other.view_address
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, var other: Self):
         self.kind = other.kind
         self.tensor_address = other.tensor_address
         self.view_address = other.view_address
@@ -75,22 +142,31 @@ struct TensorLike[dtype: DType](
     fn view_ptr(self) -> Self.ViewAddress:
         return self.view_address
 
-    # fn inner_address(self) -> UnsafePointer[Tensor[dtype]]:
-    # return (
-    # self.tensor_address if self.kind == 0 else self.view_address
-    # )  # base pointer address
-
     fn inner_id(self) -> Int:
         return Int(self.tensor_address) if self.kind == 0 else Int(
             self.view_address
         )
+
+    # Only to be called when kind == 1 i.e. this TensorLike contains a TensorView and it parent isis a tensor
+    fn parent_tensor(self) -> Tensor[dtype]:
+        if self.kind == 0:
+            abort("TensorLike → parent_tensor called when it contains a Tensor")
+        ancestors = self.view_address[].ancestors
+        return ancestors.get(0)[].tensor()
+
+    # Only to be called when kind == 1 i.e. this TensorLike contains a TensorView and its parent is also a view
+    fn parent_view(self) -> TensorView[dtype]:
+        if self.kind == 0:
+            abort("TensorLike → parent_tensor called when it contains a Tensor")
+        ancestors = self.view_address[].ancestors
+        return ancestors.get(0)[].view()
 
     # We ask this question during backward pass on TensorLike when it encapsulates a TensorView
     fn parent_is_tensor(self) -> Bool:
         is_tensor = False
         if self.kind == 0:
             abort(
-                "TensorLike → parent_is_view: invoked on TensorLike"
+                "TensorLike → parent_is_tensor: invoked on TensorLike"
                 " encapsulating a Tensor"
             )
         else:
@@ -99,7 +175,8 @@ struct TensorLike[dtype: DType](
                 len(ancestors) == 0 or len(ancestors) > 1
             ):  # How did I materialize? Should not happen
                 abort(
-                    "TensorLike → parent_is_view: view with untraceable origin"
+                    "TensorLike → parent_is_tensor: view with untraceable"
+                    " origin"
                 )
             is_tensor = ancestors.get(0)[].is_tensor()
         print("parent is tensor: ", is_tensor)
@@ -159,28 +236,29 @@ struct TensorLike[dtype: DType](
             return self.view_address[].shape
 
     fn seed_grad(self, value: Scalar[dtype]):
-        if self.is_tensor():
-            self.tensor().seed_grad(value)
+        if self.kind == 0:
+            self.tensor_address[].seed_grad(value)
         else:
             self.view_address[].seed_grad(value)
 
     fn update_grad[opcode: Int](self, incoming: Tensor[dtype]):
-        if self.is_tensor():
-            self.tensor().update_grad[opcode](incoming)
+        if self.kind == 0:
+            self.tensor_address[].update_grad[opcode](incoming)
         else:
-            self.view().base_tensor[].update_grad[opcode](incoming)
+            incoming.print()
+            print("update_grad: ", is_null(self.view_address[].base_tensor))
+            self.view_address[].base_tensor[].update_grad[opcode](incoming)
 
     fn seed_grad(self, with_tensor: Tensor[dtype]):
-        if self.is_tensor():
-            self.tensor().seed_grad(with_tensor)
+        if self.kind == 0:
+            self.tensor_address[].seed_grad(with_tensor)
         else:
             self.view_address[].seed_grad(with_tensor)
 
     fn requires_grad(self) -> Bool:
         return (
-            self.view()
-            ._requires_grad() if self.is_view() else self.tensor()
-            ._requires_grad()
+            self.view_address[]._requires_grad() if self.kind
+            == 1 else self.tensor_address[]._requires_grad()
         )
 
     fn print_tensor_recursive(
@@ -335,27 +413,24 @@ struct TensorLike[dtype: DType](
         if not self.requires_grad():
             return
         self.seed_grad(seed_tensor)
-        visited = IntList.Empty
+        visited = Set[Int]()
         topo_order = List[Self]()  # Stores nodes in topological order
 
         # --- (1) Perform topological sort (DFS-based) ---
-        stack = [(self, False)]  # (node, processed)
+        stack = [self]  # (node, processed)
         while stack:
-            node, processed = stack.pop()
-            if processed:
-                topo_order.append(node)
-                continue
+            node = stack.pop()
             if node.inner_id() in visited:
                 continue
-            visited.append(node.inner_id())
-            stack.append((node, True))  # Mark for post-processing
+            topo_order.append(node)
+            visited.add(node.inner_id())
             # Push Ancestors (dependents) onto the stack
             for ancestor in node.ancestry():
-                stack.append((ancestor[], False))
+                stack.append(ancestor[])
 
         # --- (2) Process in reverse topological order ---
-        visited = IntList.Empty  # Reset for gradient accumulation
-        for node in reversed(topo_order):
+        # visited = IntList.Empty  # Reset for gradient accumulation
+        for node in topo_order:
             if node.has_backward_fn():
                 for recipient, grad_share, opcode in node.backward_fn()(
                     UnsafePointer(to=node)

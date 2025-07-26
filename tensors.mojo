@@ -45,6 +45,7 @@ struct Tensor[dtype: DType = DType.float32](
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
     alias Blocks = List[Self.Block]
+    alias Ancestor_of = TensorLike.from_tensor
     var shape: Shape
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
@@ -105,7 +106,6 @@ struct Tensor[dtype: DType = DType.float32](
             backward_fn = ViewBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
-            print("ViewBackward fn added")
 
         return out
 
@@ -132,7 +132,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return True
 
-    alias Ancestor_of = TensorLike.from_tensor
 
     # Check if it has a backward fn before calling this API
     fn backward_fn(self) -> BackwardFn[dtype]:
@@ -1532,13 +1531,20 @@ struct Tensor[dtype: DType = DType.float32](
         if shape.num_elements() + offset > self.numels():
             abort("Tensor → view(shape): shape numels exceeds base tensor size")
 
-        return TensorView(
+        out = TensorView(
             UnsafePointer(to=self),
             shape,
             Strides.default(shape),
             offset=offset,
             requires_grad=_requires_grad,
         )
+        if self.requires_grad:
+            backward_fn = ViewBackward[dtype]().into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+
+        return out
+
 
     fn view(
         self,
@@ -1657,8 +1663,16 @@ struct Tensor[dtype: DType = DType.float32](
 
 fn main() raises:
     a = Tensor.arange(12, requires_grad=True)
-    v = a.view([12])
-    v.print()
-    print(v.has_backward_fn())
-    v.backward()
+    v1 = a.view([12])
+    v2 = v1.view(Shape.of(2, 6))
+    print("id of v2, v1, a: ", id(v2), id(v1), id(a))
+    print("v1's ancestors")
+    v1.ancestors.print()
+    print("v2's ancestors")
+    v2.ancestors.print()
+    v2.backward()
     a.gprint()
+    _ = v2
+    _ = v1
+    _ = a
+

@@ -79,10 +79,7 @@ fn is_null[dtype: DType](addr: UnsafePointer[Tensor[dtype]]) -> Bool:
 
 
 fn main() raises:
-    s = "Hello"
-    id_ = Int(UnsafePointer(to=s))
-    print("So", "far", "so good", id(s), id_)
-
+    pass
 
 struct Validator:
     @staticmethod
