@@ -27,11 +27,17 @@ from operators import (
     DivideByScalar,
     DivideScalar,
     MulScalar,
-    sum_across_rows,
-    sum_across_cols,
     Power,
     scalar_ops,
     Add,
+    sumup,
+    tensor_compare,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanEqual,
+    GreaterThan,
+    GreaterThanEqual,
     Subtract,
     Multiply,
 )
@@ -436,25 +442,22 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[set_value, simdwidthof[dtype]()](self.numels())
 
     fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        if self.shape != other.shape:
-            abort(
-                "Tensor __eq__ → Dimension mismatch: "
-                + self.shape.__str__()
-                + ", "
-                + other.shape.__str__()
-            )
-        result = Tensor[DType.bool](self.shape, False)
+        return tensor_compare[Equal](self, other)
 
-        @parameter
-        fn compare_elems[simd_width: Int](idx: Int):
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                self.data.load[width=simd_width](idx)
-                == other.data.load[width=simd_width](idx),
-            )
+    fn __ne__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare[NotEqual](self, other)
 
-        vectorize[compare_elems, simdwidthof[DType.bool]()](result.numels())
-        return result
+    fn __lt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare[LessThan](self, other)
+
+    fn __le__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare[LessThanEqual](self, other)
+
+    fn __gt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare[GreaterThan](self, other)
+
+    fn __ge__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare[GreaterThanEqual](self, other)
 
     fn __iadd__(self, other: Self):
         if self.is_leaf():
@@ -541,25 +544,6 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         vectorize[absolute_value, simdwidthof[dtype]()](result.numels())
-        return result
-
-    fn __ne__(self, other: Self) -> Tensor[DType.bool]:
-        if self.shape != other.shape:
-            abort(
-                "Tensor → __ne__(self, other): Dimension mismatch: "
-                + self.shape.__str__()
-                + ", "
-                + other.shape.__str__()
-            )
-        result = self == other
-
-        @parameter
-        fn invert[simd_width: Int](idx: Int):
-            result.data.store[width=simd_width](
-                idx, ~result.data.load[width=simd_width](idx)
-            )
-
-        vectorize[invert, simdwidthof[DType.bool]()](result.numels())
         return result
 
     fn has_grad(self) -> Bool:
@@ -1185,11 +1169,8 @@ struct Tensor[dtype: DType = DType.float32](
         )
         reduced_shape = Shape(self.shape.axes_spans.select(normalized_axes))
         # Special handling for full reduction case
-        if reducing_all and not keepdims:  # Vectorize this
-            summ = Scalar[dtype](0)
-            for idx in self.shape:
-                summ += self[idx]
-            out[IntList.Empty] = summ
+        if reducing_all and not keepdims:
+            out[IntList.Empty] = sumup(self)
         else:
             for out_idx in out_shape:
                 summ = Scalar[dtype](0)

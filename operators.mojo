@@ -1,4 +1,5 @@
 from tensors import Tensor
+from common_utils import panic
 from algorithm import vectorize, parallelize
 from sys import simdwidthof
 from shapes import Shape
@@ -21,6 +22,12 @@ alias Multiply = 10
 alias SubtractFromScalar = 11
 alias DivideByScalar = 12
 alias DivideScalar = 13
+alias Equal = 14
+alias NotEqual = 15
+alias LessThan = 16
+alias LessThanEqual = 17
+alias GreaterThan = 18
+alias GreaterThanEqual = 19
 
 
 @always_inline
@@ -171,7 +178,126 @@ fn __tensor_op_scalar__[
     return out
 
 
-from testing import assert_true
+fn tensor_compare_scalar[
+    dtype: DType, //, op: Int
+](this: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[DType.bool]:
+    result = Tensor[DType.bool](this.shape, False)
+
+    @parameter
+    fn compare_elems[simd_width: Int](idx: Int):
+        if op == Equal:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx) == scalar,
+            )
+
+        if op == NotEqual:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx) != scalar,
+            )
+
+        if op == LessThan:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx) < scalar,
+            )
+
+        if op == LessThanEqual:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx) <= scalar,
+            )
+
+        if op == GreaterThan:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx) > scalar,
+            )
+
+        if op == GreaterThanEqual:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx) >= scalar,
+            )
+
+    vectorize[compare_elems, simdwidthof[DType.bool]()](result.numels())
+    return result
+
+
+fn tensor_compare[
+    dtype: DType, //, op: Int
+](this: Tensor[dtype], other: Tensor[dtype]) -> Tensor[DType.bool]:
+    if this.shape != other.shape:
+        panic(
+            "Tensor __eq__ → Dimension mismatch:",
+            this.shape.__str__(),
+            ",",
+            other.shape.__str__(),
+        )
+    result = Tensor[DType.bool](this.shape, False)
+
+    @parameter
+    fn compare_elems[simd_width: Int](idx: Int):
+        if op == Equal:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx)
+                == other.data.load[width=simd_width](idx),
+            )
+
+        if op == NotEqual:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx)
+                != other.data.load[width=simd_width](idx),
+            )
+
+        if op == LessThan:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx)
+                < other.data.load[width=simd_width](idx),
+            )
+
+        if op == LessThanEqual:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx)
+                <= other.data.load[width=simd_width](idx),
+            )
+
+        if op == GreaterThan:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx)
+                > other.data.load[width=simd_width](idx),
+            )
+
+        if op == GreaterThanEqual:
+            result.data.store[width=simd_width, volatile=True](
+                idx,
+                this.data.load[width=simd_width](idx)
+                >= other.data.load[width=simd_width](idx),
+            )
+
+    vectorize[compare_elems, simdwidthof[DType.bool]()](result.numels())
+    return result
+
+
+fn sumup[dtype: DType, //](input: Tensor[dtype]) -> Scalar[dtype]:
+    constrained[
+        dtype.is_numeric(),
+        "operators → sumup is for numeric data types only",
+    ]()
+    summ = Scalar[dtype](0)
+
+    @parameter
+    fn sum_elems[simd_width: Int](idx: Int):
+        summ += input.data.load[width=simd_width](idx).reduce_add()
+
+    vectorize[sum_elems, simdwidthof[dtype]()](input.numels())
+    return summ
 
 
 fn main() raises:
