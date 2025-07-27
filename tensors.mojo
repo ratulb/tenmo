@@ -115,9 +115,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn into_tensor(self) -> Tensor[dtype]:
-        return self
-
     fn __init__(out self, shape: Shape, requires_grad: Bool = False):
         Shape.validate(shape)
         self.shape = shape
