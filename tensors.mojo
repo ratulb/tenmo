@@ -14,7 +14,7 @@ from ancestry import Ancestors
 from views import TensorView
 from strides import Strides
 from shared import TensorLike
-from common_utils import Validator, log_debug, variadic1or2, is_null, id
+from common_utils import Validator, log_debug, variadic1or2
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
@@ -1111,7 +1111,6 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn reshape(self, new_shape: Shape) -> Tensor[dtype]:
         if self.numels() != new_shape.num_elements():
-            # if self.shape.product() != new_shape.product():
             abort(
                 "Tensor with "
                 + String(self.numels())
@@ -1130,7 +1129,6 @@ struct Tensor[dtype: DType = DType.float32](
             out.base.init_pointee_move(base^)
 
             backward_fn = ReshapeBackward[dtype]().into_backward_fn()
-            print("ReshapedBackward being added")
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
 
@@ -1666,7 +1664,21 @@ fn main() raises:
     print("v2")
     v2.print()
     v3 = v2.view([3, 4])
+    ancestor = v3.ancestors.get(0)[]
+    v3.ancestors.print()
+    if v3.ancestors:
+        print("Is it empty? No")
+    print("Does it contains? ", ancestor in v3.ancestors)
+    print("Does it contains? ", v3.ancestors.get(0)[] in v3.ancestors)
+    print("Does it contains? ", v2.ancestors.get(0)[] in v3.ancestors)
     v3.backward()
+    print("Does it contains? ", ancestor in v3.ancestors)
+    print("Does it contains? ", v3.ancestors.get(0)[] in v3.ancestors)
+    print("Does it contains? ", v2.ancestors.get(0)[] in v3.ancestors)
+
+    _= v3.ancestors.pop()
+    if not v3.ancestors:
+        print("Is it empty? yes")
     print("v3 grad")
     v3.gprint(12, 12)
     print("v2 grad")

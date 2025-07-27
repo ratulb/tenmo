@@ -319,7 +319,7 @@ struct TensorLike[dtype: DType](
         graph = List[Self]()  # Stores nodes in topological order
 
         # --- (1) Perform topological sort (DFS-based) ---
-        stack = [self]  # (node, processed)
+        stack = [self]  # (node)
         while stack:
             node = stack.pop()
             if node.inner_id() in visited:
