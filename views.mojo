@@ -237,26 +237,31 @@ struct TensorView[dtype: DType = DType.float32](
             memcpy[Scalar[dtype]](
                 out.data, self.base_tensor[].data + self.offset, numels
             )
-            return out
 
-        # Slow path: general indexing using shape
-        rank = self.shape.rank()
-        indices = IntList.filled(rank, 0)
+        else:
+            # Slow path: general indexing using shape
+            rank = self.shape.rank()
+            indices = IntList.filled(rank, 0)
 
-        for _ in range(numels):
-            # Copy value at current index from view to out
-            out[indices] = self[indices]
+            for _ in range(numels):
+                # Copy value at current index from view to out
+                out[indices] = self[indices]
 
-            # Increment multi-dimensional index (manual shape walker)
-            var carry = True
-            for dim in reversed(range(rank)):
-                if carry:
-                    indices[dim] += 1
-                    if indices[dim] >= self.shape[dim]:
-                        indices[dim] = 0  # Carry over
-                        carry = True
-                    else:
-                        carry = False
+                # Increment multi-dimensional index (manual shape walker)
+                var carry = True
+                for dim in reversed(range(rank)):
+                    if carry:
+                        indices[dim] += 1
+                        if indices[dim] >= self.shape[dim]:
+                            indices[dim] = 0  # Carry over
+                            carry = True
+                        else:
+                            carry = False
+        if self.requires_grad:
+            backward_fn = ViewBackward[dtype]().into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+
         return out
 
     fn all_close(
