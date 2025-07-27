@@ -9,8 +9,10 @@ from os import abort
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
 
+
 fn id[type: AnyType, //](t: type) -> Int:
     return Int(UnsafePointer(to=t))
+
 
 fn log_debug(msg: String):
     log.debug(msg)
@@ -80,6 +82,7 @@ fn is_null[dtype: DType](addr: UnsafePointer[Tensor[dtype]]) -> Bool:
 
 fn main() raises:
     pass
+
 
 struct Validator:
     @staticmethod
