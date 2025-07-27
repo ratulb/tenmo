@@ -1451,7 +1451,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return result
 
-    fn backward_grad_contrib(
+    fn backward_contribution(
         self,
         other: Tensor[dtype],
         upstream_grad: Tensor[dtype],
@@ -1661,24 +1661,10 @@ fn main() raises:
     a = Tensor.arange(12, requires_grad=True)
     v1 = a.view([12])
     v2 = v1.view(Shape.of(2, 6))
-    print("v2")
-    v2.print()
     v3 = v2.view([3, 4])
-    ancestor = v3.ancestors.get(0)[]
-    v3.ancestors.print()
-    if v3.ancestors:
-        print("Is it empty? No")
-    print("Does it contains? ", ancestor in v3.ancestors)
-    print("Does it contains? ", v3.ancestors.get(0)[] in v3.ancestors)
-    print("Does it contains? ", v2.ancestors.get(0)[] in v3.ancestors)
-    v3.backward()
-    print("Does it contains? ", ancestor in v3.ancestors)
-    print("Does it contains? ", v3.ancestors.get(0)[] in v3.ancestors)
-    print("Does it contains? ", v2.ancestors.get(0)[] in v3.ancestors)
-
-    _= v3.ancestors.pop()
-    if not v3.ancestors:
-        print("Is it empty? yes")
+    b = v3.into_tensor()
+    c = b * 2
+    c.backward()
     print("v3 grad")
     v3.gprint(12, 12)
     print("v2 grad")

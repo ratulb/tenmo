@@ -25,7 +25,7 @@ struct BroadcastBackward[
         ancestor_2 = ancestors.get(1)[]
 
         if ancestor_1.requires_grad():
-            ancestor_1_share = ancestor_1.tensor().backward_grad_contrib(
+            ancestor_1_share = ancestor_1.tensor().backward_contribution(
                 ancestor_2.tensor(), gradients, Multiply
             )
             grad_outputs.append(
@@ -37,7 +37,7 @@ struct BroadcastBackward[
             )
 
         if ancestor_2.requires_grad():
-            ancestor_2_share = ancestor_2.tensor().backward_grad_contrib(
+            ancestor_2_share = ancestor_2.tensor().backward_contribution(
                 ancestor_1.tensor(), gradients, Multiply
             )
             grad_outputs.append(
