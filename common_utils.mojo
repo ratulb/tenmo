@@ -14,6 +14,19 @@ fn id[type: AnyType, //](t: type) -> Int:
     return Int(UnsafePointer(to=t))
 
 
+fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
+    return ptr.__as_bool__() == False
+
+
+fn panic(*s: String):
+    abrt = String(capacity=len(s))
+    abrt += s[0].strip()
+    for i in range(1, len(s)):
+        stripped = " " + s[i].strip()
+        abrt += stripped
+    abort(abrt)
+
+
 fn log_debug(msg: String):
     log.debug(msg)
 
@@ -74,14 +87,6 @@ fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int]:
     if n == -1:
         return create_variadic_list(m)
     return create_variadic_list(m, n)
-
-
-fn is_null[dtype: DType](addr: UnsafePointer[Tensor[dtype]]) -> Bool:
-    return addr.__as_bool__() == False
-
-
-fn main() raises:
-    pass
 
 
 struct Validator:
@@ -173,3 +178,7 @@ struct Validator:
         except e:
             abort(e.__str__())
         return normalized_axes
+
+
+fn main() raises:
+    panic("This ", "is", "very       ", "     bad")
