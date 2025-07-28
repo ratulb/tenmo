@@ -3,10 +3,10 @@ from shapes import Shape
 from views import TensorView
 from intlist import IntList
 from backpropagation import BackwardFn
-from operators import AddTensor, SubtractTensor
 from os import abort
 from ancestry import Ancestors
 from collections import Set
+from operators import AddTensor, SubtractTensor, Noop
 
 
 fn main() raises:
@@ -100,22 +100,21 @@ struct TensorLike[dtype: DType](
         )
 
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
-        return self.tensor_address[][
-            indices
-        ] if self.is_tensor() else self.view_address[][indices]
+        return (
+            self.tensor_address[][indices] if self.kind
+            == 0 else self.view_address[][indices]
+        )
 
     fn has_backward_fn(self) -> Bool:
         return (
-            self.tensor_address[]
-            .has_backward_fn() if self.is_tensor() else self.view_address[]
-            .has_backward_fn()
+            self.tensor_address[].has_backward_fn() if self.kind
+            == 0 else self.view_address[].has_backward_fn()
         )
 
     fn backward_fn(self) -> BackwardFn[dtype]:
         return (
-            self.tensor_address[]
-            .backward_fn() if self.is_tensor() else self.view_address[]
-            .backward_fn()
+            self.tensor_address[].backward_fn() if self.kind
+            == 0 else self.view_address[].backward_fn()
         )
 
     fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
@@ -305,42 +304,85 @@ struct TensorLike[dtype: DType](
 
         return out
 
-    fn backward(self, start_grad: Scalar[dtype] = 1.0):
-        if not self.requires_grad():
+    fn backward(root: Self, start_grad: Scalar[dtype] = 1.0):
+        if not root.requires_grad():
             return
-        seed_tensor = Tensor[dtype].full(self.shape(), start_grad)
-        self.backward(seed_tensor)
+        seed_tensor = Tensor[dtype].full(root.shape(), start_grad)
+        root.backward(seed_tensor)
 
-    fn backward(self, seed_tensor: Tensor[dtype]):
-        if not self.requires_grad():
+    fn backward(root: Self, seed_tensor: Tensor[dtype]):
+        if not root.requires_grad():
             return
-        self.seed_grad(seed_tensor)
-        visited = Set[Int]()
-        graph = List[Self]()  # Stores nodes in topological order
+        root.seed_grad(seed_tensor)
+        tracked = Set[Int]()
+        streams = List[GradStream[dtype]]()
 
-        # --- (1) Perform topological sort (DFS-based) ---
-        stack = [self]  # (node)
+        stack = [root]
         while stack:
-            node = stack.pop()
-            if node.inner_id() in visited:
+            stream = stack.pop()
+            if stream.inner_id() in tracked:
                 continue
-            graph.append(node)
-            visited.add(node.inner_id())
-            # Push Ancestors (dependents) onto the stack
-            for ancestor in node.ancestry():
-                stack.append(ancestor[])
+            streams.append(GradStream[dtype](stream))
+            tracked.add(stream.inner_id())
+            for origin in stream.ancestry():
+                stack.append(origin[])
 
-        for node in graph:
-            if node.has_backward_fn():
-                for recipient, grad_share, opcode in node.backward_fn()(
-                    UnsafePointer(to=node)
-                ):
-                    if recipient.is_view() and not recipient.has_grad():
-                        recipient.init_grad()
-                    recipient.update_grad[AddTensor](
-                        grad_share
-                    ) if opcode == AddTensor else recipient.update_grad[
-                        SubtractTensor
-                    ](
-                        grad_share
-                    )
+        for stream in streams:
+            stream.flow()
+
+
+struct GradStream[dtype: DType](Copyable & Movable):
+    var recipient: TensorLike[dtype]  # Tensor or View
+    var grad: Optional[
+        Tensor[dtype]
+    ]  # Gradient to apply (None if recipient is a tensor)
+    var opcode: Int
+
+    fn __init__(
+        out self,
+        recipient: TensorLike[dtype],
+        grad: Optional[Tensor[dtype]] = None,
+        opcode: Int = Noop,
+    ):
+        self.recipient = recipient
+        self.grad = grad
+        self.opcode = opcode
+
+    fn __copyinit__(out self, other: Self):
+        self.recipient = other.recipient
+        self.grad = other.grad
+        self.opcode = other.opcode
+
+    fn __moveinit__(out self, var other: Self):
+        self.recipient = other.recipient
+        self.grad = other.grad
+        self.opcode = other.opcode
+
+    fn is_view(self) -> Bool:
+        return self.recipient.is_view()
+
+    fn is_tensor(self) -> Bool:
+        return self.recipient.is_tensor()
+
+    fn has_backward_fn(self) -> Bool:
+        return self.recipient.has_backward_fn()
+
+    fn flow(self):
+        if self.recipient.has_backward_fn():
+            for recipient, grad_share, opcode in self.recipient.backward_fn()(
+                UnsafePointer(to=self.recipient)
+            ):
+                gradstream = Self(recipient, Optional(grad_share), opcode)
+                gradstream.sink()
+
+    fn sink(self):
+        grad_share = self.grad.value()
+        if self.recipient.is_view() and not self.recipient.has_grad():
+            self.recipient.init_grad()
+        self.recipient.update_grad[AddTensor](
+            grad_share
+        ) if self.opcode == AddTensor else self.recipient.update_grad[
+            SubtractTensor
+        ](
+            grad_share
+        )

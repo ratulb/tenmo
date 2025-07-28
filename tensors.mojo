@@ -32,6 +32,7 @@ from operators import (
     Add,
     sumup,
     tensor_compare,
+    tensor_compare_scalar,
     Equal,
     NotEqual,
     LessThan,
@@ -437,6 +438,24 @@ struct Tensor[dtype: DType = DType.float32](
             self.data.store[width=simd_width](idx, value)
 
         vectorize[set_value, simdwidthof[dtype]()](self.numels())
+
+    fn __eq__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare_scalar[Equal](self, scalar)
+
+    fn __ne__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare_scalar[NotEqual](self, scalar)
+
+    fn __lt__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare_scalar[LessThan](self, scalar)
+
+    fn __le__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare_scalar[LessThanEqual](self, scalar)
+
+    fn __gt__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare_scalar[GreaterThan](self, scalar)
+
+    fn __ge__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
+        return tensor_compare_scalar[GreaterThanEqual](self, scalar)
 
     fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         return tensor_compare[Equal](self, other)
@@ -1636,21 +1655,4 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    a = Tensor.arange(12, requires_grad=True)
-    v1 = a.view([12])
-    v2 = v1.view(Shape.of(2, 6))
-    v3 = v2.view([3, 4])
-    b = v3.into_tensor()
-    c = b * 2
-    c.backward()
-    print("v3 grad")
-    v3.gprint(12, 12)
-    print("v2 grad")
-    v2.gprint(12, 12)
-    print("v1 grad")
-    v1.gprint(12, 12)
-    print("a grad")
-    a.gprint(12, 12)
-    _ = v2
-    _ = v1
-    _ = a
+    pass
