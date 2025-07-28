@@ -14,7 +14,7 @@ A blazing-fast, from-scratch **Tensor** library built in [Mojo🔥](https://modu
 - 🪜 Views and slicing
 - 🧪 Comprehensive test coverage
 
-> 🚧 **Work in Progress** – This project is a deep dive into Mojo internals, systems programming, and the foundation of modern deep learning libraries. Built with ❤️ from scratch — no NumPy, PyTorch, or TensorFlow under the hood.
+> 🚧 **Work in Progress** – This project is evolving as Mojo is. Breaking changes are to be expected. Built with ❤️ from scratch — no NumPy, PyTorch, or TensorFlow under the hood.
 
 ---
 
