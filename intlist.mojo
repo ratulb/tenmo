@@ -1,6 +1,6 @@
 from memory import memcpy, memset, Pointer
 from os import abort
-from common_utils import log_debug
+from common_utils import log_debug, panic
 
 
 @register_passable
@@ -87,12 +87,18 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             array.size = capacity
         return array
 
-    @always_inline
     fn product(self) -> Int:
         result = 1
         for each in self:
             result *= each
         return result
+
+    fn sum(self) -> Int:
+        result = 0
+        for each in self:
+            result += each
+        return result
+
 
     fn has_duplicates(self) -> Bool:
         if len(self) <= 1:
@@ -244,6 +250,19 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             result.copy_from(i * len(self), self, 0, len(self))
         return result
 
+    fn __mul__(self: IntList, other: Self) -> IntList:
+        if len(self) != len(other):
+            panic(
+                "IntList → __mul__(other): lengths are not equal → ",
+                String(len(self)),
+                "<=>",
+                String(len(other)),
+            )
+        result = IntList.with_capacity(len(self))
+        for i in range(len(self)):
+            result[i] = self[i] * other[i]
+        return result
+
     fn __getitem__(self, slice: Slice) -> Self:
         var start, end, step = slice.indices(len(self))
         var spread = range(start, end, step)
@@ -306,7 +325,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         """
 
         if idx < 0 or idx >= len(self):
-            abort("IntList __getitem__ -> Out-of-bounds read: " + String(idx))
+            abort("IntList __getitem__  → Out-of-bounds read: " + String(idx))
 
         return (self.data + idx)[]
 
@@ -689,7 +708,7 @@ struct ZipIterator[
 
 
 fn main() raises:
-    l = IntList.Empty
-    print(l.is_empty())
-    l.prepend(2)
-    print(l.is_empty())
+    l1 = IntList(1, 2, 3)
+    l2 = IntList(1, 2, 3)
+    for a, b in l1.zip(l2):
+        print(a, b)

@@ -20,7 +20,6 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     fn __eq__(self, other: Self) -> Bool:
         return self.strides == other.strides
 
-    @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
         """Initialize by copying an existing `Strides`.
         Args:
