@@ -102,15 +102,17 @@ struct Tensor[dtype: DType = DType.float32](
     fn into_view(
         self, requires_grad: Optional[Bool] = None
     ) -> TensorView[dtype]:
+        shape = self.shape
+        strides = Strides.default(shape)
         out = TensorView(
             UnsafePointer(to=self),
-            self.shape,
+            shape,
             Strides.default(self.shape),
             offset=0,
             requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
         if self.requires_grad:
-            backward_fn = ViewBackward[dtype]().into_backward_fn()
+            backward_fn = ViewBackward[dtype](shape, strides, 0).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
 
@@ -1524,16 +1526,16 @@ struct Tensor[dtype: DType = DType.float32](
             return self.into_view(requires_grad=requires_grad)
         if shape.num_elements() + offset > self.numels():
             abort("Tensor → view(shape): shape numels exceeds base tensor size")
-
+        strides = Strides.default(shape)
         out = TensorView(
             UnsafePointer(to=self),
             shape,
-            Strides.default(shape),
+            strides,
             offset=offset,
             requires_grad=_requires_grad,
         )
         if self.requires_grad:
-            backward_fn = ViewBackward[dtype]().into_backward_fn()
+            backward_fn = ViewBackward[dtype](shape, strides, offset).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
 
@@ -1655,4 +1657,9 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
+    a = Tensor.arange(12, requires_grad=True)
+    v1 = a.view([2, 4], offset=4)
+    v2 = v1.view([4, 2])
+    v2.backward()
+    _ =v1
+    a.gprint()

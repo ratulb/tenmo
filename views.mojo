@@ -82,27 +82,30 @@ struct TensorView[dtype: DType = DType.float32](
     fn view(self, shape: List[Int]) -> TensorView[dtype]:
         return self.view(Shape(shape))
 
-    fn view(self, new_shape: Shape) -> TensorView[dtype]:
-        if not self.shape.num_elements() == new_shape.num_elements():
+    fn view(self, shape: Shape) -> TensorView[dtype]:
+        if not self.shape.num_elements() == shape.num_elements():
             abort(
                 "TensorView → view: shape"
-                + new_shape.__str__()
+                + shape.__str__()
                 + " is invalid: total number of elements("
                 + String(self.shape.num_elements())
                 + ") must match"
             )
 
-        new_strides = Strides.default(new_shape)
+        strides = Strides.default(shape)
+        offset = self.offset
 
         out = TensorView[dtype](
             base_tensor=self.base_tensor,
-            shape=new_shape,
-            strides=new_strides,
-            offset=self.offset,
+            shape=shape,
+            strides=strides,
+            offset=offset,
             requires_grad=self.requires_grad,
         )
         if self.requires_grad:
-            backward_fn = ViewBackward[dtype]().into_backward_fn()
+            backward_fn = ViewBackward[dtype](
+                shape, strides, offset
+            ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
         return out
@@ -110,31 +113,31 @@ struct TensorView[dtype: DType = DType.float32](
     # Fully custom shape/strides/offset
     fn view(
         self,
-        new_shape: List[Int],
-        new_strides: List[Int],
-        new_offset: Optional[Int] = None,
+        shape: List[Int],
+        strides: List[Int],
+        offset: Optional[Int] = None,
     ) -> TensorView[dtype]:
-        offset = new_offset.value() if new_offset else self.offset
-        return self.view(Shape(new_shape), Strides(new_strides), offset)
+        new_offset = offset.value() if offset else self.offset
+        return self.view(Shape(shape), Strides(strides), new_offset)
 
     fn view(
-        self, new_shape: Shape, new_strides: Strides, new_offset: Int
+        self, shape: Shape, strides: Strides, offset: Int
     ) -> TensorView[dtype]:
-        if not new_shape.rank() == new_strides.rank():
+        if not shape.rank() == strides.rank():
             abort(
                 "TensorView → view: shape"
-                + new_shape.__str__()
+                + shape.__str__()
                 + " and strides"
-                + new_strides.__str__()
+                + strides.__str__()
                 + " must have the same rank"
             )
 
         # Basic bounds checking: ensure the view doesn't go out of bounds
-        numels = new_shape.num_elements()
+        numels = shape.num_elements()
         max_index = 0
-        for i in range(new_shape.rank()):
-            max_index += (new_shape[i] - 1) * new_strides[i]
-        total_offset = new_offset + max_index
+        for i in range(shape.rank()):
+            max_index += (shape[i] - 1) * strides[i]
+        total_offset = offset + max_index
         num_elems = self.shape.num_elements()
         if not total_offset < num_elems:
             abort(
@@ -143,12 +146,37 @@ struct TensorView[dtype: DType = DType.float32](
                 + String(num_elems)
                 + ")"
             )
+        composite_offset = offset + self.offset
+            # (1) Compute bounds of parent view (`self`)
+        parent_min = self.offset
+        parent_max = self.offset
+        for i in range(self.shape.rank()):
+            parent_max += (self.shape[i] - 1) * self.strides[i]
+        if parent_min > parent_max:
+            parent_min, parent_max = parent_max, parent_min
 
+        # (2) Compute bounds of new view (proposed)
+        # New view's offset is `self.offset + offset` (base-relative)
+
+        # Compute min/max flat indices in the base tensor
+        new_min = composite_offset
+        new_max = composite_offset
+        for i in range(shape.rank()):
+            stride = strides[i]
+            dim_size = shape[i]
+            if stride >= 0:
+                new_max += (dim_size - 1) * stride  # increasing indices
+            else:
+                new_min += (dim_size - 1) * stride  # decreasing indices (negative stride)
+
+        # (3) Ensure new view fits within parent view's bounds
+        if new_min < parent_min or new_max > parent_max:
+            abort("TensorView → view: requested view exceeds parent view bounds!")
         return TensorView[dtype](
             base_tensor=self.base_tensor,
-            shape=new_shape,
-            strides=new_strides,
-            offset=new_offset,
+            shape=shape,
+            strides=strides,
+            offset=composite_offset,
             requires_grad=self.requires_grad,
         )
 
@@ -163,6 +191,10 @@ struct TensorView[dtype: DType = DType.float32](
     fn index_offset(self, indices: IntList) -> Int:
         if not indices.len() == self.shape.rank():
             abort("TensorView → index_offset → rank mismatch")
+    # Bounds check before computing flat offset
+        for i in range(indices.len()):
+            if indices[i] < 0 or indices[i] >= self.shape[i]:
+                abort("TensorView → index_offset → index out of bounds for view")
         var flat_idx = self.offset
         for i in range(indices.len()):
             flat_idx += indices[i] * self.strides[i]
@@ -225,12 +257,10 @@ struct TensorView[dtype: DType = DType.float32](
     fn is_tensor(self) -> Bool:
         return False
 
-    fn into_view(self) -> TensorView[dtype]:
-        return self
-
     fn into_tensor(self) -> Tensor[dtype]:
-        out = Tensor[dtype](self.shape, requires_grad=self.requires_grad)
-        numels = self.shape.num_elements()
+        shape = self.shape
+        out = Tensor[dtype](shape, requires_grad=self.requires_grad)
+        numels = shape.num_elements()
 
         if self.is_contiguous():
             # Fast path: single memcpy from base tensor
@@ -240,7 +270,7 @@ struct TensorView[dtype: DType = DType.float32](
 
         else:
             # Slow path: general indexing using shape
-            rank = self.shape.rank()
+            rank = shape.rank()
             indices = IntList.filled(rank, 0)
 
             for _ in range(numels):
@@ -258,7 +288,11 @@ struct TensorView[dtype: DType = DType.float32](
                         else:
                             carry = False
         if self.requires_grad:
-            backward_fn = ViewBackward[dtype]().into_backward_fn()
+            strides = self.strides
+            offset = self.offset
+            backward_fn = ViewBackward[dtype](
+                shape, strides, offset
+            ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
 
@@ -334,6 +368,8 @@ struct TensorView[dtype: DType = DType.float32](
         else:
             s += "View"
         s += self.shape.__str__()
+        s += ", strides: " + self.strides.__str__()
+        s += ", offset: " + self.offset.__str__()
         s += ", Type: " + dtype.__str__()
         s += ", requires_grad: " + String(self.requires_grad)
         s += "]"
@@ -397,7 +433,45 @@ struct TensorView[dtype: DType = DType.float32](
 
 
 fn main():
-    a = Tensor.rand(2, 3, 4)
-    v = a.into_view()
-    v1 = v.view([4, 3, 2], [3, 2, 4])
-    print(a[0, 0, 0], v[IntList(0, 0, 0)], v1[IntList(0, 0, 0)])
+    # a = Tensor.arange(16, requires_grad = True)
+    a = Tensor.d2(
+        [
+            [
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+            ],
+            [
+                4.0,
+                5.0,
+                6.0,
+                7.0,
+            ],
+            [
+                8.0,
+                9.0,
+                10.0,
+                11.0,
+            ],
+            [
+                12.0,
+                13.0,
+                14.0,
+                15.0,
+            ],
+        ],
+        requires_grad=True,
+    )
+    v1 = a.view([2, 2], [4, 1], offset=5)
+    v1.print()
+    v2 = v1.view([2, 2], [2, 1], 0)
+    v2.print()
+    print(v2[3, 3])
+    _ = a
+    x, y = 10, 100
+    print(x, y)
+    x, y = y, x
+
+    print(x, y)
+
