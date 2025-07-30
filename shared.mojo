@@ -70,12 +70,6 @@ struct TensorLike[dtype: DType](
     fn is_tensor(self) -> Bool:
         return self.kind == 0
 
-    fn tensor_ptr(self) -> Self.TensorAddress:
-        return self.tensor_address
-
-    fn view_ptr(self) -> Self.ViewAddress:
-        return self.view_address
-
     fn inner_id(self) -> Int:
         return Int(self.tensor_address) if self.kind == 0 else Int(
             self.view_address
@@ -125,6 +119,12 @@ struct TensorLike[dtype: DType](
 
     fn rank(self) -> Int:
         return self.shape().rank()
+
+    fn base_shape(self) -> Shape:
+        if self.kind == 0:
+            return self.tensor_address[].shape
+        else:
+            return self.view_address[].base_tensor[].shape
 
     fn shape(self) -> Shape:
         if self.kind == 0:
