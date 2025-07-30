@@ -179,6 +179,55 @@ struct Validator:
             abort(e.__str__())
         return normalized_axes
 
+    @staticmethod
+    fn validate_indices(
+        indices: IntList,
+        shape: Shape,
+        prefix: String = "",
+        do_panic: Bool = True,
+    ) -> Bool:
+        # Check rank match
+        if len(indices) != shape.rank():
+            if do_panic:
+                panic(
+                    prefix + " →" if prefix else "",
+                    "Incorrect number of indices: expected "
+                    + String(shape.rank())
+                    + ", got "
+                    + String(len(indices)),
+                )
+            return False
+
+        # Check each index
+        for i in range(shape.rank()):
+            if indices[i] < 0:
+                if do_panic:
+                    panic(
+                        prefix + " →" if prefix else "",
+                        "Negative index at dimension "
+                        + String(i)
+                        + ": "
+                        + String(indices[i]),
+                    )
+                return False
+            if indices[i] >= shape[i]:
+                if do_panic:
+                    panic(
+                        prefix + " →" if prefix else "",
+                        "Index out of bounds at dimension "
+                        + String(i)
+                        + ": "
+                        + String(indices[i])
+                        + " >= "
+                        + String(shape[i]),
+                    )
+                return False
+
+        return True
+
 
 fn main() raises:
-    panic("This ", "is", "very       ", "     bad")
+    indices = IntList(1)
+    shape = Shape.of(1, 2)
+    #_= Validator.validate_indices(indices, shape, "Tensor")
+    _= Validator.validate_indices(indices, shape)
