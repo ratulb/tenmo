@@ -7,7 +7,7 @@ from intlist import IntList
 
 @fieldwise_init
 @register_passable
-struct TBackward[dtype: DType](Copyable & Movable):
+struct TBackward[dtype: DType](Copyable & Movable & Stringable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
@@ -27,10 +27,13 @@ struct TBackward[dtype: DType](Copyable & Movable):
             )
         ]
 
+    fn __str__(self) -> String:
+        return "TBackward"
+
 
 @fieldwise_init
 @register_passable
-struct TransposeBackward[dtype: DType](Copyable & Movable):
+struct TransposeBackward[dtype: DType](Copyable & Movable & Stringable):
     var axes: IntList
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
@@ -39,17 +42,14 @@ struct TransposeBackward[dtype: DType](Copyable & Movable):
     fn backward[
         dtype: DType
     ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], TensorLike[dtype], Int]
+        Tuple[TensorLike[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
         gradients = output.gradients()[]
-        var grad_outputs: List[
-            Tuple[TensorLike[dtype], TensorLike[dtype], Int]
-        ] = []
         ancestor = output.ancestry().get(0)[]
         inverted_axes = IntList.invert_permutation(self.axes)
         grad_transposed = gradients.transpose(inverted_axes)
-        grad_output = TensorLike(UnsafePointer(to=grad_transposed))
+        grad_output = grad_transposed.into_tensor()
         return [
             (
                 ancestor,
@@ -57,6 +57,9 @@ struct TransposeBackward[dtype: DType](Copyable & Movable):
                 AddTensor,
             )
         ]
+
+    fn __str__(self) -> String:
+        return "TransposeBackward"
 
 
 fn main():
