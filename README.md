@@ -56,6 +56,22 @@ t2.print()
 y = t * 2.0
 y.backward()
 t.grad[].print() or t.gprint()
+
+a = Tensor.arange(12, requires_grad=True)
+v1 = a.view([5, 2], offset=2)   # Slice starting from a[2]
+v2 = v1.view([2, 5])            # Reshape
+v3 = v2.view([10])              # Flatten
+
+v3.backward()
+expected = Tensor.ones(12)
+expected[0] = 0
+expected[1] = 0
+assert_true((a.grad[] == expected).all_true())
+v3.free()
+v2.free()
+v1.free()
+a.free()
+
 ```
 
 ---
