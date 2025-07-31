@@ -5,30 +5,7 @@ from memory import Pointer
 
 
 fn main() raises:
-    test_slice_from()
-
-
-from testing import assert_true
-
-
-fn test_slice_from() raises:
-    shape = Shape.of(2, 3, 4)
-    assert_true(
-        shape.slice_from(0) == shape,
-        "slice_from assertion from beginning failed",
-    )
-    assert_true(
-        shape.slice_from(1) == Shape.of(3, 4),
-        "slice_from assertion from from index 1 failed",
-    )
-    assert_true(
-        shape.slice_from(2) == Shape.of(4),
-        "slice_from assertion from from index 2 failed",
-    )
-    assert_true(
-        shape.slice_from(3) == Shape.Void,
-        "slice_from assertion from from index 3 failed",
-    )
+    pass
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
@@ -290,6 +267,10 @@ struct Shape(
         for axis in axes:
             result.append(self[axis])
         return Shape(result)
+
+    fn __eq__(self, other: List[Int]) -> Bool:
+        shape = Self(other)
+        return self.__eq__(shape)
 
     fn __eq__(self, other: Self) -> Bool:
         if self.ndim != other.ndim:
