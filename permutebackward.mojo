@@ -32,5 +32,5 @@ struct PermuteBackward[dtype: DType](Copyable & Movable):
         return [(parent, parent_grad, AddTensor)]
 
 
-fn main():
+fn main() raises:
     pass

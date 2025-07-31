@@ -320,7 +320,7 @@ struct Shape(
         if len(indices) != self.ndim:
             print(
                 (
-                    "Shape fltatten_index → shape mismatch len(indices) !="
+                    "Shape flatten_index → shape mismatch len(indices) !="
                     " self.ndim[self.rank() | len(self)"
                 ),
                 len(indices),
@@ -333,7 +333,7 @@ struct Shape(
             idx = indices[i]
             dim = self.axes_spans[i]
             if idx >= dim:
-                print("Shape fltatten_index → index >= dim span", idx, dim)
+                print("Shape flatten_index → index >= dim span", idx, dim)
                 return -1
             index += idx * stride
             stride *= dim

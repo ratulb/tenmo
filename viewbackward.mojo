@@ -25,20 +25,10 @@ struct ViewBackward[dtype: DType](Copyable & Movable):
         gradients = output.gradients()[]
         parent = output.ancestry().get(0)[]
         offset_delta = self.offset - parent.offset()
-        parent_grad = Tensor[dtype].zeros(parent.shape())
+        # parent_grad = Tensor[dtype].zeros(parent.shape())
 
-        _ = """parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
-
-        for child_indices in self.shape:
-            child_flat = (child_indices * self.strides.to_list()).sum()
-
-            parent_flat = child_flat + offset_delta
-
-            parent_grad[parent_flat] += gradients[child_indices]
-
-        return [(parent, parent_grad.reshape(parent.shape()), AddTensor)]"""
-
-        for child_indices in self.shape:
+        parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
+        _ = """for child_indices in self.shape:
             child_flat = (child_indices * self.strides.to_list()).sum()
 
             parent_flat = child_flat + offset_delta
@@ -51,7 +41,16 @@ struct ViewBackward[dtype: DType](Copyable & Movable):
                 parent_indices.append(dim_idx)
             parent_grad[parent_indices] += gradients[child_indices]
 
-        return [(parent, parent_grad, AddTensor)]
+            return [(parent, parent_grad, AddTensor)]"""
+
+        for child_indices in self.shape:
+            child_flat = (child_indices * self.strides.to_list()).sum()
+
+            parent_flat = child_flat + offset_delta
+
+            parent_grad[parent_flat] += gradients[child_indices]
+
+        return [(parent, parent_grad.reshape(parent.shape()), AddTensor)]
 
 
 fn main():

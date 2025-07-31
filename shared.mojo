@@ -2,6 +2,7 @@ from tensors import Tensor
 from shapes import Shape
 from views import TensorView
 from intlist import IntList
+from strides import Strides
 from backpropagation import BackwardFn
 from os import abort
 from ancestry import Ancestors
@@ -125,6 +126,15 @@ struct TensorLike[dtype: DType](
             return self.tensor_address[].shape
         else:
             return self.view_address[].base_tensor[].shape
+
+    fn strides(self) -> Strides:
+        return (
+            Strides.default(self.tensor_address[].shape) if self.kind
+            == 0 else self.view_address[].strides
+        )
+
+    fn offset(self) -> Int:
+        return 0 if self.kind == 0 else self.view_address[].offset
 
     fn shape(self) -> Shape:
         if self.kind == 0:

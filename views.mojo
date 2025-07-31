@@ -2,12 +2,13 @@ from tensors import Tensor
 from shapes import Shape
 from intlist import IntList
 from strides import Strides
-from os import abort
 from shared import TensorLike
-from ancestry import Ancestors
-from memory import memcpy, memset_zero
-from walkback import BackwardFn, MatmulBackward, ViewBackward
+from walkback import BackwardFn, MatmulBackward, ViewBackward, PermuteBackward
 from operators import __tensor_op_tensor__
+from common_utils import Validator, log_debug
+from ancestry import Ancestors
+from os import abort
+from memory import memcpy, memset_zero
 
 
 struct TensorView[dtype: DType = DType.float32](
@@ -147,7 +148,7 @@ struct TensorView[dtype: DType = DType.float32](
                 + ")"
             )
         composite_offset = offset + self.offset
-            # (1) Compute bounds of parent view (`self`)
+        # (1) Compute bounds of parent view (`self`)
         parent_min = self.offset
         parent_max = self.offset
         for i in range(self.shape.rank()):
@@ -167,34 +168,47 @@ struct TensorView[dtype: DType = DType.float32](
             if stride >= 0:
                 new_max += (dim_size - 1) * stride  # increasing indices
             else:
-                new_min += (dim_size - 1) * stride  # decreasing indices (negative stride)
+                new_min += (
+                    dim_size - 1
+                ) * stride  # decreasing indices (negative stride)
 
         # (3) Ensure new view fits within parent view's bounds
         if new_min < parent_min or new_max > parent_max:
-            abort("TensorView → view: requested view exceeds parent view bounds!")
-        return TensorView[dtype](
+            abort(
+                "TensorView → view: requested view exceeds parent view bounds!"
+            )
+        requires_grad = self.requires_grad
+        out = TensorView[dtype](
             base_tensor=self.base_tensor,
             shape=shape,
             strides=strides,
             offset=composite_offset,
-            requires_grad=self.requires_grad,
+            requires_grad=requires_grad,
         )
+        if requires_grad:
+            backward_fn = ViewBackward[dtype](
+                shape, strides, composite_offset
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+        return out
 
-    fn is_contiguous(self) -> Bool:
-        # return self.offset == 0 and self.strides.is_contiguous(self.shape)
-        return self.strides.is_contiguous(self.shape)
+    fn is_contiguous(self, check_offset: Bool = False) -> Bool:
+        if check_offset and self.offset != 0:
+            return False
+        var expected_stride = 1
+        for i in reversed(range(len(self.shape))):
+            if self.strides[i] != expected_stride:
+                return False
+            expected_stride *= self.shape[i]
+        return True
 
     fn into_tensorlike(self) -> TensorLike[dtype]:
         return TensorLike[dtype](UnsafePointer(to=self))
 
     # Index calculation: flat offset into underlying tensor's data[]
     fn index_offset(self, indices: IntList) -> Int:
-        if not indices.len() == self.shape.rank():
-            abort("TensorView → index_offset → rank mismatch")
-    # Bounds check before computing flat offset
-        for i in range(indices.len()):
-            if indices[i] < 0 or indices[i] >= self.shape[i]:
-                abort("TensorView → index_offset → index out of bounds for view")
+        _ = Validator.validate_indices(indices, self.shape, "TensorView")
         var flat_idx = self.offset
         for i in range(indices.len()):
             flat_idx += indices[i] * self.strides[i]
@@ -297,6 +311,56 @@ struct TensorView[dtype: DType = DType.float32](
             out.add_ancestry(Self.Ancestor_of(self))
 
         return out
+
+    fn permute(self, axes: List[Int]) -> TensorView[dtype]:
+        return self.permute(IntList.new(axes))
+
+    fn permute(self, axes: IntList) -> TensorView[dtype]:
+        if len(axes) != self.shape.rank():
+            abort("TensorView → permute: number of axes must match tensor rank")
+
+        # Check for valid permutation
+        seen = IntList.with_capacity(len(axes))
+        for axis in axes:
+            if axis < 0 or axis >= self.shape.rank():
+                abort("TensorView → permute: invalid axis index")
+            if axis in seen:
+                abort("TensorView → permute: duplicate axis in permutation")
+            seen.append(axis)
+
+        seen.free()
+
+        # Create new shape and strides
+        new_shape = IntList.with_capacity(len(axes))
+        new_strides = IntList.with_capacity(len(axes))
+        for axis in axes:
+            new_shape.append(self.shape[axis])
+            new_strides.append(self.strides[axis])
+
+        # Return new view with same base but reordered axes
+        out = self.view(
+            shape=Shape(new_shape),
+            strides=Strides(new_strides),
+            offset=self.offset,  # Permute doesn't change offset
+        )
+        if self.requires_grad:
+            permutation = axes.copy()
+            backward_fn = PermuteBackward[dtype](permutation).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+
+        return out
+
+    fn free(owned self):
+        if self.has_grad():
+            for i in range(self.grad[].numels()):
+                (self.grad[].data + i).destroy_pointee()
+            self.grad.free()
+            log_debug("TensorView __del__ → freed grad(and pointees)")
+        self.shape.free()
+        self.strides.free()
+        self.ancestors.free()
+        _ = self^
 
     fn all_close(
         self,
@@ -432,46 +496,5 @@ struct TensorView[dtype: DType = DType.float32](
         return out
 
 
-fn main():
-    # a = Tensor.arange(16, requires_grad = True)
-    a = Tensor.d2(
-        [
-            [
-                0.0,
-                1.0,
-                2.0,
-                3.0,
-            ],
-            [
-                4.0,
-                5.0,
-                6.0,
-                7.0,
-            ],
-            [
-                8.0,
-                9.0,
-                10.0,
-                11.0,
-            ],
-            [
-                12.0,
-                13.0,
-                14.0,
-                15.0,
-            ],
-        ],
-        requires_grad=True,
-    )
-    v1 = a.view([2, 2], [4, 1], offset=5)
-    v1.print()
-    v2 = v1.view([2, 2], [2, 1], 0)
-    v2.print()
-    print(v2[3, 3])
-    _ = a
-    x, y = 10, 100
-    print(x, y)
-    x, y = y, x
-
-    print(x, y)
-
+fn main() raises:
+    pass

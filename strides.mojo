@@ -4,7 +4,9 @@ from os import abort
 
 
 fn main():
-    pass
+    strides = Strides([1, 2, 3])
+    for i in strides.to_list().__reversed__():
+        print(i)
 
 
 @register_passable
@@ -134,3 +136,7 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
                     abort("broadcast_to: incompatible shape")
 
         return Strides(result)
+
+    fn free(owned self):
+        """Free strides IntList."""
+        self.strides.free()

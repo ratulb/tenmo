@@ -112,11 +112,19 @@ struct Tensor[dtype: DType = DType.float32](
             requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
         if self.requires_grad:
-            backward_fn = ViewBackward[dtype](shape, strides, 0).into_backward_fn()
+            backward_fn = ViewBackward[dtype](
+                shape, strides, 0
+            ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
 
         return out
+
+    fn permute(self, axes: IntList) -> TensorView[dtype]:
+        return self.into_view().permute(axes)
+
+    fn permute(self, axes: List[Int]) -> TensorView[dtype]:
+        return self.into_view().permute(axes)
 
     fn __init__(out self, shape: Shape, requires_grad: Bool = False):
         Shape.validate(shape)
@@ -1535,7 +1543,9 @@ struct Tensor[dtype: DType = DType.float32](
             requires_grad=_requires_grad,
         )
         if self.requires_grad:
-            backward_fn = ViewBackward[dtype](shape, strides, offset).into_backward_fn()
+            backward_fn = ViewBackward[dtype](
+                shape, strides, offset
+            ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
 
@@ -1657,9 +1667,4 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    a = Tensor.arange(12, requires_grad=True)
-    v1 = a.view([2, 4], offset=4)
-    v2 = v1.view([4, 2])
-    v2.backward()
-    _ =v1
-    a.gprint()
+    pass

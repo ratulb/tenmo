@@ -15,11 +15,13 @@ from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
 from transposebackward import TBackward, TransposeBackward
 from matmulbackward import MatmulBackward
 from viewbackward import ViewBackward
+from permutebackward import PermuteBackward
 
 alias Delegate[dtype: DType] = Variant[
     MatmulBackward[dtype],
     ReshapeBackward[dtype],
     ViewBackward[dtype],
+    PermuteBackward[dtype],
     SumBackward[dtype],
     MeanBackward[dtype],
     AddBackward[dtype],
@@ -62,6 +64,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         if self.grad_fn.isa[ViewBackward[dtype]]():
             return self.grad_fn[ViewBackward[dtype]].backward[dtype](out_ptr)
+
+        if self.grad_fn.isa[PermuteBackward[dtype]]():
+            return self.grad_fn[PermuteBackward[dtype]].backward[dtype](out_ptr)
 
         elif self.grad_fn.isa[SumBackward[dtype]]():
             return self.grad_fn[SumBackward[dtype]].backward[dtype](out_ptr)
