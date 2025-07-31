@@ -118,6 +118,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.grad_fn.isa[TBackward[dtype]]():
             return self.grad_fn[TBackward[dtype]].backward[dtype](out_ptr)
 
+        elif self.grad_fn.isa[TransposeBackward[dtype]]():
+            return self.grad_fn[TransposeBackward[dtype]].backward[dtype](out_ptr)
+
         elif self.grad_fn.isa[
             BroadcastBackward[dtype, AddTensor, AddTensor, False]
         ]():

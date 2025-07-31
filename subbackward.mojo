@@ -5,7 +5,7 @@ from shared import TensorLike
 from backpropagation import Delegate, BackwardFn
 
 
-struct SubBackward[dtype: DType](Copyable & Movable):
+struct SubBackward[dtype: DType](Copyable & Movable & Stringable):
     var signs: IntList
 
     fn __init__(out self):
@@ -48,9 +48,13 @@ struct SubBackward[dtype: DType](Copyable & Movable):
             )
         return grad_outputs
 
+    fn __str__(self) -> String:
+        return "SubBackward"
+
+
 
 @fieldwise_init
-struct SubLeftRightBackwardScalar[dtype: DType](Copyable & Movable):
+struct SubLeftRightBackwardScalar[dtype: DType](Copyable & Movable & Stringable):
     var negate: Bool
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
@@ -68,6 +72,8 @@ struct SubLeftRightBackwardScalar[dtype: DType](Copyable & Movable):
             (ancestor, gradients, SubtractTensor if self.negate else AddTensor)
         ]
 
+    fn __str__(self) -> String:
+        return "SubLeftRightBackwardScalar"
 
 fn main():
     print("passes")

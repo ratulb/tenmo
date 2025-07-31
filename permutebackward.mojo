@@ -6,7 +6,7 @@ from intlist import IntList
 
 
 @fieldwise_init
-struct PermuteBackward[dtype: DType](Copyable & Movable):
+struct PermuteBackward[dtype: DType](Copyable & Movable & Stringable):
     var permutation: IntList  # forward permutation used
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
@@ -31,6 +31,8 @@ struct PermuteBackward[dtype: DType](Copyable & Movable):
 
         return [(parent, parent_grad, AddTensor)]
 
+    fn __str__(self) -> String:
+        return "PermuteBackward"
 
 fn main() raises:
     pass

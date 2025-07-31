@@ -13,7 +13,7 @@ from operators import (
 
 
 @fieldwise_init
-struct ExponientionBackward[dtype: DType](Copyable & Movable):
+struct ExponientionBackward[dtype: DType](Copyable & Movable & Stringable):
     var exponent: Scalar[dtype]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
@@ -48,6 +48,8 @@ struct ExponientionBackward[dtype: DType](Copyable & Movable):
             )
         ]
 
+    fn __str__(self) -> String:
+        return "AddBackward"
 
 fn main():
     pass

@@ -1628,6 +1628,15 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn transpose(
+        self, *axes: Int, requires_grad: Optional[Bool] = None
+    ) -> TensorView[dtype]:
+        _axes = IntList.with_capacity(len(axes))
+        for each in axes:
+            _axes.append(each)
+        return self.transpose(_axes, requires_grad)
+
+
+    fn transpose(
         self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
     ) -> TensorView[dtype]:
         return self.transpose(IntList.new(axes))
@@ -1667,4 +1676,65 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
+    test_backward_through_nested_views()
+
+from testing import assert_true
+
+fn test_backward_through_nested_views() raises:
+    # Test 1: Simple 2D transpose
+    x = Tensor.rand(2, 3, requires_grad = True)
+    y = x.permute([1, 0])
+    yt = y.into_tensor()
+    loss = yt.sum()
+
+    loss.backward()
+    assert_true(x.grad[].shape == [2, 3])
+    loss.free()
+    yt.free()
+    y.free()
+    x.free()
+
+    # Test 2: 3D permutation
+    x = Tensor.rand(4, 5, 6, requires_grad = True)
+    y = x.permute([2, 0, 1])
+    yt = y.into_tensor()
+    loss = yt.sum()
+
+    loss.backward()
+    assert_true(x.grad[].shape == [4, 5, 6])
+    loss.free()
+    yt.free()
+    y.free()
+    x.free()
+
+
+    # Test 3: Identity permutation
+    x = Tensor.rand(3, 3, requires_grad = True)
+    y = x.permute([0, 1])
+    yt = y.into_tensor()
+    loss = yt.sum()
+
+    loss.backward()
+    assert_true(x.grad[].all_close(Tensor.ones(3, 3)))
+    loss.free()
+    yt.free()
+    y.free()
+    x.free()
+
+    # Test 4: Non-contiguous case
+    x = Tensor.rand(4, 4, requires_grad=True)
+    t = x.transpose(0, 1)
+    y = t.permute([1, 0])
+    yt = y.into_tensor()
+    loss = yt.sum()
+    loss.backward(42)
+    assert_true(Strides.default(x.grad[].shape) == Strides.default(x.shape))
+    x.gprint()
+    loss.free()
+    yt.free()
+    y.free()
+    t.free()
+    x.free()
+
+
+

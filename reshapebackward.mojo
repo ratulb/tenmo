@@ -5,7 +5,7 @@ from backpropagation import BackwardFn, Delegate
 
 
 @fieldwise_init
-struct ReshapeBackward[dtype: DType](Copyable & Movable):
+struct ReshapeBackward[dtype: DType](Copyable & Movable & Stringable):
     fn backward[
         dtype: DType
     ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
@@ -26,6 +26,8 @@ struct ReshapeBackward[dtype: DType](Copyable & Movable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
+    fn __str__(self) -> String:
+        return "ReshapeBackward"
 
 fn main():
     print("Yes")

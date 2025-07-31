@@ -5,7 +5,7 @@ from operators import AddTensor
 
 
 @fieldwise_init
-struct MatmulBackward[dtype: DType](Copyable & Movable):
+struct MatmulBackward[dtype: DType](Copyable & Movable & Stringable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
@@ -50,6 +50,8 @@ struct MatmulBackward[dtype: DType](Copyable & Movable):
 
         return grad_outputs
 
+    fn __str__(self) -> String:
+        return "MatmulBackward"
 
 fn main():
     pass

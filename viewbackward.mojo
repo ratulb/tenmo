@@ -8,7 +8,7 @@ from intlist import IntList
 
 
 @fieldwise_init
-struct ViewBackward[dtype: DType](Copyable & Movable):
+struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
     var shape: Shape
     var strides: Strides
     var offset: Int
@@ -52,6 +52,8 @@ struct ViewBackward[dtype: DType](Copyable & Movable):
 
         return [(parent, parent_grad.reshape(parent.shape()), AddTensor)]
 
+    fn __str__(self) -> String:
+        return "ViewBackward"
 
 fn main():
     pass

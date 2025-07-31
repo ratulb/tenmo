@@ -6,7 +6,7 @@ from backpropagation import Delegate, BackwardFn
 @fieldwise_init
 struct BroadcastBackward[
     dtype: DType, Tensor_Op_First: Int, Tensor_Op_Second: Int, Multiply: Bool
-](Copyable & Movable):
+](Copyable & Movable & Stringable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
@@ -48,6 +48,9 @@ struct BroadcastBackward[
                 )
             )
         return grad_outputs
+
+    fn __str__(self) -> String:
+        return "BroadcastBackward"
 
 
 fn main():

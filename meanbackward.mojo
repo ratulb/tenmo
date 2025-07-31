@@ -6,7 +6,7 @@ from shared import TensorLike
 from backpropagation import Delegate, BackwardFn
 
 
-struct MeanBackward[dtype: DType](Copyable & Movable):
+struct MeanBackward[dtype: DType](Copyable & Movable & Stringable):
     var axes: IntList
     var keepdims: Bool
 
@@ -76,6 +76,8 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
+    fn __str__(self) -> String:
+        return "MeanBackward"
 
 fn main():
     print("passes")

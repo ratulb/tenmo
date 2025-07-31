@@ -6,7 +6,7 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn
 
 
-struct SumBackward[dtype: DType](Copyable & Movable):
+struct SumBackward[dtype: DType](Copyable & Movable & Stringable):
     var axes: IntList
     var keepdims: Bool
 
@@ -73,6 +73,8 @@ struct SumBackward[dtype: DType](Copyable & Movable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
+    fn __str__(self) -> String:
+        return "SumBackward"
 
 fn main():
     print("passes")
