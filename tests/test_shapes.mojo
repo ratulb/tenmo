@@ -5,6 +5,26 @@ from shapes import Shape
 from testing import assert_true, assert_raises
 
 
+fn test_slice_from() raises:
+    shape = Shape.of(2, 3, 4)
+    assert_true(
+        shape.slice_from(0) == shape,
+        "slice_from assertion from beginning failed",
+    )
+    assert_true(
+        shape.slice_from(1) == Shape.of(3, 4),
+        "slice_from assertion from from index 1 failed",
+    )
+    assert_true(
+        shape.slice_from(2) == Shape.of(4),
+        "slice_from assertion from from index 2 failed",
+    )
+    assert_true(
+        shape.slice_from(3) == Shape.Void,
+        "slice_from assertion from from index 3 failed",
+    )
+
+
 fn test_reverse() raises:
     shape = Shape.of(1, 2, 3)
     assert_true(
@@ -210,6 +230,7 @@ fn test_zip_reversed() raises:
 
 
 fn main() raises:
+    test_slice_from()
     test_reverse()
     test_equivalence()
     test_empty_shape()
@@ -220,5 +241,3 @@ fn main() raises:
     test_shape_as_intlist()
     test_index_iter()
     test_zip_reversed()
-
-
