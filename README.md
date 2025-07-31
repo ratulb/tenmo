@@ -67,6 +67,8 @@ expected = Tensor.ones(12)
 expected[0] = 0
 expected[1] = 0
 assert_true((a.grad[] == expected).all_true())
+✅ Final a.grad
+a.grad = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 v3.free()
 v2.free()
 v1.free()
