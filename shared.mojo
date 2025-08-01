@@ -11,7 +11,8 @@ from operators import AddTensor, SubtractTensor, Noop
 
 
 fn main() raises:
-    pass
+    a = Tensor.arange(6 * 5 * 10).reshape(6, 5, 10)
+    a.print()
 
 
 struct TensorLike[dtype: DType](
@@ -184,9 +185,8 @@ struct TensorLike[dtype: DType](
             return
         current_dim = len(indices)
         indent = " " * (level * 2)
-        # Defensive check
+
         if current_dim >= self.rank():
-            # if current_dim > self.rank():
             print(
                 "ERROR: current_dim (",
                 current_dim,
@@ -198,7 +198,6 @@ struct TensorLike[dtype: DType](
 
         size = self.shape()[current_dim]
 
-        # Size sanity check
         if size < 0 or size > 1_000_000:
             print(
                 "ERROR: suspicious size: ",
@@ -216,52 +215,49 @@ struct TensorLike[dtype: DType](
             for i in range(size):
                 if i < num_first:
                     indices.append(i)
-                    print(
-                        self[indices],
-                        end=", " if (
-                            i != num_first - 1 or size > num_first + num_last
-                        ) else "",
-                    )
+                    print(self[indices], end="")
                     _ = indices.pop()
-                elif i == num_first:
-                    if size > num_first + num_last:
-                        print("..., ", end="")
+                    if i != size - 1:
+                        print(", ", end="")
+                elif i == num_first and size > num_first + num_last:
+                    print("..., ", end="")
                 elif i >= size - num_last:
                     indices.append(i)
-                    print(self[indices], end=", " if i != size - 1 else "")
+                    print(self[indices], end="")
                     _ = indices.pop()
-                else:
-                    # Handles middle region not explicitly caught
-                    continue
+                    if i != size - 1:
+                        print(", ", end="")
 
-            print("]", end="\n")
+            print("]", end="")
 
         else:
             print(indent + "[")
             for i in range(size):
                 if i < num_first:
                     indices.append(i)
-                    self.print_tensor_recursive(indices, level + 1)
+                    self.print_tensor_recursive(
+                        indices, level + 1, num_first, num_last
+                    )
                     _ = indices.pop()
-                    if i != num_first - 1 or size > num_first + num_last:
-                        print(",")
-                elif i == num_first:
-                    if size > num_first + num_last:
-                        print(indent + "  ...,")
+                elif i == num_first and size > num_first + num_last:
+                    print(indent + "  ...,")
                 elif i >= size - num_last:
                     indices.append(i)
-                    self.print_tensor_recursive(indices, level + 1)
+                    self.print_tensor_recursive(
+                        indices, level + 1, num_first, num_last
+                    )
                     _ = indices.pop()
-                    if i != size - 1:
-                        print(",")
-                else:
-                    # This path was previously missing, which caused silent looping!
-                    continue
 
-                print(indent + "]", end="\n")
-                # print("\n")
+                # Print comma and newline for all but last element
+                if i != size - 1 and (i < num_first or i >= size - num_last):
+                    print(",")
+                # Special case: last element needs newline before closing bracket
+                elif i == size - 1:
+                    print()  # Newline before closing bracket
 
-    fn print(self, num_first: Int = 10, num_last: Int = 10):
+            print(indent + "]", end="")
+
+    fn print(self, num_first: Int = 5, num_last: Int = 1):
         print(
             self.__str__(),
             end="\n",
