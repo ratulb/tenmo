@@ -130,7 +130,7 @@ struct TensorLike[dtype: DType](
 
     fn strides(self) -> Strides:
         return (
-            Strides.default(self.tensor_address[].shape) if self.kind
+            self.tensor_address[].strides if self.kind
             == 0 else self.view_address[].strides
         )
 
