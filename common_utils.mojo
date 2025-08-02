@@ -89,6 +89,19 @@ fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int]:
     return create_variadic_list(m, n)
 
 
+struct Slicer:
+    @staticmethod
+    fn slice(
+        slice: Slice, end: Int, start: Int = 0, step: Int = 1
+    ) -> (Int, Int, Int):
+        _start, _end, _step = (
+            slice.start.or_else(start),
+            slice.end.or_else(end),
+            slice.step.or_else(step),
+        )
+        return _start, _end, _step
+
+
 struct Validator:
     @staticmethod
     fn validate_dtype_consistency(
@@ -227,7 +240,4 @@ struct Validator:
 
 
 fn main() raises:
-    indices = IntList(1)
-    shape = Shape.of(1, 2)
-    #_= Validator.validate_indices(indices, shape, "Tensor")
-    _= Validator.validate_indices(indices, shape)
+    pass
