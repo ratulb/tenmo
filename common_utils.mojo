@@ -5,6 +5,7 @@ from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
 from os import abort
+from utils import Variant
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -87,6 +88,28 @@ fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int]:
     if n == -1:
         return create_variadic_list(m)
     return create_variadic_list(m, n)
+
+
+@fieldwise_init
+struct NewAxis(Copyable & Movable):  # Empty struct as a sentinel
+    pass
+
+
+alias Idx = Variant[Int, Slice, NewAxis]
+
+alias newaxis = Idx(NewAxis())
+
+
+fn i(value: Int) -> Idx:
+    return Idx(value)
+
+
+fn s() -> Idx:
+    return s(None, None, None)
+
+
+fn s(start: Optional[Int], end: Optional[Int], step: Optional[Int]) -> Idx:
+    return Idx(slice(start, end, step))
 
 
 struct Slicer:

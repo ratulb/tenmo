@@ -302,9 +302,10 @@ struct Shape(
             print(
                 (
                     "Shape flatten_index → shape mismatch len(indices) !="
-                    " self.ndim[self.rank() | len(self)"
+                    " self.ndim -> "
                 ),
                 len(indices),
+                "<=>",
                 self.ndim,
             )
             return -1

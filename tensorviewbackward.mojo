@@ -8,10 +8,9 @@ from intlist import IntList
 
 
 @fieldwise_init
-struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
+struct TensorViewBackward[dtype: DType](Copyable & Movable & Stringable):
     var shape: Shape
     var strides: Strides
-    var offset: Int
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -24,9 +23,12 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
         output = out_ptr[]
         gradients = output.gradients()[]
         parent = output.ancestry().get(0)[]
-        offset_delta = self.offset - parent.offset()
-        parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
-        _ = """for child_indices in self.shape:
+        parent_shape = parent.shape()
+
+        parent_grad = Tensor[dtype].zeros(parent_shape.num_elements())
+        _="""parent_grad = Tensor[dtype].zeros(parent.shape())
+        offset_delta = self.offset(???)  - parent.offset()
+        for child_indices in self.shape:
             child_flat = (child_indices * self.strides.to_list()).sum()
 
             parent_flat = child_flat + offset_delta
@@ -40,17 +42,16 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
             parent_grad[parent_indices] += gradients[child_indices]
 
             return [(parent, parent_grad, AddTensor)]"""
-        parent_shape = parent.shape()
 
         for child_indices in self.shape:
             child_flat = (child_indices * self.strides.to_list()).sum()
-            parent_flat = child_flat + offset_delta
+            parent_flat = child_flat
             parent_grad[parent_flat] += gradients[child_indices]
         reshaped = parent_grad.reshape(parent_shape)
         return [(parent, reshaped, AddTensor)]
 
     fn __str__(self) -> String:
-        return "ViewBackward"
+        return "TensorViewBackward"
 
 fn main():
     pass

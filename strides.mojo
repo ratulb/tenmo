@@ -4,14 +4,16 @@ from os import abort
 
 
 fn main():
-    strides = Strides([1, 2, 3])
+    strides = Strides([])
     for i in strides.to_list().__reversed__():
         print(i)
+    print(Strides.Zero)
 
 
 @register_passable
 struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     var strides: IntList
+    alias Zero = Self(IntList.Empty)
 
     fn __init__(out self, values: List[Int]):
         self.strides = IntList.new(values)

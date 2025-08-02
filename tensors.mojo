@@ -14,7 +14,18 @@ from ancestry import Ancestors
 from views import TensorView
 from strides import Strides
 from shared import TensorLike
-from common_utils import Validator, log_debug, variadic1or2
+from common_utils import (
+    Validator,
+    panic,
+    log_debug,
+    variadic1or2,
+    Slicer,
+    i,
+    s,
+    newaxis,
+    Idx,
+    NewAxis,
+)
 from operators import (
     __tensor_op_tensor__,
     AddTensor,
@@ -54,6 +65,7 @@ struct Tensor[dtype: DType = DType.float32](
     alias Blocks = List[Self.Block]
     alias Ancestor_of = TensorLike.from_tensor
     var shape: Shape
+    var strides: Strides
     var data: UnsafePointer[Scalar[dtype]]
     var requires_grad: Bool
     var grad: UnsafePointer[Self]
@@ -82,6 +94,7 @@ struct Tensor[dtype: DType = DType.float32](
     ):
         Shape.validate(shape)
         self.shape = shape
+        self.strides = Strides.default(shape)
         self.requires_grad = requires_grad
         self.backwardFn = None
         self.grad = UnsafePointer[Self]()
@@ -103,11 +116,11 @@ struct Tensor[dtype: DType = DType.float32](
         self, requires_grad: Optional[Bool] = None
     ) -> TensorView[dtype]:
         shape = self.shape
-        strides = Strides.default(shape)
+        strides = self.strides
         out = TensorView(
             UnsafePointer(to=self),
-            shape,
-            Strides.default(self.shape),
+            self.shape,
+            self.strides,
             offset=0,
             requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
@@ -121,14 +134,19 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn permute(self, axes: IntList) -> TensorView[dtype]:
-        return self.into_view().permute(axes)
+        view = self.into_view()
+        permutated = view.permute(axes)
+        return permutated
 
     fn permute(self, axes: List[Int]) -> TensorView[dtype]:
-        return self.into_view().permute(axes)
+        view = self.into_view()
+        permutated = view.permute(axes)
+        return permutated
 
     fn __init__(out self, shape: Shape, requires_grad: Bool = False):
         Shape.validate(shape)
         self.shape = shape
+        self.strides = Strides.default(shape)
         self.requires_grad = requires_grad
         self.base = UnsafePointer[Tensor[dtype]]()
         self.backwardFn = None
@@ -170,7 +188,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         index = self.shape.flatten_index(indices)
         if index == -1:
-            abort("__getitem__(*indices): Invalid indices")
+            abort("Tensor →__getitem__(*indices): Invalid indices")
         return self.data.load[volatile=True](index)
 
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
@@ -203,7 +221,166 @@ struct Tensor[dtype: DType = DType.float32](
             )
         return self[0] if self.shape == Shape.Unit else self[IntList.Empty]
 
-    fn __getitem__(self, indices: List[Int]) -> TensorView[dtype]:
+    fn __getitem__(self, *slices: Slice) -> TensorView[dtype]:
+        rank = self.shape.rank()
+        if not len(slices) == rank:
+            abort("Number of slices must match tensor rank")
+
+        new_shape = IntList.with_capacity(rank)
+        new_strides = IntList.with_capacity(rank)
+        new_offset = 0
+        strides = Strides.default(self.shape)
+
+        for i in range(rank):
+            axis = self.shape[i]
+            stride = strides[i]
+
+            start, end, step = Slicer.slice(slices[i], axis)
+            # Negative index adjustment
+            if start < 0:
+                start += axis
+            if end < 0:
+                end += axis
+
+            # Clamp to bounds
+            start = max(0, min(start, axis))
+            end = max(0, min(end, axis))
+
+            # Calculate length
+            span = end - start
+            length = (span + (step - 1)) // step  # ceil division
+
+            new_shape.append(length)
+            new_strides.append(stride * step)
+
+            new_offset += start * stride
+        view_shape = Shape(new_shape)
+        view_strides = Strides(new_strides)
+        out = TensorView[dtype](
+            UnsafePointer(to=self),
+            shape=view_shape,
+            strides=view_strides,
+            offset=new_offset,
+            requires_grad=self.requires_grad,
+        )
+        if self.requires_grad:
+            backward_fn = ViewBackward[dtype](
+                view_shape, view_strides, new_offset
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+
+        return out
+
+    fn __getitem__(self, *indices: Idx) -> TensorView[dtype]:
+        var required_rank = 0
+        for idx in indices:
+            if not idx.isa[NewAxis]():  # Only count non-newaxis indices
+                required_rank += 1
+        rank = self.shape.rank()
+        count = len(indices)
+        if required_rank != rank:
+            panic(
+                "Tensor →__getitem__(*indices: Idx): axes count(",
+                String(rank),
+                ") and non-newaxis indices len(",
+                String(required_rank),
+                ") does not match",
+            )
+        var view_shape = IntList.with_capacity(rank)
+        var view_strides = IntList.with_capacity(rank)
+        var view_offset = 0
+        var dim_counter = 0  # Tracks original tensor dimensions
+
+        for i in range(count):
+            idx = indices[i]
+
+            # Case 1: NewAxis (add dimension)
+            if idx.isa[NewAxis]():
+                view_shape.append(1)  # Insert size-1 axis
+                view_strides.append(0)  # Broadcastable stride
+
+            else:
+                # Process Int/Slice against original tensor's dim_counter-th dimension
+                shape_dim = self.shape[dim_counter]
+                stride_dim = self.strides[dim_counter]
+                dim_counter += 1
+                if idx.isa[Int]():
+                    axis = idx[Int]
+                    if axis < 0:
+                        axis += shape_dim  # Handle negative indices
+                    if not 0 <= axis < shape_dim:
+                        panic(
+                            (
+                                "Tensor →__getitem__(*indices: Idx): index out"
+                                " of bounds. Axis("
+                            ),
+                            String(axis),
+                            ") and tensor axis(",
+                            String(shape_dim),
+                            ")",
+                        )
+                    view_offset += axis * stride_dim
+                    # Do NOT append to shape/strides (reduces rank)
+
+                # Case 3: Slice (subview)
+                elif idx.isa[Slice]():
+                    s = idx[Slice]
+                    start, end, step = Slicer.slice(s, shape_dim)
+                    if step == 0:
+                        panic(
+                            "Tensor →__getitem__(*indices: Idx): slice step"
+                            " cannot be zero"
+                        )
+                    if step > 0:
+                        if not start < end:
+                            panic(
+                                "Tensor →__getitem__(*indices: Idx): invalid"
+                                " slice range"
+                            )
+                    else:
+                        if not start > end:
+                            panic(
+                                "Tensor →__getitem__(*indices: Idx): invalid"
+                                " negative slice range"
+                            )
+                    view_shape.append((end - start + step - 1) // step)
+                    view_strides.append(stride_dim * step)
+                    view_offset += start * stride_dim
+
+        var out: TensorView[dtype]
+        # Rank-0 (scalar) case -> return as rank-0 TensorView
+        if len(view_shape) == 0:
+            out = TensorView[dtype](
+                UnsafePointer(to=self),
+                shape=Shape.Void,
+                strides=Strides.Zero,
+                offset=view_offset,
+                requires_grad=self.requires_grad,
+            )
+        else:
+            out = TensorView[dtype](
+                UnsafePointer(to=self),
+                shape=Shape(view_shape),
+                strides=Strides(view_strides),
+                offset=view_offset,
+                requires_grad=self.requires_grad,
+            )
+        if self.requires_grad:
+            backward_fn = (
+                ViewBackward[dtype](
+                    Shape(view_shape), Strides(view_strides), view_offset
+                ).into_backward_fn() if len(view_shape)
+                != 0 else ViewBackward[dtype](
+                    Shape.Void, Strides.Zero, view_offset
+                ).into_backward_fn()
+            )
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+
+        return out
+
+        _ = """fn __getitem__(self, indices: List[Int]) -> TensorView[dtype]:
         rank = self.shape.rank()
         index_len = len(indices)
 
@@ -248,10 +425,11 @@ struct Tensor[dtype: DType = DType.float32](
             strides=new_strides,
             offset=offset,
             requires_grad=self.requires_grad,
-        )
+        )"""
 
     fn __moveinit__(out self, owned other: Self):
         self.shape = other.shape
+        self.strides = other.strides
         self.data = UnsafePointer[Scalar[other.dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
@@ -262,6 +440,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
+        self.strides = other.strides
         self.data = UnsafePointer[Scalar[other.dtype]].alloc(other.numels())
         memcpy(self.data, other.data, other.numels())
         self.requires_grad = other.requires_grad
@@ -1527,9 +1706,7 @@ struct Tensor[dtype: DType = DType.float32](
                 + "and self.numels() => "
                 + String(self.numels())
             )
-        _requires_grad = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
+        # _requires_grad = requires_grad.value() if requires_grad else self.requires_grad
         if shape == self.shape and offset == 0:  # Tensor offset is always 0
             return self.into_view(requires_grad=requires_grad)
         if shape.num_elements() + offset > self.numels():
@@ -1540,7 +1717,7 @@ struct Tensor[dtype: DType = DType.float32](
             shape,
             strides,
             offset=offset,
-            requires_grad=_requires_grad,
+            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
         if self.requires_grad:
             backward_fn = ViewBackward[dtype](
@@ -1635,7 +1812,6 @@ struct Tensor[dtype: DType = DType.float32](
             _axes.append(each)
         return self.transpose(_axes, requires_grad)
 
-
     fn transpose(
         self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
     ) -> TensorView[dtype]:
@@ -1655,7 +1831,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         # Permute shape and create default strides and permute
         var new_shape = self.shape.permute(normalized_axes)
-        var new_strides = Strides.default(self.shape).permute(normalized_axes)
+        var new_strides = self.strides.permute(normalized_axes)
         out = self.view(
             new_shape,
             new_strides,
@@ -1676,65 +1852,34 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    test_backward_through_nested_views()
+    # test_scalar_view()
+    x = Tensor([1, 2, 3], requires_grad=True)  # Shape (3,)
+    x.print()
+
+    # Add new axis (shape becomes (3, 1))
+    y = x[s(), newaxis]
+    #y = x[s()]
+    y.print()
+    a = y.into_tensor()
+    b = a * 2
+    b.backward()
+    x.gprint()
+    b.free()
+    a.free()
+    y.free()
+    x.free()
+    # Mixed indexing (shape becomes (1,))
+    # z = x[newaxis]  # Note: No `i()` if using direct Int
+    # z.print()
+
 
 from testing import assert_true
 
-fn test_backward_through_nested_views() raises:
-    # Test 1: Simple 2D transpose
-    x = Tensor.rand(2, 3, requires_grad = True)
-    y = x.permute([1, 0])
-    yt = y.into_tensor()
-    loss = yt.sum()
 
-    loss.backward()
-    assert_true(x.grad[].shape == [2, 3])
-    loss.free()
-    yt.free()
-    y.free()
-    x.free()
-
-    # Test 2: 3D permutation
-    x = Tensor.rand(4, 5, 6, requires_grad = True)
-    y = x.permute([2, 0, 1])
-    yt = y.into_tensor()
-    loss = yt.sum()
-
-    loss.backward()
-    assert_true(x.grad[].shape == [4, 5, 6])
-    loss.free()
-    yt.free()
-    y.free()
-    x.free()
-
-
-    # Test 3: Identity permutation
-    x = Tensor.rand(3, 3, requires_grad = True)
-    y = x.permute([0, 1])
-    yt = y.into_tensor()
-    loss = yt.sum()
-
-    loss.backward()
-    assert_true(x.grad[].all_close(Tensor.ones(3, 3)))
-    loss.free()
-    yt.free()
-    y.free()
-    x.free()
-
-    # Test 4: Non-contiguous case
-    x = Tensor.rand(4, 4, requires_grad=True)
-    t = x.transpose(0, 1)
-    y = t.permute([1, 0])
-    yt = y.into_tensor()
-    loss = yt.sum()
-    loss.backward(42)
-    assert_true(Strides.default(x.grad[].shape) == Strides.default(x.shape))
-    x.gprint()
-    loss.free()
-    yt.free()
-    y.free()
-    t.free()
-    x.free()
-
-
-
+fn test_scalar_view() raises:
+    a = Tensor.scalar(10, requires_grad=True)
+    v = a.into_view()
+    t = v.into_tensor()
+    s = t * 2
+    s.backward(42)
+    assert_true(a.grad[].item() == 84, "Scalar view grad assertion failed")

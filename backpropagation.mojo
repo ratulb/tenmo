@@ -16,11 +16,13 @@ from transposebackward import TBackward, TransposeBackward
 from matmulbackward import MatmulBackward
 from viewbackward import ViewBackward
 from permutebackward import PermuteBackward
+from tensorviewbackward import TensorViewBackward
 
 alias Delegate[dtype: DType] = Variant[
     MatmulBackward[dtype],
     ReshapeBackward[dtype],
     ViewBackward[dtype],
+    TensorViewBackward[dtype],
     PermuteBackward[dtype],
     SumBackward[dtype],
     MeanBackward[dtype],
@@ -64,6 +66,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         if self.grad_fn.isa[ViewBackward[dtype]]():
             return self.grad_fn[ViewBackward[dtype]].backward[dtype](out_ptr)
+
+        if self.grad_fn.isa[TensorViewBackward[dtype]]():
+            return self.grad_fn[TensorViewBackward[dtype]].backward[dtype](out_ptr)
 
         if self.grad_fn.isa[PermuteBackward[dtype]]():
             return self.grad_fn[PermuteBackward[dtype]].backward[dtype](out_ptr)

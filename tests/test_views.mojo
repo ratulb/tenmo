@@ -6,6 +6,13 @@ from testing import assert_true, assert_false, assert_raises, assert_equal
 
 
 fn main() raises:
+    test_nested_views_grad_propagation()
+    test_reshape_slice_sum_backward()
+    test_backward_through_nested_views_non_contiguous()
+    test_identity_permutation()
+    test_backward_through_nested_views()
+
+
     test_permute_backward()
     test_tensor_permute_flatten_backprop()
 
@@ -525,3 +532,159 @@ fn test_into_tensor_nested_view() raises:
     var v2 = v1.slice(1, 3)          # [30, 40]
     var out = v2.into_tensor()
     assert_true(out.all_close(Tensor.d1([30, 40])))"""
+
+
+
+
+fn test_backward_through_nested_views_non_contiguous() raises:
+    print("test_backward_through_nested_views_non_contiguous")
+    x4 = Tensor.rand(4, 4, requires_grad=True)
+    t4 = x4.transpose(0, 1)
+    y4 = t4.permute([1, 0])
+    yt4 = y4.into_tensor()
+    loss4 = yt4.sum()
+    loss4.backward(42)
+    assert_true(Strides.default(x4.grad[].shape) == Strides.default(x4.shape))
+    loss4.free()
+    yt4.free()
+    y4.free()
+    t4.free()
+    x4.free()
+
+fn test_identity_permutation() raises:
+    print("test_identity_permutation")
+    x3 = Tensor.rand(3, 3, requires_grad=True)
+    v3 = x3.into_view()
+    y3 = v3.permute([0, 1])
+    yt3 = y3.into_tensor()
+    loss3 = yt3.sum()
+    loss3.backward()
+    assert_true(x3.grad[].all_close(Tensor.ones(3, 3)))
+    loss3.free()
+    yt3.free()
+    y3.free()
+    x3.free()
+
+
+fn test_reshape_slice_sum_backward() raises:
+    print("test_reshape_slice_sum_backward")
+    a = Tensor.arange(15, requires_grad=True)
+    r = a.reshape(5, 3)
+    v = r[1:4:2, :]
+    tensor = v.into_tensor()
+    s = tensor.sum()
+    s.backward()
+    assert_true(
+        (
+            a.grad[]
+            == Tensor.d1(
+                [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                ]
+            ).float()
+        ).all_true()
+    )
+    s.free()
+    tensor.free()
+    v.free()
+    r.free()
+    a.free()
+
+
+fn test_backward_through_nested_views() raises:
+    print("test_backward_through_nested_views")
+    # Test 1: Simple 2D transpose
+    x1 = Tensor.rand(2, 3, requires_grad=True)
+    v1 = x1.into_view()
+    y1 = v1.permute([1, 0])
+    yt1 = y1.into_tensor()
+    loss1 = yt1.sum()
+
+    loss1.backward()
+    assert_true(x1.grad[].shape == [2, 3])
+    loss1.free()
+    yt1.free()
+    y1.free()
+    v1.free()
+    x1.free()
+    print("ok1")
+    # Test 2: 3D permutation
+    x2 = Tensor.rand(4, 5, 6, requires_grad=True)
+    v2 = x2.into_view()
+    y2 = v2.permute([2, 0, 1])
+    yt2 = y2.into_tensor()
+    loss2 = yt2.sum()
+
+    loss2.backward()
+    assert_true(x2.grad[].shape == [4, 5, 6])
+    loss2.free()
+    yt2.free()
+    y2.free()
+    v2.free()
+    x2.free()
+
+    print("ok2")
+
+fn test_nested_views_grad_propagation() raises:
+    print("test_nested_views_grad_propagation")
+
+    # Step 1: Create a base tensor
+    var A = Tensor.rand(4, 5, 6, requires_grad=True)
+
+    # Step 2: Reshape to 2D (simulate flattening last two dims)
+    var V1 = A.view([4, 30])  # shape: (4, 30)
+
+    # Step 3: Slice via view with offset (simulate slicing last 20 elements of each row)
+    var V2 = V1.view(
+        [4, 20], offset=10
+    )  # skips first 10 elements in flattened row
+
+    # Step 4: Reshape again into (8, 10)
+    var V3 = V2.view([8, 10])
+
+    var Y = V3.into_tensor()
+    # Step 5: Sum and backward
+    var LOSS = Y.sum()
+    LOSS.backward()
+
+    # Validate: only the correct region of x.grad should be non-zero
+    #A.grad[].print()
+    var zero_count = 0
+    var nonzero_count = 0
+    for i in range(4):
+        for j in range(5):
+            for k in range(6):
+                # Compute flat index in original (5, 6) → offset = j * 6 + k
+                var flat = i * 30 + j * 6 + k
+                if flat >= 10 and flat < 90:
+                    # These 20 values should have been touched
+                    assert_true(A.grad[][i, j, k] != 0.0)
+                    nonzero_count += 1
+                else:
+                    # Rest untouched
+                    assert_true(A.grad[][i, j, k] == 0.0)
+                    zero_count += 1
+
+    # Sanity: Expect 4 batches × 20 values = 80 nonzero
+    assert_true(nonzero_count == 80)
+    assert_true(zero_count == 4 * 30 - 80)
+
+    # Cleanup
+    LOSS.free()
+    Y.free()
+    V3.free()
+    V2.free()

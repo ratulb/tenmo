@@ -3,7 +3,7 @@ from shapes import Shape
 from intlist import IntList
 from strides import Strides
 from shared import TensorLike
-from walkback import BackwardFn, MatmulBackward, ViewBackward, PermuteBackward
+from walkback import BackwardFn, MatmulBackward, ViewBackward, PermuteBackward, TensorViewBackward
 from operators import __tensor_op_tensor__
 from common_utils import Validator, log_debug
 from ancestry import Ancestors
@@ -26,6 +26,7 @@ struct TensorView[dtype: DType = DType.float32](
     var grad: UnsafePointer[Tensor[dtype]]
     var ancestors: Ancestors[dtype]
     var backwardFn: Optional[BackwardFn[dtype]]
+    var contiguous: Bool
 
     fn __init__(
         out self,
@@ -43,8 +44,10 @@ struct TensorView[dtype: DType = DType.float32](
         self.grad = UnsafePointer[Tensor[dtype]]()
         self.ancestors = Ancestors[dtype].untracked()
         self.backwardFn = None
+        self.contiguous = False
+        self.contiguous = self.is_contiguous()
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, var other: Self):
         self.base_tensor = other.base_tensor
         self.shape = other.shape
         self.strides = other.strides
@@ -53,6 +56,7 @@ struct TensorView[dtype: DType = DType.float32](
         self.grad = other.grad
         self.ancestors = other.ancestors
         self.backwardFn = other.backwardFn
+        self.contiguous = other.contiguous
 
     fn __copyinit__(out self, other: Self):
         self.base_tensor = other.base_tensor
@@ -63,6 +67,8 @@ struct TensorView[dtype: DType = DType.float32](
         self.grad = other.grad
         self.ancestors = other.ancestors
         self.backwardFn = other.backwardFn
+        self.contiguous = other.contiguous
+
 
     fn zero_grad(self):
         if self.requires_grad and self.has_grad():
@@ -110,6 +116,11 @@ struct TensorView[dtype: DType = DType.float32](
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
         return out
+
+    fn view(self, shape: List[Int], offset: Int) -> TensorView[dtype]:
+        _shape = Shape(shape)
+        return self.view(_shape, Strides.default(_shape), offset)
+
 
     # Fully custom shape/strides/offset
     fn view(
@@ -193,9 +204,7 @@ struct TensorView[dtype: DType = DType.float32](
             out.add_ancestry(Self.Ancestor_of(self))
         return out
 
-    fn is_contiguous(self, check_offset: Bool = False) -> Bool:
-        if check_offset and self.offset != 0:
-            return False
+    fn is_contiguous(self) -> Bool:
         var expected_stride = 1
         for i in reversed(range(len(self.shape))):
             if self.strides[i] != expected_stride:
@@ -302,10 +311,8 @@ struct TensorView[dtype: DType = DType.float32](
                         else:
                             carry = False
         if self.requires_grad:
-            strides = self.strides
-            offset = self.offset
-            backward_fn = ViewBackward[dtype](
-                shape, strides, offset
+            backward_fn = TensorViewBackward[dtype](
+                shape, Strides.default(shape)
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
@@ -497,4 +504,24 @@ struct TensorView[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
+    test_slice_every_second_row_column1()
+
+from testing import assert_true
+
+fn test_slice_every_second_row_column1() raises:
+    print("test_slice_every_second_row_column1")
+    _="""var a = Tensor.arange(15, requires_grad=True)
+    var r = a.reshape(5, 3)
+    var v = r[::2, 1]  # Select col 1 of rows 0, 2, 4
+    var loss = v.sum()
+    loss.backward()
+    grad = a.grad[]
+    assert_true(grad.shape == a.shape)
+    assert_true(grad[1] == 1)  # r[0,1]
+    assert_true(grad[7] == 1)  # r[2,1]
+    assert_true(grad[13] == 1) # r[4,1]
+    assert_true(grad.sum() == 3)
+    loss.free()
+    r.free()
+    a.free()"""
+
