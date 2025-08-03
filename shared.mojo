@@ -8,11 +8,12 @@ from os import abort
 from ancestry import Ancestors
 from collections import Set
 from operators import AddTensor, SubtractTensor, Noop
+from common_utils import compute_output_shape
 
 
 fn main() raises:
     a = Tensor.arange(6 * 5 * 10).reshape(6, 5, 10)
-    a.print()
+    a.print(3, 3)
 
 
 struct TensorLike[dtype: DType](
@@ -293,6 +294,50 @@ struct TensorLike[dtype: DType](
         return len(self.tensor_address[]) if self.kind == 0 else len(
             self.view_address[]
         )
+
+    fn sum_all(self) -> Scalar[dtype]:
+        if self.kind == 0:
+            return self.tensor_address[].sum_all()
+        else:
+            return self.view_address[].sum_all()
+
+    fn sum(
+        self, normalized_axes: IntList, keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        """Compute sum along specified axes."""
+        shape = self.shape()
+        rank = shape.rank()
+
+        out_shape = compute_output_shape(shape, normalized_axes, keepdims)
+        out = Tensor[dtype].zeros(out_shape)
+
+        if out_shape == Shape.Void:
+            if rank == 0:  # Scalar case
+                out[IntList.Empty] = self[IntList.Empty]
+            elif rank == len(normalized_axes) and not keepdims:  # Reducing all
+                out[IntList.Empty] = self.sum_all()
+        else:
+            reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
+            for out_idx in out_shape:
+                var summ = Scalar[dtype](0)
+                for red_idx in reduced_shape:
+                    full_idx = out_idx.replace(
+                        normalized_axes, red_idx
+                    ) if keepdims else out_idx.insert(normalized_axes, red_idx)
+                    summ += self[full_idx]
+                out[out_idx] = summ
+
+        return out
+
+    fn mean(
+        self, normalized_axes: IntList, keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        shape = self.shape()
+        # Compute total count of elements being reduced
+        count = shape.axes_spans.select(normalized_axes).product()
+        # Perform sum and divide by count
+        out = self.sum(normalized_axes, keepdims) / Scalar[dtype](count)
+        return out
 
     # Note - matmul has not been optimized at all - once everything is place - revisit this
     fn matmul(self, other: Self) -> Tensor[dtype]:

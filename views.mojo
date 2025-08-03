@@ -9,9 +9,11 @@ from walkback import (
     ViewBackward,
     PermuteBackward,
     TensorViewBackward,
+    SumBackward,
+    MeanBackward,
 )
 from operators import __tensor_op_tensor__
-from common_utils import Validator, log_debug
+from common_utils import Validator, log_debug, compute_output_shape, i, s
 from ancestry import Ancestors
 from os import abort
 from memory import memcpy, memset_zero
@@ -126,8 +128,7 @@ struct TensorView[dtype: DType = DType.float32](
         return out
 
     fn view(self, shape: List[Int], offset: Int) -> TensorView[dtype]:
-        _shape = Shape(shape)
-        return self.view(_shape, Strides.default(_shape), offset)
+        return self.view(Shape(shape), Strides.default(Shape(shape)), offset)
 
     # Fully custom shape/strides/offset
     fn view(
@@ -229,6 +230,56 @@ struct TensorView[dtype: DType = DType.float32](
         for i in range(indices.len()):
             flat_idx += indices[i] * self.strides[i]
         return flat_idx
+
+    fn sum_all(self) -> Scalar[dtype]:
+        out = Scalar[dtype](0)
+        for indices in self.shape:
+            out += self[indices]
+        return out
+
+    fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
+        return self.sum(IntList.new(axes), keepdims)
+
+    fn sum(
+        self: Self,
+        axes: IntList,
+        keepdims: Bool = False,
+    ) -> Tensor[dtype]:
+        normalized_axes = Validator.validate_and_normalize_axes(
+            self.shape, axes
+        )
+        out = TensorLike.from_view(self).sum(normalized_axes, keepdims)
+        if self.requires_grad:
+            out.requires_grad = True
+            out.init_grad()
+            backward_fn = SumBackward[dtype](
+                normalized_axes.copy(), keepdims
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+
+        return out
+
+    fn mean(
+        self, axes: List[Int] = [], keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        return self.mean(IntList.new(axes), keepdims)
+
+    fn mean(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
+        normalized_axes = Validator.validate_and_normalize_axes(
+            self.shape, axes
+        )
+        out = TensorLike.from_view(self).mean(normalized_axes, keepdims)
+        if self.requires_grad:
+            out.requires_grad = True
+            out.init_grad()
+            backward_fn = MeanBackward[dtype](
+                normalized_axes.copy(), keepdims
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
+
+        return out
 
     # Element access
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
@@ -512,6 +563,10 @@ struct TensorView[dtype: DType = DType.float32](
 
 fn main() raises:
     test_slice_every_second_row_column1()
+    a = Tensor.arange(10)
+    v = a.view(Shape.of(5), offset=1)
+    r = v.sum_all()
+    print(r)
 
 
 from testing import assert_true
@@ -521,15 +576,20 @@ fn test_slice_every_second_row_column1() raises:
     print("test_slice_every_second_row_column1")
     var a = Tensor.arange(15, requires_grad=True)
     var r = a.reshape(5, 3)
-    var v = r[::2, 1]  # Select col 1 of rows 0, 2, 4
+    r.print()
+    var v = r[s(None, None, 2), i(1)]  # Select col 1 of rows 0, 2, 4
+    v.print()
     var loss = v.sum()
+    loss.print()
     loss.backward()
+    a.grad[].print()
     grad = a.grad[]
     assert_true(grad.shape == a.shape)
     assert_true(grad[1] == 1)  # r[0,1]
     assert_true(grad[7] == 1)  # r[2,1]
-    assert_true(grad[13] == 1) # r[4,1]
-    assert_true(grad.sum() == 3)
+    assert_true(grad[13] == 1)  # r[4,1]
+    assert_true(grad.sum().item() == 3)
     loss.free()
+    v.free()
     r.free()
     a.free()

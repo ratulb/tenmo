@@ -285,7 +285,7 @@ fn tensor_compare[
     return result
 
 
-fn sumup[dtype: DType, //](input: Tensor[dtype]) -> Scalar[dtype]:
+fn sum_all[dtype: DType, //](input: Tensor[dtype]) -> Scalar[dtype]:
     constrained[
         dtype.is_numeric(),
         "operators → sumup is for numeric data types only",

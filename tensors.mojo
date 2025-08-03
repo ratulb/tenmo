@@ -42,7 +42,7 @@ from operators import (
     Power,
     scalar_ops,
     Add,
-    sumup,
+    sum_all,
     tensor_compare,
     tensor_compare_scalar,
     Equal,
@@ -1340,6 +1340,9 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
+    fn sum_all(self) -> Scalar[dtype]:
+        return sum_all(self)
+
     fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
         return self.sum(IntList.new(axes), keepdims)
 
@@ -1347,36 +1350,14 @@ struct Tensor[dtype: DType = DType.float32](
         self: Self,
         axes: IntList,
         keepdims: Bool = False,
-        track_grad: Bool = True,
     ) -> Tensor[dtype]:
-        """Compute sum along specified axes."""
         normalized_axes = Validator.validate_and_normalize_axes(
             self.shape, axes
         )
-        requires_grad = self.requires_grad and track_grad
-        rank = self.shape.rank()
-
-        out_shape = compute_output_shape(self.shape, normalized_axes, keepdims)
-        out = Tensor[dtype].zeros(out_shape, requires_grad=requires_grad)
-
-        if out_shape == Shape.Void:
-            if rank == 0:  # Scalar case
-                out[IntList.Empty] = self[IntList.Empty]
-            elif rank == len(normalized_axes) and not keepdims:  # Reducing all
-                out[IntList.Empty] = sumup(self)
-        else:
-            reduced_shape = Shape(self.shape.axes_spans.select(normalized_axes))
-            for out_idx in out_shape:
-                var summ = Scalar[dtype](0)
-                for red_idx in reduced_shape:
-                    full_idx = out_idx.replace(
-                        normalized_axes, red_idx
-                    ) if keepdims else out_idx.insert(normalized_axes, red_idx)
-                    summ += self[full_idx]
-                out[out_idx] = summ
-
-        # Setup backward if needed
-        if requires_grad:
+        out = TensorLike.from_tensor(self).sum(normalized_axes, keepdims)
+        if self.requires_grad:
+            out.requires_grad = True
+            out.init_grad()
             backward_fn = SumBackward[dtype](
                 normalized_axes.copy(), keepdims
             ).into_backward_fn()
@@ -1394,14 +1375,7 @@ struct Tensor[dtype: DType = DType.float32](
         normalized_axes = Validator.validate_and_normalize_axes(
             self.shape, axes
         )
-        # Compute total count of elements being reduced
-        count = self.shape.axes_spans.select(normalized_axes).product()
-        # Perform sum and divide by count
-        out = self.sum(normalized_axes, keepdims, track_grad=False) / Scalar[
-            dtype
-        ](count)
-
-        # Gradient logic
+        out = TensorLike.from_tensor(self).mean(normalized_axes, keepdims)
         if self.requires_grad:
             out.requires_grad = True
             out.init_grad()
