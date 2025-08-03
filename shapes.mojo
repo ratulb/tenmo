@@ -314,8 +314,17 @@ struct Shape(
         for i in reversed(range(self.ndim)):
             idx = indices[i]
             dim = self.axes_spans[i]
-            if idx >= dim:
-                print("Shape flatten_index → index >= dim span", idx, dim)
+            if idx < 0:
+                idx += dim  # Negative index
+            if idx >= dim or idx < 0:  # Negative index
+                print(
+                    (
+                        "Shape flatten_index → invalid index >= dim span or"
+                        " negative: "
+                    ),
+                    idx,
+                    dim,
+                )
                 return -1
             index += idx * stride
             stride *= dim

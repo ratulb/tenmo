@@ -55,6 +55,14 @@ struct TensorLike[dtype: DType](
             == other.view_address
         )
 
+    fn equal(self, other: Self) -> Bool:
+        if self.shape() != other.shape():
+            return False
+        for indices in self.shape():
+            if self[indices] != other[indices]:
+                return False
+        return True
+
     fn __ne__(self, other: Self) -> Bool:
         return not self.__eq__(other)
 

@@ -327,6 +327,10 @@ struct Tensor[dtype: DType = DType.float32](
                 elif idx.isa[Slice]():
                     s = idx[Slice]
                     start, end, step = Slicer.slice(s, shape_dim)
+
+                    start = max(0, min(start, shape_dim))
+                    end = max(0, min(end, shape_dim))
+
                     if step == 0:
                         panic(
                             "Tensor →__getitem__(*indices: Idx): slice step"
@@ -664,6 +668,9 @@ struct Tensor[dtype: DType = DType.float32](
     fn __ge__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         return tensor_compare[GreaterThanEqual](self, other)
 
+    fn __eq__(self, other: TensorView[dtype]) -> Bool:
+        return TensorLike.from_tensor(self).equal(TensorLike.from_view(other))
+
     fn __iadd__(self, other: Self):
         if self.is_leaf():
             abort(
@@ -894,6 +901,12 @@ struct Tensor[dtype: DType = DType.float32](
         vectorize[mapper, simdwidthof[dtype]()](tensor.numels())
 
         return tensor
+
+    @staticmethod
+    fn zeros(
+        axes_spans: List[Int], requires_grad: Bool = False
+    ) -> Tensor[dtype]:
+        return Self.zeros(Shape(axes_spans), requires_grad)
 
     @staticmethod
     fn zeros(*axes_spans: Int, requires_grad: Bool = False) -> Tensor[dtype]:
@@ -1297,6 +1310,9 @@ struct Tensor[dtype: DType = DType.float32](
         if len(newdims) == 1 and newdims[0] == 0:
             return self.reshape()
         return self.reshape(Shape(newdims))
+
+    fn reshape(self, shape: List[Int]) -> Tensor[dtype]:
+        return self.reshape(Shape(shape))
 
     fn reshape(self, new_shape: Shape) -> Tensor[dtype]:
         if self.numels() != new_shape.num_elements():
@@ -1852,34 +1868,7 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    # test_scalar_view()
-    x = Tensor([1, 2, 3], requires_grad=True)  # Shape (3,)
-    x.print()
-
-    # Add new axis (shape becomes (3, 1))
-    y = x[s(), newaxis]
-    #y = x[s()]
-    y.print()
-    a = y.into_tensor()
-    b = a * 2
-    b.backward()
-    x.gprint()
-    b.free()
-    a.free()
-    y.free()
-    x.free()
-    # Mixed indexing (shape becomes (1,))
-    # z = x[newaxis]  # Note: No `i()` if using direct Int
-    # z.print()
+    pass
 
 
 from testing import assert_true
-
-
-fn test_scalar_view() raises:
-    a = Tensor.scalar(10, requires_grad=True)
-    v = a.into_view()
-    t = v.into_tensor()
-    s = t * 2
-    s.backward(42)
-    assert_true(a.grad[].item() == 84, "Scalar view grad assertion failed")

@@ -3,15 +3,23 @@ from shapes import Shape
 from strides import Strides
 from intlist import IntList
 from testing import assert_true, assert_false, assert_raises, assert_equal
+from common_utils import i, newaxis, s
 
 
 fn main() raises:
+    test_edge_case_indexing()
+    test_mixed_indexing()
+    test_newaxis_dimension_insertion()
+    test_basic_slicing()
+    test_newaxis()
+    test_scalar_view()
+    test_integer_indexing()
+
     test_nested_views_grad_propagation()
     test_reshape_slice_sum_backward()
     test_backward_through_nested_views_non_contiguous()
     test_identity_permutation()
     test_backward_through_nested_views()
-
 
     test_permute_backward()
     test_tensor_permute_flatten_backprop()
@@ -424,7 +432,7 @@ fn test_getitem_list_empty_indices_returns_full_view() raises:
     print("test_getitem_list_empty_indices_returns_full_view")
     a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     # v = a.__getitem__(List[Int]())
-    v = a[[]]
+    v = a[:, :]
     assert_true(v.shape == a.shape)
     assert_true(v.offset == 0)
     assert_true(v.all_close(a))
@@ -534,8 +542,6 @@ fn test_into_tensor_nested_view() raises:
     assert_true(out.all_close(Tensor.d1([30, 40])))"""
 
 
-
-
 fn test_backward_through_nested_views_non_contiguous() raises:
     print("test_backward_through_nested_views_non_contiguous")
     x4 = Tensor.rand(4, 4, requires_grad=True)
@@ -550,6 +556,7 @@ fn test_backward_through_nested_views_non_contiguous() raises:
     y4.free()
     t4.free()
     x4.free()
+
 
 fn test_identity_permutation() raises:
     print("test_identity_permutation")
@@ -639,6 +646,7 @@ fn test_backward_through_nested_views() raises:
 
     print("ok2")
 
+
 fn test_nested_views_grad_propagation() raises:
     print("test_nested_views_grad_propagation")
 
@@ -662,7 +670,7 @@ fn test_nested_views_grad_propagation() raises:
     LOSS.backward()
 
     # Validate: only the correct region of x.grad should be non-zero
-    #A.grad[].print()
+    # A.grad[].print()
     var zero_count = 0
     var nonzero_count = 0
     for i in range(4):
@@ -688,3 +696,150 @@ fn test_nested_views_grad_propagation() raises:
     Y.free()
     V3.free()
     V2.free()
+
+
+fn test_edge_case_indexing() raises:
+    print("test_edge_case_indexing")
+    var a = Tensor.arange(6).reshape([2, 3])
+
+    # Empty slice
+    var empty = a[0:1, :]
+    assert_true(empty.shape == [1, 3])
+
+    # Stop > dim size
+    # var oversized_slice = a[:, 0:100]
+    var oversized_slice = a[s(), s(None, 100, None)]
+
+    assert_true(oversized_slice == a)
+
+    a.free()
+
+
+fn test_mixed_indexing() raises:
+    print("test_mixed_indexing")
+    var a = Tensor.arange(12, requires_grad=True)
+    r = a.reshape([3, 4])
+
+    # Mixed int/slice/newaxis
+    var v = r[i(1), newaxis, s(0, 4, 2)]
+    assert_true(v.shape == [1, 2])
+    assert_true(v == Tensor.d2([[4, 6]]))
+
+    # Gradient check
+    z = v.into_tensor()
+    var s = z.sum()
+    s.backward()
+    var expected_grad = Tensor.zeros([3, 4])
+    expected_grad[1, 0] = 1.0
+    expected_grad[1, 2] = 1.0
+    assert_true((r.grad[] == expected_grad).all_true())
+    s.free()
+    z.free()
+    v.free()
+    a.free()
+
+
+fn test_newaxis_dimension_insertion() raises:
+    print("test_newaxis_dimension_insertion")
+    var a = Tensor([1, 2, 3], requires_grad=True)
+
+    # Insert at beginning
+    var v1 = a[newaxis, s()]
+    assert_true(v1.shape == [1, 3])
+    assert_true(v1 == Tensor.d2([[1, 2, 3]]))
+
+    # Insert at middle
+    var v2 = a[s(), newaxis]
+    assert_true(v2.shape == [3, 1])
+    assert_true(v2 == Tensor.d2([[1], [2], [3]]))
+
+    # Gradient check
+    b = v2.into_tensor()
+    var s = b.sum()
+    s.backward()
+    assert_true((a.grad[] == Tensor([1, 1, 1])).all_true())
+    s.free()
+    b.free()
+    v2.free()
+    v1.free()
+    a.free()
+
+
+fn test_basic_slicing() raises:
+    print("test_basic_slicing")
+    var a = Tensor.arange(6, requires_grad=True)
+
+    r = a.reshape([2, 3])
+
+    # Full slice
+    # var full_slice = r[s(), s()]
+    var full_slice = r[:, :]
+    assert_true(full_slice == r)
+
+    # Row slice
+    var row = r[1, s()]
+    assert_true(row == Tensor([3, 4, 5]))
+
+    # Column slice with step
+    var col_step = r[s(), s(0, 3, 2)]
+    expect = Tensor.d2([[0, 2], [3, 5]])
+    assert_true(col_step == Tensor.d2([[0, 2], [3, 5]]))
+
+    # Gradient check
+    var y = r[0:1, 1:3]
+    z = y.into_tensor()
+    s = z.sum()
+    s.backward()
+    var expected_grad = Tensor.d2([[0, 1, 1], [0, 0, 0]])
+    assert_true((r.grad[] == expected_grad).all_true())
+
+    s.free()
+    z.free()
+    y.free()
+    r.free()
+    a.free()
+
+
+fn test_integer_indexing() raises:
+    print("test_integer_indexing")
+    var a = Tensor.arange(6, requires_grad=True)
+    r = a.reshape(2, 3)
+
+    # Value checks
+    assert_true(r[1, 2] == 5)  # Last element
+    assert_true(r[-1, -1] == 5)  # Negative indices
+    assert_true(r[0, 0] == 0)  # First element
+
+    # Gradient check
+    var y = r[i(1), i(2)]
+    y.backward(42)
+    var expected_grad = Tensor.zeros(6)
+    expected_grad[5] = 42
+    assert_true((a.grad[] == expected_grad).all_true())
+
+    y.free()
+    r.free()
+    a.free()
+
+
+fn test_newaxis() raises:
+    x = Tensor([1, 2, 3], requires_grad=True)
+    equal = x.into_view()
+    y = x[newaxis, s(), newaxis]
+    a = y.into_tensor()
+    b = a * 2
+    b.backward()
+    assert_true((x.grad[] == Tensor([2, 2, 2])).all_true())
+    b.free()
+    a.free()
+    y.free()
+    x.free()
+
+
+fn test_scalar_view() raises:
+    a = Tensor.scalar(10, requires_grad=True)
+    v = a.into_view()
+    t = v.into_tensor()
+    s = t * 2
+    s.backward(42)
+    assert_true(a.grad[].item() == 84, "Scalar view grad assertion failed")

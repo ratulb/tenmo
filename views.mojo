@@ -3,7 +3,13 @@ from shapes import Shape
 from intlist import IntList
 from strides import Strides
 from shared import TensorLike
-from walkback import BackwardFn, MatmulBackward, ViewBackward, PermuteBackward, TensorViewBackward
+from walkback import (
+    BackwardFn,
+    MatmulBackward,
+    ViewBackward,
+    PermuteBackward,
+    TensorViewBackward,
+)
 from operators import __tensor_op_tensor__
 from common_utils import Validator, log_debug
 from ancestry import Ancestors
@@ -69,6 +75,8 @@ struct TensorView[dtype: DType = DType.float32](
         self.backwardFn = other.backwardFn
         self.contiguous = other.contiguous
 
+    fn __eq__(self, other: Tensor[dtype]) -> Bool:
+        return TensorLike.from_view(self).equal(TensorLike.from_tensor(other))
 
     fn zero_grad(self):
         if self.requires_grad and self.has_grad():
@@ -120,7 +128,6 @@ struct TensorView[dtype: DType = DType.float32](
     fn view(self, shape: List[Int], offset: Int) -> TensorView[dtype]:
         _shape = Shape(shape)
         return self.view(_shape, Strides.default(_shape), offset)
-
 
     # Fully custom shape/strides/offset
     fn view(
@@ -506,11 +513,13 @@ struct TensorView[dtype: DType = DType.float32](
 fn main() raises:
     test_slice_every_second_row_column1()
 
+
 from testing import assert_true
+
 
 fn test_slice_every_second_row_column1() raises:
     print("test_slice_every_second_row_column1")
-    _="""var a = Tensor.arange(15, requires_grad=True)
+    _ = """var a = Tensor.arange(15, requires_grad=True)
     var r = a.reshape(5, 3)
     var v = r[::2, 1]  # Select col 1 of rows 0, 2, 4
     var loss = v.sum()
@@ -524,4 +533,3 @@ fn test_slice_every_second_row_column1() raises:
     loss.free()
     r.free()
     a.free()"""
-
