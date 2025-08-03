@@ -519,7 +519,7 @@ from testing import assert_true
 
 fn test_slice_every_second_row_column1() raises:
     print("test_slice_every_second_row_column1")
-    _ = """var a = Tensor.arange(15, requires_grad=True)
+    var a = Tensor.arange(15, requires_grad=True)
     var r = a.reshape(5, 3)
     var v = r[::2, 1]  # Select col 1 of rows 0, 2, 4
     var loss = v.sum()
@@ -532,4 +532,4 @@ fn test_slice_every_second_row_column1() raises:
     assert_true(grad.sum() == 3)
     loss.free()
     r.free()
-    a.free()"""
+    a.free()

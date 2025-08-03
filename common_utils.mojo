@@ -125,6 +125,42 @@ struct Slicer:
         return _start, _end, _step
 
 
+fn compute_output_shape(
+    original_shape: Shape, normalized_axes: IntList, keepdims: Bool
+) -> Shape:
+    """Compute the output shape after reduction along specified axes.
+
+    Args:
+        original_shape: Shape of the tensor before reduction.
+        normalized_axes: Sorted list of axes to reduce over (must be valid for shape).
+        keepdims: Whether to keep reduced dimensions as size 1.
+
+    Returns:
+        Shape after reduction
+
+    Behavior:
+        - If reducing all axes and keepdims=False → returns Shape.Void (scalar)
+        - Otherwise:
+            - For reduced axes: keep as 1 if keepdims=True, else remove
+            - For non-reduced axes: keep original size.
+    """
+    rank = original_shape.rank()
+
+    # Full reduction case (return scalar shape if not keeping dims)
+    if rank == 0 or (len(normalized_axes) == rank and not keepdims):
+        return Shape.Void
+
+    var spans = IntList.with_capacity(rank)
+    for dim in range(rank):
+        if dim in normalized_axes:
+            if keepdims:
+                spans.append(1)  # Keep reduced dim as size 1
+        else:
+            spans.append(original_shape[dim])  # Keep original size
+
+    return Shape(spans)
+
+
 struct Validator:
     @staticmethod
     fn validate_dtype_consistency(
@@ -141,14 +177,29 @@ struct Validator:
 
     @staticmethod
     fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
-        # Ensure axes are unique, sorted, and within bounds.
+        """Validate and normalize axes for reduction operations.
+        Args:
+            shape: Tensor shape to validate against
+            axes: Input axes to normalize
+        Returns:
+            Normalized, sorted, and deduplicated axes
+        Behavior:
+            - For scalar tensors (rank=0):
+                - `[-1]` → empty list (reduce all)
+                - Any other non-empty axes → error
+            - For non-scalar tensors:
+                - Empty list → reduce all axes (return 0..rank-1)
+                - Normalize negative indices
+                - Validate bounds
+                - Sort and deduplicate.
+        """
         rank = shape.rank()
-
+        # Handle scalar case (rank=0)
         if rank == 0:
-            if len(axes) == 1 and axes[0] == -1:
+            if axes.is_empty() or axes == IntList(-1):
                 return (
                     IntList()
-                )  # Interpret `[-1]` as "reduce all axes" for scalars
+                )  # Special case: [-1] means reduce all/# Empty axes for scalar is valid
             if len(axes) > 0:
                 abort(
                     "Tensor → validate_and_normalize_axes - cannot reduce over"
@@ -157,24 +208,25 @@ struct Validator:
                     + " for scalar tensor with shape: "
                     + shape.__str__()
                 )
-            return IntList()  # Scalar sum over [] is valid
 
+        # Default case: reduce all axes
         if len(axes) == 0:
             return IntList.range_list(rank)
-        normalized = IntList.with_capacity(len(axes))
-        for _axis in axes:
-            axis = _axis
-            if axis < 0:
-                axis += rank
-            if axis < 0 or axis >= rank:
+
+        # Normalize and validate axes
+        var normalized = IntList.with_capacity(len(axes))
+        for axis in axes:
+            normalized_axis = axis if axis >= 0 else axis + rank
+            if normalized_axis < 0 or normalized_axis >= rank:
                 abort(
                     "Tensor → validate_and_normalize_axes - invalid axis: "
-                    + String(_axis)
+                    + String(axis)
                     + " for tensor shape: "
                     + shape.__str__()
                 )
-            normalized.append(axis)
-        # Sort and deduplicate
+            normalized.append(normalized_axis)
+
+        # Ensure uniqueness and sorted order
         normalized.sort_and_deduplicate()
         return normalized
 
@@ -191,9 +243,7 @@ struct Validator:
             var seen = IntList.filled(rank, 0)
             # Normalize/validate/check duplicate
             for axis in axes:
-                normalized_axis = axis
-                if normalized_axis < 0:
-                    normalized_axis += rank
+                normalized_axis = axis if axis >= 0 else axis + rank
                 if normalized_axis < 0 or normalized_axis >= rank:
                     raise (
                         String(

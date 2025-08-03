@@ -16,6 +16,7 @@ from strides import Strides
 from shared import TensorLike
 from common_utils import (
     Validator,
+    compute_output_shape,
     panic,
     log_debug,
     variadic1or2,
@@ -1348,66 +1349,36 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         track_grad: Bool = True,
     ) -> Tensor[dtype]:
+        """Compute sum along specified axes."""
         normalized_axes = Validator.validate_and_normalize_axes(
             self.shape, axes
         )
-        requires_grad = self.requires_grad
+        requires_grad = self.requires_grad and track_grad
         rank = self.shape.rank()
 
-        # Early scalar return
-        if rank == 0:
-            scalar_out = Tensor[dtype].zeros(
-                Shape.Void, requires_grad=self.requires_grad and track_grad
-            )
-            scalar_out[IntList.Empty] = self[IntList.Empty]
+        out_shape = compute_output_shape(self.shape, normalized_axes, keepdims)
+        out = Tensor[dtype].zeros(out_shape, requires_grad=requires_grad)
 
-            if self.requires_grad and track_grad:
-                backward_fn = SumBackward[dtype]().into_backward_fn()
-                scalar_out.backwardFn = Optional(backward_fn)
-                scalar_out.add_ancestry(Self.Ancestor_of(self))
-
-            return scalar_out
-
-        # FIX 1: Handle full reduction case explicitly
-        var out_shape: Shape
-        reducing_all = len(normalized_axes) == rank
-        if reducing_all and not keepdims:
-            # Explicit scalar output for full reduction
-            out_shape = Shape.Void
+        if out_shape == Shape.Void:
+            if rank == 0:  # Scalar case
+                out[IntList.Empty] = self[IntList.Empty]
+            elif rank == len(normalized_axes) and not keepdims:  # Reducing all
+                out[IntList.Empty] = sumup(self)
         else:
-            spans = IntList.with_capacity(rank)
-            for i in range(rank):
-                if i in normalized_axes:
-                    if keepdims:
-                        spans.append(1)
-                    else:
-                        continue
-                else:
-                    spans.append(self.shape[i])
-            out_shape = Shape(spans)
-        out = Tensor[dtype].zeros(
-            out_shape, requires_grad=requires_grad and track_grad
-        )
-        reduced_shape = Shape(self.shape.axes_spans.select(normalized_axes))
-        # Special handling for full reduction case
-        if reducing_all and not keepdims:
-            out[IntList.Empty] = sumup(self)
-        else:
+            reduced_shape = Shape(self.shape.axes_spans.select(normalized_axes))
             for out_idx in out_shape:
-                summ = Scalar[dtype](0)
+                var summ = Scalar[dtype](0)
                 for red_idx in reduced_shape:
-                    if keepdims:
-                        full_idx = out_idx.replace(normalized_axes, red_idx)
-                    else:
-                        full_idx = out_idx.insert(normalized_axes, red_idx)
+                    full_idx = out_idx.replace(
+                        normalized_axes, red_idx
+                    ) if keepdims else out_idx.insert(normalized_axes, red_idx)
                     summ += self[full_idx]
                 out[out_idx] = summ
 
-        if requires_grad and track_grad:
-            _axes = normalized_axes.copy()
-            _keepdims = keepdims
+        # Setup backward if needed
+        if requires_grad:
             backward_fn = SumBackward[dtype](
-                _axes, _keepdims
+                normalized_axes.copy(), keepdims
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
@@ -1434,10 +1405,8 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
             out.requires_grad = True
             out.init_grad()
-            _axes = normalized_axes.copy()
-            _keepdims = keepdims
             backward_fn = MeanBackward[dtype](
-                _axes, _keepdims
+                normalized_axes.copy(), keepdims
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
