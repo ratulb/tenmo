@@ -78,20 +78,6 @@ a.free()
 
 ---
 
-## 📁 Project Structure
-
-```
-.
-├── tensors.mojo                # Core Tensor implementation
-├── views.mojo                  # TensorView (slicing/view logic)
-├── shapes.mojo                 # Shape logic and utilities
-├── intlist.mojo                # Light Intger list backing many operations
-├── operators.mojo              # Vectorized ops
-├── tests/test_tensors.mojo     # Unit tests
-└── README.md                   # You're here!
-```
-
----
 
 ## 🧪 Running Tests
 
