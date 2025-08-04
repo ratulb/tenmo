@@ -19,8 +19,6 @@ fn test_equality_when_inner_is_tensor() raises:
         tl1 == tl3,
         "Inequality assertion failed when pointing to different lvalues",
     )
-    print(tl1.inner_id(), tl2.inner_id(), tl3.inner_id())
-
     assert_true(
         tl1.inner_id() == tl2.inner_id(),
         "Inner id equality assertion failed when pointing to same lvalue",
