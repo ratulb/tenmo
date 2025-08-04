@@ -111,7 +111,7 @@ Perfect for understanding what deep learning libraries **actually do under the h
 ## 🛠️ Roadmap
 
 - [x] Optimized matmul/optmization in general
-- [x] Transperant GPU support
+- [x] Transperant GPU offloading
 - [x] Distributed Training
 
 
