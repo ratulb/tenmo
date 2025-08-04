@@ -21,11 +21,11 @@ struct MatmulBackward[dtype: DType](Copyable & Movable & Stringable):
         ] = []
         ancestor_1 = output.ancestry().get(0)[]
         ancestor_2 = output.ancestry().get(1)[]
-
         if ancestor_1.requires_grad():
-            ancestor_1_grad_share = gradients.matmul(
-                ancestor_2.tensor().transpose()
-            )
+            ancestor_2_transposed = (
+                ancestor_2.tensor() if ancestor_2.is_tensor() else ancestor_2.view().into_tensor()
+            ).transpose()
+            ancestor_1_grad_share = gradients.matmul(ancestor_2_transposed)
             ancestor_1_grad_share.requires_grad = False
             grad_outputs.append(
                 (
@@ -36,9 +36,10 @@ struct MatmulBackward[dtype: DType](Copyable & Movable & Stringable):
             )
 
         if ancestor_2.requires_grad():
-            ancestor_2_grad_share = (
-                ancestor_1.tensor().transpose().matmul(gradients)
-            )
+            ancestor_1_transposed = (
+                ancestor_1.tensor() if ancestor_1.is_tensor() else ancestor_1.view().into_tensor()
+            ).transpose()
+            ancestor_2_grad_share = ancestor_1_transposed.matmul(gradients)
             ancestor_2_grad_share.requires_grad = False
             grad_outputs.append(
                 (
@@ -52,6 +53,7 @@ struct MatmulBackward[dtype: DType](Copyable & Movable & Stringable):
 
     fn __str__(self) -> String:
         return "MatmulBackward"
+
 
 fn main():
     pass
