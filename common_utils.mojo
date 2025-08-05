@@ -231,38 +231,38 @@ struct Validator:
         return normalized
 
     @staticmethod
-    fn validate_axes(axes: IntList, rank: Int) -> IntList:
-        var normalized_axes = IntList.Empty
-        try:
-            if axes.len() != rank:
-                raise (
-                    String(
-                        "transpose axes must have length {0}, but got {1}"
-                    ).format(rank, axes.len())
+    fn validate_axes(axes: IntList, shape: Shape) -> IntList:
+        rank = shape.rank()
+        var normalized_axes = IntList.with_capacity(rank)
+        if axes.len() != rank:
+            panic(
+                "Validator → validate_axes: transpose axes must have length",
+                String(rank) + ",",
+                "but got",
+                String(axes.len()),
+            )
+        var seen = IntList.filled(rank, 0)
+        # Normalize/validate/check duplicate
+        for axis in axes:
+            normalized_axis = axis if axis >= 0 else axis + rank
+            if normalized_axis < 0 or normalized_axis >= rank:
+                panic(
+                    "Validator → validate_axes: invalid axis",
+                    String(axis),
+                    "in transpose: must be in range [0,"
+                    + String(rank - 1)
+                    + "]",
                 )
-            var seen = IntList.filled(rank, 0)
-            # Normalize/validate/check duplicate
-            for axis in axes:
-                normalized_axis = axis if axis >= 0 else axis + rank
-                if normalized_axis < 0 or normalized_axis >= rank:
-                    raise (
-                        String(
-                            "Invalid axis {0} in transpose: must be in range"
-                            " [0, {1}]"
-                        ).format(axis, rank - 1)
-                    )
 
-                if seen[normalized_axis] == 1:
-                    raise (
-                        String(
-                            "Duplicate axis {0} found in transpose axes"
-                        ).format(axis)
-                    )
+            if seen[normalized_axis] == 1:
+                panic(
+                    "Validator → validate_axes: duplicate axis",
+                    String(axis),
+                    "in transpose axes",
+                )
 
-                seen[normalized_axis] = 1
-                normalized_axes.append(normalized_axis)
-        except e:
-            abort(e.__str__())
+            seen[normalized_axis] = 1
+            normalized_axes.append(normalized_axis)
         return normalized_axes
 
     @staticmethod

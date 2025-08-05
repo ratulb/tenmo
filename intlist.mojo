@@ -539,6 +539,11 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             copy.append(e)
         return copy^
 
+    fn reversed(self) -> Self:
+        copied = self.copy()
+        copied.reverse()
+        return copied
+
     fn reverse(mut self):
         """Reverses the elements of the list."""
 

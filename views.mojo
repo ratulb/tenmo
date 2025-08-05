@@ -11,6 +11,7 @@ from walkback import (
     TensorViewBackward,
     SumBackward,
     MeanBackward,
+    TransposeBackward,
 )
 from operators import __tensor_op_tensor__
 from common_utils import Validator, log_debug, compute_output_shape, i, s
@@ -100,32 +101,7 @@ struct TensorView[dtype: DType = DType.float32](
         return self.view(Shape(shape))
 
     fn view(self, shape: Shape) -> TensorView[dtype]:
-        if not self.shape.num_elements() == shape.num_elements():
-            abort(
-                "TensorView → view: shape"
-                + shape.__str__()
-                + " is invalid: total number of elements("
-                + String(self.shape.num_elements())
-                + ") must match"
-            )
-
-        strides = Strides.default(shape)
-        offset = self.offset
-
-        out = TensorView[dtype](
-            base_tensor=self.base_tensor,
-            shape=shape,
-            strides=strides,
-            offset=offset,
-            requires_grad=self.requires_grad,
-        )
-        if self.requires_grad:
-            backward_fn = ViewBackward[dtype](
-                shape, strides, offset
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-        return out
+        return self.view(shape, Strides.default(shape), 0)
 
     fn view(self, shape: List[Int], offset: Int) -> TensorView[dtype]:
         return self.view(Shape(shape), Strides.default(Shape(shape)), offset)
@@ -540,11 +516,14 @@ struct TensorView[dtype: DType = DType.float32](
         this = TensorLike.from_view(self)
         that = TensorLike.from_view(other)
         out = this.matmul(that)
-        if out.requires_grad:
+        requires_grad = self.requires_grad or other.requires_grad
+        if requires_grad:
+            out.requires_grad = True
+            out.init_grad()
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(this)
-            out.add_ancestry(that)
+            out.add_ancestry(Self.Ancestor_of(self))
+            out.add_ancestry(Self.Ancestor_of(other))
 
         return out
 
@@ -552,11 +531,57 @@ struct TensorView[dtype: DType = DType.float32](
         this = TensorLike.from_view(self)
         that = TensorLike.from_tensor(other)
         out = this.matmul(that)
-        if out.requires_grad:
+        requires_grad = self.requires_grad or other.requires_grad
+        if requires_grad:
+            out.requires_grad = True
+            out.init_grad()
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(this)
             out.add_ancestry(that)
+
+        return out
+
+    fn transpose(
+        self, *axes: Int, requires_grad: Optional[Bool] = None
+    ) -> TensorView[dtype]:
+        transpose_axes = IntList.with_capacity(len(axes))
+        for axis in transpose_axes:
+            transpose_axes.append(axis)
+        return self.transpose(transpose_axes, requires_grad)
+
+    fn transpose(
+        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
+    ) -> TensorView[dtype]:
+        return self.transpose(IntList.new(axes))
+
+    fn transpose(
+        self, axes: IntList, requires_grad: Optional[Bool] = None
+    ) -> TensorView[dtype]:
+        shape = self.shape
+        var normalized_axes = Validator.validate_axes(
+            axes if len(axes)
+            > 0 else IntList.range_list(shape.rank()).reversed(),
+            shape,
+        )
+
+        # Permute shape and create default strides and permute
+        var new_shape = shape.permute(normalized_axes)
+        var new_strides = self.strides.permute(normalized_axes)
+        out = TensorView[dtype](
+            base_tensor=self.base_tensor,
+            shape=new_shape,
+            strides=new_strides,
+            offset=self.offset,
+            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
+        )
+        if self.requires_grad:
+            backward_fn = TransposeBackward[dtype](
+                normalized_axes
+            ).into_backward_fn()
+
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(Self.Ancestor_of(self))
 
         return out
 

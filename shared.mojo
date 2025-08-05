@@ -340,27 +340,36 @@ struct TensorLike[dtype: DType](
         return out
 
     # Note - matmul has not been optimized at all - once everything is place - revisit this
-    fn matmul(self, other: Self) -> Tensor[dtype]:
-        if not self.rank() == 2:
+    fn matmul[version: Int = 0](self, other: Self) -> Tensor[dtype]:
+        @parameter
+        if version == 0:
+            return Self.mm_naive(self, other)
+        else:
+            return Self.mm_naive(self, other)
+
+    @staticmethod
+    fn mm_naive(lhs: Self, rhs: Self) -> Tensor[dtype]:
+        if not lhs.rank() == 2:
             abort("TensorLike → matmul: Only supports 2D matmul for now")
-        if not other.rank() == 2:
+        if not rhs.rank() == 2:
             abort("TensorLike → matmul: Other must be 2D")
-        if not self.shape()[1] == other.shape()[0]:
+        if not lhs.shape()[1] == rhs.shape()[0]:
             abort("TensorLike → matmul: Incompatible shapes")
 
-        m, k = self.shape()[0], self.shape()[1]
-        n = other.shape()[1]
+        M, K = lhs.shape()[0], lhs.shape()[1]
+        N = rhs.shape()[1]
 
-        requires_grad = self.requires_grad() or other.requires_grad()
-        var out = Tensor[dtype](m, n, requires_grad=requires_grad)
-
-        for i in range(m):
-            for j in range(n):
-                var summ = Scalar[dtype](0)
-                for p in range(k):
-                    summ += self[IntList(i, p)] * other[IntList(p, j)]
-                out[IntList(i, j)] = summ
-
+        var out = Tensor[dtype].zeros(M, N, requires_grad=False)
+        out_index = IntList.with_capacity(2, 0)
+        lhs_index = IntList.with_capacity(2, 0)
+        rhs_index = IntList.with_capacity(2, 0)
+        for m in range(M):
+            out_index[0], lhs_index[0] = m, m
+            for n in range(N):
+                out_index[1], rhs_index[1] = n, n
+                for k in range(K):
+                    lhs_index[1], rhs_index[0] = k, k
+                    out[out_index] += lhs[lhs_index] * rhs[rhs_index]
         return out
 
     fn backward(root: Self, start_grad: Scalar[dtype] = 1.0):

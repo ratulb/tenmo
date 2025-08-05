@@ -7,6 +7,7 @@ from common_utils import i, newaxis, s
 
 
 fn main() raises:
+    test_slice_every_second_row_column1()
     test_edge_case_indexing()
     test_mixed_indexing()
     test_newaxis_dimension_insertion()
@@ -65,6 +66,27 @@ fn main() raises:
     test_view_identity()
     test_view_stride_bounds_overflow()
 
+fn test_slice_every_second_row_column1() raises:
+    print("test_slice_every_second_row_column1")
+    var a = Tensor.arange(15, requires_grad=True)
+    var r = a.reshape(5, 3)
+    r.print()
+    var v = r[s(None, None, 2), i(1)]  # Select col 1 of rows 0, 2, 4
+    v.print()
+    var loss = v.sum()
+    loss.print()
+    loss.backward()
+    a.grad[].print()
+    grad = a.grad[]
+    assert_true(grad.shape == a.shape)
+    assert_true(grad[1] == 1)  # r[0,1]
+    assert_true(grad[7] == 1)  # r[2,1]
+    assert_true(grad[13] == 1)  # r[4,1]
+    assert_true(grad.sum().item() == 3)
+    loss.free()
+    v.free()
+    r.free()
+    a.free()
 
 fn test_permute_backward() raises:
     print("test_permute_backward")
@@ -75,7 +97,6 @@ fn test_permute_backward() raises:
     var flat = p.view([6])
 
     flat.backward()
-    a.grad[].print()
     var expected = Tensor.d1([1, 1, 1, 1, 1, 1])
     assert_true((a.grad[] == expected).all_true())
 
@@ -628,7 +649,6 @@ fn test_backward_through_nested_views() raises:
     y1.free()
     v1.free()
     x1.free()
-    print("ok1")
     # Test 2: 3D permutation
     x2 = Tensor.rand(4, 5, 6, requires_grad=True)
     v2 = x2.into_view()
@@ -644,7 +664,6 @@ fn test_backward_through_nested_views() raises:
     v2.free()
     x2.free()
 
-    print("ok2")
 
 
 fn test_nested_views_grad_propagation() raises:

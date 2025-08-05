@@ -385,53 +385,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-        _ = """fn __getitem__(self, indices: List[Int]) -> TensorView[dtype]:
-        rank = self.shape.rank()
-        index_len = len(indices)
-
-        if index_len > rank:
-            abort(
-                String("__getitem__(List[Int]): Too many indices (")
-                + String(index_len)
-                + ") for tensor of rank "
-                + String(rank)
-            )
-
-        normalized_indices = IntList.with_capacity(index_len)
-        for i in range(index_len):
-            idx = indices[i]
-            dim = self.shape[i]
-
-            # Handle negative indexing
-            if idx < 0:
-                idx += dim
-
-            if idx < 0 or idx >= dim:
-                abort(
-                    String("__getitem__(List[Int]): Index ")
-                    + String(indices[i])
-                    + " out of bound s for axis "
-                    + String(i)
-                    + " with size "
-                    + String(dim)
-                )
-
-            normalized_indices.append(idx)
-        strides = Strides.default(self.shape)
-        offset = 0
-        for i in range(len(normalized_indices)):
-            offset += normalized_indices[i] * strides[i]
-        new_shape = self.shape.slice_from(index_len)
-        new_strides = Strides.default(self.shape).slice_from(index_len)
-
-        return TensorView[dtype](
-            UnsafePointer(to=self),
-            shape=new_shape,
-            strides=new_strides,
-            offset=offset,
-            requires_grad=self.requires_grad,
-        )"""
-
     fn __moveinit__(out self, owned other: Self):
         self.shape = other.shape
         self.strides = other.strides
@@ -1743,7 +1696,10 @@ struct Tensor[dtype: DType = DType.float32](
         this = TensorLike.from_tensor(self)
         that = TensorLike.from_tensor(other)
         out = this.matmul(that)
-        if out.requires_grad:
+        requires_grad = self.requires_grad or other.requires_grad
+        if requires_grad:
+            out.requires_grad = True
+            out.init_grad()
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(this)
@@ -1755,21 +1711,24 @@ struct Tensor[dtype: DType = DType.float32](
         this = TensorLike.from_tensor(self)
         that = TensorLike.from_view(other)
         out = this.matmul(that)
-        if out.requires_grad:
+        requires_grad = self.requires_grad or other.requires_grad
+        if requires_grad:
+            out.requires_grad = True
+            out.init_grad()
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(this)
-            out.add_ancestry(that)
+            out.add_ancestry(Self.Ancestor_of(self))
+            out.add_ancestry(TensorLike.from_view(other))
 
         return out
 
     fn transpose(
         self, *axes: Int, requires_grad: Optional[Bool] = None
     ) -> TensorView[dtype]:
-        _axes = IntList.with_capacity(len(axes))
-        for each in axes:
-            _axes.append(each)
-        return self.transpose(_axes, requires_grad)
+        transpose_axes = IntList.with_capacity(len(axes))
+        for axis in transpose_axes:
+            transpose_axes.append(axis)
+        return self.transpose(transpose_axes, requires_grad)
 
     fn transpose(
         self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
@@ -1779,17 +1738,15 @@ struct Tensor[dtype: DType = DType.float32](
     fn transpose(
         self, axes: IntList, requires_grad: Optional[Bool] = None
     ) -> TensorView[dtype]:
-        var rank = self.rank()
-
-        var actual_axes = axes
-        if axes.is_empty():
-            actual_axes = IntList.range_list(rank)
-            actual_axes.reverse()
-
-        var normalized_axes = Validator.validate_axes(actual_axes, rank)
+        shape = self.shape
+        var normalized_axes = Validator.validate_axes(
+            axes if len(axes)
+            > 0 else IntList.range_list(shape.rank()).reversed(),
+            shape,
+        )
 
         # Permute shape and create default strides and permute
-        var new_shape = self.shape.permute(normalized_axes)
+        var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides.permute(normalized_axes)
         out = self.view(
             new_shape,
@@ -1798,10 +1755,8 @@ struct Tensor[dtype: DType = DType.float32](
             requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
         if self.requires_grad:
-            normalized_axes_copy = normalized_axes.copy()
-
             backward_fn = TransposeBackward[dtype](
-                normalized_axes_copy
+                normalized_axes
             ).into_backward_fn()
 
             out.backwardFn = Optional(backward_fn)

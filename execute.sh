@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|views|intlist|shapes|strides|ancestry|shared|all]"
+    echo "Usage: $0 [tensors|views|intlist|shapes|strides|ancestry|shared|bench|all]"
     exit 1
 fi
 
@@ -11,6 +11,10 @@ fi
 case $1 in
     tensors)
         mojo -I . tests/test_tensors.mojo
+        ;;
+    bench)
+        echo "Running tensor multiplication benchmark"
+        mojo -I . tests/test_matmul_bench.mojo
         ;;
     views)
         echo "Running view test cases"
@@ -41,6 +45,8 @@ case $1 in
         ;;
     all)
         mojo -I . tests/test_tensors.mojo
+        echo "Running tensor multiplication benchmark"
+        mojo -I . tests/test_matmul_bench.mojo
         echo "Running view test cases"
         mojo -I . tests/test_views.mojo
         echo "Running shape test cases"
@@ -56,7 +62,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: tensors, views, shapes, intlists, strides, ancestry, shared, all"
+        echo "Available tests: tensors, views, shapes, intlists, strides, ancestry, shared, bench, all"
         exit 1
         ;;
 esac
