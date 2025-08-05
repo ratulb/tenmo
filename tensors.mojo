@@ -1,6 +1,6 @@
 ### Mojo Tensor
 ### Implement tensor library in mojo from first principles
-
+from time import perf_counter_ns
 from math import iota, exp, floor
 from random import seed, random_float64
 from algorithm import vectorize
@@ -1701,19 +1701,35 @@ struct Tensor[dtype: DType = DType.float32](
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
 
-    # Note - matmul has not been optimized at all - once everything is place - revisit this
-    fn matmul(self, other: Self) -> Self:
-        this = TensorLike.from_tensor(self)
-        that = TensorLike.from_tensor(other)
-        out = this.matmul(that)
+    fn matmul[simd_width: Int = simdwidthof[dtype]()](self, other: Self) -> Self:
+        print("I being called for action")
+        rows = self.rows()
+        cols = self.cols()
+        cols_O = other.cols()
+        out = Tensor[dtype].zeros(rows, cols_O, requires_grad=False)
+        start = perf_counter_ns()
+        for i in range(rows):
+            for j in range(cols):
+                curr_cell = self.data.load[width=1](i * cols + j)
+                @parameter
+                fn dot[simdwidth: Int](k: Int):
+                    out.data.store[width=simdwidth](
+                        i * cols_O + k,
+                        out.data.load[width=simdwidth](i * cols_O + k)
+                        + curr_cell * other.data.load[width=simdwidth](j * cols_O + k),
+                    )
+
+                vectorize[dot, simd_width](cols_O)
+        end = perf_counter_ns()
+        print("matmul took: ", end - start)
         requires_grad = self.requires_grad or other.requires_grad
         if requires_grad:
             out.requires_grad = True
             out.init_grad()
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(this)
-            out.add_ancestry(that)
+            out.add_ancestry(Self.Ancestor_of(self))
+            out.add_ancestry(Self.Ancestor_of(other))
 
         return out
 
