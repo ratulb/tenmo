@@ -45,8 +45,6 @@ case $1 in
         ;;
     all)
         mojo -I . tests/test_tensors.mojo
-        echo "Running tensor multiplication benchmark"
-        mojo -I . tests/test_matmul_bench.mojo
         echo "Running view test cases"
         mojo -I . tests/test_views.mojo
         echo "Running shape test cases"
@@ -59,6 +57,8 @@ case $1 in
         mojo -I . tests/test_ancestry.mojo
         echo "Running intList test cases"
         mojo -I . tests/test_intlist.mojo
+        echo "Running tensor multiplication benchmark"
+        mojo -I . tests/test_matmul_bench.mojo
         ;;
     *)
         echo "Error: Unknown test '$1'"
