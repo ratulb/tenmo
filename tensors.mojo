@@ -74,12 +74,6 @@ struct Tensor[dtype: DType = DType.float32](
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
     var backwardFn: Optional[BackwardFn[dtype]]
 
-    fn backward(self, start_grad: Scalar[dtype] = 1.0):
-        TensorLike.from_tensor(self).backward(start_grad)
-
-    fn backward(self, seed_tensor: Tensor[dtype]):
-        TensorLike.from_tensor(self).backward(seed_tensor)
-
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
         self = Self(shape, requires_grad)
@@ -104,6 +98,27 @@ struct Tensor[dtype: DType = DType.float32](
         self.data = data
         self.init_grad()
 
+    fn __init__(out self, shape: Shape, requires_grad: Bool = False):
+        Shape.validate(shape)
+        self.shape = shape
+        self.strides = Strides.default(shape)
+        self.requires_grad = requires_grad
+        self.base = UnsafePointer[Tensor[dtype]]()
+        self.backwardFn = None
+        self.grad = UnsafePointer[Self]()
+        self.ancestors = Ancestors[dtype].untracked()
+        if shape.ndim == 0:  # Tensor with Shape ()
+            self.data = UnsafePointer[Scalar[dtype]].alloc(1)
+        else:
+            self.data = UnsafePointer[Scalar[dtype]].alloc(
+                self.shape.num_elements()
+            )
+
+        self.init_grad()
+
+    fn is_contiguous(self) -> Bool:
+        return True
+
     fn is_tensor(self) -> Bool:
         return True
 
@@ -112,6 +127,12 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn is_view(self) -> Bool:
         return False
+
+    fn backward(self, start_grad: Scalar[dtype] = 1.0):
+        TensorLike.from_tensor(self).backward(start_grad)
+
+    fn backward(self, seed_tensor: Tensor[dtype]):
+        TensorLike.from_tensor(self).backward(seed_tensor)
 
     fn into_view(
         self, requires_grad: Optional[Bool] = None
@@ -144,33 +165,22 @@ struct Tensor[dtype: DType = DType.float32](
         permutated = view.permute(axes)
         return permutated
 
-    fn __init__(out self, shape: Shape, requires_grad: Bool = False):
-        Shape.validate(shape)
-        self.shape = shape
-        self.strides = Strides.default(shape)
-        self.requires_grad = requires_grad
-        self.base = UnsafePointer[Tensor[dtype]]()
-        self.backwardFn = None
-        self.grad = UnsafePointer[Self]()
-        self.ancestors = Ancestors[dtype].untracked()
-        if shape.ndim == 0:  # Tensor with Shape ()
-            self.data = UnsafePointer[Scalar[dtype]].alloc(1)
-        else:
-            self.data = UnsafePointer[Scalar[dtype]].alloc(
-                self.shape.num_elements()
-            )
-
-        self.init_grad()
-
-    fn is_contiguous(self) -> Bool:
-        return True
-
     # Check if it has a backward fn before calling this API
     fn backward_fn(self) -> BackwardFn[dtype]:
         return self.backwardFn.value()
 
     fn has_backward_fn(self) -> Bool:
         return self.backwardFn is not None
+
+    fn rows(self) -> Int:
+        if not self.rank() == 2:
+            abort("Tensor → rows: tensor rank is not 2")
+        return self.shape[0]
+
+    fn cols(self) -> Int:
+        if not self.rank() == 2:
+            abort("Tensor → cols: tensor rank is not 2")
+        return self.shape[1]
 
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
         if self.shape.ndim == 0 and len(indices) != 0:  # Tensor with Shape ()

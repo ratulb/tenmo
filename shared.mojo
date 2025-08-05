@@ -86,6 +86,18 @@ struct TensorLike[dtype: DType](
             self.view_address
         )
 
+    fn rows(self) -> Int:
+        return (
+            self.tensor_address[].rows() if self.kind
+            == 0 else self.view_address[].rows()
+        )
+
+    fn cols(self) -> Int:
+        return (
+            self.tensor_address[].cols() if self.kind
+            == 0 else self.view_address[].cols()
+        )
+
     fn tensor(self) -> Tensor[dtype]:
         return self.tensor_address[]
 
@@ -182,6 +194,160 @@ struct TensorLike[dtype: DType](
             == 1 else self.tensor_address[]._requires_grad()
         )
 
+    fn __str__(self) -> String:
+        if self.kind == 0:
+            t = self.tensor_address[]
+            return t.__str__()
+        else:
+            v = self.view_address[]
+            return v.__str__()
+
+    fn __repr__(self) -> String:
+        return self.__str__()
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
+
+    fn __len__(self) -> Int:
+        return len(self.tensor_address[]) if self.kind == 0 else len(
+            self.view_address[]
+        )
+
+    fn sum_all(self) -> Scalar[dtype]:
+        if self.kind == 0:
+            return self.tensor_address[].sum_all()
+        else:
+            return self.view_address[].sum_all()
+
+    fn sum(
+        self, normalized_axes: IntList, keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        """Compute sum along specified axes."""
+        shape = self.shape()
+        rank = shape.rank()
+
+        out_shape = compute_output_shape(shape, normalized_axes, keepdims)
+        out = Tensor[dtype].zeros(out_shape)
+
+        if out_shape == Shape.Void:
+            if rank == 0:  # Scalar case
+                out[IntList.Empty] = self[IntList.Empty]
+            elif rank == len(normalized_axes) and not keepdims:  # Reducing all
+                out[IntList.Empty] = self.sum_all()
+        else:
+            reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
+            for out_idx in out_shape:
+                var summ = Scalar[dtype](0)
+                for red_idx in reduced_shape:
+                    full_idx = out_idx.replace(
+                        normalized_axes, red_idx
+                    ) if keepdims else out_idx.insert(normalized_axes, red_idx)
+                    summ += self[full_idx]
+                out[out_idx] = summ
+
+        return out
+
+    fn mean(
+        self, normalized_axes: IntList, keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        shape = self.shape()
+        # Compute total count of elements being reduced
+        count = shape.axes_spans.select(normalized_axes).product()
+        # Perform sum and divide by count
+        out = self.sum(normalized_axes, keepdims) / Scalar[dtype](count)
+        return out
+
+    fn matmul[version: Int = 0](self, other: Self) -> Tensor[dtype]:
+        @parameter
+        if version == 0:
+            return Self.mm_tiled(self, other)
+        else:
+            return Self.mm_reordered(self, other)
+
+    @staticmethod
+    fn validate_matrix_shapes(lhs: Self, rhs: Self):
+        if not lhs.rank() == 2:
+            abort("TensorLike → matmul: Only supports 2D matmul")
+        if not rhs.rank() == 2:
+            abort("TensorLike → matmul: Other must be 2D")
+        if not lhs.shape()[1] == rhs.shape()[0]:
+            abort("TensorLike → matmul: Incompatible shapes")
+
+    @staticmethod
+    fn mm_reordered(lhs: Self, rhs: Self) -> Tensor[dtype]:
+        Self.validate_matrix_shapes(lhs, rhs)
+        M, K = lhs.shape()[0], lhs.shape()[1]
+        N = rhs.shape()[1]
+
+        var out = Tensor[dtype].zeros(M, N, requires_grad=False)
+        out_index = IntList.with_capacity(2, 0)
+        lhs_index = IntList.with_capacity(2, 0)
+        rhs_index = IntList.with_capacity(2, 0)
+        for m in range(M):
+            out_index[0], lhs_index[0] = m, m
+            for n in range(N):
+                out_index[1], rhs_index[1] = n, n
+                for k in range(K):
+                    lhs_index[1], rhs_index[0] = k, k
+                    out[out_index] += lhs[lhs_index] * rhs[rhs_index]
+        return out
+
+    fn mm_tiled[block_size: Int = 64](lhs: Self, rhs: Self) -> Tensor[dtype]:
+        Self.validate_matrix_shapes(lhs, rhs)
+        var out = Tensor[dtype].zeros(
+            lhs.rows(), rhs.cols(), requires_grad=False
+        )
+        out_index = IntList.with_capacity(2, 0)
+        lhs_index = IntList.with_capacity(2, 0)
+        rhs_index = IntList.with_capacity(2, 0)
+        for m_block in range(0, lhs.rows(), block_size):
+            for n_block in range(0, rhs.cols(), block_size):
+                for k_block in range(0, lhs.cols(), block_size):
+                    # Process a block
+                    for m in range(
+                        m_block, min(m_block + block_size, lhs.rows())
+                    ):
+                        out_index[0], lhs_index[0] = m, m
+                        for n in range(
+                            n_block, min(n_block + block_size, rhs.cols())
+                        ):
+                            out_index[1], rhs_index[1] = n, n
+                            for k in range(
+                                k_block, min(k_block + block_size, lhs.cols())
+                            ):
+                                lhs_index[1], rhs_index[0] = k, k
+                                out[out_index] += (
+                                    lhs[lhs_index] * rhs[rhs_index]
+                                )
+
+        return out
+
+    fn backward(root: Self, start_grad: Scalar[dtype] = 1.0):
+        if not root.requires_grad():
+            return
+        seed_tensor = Tensor[dtype].full(root.shape(), start_grad)
+        root.backward(seed_tensor)
+
+    fn backward(root: Self, seed_tensor: Tensor[dtype]):
+        if not root.requires_grad():
+            return
+        root.seed_grad(seed_tensor)
+        tracked = Set[Int]()
+        streams = List[GradStream[dtype]]()
+
+        stack = [root]
+        while stack:
+            stream = stack.pop()
+            if stream.inner_id() in tracked:
+                continue
+            streams.append(GradStream[dtype](stream))
+            tracked.add(stream.inner_id())
+            for origin in stream.ancestry():
+                stack.append(origin[])
+
+        for stream in streams:
+            stream.flow()
+
     fn print_tensor_recursive(
         self,
         mut indices: IntList,
@@ -275,128 +441,6 @@ struct TensorLike[dtype: DType](
         self.print_tensor_recursive(
             empty, 1, num_first=num_first, num_last=num_last
         )
-
-    fn __str__(self) -> String:
-        if self.kind == 0:
-            t = self.tensor_address[]
-            return t.__str__()
-        else:
-            v = self.view_address[]
-            return v.__str__()
-
-    fn __repr__(self) -> String:
-        return self.__str__()
-
-    fn write_to[W: Writer](self, mut writer: W):
-        writer.write(self.__str__())
-
-    fn __len__(self) -> Int:
-        return len(self.tensor_address[]) if self.kind == 0 else len(
-            self.view_address[]
-        )
-
-    fn sum_all(self) -> Scalar[dtype]:
-        if self.kind == 0:
-            return self.tensor_address[].sum_all()
-        else:
-            return self.view_address[].sum_all()
-
-    fn sum(
-        self, normalized_axes: IntList, keepdims: Bool = False
-    ) -> Tensor[dtype]:
-        """Compute sum along specified axes."""
-        shape = self.shape()
-        rank = shape.rank()
-
-        out_shape = compute_output_shape(shape, normalized_axes, keepdims)
-        out = Tensor[dtype].zeros(out_shape)
-
-        if out_shape == Shape.Void:
-            if rank == 0:  # Scalar case
-                out[IntList.Empty] = self[IntList.Empty]
-            elif rank == len(normalized_axes) and not keepdims:  # Reducing all
-                out[IntList.Empty] = self.sum_all()
-        else:
-            reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
-            for out_idx in out_shape:
-                var summ = Scalar[dtype](0)
-                for red_idx in reduced_shape:
-                    full_idx = out_idx.replace(
-                        normalized_axes, red_idx
-                    ) if keepdims else out_idx.insert(normalized_axes, red_idx)
-                    summ += self[full_idx]
-                out[out_idx] = summ
-
-        return out
-
-    fn mean(
-        self, normalized_axes: IntList, keepdims: Bool = False
-    ) -> Tensor[dtype]:
-        shape = self.shape()
-        # Compute total count of elements being reduced
-        count = shape.axes_spans.select(normalized_axes).product()
-        # Perform sum and divide by count
-        out = self.sum(normalized_axes, keepdims) / Scalar[dtype](count)
-        return out
-
-    # Note - matmul has not been optimized at all - once everything is place - revisit this
-    fn matmul[version: Int = 0](self, other: Self) -> Tensor[dtype]:
-        @parameter
-        if version == 0:
-            return Self.mm_naive(self, other)
-        else:
-            return Self.mm_naive(self, other)
-
-    @staticmethod
-    fn mm_naive(lhs: Self, rhs: Self) -> Tensor[dtype]:
-        if not lhs.rank() == 2:
-            abort("TensorLike → matmul: Only supports 2D matmul for now")
-        if not rhs.rank() == 2:
-            abort("TensorLike → matmul: Other must be 2D")
-        if not lhs.shape()[1] == rhs.shape()[0]:
-            abort("TensorLike → matmul: Incompatible shapes")
-
-        M, K = lhs.shape()[0], lhs.shape()[1]
-        N = rhs.shape()[1]
-
-        var out = Tensor[dtype].zeros(M, N, requires_grad=False)
-        out_index = IntList.with_capacity(2, 0)
-        lhs_index = IntList.with_capacity(2, 0)
-        rhs_index = IntList.with_capacity(2, 0)
-        for m in range(M):
-            out_index[0], lhs_index[0] = m, m
-            for n in range(N):
-                out_index[1], rhs_index[1] = n, n
-                for k in range(K):
-                    lhs_index[1], rhs_index[0] = k, k
-                    out[out_index] += lhs[lhs_index] * rhs[rhs_index]
-        return out
-
-    fn backward(root: Self, start_grad: Scalar[dtype] = 1.0):
-        if not root.requires_grad():
-            return
-        seed_tensor = Tensor[dtype].full(root.shape(), start_grad)
-        root.backward(seed_tensor)
-
-    fn backward(root: Self, seed_tensor: Tensor[dtype]):
-        if not root.requires_grad():
-            return
-        root.seed_grad(seed_tensor)
-        tracked = Set[Int]()
-        streams = List[GradStream[dtype]]()
-
-        stack = [root]
-        while stack:
-            stream = stack.pop()
-            if stream.inner_id() in tracked:
-                continue
-            streams.append(GradStream[dtype](stream))
-            tracked.add(stream.inner_id())
-            for origin in stream.ancestry():
-                stack.append(origin[])
-
-        for stream in streams:
-            stream.flow()
 
 
 struct GradStream[dtype: DType](Copyable & Movable):

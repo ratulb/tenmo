@@ -97,6 +97,19 @@ struct TensorView[dtype: DType = DType.float32](
             self.grad[], gradients
         )
 
+    fn rank(self) -> Int:
+        return self.shape.rank()
+
+    fn rows(self) -> Int:
+        if not self.rank() == 2:
+            abort("TensorView → rows: tensor rank is not 2")
+        return self.shape[0]
+
+    fn cols(self) -> Int:
+        if not self.rank() == 2:
+            abort("TensorView → cols: tensor rank is not 2")
+        return self.shape[1]
+
     fn view(self, shape: List[Int]) -> TensorView[dtype]:
         return self.view(Shape(shape))
 
@@ -587,34 +600,8 @@ struct TensorView[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    test_slice_every_second_row_column1()
-    a = Tensor.arange(10)
-    v = a.view(Shape.of(5), offset=1)
-    r = v.sum_all()
-    print(r)
-
+    pass
 
 from testing import assert_true
 
 
-fn test_slice_every_second_row_column1() raises:
-    print("test_slice_every_second_row_column1")
-    var a = Tensor.arange(15, requires_grad=True)
-    var r = a.reshape(5, 3)
-    r.print()
-    var v = r[s(None, None, 2), i(1)]  # Select col 1 of rows 0, 2, 4
-    v.print()
-    var loss = v.sum()
-    loss.print()
-    loss.backward()
-    a.grad[].print()
-    grad = a.grad[]
-    assert_true(grad.shape == a.shape)
-    assert_true(grad[1] == 1)  # r[0,1]
-    assert_true(grad[7] == 1)  # r[2,1]
-    assert_true(grad[13] == 1)  # r[4,1]
-    assert_true(grad.sum().item() == 3)
-    loss.free()
-    v.free()
-    r.free()
-    a.free()

@@ -4,7 +4,7 @@ from views import TensorView
 from testing import assert_true
 
 fn main() raises:
-    size = 128
+    size = 256
 
     A = Tensor.rand(size, size, requires_grad=True)
     B = Tensor.rand(size, size, requires_grad=True)
