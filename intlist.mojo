@@ -167,6 +167,12 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
                 times += 1
         return times
 
+    fn any(self, cond: fn (Int) -> Bool) -> Bool:
+        for elem in self:
+            if cond(elem):
+                return True
+        return False
+
     @always_inline
     fn is_strictly_increasing_from_zero(self) -> Bool:
         for i in range(len(self)):
@@ -713,9 +719,23 @@ struct ZipIterator[
 
 fn main() raises:
     test_negative_indices()
+    test_any()
+    inferred_dim = 10
+    l = IntList(1, 2, 5, -1, 10)
+    concrete_shape = [inferred_dim if dim == -1 else dim for dim in l]
+    print(concrete_shape.__str__())
 
 
 from testing import assert_true
+
+
+fn test_any() raises:
+    l = IntList(1, 3, 0, -1)
+
+    fn check(e: Int) -> Bool:
+        return e == -1
+
+    assert_true(l.any(check), "Any assertion for -1 failed")
 
 
 fn test_negative_indices() raises:

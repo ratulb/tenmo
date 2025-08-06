@@ -101,9 +101,9 @@ struct Shape(
                 abort(
                     "Shape → __init__: negative or zero sized dimension(s) are"
                     " not allowed →"
-                    + " Dim = "
+                    + " dimension = "
                     + String(dims[i])
-                    + " at index = "
+                    + " @index = "
                     + String(i)
                 )
         _numels = 1
