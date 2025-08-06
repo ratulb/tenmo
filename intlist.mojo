@@ -99,7 +99,6 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             result += each
         return result
 
-
     fn has_duplicates(self) -> Bool:
         if len(self) <= 1:
             return False
@@ -323,11 +322,11 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             The integer value at the specified index.
 
         """
-
-        if idx < 0 or idx >= len(self):
+        index = idx if idx >= 0 else idx + self.__len__()
+        if index < 0 or index >= len(self):
             abort("IntList __getitem__  → Out-of-bounds read: " + String(idx))
 
-        return (self.data + idx)[]
+        return (self.data + index)[]
 
     @always_inline("nodebug")
     fn __setitem__(mut self, idx: Int, value: Int):
@@ -713,7 +712,15 @@ struct ZipIterator[
 
 
 fn main() raises:
+    test_negative_indices()
+
+
+from testing import assert_true
+
+
+fn test_negative_indices() raises:
     l1 = IntList(1, 2, 3)
-    l2 = IntList(1, 2, 3)
-    for a, b in l1.zip(l2):
-        print(a, b)
+    assert_true(
+        l1[-1] == 3 and l1[-2] == 2 and l1[-3] == 1,
+        "IntList negative indices assertion failed",
+    )

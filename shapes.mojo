@@ -5,7 +5,18 @@ from memory import Pointer
 
 
 fn main() raises:
-    pass
+    test_negative_indices()
+
+
+from testing import assert_true
+
+
+fn test_negative_indices() raises:
+    shape = Shape([1, 2, 3])
+    assert_true(
+        shape[-1] == 3 and shape[-2] == 2 and shape[-3] == 1,
+        "Shape negative indices assertion failed",
+    )
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
@@ -252,15 +263,16 @@ struct Shape(
         return self.ndim
 
     fn __getitem__(self, idx: Int) -> Int:
-        if 0 <= idx < self.ndim:
-            return self.axes_spans[idx]
+        index = idx if idx >= 0 else idx + self.__len__()
+        if 0 <= index < self.ndim:
+            return self.axes_spans[index]
         else:
             return -1
 
     fn permute(self, axes: IntList) -> Self:
         if not len(axes) == len(self):
             abort(
-                "Shape -> permute: axes length not equal to shape's dimension"
+                "Shape → permute: axes length not equal to shape's dimension"
                 " count"
             )
         result = IntList.with_capacity(len(axes))
@@ -294,14 +306,14 @@ struct Shape(
         if self.ndim == 0:
             if len(indices) != 0:
                 abort(
-                    "Shape.flatten_index: Scalar tensor should receive empty"
+                    "Shape → flatten_index: scalar tensor should receive empty"
                     " indices[IntList]"
                 )
             return 0
         if len(indices) != self.ndim:
             print(
                 (
-                    "Shape flatten_index → shape mismatch len(indices) !="
+                    "Shape → flatten_index: shape mismatch len(indices) !="
                     " self.ndim -> "
                 ),
                 len(indices),
@@ -319,7 +331,7 @@ struct Shape(
             if idx >= dim or idx < 0:  # Negative index
                 print(
                     (
-                        "Shape flatten_index → invalid index >= dim span or"
+                        "Shape → flatten_index: invalid index >= dim span or"
                         " negative: "
                     ),
                     idx,
@@ -400,7 +412,7 @@ struct Shape(
         for idx in range(shape.ndim):
             if shape.axes_spans[idx] < 1:
                 abort(
-                    "Shape → validate - Shape dimension not valid: "
+                    "Shape → validate: shape dimension not valid: "
                     + String(shape.axes_spans[idx])
                 )
 
