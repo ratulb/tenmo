@@ -10,6 +10,10 @@ from utils import Variant
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
 
+@always_inline
+fn is_power_of_two(x: Int) -> Bool:
+    return x > 0 and (x & (x - 1)) == 0
+
 
 fn id[type: AnyType, //](t: type) -> Int:
     return Int(UnsafePointer(to=t))

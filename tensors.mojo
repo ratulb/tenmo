@@ -1748,11 +1748,13 @@ struct Tensor[dtype: DType = DType.float32](
 
                 @parameter
                 fn mul_add[simdwidth: Int](k: Int):
-                    vector = SIMD[dtype, simdwidth](scalar_a)
+                    vectorized_a = SIMD[dtype, simdwidth](scalar_a)
+                    vector_b = B.load[simdwidth](j, k)
+                    product = vectorized_a * vector_b
+                    offset = i * cols_b + k
                     C.data.store[width=simdwidth](
-                        i * cols_b + k,
-                        C.data.load[width=simdwidth](i * cols_b + k)
-                        + vector * B.data.load[width=simdwidth](j * cols_b + k),
+                        offset,
+                        C.data.load[width=simdwidth](offset) + product,
                     )
 
                 vectorize[mul_add, simd_width](cols_b)
@@ -1770,19 +1772,7 @@ struct Tensor[dtype: DType = DType.float32](
         return C
 
     fn matmul(self, other: TensorView[dtype]) -> Self:
-        this = TensorLike.from_tensor(self)
-        that = TensorLike.from_view(other)
-        out = this.matmul(that)
-        requires_grad = self.requires_grad or other.requires_grad
-        if requires_grad:
-            out.requires_grad = True
-            out.init_grad()
-            backward_fn = MatmulBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-            out.add_ancestry(TensorLike.from_view(other))
-
-        return out
+        return self.matmul(UnsafePointer(to=other))
 
     fn matmul[
         simd_width: Int = simdwidthof[dtype]()
@@ -1818,6 +1808,16 @@ struct Tensor[dtype: DType = DType.float32](
                 else:
                     for step in range(0, mbatch):
                         C.store(i, j + step, accum[step])
+
+        requires_grad = A.requires_grad or B.requires_grad
+        if requires_grad:
+            C.requires_grad = True
+            C.init_grad()
+            backward_fn = MatmulBackward[dtype]().into_backward_fn()
+            C.backwardFn = Optional(backward_fn)
+            C.add_ancestry(Self.Ancestor_of(A))
+            C.add_ancestry(TensorLike(V))
+
         return C
 
     fn transpose(
