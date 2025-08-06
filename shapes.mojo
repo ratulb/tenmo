@@ -6,9 +6,23 @@ from memory import Pointer
 
 fn main() raises:
     test_negative_indices()
+    test_slice_shape()
 
 
 from testing import assert_true
+
+
+fn test_slice_shape() raises:
+    shape = Shape([1, 2, 3, 4])
+    assert_true(
+        shape[:-1] == Shape.of(1, 2, 3)
+        and shape[:-2] == Shape.of(1, 2)
+        and shape[:-3] == Shape(1)
+        and shape[2::4] == Shape.of(3)
+        and shape[-1:] == Shape.of(4)
+        and shape[-2:] == Shape.of(3, 4),
+        "Shape slice assertion failed",
+    )
 
 
 fn test_negative_indices() raises:
@@ -268,6 +282,10 @@ struct Shape(
             return self.axes_spans[index]
         else:
             return -1
+
+    fn __getitem__(self, slice: Slice) -> Self:
+        l = self.axes_spans[slice]
+        return Self(l)
 
     fn permute(self, axes: IntList) -> Self:
         if not len(axes) == len(self):
