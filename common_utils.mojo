@@ -1,6 +1,5 @@
 from shapes import Shape
 from tensors import Tensor
-from testing import assert_true
 from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
@@ -9,6 +8,7 @@ from utils import Variant
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
+
 
 @always_inline
 fn is_power_of_two(x: Int) -> Bool:
@@ -315,6 +315,92 @@ struct Validator:
 
         return True
 
+    @staticmethod
+    fn validate_new_shape(curr_dims: IntList, new_dims: IntList) -> Shape:
+        """
+
+        Validates if a tensor can be reshaped from `current_shape` to `new_shape`.
+
+        Args:
+            curr_dims: Original shape of the tensor (e.g., `3, 4, 5`).
+            new_dims: Requested new shape (e.g., `2, -1, 10`). May contain at most one `-1`.
+
+        Returns:
+            Shape: Validated concrete shape (e.g., `Shape(2, 6, 10)`).
+
+        """
+        var concrete_dims: IntList
+
+        # --- Step 1: Check for invalid values in `new_shape` ---
+        if new_dims.any(Self.invalid_dim):
+            panic(
+                "Shape dimensions must be positive or -1 got ",
+                new_dims.__str__(),
+            )
+
+        # --- Step 2: Count `-1` entries (only one allowed) ---
+        neg_one_count = new_dims.count(-1)
+        if neg_one_count > 1:
+            panic(
+                "At most one -1 allowed in new_shape got ", new_dims.__str__()
+            )
+
+        # Calculate concrete shape (replacing -1 if needed)
+        curr_product = curr_dims.product()
+        if neg_one_count == 1:
+            # Infer the dimension marked as -1
+            known_dims_product = 1
+            for dim in new_dims:
+                if dim != -1:
+                    known_dims_product *= dim
+            if curr_product % known_dims_product != 0:
+                panic(
+                    "Cannot infer -1:",
+                    String(curr_product),
+                    "elements not divisible by",
+                    String(known_dims_product),
+                )
+            inferred_dim = curr_product // known_dims_product
+            concrete_dims = IntList.new(
+                [inferred_dim if dim == -1 else dim for dim in new_dims]
+            )
+        else:
+            concrete_dims = new_dims.copy()
+
+        if concrete_dims.product() != curr_product:
+            panic(
+                "Shape mismatch: ",
+                String(curr_product),
+                " elements vs. ",
+                String(concrete_dims.product()),
+            )
+
+        return Shape(concrete_dims)
+
+    @always_inline
+    @staticmethod
+    fn invalid_dim(dim: Int) -> Bool:
+        return dim == 0 or dim < -1
+
+
+from testing import assert_true
+
+
+fn test_validate_new_shape() raises:
+    print("test_validate_new_shape")
+    curr_dims = IntList.new([3, 4, 5])
+    new_dims = IntList.new([2, -1, 10])
+    concrete_shape = Validator.validate_new_shape(curr_dims, new_dims)
+    assert_true(
+        concrete_shape == Shape.of(2, 3, 10),
+        "validate_new_shape assertion 1 failed",
+    )
+    new_dims = IntList.new([-1])
+    concrete_shape = Validator.validate_new_shape(curr_dims, new_dims)
+    assert_true(
+        concrete_shape == Shape.of(60), "validate_new_shape assertion 2 failed"
+    )
+
 
 fn main() raises:
-    pass
+    test_validate_new_shape()
