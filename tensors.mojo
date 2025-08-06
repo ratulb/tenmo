@@ -26,6 +26,7 @@ from common_utils import (
     newaxis,
     Idx,
     NewAxis,
+    is_power_of_two,
 )
 from operators import (
     __tensor_op_tensor__,
@@ -1139,18 +1140,49 @@ struct Tensor[dtype: DType = DType.float32](
             mut = Origin(__origin_of(self)).mut, origin = __origin_of(self)
         ]()
 
-    fn load[nelts: Int = 1](self, rows: Int, cols: Int) -> SIMD[dtype, nelts]:
-        if not self.ndim() == 2:
-            abort("Tensor → load is supported only for 2d tensor")
-        result = self.data.load[width=nelts](rows * self.shape[1] + cols)
-        return result
+    @always_inline
+    fn load[nelts: Int = 1](self, row: Int, col: Int) -> SIMD[dtype, nelts]:
+        constrained[
+            is_power_of_two(nelts),
+            "Tensor → load: SIMD width (nelts) must be a power of 2",
+        ]()
 
+        if self.rank() != 2:
+            abort("Tensor → load: supported only for 2D tensors")
+
+        if (
+            row < 0
+            or row >= self.shape[0]
+            or col < 0
+            or col + nelts > self.shape[1]
+        ):
+            abort("Tensor → load: Out-of-bounds access")
+
+        addr = row * self.strides[0] + col * self.strides[1]
+        return self.data.load[width=nelts, volatile=True](addr)
+
+    @always_inline
     fn store[
         nelts: Int = 1
-    ](self, rows: Int, cols: Int, val: SIMD[dtype, nelts]):
-        if not self.ndim() == 2:
-            abort("Tensor → store is supported only for 2d tensor")
-        self.data.store(rows * self.shape[1] + cols, val)
+    ](self, row: Int, col: Int, value: SIMD[dtype, nelts]):
+        constrained[
+            is_power_of_two(nelts),
+            "Tensor → store: SIMD width (nelts) must be a power of 2",
+        ]()
+
+        if self.rank() != 2:
+            abort("Tensor → store is supported only for 2D tensors")
+
+        if (
+            row < 0
+            or row >= self.shape[0]
+            or col < 0
+            or col + nelts > self.shape[1]
+        ):
+            abort("Tensor → store: out-of-bounds access")
+
+        addr = row * self.strides[0] + col * self.strides[1]
+        self.data.store[width=nelts, volatile=True](addr, value)
 
     fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         constrained[
@@ -1701,37 +1733,41 @@ struct Tensor[dtype: DType = DType.float32](
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
 
-    fn matmul[simd_width: Int = simdwidthof[dtype]()](self, other: Self) -> Self:
+    fn matmul[
+        simd_width: Int = simdwidthof[dtype]()
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         print("I being called for action")
-        rows = self.rows()
-        cols = self.cols()
-        cols_O = other.cols()
-        out = Tensor[dtype].zeros(rows, cols_O, requires_grad=False)
+        rows_a = A.rows()
+        cols_a = A.cols()
+        cols_b = B.cols()
+        C = Tensor[dtype].zeros(rows_a, cols_b)
         start = perf_counter_ns()
-        for i in range(rows):
-            for j in range(cols):
-                curr_cell = self.data.load[width=1](i * cols + j)
+        for i in range(rows_a):
+            for j in range(cols_a):
+                scalar_a = A.load(i, j)
+
                 @parameter
-                fn dot[simdwidth: Int](k: Int):
-                    out.data.store[width=simdwidth](
-                        i * cols_O + k,
-                        out.data.load[width=simdwidth](i * cols_O + k)
-                        + curr_cell * other.data.load[width=simdwidth](j * cols_O + k),
+                fn mul_add[simdwidth: Int](k: Int):
+                    vector = SIMD[dtype, simdwidth](scalar_a)
+                    C.data.store[width=simdwidth](
+                        i * cols_b + k,
+                        C.data.load[width=simdwidth](i * cols_b + k)
+                        + vector * B.data.load[width=simdwidth](j * cols_b + k),
                     )
 
-                vectorize[dot, simd_width](cols_O)
+                vectorize[mul_add, simd_width](cols_b)
         end = perf_counter_ns()
         print("matmul took: ", end - start)
-        requires_grad = self.requires_grad or other.requires_grad
+        requires_grad = A.requires_grad or B.requires_grad
         if requires_grad:
-            out.requires_grad = True
-            out.init_grad()
+            C.requires_grad = True
+            C.init_grad()
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-            out.add_ancestry(Self.Ancestor_of(other))
+            C.backwardFn = Optional(backward_fn)
+            C.add_ancestry(Self.Ancestor_of(A))
+            C.add_ancestry(Self.Ancestor_of(B))
 
-        return out
+        return C
 
     fn matmul(self, other: TensorView[dtype]) -> Self:
         this = TensorLike.from_tensor(self)
@@ -1747,6 +1783,42 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(TensorLike.from_view(other))
 
         return out
+
+    fn matmul[
+        simd_width: Int = simdwidthof[dtype]()
+    ](A: Tensor[dtype], V: UnsafePointer[TensorView[dtype]]) -> Tensor[dtype]:
+        B = V[]
+        rows_a = A.shape[0]
+        cols_a = A.shape[1]
+        cols_b = B.shape[1]
+        packed = B.strides[1] == 1
+        if cols_a != B.shape[0]:
+            abort("Tensor → matmul(Tensor, TensorView): Incompatible shapes")
+
+        C = Tensor[dtype].zeros(rows_a, cols_b)
+        for i in range(0, rows_a):
+            for j in range(0, cols_b, simd_width):
+                mbatch = min(simd_width, cols_b - j)
+                var accum = SIMD[dtype, simd_width](0)
+
+                for k in range(0, cols_a):
+                    scalar_a = A.load(i, k)
+
+                    if packed and mbatch == simd_width:
+                        simd_vector = B.load[simd_width](k, j)
+                        accum += simd_vector * scalar_a
+                    else:
+                        # mbatch < simd_width or scattered B cols
+                        for step in range(0, mbatch):
+                            scalar_b = B.load(k, j + step)
+                            accum[step] += scalar_a * scalar_b
+
+                if mbatch == simd_width:
+                    C.store[simd_width](i, j, accum)
+                else:
+                    for step in range(0, mbatch):
+                        C.store(i, j + step, accum[step])
+        return C
 
     fn transpose(
         self, *axes: Int, requires_grad: Optional[Bool] = None
