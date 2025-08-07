@@ -10,8 +10,9 @@ fn main():
     print(Strides.Zero)
 
 
-@register_passable
-struct Strides(Sized & Copyable & Stringable & Representable & Writable):
+struct Strides(
+    Sized & Copyable & Movable & Stringable & Representable & Writable
+):
     var strides: IntList
     alias Zero = Self(IntList.Empty)
 
@@ -25,10 +26,9 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
         return self.strides == other.strides
 
     fn __copyinit__(out self, existing: Self):
-        """Initialize by copying an existing `Strides`.
-        Args:
-            existing: The Strides to copy from.
-        """
+        self.strides = existing.strides
+
+    fn __moveinit__(out self, var existing: Self):
         self.strides = existing.strides
 
     fn is_contiguous(self, shape: Shape) -> Bool:

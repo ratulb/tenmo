@@ -1,6 +1,5 @@
 ### Mojo Tensor
 ### Implement tensor library in mojo from first principles
-from time import perf_counter_ns
 from math import iota, exp, floor
 from random import seed, random_float64
 from algorithm import vectorize
@@ -116,6 +115,36 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         self.init_grad()
+
+    fn __moveinit__(out self, owned other: Self):
+        self.shape = other.shape
+        self.strides = other.strides
+        self.data = UnsafePointer[Scalar[other.dtype]].alloc(other.numels())
+        memcpy(self.data, other.data, other.numels())
+        self.requires_grad = other.requires_grad
+        self.grad = other.grad
+        self.ancestors = other.ancestors
+        self.base = other.base
+        self.backwardFn = other.backwardFn
+
+    fn __copyinit__(out self, other: Self):
+        self.shape = other.shape
+        self.strides = other.strides
+        self.data = UnsafePointer[Scalar[other.dtype]].alloc(other.numels())
+        memcpy(self.data, other.data, other.numels())
+        self.requires_grad = other.requires_grad
+        self.grad = other.grad
+        self.ancestors = other.ancestors
+        self.base = other.base
+        self.backwardFn = other.backwardFn
+        self.init_grad()
+
+    fn init_grad(mut self):
+        if self.requires_grad and not self.grad.__as_bool__():
+            gradients = Tensor[dtype](self.shape)
+            self.grad = UnsafePointer[Self].alloc(1)
+            self.grad.init_pointee_move(gradients^)
+            self.zero_grad()
 
     fn is_contiguous(self) -> Bool:
         return True
@@ -234,40 +263,15 @@ struct Tensor[dtype: DType = DType.float32](
         return self[0] if self.shape == Shape.Unit else self[IntList.Empty]
 
     fn __getitem__(self, *slices: Slice) -> TensorView[dtype]:
-        rank = self.shape.rank()
-        if not len(slices) == rank:
-            abort("Number of slices must match tensor rank")
+        # Delegate shape/strides/offset computation
+        view_shape, view_strides, new_offset = (
+            Validator.validate_and_compute_view_metadata(
+                self.shape,
+                self.strides,
+                slices,
+            )
+        )
 
-        new_shape = IntList.with_capacity(rank)
-        new_strides = IntList.with_capacity(rank)
-        new_offset = 0
-        strides = Strides.default(self.shape)
-
-        for i in range(rank):
-            axis = self.shape[i]
-            stride = strides[i]
-
-            start, end, step = Slicer.slice(slices[i], axis)
-            # Negative index adjustment
-            if start < 0:
-                start += axis
-            if end < 0:
-                end += axis
-
-            # Clamp to bounds
-            start = max(0, min(start, axis))
-            end = max(0, min(end, axis))
-
-            # Calculate length
-            span = end - start
-            length = (span + (step - 1)) // step  # ceil division
-
-            new_shape.append(length)
-            new_strides.append(stride * step)
-
-            new_offset += start * stride
-        view_shape = Shape(new_shape)
-        view_strides = Strides(new_strides)
         out = TensorView[dtype](
             UnsafePointer(to=self),
             shape=view_shape,
@@ -285,146 +289,36 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn __getitem__(self, *indices: Idx) -> TensorView[dtype]:
-        var required_rank = 0
-        for idx in indices:
-            if not idx.isa[NewAxis]():  # Only count non-newaxis indices
-                required_rank += 1
-        rank = self.shape.rank()
-        count = len(indices)
-        if required_rank != rank:
-            panic(
-                "Tensor →__getitem__(*indices: Idx): axes count(",
-                String(rank),
-                ") and non-newaxis indices len(",
-                String(required_rank),
-                ") does not match",
+        # Compute view metadata
+        view_shape, view_strides, view_offset = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                self.shape, self.strides, indices
             )
-        var view_shape = IntList.with_capacity(rank)
-        var view_strides = IntList.with_capacity(rank)
-        var view_offset = 0
-        var dim_counter = 0  # Tracks original tensor dimensions
+        )
 
-        for i in range(count):
-            idx = indices[i]
+        # Handle scalar (rank-0) case
+        is_scalar = len(view_shape) == 0
+        shape = Shape.Void if is_scalar else view_shape
+        strides = Strides.Zero if is_scalar else view_strides
 
-            # Case 1: NewAxis (add dimension)
-            if idx.isa[NewAxis]():
-                view_shape.append(1)  # Insert size-1 axis
-                view_strides.append(0)  # Broadcastable stride
+        # Create view
+        out = TensorView[dtype](
+            UnsafePointer(to=self),
+            shape=shape,
+            strides=strides,
+            offset=view_offset,
+            requires_grad=self.requires_grad,
+        )
 
-            else:
-                # Process Int/Slice against original tensor's dim_counter-th dimension
-                shape_dim = self.shape[dim_counter]
-                stride_dim = self.strides[dim_counter]
-                dim_counter += 1
-                if idx.isa[Int]():
-                    axis = idx[Int]
-                    if axis < 0:
-                        axis += shape_dim  # Handle negative indices
-                    if not 0 <= axis < shape_dim:
-                        panic(
-                            (
-                                "Tensor →__getitem__(*indices: Idx): index out"
-                                " of bounds. Axis("
-                            ),
-                            String(axis),
-                            ") and tensor axis(",
-                            String(shape_dim),
-                            ")",
-                        )
-                    view_offset += axis * stride_dim
-                    # Do NOT append to shape/strides (reduces rank)
-
-                # Case 3: Slice (subview)
-                elif idx.isa[Slice]():
-                    s = idx[Slice]
-                    start, end, step = Slicer.slice(s, shape_dim)
-
-                    start = max(0, min(start, shape_dim))
-                    end = max(0, min(end, shape_dim))
-
-                    if step == 0:
-                        panic(
-                            "Tensor →__getitem__(*indices: Idx): slice step"
-                            " cannot be zero"
-                        )
-                    if step > 0:
-                        if not start < end:
-                            panic(
-                                "Tensor →__getitem__(*indices: Idx): invalid"
-                                " slice range"
-                            )
-                    else:
-                        if not start > end:
-                            panic(
-                                "Tensor →__getitem__(*indices: Idx): invalid"
-                                " negative slice range"
-                            )
-                    view_shape.append((end - start + step - 1) // step)
-                    view_strides.append(stride_dim * step)
-                    view_offset += start * stride_dim
-
-        var out: TensorView[dtype]
-        # Rank-0 (scalar) case -> return as rank-0 TensorView
-        if len(view_shape) == 0:
-            out = TensorView[dtype](
-                UnsafePointer(to=self),
-                shape=Shape.Void,
-                strides=Strides.Zero,
-                offset=view_offset,
-                requires_grad=self.requires_grad,
-            )
-        else:
-            out = TensorView[dtype](
-                UnsafePointer(to=self),
-                shape=Shape(view_shape),
-                strides=Strides(view_strides),
-                offset=view_offset,
-                requires_grad=self.requires_grad,
-            )
+        # Setup autograd
         if self.requires_grad:
-            backward_fn = (
-                ViewBackward[dtype](
-                    Shape(view_shape), Strides(view_strides), view_offset
-                ).into_backward_fn() if len(view_shape)
-                != 0 else ViewBackward[dtype](
-                    Shape.Void, Strides.Zero, view_offset
-                ).into_backward_fn()
-            )
+            backward_fn = ViewBackward[dtype](
+                shape, strides, view_offset
+            ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(Self.Ancestor_of(self))
 
         return out
-
-    fn __moveinit__(out self, owned other: Self):
-        self.shape = other.shape
-        self.strides = other.strides
-        self.data = UnsafePointer[Scalar[other.dtype]].alloc(other.numels())
-        memcpy(self.data, other.data, other.numels())
-        self.requires_grad = other.requires_grad
-        self.grad = other.grad
-        self.ancestors = other.ancestors
-        self.base = other.base
-        self.backwardFn = other.backwardFn
-
-    fn __copyinit__(out self, other: Self):
-        self.shape = other.shape
-        self.strides = other.strides
-        self.data = UnsafePointer[Scalar[other.dtype]].alloc(other.numels())
-        memcpy(self.data, other.data, other.numels())
-        self.requires_grad = other.requires_grad
-        self.grad = other.grad
-        self.ancestors = other.ancestors
-        self.base = other.base
-        self.backwardFn = other.backwardFn
-        self.init_grad()
-
-    fn init_grad(mut self):
-        if self.requires_grad and not self.grad.__as_bool__():
-            gradients = Tensor[dtype](self.shape)
-            self.grad = UnsafePointer[Self].alloc(1)
-            self.grad.init_pointee_move(gradients^)
-            self.zero_grad()
 
     # Always use this to print grad to avoid surprises of segmentation fault!
     fn gprint(self, num_first: Int = 10, num_last: Int = 10):
@@ -1305,23 +1199,34 @@ struct Tensor[dtype: DType = DType.float32](
     fn reshape(self, *newdims: Int) -> Tensor[dtype]:
         if len(newdims) == 1 and newdims[0] == 0:
             return self.reshape()
-        return self.reshape(Shape(newdims))
+        shape = Validator.validate_new_shape(
+            self.shape.intlist(), IntList(newdims)
+        )
+        return self.reshape(shape, validated=True)
 
     fn reshape(self, shape: List[Int]) -> Tensor[dtype]:
-        return self.reshape(Shape(shape))
+        new_shape = Validator.validate_new_shape(
+            self.shape.intlist(), IntList.new(shape)
+        )
+        return self.reshape(new_shape, validated=True)
 
-    fn reshape(self, new_shape: Shape) -> Tensor[dtype]:
-        if self.numels() != new_shape.num_elements():
+    fn reshape(
+        self, new_shape: Shape, validated: Bool = False
+    ) -> Tensor[dtype]:
+        shape = new_shape if validated else Validator.validate_new_shape(
+            self.shape.intlist(), new_shape.intlist()
+        )
+        if self.numels() != shape.num_elements():
             abort(
                 "Tensor with "
                 + String(self.numels())
                 + " element(s) can't be converted to a tensor containing "
-                + String(new_shape.num_elements())
+                + String(shape.num_elements())
                 + " element(s)"
             )
 
         requires_grad = self.requires_grad
-        out = Tensor[dtype](new_shape, self.data, requires_grad=requires_grad)
+        out = Tensor[dtype](shape, self.data, requires_grad=requires_grad)
 
         if requires_grad:
             # Only allocate base if needed
@@ -1615,28 +1520,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return grad_contrib
 
-    fn T(self, tile_size: Int = 32) -> Tensor[dtype]:
-        if self.shape.ndim != 2:
-            abort("Tensor → transpose allowed only for 2D tensors")
-        rows, cols = (self.shape[0], self.shape[1])
-        out = Tensor[dtype](
-            self.shape.reverse(), requires_grad=self.requires_grad
-        )
-
-        for i in range(0, rows, tile_size):
-            for j in range(0, cols, tile_size):
-                for ii in range(i, min(i + tile_size, rows)):
-                    for jj in range(j, min(j + tile_size, cols)):
-                        out[jj, ii] = self[ii, jj]
-
-        if self.requires_grad:
-            backward_fn = TBackward[dtype]().into_backward_fn()
-
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
-
     fn view(
         self,
         shape: List[Int],
@@ -1736,12 +1619,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn matmul[
         simd_width: Int = simdwidthof[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        print("I being called for action")
         rows_a = A.rows()
         cols_a = A.cols()
         cols_b = B.cols()
         C = Tensor[dtype].zeros(rows_a, cols_b)
-        start = perf_counter_ns()
         for i in range(rows_a):
             for j in range(cols_a):
                 scalar_a = A.load(i, j)
@@ -1758,8 +1639,6 @@ struct Tensor[dtype: DType = DType.float32](
                     )
 
                 vectorize[mul_add, simd_width](cols_b)
-        end = perf_counter_ns()
-        print("matmul took: ", end - start)
         requires_grad = A.requires_grad or B.requires_grad
         if requires_grad:
             C.requires_grad = True
@@ -1864,7 +1743,8 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
+    a = Tensor.arange(24).reshape(2, -1)
+    a.print()
 
 
 from testing import assert_true

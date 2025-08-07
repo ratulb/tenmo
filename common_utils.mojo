@@ -3,6 +3,7 @@ from tensors import Tensor
 from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
+from strides import Strides
 from os import abort
 from utils import Variant
 
@@ -381,6 +382,144 @@ struct Validator:
     @staticmethod
     fn invalid_dim(dim: Int) -> Bool:
         return dim == 0 or dim < -1
+
+    @always_inline
+    @staticmethod
+    fn validate_and_compute_view_metadata(
+        original_shape: Shape,
+        original_strides: Strides,
+        slices: VariadicListMem[Slice],
+    ) -> Tuple[Shape, Strides, Int]:
+        """
+        Computes the new shape, strides, and offset for a tensor view after slicing.
+
+        Args:
+            original_shape: The shape of the original tensor.
+            original_strides: The strides of the original tensor.
+            slices: VariadicList of slice objects for each dimension.
+
+        Returns:
+            Tuple[Shape, Strides, int]: New shape, strides, and offset.
+
+        """
+        rank = original_shape.rank()
+        if len(slices) != rank:
+            abort("Number of slices must match tensor rank")
+
+        new_shape = IntList.with_capacity(rank)
+        new_strides = IntList.with_capacity(rank)
+        new_offset = 0
+
+        for i in range(rank):
+            axis = original_shape[i]
+            stride = original_strides[i]
+
+            start, end, step = Slicer.slice(slices[i], axis)
+
+            # Negative index adjustment
+            start = start + axis if start < 0 else start
+            end = end + axis if end < 0 else end
+
+            # Clamp to bounds
+            start = max(0, min(start, axis))
+            end = max(0, min(end, axis))
+
+            # Calculate length (ceil division)
+            span = end - start
+            length = (span + (step - 1)) // step
+
+            new_shape.append(length)
+            new_strides.append(stride * step)
+            new_offset += start * stride
+
+        return Shape(new_shape), Strides(new_strides), new_offset
+
+    @always_inline
+    @staticmethod
+    fn validate_and_compute_advanced_indexing_metadata(
+        original_shape: Shape,
+        original_strides: Strides,
+        indices: VariadicListMem[Idx],
+    ) -> Tuple[Shape, Strides, Int]:
+        """
+        Computes view metadata (shape, strides, offset) for advanced indexing operations.
+        Args:
+            original_shape: Shape of the original tensor.
+            original_strides: Strides of the original tensor.
+            indices: VariadicListMem of Idx variants (NewAxis/Int/Slice).
+        Returns:
+            Tuple[Shape, Strides, int]: New shape, strides, and offset.
+        """
+        # Validate rank vs non-newaxis indices count
+        var required_rank = 0
+        for idx in indices:
+            if not idx.isa[NewAxis]():  # Only count non-newaxis indices
+                required_rank += 1
+        if required_rank != original_shape.rank():
+            panic(
+                "Tensor indexing: axes count(",
+                String(original_shape.rank()),
+                ") and ",
+                "non-newaxis indices count(",
+                String(required_rank),
+                ") mismatch",
+            )
+
+        new_shape = IntList.with_capacity(len(indices))
+        new_strides = IntList.with_capacity(len(indices))
+        offset = 0
+        dim_counter = 0  # Tracks original tensor dimensions
+
+        for idx in indices:
+            if idx.isa[NewAxis]():
+                # Case 1: NewAxis insertion
+                new_shape.append(1)
+                new_strides.append(0)
+            elif idx.isa[Int]():
+                # Case 2: Integer indexing (dimension reduction)
+                axis = idx[Int]
+                shape_dim = original_shape[dim_counter]
+                stride_dim = original_strides[dim_counter]
+                dim_counter += 1
+                if axis < 0:
+                    axis += shape_dim
+                if not 0 <= axis < shape_dim:
+                    panic(
+                        "Index",
+                        String(axis),
+                        "out of bounds for dimension",
+                        String(shape_dim),
+                    )
+                offset += axis * stride_dim
+                # No shape/strides append (reduces rank)
+            elif idx.isa[Slice]():
+                # Case 3: Slicing
+                s = idx[Slice]
+                shape_dim = original_shape[dim_counter]
+                stride_dim = original_strides[dim_counter]
+                dim_counter += 1
+                start, end, step = Slicer.slice(s, shape_dim)
+                start = max(0, min(start, shape_dim))
+                end = max(0, min(end, shape_dim))
+                if step == 0:
+                    panic("Slice step cannot be zero")
+                if (step > 0 and start >= end) or (step < 0 and start <= end):
+                    panic(
+                        "Invalid slice range [",
+                        String(start),
+                        ":",
+                        String(end),
+                        ":",
+                        String(step),
+                        "]",
+                    )
+
+                new_length = (end - start + step - 1) // step
+                new_shape.append(new_length)
+                new_strides.append(stride_dim * step)
+                offset += start * stride_dim
+
+        return Shape(new_shape), Strides(new_strides), offset
 
 
 from testing import assert_true
