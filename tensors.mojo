@@ -13,47 +13,9 @@ from ancestry import Ancestors
 from views import TensorView
 from strides import Strides
 from shared import TensorLike
-from common_utils import (
-    Validator,
-    compute_output_shape,
-    panic,
-    log_debug,
-    variadic1or2,
-    Slicer,
-    i,
-    s,
-    newaxis,
-    Idx,
-    NewAxis,
-    is_power_of_two,
-)
-from operators import (
-    __tensor_op_tensor__,
-    AddTensor,
-    SubtractTensor,
-    MulTensor,
-    __tensor_op_scalar__,
-    AddScalar,
-    SubtractScalar,
-    SubtractFromScalar,
-    DivideByScalar,
-    DivideScalar,
-    MulScalar,
-    Power,
-    scalar_ops,
-    Add,
-    sum_all,
-    tensor_compare,
-    tensor_compare_scalar,
-    Equal,
-    NotEqual,
-    LessThan,
-    LessThanEqual,
-    GreaterThan,
-    GreaterThanEqual,
-    Subtract,
-    Multiply,
-)
+from common_utils_imports import *
+from operators import __tensor_op_tensor__, __tensor_op_scalar__
+from operators_imports import *
 from walkback import *
 
 
@@ -1741,8 +1703,6 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    a = Tensor.arange(24).reshape(2, -1)
-    a.print()
-
+    pass
 
 from testing import assert_true
