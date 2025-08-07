@@ -1579,6 +1579,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn matmul[
         simd_width: Int = simdwidthof[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+        Validator.validate_matrix_shapes(A, B)
         rows_a = A.rows()
         cols_a = A.cols()
         cols_b = B.cols()
@@ -1611,18 +1612,23 @@ struct Tensor[dtype: DType = DType.float32](
         return C
 
     fn matmul(self, other: TensorView[dtype]) -> Self:
-        return self.matmul(UnsafePointer(to=other))
+        Validator.validate_matrix_shapes(self, other)
+        return self.matmul(UnsafePointer(to=other), validated=True)
 
     fn matmul[
         simd_width: Int = simdwidthof[dtype]()
-    ](A: Tensor[dtype], V: UnsafePointer[TensorView[dtype]]) -> Tensor[dtype]:
+    ](
+        A: Tensor[dtype],
+        V: UnsafePointer[TensorView[dtype]],
+        validated: Bool = False,
+    ) -> Tensor[dtype]:
         B = V[]
+        if not validated:
+            Validator.validate_matrix_shapes(A, B)
         rows_a = A.shape[0]
         cols_a = A.shape[1]
         cols_b = B.shape[1]
         packed = B.strides[1] == 1
-        if cols_a != B.shape[0]:
-            abort("Tensor → matmul(Tensor, TensorView): Incompatible shapes")
 
         C = Tensor[dtype].zeros(rows_a, cols_b)
         for i in range(0, rows_a):
@@ -1703,6 +1709,9 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
+    a = Tensor.rand(3, 4, 5)
+    v = a[:, :, :]
+    print(v.is_contiguous())
+
 
 from testing import assert_true

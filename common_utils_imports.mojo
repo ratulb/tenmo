@@ -11,4 +11,5 @@ from common_utils import (
     Idx,
     NewAxis,
     is_power_of_two,
+    validate_matrix_shapes,
 )

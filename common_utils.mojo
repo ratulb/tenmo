@@ -1,5 +1,6 @@
 from shapes import Shape
 from tensors import Tensor
+from views import TensorView
 from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
@@ -520,6 +521,54 @@ struct Validator:
                 offset += start * stride_dim
 
         return Shape(new_shape), Strides(new_strides), offset
+
+    @always_inline
+    @staticmethod
+    fn validate_matrix_shapes[
+        dtype: DType, //
+    ](lhs: Tensor[dtype], rhs: Tensor[dtype]):
+        if not lhs.rank() == 2:
+            abort("Tensor → matmul(Tensor): Only supports 2D matmul")
+        if not rhs.rank() == 2:
+            abort("Tensor → matmul(Tensor): Other must be 2D")
+        if not lhs.shape[1] == rhs.shape[0]:
+            abort("Tensor → matmul(Tensor): Incompatible shapes")
+
+    @always_inline
+    @staticmethod
+    fn validate_matrix_shapes[
+        dtype: DType, //
+    ](lhs: Tensor[dtype], rhs: TensorView[dtype]):
+        if not lhs.rank() == 2:
+            abort("Tensor → matmul(TensorView): Only supports 2D matmul")
+        if not rhs.rank() == 2:
+            abort("Tensor → matmul(TensorView): Other must be 2D")
+        if not lhs.shape[1] == rhs.shape[0]:
+            abort("Tensor → matmul(TensorView): Incompatible shapes")
+
+    @always_inline
+    @staticmethod
+    fn validate_matrix_shapes[
+        dtype: DType, //
+    ](lhs: TensorView[dtype], rhs: TensorView[dtype]):
+        if not lhs.rank() == 2:
+            abort("TensorView → matmul(TensorView): Only supports 2D matmul")
+        if not rhs.rank() == 2:
+            abort("TensorView → matmul(TensorView): Other must be 2D")
+        if not lhs.shape[1] == rhs.shape[0]:
+            abort("TensorView → matmul(TensorView): Incompatible shapes")
+
+    @always_inline
+    @staticmethod
+    fn validate_matrix_shapes[
+        dtype: DType, //
+    ](lhs: TensorView[dtype], rhs: Tensor[dtype]):
+        if not lhs.rank() == 2:
+            abort("TensorView → matmul(Tensor): Only supports 2D matmul")
+        if not rhs.rank() == 2:
+            abort("TensorView → matmul(Tensor): Other must be 2D")
+        if not lhs.shape[1] == rhs.shape[0]:
+            abort("TensorView → matmul(Tensor): Incompatible shapes")
 
 
 from testing import assert_true
