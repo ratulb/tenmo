@@ -170,7 +170,7 @@ struct Tensor[dtype: DType = DType.float32](
         shape = self.shape
         strides = self.strides
         out = TensorView(
-            UnsafePointer(to=self),
+            self.unsafe_address(),
             self.shape,
             self.strides,
             offset=0,
@@ -273,7 +273,7 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         out = TensorView[dtype](
-            UnsafePointer(to=self),
+            self.unsafe_address(),
             shape=view_shape,
             strides=view_strides,
             offset=new_offset,
@@ -303,7 +303,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         # Create view
         out = TensorView[dtype](
-            UnsafePointer(to=self),
+            self.unsafe_address(),
             shape=shape,
             strides=strides,
             offset=view_offset,
@@ -1288,7 +1288,7 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn __add__(self, other: Self) -> Tensor[dtype]:
-        if UnsafePointer(to=self) == UnsafePointer(to=other):
+        if self.unsafe_address() == other.unsafe_address():
             return self.__mul__(2)
         if not self.broadcastable(other):
             abort(
@@ -1331,9 +1331,7 @@ struct Tensor[dtype: DType = DType.float32](
                 Subtract, AddTensor, SubtractTensor
             ](other)
 
-        out = __tensor_op_tensor__[dtype, SubtractTensor](
-            UnsafePointer(to=self)[], UnsafePointer(to=other)[]
-        )
+        out = __tensor_op_tensor__[dtype, SubtractTensor](self, other)
 
         if self.requires_grad or other.requires_grad:
             sub_backward = SubBackward[dtype]()
@@ -1550,7 +1548,7 @@ struct Tensor[dtype: DType = DType.float32](
             abort("Tensor → view(shape): shape numels exceeds base tensor size")
         strides = Strides.default(shape)
         out = TensorView(
-            UnsafePointer(to=self),
+            self.unsafe_address(),
             shape,
             strides,
             offset=offset,
@@ -1606,7 +1604,7 @@ struct Tensor[dtype: DType = DType.float32](
             abort("Tensor → view: requested view accesses out-of-bounds data")
 
         return TensorView(
-            UnsafePointer(to=self),
+            self.unsafe_address(),
             shape,
             strides,
             offset=offset,
