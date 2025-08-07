@@ -1,6 +1,6 @@
 from python import Python, PythonObject
 from tensors import Tensor
-from memory import UnsafePointer, memcpy
+from memory import memcpy
 
 
 fn numpy_dtype(dtype: DType) raises -> PythonObject:
@@ -29,12 +29,14 @@ fn ndarray_ptr[
     return ndarray.__array_interface__["data"][0].unsafe_get_as_pointer[dtype]()
 
 
-fn to_ndarray[
-    axes_sizes: Int, dtype: DType, //
-](tensor: Tensor[axes_sizes, dtype]) raises -> PythonObject:
+fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
     np = Python.import_module("numpy")
-    ndarray = np.zeros(tensor.numels(), dtype=numpy_dtype(tensor.datatype))
+    ndarray = np.zeros(tensor.numels(), dtype=numpy_dtype(tensor.dtype))
     ndarray_ptr = ndarray_ptr[dtype](ndarray)
-    buffer_ptr = tensor.unsafe_ptr()
+    buffer_ptr = tensor.data_ptr()
     memcpy(ndarray_ptr, buffer_ptr, tensor.numels())
     return ndarray
+
+
+fn main():
+    pass
