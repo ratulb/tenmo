@@ -279,79 +279,122 @@ struct Buffer[dtype: DType = DType.float32](
     fn __eq__[
         simd_width: Int = simdwidthof[dtype]()
     ](this: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
-        var out = Buffer[dtype.bool](this.size)
+        total = this.size
+        out = Buffer[DType.bool](total)
 
-        @parameter
-        fn compare_scalar[simdwidth: Int](idx: Int):
-            out.store[simdwidth](idx, this.load[simdwidth](idx).__eq__(scalar))
+        simd_blocks = total // simd_width
+        for block in range(simd_blocks):
+            idx = block * simd_width
+            cmp = this.load[simd_width](idx) == scalar
+            for k in range(simd_width):
+                out.store[simd_width](idx + k, cmp[idx + k])
+        i = simd_blocks * simd_width
 
-        vectorize[compare_scalar, simd_width](this.size)
+        for k in range(i, total):
+            out.store(k, this.load(k) == scalar)
         return out
 
     fn __ne__[
         simd_width: Int = simdwidthof[dtype]()
     ](this: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
-        var out = Buffer[dtype.bool](this.size)
+        total = this.size
+        out = Buffer[DType.bool](total)
 
-        @parameter
-        fn compare_scalar[simdwidth: Int](idx: Int):
-            out.store[simdwidth](idx, this.load[simdwidth](idx).__ne__(scalar))
+        simd_blocks = total // simd_width
+        for block in range(simd_blocks):
+            idx = block * simd_width
+            cmp = this.load[simd_width](idx) != scalar
+            for k in range(simd_width):
+                out.store[simd_width](idx + k, cmp[idx + k])
+        i = simd_blocks * simd_width
 
-        vectorize[compare_scalar, simd_width](this.size)
+        for k in range(i, total):
+            out.store(k, this.load(k) != scalar)
         return out
 
     fn __lt__[
         simd_width: Int = simdwidthof[dtype]()
     ](this: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
-        var out = Buffer[dtype.bool](this.size)
+        total = this.size
+        out = Buffer[DType.bool](total)
 
-        @parameter
-        fn compare_scalar[simdwidth: Int](idx: Int):
-            out.store[simdwidth](idx, this.load[simdwidth](idx).__lt__(scalar))
+        simd_blocks = total // simd_width
+        for block in range(simd_blocks):
+            idx = block * simd_width
+            cmp = this.load[simd_width](idx) < scalar
+            for k in range(simd_width):
+                out.store[simd_width](idx + k, cmp[idx + k])
+        i = simd_blocks * simd_width
 
-        vectorize[compare_scalar, simd_width](this.size)
+        for k in range(i, total):
+            out.store(k, this.load(k) < scalar)
         return out
 
     fn __le__[
         simd_width: Int = simdwidthof[dtype]()
     ](this: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
-        var out = Buffer[dtype.bool](this.size)
+        total = this.size
+        out = Buffer[DType.bool](total)
 
-        @parameter
-        fn compare_scalar[simdwidth: Int](idx: Int):
-            out.store[simdwidth](idx, this.load[simdwidth](idx).__le__(scalar))
+        simd_blocks = total // simd_width
+        for block in range(simd_blocks):
+            idx = block * simd_width
+            cmp = this.load[simd_width](idx) <= scalar
+            for k in range(simd_width):
+                out.store[simd_width](idx + k, cmp[idx + k])
+        i = simd_blocks * simd_width
 
-        vectorize[compare_scalar, simd_width](this.size)
+        for k in range(i, total):
+            out.store(k, this.load(k) <= scalar)
         return out
 
     fn __gt__[
         simd_width: Int = simdwidthof[dtype]()
     ](this: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
-        var out = Buffer[dtype.bool](this.size)
+        total = this.size
+        out = Buffer[DType.bool](total)
 
-        @parameter
-        fn compare_scalar[simdwidth: Int](idx: Int):
-            out.store[simdwidth](idx, this.load[simdwidth](idx).__gt__(scalar))
+        simd_blocks = total // simd_width
+        for block in range(simd_blocks):
+            idx = block * simd_width
+            cmp = this.load[simd_width](idx) > scalar
+            for k in range(simd_width):
+                out.store[simd_width](idx + k, cmp[idx + k])
+        i = simd_blocks * simd_width
 
-        vectorize[compare_scalar, simd_width](this.size)
+        for k in range(i, total):
+            out.store(k, this.load(k) > scalar)
         return out
 
     fn __ge__[
         simd_width: Int = simdwidthof[dtype]()
     ](this: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
-        var out = Buffer[dtype.bool](this.size)
+        total = this.size
+        out = Buffer[DType.bool](total)
 
-        @parameter
-        fn compare_scalar[simdwidth: Int](idx: Int):
-            out.store[simdwidth](idx, this.load[simdwidth](idx).__ge__(scalar))
+        simd_blocks = total // simd_width
+        for block in range(simd_blocks):
+            idx = block * simd_width
+            cmp = this.load[simd_width](idx) >= scalar
+            for k in range(simd_width):
+                out.store[simd_width](idx + k, cmp[idx + k])
+        i = simd_blocks * simd_width
 
-        vectorize[compare_scalar, simd_width](this.size)
+        for k in range(i, total):
+            out.store(k, this.load(k) >= scalar)
         return out
 
     fn __eq__[
         dtype: DType,
         simd_width: Int = simdwidthof[dtype](),
     ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Buffer[DType.bool]:
+        if not lhs.size == rhs.size:
+            panic(
+                "Buffer → __eq__: buffer size does not match -> lhs:",
+                lhs.size.__str__(),
+                "vs. rhs:",
+                rhs.size.__str__(),
+            )
         total = lhs.size
         out = Buffer[DType.bool](total)
 
@@ -360,7 +403,8 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx) == rhs.load[simd_width](idx)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp)
+                out.store[simd_width](idx + k, cmp[idx + k])
+            # out.store[simd_width](idx, cmp)
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -386,7 +430,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx) != rhs.load[simd_width](idx)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp)
+                out.store[simd_width](idx + k, cmp[idx + k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -411,7 +455,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx) < rhs.load[simd_width](idx)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp)
+                out.store[simd_width](idx + k, cmp[idx + k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -436,7 +480,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx) <= rhs.load[simd_width](idx)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp)
+                out.store[simd_width](idx + k, cmp[idx + k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -461,7 +505,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx) > rhs.load[simd_width](idx)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp)
+                out.store[simd_width](idx + k, cmp[idx + k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -486,7 +530,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx) >= rhs.load[simd_width](idx)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp)
+                out.store[simd_width](idx + k, cmp[idx + k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -608,34 +652,28 @@ struct Buffer[dtype: DType = DType.float32](
         return False
 
     fn for_all[
-        dtype: DType,
         simd_width: Int = simdwidthof[dtype](),
-    ](buf: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Buffer[
+    ](this: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Buffer[
         DType.bool
     ]:
-        total = buf.size
+        total = this.size
         out = Buffer[DType.bool](total)
 
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            vals = buf.load[simd_width](idx)
+            vector = this.load[simd_width](idx)
 
-            # Apply predicate per lane
-            var cmp = SIMD[DType.bool, simd_width](False)
             for k in range(simd_width):
-                cmp[k] = pred(vals[k])
-
-            out.store[simd_width](idx, cmp)
+                out.store[simd_width](idx + k, pred(vector[k]))
 
         i = simd_blocks * simd_width
         for k in range(i, total):
-            out.store(k, pred(buf.load(k)))
+            out.store(k, pred(this.load(k)))
 
         return out
 
     fn all_true[
-        dtype: DType,
         simd_width: Int = simdwidthof[dtype](),
     ](self: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Bool:
         total = self.size
@@ -661,7 +699,7 @@ struct Buffer[dtype: DType = DType.float32](
         fn pred(scalar: Scalar[DType.bool]) -> Bool:
             return scalar == True
 
-        return buf.all_true[DType.bool, simd_width](pred)
+        return buf.all_true[simd_width](pred)
 
     @no_inline
     fn __str__(self) -> String:
@@ -670,7 +708,7 @@ struct Buffer[dtype: DType = DType.float32](
     fn write_to[W: Writer](self, mut writer: W):
         length = len(self)
         writer.write("Buffer[")
-        if length <= 3000:
+        if length <= 4000:
             for i in range(length):
                 writer.write(self.load(i))
                 if i < length - 1:
@@ -701,18 +739,131 @@ struct Buffer[dtype: DType = DType.float32](
 
 
 fn main() raises:
+    _ = """a = SIMD[DType.float32, 4](3, 42, 0, 42)
+    b = SIMD[DType.float32, 4](1, 42, 4, 42)
+    c = a - b
+    print(c)
+    d = c.cast[DType.bool]()
+    print(d)"""
+
+    test_buffer_buffer_add()
+    _ = """test_buffer_buffer_mul()
+    test_buffer_scalar_float_greater_than()
+    test_buffer_scalar_float_less_than_eq()
+    test_buffer_scalar_float_greater_than_eq()
+    test_buffer_scalar_float_less_than()
+    test_buffer_scalar_float_equality()
+    test_buffer_scalar_float_inequality()
+    test_buffer_float_equality()
     test_buffer_dot()
     test_buffer_prod()
     test_buffer_sum()
     test_buffer_float_greater_than_eq()
     test_buffer_float_greater_than()
     test_buffer_float_less_than()
-    test_buffer_float_equality()
     test_buffer_float_inequality()
-    test_buffer_float_less_eq_than()
+    test_buffer_float_less_eq_than()"""
 
 
 from testing import assert_true, assert_false
+
+
+fn test_buffer_buffer_mul() raises:
+    x = Buffer[DType.bool](129)
+    x.fill(True)
+    y = Buffer[DType.bool](129)
+    y.fill(True)
+    expect = Buffer[DType.bool](129)
+    expect.fill(True)
+    mul_result = x * y
+    cmp_result = mul_result == expect
+    assert_true(
+        cmp_result.all_true(),
+        "Buffer buffer mul for boolean - assertion failed",
+    )
+    y.fill(False)
+    expect.fill(True)
+    mul_result = x * y
+    cmp_result = mul_result == expect
+    assert_false(
+        cmp_result.all_true(),
+        "Buffer buffer mul for boolean(True * False) - assertion failed",
+    )
+
+
+fn test_buffer_buffer_add() raises:
+    a = Buffer(72)
+    a.fill(43.0)
+    b = Buffer(72)
+    b.fill(43.0)
+    expected = Buffer(72)
+    expected.fill(86)
+    added = a + b
+    result = added == expected
+    print(result)
+    _ = """assert_true(
+        result.all_true(),
+        "Buffer buffer add assertion failed",
+    )"""
+
+
+fn test_buffer_scalar_float_greater_than_eq() raises:
+    a = Buffer(72)
+    a.fill(43.0)
+    result1 = a >= 42
+    a.fill(42.0)
+    result2 = a >= 42
+    assert_true(
+        result1.all_true() and result2.all_true(),
+        "Buffer scalar float greater than eq assertion failed",
+    )
+
+
+fn test_buffer_scalar_float_less_than_eq() raises:
+    a = Buffer(72)
+    a.fill(42.0)
+    result1 = a <= 43
+    result2 = a <= 42
+    assert_true(
+        result1.all_true() and result2.all_true(),
+        "Buffer scalar float less than eq assertion failed",
+    )
+
+
+fn test_buffer_scalar_float_greater_than() raises:
+    a = Buffer(72)
+    a.fill(42.0)
+    result = a > 41
+    assert_true(
+        result.all_true(), "Buffer scalar float greater than assertion failed"
+    )
+
+
+fn test_buffer_scalar_float_less_than() raises:
+    a = Buffer(72)
+    a.fill(42.0)
+    result = a < 43
+    assert_true(
+        result.all_true(), "Buffer scalar float less than assertion failed"
+    )
+
+
+fn test_buffer_scalar_float_inequality() raises:
+    a = Buffer(72)
+    a.fill(42.0)
+    result = a != 43
+    assert_true(
+        result.all_true(), "Buffer scalar float inequality assertion failed"
+    )
+
+
+fn test_buffer_scalar_float_equality() raises:
+    a = Buffer(72)
+    a.fill(42.0)
+    result = a == 42
+    assert_true(
+        result.all_true(), "Buffer scalar float equality assertion failed"
+    )
 
 
 fn test_buffer_dot() raises:
