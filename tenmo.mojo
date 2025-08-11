@@ -29,7 +29,7 @@ struct Tensor[dtype: DType = DType.float32](
     var shape: Shape
     var strides: Strides
     var offset: Int
-    var data: Buffer[dtype]
+    var buffer: Buffer[dtype]
     var requires_grad: Bool
     var grad: UnsafePointer[Buffer[dtype]]
     var ancestors: Optional[Ancestors[dtype]]
@@ -48,7 +48,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = UnsafePointer[Tensor[dtype]]()
         self.backwardFn = None
         self.ancestors = None
-        self.data = Buffer[dtype].Empty
+        self.buffer = Buffer[dtype].Empty
         self.owns_data = False
         self.keep_alive = None
 
@@ -62,7 +62,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __init__(
         out self,
         shape: Shape,
-        data: Buffer[dtype],
+        buffer: Buffer[dtype],
         requires_grad: Bool = False,
     ):
         Shape.validate(shape)
@@ -74,7 +74,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.grad = UnsafePointer[Buffer[dtype]]()
         self.ancestors = None
         self.base = UnsafePointer[Tensor[dtype]]()
-        self.data = data
+        self.buffer = buffer
         self.owns_data = True
         self.keep_alive = Optional(ArcPointer(True))
         self.init_grad()
@@ -90,7 +90,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.grad = UnsafePointer[Buffer[dtype]]()
         self.ancestors = None
         # Take of Tensor with Shape.Void
-        self.data = Buffer[dtype](1) if shape.rank() == 0 else Buffer[dtype](
+        self.buffer = Buffer[dtype](1) if shape.rank() == 0 else Buffer[dtype](
             shape.num_elements()
         )
         self.owns_data = True
@@ -101,7 +101,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.shape = other.shape
         self.strides = other.strides
         self.offset = other.offset
-        self.data = other.data
+        self.buffer = other.buffer
         self.requires_grad = other.requires_grad
         self.grad = other.grad
         self.ancestors = other.ancestors
@@ -114,7 +114,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.shape = other.shape
         self.strides = other.strides
         self.offset = other.offset
-        self.data = other.data
+        self.buffer = other.buffer
         self.requires_grad = other.requires_grad
         self.grad = other.grad
         self.ancestors = other.ancestors
@@ -217,11 +217,14 @@ struct Tensor[dtype: DType = DType.float32](
 
         return flat
 
+    fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
+        return self.__getitem__(IntList.new(indices))
+
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
         if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
             abort("Tensor → __getitem__: Scalar tensor expects no indices")
         index = self.flatten_index(indices)
-        return self.data.load(index)
+        return self.buffer.load(index)
 
     fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
         if self.rank() == 0:  # Tensor with Shape ()
@@ -231,7 +234,9 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         index = self.flatten_index(indices)
-        return self.data.load(index)
+        return self.buffer.load(
+            index
+        ) if self.owns_data else self.base[].buffer.load(index)
 
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
         if self.rank() == 0:  # Tensor with Shape ()
@@ -240,13 +245,16 @@ struct Tensor[dtype: DType = DType.float32](
                 " scalar tensor. Use __setitem__(IntList())"
             )
         index = self.flatten_index(indices)
-        self.data.store(index, value)
+        self.buffer.store(index, value)
+
+    fn __setitem__(self, indices: List[Int], value: Scalar[dtype]):
+        self.__setitem__(IntList.new(indices), value)
 
     fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
         if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
             abort("Tensor → __setitem__: Scalar tensor expects no indices")
         index = self.flatten_index(indices)
-        self.data.store(index, value)
+        self.buffer.store(index, value)
 
     fn item(self) -> Scalar[dtype]:
         if (
@@ -257,7 +265,12 @@ struct Tensor[dtype: DType = DType.float32](
                 " shape: "
                 + self.shape.__str__()
             )
-        return self[0] if self.shape == Shape.Unit else self[IntList.Empty]
+        return (
+            self[0] if self.shape == Shape.Unit else self[IntList.Empty]
+        ) if self.owns_data else (
+            self.base[][0] if self.shape
+            == Shape.Unit else self.base[][IntList.Empty]
+        )
 
     fn __str__(self) -> String:
         rank = self.rank()
@@ -305,7 +318,7 @@ struct Tensor[dtype: DType = DType.float32](
             return Optional(
                 Tensor[dtype](
                     shape=self.shape,
-                    data=self.grad[],
+                    buffer=self.grad[],
                     requires_grad=False,
                 )
             )
@@ -340,40 +353,48 @@ struct Tensor[dtype: DType = DType.float32](
         return self.numels() == 1 and self.shape == Shape.Void
 
     fn __eq__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data == scalar, False)
+        return Tensor[DType.bool](self.shape, self.buffer == scalar, False)
 
     fn __ne__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data != scalar, False)
+        return Tensor[DType.bool](self.shape, self.buffer != scalar, False)
 
     fn __lt__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data < scalar, False)
+        return Tensor[DType.bool](self.shape, self.buffer < scalar, False)
 
     fn __le__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data <= scalar, False)
+        return Tensor[DType.bool](self.shape, self.buffer <= scalar, False)
 
     fn __gt__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data > scalar, False)
+        return Tensor[DType.bool](self.shape, self.buffer > scalar, False)
 
     fn __ge__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data >= scalar, False)
+        return Tensor[DType.bool](self.shape, self.buffer >= scalar, False)
 
     fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data == other.data, False)
+        return Tensor[DType.bool](
+            self.shape, self.buffer == other.buffer, False
+        )
 
     fn __ne__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data != other.data, False)
+        return Tensor[DType.bool](
+            self.shape, self.buffer != other.buffer, False
+        )
 
     fn __lt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data < other.data, False)
+        return Tensor[DType.bool](self.shape, self.buffer < other.buffer, False)
 
     fn __le__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data <= other.data, False)
+        return Tensor[DType.bool](
+            self.shape, self.buffer <= other.buffer, False
+        )
 
     fn __gt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data > other.data, False)
+        return Tensor[DType.bool](self.shape, self.buffer > other.buffer, False)
 
     fn __ge__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.data >= other.data, False)
+        return Tensor[DType.bool](
+            self.shape, self.buffer >= other.buffer, False
+        )
 
     # fn __eq__(self, other: TensorView[dtype]) -> Bool:
     # return TensorLike.from_tensor(self).equal(TensorLike.from_view(other))
@@ -389,9 +410,11 @@ struct Tensor[dtype: DType = DType.float32](
         return self.to_dtype[DType.float64]()
 
     fn to_dtype[NewType: DType](self) -> Tensor[NewType]:
-        new_data = self.data.to_dtype[NewType]()
+        new_buffer = self.buffer.to_dtype[NewType]()
         out = Tensor[NewType](
-            shape=self.shape, data=new_data, requires_grad=self.requires_grad
+            shape=self.shape,
+            buffer=new_buffer,
+            requires_grad=self.requires_grad,
         )
 
         return out
@@ -426,12 +449,12 @@ struct Tensor[dtype: DType = DType.float32](
     fn for_all[
         simd_width: Int = simdwidthof[dtype]()
     ](self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
-        return self.data.for_all[simd_width](pred).all_true()
+        return self.buffer.for_all[simd_width](pred).all_true()
 
     fn any[
         simd_width: Int = simdwidthof[dtype]()
     ](self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
-        return self.data.any[simd_width](pred)
+        return self.buffer.any[simd_width](pred)
 
     fn all_close[
         simd_width: Int = simdwidthof[dtype](),
@@ -453,16 +476,16 @@ struct Tensor[dtype: DType = DType.float32](
                 + ", "
                 + other.shape.__str__()
             )
-        return self.data.all_close[simd_width](other.data, rtol, atol)
+        return self.buffer.all_close[simd_width](other.buffer, rtol, atol)
 
-    fn data_address(
+    fn buffer_address(
         ref self,
     ) -> UnsafePointer[
         Buffer[dtype],
         mut = Origin(__origin_of(self)).mut,
         origin = __origin_of(self),
     ]:
-        return UnsafePointer(to=self.data).origin_cast[
+        return UnsafePointer(to=self.buffer).origin_cast[
             mut = Origin(__origin_of(self)).mut, origin = __origin_of(self)
         ]()
 
@@ -474,6 +497,22 @@ struct Tensor[dtype: DType = DType.float32](
         origin = __origin_of(self),
     ]:
         return UnsafePointer(to=self).origin_cast[
+            mut = Origin(__origin_of(self)).mut, origin = __origin_of(self)
+        ]()
+
+    fn base_address(
+        ref self,
+    ) -> UnsafePointer[
+        Tensor[dtype],
+        mut = Origin(__origin_of(self)).mut,
+        origin = __origin_of(self),
+    ]:
+        if self.owns_data and not self.base.__as_bool__():
+            abort(
+                "Tensor → base_address: called on owning tensor. Valid only for"
+                " view type tensor"
+            )
+        return self.base.origin_cast[
             mut = Origin(__origin_of(self)).mut, origin = __origin_of(self)
         ]()
 
@@ -491,7 +530,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
         memcpy(
             self.grad[].data,
-            with_tensor.data.data,
+            with_tensor.buffer.data,
             with_tensor.numels(),
         )
 
@@ -500,7 +539,7 @@ struct Tensor[dtype: DType = DType.float32](
             self.grad[].fill(value)
 
     fn fill(self, value: Scalar[dtype]):
-        self.data.fill(value)
+        self.buffer.fill(value)
 
     @staticmethod
     fn full_like(
@@ -532,7 +571,7 @@ struct Tensor[dtype: DType = DType.float32](
         shape = Shape(axes_spans)
         tensor = Tensor[dtype](shape, requires_grad)
         for i in range(tensor.numels()):  # To be vectorized
-            tensor.data.store(
+            tensor.buffer.store(
                 i,
                 random_float64(
                     min.cast[DType.float64](), max.cast[DType.float64]()
@@ -591,7 +630,7 @@ struct Tensor[dtype: DType = DType.float32](
             data = SIMD[dtype, simd_width](first_entry)
             for i in range(1, simd_width):
                 data[i] = fill(idx + i).cast[dtype]()
-            tensor.data.store[simdwidth=simd_width](idx, data)
+            tensor.buffer.store[simdwidth=simd_width](idx, data)
 
         vectorize[mapper, simdwidthof[dtype]()](tensor.numels())
 
@@ -612,9 +651,11 @@ struct Tensor[dtype: DType = DType.float32](
     fn zeros_like(
         tensor: Tensor[dtype], requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        data = Buffer[dtype].full(Scalar[dtype](0), tensor.shape.num_elements())
+        buffer = Buffer[dtype].full(
+            Scalar[dtype](0), tensor.shape.num_elements()
+        )
         out = Tensor[dtype](
-            shape=tensor.shape, data=data, requires_grad=requires_grad
+            shape=tensor.shape, buffer=buffer, requires_grad=requires_grad
         )
         return out
 
@@ -627,8 +668,10 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn zeros(shape: Shape, requires_grad: Bool = False) -> Tensor[dtype]:
-        data = Buffer[dtype].full(Scalar[dtype](0), shape.num_elements())
-        out = Tensor[dtype](shape=shape, data=data, requires_grad=requires_grad)
+        buffer = Buffer[dtype].full(Scalar[dtype](0), shape.num_elements())
+        out = Tensor[dtype](
+            shape=shape, buffer=buffer, requires_grad=requires_grad
+        )
         return out
 
     @staticmethod
@@ -641,7 +684,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
         shape = Shape(IntList(len(row)))
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.data.data, row.data, len(row))
+        memcpy(tensor.buffer.data, row.data, len(row))
         return tensor
 
     @staticmethod
@@ -655,7 +698,7 @@ struct Tensor[dtype: DType = DType.float32](
             flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.data.data, flattened.data, tensor.numels())
+        memcpy(tensor.buffer.data, flattened.data, tensor.numels())
         return tensor
 
     @staticmethod
@@ -675,7 +718,7 @@ struct Tensor[dtype: DType = DType.float32](
                 flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.data.data, flattened.data, tensor.numels())
+        memcpy(tensor.buffer.data, flattened.data, tensor.numels())
         return tensor
 
     @staticmethod
@@ -711,7 +754,7 @@ struct Tensor[dtype: DType = DType.float32](
                     flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.data.data, flattened.data, tensor.numels())
+        memcpy(tensor.buffer.data, flattened.data, tensor.numels())
         return tensor
 
     @staticmethod
@@ -751,7 +794,7 @@ struct Tensor[dtype: DType = DType.float32](
                         flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.data.data, flattened.data, tensor.numels())
+        memcpy(tensor.buffer.data, flattened.data, tensor.numels())
         return tensor
 
     @staticmethod
@@ -821,11 +864,11 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             value = SIMD[dtype, 1](1)
         for i in range(tensor.numels()):
-            tensor.data.store(i, value)
+            tensor.buffer.store(i, value)
         return tensor
 
     fn sum_all(self) -> Scalar[dtype]:
-        return self.data.sum()
+        return self.buffer.sum()
 
     fn broadcast_to(self, target_shape: Shape) -> Tensor[dtype]:
         if not self.shape.broadcastable(target_shape):
@@ -874,7 +917,7 @@ struct Tensor[dtype: DType = DType.float32](
             abort("Tensor → load: Out-of-bounds access")
 
         addr = row * self.strides[0] + col * self.strides[1]
-        return self.data.load[simdwidth](addr)
+        return self.buffer.load[simdwidth](addr)
 
     @always_inline
     fn store[
@@ -897,7 +940,7 @@ struct Tensor[dtype: DType = DType.float32](
             abort("Tensor → store: out-of-bounds access")
 
         addr = row * self.strides[0] + col * self.strides[1]
-        self.data.store[simdwidth](addr, value)
+        self.buffer.store[simdwidth](addr, value)
 
     fn into_view(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         if not self.owns_data:
@@ -919,6 +962,33 @@ struct Tensor[dtype: DType = DType.float32](
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(self)
 
+        return out
+
+    fn contiguous(self) -> Tensor[dtype]:
+        if self.owns_data:
+            return self
+        shape = self.shape
+        out = Tensor[dtype](shape, requires_grad=self.requires_grad)
+        numels = shape.num_elements()
+
+        if self.is_contiguous():  # View is contiguous
+            # Fast path: single memcpy
+            src_data = self.base[].buffer.data + self.offset
+            memcpy(out.buffer.data, src_data, numels)
+        else:
+            # Slow path: iterate and copy
+            if shape.rank() == 0:
+                out[[]] = self[[]]  # Handle 0D tensors
+            else:
+                indices = [0] * shape.rank()  # Initialize to zeros
+                for _ in range(numels):
+                    out[indices] = self[indices]
+                    # Increment multi-dimensional index
+                    for dim in reversed(range(shape.rank())):
+                        indices[dim] += 1
+                        if indices[dim] < shape[dim]:
+                            break
+                        indices[dim] = 0  # Carry to next dimension
         return out
 
     fn reshape(self) -> Tensor[dtype]:
@@ -959,7 +1029,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         requires_grad = self.requires_grad
-        out = Tensor[dtype](shape, self.data, requires_grad=requires_grad)
+        out = Tensor[dtype](shape, self.buffer, requires_grad=requires_grad)
 
         _ = """if requires_grad:
             # Only allocate base if needed
@@ -1076,26 +1146,43 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.gradients().value().print(num_first, num_last)
 
-    fn free(owned self):
+    # fn free(owned self):
+    fn __del__(owned self):
         if not self.owns_data:
-            self.data.free()
+            log_debug(
+                "Tensor__del__ → non-owning tensor got deleted - keep alive"
+                " count: "
+                + self.keep_alive.value().count().__str__()
+            )
+            self.buffer.free()
             self.shape.free()
             self.strides.free()
             if self.has_grad():
                 self.grad[].free()
                 self.grad.destroy_pointee()
                 self.grad.free()
-            if not self.ancestors:
+            if self.ancestors:
                 self.ancestors.value().free()
             _ = self^
 
-        elif self.owns_data and self.keep_alive.value().count() > 1:
+        elif (
+            self.owns_data
+            and self.keep_alive
+            and self.keep_alive.value().count() > 1
+        ):
             log_debug(
-                "Tensor__del__ → can not delete - has outstanding references"
+                "Tensor__del__ → can not delete - has outstanding references -"
+                " keep alive count: "
+                + self.keep_alive.value().count().__str__()
             )
             return
 
         else:
+            log_debug(
+                "Tensor__del__ → freeing up resources - keep alive count: "
+                + self.keep_alive.value().count().__str__()
+            )
+
             if self.has_grad():
                 self.grad[].free()
                 self.grad.destroy_pointee()
@@ -1103,9 +1190,9 @@ struct Tensor[dtype: DType = DType.float32](
                 log_debug("Tensor__del__ → freed grad")
             self.shape.free()
             self.strides.free()
-            if not self.ancestors:
+            if self.ancestors:
                 self.ancestors.value().free()
-            self.data.free()
+            self.buffer.free()
         _ = self^
 
         _ = """fn backward(self, start_grad: Scalar[dtype] = 1.0):
@@ -1221,11 +1308,11 @@ struct Tensor[dtype: DType = DType.float32](
 
         @parameter
         fn add_elems[simd_width: Int](idx: Int):
-            self.data.store[width=simd_width](
+            self.buffer.store[width=simd_width](
                 idx,
                 (
-                    self.data.load[width=simd_width](idx)
-                    + other.data.load[width=simd_width](idx)
+                    self.buffer.load[width=simd_width](idx)
+                    + other.buffer.load[width=simd_width](idx)
                 ),
             )
 
@@ -1237,8 +1324,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         @parameter
         fn exp_elems[simd_width: Int](idx: Int):
-            result.data.store[width=simd_width](
-                idx, exp(self.data.load[width=simd_width](idx))
+            result.buffer.store[width=simd_width](
+                idx, exp(self.buffer.load[width=simd_width](idx))
             )
 
         vectorize[exp_elems, simdwidthof[dtype]()](result.numels())
@@ -1255,8 +1342,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         @parameter
         fn negate_elems[simd_width: Int](idx: Int):
-            result.data.store[width=simd_width](
-                idx, self.data.load[width=simd_width](idx).__neg__()
+            result.buffer.store[width=simd_width](
+                idx, self.buffer.load[width=simd_width](idx).__neg__()
             )
 
         vectorize[negate_elems, simdwidthof[dtype]()](result.numels())
@@ -1267,8 +1354,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         @parameter
         fn invert_elems[simd_width: Int](idx: Int):
-            result.data.store[width=simd_width](
-                idx, ~self.data.load[width=simd_width](idx)
+            result.buffer.store[width=simd_width](
+                idx, ~self.buffer.load[width=simd_width](idx)
             )
 
         vectorize[invert_elems, simdwidthof[DType.bool]()](result.numels())
@@ -1284,8 +1371,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         @parameter
         fn absolute_value[simd_width: Int](idx: Int):
-            result.data.store[width=simd_width](
-                idx, self.data.load[width=simd_width](idx).__abs__()
+            result.buffer.store[width=simd_width](
+                idx, self.buffer.load[width=simd_width](idx).__abs__()
             )
 
         vectorize[absolute_value, simdwidthof[dtype]()](result.numels())
@@ -1578,8 +1665,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         @parameter
         fn add_value[simd_width: Int](idx: Int):
-            self.data.store[width=simd_width](
-                idx, self.data.load[width=simd_width](idx) + value
+            self.buffer.store[width=simd_width](
+                idx, self.buffer.load[width=simd_width](idx) + value
             )
 
         vectorize[add_value, simdwidthof[dtype]()](self.numels())
@@ -1769,9 +1856,9 @@ struct Tensor[dtype: DType = DType.float32](
                     vector_b = B.load[simdwidth](j, k)
                     product = vectorized_a * vector_b
                     offset = i * cols_b + k
-                    C.data.store[width=simdwidth](
+                    C.buffer.store[width=simdwidth](
                         offset,
-                        C.data.load[width=simdwidth](offset) + product,
+                        C.buffer.load[width=simdwidth](offset) + product,
                     )
 
                 vectorize[mul_add, simd_width](cols_b)
@@ -1884,7 +1971,7 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    a = Tensor.rand(1, 2, 3, requires_grad=True)
+    _ = """a = Tensor.rand(1, 2, 3, requires_grad=True)
     b = Tensor.rand(1, 2, 3, requires_grad=True)
     (a == b).print()
     a.print()
@@ -1892,23 +1979,41 @@ fn main() raises:
     print(a.grad[])
     a.gradients().value().print()
     a.gprint()
-    # test_grads_on_tensor_init()
     x = Tensor.d1([1, 2, 3])
     y = Tensor.d1([2, 2, 3])
-    (x == y).print()
+    (x == y).print()"""
+    # test_grads_on_tensor_init()
+    test_scalar_indexing()
 
 
 from testing import assert_true
 
+
 fn test_scalar_indexing() raises:
-    pass
+    a = Tensor.scalar(10)
+    v = a.into_view()
+    v1 = a.into_view()
+    index = a.flatten_index([])
+    assert_true(index == 0, "scalar indexing failed")
+    idx = List[Int]()
+    assert_true(a.__getitem__(idx) == 10, "scalar indexing get failed")
+    assert_true(a[[]] == 10, "scalar indexing get list literal failed")
+    a[[]] = 100
+    assert_true(
+        a[[]] == 100, "scalar indexing get after set list literal failed"
+    )
+    assert_true(a.item() == 100, "scalar indexing item call failed")
+    assert_true(v.item() == 100, "scalar indexing on view - item call failed")
+    assert_true(
+        v1.item() == 100, "scalar indexing on view 1 - item call failed"
+    )
+
 
 fn test_grads_on_tensor_init() raises:
     a = Tensor(6, 3, 4, requires_grad=True)
     b = Tensor(6, 3, 4)
     assert_true(
         a.has_grad() and a.grad_is_zero() and not b.has_grad(),
-        # a.has_grad() and not b.has_grad(),
         "Initialization grad assertions failed",
     )
     print("ok1")
