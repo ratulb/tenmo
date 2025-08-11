@@ -13,6 +13,11 @@ struct Buffer[dtype: DType = DType.float32](
 ):
     var size: Int
     var data: UnsafePointer[Scalar[dtype]]
+    alias Empty = Buffer[dtype]()
+
+    fn __init__(out self):
+        self.size = 0
+        self.data = UnsafePointer[Scalar[dtype]]()
 
     fn __init__(out self, size: Int):
         self.data = UnsafePointer[Scalar[dtype]].alloc(size)
@@ -235,12 +240,20 @@ struct Buffer[dtype: DType = DType.float32](
         vectorize[divide_scalar, simd_width](this.size)
         return out
 
+    @staticmethod
+    fn full[
+        simd_width: Int = simdwidthof[dtype]()
+    ](value: Scalar[dtype], size: Int) -> Buffer[dtype]:
+        buffer = Buffer[dtype](size)
+        buffer.fill[simd_width](value)
+        return buffer
+
     fn fill[
         simd_width: Int = simdwidthof[dtype]()
-    ](this: Buffer[dtype], scalar: Scalar[dtype]):
+    ](this: Buffer[dtype], value: Scalar[dtype]):
         @parameter
         fn set_scalar[simdwidth: Int](idx: Int):
-            this.store[simdwidth](idx, scalar)
+            this.store[simdwidth](idx, value)
 
         vectorize[set_scalar, simd_width](this.size)
 
@@ -535,6 +548,28 @@ struct Buffer[dtype: DType = DType.float32](
 
         for k in range(i, total):
             out.store(k, lhs.load(k) >= rhs.load(k))
+        return out
+
+    fn float(self) -> Buffer[DType.float32]:
+        if dtype == DType.float32:
+            return rebind[Buffer[DType.float32]](self)
+        return self.to_dtype[DType.float32]()
+
+    fn float64(self) -> Buffer[DType.float64]:
+        if dtype == DType.float64:
+            return rebind[Buffer[DType.float64]](self)
+        return self.to_dtype[DType.float64]()
+
+    fn to_dtype[NewType: DType](self) -> Buffer[NewType]:
+        out = Buffer[NewType](self.size)
+
+        @parameter
+        fn cast_values[simd_width: Int](idx: Int):
+            out.store[simd_width](
+                idx, self.load[simd_width](idx).cast[NewType]()
+            )
+
+        vectorize[cast_values, simdwidthof[NewType]()](self.size)
         return out
 
     fn sum[

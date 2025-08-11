@@ -316,18 +316,18 @@ struct Shape(
     fn num_elements(self) -> Int:
         return self.numels
 
-    fn flatten_index(self, indices: VariadicList[Int]) -> Int:
+    fn flatten_index(self, indices: VariadicList[Int], offset: Int = 0) -> Int:
         list = variadiclist_as_intlist(indices)
-        return self.flatten_index(list)
+        return self.flatten_index(list, offset)
 
-    fn flatten_index(self, indices: IntList) -> Int:
+    fn flatten_index(self, indices: IntList, offset: Int=0) -> Int:
         if self.ndim == 0:
             if len(indices) != 0:
                 abort(
                     "Shape → flatten_index: scalar tensor should receive empty"
                     " indices[IntList]"
                 )
-            return 0
+            return 0 + offset
         if len(indices) != self.ndim:
             print(
                 (
@@ -339,7 +339,7 @@ struct Shape(
                 self.ndim,
             )
             return -1
-        var index = 0
+        var index = offset
         var stride = 1
         for i in reversed(range(self.ndim)):
             idx = indices[i]
