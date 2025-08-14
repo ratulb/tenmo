@@ -320,7 +320,7 @@ struct Shape(
         list = variadiclist_as_intlist(indices)
         return self.flatten_index(list, offset)
 
-    fn flatten_index(self, indices: IntList, offset: Int=0) -> Int:
+    fn flatten_index(self, indices: IntList, offset: Int = 0) -> Int:
         if self.ndim == 0:
             if len(indices) != 0:
                 abort(
@@ -374,11 +374,11 @@ struct Shape(
             Indices in original tensor's space.
         """
         if not self.ndim <= broadcast_shape.ndim:
-            abort("Original dims > broadcast dims")
+            abort("Shape → translate_index: original dims > broadcast dims")
         if not mask.size == broadcast_shape.ndim:
-            abort("Mask/broadcast shape mismatch")
+            abort("Shape → translate_index: mask/broadcast shape mismatch")
         if not indices.size == broadcast_shape.ndim:
-            abort("Indices/broadcast shape mismatch")
+            abort("Shape → translate_index: indices/broadcast shape mismatch")
 
         translated = IntList.with_capacity(self.ndim)
         offset = broadcast_shape.ndim - self.ndim
@@ -386,7 +386,7 @@ struct Shape(
         for i in range(self.ndim):
             broadcast_axis = i + offset
             if not broadcast_axis < mask.size:
-                abort("Invalid axis")
+                abort("Shape → translate_index: invalid axis")
 
             if mask[broadcast_axis] == 1:
                 translated.append(0)  # Broadcasted dim
