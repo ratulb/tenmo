@@ -18,6 +18,7 @@ from walkback import *
 from buffers import Buffer
 from time import perf_counter_ns
 
+
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Representable & Writable
 ):
@@ -144,8 +145,6 @@ struct Tensor[dtype: DType = DType.float32](
             self.grad.init_pointee_move(grad^)
 
     fn is_contiguous(self) -> Bool:
-        # if self.owns_data:
-        # return True
         var expected_stride = 1
         for i in reversed(range(self.shape.rank())):
             if self.strides[i] != expected_stride:
@@ -206,9 +205,7 @@ struct Tensor[dtype: DType = DType.float32](
                 " tensor rank"
             )
 
-        var flat: Int = (
-            self.offset
-        )  # absolute base offset (0 for owning tensors)
+        flat = self.offset  # absolute base offset (0 for owning tensors)
 
         # 2. Normalize negative indices, bounds-check, and accumulate
         for dim_idx in range(len(indices)):
@@ -605,7 +602,6 @@ struct Tensor[dtype: DType = DType.float32](
             )
         return tensor
 
-
     @staticmethod
     fn arange(
         *args: Scalar[dtype],
@@ -651,7 +647,6 @@ struct Tensor[dtype: DType = DType.float32](
         for i in range(count):
             buffer[i] = value
             value += step
-
 
         tensor = Tensor[dtype](
             Shape([count]), buffer^, requires_grad=requires_grad
@@ -822,7 +817,6 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn of(*elems: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "of(*elems)")
-        # shape = Shape.of(len(elems))
         shape = Shape(IntList(len(elems)))
         tensor = Tensor[dtype](shape, requires_grad)
         for i in range(len(elems)):
@@ -833,10 +827,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn of(
         elems: Self.Row,
         requires_grad: Bool = False,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "of(elems)")
-        shape = Shape.of(len(elems))
-        tensor = Tensor[Self.dtype](shape, requires_grad)
+        shape = Shape(IntList(len(elems)))
+        tensor = Tensor[dtype](shape, requires_grad)
         for i in range(len(elems)):
             tensor[i] = elems[i]
         return tensor
@@ -921,9 +915,11 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
+    @always_inline
     fn broadcast_mask(self, broadcast_shape: Shape) -> IntList:
         return self.shape.broadcast_mask(broadcast_shape)
 
+    @always_inline
     fn translate_index(
         self, indices: IntList, mask: IntList, broadcast_shape: Shape
     ) -> IntList:
@@ -948,9 +944,22 @@ struct Tensor[dtype: DType = DType.float32](
             or col + simdwidth > self.shape[1]
         ):
             abort("Tensor → load: Out-of-bounds access")
+        if not self.owns_data and self.strides[1] != 1 and simdwidth > 1:
+            abort(
+                "Tensor → SIMD load attempted on non-contiguous Tensor - only"
+                " single-element loads are permitted for non-contiguous tensor"
+            )
 
-        addr = row * self.strides[0] + col * self.strides[1]
-        return self.buffer.load[simdwidth](addr)
+        addr = (
+            row * self.strides[0]
+            + col * self.strides[1]
+            + 0 if self.owns_data else self.offset
+        )
+        return self.buffer.load[simdwidth](
+            addr
+        ) if self.owns_data else self.base_address()[].buffer.load[simdwidth](
+            addr
+        )
 
     @always_inline
     fn store[
@@ -972,8 +981,23 @@ struct Tensor[dtype: DType = DType.float32](
         ):
             abort("Tensor → store: out-of-bounds access")
 
-        addr = row * self.strides[0] + col * self.strides[1]
-        self.buffer.store[simdwidth](addr, value)
+        if not self.owns_data and self.strides[1] != 1 and simdwidth > 1:
+            abort(
+                "Tensor → SIMD store attempted on non-contiguous Tensor - only"
+                " single-element stores are permitted for non-contiguous tensor"
+            )
+
+        addr = (
+            row * self.strides[0]
+            + col * self.strides[1]
+            + 0 if self.owns_data else self.offset
+        )
+
+        self.buffer.store[simdwidth](
+            addr, value
+        ) if self.owns_data else self.base_address()[].buffer.store[simdwidth](
+            addr, value
+        )
 
     fn into_view(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         if not self.owns_data:
@@ -1282,7 +1306,6 @@ struct Tensor[dtype: DType = DType.float32](
         rank = shape.rank()
         normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
         out_shape = compute_output_shape(shape, normalized_axes, keepdims)
-        print("The out_shape: ", out_shape)
         out = Tensor[dtype].zeros(out_shape)
 
         if out_shape == Shape.Void:
@@ -1290,7 +1313,6 @@ struct Tensor[dtype: DType = DType.float32](
                 out[IntList.Empty] = self[IntList.Empty]
             elif rank == len(normalized_axes) and not keepdims:  # Reducing all
                 out[IntList.Empty] = self.sum_all()
-                print("self.sum_all(): ", self.sum_all(), out[IntList.Empty])
         else:
             reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
             for out_idx in out_shape:
@@ -1431,6 +1453,15 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(self, other)
 
         return out
+
+    fn update_grad[opcode: Int](self, grad_tensor: Tensor[dtype]):
+        incoming = grad_tensor.buffer
+        if opcode == MulTensor:
+            self.grad[] *= incoming
+        if opcode == AddTensor:
+            self.grad[] += incoming
+        if opcode == SubtractTensor:
+            self.grad[] -= incoming
 
     fn print_tensor_recursive(
         self,
@@ -1688,11 +1719,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         vectorize[absolute_value, simdwidthof[dtype]()](result.numels())
         return result
-
-    fn update_grad[opcode: Int](self, gradients: Tensor[dtype]):
-        self.grad[] = __tensor_op_tensor__[dtype, opcode](
-            self.grad[], gradients
-        )
 
 
     fn __radd__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
@@ -1979,10 +2005,15 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
+    a = Tensor.rand(3, 4, requires_grad=True)
+    v = a.into_view()
+    v.init_grad()
+    v.gprint()
     test_grads_on_tensor_init()
     test_scalar_indexing()
     test_view_of_view()
     test_sum_all()
+
 
 from testing import assert_true
 
@@ -1999,11 +2030,22 @@ fn test_sum_all() raises:
     s3 = v4.sum_all()
     s4 = v4.sum_all()
     s5 = v5.sum_all()
-    assert_true(s3 == s4 and s4 == s5 and s5 == 555, "view sum_all assertion failed")
+    assert_true(
+        s3 == s4 and s4 == s5 and s5 == 555, "view sum_all assertion failed"
+    )
     assert_true(v._contiguous and v4._contiguous, "contiguity assertion failed")
-    assert_true(v.sum_all() == 1475, "non-owning contiguous tensor sum_all assertion failed")
-    assert_true(a.sum_all()[0] == 1770, "owning tensor sum_all assertion failed")
-    assert_true(v2.sum_all()[0] == 1770, "owning tensor non-contiguous sum_all assertion failed")
+    assert_true(
+        v.sum_all() == 1475,
+        "non-owning contiguous tensor sum_all assertion failed",
+    )
+    assert_true(
+        a.sum_all()[0] == 1770, "owning tensor sum_all assertion failed"
+    )
+    assert_true(
+        v2.sum_all()[0] == 1770,
+        "owning tensor non-contiguous sum_all assertion failed",
+    )
+
 
 fn test_view_of_view() raises:
     a = Tensor.scalar(10)
