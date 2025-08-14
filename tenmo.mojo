@@ -644,22 +644,15 @@ struct Tensor[dtype: DType = DType.float32](
         if size <= 0:
             abort("Error: computed arange size is zero")
         count = size.__int__()
-        tensor = Tensor[dtype](count, requires_grad=requires_grad)
+        buffer = Buffer[dtype](count)
 
-        @parameter
-        fn fill(i: Int) -> Scalar[dtype]:
-            return (i * step + start) % end
-
-        @parameter
-        fn mapper[simd_width: Int](idx: Int):
-            first_entry = fill(idx).cast[dtype]()
-            data = SIMD[dtype, simd_width](first_entry)
-            for i in range(1, simd_width):
-                data[i] = fill(idx + i).cast[dtype]()
-            tensor.buffer.store[simdwidth=simd_width](idx, data)
-
-        vectorize[mapper, simdwidthof[dtype]()](tensor.numels())
-
+        var value = start
+        for i in range(count):
+            buffer[i] = value
+            value += step
+        tensor = Tensor[dtype](
+            Shape([count]), buffer^, requires_grad=requires_grad
+        )
         return tensor
 
     @staticmethod
@@ -894,7 +887,18 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     fn sum_all(self) -> Scalar[dtype]:
-        return self.buffer.sum()
+        if self.owns_data:
+            return self.buffer.sum()
+        else:
+            if self._contiguous:
+                return self.base_address()[].buffer.sum(
+                    self.offset, self.max_index() + self.offset + 1
+                )
+            else:
+                summ = Scalar[dtype](0)
+                for indices in self.shape:
+                    summ += self[indices]
+                return summ
 
     fn broadcast_to(self, target_shape: Shape) -> Tensor[dtype]:
         if not self.shape.broadcastable(target_shape):
@@ -1022,11 +1026,11 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             if min_index < 0 or max_index >= self.numels():
                 abort("Tensor → view: exceeds tensor's memory bounds")
-
+        absolute_offset = self.offset + offset
         out = Tensor[dtype].Empty
         out.shape = shape
         out.strides = strides
-        out.offset = self.offset + offset
+        out.offset = absolute_offset
         out.requires_grad = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
@@ -1035,12 +1039,82 @@ struct Tensor[dtype: DType = DType.float32](
 
         if self.requires_grad:
             backward_fn = ViewBackward[dtype](
-                shape, strides, 0
+                shape, strides, absolute_offset
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(self)
 
         return out
+
+    fn view(
+        self,
+        shape: List[Int],
+        strides: List[Int],
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return self.view(
+            shape=Shape(shape),
+            strides=Strides(strides),
+            offset=offset,
+            requires_grad=requires_grad,
+        )
+
+    fn view(
+        self,
+        shape: List[Int],
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return self.view(
+            shape=Shape(shape), offset=offset, requires_grad=requires_grad
+        )
+
+    fn view(
+        self,
+        shape: Shape,
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return self.view(
+            shape=shape,
+            strides=Strides.default(shape),
+            offset=offset,
+            requires_grad=requires_grad,
+        )
+
+    fn __getitem__(self, *slices: Slice) -> Tensor[dtype]:
+        # Delegate shape/strides/offset computation
+        shape, strides, offset = Validator.validate_and_compute_view_metadata(
+            self.shape,
+            self.strides,
+            slices,
+        )
+        return self.view(
+            shape=shape,
+            strides=strides,
+            offset=offset,
+            requires_grad=self.requires_grad,
+        )
+
+    fn __getitem__(self, *indices: Idx) -> Tensor[dtype]:
+        # Compute view metadata
+        view_shape, view_strides, view_offset = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                self.shape, self.strides, indices
+            )
+        )
+
+        # Handle scalar (rank-0) case
+        is_scalar = len(view_shape) == 0
+        shape = Shape.Void if is_scalar else view_shape
+        strides = Strides.Zero if is_scalar else view_strides
+        return self.view(
+            shape=shape,
+            strides=strides,
+            offset=view_offset,
+            requires_grad=self.requires_grad,
+        )
 
     fn contiguous(self) -> Tensor[dtype]:
         if self.owns_data and self._contiguous:
@@ -1107,17 +1181,251 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         requires_grad = self.requires_grad
-        out = Tensor[dtype](shape, self.buffer, requires_grad=requires_grad)
+        buffer = self.buffer.clone()
+        out = Tensor[dtype](shape, buffer, requires_grad=requires_grad)
 
-        _ = """if requires_grad:
-            # Only allocate base if needed
+        if requires_grad:
+            # Using base to keep track of grad already contributed to parent
             base = Tensor[dtype].zeros(self.shape)
             out.base = UnsafePointer[Tensor[dtype]].alloc(0)
             out.base.init_pointee_move(base^)
 
             backward_fn = ReshapeBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)"""
+            out.add_ancestry(self)
+
+        return out
+
+    fn broadcast_op(
+        self,
+        other: Self,
+        op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
+    ) -> Tensor[dtype]:
+        if self.shape.rank() == 0 or other.shape.rank() == 0:
+            return self.broadcast_scalar_op(other, op)
+        else:
+            return self.broadcast_tensor_op(other, op)
+
+    fn broadcast_scalar_op(
+        self,
+        other: Self,
+        op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
+    ) -> Tensor[dtype]:
+        # Decide result shape
+        result_shape = other.shape if self.shape.rank() == 0 else self.shape
+        requires_grad = self.requires_grad or other.requires_grad
+        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
+
+        for indices in result_shape:
+            self_val = self.item() if self.shape.rank() == 0 else self[indices]
+            other_val = (
+                other.item() if other.shape.rank() == 0 else other[indices]
+            )
+            result[indices] = op(self_val, other_val)
+
+        return result
+
+    fn broadcast_tensor_op(
+        self,
+        other: Self,
+        op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
+    ) -> Tensor[dtype]:
+        result_shape = Shape.broadcast_shape(self.shape, other.shape)
+        mask1 = self.broadcast_mask(result_shape)
+        mask2 = other.broadcast_mask(result_shape)
+        requires_grad = self.requires_grad or other.requires_grad
+        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
+
+        for indices in result_shape:
+            self_indices = self.translate_index(indices, mask1, result_shape)
+            other_indices = other.translate_index(indices, mask2, result_shape)
+            result[indices] = op(self[self_indices], other[other_indices])
+
+        return result
+
+    fn backward_contribution(
+        self,
+        other: Tensor[dtype],
+        upstream_grad: Tensor[dtype],
+        do_multiply: Bool,
+    ) -> Tensor[dtype]:
+        var grad_contrib: Tensor[dtype]
+        if upstream_grad.shape == Shape.Void:
+            grad_contrib = Tensor[dtype].full(
+                self.shape, upstream_grad.item(), requires_grad=False
+            )
+        else:
+            grad_contrib = (
+                upstream_grad * other if do_multiply else upstream_grad
+            )
+            if grad_contrib.shape != self.shape:
+                axes = self.broadcast_mask(grad_contrib.shape).indices_of(1)
+                grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
+            if grad_contrib.shape != self.shape:
+                grad_contrib = grad_contrib.reshape(self.shape)
+            grad_contrib.requires_grad = False
+
+        return grad_contrib
+
+    fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
+        return self.sum(IntList.new(axes), keepdims)
+
+    fn sum(
+        self,
+        axes: IntList,
+        keepdims: Bool = False,
+    ) -> Tensor[dtype]:
+        shape = self.shape
+        rank = shape.rank()
+        normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
+        out_shape = compute_output_shape(shape, normalized_axes, keepdims)
+        print("The out_shape: ", out_shape)
+        out = Tensor[dtype].zeros(out_shape)
+
+        if out_shape == Shape.Void:
+            if rank == 0:  # Scalar case
+                out[IntList.Empty] = self[IntList.Empty]
+            elif rank == len(normalized_axes) and not keepdims:  # Reducing all
+                out[IntList.Empty] = self.sum_all()
+                print("self.sum_all(): ", self.sum_all(), out[IntList.Empty])
+        else:
+            reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
+            for out_idx in out_shape:
+                var summ = Scalar[dtype](0)
+                for red_idx in reduced_shape:
+                    full_idx = out_idx.replace(
+                        normalized_axes, red_idx
+                    ) if keepdims else out_idx.insert(normalized_axes, red_idx)
+                    summ += self[full_idx]
+                out[out_idx] = summ
+
+        if self.requires_grad:
+            out.requires_grad = True
+            out.init_grad()
+            backward_fn = SumBackward[dtype](
+                normalized_axes.copy(), keepdims
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(self)
+
+        return out
+
+    fn mean(
+        self, axes: List[Int] = [], keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        return self.mean(IntList.new(axes), keepdims)
+
+    fn mean(
+        self: Tensor[dtype], axes: IntList, keepdims: Bool = False
+    ) -> Tensor[dtype]:
+        normalized_axes = Validator.validate_and_normalize_axes(
+            self.shape, axes
+        )
+        count = self.shape.axes_spans.select(normalized_axes).product()
+        out = self.sum(normalized_axes, keepdims) / Scalar[dtype](count)
+
+        if self.requires_grad:
+            out.requires_grad = True
+            out.init_grad()
+            backward_fn = MeanBackward[dtype](
+                normalized_axes.copy(), keepdims
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(self)
+
+        return out
+
+    fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Tensor → __rtruediv__ is for numeric data types only",
+        ]()
+
+        buffer = scalar / self.buffer
+        out = Tensor[dtype](self.shape, buffer, self.requires_grad)
+
+        if self.requires_grad:
+            backward_fn = RightTrueDivBackwardScalar[dtype](
+                scalar
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(self)
+
+        return out
+
+    fn __truediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Tensor → __truediv__ is for numeric data types only",
+        ]()
+
+        if scalar == Scalar[dtype](0):
+            abort("Tensor → __truediv__ : canot divide by " + scalar.__str__())
+
+        buffer = self.buffer / scalar
+        out = Tensor[dtype](self.shape, buffer, self.requires_grad)
+
+        if self.requires_grad:
+            backward_fn = TrueDivBackwardScalar[dtype](
+                scalar
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(self)
+
+        return out
+
+    fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return self.__mul__(scalar)
+
+    fn __mul__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
+        buffer = self.buffer * factor
+        requires_grad = self.requires_grad
+        out = Tensor[dtype](self.shape, buffer, requires_grad=requires_grad)
+
+        if requires_grad:
+            backward_fn = MulBackwardScalar[dtype](factor).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(self)
+
+        return out
+
+    # Element wise multiplication of two tensors
+    fn __mul__(self, other: Self) -> Tensor[dtype]:
+        if not self.broadcastable(other):
+            abort(
+                "__mul__(self * other) → Dimension mismatch: "
+                + self.shape.__str__()
+                + " <=> "
+                + other.shape.__str__()
+            )
+
+        if self.shape != other.shape:
+            return self.broadcast_mul_operation(other)
+        buffer = self.buffer * other.buffer
+        requires_grad = self.requires_grad or other.requires_grad
+        out = Tensor[dtype](self.shape, buffer, requires_grad=requires_grad)
+
+        if requires_grad:
+            backward_fn = MultiplyBackward[dtype]().into_backward_fn()
+
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(self, other)
+
+        return out
+
+    fn broadcast_mul_operation(
+        self: Self,
+        other: Self,
+    ) -> Tensor[dtype]:
+        out = self.broadcast_op(other, scalar_ops[dtype, Multiply])
+        requires_grad = self.requires_grad or other.requires_grad
+        if requires_grad:
+            backward_fn = BroadcastBackward[
+                dtype, AddTensor, AddTensor, True
+            ]().into_backward_fn()
+
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(self, other)
 
         return out
 
@@ -1279,26 +1587,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn backward(self, seed_tensor: Tensor[dtype]):
         TensorLike.from_tensor(self).backward(seed_tensor)
 
-    fn into_view(
-        self, requires_grad: Optional[Bool] = None
-    ) -> TensorView[dtype]:
-        shape = self.shape
-        strides = self.strides
-        out = TensorView(
-            self.address(),
-            self.shape,
-            self.strides,
-            offset=0,
-            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
-        )
-        if self.requires_grad:
-            backward_fn = ViewBackward[dtype](
-                shape, strides, 0
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
 
     fn permute(self, axes: IntList) -> TensorView[dtype]:
         view = self.into_view()
@@ -1309,64 +1597,6 @@ struct Tensor[dtype: DType = DType.float32](
         view = self.into_view()
         permutated = view.permute(axes)
         return permutated
-
-    fn __getitem__(self, *slices: Slice) -> TensorView[dtype]:
-        # Delegate shape/strides/offset computation
-        view_shape, view_strides, new_offset = (
-            Validator.validate_and_compute_view_metadata(
-                self.shape,
-                self.strides,
-                slices,
-            )
-        )
-
-        out = TensorView[dtype](
-            self.address(),
-            shape=view_shape,
-            strides=view_strides,
-            offset=new_offset,
-            requires_grad=self.requires_grad,
-        )
-        if self.requires_grad:
-            backward_fn = ViewBackward[dtype](
-                view_shape, view_strides, new_offset
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
-
-    fn __getitem__(self, *indices: Idx) -> TensorView[dtype]:
-        # Compute view metadata
-        view_shape, view_strides, view_offset = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                self.shape, self.strides, indices
-            )
-        )
-
-        # Handle scalar (rank-0) case
-        is_scalar = len(view_shape) == 0
-        shape = Shape.Void if is_scalar else view_shape
-        strides = Strides.Zero if is_scalar else view_strides
-
-        # Create view
-        out = TensorView[dtype](
-            self.address(),
-            shape=shape,
-            strides=strides,
-            offset=view_offset,
-            requires_grad=self.requires_grad,
-        )
-
-        # Setup autograd
-        if self.requires_grad:
-            backward_fn = ViewBackward[dtype](
-                shape, strides, view_offset
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
 
 
     fn __iadd__(self, other: Self):
@@ -1461,43 +1691,6 @@ struct Tensor[dtype: DType = DType.float32](
             self.grad[], gradients
         )
 
-    fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        constrained[
-            dtype.is_numeric(),
-            "Tensor → __rtruediv__ is for numeric data types only",
-        ]()
-
-        var out = __tensor_op_scalar__[dtype, DivideScalar](self, scalar)
-
-        if self.requires_grad:
-            backward_fn = RightTrueDivBackwardScalar[dtype](
-                scalar
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
-
-    fn __truediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        constrained[
-            dtype.is_numeric(),
-            "Tensor → __truediv__ is for numeric data types only",
-        ]()
-
-        if scalar == Scalar[dtype](0):
-            abort("Tensor → __truediv__ : canot divide by " + scalar.__str__())
-        var out = __tensor_op_scalar__[dtype, DivideByScalar](
-            self,
-            scalar,
-        )
-        if self.requires_grad:
-            backward_fn = TrueDivBackwardScalar[dtype](
-                scalar
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
 
     fn __radd__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
         return self.__add__(scalar)
@@ -1512,21 +1705,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return self.__mul__(scalar)
-
-    fn __mul__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
-        var out = __tensor_op_scalar__[dtype, MulScalar](
-            self,
-            factor,
-        )
-
-        if self.requires_grad:
-            backward_fn = MulBackwardScalar[dtype](factor).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
 
     fn __pow__(self, exponent: Scalar[dtype]) -> Tensor[dtype]:
         constrained[
@@ -1571,51 +1749,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
-        return self.sum(IntList.new(axes), keepdims)
-
-    fn sum(
-        self: Self,
-        axes: IntList,
-        keepdims: Bool = False,
-    ) -> Tensor[dtype]:
-        normalized_axes = Validator.validate_and_normalize_axes(
-            self.shape, axes
-        )
-        out = TensorLike.from_tensor(self).sum(normalized_axes, keepdims)
-        if self.requires_grad:
-            out.requires_grad = True
-            out.init_grad()
-            backward_fn = SumBackward[dtype](
-                normalized_axes.copy(), keepdims
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
-
-    fn mean(
-        self, axes: List[Int] = [], keepdims: Bool = False
-    ) -> Tensor[dtype]:
-        return self.mean(IntList.new(axes), keepdims)
-
-    fn mean(self, axes: IntList, keepdims: Bool = False) -> Tensor[dtype]:
-        normalized_axes = Validator.validate_and_normalize_axes(
-            self.shape, axes
-        )
-        out = TensorLike.from_tensor(self).mean(normalized_axes, keepdims)
-        if self.requires_grad:
-            out.requires_grad = True
-            out.init_grad()
-            backward_fn = MeanBackward[dtype](
-                normalized_axes.copy(), keepdims
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
-
-    fn __add__(self, other: Self) -> Tensor[dtype]:
+        fn __add__(self, other: Self) -> Tensor[dtype]:
         if self.address() == other.address():
             return self.__mul__(2)
         if not self.broadcastable(other):
@@ -1674,49 +1808,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn broadcast_mul_operation(
-        self: Self,
-        other: Self,
-    ) -> Tensor[dtype]:
-        out = self.broadcast_op(other, scalar_ops[dtype, Multiply])
-        requires_grad = self.requires_grad or other.requires_grad
-        if requires_grad:
-            backward_fn = BroadcastBackward[
-                dtype, AddTensor, AddTensor, True
-            ]().into_backward_fn()
-
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-            out.add_ancestry(Self.Ancestor_of(other))
-
-        return out
-
-    # Element wise multiplication of two tensors
-    fn __mul__(self, other: Self) -> Tensor[dtype]:
-        if not self.broadcastable(other):
-            abort(
-                "__mul__(self * other) → Dimension mismatch: "
-                + self.shape.__str__()
-                + " <=> "
-                + other.shape.__str__()
-            )
-
-        if self.shape != other.shape:
-            return self.broadcast_mul_operation(other)
-
-        var out = __tensor_op_tensor__[dtype, MulTensor](
-            self,
-            other,
-        )
-
-        if self.requires_grad or other.requires_grad:
-            backward_fn = MultiplyBackward[dtype]().into_backward_fn()
-
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-            out.add_ancestry(Self.Ancestor_of(other))
-
-        return out
 
     fn broadcast_add_subtract_operation[
         Element_Wise_Op: Int, Tensor_Op_First: Int, Tensor_Op_Second: Int
@@ -1748,170 +1839,6 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         vectorize[add_value, simdwidthof[dtype]()](self.numels())
-
-    fn broadcast_op(
-        self,
-        other: Self,
-        op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
-    ) -> Tensor[dtype]:
-        if self.shape.rank() == 0 or other.shape.rank() == 0:
-            return self.broadcast_scalar_op(other, op)
-        else:
-            return self.broadcast_tensor_op(other, op)
-
-    fn broadcast_scalar_op(
-        self,
-        other: Self,
-        op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
-    ) -> Tensor[dtype]:
-        # Decide result shape
-        result_shape = other.shape if self.shape.rank() == 0 else self.shape
-        requires_grad = self.requires_grad or other.requires_grad
-        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
-
-        for indices in result_shape:
-            self_val = self.item() if self.shape.rank() == 0 else self[indices]
-            other_val = (
-                other.item() if other.shape.rank() == 0 else other[indices]
-            )
-            result[indices] = op(self_val, other_val)
-
-        return result
-
-    fn broadcast_tensor_op(
-        self,
-        other: Self,
-        op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
-    ) -> Tensor[dtype]:
-        result_shape = Shape.broadcast_shape(self.shape, other.shape)
-        mask1 = self.broadcast_mask(result_shape)
-        mask2 = other.broadcast_mask(result_shape)
-        requires_grad = self.requires_grad or other.requires_grad
-        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
-
-        for indices in result_shape:
-            self_indices = self.translate_index(indices, mask1, result_shape)
-            other_indices = other.translate_index(indices, mask2, result_shape)
-            result[indices] = op(self[self_indices], other[other_indices])
-
-        return result
-
-    fn backward_contribution(
-        self,
-        other: Tensor[dtype],
-        upstream_grad: Tensor[dtype],
-        do_multiply: Bool,
-    ) -> Tensor[dtype]:
-        var grad_contrib: Tensor[dtype]
-        if upstream_grad.shape == Shape.Void:
-            grad_contrib = Tensor[dtype].full(
-                self.shape, upstream_grad.item(), requires_grad=False
-            )
-        else:
-            grad_contrib = (
-                upstream_grad * other if do_multiply else upstream_grad
-            )
-            if grad_contrib.shape != self.shape:
-                axes = self.broadcast_mask(grad_contrib.shape).indices_of(1)
-                grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
-            if grad_contrib.shape != self.shape:
-                grad_contrib = grad_contrib.reshape(self.shape)
-            grad_contrib.requires_grad = False
-
-        return grad_contrib
-
-    fn view(
-        self,
-        shape: List[Int],
-        offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> TensorView[dtype]:
-        return self.view(
-            shape=Shape(shape), offset=offset, requires_grad=requires_grad
-        )
-
-    fn view(
-        self,
-        shape: Shape,
-        offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> TensorView[dtype]:
-        if offset < 0 or offset >= self.numels():
-            abort(
-                "Tensor → view(shape): offset out of bounds: offset => "
-                + String(offset)
-                + "and self.numels() => "
-                + String(self.numels())
-            )
-        # _requires_grad = requires_grad.value() if requires_grad else self.requires_grad
-        if shape == self.shape and offset == 0:  # Tensor offset is always 0
-            return self.into_view(requires_grad=requires_grad)
-        if shape.num_elements() + offset > self.numels():
-            abort("Tensor → view(shape): shape numels exceeds base tensor size")
-        strides = Strides.default(shape)
-        out = TensorView(
-            self.address(),
-            shape,
-            strides,
-            offset=offset,
-            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
-        )
-        if self.requires_grad:
-            backward_fn = ViewBackward[dtype](
-                shape, strides, offset
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out
-
-    fn view(
-        self,
-        shape: List[Int],
-        strides: List[Int],
-        offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> TensorView[dtype]:
-        return self.view(
-            shape=Shape(shape),
-            strides=Strides(strides),
-            offset=offset,
-            requires_grad=requires_grad,
-        )
-
-    fn view(
-        self,
-        shape: Shape,
-        strides: Strides,
-        offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> TensorView[dtype]:
-        if offset < 0 or offset >= self.numels():
-            abort("Tensor → view: offset out of bounds")
-
-        if strides.rank() != shape.rank():
-            abort("Tensor → view: shape and strides must have same rank")
-
-        var min_index = offset
-        var max_index = offset
-        for i in range(shape.rank()):
-            stride = strides[i]
-            extent = (shape[i] - 1) * stride
-            if extent > 0:
-                max_index += extent
-            else:
-                min_index += extent
-
-        if min_index < 0 or max_index >= self.numels():
-            abort("Tensor → view: requested view accesses out-of-bounds data")
-
-        return TensorView(
-            self.address(),
-            shape,
-            strides,
-            offset=offset,
-            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
-        )
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
@@ -2049,40 +1976,26 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    test_view_of_view()
-    _ = """indices = IntList(0) * 3  # Initialize to zeros
-    print("indices: ", indices)
-    shape = Shape([1, 2, 3])
-    for _ in range(shape.num_elements()):
-        print("here: ", indices)
-        # Increment multi-dimensional index
-        for dim in reversed(range(shape.rank())):
-            indices[dim] += 1
-            if indices[dim] < shape[dim]:
-                break
-            indices[dim] = 0  # Carry to next dimension"""
-
-    _ = """a = Tensor.rand(1, 2, 3, requires_grad=True)
-    b = Tensor.rand(1, 2, 3, requires_grad=True)
-    (a == b).print()
-    a.print()
-    a.seed_grad(42)
-    print(a.grad[])
-    a.gradients().value().print()
-    a.gprint()
-    x = Tensor.d1([1, 2, 3])
-    y = Tensor.d1([2, 2, 3])
-    (x == y).print()"""
-    # test_grads_on_tensor_init()
-    test_scalar_indexing()
-    shape1, shape2 = Shape.Unit, Shape.Void
-    print(shape1.num_elements(), shape2.num_elements())
-
+    #test_grads_on_tensor_init()
+    #test_scalar_indexing()
+    #test_view_of_view()
+    test_sum_all()
 
 from testing import assert_true
 
 # fn test_scalar_indexing_contiguous() raises:
 
+
+fn test_sum_all() raises:
+    a = Tensor.arange(3 * 4 * 5)
+    print("The followin is a")
+    #a.print()
+    r = a.reshape(3, 4, 5)
+    #r.print()
+    v = a.view(shape=Shape.of(2, 5, 5), offset=5)
+    assert_true(v.sum_all() == 1475, "non-owning tensor sum_all assertion failed")
+    print("a.sum_all(): ", a.sum_all(), a[0], a[1], a[2])
+    assert_true(a.sum_all()[0] == 1770, "owning tensor sum_all assertion failed")
 
 fn test_view_of_view() raises:
     a = Tensor.scalar(10)
@@ -2132,8 +2045,8 @@ fn test_grads_on_tensor_init() raises:
 
     result = a.grad[] == buffer
     result2 = result.all_true()
-    print("result: ", result, result2)
 
+    assert_true(result2, "grad and expected does not match")
     assert_true(not a.grad_is_zero(), "grad seeding assertion failed")
-    # a.zero_grad()
-    # assert_true(a.grad_is_zero(), "zero grad assertion failed")
+    a.zero_grad()
+    assert_true(a.grad_is_zero(), "zero grad assertion failed")

@@ -1,6 +1,7 @@
 from algorithm import vectorize
 from sys import simdwidthof
 from memory import memset_zero, memcpy
+from math import exp
 
 # from runtime.asyncrt import num_physical_cores
 from sys import num_logical_cores, num_physical_cores
@@ -311,6 +312,32 @@ struct Buffer[dtype: DType = DType.float32](
             )
 
         vectorize[divide_scalar, simd_width](this.size)
+        return out
+
+    fn __abs__(self) -> Buffer[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Buffer → __abs__ is for numeric data types only",
+        ]()
+        total = self.size
+        out = Buffer[dtype](total)
+
+        @parameter
+        fn absolute_value[simdwidth: Int](idx: Int):
+            out.store[simdwidth](idx, self.load[simdwidth](idx).__abs__())
+
+        vectorize[absolute_value, simdwidthof[dtype]()](total)
+        return out
+
+    fn exp(self) -> Buffer[dtype]:
+        total = self.size
+        out = Buffer[dtype](total)
+
+        @parameter
+        fn exp_elems[simdwidth: Int](idx: Int):
+            out.store[simdwidth](idx, exp(self.load[simdwidth](idx)))
+
+        vectorize[exp_elems, simdwidthof[dtype]()](total)
         return out
 
     @staticmethod
@@ -676,22 +703,25 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn sum[
         simd_width: Int = simdwidthof[dtype]()
-    ](this: Buffer[dtype]) -> Scalar[dtype]:
+    ](
+        this: Buffer[dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ) -> Scalar[dtype]:
         constrained[
             dtype.is_numeric(),
             "Buffer → sum is for numeric data types only",
         ]()
-
         var summ = Scalar[dtype](0)
-        total = this.size
+        total = (end_index.value() if end_index else this.size) - start_index
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
-            idx = block * simd_width
+            idx = start_index + block * simd_width
             summ += this.load[simd_width](idx).reduce_add()
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            summ += this.load(k)
+            summ += this.load(k + start_index)
         return summ
 
     fn dot(lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Scalar[dtype]:
