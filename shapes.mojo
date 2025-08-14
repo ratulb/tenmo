@@ -128,6 +128,7 @@ struct Shape(
         new_axes_spans = self.axes_spans[axis:]
         return Shape(new_axes_spans)
 
+    @always_inline
     fn broadcastable(self, to: Shape) -> Bool:
         dims1 = self.intlist()
         dims2 = to.intlist()
@@ -138,6 +139,7 @@ struct Shape(
                     return False
         return True
 
+    @always_inline
     fn broadcast_mask(self, target_shape: Shape) -> IntList:
         mask = IntList.with_capacity(target_shape.ndim)
         offset = target_shape.ndim - self.ndim
@@ -196,6 +198,7 @@ struct Shape(
         axes = self.intlist()[:axis] + self.intlist()[axis + 1 :]
         return Shape(axes)
 
+    @always_inline
     @staticmethod
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
         # Handle scalar cases first
@@ -232,6 +235,7 @@ struct Shape(
 
         return Shape(padded1), Shape(padded2)
 
+    @always_inline
     @staticmethod
     fn broadcast_shape(this: Shape, that: Shape) -> Shape:
         if not this.broadcastable(that):
@@ -276,6 +280,7 @@ struct Shape(
     fn rank(self) -> Int:
         return self.ndim
 
+    @always_inline
     fn __getitem__(self, idx: Int) -> Int:
         index = idx if idx >= 0 else idx + self.__len__()
         if 0 <= index < self.ndim:
@@ -313,6 +318,7 @@ struct Shape(
     fn __ne__(self, other: Self) -> Bool:
         return not self.__eq__(other)
 
+    @always_inline
     fn num_elements(self) -> Int:
         return self.numels
 
@@ -360,6 +366,7 @@ struct Shape(
             stride *= dim
         return index
 
+    @always_inline
     fn translate_index(
         self, indices: IntList, mask: IntList, broadcast_shape: Shape
     ) -> IntList:
