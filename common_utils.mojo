@@ -7,6 +7,7 @@ from intlist import IntList
 from strides import Strides
 from os import abort
 from utils import Variant
+from builtin._location import __call_location, _SourceLocation
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -22,17 +23,31 @@ fn id[type: AnyType, //](t: type) -> Int:
 
 
 fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
-    return ptr.__as_bool__() == False
 
-
-fn panic(*s: String):
+    _="""@always_inline("nodebug")
+    fn panic(*s: String):
     abrt = String(capacity=len(s))
     abrt += s[0].strip()
     for i in range(1, len(s)):
         stripped = " " + s[i].strip()
         abrt += stripped
-    abort(abrt)
+    loc = __call_location[inline_count=2]()
+    abrt +=". " + loc.file_name + ":" + loc.line.__str__() + ":" + loc.col.__str__()
+    abort(abrt)"""
 
+    return ptr.__as_bool__() == False
+
+@always_inline("nodebug")
+fn panic[depth: Int=1](*s: String):
+    var message = String(capacity=len(s))
+    if len(s) > 0:
+        message += s[0].strip()
+        for i in range(1, len(s)):
+            message += " " + s[i].strip()
+
+    loc = __call_location[inline_count=depth]()
+    message += " at " + loc.file_name + ":" + loc.line.__str__() + ":" + loc.col.__str__()
+    abort(message)
 
 fn log_debug(msg: String):
     log.debug(msg)

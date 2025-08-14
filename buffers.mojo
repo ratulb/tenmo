@@ -8,7 +8,6 @@ from sys import num_logical_cores, num_physical_cores
 from common_utils import log_debug, panic
 
 
-@fieldwise_init
 struct Buffer[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Writable & Representable
 ):
@@ -24,15 +23,25 @@ struct Buffer[dtype: DType = DType.float32](
         self.data = UnsafePointer[Scalar[dtype]].alloc(size)
         self.size = size
 
-        _ = """fn __init__(out self, size: Int, data: UnsafePointer[Scalar[dtype]]):
+    fn __init__(out self, size: Int, data: UnsafePointer[Scalar[dtype]]):
         self.size = size
-        self.data = data"""
+        self.data = data
+
+    fn __moveinit__(out self, var other: Self):
+        self.size = other.size
+        self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
+        memcpy(self.data, other.data, other.size)
+
+    fn __copyinit__(out self, other: Self):
+        self.size = other.size
+        self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
+        memcpy(self.data, other.data, other.size)
 
     fn clone(self) -> Buffer[dtype]:
         data = UnsafePointer[Scalar[dtype]].alloc(self.size)
         memcpy(data, self.data, self.size)
-        cloned = Buffer[dtype](self.size, data)
-        return cloned
+        clone = Buffer[dtype](self.size, data)
+        return clone
 
     fn __len__(self) -> Int:
         return self.size

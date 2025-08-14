@@ -16,7 +16,7 @@ from operators import __tensor_op_tensor__, __tensor_op_scalar__
 from operators_imports import *
 from walkback import *
 from buffers import Buffer
-
+from time import perf_counter_ns
 
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Representable & Writable
@@ -201,7 +201,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn flatten_index(self, indices: IntList) -> Int:
         # 1. Rank check
         if len(indices) != self.rank():
-            panic(
+            panic[2](
                 "Tensor → flatten_index: number of indices does not match"
                 " tensor rank"
             )
@@ -605,6 +605,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
         return tensor
 
+
     @staticmethod
     fn arange(
         *args: Scalar[dtype],
@@ -650,6 +651,8 @@ struct Tensor[dtype: DType = DType.float32](
         for i in range(count):
             buffer[i] = value
             value += step
+
+
         tensor = Tensor[dtype](
             Shape([count]), buffer^, requires_grad=requires_grad
         )
@@ -1031,6 +1034,7 @@ struct Tensor[dtype: DType = DType.float32](
         out.shape = shape
         out.strides = strides
         out.offset = absolute_offset
+        out._contiguous = out.is_contiguous()
         out.requires_grad = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
@@ -1181,8 +1185,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         requires_grad = self.requires_grad
-        buffer = self.buffer.clone()
-        out = Tensor[dtype](shape, buffer, requires_grad=requires_grad)
+        out = Tensor[dtype](shape, self.buffer, requires_grad=requires_grad)
 
         if requires_grad:
             # Using base to keep track of grad already contributed to parent
@@ -1976,9 +1979,9 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    #test_grads_on_tensor_init()
-    #test_scalar_indexing()
-    #test_view_of_view()
+    test_grads_on_tensor_init()
+    test_scalar_indexing()
+    test_view_of_view()
     test_sum_all()
 
 from testing import assert_true
@@ -1987,15 +1990,20 @@ from testing import assert_true
 
 
 fn test_sum_all() raises:
-    a = Tensor.arange(3 * 4 * 5)
-    print("The followin is a")
-    #a.print()
-    r = a.reshape(3, 4, 5)
-    #r.print()
+    a = Tensor.arange(3 * 4 * 5).reshape(3, 4, 5)
     v = a.view(shape=Shape.of(2, 5, 5), offset=5)
-    assert_true(v.sum_all() == 1475, "non-owning tensor sum_all assertion failed")
-    print("a.sum_all(): ", a.sum_all(), a[0], a[1], a[2])
+    v2 = a.view(shape=[3, 5, 4], strides=[20, 1, 5], offset=0)
+    v3 = a.view(shape=[3, 5, 3], strides=[15, 1, 3], offset=15)
+    v4 = v3.view(shape=[5, 3], offset=15)
+    v5 = v3.view(shape=[3, 5], strides=[1, 3], offset=15)
+    s3 = v4.sum_all()
+    s4 = v4.sum_all()
+    s5 = v5.sum_all()
+    assert_true(s3 == s4 and s4 == s5 and s5 == 555, "view sum_all assertion failed")
+    assert_true(v._contiguous and v4._contiguous, "contiguity assertion failed")
+    assert_true(v.sum_all() == 1475, "non-owning contiguous tensor sum_all assertion failed")
     assert_true(a.sum_all()[0] == 1770, "owning tensor sum_all assertion failed")
+    assert_true(v2.sum_all()[0] == 1770, "owning tensor non-contiguous sum_all assertion failed")
 
 fn test_view_of_view() raises:
     a = Tensor.scalar(10)
