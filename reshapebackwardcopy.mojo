@@ -1,0 +1,36 @@
+from tenmo import Tensor
+from sharedcopy import TensorLite
+from operators import AddTensor, SubtractTensor
+from backpropagationcopy import BackwardFn, Delegate
+
+
+@fieldwise_init
+struct ReshapeBackward[dtype: DType](Copyable & Movable & Stringable):
+    fn backward[
+        dtype: DType
+    ](self, output_ptr: UnsafePointer[TensorLite[dtype]]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
+    ]:
+        output = output_ptr[]
+        gradients = output.gradients().value()
+        ancestor = output.ancestry().get(0)[]
+        reshaped = gradients.reshape(ancestor.shape())
+        # Deduct already contributed portion
+        _="""new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
+            reshaped, output.base[]
+        )"""
+        new_contrib = reshaped - output.tensor().base[]
+        print("new_contrib*******************************")
+        new_contrib.print()
+        # Update base accumulator
+        output.tensor().base.init_pointee_move(reshaped^)
+        return [(ancestor, new_contrib, AddTensor)]
+
+    fn into_backward_fn(self) -> BackwardFn[dtype]:
+        return BackwardFn[dtype](Delegate[dtype](self))
+
+    fn __str__(self) -> String:
+        return "ReshapeBackward"
+
+fn main():
+    print("Yes")

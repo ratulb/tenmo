@@ -14,9 +14,10 @@ from strides import Strides
 from common_utils_imports import *
 from operators import __tensor_op_tensor__, __tensor_op_scalar__
 from operators_imports import *
-from walkback import *
+from walkbackcopy import *
 from buffers import Buffer
 from time import perf_counter_ns
+from sharedcopy import TensorLite
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -34,7 +35,7 @@ struct Tensor[dtype: DType = DType.float32](
     var buffer: Buffer[dtype]
     var requires_grad: Bool
     var grad: UnsafePointer[Buffer[dtype]]
-    var ancestors: Optional[Ancestors[dtype]]
+    var ancestors: Ancestors[dtype]
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
     var backwardFn: Optional[BackwardFn[dtype]]
     var owns_data: Bool
@@ -49,7 +50,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.grad = UnsafePointer[Buffer[dtype]]()
         self.base = UnsafePointer[Tensor[dtype]]()
         self.backwardFn = None
-        self.ancestors = None
+        self.ancestors = Ancestors[dtype].untracked()
         self.buffer = Buffer[dtype].Empty
         self.owns_data = False
         self.keep_alive = None
@@ -76,7 +77,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.backwardFn = None
         self.grad = UnsafePointer[Buffer[dtype]]()
-        self.ancestors = None
+        self.ancestors = Ancestors[dtype].untracked()
         self.base = UnsafePointer[Tensor[dtype]]()
         self.buffer = buffer
         self.owns_data = True
@@ -94,7 +95,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = UnsafePointer[Tensor[dtype]]()
         self.backwardFn = None
         self.grad = UnsafePointer[Buffer[dtype]]()
-        self.ancestors = None
+        self.ancestors = Ancestors[dtype].untracked()
         # Take of Tensor with Shape.Void
         self.buffer = Buffer[dtype](1) if shape.rank() == 0 else Buffer[dtype](
             shape.num_elements()
@@ -126,13 +127,17 @@ struct Tensor[dtype: DType = DType.float32](
         self._contiguous = other._contiguous
         self.buffer = other.buffer
         self.requires_grad = other.requires_grad
-        self.grad = other.grad
+        if other.has_grad():
+            self.grad = UnsafePointer[Buffer[dtype]].alloc(1)
+            self.grad.init_pointee_copy(other.grad[])
+        else:
+            self.grad = other.grad
         self.ancestors = other.ancestors
         self.base = other.base
         self.backwardFn = other.backwardFn
         self.owns_data = other.owns_data
         self.keep_alive = other.keep_alive
-        self.init_grad()
+        #self.init_grad()
 
     fn id(self) -> Int:
         return Int(UnsafePointer(to=self))
@@ -437,15 +442,13 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn add_ancestry(mut self, *parents: Tensor[dtype]):
-        if self.ancestors is None:
-            self.ancestors = Optional(Ancestors[dtype].untracked())
+    fn add_ancestry(mut self, *parents: TensorLite[dtype]):
         for parent in parents:
-            var ptr = UnsafePointer[Tensor[dtype]].alloc(1)
+            var ptr = UnsafePointer[TensorLite[dtype]].alloc(1)
             ptr.init_pointee_copy(parent)
-            self.ancestors.value().append(ptr)
+            self.ancestors.append(ptr)
 
-    fn ancestry(self) -> Optional[Ancestors[dtype]]:
+    fn ancestry(self) -> Ancestors[dtype]:
         return self.ancestors
 
     @always_inline
@@ -496,16 +499,10 @@ struct Tensor[dtype: DType = DType.float32](
             )
         return self.buffer.all_close[simd_width](other.buffer, rtol, atol)
 
-    fn buffer_address(
-        ref self,
-    ) -> UnsafePointer[
-        Buffer[dtype],
-        mut = Origin(__origin_of(self)).mut,
-        origin = __origin_of(self),
-    ]:
-        return UnsafePointer(to=self.buffer).origin_cast[
-            mut = Origin(__origin_of(self)).mut, origin = __origin_of(self)
-        ]()
+    @always_inline
+    fn data_buffer(self) -> Buffer[dtype]:
+        return self.buffer if self.owns_data else self.base_address()[].buffer
+        # return self.buffer if self.owns_data else self.base[].buffer
 
     fn address(
         ref self,
@@ -515,6 +512,18 @@ struct Tensor[dtype: DType = DType.float32](
         origin = __origin_of(self),
     ]:
         return UnsafePointer(to=self).origin_cast[
+            mut = Origin(__origin_of(self)).mut, origin = __origin_of(self)
+        ]()
+
+    @always_inline
+    fn grad_buffer(
+        ref self,
+    ) -> UnsafePointer[
+        Buffer[dtype],
+        mut = Origin(__origin_of(self)).mut,
+        origin = __origin_of(self),
+    ]:
+        return self.grad.origin_cast[
             mut = Origin(__origin_of(self)).mut, origin = __origin_of(self)
         ]()
 
@@ -535,8 +544,8 @@ struct Tensor[dtype: DType = DType.float32](
             mut = Origin(__origin_of(self)).mut, origin = __origin_of(self)
         ]()
 
-    fn seed_grad(self, with_tensor: Tensor[dtype]):
-        if not self.requires_grad or not self.has_grad():
+    fn seed_grad(mut self, with_tensor: Tensor[dtype]):
+        if not self.requires_grad:
             return
         if self.shape != with_tensor.shape:
             target = "Tensor" if self.owns_data else "View"
@@ -547,11 +556,17 @@ struct Tensor[dtype: DType = DType.float32](
                 " ≠ ",
                 with_tensor.shape.__str__(),
             )
+        if not self.has_grad():
+            self.init_grad()
+
+        print("self.grad[]")
         memcpy(
             self.grad[].data,
             with_tensor.buffer.data,
             with_tensor.numels(),
         )
+        print(self.grad[])
+        print("grad seeded")
 
     fn seed_grad(self, value: Scalar[dtype]):
         if self.has_grad():
@@ -1013,7 +1028,7 @@ struct Tensor[dtype: DType = DType.float32](
                 shape, strides, 0
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(TensorLite[dtype].of(self))
 
         return out
 
@@ -1062,11 +1077,12 @@ struct Tensor[dtype: DType = DType.float32](
         out.keep_alive = self.keep_alive
 
         if self.requires_grad:
-            backward_fn = ViewBackward[dtype](
+            _="""backward_fn = ViewBackward[dtype](
                 shape, strides, absolute_offset
             ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self)
+            pass
 
         return out
 
@@ -1168,7 +1184,7 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn reshape(self) -> Tensor[dtype]:
-        if self.numels() != 0:
+        if self.numels() != 1:
             abort(
                 "Only tensor with single element can be reshaped to scalar"
                 " tensor"
@@ -1176,7 +1192,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.reshape(Shape.Void)
 
     fn reshape(self, *newdims: Int) -> Tensor[dtype]:
-        if len(newdims) == 0 and newdims[0] == 0:
+        if len(newdims) == 1 and newdims[0] == 0:
             return self.reshape()
         shape = Validator.validate_new_shape(
             self.shape.intlist(), IntList(newdims)
@@ -1211,12 +1227,12 @@ struct Tensor[dtype: DType = DType.float32](
         if requires_grad:
             # Using base to keep track of grad already contributed to parent
             base = Tensor[dtype].zeros(self.shape)
-            out.base = UnsafePointer[Tensor[dtype]].alloc(0)
+            out.base = UnsafePointer[Tensor[dtype]].alloc(1)
             out.base.init_pointee_move(base^)
 
             backward_fn = ReshapeBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.add_ancestry(TensorLite[dtype].of(self))
 
         return out
 
@@ -1323,11 +1339,11 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
             out.requires_grad = True
             out.init_grad()
-            backward_fn = SumBackward[dtype](
+            _="""backward_fn = SumBackward[dtype](
                 normalized_axes.copy(), keepdims
             ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self)
 
         return out
 
@@ -1348,11 +1364,11 @@ struct Tensor[dtype: DType = DType.float32](
         if self.requires_grad:
             out.requires_grad = True
             out.init_grad()
-            backward_fn = MeanBackward[dtype](
+            _="""backward_fn = MeanBackward[dtype](
                 normalized_axes.copy(), keepdims
             ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self)
 
         return out
 
@@ -1368,11 +1384,12 @@ struct Tensor[dtype: DType = DType.float32](
         out = Tensor[dtype](self.shape, buffer, self.requires_grad)
 
         if self.requires_grad:
-            backward_fn = RightTrueDivBackwardScalar[dtype](
+            _="""backward_fn = RightTrueDivBackwardScalar[dtype](
                 scalar
             ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self)
+            pass
 
         return out
 
@@ -1391,11 +1408,12 @@ struct Tensor[dtype: DType = DType.float32](
         out = Tensor[dtype](self.shape, buffer, self.requires_grad)
 
         if self.requires_grad:
-            backward_fn = TrueDivBackwardScalar[dtype](
+            _="""backward_fn = TrueDivBackwardScalar[dtype](
                 scalar
             ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self)
+            pass
 
         return out
 
@@ -1410,9 +1428,10 @@ struct Tensor[dtype: DType = DType.float32](
         out = Tensor[dtype](self.shape, buffer, requires_grad=requires_grad)
 
         if requires_grad:
-            backward_fn = MulBackwardScalar[dtype](factor).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            _="""backward_fn = MulBackwardScalar[dtype](factor).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)"""
+            pass
+            #out.add_ancestry(self)
 
         return out
 
@@ -1435,10 +1454,11 @@ struct Tensor[dtype: DType = DType.float32](
         out = Tensor[dtype](self.shape, buffer, requires_grad=requires_grad)
 
         if requires_grad:
-            backward_fn = MultiplyBackward[dtype]().into_backward_fn()
+            _="""backward_fn = MultiplyBackward[dtype]().into_backward_fn()
 
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self, other)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self, other)
+            pass
 
         return out
 
@@ -1449,16 +1469,18 @@ struct Tensor[dtype: DType = DType.float32](
         out = self.broadcast_op(other, scalar_ops[dtype, Multiply])
         requires_grad = self.requires_grad or other.requires_grad
         if requires_grad:
-            backward_fn = BroadcastBackward[
+            _="""backward_fn = BroadcastBackward[
                 dtype, AddTensor, AddTensor, True
             ]().into_backward_fn()
 
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self, other)
+            out.add_ancestry(self, other)"""
+            pass
 
         return out
 
-    fn update_grad[opcode: Int](self, grad_tensor: Tensor[dtype]):
+
+    fn update_grad[opcode: Int](mut self, grad_tensor: Tensor[dtype]):
         incoming = (
             grad_tensor.buffer if grad_tensor.owns_data else grad_tensor.base_address()[].buffer
         )
@@ -1545,9 +1567,10 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         if self.requires_grad:
-            backward_fn = AddBackwardScalar[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            _="""backward_fn = AddBackwardScalar[dtype]().into_backward_fn()
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self)
+            pass
 
         return out
 
@@ -1565,11 +1588,12 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         if self.requires_grad:
-            backward_fn = ExponientionBackward[dtype](
+            _="""backward_fn = ExponientionBackward[dtype](
                 exponent
             ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self)
+            pass
 
         return out
 
@@ -1581,11 +1605,12 @@ struct Tensor[dtype: DType = DType.float32](
             self.requires_grad,
         )
         if self.requires_grad:
-            backward_fn = SubLeftRightBackwardScalar[dtype](
+            _="""backward_fn = SubLeftRightBackwardScalar[dtype](
                 True
             ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self)
+            pass
 
         return out
 
@@ -1598,11 +1623,12 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         if self.requires_grad:
-            backward_fn = SubLeftRightBackwardScalar[dtype](
+            _="""backward_fn = SubLeftRightBackwardScalar[dtype](
                 False
             ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self)
+            pass
 
         return out
 
@@ -1632,15 +1658,17 @@ struct Tensor[dtype: DType = DType.float32](
         out = Tensor[dtype](self.shape, buffer, requires_grad)
 
         if requires_grad:
-            sub_backward = SubBackward[dtype]()
+            #sub_backward = SubBackward[dtype]()
             if self.requires_grad:
-                out.add_ancestry(self)
-                sub_backward.negate(False)
+                #out.add_ancestry(self)
+                #sub_backward.negate(False)
+                pass
             if other.requires_grad:
-                out.add_ancestry(other)
-                sub_backward.negate(True)
+                pass
+                #out.add_ancestry(other)
+                _="""sub_backward.negate(True)
             backward_fn = sub_backward.into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
+            out.backwardFn = Optional(backward_fn)"""
 
         return out
 
@@ -1679,12 +1707,14 @@ struct Tensor[dtype: DType = DType.float32](
         out = Tensor[dtype](self.shape, buffer, requires_grad)
 
         if requires_grad:
-            backward_fn = AddBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
+            _="""backward_fn = AddBackward[dtype]().into_backward_fn()
+            out.backwardFn = Optional(backward_fn)"""
             if self.requires_grad:
-                out.add_ancestry(self)
+                #out.add_ancestry(self)
+                pass
             if other.requires_grad:
-                out.add_ancestry(other)
+                #out.add_ancestry(other)
+                pass
 
         return out
 
@@ -1705,12 +1735,13 @@ struct Tensor[dtype: DType = DType.float32](
     ](self, other: Self) -> Tensor[dtype]:
         var out = self.broadcast_op(other, scalar_ops[dtype, Element_Wise_Op])
         if self.requires_grad or other.requires_grad:
-            backward_fn = BroadcastBackward[
+            _="""backward_fn = BroadcastBackward[
                 dtype, Tensor_Op_First, Tensor_Op_Second, False
             ]().into_backward_fn()
 
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self, other)
+            out.backwardFn = Optional(backward_fn)"""
+            #out.add_ancestry(self, other)
+            pass
 
         return out
 
@@ -1833,7 +1864,7 @@ struct Tensor[dtype: DType = DType.float32](
                 self.grad.destroy_pointee()
                 self.grad.free()
             if self.ancestors:
-                self.ancestors.value().free()
+                self.ancestors.free()
             _ = self^
 
         elif (
@@ -1862,18 +1893,43 @@ struct Tensor[dtype: DType = DType.float32](
             self.shape.free()
             self.strides.free()
             if self.ancestors:
-                self.ancestors.value().free()
+                self.ancestors.free()
             self.buffer.free()
         _ = self^
 
-        _ = """fn backward(self, start_grad: Scalar[dtype] = 1.0):
-        TensorLike.from_tensor(self).backward(start_grad)
+        _="""fn backward(mut self, start_grad: Scalar[dtype] = 1.0):
+        if not self.requires_grad:
+            return
+        seed_tensor = Tensor[dtype].full(self.shape, start_grad)
+        self.backward(seed_tensor)
+
+    fn backward(mut self, seed_tensor: Tensor[dtype]):
+        if not self.requires_grad:
+            return
+        self.seed_grad(seed_tensor)
+        tracked = IntList.Empty
+        graph = List[Tensor[dtype]]()
+        stack = [self]
+        while stack:
+            tensor = stack.pop()
+            if tensor.id() in tracked:
+                continue
+            graph.append(tensor)
+            tracked.append(tensor.id())
+            for ancestor in tensor.ancestry():
+                stack.append(ancestor[])
+        print("tracked: ", tracked)
+        for tensor in graph:
+            tensor.flow()"""
+    fn backward(self, start_grad: Scalar[dtype] = 1.0):
+        TensorLite.of(self).backward(start_grad)
 
     fn backward(self, seed_tensor: Tensor[dtype]):
-        TensorLike.from_tensor(self).backward(seed_tensor)
+        TensorLite.of(self).backward(seed_tensor)
 
 
-    fn permute(self, axes: IntList) -> TensorView[dtype]:
+
+        _="""fn permute(self, axes: IntList) -> TensorView[dtype]:
         view = self.into_view()
         permutated = view.permute(axes)
         return permutated
@@ -1972,7 +2028,7 @@ struct Tensor[dtype: DType = DType.float32](
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
             C.backwardFn = Optional(backward_fn)
             C.add_ancestry(Self.Ancestor_of(A))
-            C.add_ancestry(TensorLike(V))
+            C.add_ancestry(TensorLite(V))
 
         return C
 
@@ -2020,8 +2076,9 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    test_add_tensor_and_view()
-    _ = """test_add_tensors()
+    test_reshape_backward()
+    _="""test_add_tensor_and_view()
+    test_add_tensors()
     test_subtract_scalar()
     test_add_scalar()
     test_powering()
@@ -2038,6 +2095,19 @@ fn main() raises:
 
 from testing import assert_true
 
+fn test_reshape_backward() raises:
+    a = Tensor.scalar(100, requires_grad = True)
+    r = a.reshape()
+    v = r.into_view()
+    print("a.id(), r.id(), v.id(): ", a.id(), r.id(), v.id())
+    print("This is reshaped", r.has_backward_fn())
+    v.ancestors.print()
+    v.print()
+
+    v.backward(42)
+    a.gprint()
+    _ = r
+    _ = a
 
 fn test_add_tensor_and_view() raises:
     a = Tensor.full(Shape.of(3, 3), 2)

@@ -9,7 +9,7 @@ from common_utils import log_debug, panic
 
 
 struct Buffer[dtype: DType = DType.float32](
-    Copyable & Movable & Sized & Stringable & Writable & Representable
+    Copyable & Movable & Sized & Stringable & Writable & Representable & Absable
 ):
     var size: Int
     var data: UnsafePointer[Scalar[dtype]]
