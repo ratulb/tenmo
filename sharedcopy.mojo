@@ -38,7 +38,7 @@ struct TensorLite[dtype: DType](
 
     @always_inline
     fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
-        return self.tensor().gradients()
+        return self.tensor_address[].gradients()
 
     @staticmethod
     fn of(tensor: Tensor[dtype]) -> Self:
@@ -101,8 +101,7 @@ struct TensorLite[dtype: DType](
         if (
             not self.tensor_address[].owns_data
         ):  # Currently for tensors requiring grad, we initialize grad upfront
-            self.tensor_address[].init_grad()
-
+            self.tensor_address[].init_gradbox()
 
     fn backward(root: Self, start_grad: Scalar[dtype] = 1.0):
         if not root.requires_grad():
@@ -159,7 +158,6 @@ struct GradStream[dtype: DType](Copyable & Movable):
         self.grad = other.grad
         self.opcode = other.opcode
 
-
     fn has_backward_fn(self) -> Bool:
         return self.recipient.has_backward_fn()
 
@@ -182,3 +180,8 @@ struct GradStream[dtype: DType](Copyable & Movable):
         ](
             grad_share
         )
+
+    fn edges(self) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
+        if not self.recipient.has_backward_fn():
+            return []
+        return self.recipient.backward_fn()(self.recipient)
