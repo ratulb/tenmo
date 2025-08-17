@@ -37,8 +37,8 @@ struct TensorLite[dtype: DType](
         return self.tensor_address[].shape
 
     @always_inline
-    fn gradients(self) -> Optional[Tensor[dtype]]:
-        return self.tensor_address[].gradients()
+    fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
+        return self.tensor().gradients()
 
     @staticmethod
     fn of(tensor: Tensor[dtype]) -> Self:
@@ -166,7 +166,7 @@ struct GradStream[dtype: DType](Copyable & Movable):
     fn flow(self):
         if self.recipient.has_backward_fn():
             for recipient, grad_share, opcode in self.recipient.backward_fn()(
-                UnsafePointer(to=self.recipient)
+                self.recipient
             ):
                 gradstream = Self(recipient, Optional(grad_share), opcode)
                 gradstream.sink()

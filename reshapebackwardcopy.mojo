@@ -8,11 +8,10 @@ from backpropagationcopy import BackwardFn, Delegate
 struct ReshapeBackward[dtype: DType](Copyable & Movable & Stringable):
     fn backward[
         dtype: DType
-    ](self, output_ptr: UnsafePointer[TensorLite[dtype]]) -> List[
+    ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = output_ptr[]
-        gradients = output.gradients().value()
+        gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
         reshaped = gradients.reshape(ancestor.shape())
         # Deduct already contributed portion
@@ -20,8 +19,6 @@ struct ReshapeBackward[dtype: DType](Copyable & Movable & Stringable):
             reshaped, output.base[]
         )"""
         new_contrib = reshaped - output.tensor().base[]
-        print("new_contrib*******************************")
-        new_contrib.print()
         # Update base accumulator
         output.tensor().base.init_pointee_move(reshaped^)
         return [(ancestor, new_contrib, AddTensor)]
