@@ -13,16 +13,15 @@ struct TBackward[dtype: DType](Copyable & Movable & Stringable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLite[dtype]]) -> List[
+    ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
         return [
             (
                 ancestor,
-                gradients.transpose().into_tensor(),
+                gradients.transpose(),
                 AddTensor,
             )
         ]
@@ -48,11 +47,10 @@ struct TransposeBackward[dtype: DType](Copyable & Movable & Stringable):
         ancestor = output.ancestry().get(0)[]
         inverted_axes = IntList.invert_permutation(self.axes)
         grad_transposed = gradients.transpose(inverted_axes)
-        grad_output = grad_transposed.into_tensor()
         return [
             (
                 ancestor,
-                grad_output,
+                grad_transposed,
                 AddTensor,
             )
         ]

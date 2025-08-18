@@ -1218,6 +1218,48 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
+    fn transpose(
+        self, *axes: Int, requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
+        transpose_axes = IntList.with_capacity(len(axes))
+        for axis in transpose_axes:
+            transpose_axes.append(axis)
+        return self.transpose(transpose_axes, requires_grad)
+
+    fn transpose(
+        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
+        return self.transpose(IntList.new(axes))
+
+    fn transpose(
+        self, axes: IntList, requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
+        shape = self.shape
+        var normalized_axes = Validator.validate_axes(
+            axes if len(axes)
+            > 0 else IntList.range_list(shape.rank()).reversed(),
+            shape,
+        )
+
+        # Permute shape and create default strides and permute
+        var new_shape = shape.permute(normalized_axes)
+        var new_strides = self.strides.permute(normalized_axes)
+        out = self.view(
+            new_shape,
+            new_strides,
+            offset=0,
+            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
+        )
+        if self.requires_grad:
+            backward_fn = TransposeBackward[dtype](
+                normalized_axes
+            ).into_backward_fn()
+
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(TensorLite.of(self))
+
+        return out
+
     fn broadcast_op(
         self,
         other: Self,
@@ -1756,6 +1798,45 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
+    fn permute(self, axes: List[Int]) -> Tensor[dtype]:
+        return self.permute(IntList.new(axes))
+
+    fn permute(self, axes: IntList) -> Tensor[dtype]:
+        if len(axes) != self.shape.rank():
+            abort("Tensor → permute: number of axes must match tensor rank")
+
+        # Check for valid permutation
+        seen = IntList.with_capacity(len(axes))
+        for axis in axes:
+            if axis < 0 or axis >= self.shape.rank():
+                abort("Tensor → permute: invalid axis index")
+            if axis in seen:
+                abort("Tensor → permute: duplicate axis in permutation")
+            seen.append(axis)
+
+        seen.free()
+
+        # Create new shape and strides
+        new_shape = IntList.with_capacity(len(axes))
+        new_strides = IntList.with_capacity(len(axes))
+        for axis in axes:
+            new_shape.append(self.shape[axis])
+            new_strides.append(self.strides[axis])
+
+        # Return new view with same base but reordered axes
+        out = self.view(
+            shape=Shape(new_shape),
+            strides=Strides(new_strides),
+            offset=self.offset,  # Permute doesn't change offset
+        )
+        if self.requires_grad:
+            permutation = axes.copy()
+            backward_fn = PermuteBackward[dtype](permutation).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(TensorLite.of(self))
+
+        return out
+
     fn print_tensor_recursive(
         self,
         mut indices: IntList,
@@ -1909,25 +1990,14 @@ struct Tensor[dtype: DType = DType.float32](
             self.buffer.free()
         _ = self^
 
+    fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
+        return ((self - target) ** 2).mean()
+
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         TensorLite.of(self).backward(start_grad)
 
     fn backward(self, seed_tensor: Tensor[dtype]):
         TensorLite.of(self).backward(seed_tensor)
-
-        _ = """fn permute(self, axes: IntList) -> TensorView[dtype]:
-        view = self.into_view()
-        permutated = view.permute(axes)
-        return permutated
-
-    fn permute(self, axes: List[Int]) -> TensorView[dtype]:
-        view = self.into_view()
-        permutated = view.permute(axes)
-        return permutated
-
-
-    fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
-        return ((self - target) ** 2).mean()
 
     fn matmul[
         simd_width: Int = simdwidthof[dtype]()
@@ -1942,14 +2012,14 @@ struct Tensor[dtype: DType = DType.float32](
                 scalar_a = A.load(i, j)
 
                 @parameter
-                fn mul_add[simdwidth: Int](k: Int):
-                    vectorized_a = SIMD[dtype, simdwidth](scalar_a)
-                    vector_b = B.load[simdwidth](j, k)
+                fn mul_add[width: Int](k: Int):
+                    vectorized_a = SIMD[dtype, width](scalar_a)
+                    vector_b = B.load[simdwidth=width](j, k)
                     product = vectorized_a * vector_b
                     offset = i * cols_b + k
-                    C.buffer.store[width=simdwidth](
+                    C.buffer.store[simdwidth=width](
                         offset,
-                        C.buffer.load[width=simdwidth](offset) + product,
+                        C.buffer.load[simdwidth=width](offset) + product,
                     )
 
                 vectorize[mul_add, simd_width](cols_b)
@@ -1959,10 +2029,13 @@ struct Tensor[dtype: DType = DType.float32](
             C.init_gradbox()
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
             C.backwardFn = Optional(backward_fn)
-            C.add_ancestry(Self.Ancestor_of(A))
-            C.add_ancestry(Self.Ancestor_of(B))
+            C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
 
         return C
+
+        _ = """
+
+
 
     fn matmul(self, other: TensorView[dtype]) -> Self:
         Validator.validate_matrix_shapes(self, other)
@@ -2018,47 +2091,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         return C
 
-    fn transpose(
-        self, *axes: Int, requires_grad: Optional[Bool] = None
-    ) -> TensorView[dtype]:
-        transpose_axes = IntList.with_capacity(len(axes))
-        for axis in transpose_axes:
-            transpose_axes.append(axis)
-        return self.transpose(transpose_axes, requires_grad)
 
-    fn transpose(
-        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
-    ) -> TensorView[dtype]:
-        return self.transpose(IntList.new(axes))
-
-    fn transpose(
-        self, axes: IntList, requires_grad: Optional[Bool] = None
-    ) -> TensorView[dtype]:
-        shape = self.shape
-        var normalized_axes = Validator.validate_axes(
-            axes if len(axes)
-            > 0 else IntList.range_list(shape.rank()).reversed(),
-            shape,
-        )
-
-        # Permute shape and create default strides and permute
-        var new_shape = shape.permute(normalized_axes)
-        var new_strides = self.strides.permute(normalized_axes)
-        out = self.view(
-            new_shape,
-            new_strides,
-            offset=0,
-            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
-        )
-        if self.requires_grad:
-            backward_fn = TransposeBackward[dtype](
-                normalized_axes
-            ).into_backward_fn()
-
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(Self.Ancestor_of(self))
-
-        return out"""
+        """
 
 
 fn main() raises:

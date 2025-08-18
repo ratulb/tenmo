@@ -26,7 +26,7 @@ struct PermuteBackward[dtype: DType](Copyable & Movable & Stringable):
             inverse[self.permutation[i]] = i
 
         # Apply inverse permutation to gradients
-        parent_grad = gradients.permute(inverse).into_tensor()
+        parent_grad = gradients.permute(inverse)
 
         return [(parent, parent_grad, AddTensor)]
 

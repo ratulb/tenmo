@@ -78,7 +78,7 @@ def assert_grad[
     dtype: DType, //
 ](t: Tensor[dtype], expected: Tensor[dtype], label: String):
     assert_true(
-        (t.grad[] == expected).all_true(),
+        (t.gradbox[] == expected).all_true(),
         String("grad assertion failed for {0}").format(label),
     )
 

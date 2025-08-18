@@ -12,18 +12,18 @@ from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
 from exponientionbackward import ExponientionBackward
 from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
-#from transposebackward import TBackward, TransposeBackward
-#from matmulbackward import MatmulBackward
+from transposebackward import TBackward, TransposeBackward
+from matmulbackward import MatmulBackward
 from viewbackward import ViewBackward
-#from permutebackward import PermuteBackward
+from permutebackward import PermuteBackward
 #from tensorviewbackward import TensorViewBackward
 
 alias Delegate[dtype: DType] = Variant[
-    #MatmulBackward[dtype],
+    MatmulBackward[dtype],
     ReshapeBackward[dtype],
     ViewBackward[dtype],
     #TensorViewBackward[dtype],
-    #PermuteBackward[dtype],
+    PermuteBackward[dtype],
     SumBackward[dtype],
     MeanBackward[dtype],
     AddBackward[dtype],
@@ -35,7 +35,7 @@ alias Delegate[dtype: DType] = Variant[
     TrueDivBackwardScalar[dtype],
     RightTrueDivBackwardScalar[dtype],
     ExponientionBackward[dtype],
-    #TransposeBackward[dtype],
+    TransposeBackward[dtype],
     #TBackward[dtype],
     BroadcastBackward[dtype, AddTensor, AddTensor, False],
     BroadcastBackward[dtype, AddTensor, AddTensor, True],
@@ -58,28 +58,27 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     fn __call__(
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        _="""if self.grad_fn.isa[MatmulBackward[dtype]]():
+        _="""
+           elif self.grad_fn.isa[TBackward[dtype]]():
+            return self.grad_fn[TBackward[dtype]].backward[dtype](output)
+
+           if self.grad_fn.isa[TensorViewBackward[dtype]]():
+            return self.grad_fn[TensorViewBackward[dtype]].backward[dtype](output)"""
+
+        if self.grad_fn.isa[MatmulBackward[dtype]]():
             return self.grad_fn[MatmulBackward[dtype]].backward[dtype](output)
+
+        elif self.grad_fn.isa[ReshapeBackward[dtype]]():
+            return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](output)
+
+        elif self.grad_fn.isa[ViewBackward[dtype]]():
+            return self.grad_fn[ViewBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[TransposeBackward[dtype]]():
             return self.grad_fn[TransposeBackward[dtype]].backward[dtype](output)
 
-        elif self.grad_fn.isa[TBackward[dtype]]():
-            return self.grad_fn[TBackward[dtype]].backward[dtype](output)
-
-        if self.grad_fn.isa[PermuteBackward[dtype]]():
+        elif self.grad_fn.isa[PermuteBackward[dtype]]():
             return self.grad_fn[PermuteBackward[dtype]].backward[dtype](output)
-
-
-        if self.grad_fn.isa[TensorViewBackward[dtype]]():
-            return self.grad_fn[TensorViewBackward[dtype]].backward[dtype](output)"""
-
-        if self.grad_fn.isa[ReshapeBackward[dtype]]():
-            return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](output)
-
-        if self.grad_fn.isa[ViewBackward[dtype]]():
-            return self.grad_fn[ViewBackward[dtype]].backward[dtype](output)
-
 
         elif self.grad_fn.isa[SumBackward[dtype]]():
             return self.grad_fn[SumBackward[dtype]].backward[dtype](output)

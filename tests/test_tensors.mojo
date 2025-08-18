@@ -21,7 +21,7 @@ fn test_shared_tensor_twice() raises:
     d.backward()
 
     # Final grad: ∂d/∂a = [5, 5, 5]
-    assert_true(a.grad[].all_close(Tensor.d1([5.0, 5.0, 5.0])), "∂d/∂a = 5")
+    assert_true(a.gradbox[].all_close(Tensor.d1([5.0, 5.0, 5.0])), "∂d/∂a = 5")
 
 
 fn test_broadcast_and_reuse() raises:
@@ -39,7 +39,7 @@ fn test_broadcast_and_reuse() raises:
 
     # Expected gradient: shape (3,1), all 3's
     assert_true(
-        a.grad[].all_close(Tensor.d2([[3.0], [3.0], [3.0]])), "∂loss/∂a = 3"
+        a.gradbox[].all_close(Tensor.d2([[3.0], [3.0], [3.0]])), "∂loss/∂a = 3"
     )
 
 
@@ -55,7 +55,7 @@ fn test_branching_square_add() raises:
     d.backward()
 
     # ∂d/∂a = ∂b/∂a + ∂c/∂a = 4 + 2 = 6
-    assert_true(a.grad[].all_close(Tensor.d1([6.0])), "∂d/∂a = 6")
+    assert_true(a.gradbox[].all_close(Tensor.d1([6.0])), "∂d/∂a = 6")
 
 
 fn test_merge_of_dependent_branches() raises:
@@ -70,7 +70,7 @@ fn test_merge_of_dependent_branches() raises:
     c.backward()
 
     # ∂c/∂a = b + a = 3
-    assert_true(a.grad[].all_close(Tensor.d1([3.0])), "∂c/∂a = b + a = 3")
+    assert_true(a.gradbox[].all_close(Tensor.d1([3.0])), "∂c/∂a = b + a = 3")
 
 
 fn test_square_and_identity_path() raises:
@@ -84,7 +84,7 @@ fn test_square_and_identity_path() raises:
     var out = sq + id  # ∂out/∂a = 6 + 1 = 7
     out.backward()
 
-    assert_true(a.grad[].all_close(Tensor.d1([7.0])), "∂out/∂a = 7")
+    assert_true(a.gradbox[].all_close(Tensor.d1([7.0])), "∂out/∂a = 7")
 
 
 fn test_shared_dependency_multiple_paths() raises:
@@ -96,7 +96,7 @@ fn test_shared_dependency_multiple_paths() raises:
     d.backward()
 
     # Correct gradient: ∂d/∂a = 1 (from b) + 2 (from c) = 3
-    assert_true(a.grad[].all_close(Tensor.d1([3.0])), "∂d/∂a should be 2")
+    assert_true(a.gradbox[].all_close(Tensor.d1([3.0])), "∂d/∂a should be 2")
 
 
 fn test_diamond_dependency() raises:
@@ -109,7 +109,7 @@ fn test_diamond_dependency() raises:
     d.backward()
 
     # Correct gradient: ∂d/∂a = 2 + 4 = 6
-    assert_true(a.grad[].all_close(Tensor.d1([6.0])), "∂d/∂a should be 6")
+    assert_true(a.gradbox[].all_close(Tensor.d1([6.0])), "∂d/∂a should be 6")
 
 
 fn test_repeated_tensor_use() raises:
@@ -120,7 +120,7 @@ fn test_repeated_tensor_use() raises:
     b.backward()
 
     # Correct gradient: ∂b/∂a = 2a = 4
-    assert_true(a.grad[].all_close(Tensor.d1([4.0])), "∂b/∂a should be 4")
+    assert_true(a.gradbox[].all_close(Tensor.d1([4.0])), "∂b/∂a should be 4")
 
 
 fn test_topological_sort_required() raises:
@@ -131,7 +131,7 @@ fn test_topological_sort_required() raises:
     var d = b * c  # ∂d/∂a = c*∂b/∂a + b*∂c/∂a = 2*2 + 2*1 = 6
     d.backward()
     assert_true(
-        a.grad[].all_close(Tensor.d1([6.0]))
+        a.gradbox[].all_close(Tensor.d1([6.0]))
     )  # Might fail without topological sort!
 
 
@@ -232,7 +232,7 @@ fn test_tensor_shared_multiple_paths() raises:
 
     # ∂out/∂x = ∂y/∂x + ∂z/∂x = 3 + 1 = 4
     assert_true(out.item() == 12.0, "Value check")
-    assert_true(x.grad[].item() == 4.0, "Correct accumulated gradient")
+    assert_true(x.gradbox[].item() == 4.0, "Correct accumulated gradient")
 
 
 fn test_tensor_reuse_broadcasting() raises:
@@ -243,7 +243,7 @@ fn test_tensor_reuse_broadcasting() raises:
     y.sum().backward()
 
     assert_true(
-        x.grad[].all_close(Tensor.d1([2, 2, 2])),
+        x.gradbox[].all_close(Tensor.d1([2, 2, 2])),
         "Gradient doubles due to reuse",
     )
 
@@ -260,7 +260,7 @@ fn test_tensor_reuse_deep_chain() raises:
     assert_true(w.item() == 8.0, "Value check")
     # ∂w/∂x = ∂z/∂x + 1
     # z = (x + 1) * x → ∂z/∂x = (1)*x + (x+1)*1 = x + x + 1 = 2x + 1 = 5
-    assert_true(x.grad[].item() == 5 + 1, "∂w/∂x = ∂z/∂x + ∂x/∂x = 6")
+    assert_true(x.gradbox[].item() == 5 + 1, "∂w/∂x = ∂z/∂x + ∂x/∂x = 6")
 
 
 fn test_tensor_reuse_in_two_branches() raises:
@@ -273,7 +273,7 @@ fn test_tensor_reuse_in_two_branches() raises:
     z.backward()
 
     assert_true(z.item() == 13.0, "Value check")
-    assert_true(x.grad[].item() == 1 + 5, "∂z/∂x = 1 (from y1) + 5 (from y2)")
+    assert_true(x.gradbox[].item() == 1 + 5, "∂z/∂x = 1 (from y1) + 5 (from y2)")
 
 
 fn test_tensor_reuse_mixed() raises:
@@ -284,7 +284,7 @@ fn test_tensor_reuse_mixed() raises:
     y.backward()
 
     assert_true(y.item() == 12.0, "Value check")
-    assert_true(x.grad[].item() == 2 * 3 + 1, "∂y/∂x = 2x + 1 = 6 + 1 = 7")
+    assert_true(x.gradbox[].item() == 2 * 3 + 1, "∂y/∂x = 2x + 1 = 6 + 1 = 7")
 
 
 fn test_tensor_reuse_add() raises:
@@ -295,7 +295,7 @@ fn test_tensor_reuse_add() raises:
     y.backward()
 
     assert_true(y.item() == 4.0, "Value check")
-    assert_true(x.grad[].item() == 2.0, "∂y/∂x = 1 + 1 = 2 (reuse)")
+    assert_true(x.gradbox[].item() == 2.0, "∂y/∂x = 1 + 1 = 2 (reuse)")
 
 
 fn test_simple_chain() raises:
@@ -307,7 +307,7 @@ fn test_simple_chain() raises:
 
     d.backward()
     assert_true(d.item() == 9.0, "Value check")
-    assert_true(a.grad[].item() == 3.0, "∂d/∂a = b = 3")
+    assert_true(a.gradbox[].item() == 3.0, "∂d/∂a = b = 3")
 
 
 fn test_scalar_mul_scalar() raises:
@@ -319,8 +319,8 @@ fn test_scalar_mul_scalar() raises:
     c.backward()
 
     assert_true(c.item() == 12.0)
-    assert_true(a.grad[].item() == 4.0)
-    assert_true(b.grad[].item() == 3.0)
+    assert_true(a.gradbox[].item() == 4.0)
+    assert_true(b.gradbox[].item() == 3.0)
 
 
 fn test_1d_mul_1d_same_shape() raises:
@@ -332,8 +332,8 @@ fn test_1d_mul_1d_same_shape() raises:
     c.sum().backward()
 
     assert_true((c == Tensor.d1([4.0, 10.0, 18.0])).all_true())
-    assert_true(a.grad[].all_close(Tensor.d1([4.0, 5.0, 6.0])))
-    assert_true(b.grad[].all_close(Tensor.d1([1.0, 2.0, 3.0])))
+    assert_true(a.gradbox[].all_close(Tensor.d1([4.0, 5.0, 6.0])))
+    assert_true(b.gradbox[].all_close(Tensor.d1([1.0, 2.0, 3.0])))
 
 
 fn test_2d_mul_2d_same_shape() raises:
@@ -345,8 +345,8 @@ fn test_2d_mul_2d_same_shape() raises:
     c.sum().backward()
 
     assert_true((c == Tensor.d2([[5.0, 12.0], [21.0, 32.0]])).all_true())
-    assert_true(a.grad[].all_close(b))
-    assert_true(b.grad[].all_close(a))
+    assert_true(a.gradbox[].all_close(b))
+    assert_true(b.gradbox[].all_close(a))
 
 
 fn test_broadcast_2d_1d_mul() raises:
@@ -362,11 +362,11 @@ fn test_broadcast_2d_1d_mul() raises:
     summ.backward()
 
     assert_true((c == Tensor.d2([[5.0, 12.0], [15.0, 24.0]])).all_true())
-    assert_true(a.grad[].all_close(Tensor.d2([[5.0, 6.0], [5.0, 6.0]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[5.0, 6.0], [5.0, 6.0]])))
 
     # b.grad should sum over rows
     assert_true(
-        b.grad[].all_close(Tensor.d1([4.0, 6.0]).to_dtype[DType.float32]())
+        b.gradbox[].all_close(Tensor.d1([4.0, 6.0]).to_dtype[DType.float32]())
     )
 
 
@@ -381,9 +381,9 @@ fn test_broadcast_1d_2d_mul() raises:
     assert_true((c == Tensor.d2([[8.0, 15.0], [12.0, 21.0]])).all_true())
 
     assert_true(
-        a.grad[].all_close(Tensor.d1([10.0, 12.0]).to_dtype[DType.float32]())
+        a.gradbox[].all_close(Tensor.d1([10.0, 12.0]).to_dtype[DType.float32]())
     )
-    assert_true(b.grad[].all_close(Tensor.d2([[2.0, 3.0], [2.0, 3.0]])))
+    assert_true(b.gradbox[].all_close(Tensor.d2([[2.0, 3.0], [2.0, 3.0]])))
 
 
 fn test_3d_broadcast_mul() raises:
@@ -397,8 +397,8 @@ fn test_3d_broadcast_mul() raises:
     c.sum().backward()
 
     assert_true(c.shape == Shape.of(2, 2, 2))
-    assert_true(a.grad[].shape == Shape.of(2, 2, 1))
-    assert_true(b.grad[].shape == Shape.of(1, 1, 2))
+    assert_true(a.gradbox[].shape == Shape.of(2, 2, 1))
+    assert_true(b.gradbox[].shape == Shape.of(1, 1, 2))
 
 
 fn test_mul_one_requires_grad() raises:
@@ -409,7 +409,7 @@ fn test_mul_one_requires_grad() raises:
     var c = a * b
     c.sum().backward()
 
-    assert_true(b.grad[].all_close(a))
+    assert_true(b.gradbox[].all_close(a))
 
 
 fn test_scalar_tensor_mul() raises:
@@ -420,7 +420,7 @@ fn test_scalar_tensor_mul() raises:
     var c = a * b
     c.sum().backward()
 
-    assert_true(a.grad[].item() == 6.0)  # sum of b
+    assert_true(a.gradbox[].item() == 6.0)  # sum of b
 
 
 fn test_unsqueeze() raises:
@@ -441,7 +441,7 @@ fn test_tensor_mean() raises:
     m = a.mean()
     m.backward()
     assert_true(m.item() == 5.0)
-    assert_true(a.grad[].item() == 1.0)
+    assert_true(a.gradbox[].item() == 1.0)
     a.free()
     m.free()
 
@@ -449,7 +449,7 @@ fn test_tensor_mean() raises:
     m = a.mean()
     assert_true(m.item() == 2.0)
     m.backward()
-    assert_true(a.grad[].all_close(Tensor.d1([1 / 3, 1 / 3, 1 / 3])))
+    assert_true(a.gradbox[].all_close(Tensor.d1([1 / 3, 1 / 3, 1 / 3])))
     a.free()
     m.free()
 
@@ -458,7 +458,7 @@ fn test_tensor_mean() raises:
     assert_true(M.item() == 2.5)
     M.backward()
     expected = Tensor.d2([[0.25, 0.25], [0.25, 0.25]])
-    assert_true(A.grad[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])))
+    assert_true(A.gradbox[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])))
     A.free()
     M.free()
 
@@ -467,7 +467,7 @@ fn test_tensor_mean() raises:
     assert_true(m1.all_close(Tensor.d1([2.0, 3.0]).to_dtype[DType.float32]()))
     m1.backward()
     assert_true(
-        a1.grad[].all_close(
+        a1.gradbox[].all_close(
             Tensor.d2([[0.5, 0.5], [0.5, 0.5]]).to_dtype[DType.float32]()
         )
     )
@@ -476,13 +476,13 @@ fn test_tensor_mean() raises:
     MM = AA.mean(axes=[1], keepdims=False)
     assert_true(MM.all_close(Tensor.d1([1.5, 4.0]).to_dtype[DType.float32]()))
     MM.backward()
-    assert_true(AA.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
+    assert_true(AA.gradbox[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
 
     C = Tensor.d2([[1.0, 3.0], [2.0, 4.0]], requires_grad=True)
     mm = C.mean(axes=[1], keepdims=True)
     assert_true(mm.all_close(Tensor.d2([[2.0], [3.0]])))
     mm.backward()
-    assert_true(C.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
+    assert_true(C.gradbox[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
 
     A3 = Tensor.d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
@@ -493,7 +493,7 @@ fn test_tensor_mean() raises:
     expected_grad = Tensor.d3(
         [[[0.25, 0.25], [0.25, 0.25]], [[0.25, 0.25], [0.25, 0.25]]]
     )
-    assert_true(A3.grad[].all_close(expected_grad))
+    assert_true(A3.gradbox[].all_close(expected_grad))
 
     A2 = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     m2 = A2.mean(axes=[-1])  # same as axis=1
@@ -529,8 +529,8 @@ fn test_weights_bias_gradients() raises:
     _loss.backward()
 
     # Gradient should flow to w and b
-    assert_true(ww.grad[].shape == ww.shape)
-    assert_true(bb.grad[].shape == bb.shape)
+    assert_true(ww.gradbox[].shape == ww.shape)
+    assert_true(bb.gradbox[].shape == bb.shape)
 
 
 fn test_training_convergence() raises:
@@ -548,8 +548,8 @@ fn test_training_convergence() raises:
         loss.backward()
 
         # SGD
-        w.data[] -= 0.01 * w.grad[].data[]
-        b.data[] -= 0.01 * b.grad[].data[]
+        w.data[] -= 0.01 * w.gradbox[].data[]
+        b.data[] -= 0.01 * b.gradbox[].data[]
         w.zero_grad()
         b.zero_grad()
 
@@ -566,19 +566,19 @@ fn test_transpose_gradients() raises:
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     b = a.transpose()  # (2, 2) -> (2, 2)
     b.sum().backward()
-    assert_true((a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
+    assert_true((a.gradbox[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
 
     # Case 2: Transpose + reshape with non-square
     a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2, 3)
     #b = a.transpose().reshape(Shape.of(2, 3))  # (3, 2) → (2, 3)  #revisit
     #b.sum().backward()
-    #assert_true((a.grad[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())
+    #assert_true((a.gradbox[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())
 
     # Case 3: Chain transposes (A.T().T())
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     b = a.transpose().transpose()  # Should equal A
     b.sum().backward()
-    assert_true((a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
+    assert_true((a.gradbox[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
 
 
 fn test_reshape_grad_flow() raises:
@@ -594,20 +594,20 @@ fn test_reshape_grad_flow() raises:
         )
     )
     b.sum().backward()
-    assert_true((a.grad[] == Tensor.d1([1, 1, 1, 1])).all_true())
+    assert_true((a.gradbox[] == Tensor.d1([1, 1, 1, 1])).all_true())
 
     # Case 2: 1D → 2D reshape
     a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
     b = a.reshape(Shape.of(2, 2))
     (b * 2).sum().backward()
-    assert_true((a.grad[] == Tensor.d1([2, 2, 2, 2])).all_true())
+    assert_true((a.gradbox[] == Tensor.d1([2, 2, 2, 2])).all_true())
 
     # === 2D Tensor Cases ===
     # Case 3: 2D → 2D reshape (contiguous)
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     b = a.reshape(Shape.of(4, 1))
     (b**2).sum().backward()
-    assert_true((a.grad[] == Tensor.d2([[2, 4], [6, 8]])).all_true())
+    assert_true((a.gradbox[] == Tensor.d2([[2, 4], [6, 8]])).all_true())
 
     # Case 4: 2D → 1D reshape
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
@@ -617,28 +617,28 @@ fn test_reshape_grad_flow() raises:
         )
     )
     (b + 1).sum().backward()
-    assert_true((a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
+    assert_true((a.gradbox[] == Tensor.d2([[1, 1], [1, 1]])).all_true())
 
     # === 3D Tensor Cases ===
     # Case 5: 3D → 2D reshape
     _ = """a64 = Tensor[DType.float64].d3([[[1.0, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
     b = a.reshape(Shape.of(2, 4))
     b.mean().backward()
-    assert_true((a64.grad[] == Tensor[DType.float64].full(a64.shape, 0.125)).all_true())
+    assert_true((a64.gradbox[] == Tensor[DType.float64].full(a64.shape, 0.125)).all_true())
 
     # === Edge Cases ===
     # Case 6: Empty tensor reshape
     a = Tensor.d1([], requires_grad=True)
     b = a.reshape(Shape.of(0,))
     b.sum().backward()  # Should not crash
-    assert_true(a.grad[].shape == Shape.of(0,))"""
+    assert_true(a.gradbox[].shape == Shape.of(0,))"""
 
     # Case 7: Non-contiguous reshape
     _="""a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
     b = a.T().reshape(Shape.of(2, 3))  # Tests view tracking  #revisit
     b.sum().backward()
-    a.grad[].print()
-    assert_true((a.grad[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())"""
+    a.gradbox[].print()
+    assert_true((a.gradbox[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())"""
 
     # === Advanced Cases ===
     # Case 8: Chained reshapes
@@ -649,20 +649,20 @@ fn test_reshape_grad_flow() raises:
         )
     )
     b.sum().backward()
-    assert_true((a.grad[] == Tensor.d1([1, 1, 1, 1])).all_true())
+    assert_true((a.gradbox[] == Tensor.d1([1, 1, 1, 1])).all_true())
 
     # Case 9: Reshape with existing gradients
     a = Tensor.d1([1, 2], requires_grad=True)
     _ = (a * 2).sum().backward()  # a.grad = [2.0, 2.0]
     b = a.reshape(Shape.of(2, 1))
     b.sum().backward()  # Gradient accumulation
-    assert_true((a.grad[] == Tensor.d1([3, 3])).all_true())  # 2 + 1
+    assert_true((a.gradbox[] == Tensor.d1([3, 3])).all_true())  # 2 + 1
 
     # Case 10: Reshape after detach
     _ = """a = Tensor.d1([1, 2], requires_grad=True)
     b = a.detach().reshape(Shape.of(2, 1))  # Should break grad flow
     b.sum().backward()  # Should NOT affect a.grad
-    assert_true(a.grad[] is None)  # Because of detach()"""
+    assert_true(a.gradbox[] is None)  # Because of detach()"""
 
 
 fn test_reshape_gradient() raises:
@@ -673,7 +673,7 @@ fn test_reshape_gradient() raises:
     c = b.reshape(Shape.of(1))  # back to scalar
     d = c * Tensor.scalar(2)
     d.backward()
-    a.grad[].print()
+    a.gradbox[].print()
     assert_grad(a, Tensor.scalar(2), "scalar reshape chain → a")
 
     # 2. Reshape 1D → 2D → back to 1D
@@ -687,7 +687,7 @@ fn test_reshape_gradient() raises:
     d = c * Tensor.d1([10, 20, 30, 40])
     # d.backward()
     d.backward()
-    a.grad[].print()
+    a.gradbox[].print()
     assert_grad(a, Tensor.d1([10, 20, 30, 40]), "1D → 2D → 1D grad")
 
     # 3. Reshape 2D to 1D and multiply
@@ -718,7 +718,7 @@ fn test_reshape_gradient() raises:
         ]
     )
     d.backward()
-    a.grad[].print()
+    a.gradbox[].print()
     assert_grad(
         a,
         Tensor.d3(
@@ -747,11 +747,11 @@ fn test_reshape_gradient() raises:
     )
     d = c * Tensor.d1([1, 2, 3, 4])
     d.backward()
-    a.grad[].print()
+    a.gradbox[].print()
     a.print()
     assert_grad(a, Tensor.d1([1, 2, 3, 4]), "reshape with (1,4) roundtrip")
     assert_true(
-        (a.grad[] == Tensor.d1([1, 2, 3, 4])).all_true(),
+        (a.gradbox[] == Tensor.d1([1, 2, 3, 4])).all_true(),
         "reshape with (1,4) roundtrip",
     )
 
@@ -761,7 +761,7 @@ fn test_reshape_gradient() raises:
     c = b + Tensor.scalar(10)  # broadcast add
     d = c.sum()
     d.backward()
-    a.grad[].print()
+    a.gradbox[].print()
     assert_grad(a, Tensor.d1([1, 1, 1, 1]), "reshape + broadcast add + sum")
 
     _ = """# 8. Illegal reshape (shape mismatch) — should raise error
@@ -983,7 +983,7 @@ fn test_broadcast_sub() raises:
     assert_grad(X, Tensor.scalar(0), "(X - X) scalars → a")
     summ = (X - X - X - X).sum()
     summ.backward()
-    assert_true(X.grad[].item() == -2)
+    assert_true(X.gradbox[].item() == -2)
     assert_grad(X, Tensor.scalar(-2), "(X - X - X - X) scalars → a")
     a = Tensor.scalar(5, requires_grad=True)
     b = Tensor.scalar(3, requires_grad=True)
@@ -1337,19 +1337,19 @@ fn test_grad_flow_through_reshape() raises:
     # First operation using 'a'
     b = a + 1.0
     b.sum().backward()
-    assert_true((a.grad[] == Tensor.of(1.0, 1.0, 1.0)).all_true())
+    assert_true((a.gradbox[] == Tensor.of(1.0, 1.0, 1.0)).all_true())
 
     # Reshape should not clone or copy gradients
     reshaped = a.reshape(Shape.of(3))
 
-    # reshaped.grad[] should not exist on its own — we assert that it refers to the same grad storage
-    # assert_true((reshaped.grad[] == Tensor.of(1.0, 1.0, 1.0)).all_true())
+    # reshaped.gradbox[] should not exist on its own — we assert that it refers to the same grad storage
+    # assert_true((reshaped.gradbox[] == Tensor.of(1.0, 1.0, 1.0)).all_true())
 
     # New operation from reshaped
     (reshaped * 2).sum().backward()
 
     # Original 'a' should now have accumulated gradient
-    assert_true((a.grad[] == Tensor.of(3.0, 3.0, 3.0)).all_true())
+    assert_true((a.gradbox[] == Tensor.of(3.0, 3.0, 3.0)).all_true())
 
 
 fn test_reshape_preserves_grad_accumulation() raises:
@@ -1362,8 +1362,8 @@ fn test_reshape_preserves_grad_accumulation() raises:
     d = c.sum()
     d.backward()
 
-    a.grad[].print()  # Should be [1.0, 1.0, 1.0]
-    assert_true((a.grad[] == Tensor.of(1.0, 1, 1)).all_true())
+    a.gradbox[].print()  # Should be [1.0, 1.0, 1.0]
+    assert_true((a.gradbox[] == Tensor.of(1.0, 1, 1)).all_true())
 
 
 fn test_multi_dimensional_reshape() raises:
@@ -1376,7 +1376,7 @@ fn test_multi_dimensional_reshape() raises:
     d = b.sum()
     d.backward()
 
-    a.grad[].print()  # Should be [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]
+    a.gradbox[].print()  # Should be [[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]
 
 
 fn test_reshape_tensor_to_scalar() raises:
@@ -1391,7 +1391,7 @@ fn test_reshape_tensor_to_scalar() raises:
     c = b * 2
     c.backward()
 
-    a.grad[].print()  # Should be [2.0]
+    a.gradbox[].print()  # Should be [2.0]
 
 
 fn test_reshape_scalar_to_tensor() raises:
@@ -1403,7 +1403,7 @@ fn test_reshape_scalar_to_tensor() raises:
     assert_true(b[0] == Scalar(42.0))
     c = b * 3
     c.backward()
-    a.grad[].print()  # Should be [3.0]
+    a.gradbox[].print()  # Should be [3.0]
 
 
 fn test_miscellaneous() raises:
@@ -1413,7 +1413,7 @@ fn test_miscellaneous() raises:
     c = a + b
     c.sum().backward()
     # should be [1, 1, 1]
-    assert_true((a.grad[] == Tensor.of(1.0, 1, 1)).all_true())
+    assert_true((a.gradbox[] == Tensor.of(1.0, 1, 1)).all_true())
     reshaped = (a + b).mean().reshape()
     Tensor.scalar(42, requires_grad=True).sum().backward()  # This one crashes
     reshaped.backward()  # backward does not return anything
@@ -1427,7 +1427,7 @@ fn test_mean() raises:
     b.backward()
     assert_true(
         (
-            a.grad[]
+            a.gradbox[]
             == Tensor[DType.float32].d2([[0.5, 0.5, 0.5], [0.5, 0.5, 0.5]])
         ).all_true()
     )
@@ -1436,9 +1436,9 @@ fn test_mean() raises:
     assert_true((s == Tensor[DType.float32].scalar(3.5)).all_true())
     s.backward()
     # a.grad == [[1/6, 1/6, 1/6], [1/6, 1/6, 1/6]] + 0.5 from previous backward call
-    # a.grad[].print()
+    # a.gradbox[].print()
     assert_true(
-        a.grad[].all_close(
+        a.gradbox[].all_close(
             Tensor.d2(
                 [
                     [0.1666666, 0.1666666, 0.1666666],
@@ -1451,7 +1451,7 @@ fn test_mean() raises:
     a.zero_grad()
     s.backward()
     assert_true(
-        a.grad[].all_close(
+        a.gradbox[].all_close(
             Tensor.d2(
                 [
                     [0.1666666, 0.1666666, 0.1666666],
@@ -1499,7 +1499,7 @@ fn test_sum() raises:
     assert_true(
         (b == Tensor.of(3, 7)).all_true()
         and b.requires_grad
-        and (a.grad[] == Tensor.d2([[1, 1], [1, 1]])).all_true()
+        and (a.gradbox[] == Tensor.d2([[1, 1], [1, 1]])).all_true()
     )
 
     # 6. Broadcasting Compatibility
@@ -1510,7 +1510,7 @@ fn test_sum() raises:
     assert_true(
         (b == Tensor.of(1, 2, 3)).all_true()
         and b.requires_grad
-        and (a.grad[] == Tensor.d2([[1, 1, 1]])).all_true()
+        and (a.gradbox[] == Tensor.d2([[1, 1, 1]])).all_true()
     )
     tensor = Tensor.of(1, 2, 3, 4, requires_grad=True)
     result = tensor.sum(axes=[], keepdims=False)
@@ -1518,7 +1518,7 @@ fn test_sum() raises:
     result.backward()
     assert_true(
         (
-            tensor.grad[] == Tensor[DType.float32].of(1.0, 1.0, 1.0, 1.0)
+            tensor.gradbox[] == Tensor[DType.float32].of(1.0, 1.0, 1.0, 1.0)
         ).all_true()
     )
     tensor = Tensor.arange(24).reshape(2, 3, 4)
@@ -1579,7 +1579,7 @@ fn test_broadcast_add_2_tensors() raises:
 
     assert_true(
         (
-            tensor1.grad[]
+            tensor1.gradbox[]
             == Tensor.d1(
                 [
                     1,
@@ -1593,7 +1593,7 @@ fn test_broadcast_add_2_tensors() raises:
     )
 
     assert_true(
-        (tensor2.grad[] == Tensor.of([4])).all_true(),
+        (tensor2.gradbox[] == Tensor.of([4])).all_true(),
         "grad check 2 - assertion failed",
     )
 
@@ -1611,7 +1611,7 @@ fn test_broadcast_add_2_tensors() raises:
 
     assert_true(
         (
-            tensor1.grad[]
+            tensor1.gradbox[]
             == Tensor.d2(
                 [
                     [
@@ -1631,7 +1631,7 @@ fn test_broadcast_add_2_tensors() raises:
     )
 
     assert_true(
-        (tensor2.grad[] == Tensor.of([6])).all_true(),
+        (tensor2.gradbox[] == Tensor.of([6])).all_true(),
         "grad check 4 - assertion failed",
     )
 
@@ -1646,7 +1646,7 @@ fn test_broadcast_add_2_tensors() raises:
 
     assert_true(
         (
-            tensor1.grad[]
+            tensor1.gradbox[]
             == Tensor.d4(
                 [
                     [
@@ -1689,7 +1689,7 @@ fn test_broadcast_add_2_tensors() raises:
 
     assert_true(
         (
-            tensor2.grad[]
+            tensor2.gradbox[]
             == Tensor.d3(
                 [
                     [
@@ -1891,7 +1891,7 @@ fn test_reshape() raises:
     tensor = Tensor.scalar(42, requires_grad=True)
     result = tensor * 3
     result.backward()
-    assert_true(tensor.grad[].item() == 3.0)
+    assert_true(tensor.gradbox[].item() == 3.0)
     tensor2 = tensor.reshape(1)
     tensor.gprint()
     result = tensor2 * 42
@@ -1932,8 +1932,8 @@ fn test_scalar_addition() raises:
     var c = a + b
     c.backward()
     assert_true(c.item() == 7.0)
-    assert_true(a.grad[].item() == 1.0)
-    assert_true(b.grad[].item() == 1.0)
+    assert_true(a.gradbox[].item() == 1.0)
+    assert_true(b.gradbox[].item() == 1.0)
 
 
 fn test_broadcast_addition() raises:
@@ -1944,9 +1944,9 @@ fn test_broadcast_addition() raises:
     s = c.sum()
     s.backward()
     assert_true((c == Tensor.d2([[11, 22], [13, 24]])).all_true())
-    assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[1, 1], [1, 1]])))
     assert_true(
-        b.grad[].all_close(Tensor.d1([2, 2]))
+        b.gradbox[].all_close(Tensor.d1([2, 2]))
     )  # Summed over broadcast dim
 
 
@@ -1956,7 +1956,7 @@ fn test_sum_all_dims() raises:
     var s = a.sum()  # scalar
     s.backward()
     assert_true(s.item() == 10.0)
-    assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[1, 1], [1, 1]])))
 
 
 fn test_sum_specific_axis() raises:
@@ -1965,7 +1965,7 @@ fn test_sum_specific_axis() raises:
     var s = a.sum(axes=[1], keepdims=True)  # shape (2,1,2)
     s.backward()
     assert_true((s == Tensor.d3([[[4, 6]], [[12, 14]]])).all_true())
-    assert_true(a.grad[].all_close(Tensor.ones_like(a)))
+    assert_true(a.gradbox[].all_close(Tensor.ones_like(a)))
 
 
 fn test_mean_with_keepdims() raises:
@@ -1975,7 +1975,7 @@ fn test_mean_with_keepdims() raises:
     s = m.sum()
     s.backward()
     assert_true(m.all_close(Tensor.d2([[2, 3]])))
-    assert_true(a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
     m.free()
     a.free()
 
@@ -1988,8 +1988,8 @@ fn test_matmul_shapes() raises:
     var c = a.matmul(b)
     c.sum().backward()
     assert_true(c.all_close(Tensor.d2([[19, 22], [43, 50]])))
-    assert_true(a.grad[].all_close(Tensor.d2([[11, 15], [11, 15]])))
-    assert_true(b.grad[].all_close(Tensor.d2([[4, 4], [6, 6]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[11, 15], [11, 15]])))
+    assert_true(b.gradbox[].all_close(Tensor.d2([[4, 4], [6, 6]])))
 
 
 fn test_matmul_broadcasting() raises:
@@ -2008,7 +2008,7 @@ fn test_zero_grad() raises:
     var b = a * 2
     b.backward()
     a.zero_grad()
-    assert_true(a.grad[].item() == 0.0)
+    assert_true(a.gradbox[].item() == 0.0)
 
 
 fn test_transpose_grad() raises:
@@ -2017,7 +2017,7 @@ fn test_transpose_grad() raises:
     var b = a.transpose()
     _="""var c = b * Tensor.d2([[10, 30], [20, 40]]) #revisit
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[10, 20], [30, 40]])))"""
+    assert_true(a.gradbox[].all_close(Tensor.d2([[10, 20], [30, 40]])))"""
 
 
 fn test_scalar_div_tensor() raises:
@@ -2033,7 +2033,7 @@ fn test_scalar_div_tensor() raises:
 
     # dz/da = -8 / a^2 ⇒ [-2.0, -0.5]
     assert_true(
-        a.grad[].all_close(Tensor.d1([-2.0, -0.5])),
+        a.gradbox[].all_close(Tensor.d1([-2.0, -0.5])),
         "Backward gradient incorrect",
     )
 
@@ -2050,7 +2050,7 @@ fn test_scalar_div_tensor_multiple() raises:
 
     # ∂/∂a: -8 / a^2 ⇒ [-8.0, -2.0, -0.5]
     assert_true(
-        a.grad[].all_close(Tensor.d1([-8.0, -2.0, -0.5])),
+        a.gradbox[].all_close(Tensor.d1([-8.0, -2.0, -0.5])),
         "Backward grad mismatch",
     )
 
@@ -2068,7 +2068,7 @@ fn test_scalar_div_tensor_2d() raises:
 
     # Gradient: -16 / a^2
     assert_true(
-        a.grad[].all_close(Tensor.d2([[-16.0, -4.0], [-1.0, -0.25]])),
+        a.gradbox[].all_close(Tensor.d2([[-16.0, -4.0], [-1.0, -0.25]])),
         "Backward gradient failed",
     )
 
@@ -2080,8 +2080,8 @@ fn test_mul_same_shape() raises:
     var c = a * b
     assert_true(c.all_close(Tensor.d2([[5.0, 12.0], [21.0, 32.0]])))
     c.sum().backward()
-    assert_true(a.grad[].all_close(b))
-    assert_true(b.grad[].all_close(a))
+    assert_true(a.gradbox[].all_close(b))
+    assert_true(b.gradbox[].all_close(a))
 
 
 fn test_mul_tensor_scalar() raises:
@@ -2091,8 +2091,8 @@ fn test_mul_tensor_scalar() raises:
     var c = a * b
     assert_true(c.all_close(Tensor.d2([[6.0, 12.0], [18.0, 24.0]])))
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[3.0, 3.0], [3.0, 3.0]])))
-    assert_true(b.grad[].item() == 20.0)  # 2+4+6+8 = 20
+    assert_true(a.gradbox[].all_close(Tensor.d2([[3.0, 3.0], [3.0, 3.0]])))
+    assert_true(b.gradbox[].item() == 20.0)  # 2+4+6+8 = 20
 
 
 fn test_mul_scalar_tensor() raises:
@@ -2102,8 +2102,8 @@ fn test_mul_scalar_tensor() raises:
     var c = a * b
     assert_true(c.all_close(Tensor.d2([[5.0, 10.0], [15.0, 20.0]])))
     c.sum().backward()
-    assert_true(a.grad[].item() == 10.0)  # 1+2+3+4
-    assert_true(b.grad[].all_close(Tensor.d2([[5.0, 5.0], [5.0, 5.0]])))
+    assert_true(a.gradbox[].item() == 10.0)  # 1+2+3+4
+    assert_true(b.gradbox[].all_close(Tensor.d2([[5.0, 5.0], [5.0, 5.0]])))
 
 
 fn test_mul_broadcast_row() raises:
@@ -2113,8 +2113,8 @@ fn test_mul_broadcast_row() raises:
     var c = a * b  # row-wise broadcast
     assert_true(c.all_close(Tensor.d2([[10.0, 40.0], [30.0, 80.0]])))
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[10.0, 20.0], [10.0, 20.0]])))
-    assert_true(b.grad[].all_close(Tensor.d1([4, 6])))  # col sums: [1+3, 2+4]
+    assert_true(a.gradbox[].all_close(Tensor.d2([[10.0, 20.0], [10.0, 20.0]])))
+    assert_true(b.gradbox[].all_close(Tensor.d1([4, 6])))  # col sums: [1+3, 2+4]
 
 
 fn test_mul_broadcast_col() raises:
@@ -2125,10 +2125,10 @@ fn test_mul_broadcast_col() raises:
     assert_true(c.all_close(Tensor.d2([[4.0, 5.0], [8.0, 10.0], [12.0, 15.0]])))
     c.sum().backward()
     assert_true(
-        a.grad[].all_close(Tensor.d2([[9.0], [9.0], [9.0]]))
+        a.gradbox[].all_close(Tensor.d2([[9.0], [9.0], [9.0]]))
     )  # sum along row for each col
     assert_true(
-        b.grad[].all_close(Tensor.d2([[6.0, 6.0]]))
+        b.gradbox[].all_close(Tensor.d2([[6.0, 6.0]]))
     )  # sum along col for each row
 
 
@@ -2140,8 +2140,8 @@ fn test_sub_same_shape() raises:
     assert_true(c.all_close(Tensor.d2([[2.0, 2.0], [2.0, 2.0]])))
 
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
-    assert_true(b.grad[].all_close(Tensor.d2([[-1.0, -1.0], [-1.0, -1.0]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.gradbox[].all_close(Tensor.d2([[-1.0, -1.0], [-1.0, -1.0]])))
 
 
 fn test_sub_broadcast_row() raises:
@@ -2152,8 +2152,8 @@ fn test_sub_broadcast_row() raises:
     assert_true(c.all_close(Tensor.d2([[9.0, 18.0], [29.0, 38.0]])))
 
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
-    assert_true(b.grad[].all_close(Tensor.d1([-2.0, -2.0]).float()))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.gradbox[].all_close(Tensor.d1([-2.0, -2.0]).float()))
 
 
 fn test_sub_scalar_tensor() raises:
@@ -2164,8 +2164,8 @@ fn test_sub_scalar_tensor() raises:
     assert_true(c.all_close(Tensor.d2([[9.0, 8.0], [7.0, 6.0]])))
 
     c.sum().backward()
-    assert_true(a.grad[].item() == 4.0)  # 4 elements
-    assert_true(b.grad[].all_close(Tensor.d2([[-1.0, -1.0], [-1.0, -1.0]])))
+    assert_true(a.gradbox[].item() == 4.0)  # 4 elements
+    assert_true(b.gradbox[].all_close(Tensor.d2([[-1.0, -1.0], [-1.0, -1.0]])))
 
 
 fn test_sub_tensor_scalar() raises:
@@ -2176,8 +2176,8 @@ fn test_sub_tensor_scalar() raises:
     assert_true(c.all_close(Tensor.d2([[-0.5, 0.5], [1.5, 2.5]])))
 
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
-    assert_true(b.grad[].item() == -4.0)
+    assert_true(a.gradbox[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.gradbox[].item() == -4.0)
 
 
 fn test_sub_broadcast_col() raises:
@@ -2188,8 +2188,8 @@ fn test_sub_broadcast_col() raises:
     assert_true(c.all_close(Tensor.d2([[9.0, 8.0], [19.0, 18.0]])))
 
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[2.0], [2.0]])))
-    assert_true(b.grad[].all_close(Tensor.d2([[-2.0, -2.0]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[2.0], [2.0]])))
+    assert_true(b.gradbox[].all_close(Tensor.d2([[-2.0, -2.0]])))
 
 
 fn test_add_scalar_scalar() raises:
@@ -2199,8 +2199,8 @@ fn test_add_scalar_scalar() raises:
     var c = a + b
     assert_true(c.item() == 5.0, "Scalar addition failed")
     c.backward()
-    assert_true(a.grad[].item() == 1.0)
-    assert_true(b.grad[].item() == 1.0)
+    assert_true(a.gradbox[].item() == 1.0)
+    assert_true(b.gradbox[].item() == 1.0)
 
 
 fn test_add_scalar_1d() raises:
@@ -2210,8 +2210,8 @@ fn test_add_scalar_1d() raises:
     var c = a + b
     assert_true(c.all_close(Tensor.d1([3.0, 4.0, 5.0])))
     c.sum().backward()
-    assert_true(a.grad[].item() == 3.0, "a broadcast to 3 elements")
-    assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    assert_true(a.gradbox[].item() == 3.0, "a broadcast to 3 elements")
+    assert_true(b.gradbox[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
 
 
 fn test_add_1d_1d() raises:
@@ -2221,8 +2221,8 @@ fn test_add_1d_1d() raises:
     var c = a + b
     assert_true(c.all_close(Tensor.d1([5.0, 7.0, 9.0])))
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
-    assert_true(b.grad[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    assert_true(a.gradbox[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
+    assert_true(b.gradbox[].all_close(Tensor.d1([1.0, 1.0, 1.0])))
 
 
 fn test_add_2d_scalar() raises:
@@ -2232,8 +2232,8 @@ fn test_add_2d_scalar() raises:
     var c = a + b
     assert_true(c.all_close(Tensor.d2([[6.0, 7.0], [8.0, 9.0]])))
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
-    assert_true(b.grad[].item() == 4.0, "b broadcast to 4 elements")
+    assert_true(a.gradbox[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.gradbox[].item() == 4.0, "b broadcast to 4 elements")
 
 
 fn test_add_2d_1d() raises:
@@ -2243,8 +2243,8 @@ fn test_add_2d_1d() raises:
     var c = a + b  # b gets broadcasted to both rows
     assert_true(c.all_close(Tensor.d2([[11.0, 22.0], [13.0, 24.0]])))
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
-    assert_true(b.grad[].all_close(Tensor.d1([2.0, 2.0]).float()))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+    assert_true(b.gradbox[].all_close(Tensor.d1([2.0, 2.0]).float()))
 
 
 fn test_add_3d_1d() raises:
@@ -2257,8 +2257,8 @@ fn test_add_3d_1d() raises:
 
     var c = a + b  # shape (2, 2, 2)
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.full(a.shape, 1.0).float()))
-    assert_true(b.grad[].all_close(Tensor.d1([4.0, 4.0]).float()))
+    assert_true(a.gradbox[].all_close(Tensor.full(a.shape, 1.0).float()))
+    assert_true(b.gradbox[].all_close(Tensor.d1([4.0, 4.0]).float()))
 
 
 fn test_add_3d_2d() raises:
@@ -2272,9 +2272,9 @@ fn test_add_3d_2d() raises:
     var c = a + b  # b gets broadcast along dim 0
     assert_true(c.shape == a.shape)
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.full(a.shape, 1.0).float()))
+    assert_true(a.gradbox[].all_close(Tensor.full(a.shape, 1.0).float()))
     assert_true(
-        b.grad[].all_close(Tensor.full(b.shape, 2.0).float())
+        b.gradbox[].all_close(Tensor.full(b.shape, 2.0).float())
     )  # repeated twice
 
 
@@ -2289,7 +2289,7 @@ fn test_add_broadcast_degenerate() raises:
     var c = a + b
     assert_true(c.shape == a.shape)
     c.sum().backward()
-    assert_true(b.grad[].item() == 4.0, "Broadcasted across 4 elements")
+    assert_true(b.gradbox[].item() == 4.0, "Broadcasted across 4 elements")
 
 
 fn test_add_mismatch_shapes() raises:
@@ -2307,7 +2307,7 @@ fn test_mean_scalar() raises:
     var m = a.mean()
     assert_true(m.item() == 4.2, "Mean of scalar should be the scalar itself")
     m.backward()
-    assert_true(a.grad[].item() == 1.0, "Grad of scalar mean should be 1.0")
+    assert_true(a.gradbox[].item() == 1.0, "Grad of scalar mean should be 1.0")
 
 
 fn test_mean_1d() raises:
@@ -2317,7 +2317,7 @@ fn test_mean_1d() raises:
     assert_true(m.item() == 2.0, "Mean of [1, 2, 3] is 2.0")
     m.backward()
     assert_true(
-        a.grad[].all_close(Tensor.d1([1 / 3, 1 / 3, 1 / 3])),
+        a.gradbox[].all_close(Tensor.d1([1 / 3, 1 / 3, 1 / 3])),
         "Equal gradient distribution",
     )
 
@@ -2329,7 +2329,7 @@ fn test_mean_2d_all_axes() raises:
     assert_true(m.item() == 2.5, "Mean of all elements is 2.5")
     m.backward()
     assert_true(
-        a.grad[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])),
+        a.gradbox[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])),
         "Each grad is 1/4",
     )
 
@@ -2341,7 +2341,7 @@ fn test_mean_axis0() raises:
     assert_true(m.all_close(Tensor.d1([2.0, 3.0]).float()), "Mean along axis 0")
     m.backward()
     assert_true(
-        a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])),
+        a.gradbox[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])),
         "Each input contributes 1/2 to mean(axis=0)",
     )
 
@@ -2353,7 +2353,7 @@ fn test_mean_axis1_keepdims() raises:
     assert_true(m.all_close(Tensor.d2([[3.0], [7.0]])), "Mean across rows")
     m.backward()
     assert_true(
-        a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])),
+        a.gradbox[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])),
         "Row-wise mean: each contributes 1/2",
     )
 
@@ -2367,7 +2367,7 @@ fn test_mean_multiple_axes() raises:
     assert_true(m.shape == Shape.of(2), "Shape after reducing [0, 2]")
     m.backward()
     assert_true(
-        a.grad[].sum().item() == 2.0,
+        a.gradbox[].sum().item() == 2.0,
         "Total gradient distributed across all elements",
     )
 
@@ -2378,7 +2378,7 @@ fn test_mean_no_axes() raises:
     var m = a.mean(axes=[])
     assert_true(m.item() == 5.0, "Mean of all elements")
     m.backward()
-    assert_true(a.grad[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])))
 
 
 fn test_mean_no_grad() raises:
@@ -2414,7 +2414,7 @@ fn test_scalar_sum_custom_grad() raises:
     var result = a.sum()
     result.backward(Tensor.scalar(5.0))  # Upstream gradient is 5.0
     assert_true(
-        a.grad[].item() == 5.0,
+        a.gradbox[].item() == 5.0,
         "Custom upstream grad should be passed correctly",
     )
 
@@ -2428,7 +2428,7 @@ fn test_reshape_reused_twice_correct_grad() raises:
     y.backward()
 
     assert_true(
-        x.grad[].all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])),
+        x.gradbox[].all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])),
         "∂y/∂x should be 2s — not duplicated",
     )
 
@@ -2444,7 +2444,7 @@ fn test_sum_gradient_accumulation() raises:
 
     # ∂s/∂a = ∂s1/∂a + ∂s2/∂a = 1 + 1 = 2
     assert_true(
-        a.grad[].all_close(Tensor.d2([[2, 2], [2, 2]])),
+        a.gradbox[].all_close(Tensor.d2([[2, 2], [2, 2]])),
         "Gradient should accumulate from both paths",
     )
 
@@ -2455,7 +2455,7 @@ fn test_scalar_sum_backward() raises:
     var result = a.sum()  # Should just return a
     result.backward()
     assert_true(result.item() == 3.14, "Forward sum check")
-    assert_true(a.grad[].item() == 1.0, "Gradient of scalar sum should be 1.0")
+    assert_true(a.gradbox[].item() == 1.0, "Gradient of scalar sum should be 1.0")
 
 
 fn test_scalar_sum_forward() raises:
@@ -2474,7 +2474,7 @@ fn test_sum_all_axes_keepdims() raises:
     s.backward(Tensor.d2([[100]]))
 
     assert_true(s.shape == Shape.of(1, 1), "keepdims should preserve (1,1)")
-    assert_true(a.grad[].all_close(Tensor.d2([[100, 100], [100, 100]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[100, 100], [100, 100]])))
 
 
 fn test_sum_multi_axes() raises:
@@ -2492,7 +2492,7 @@ fn test_sum_multi_axes() raises:
     # Reduced to shape: (2,)
     # Incoming grad should be broadcasted back to shape (2,2,2)
     assert_true(
-        a.grad[].all_close(
+        a.gradbox[].all_close(
             Tensor.d3(
                 [
                     [[10, 10], [20, 20]],
@@ -2510,7 +2510,7 @@ fn test_sum_axis1_nokeepdims() raises:
     s.backward(Tensor.d1([5, 6]))  # shape: (2,)
     s.print()
     # Broadcast (2,) to (2,2)
-    assert_true(a.grad[].all_close(Tensor.d2([[5, 5], [6, 6]])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[5, 5], [6, 6]])))
 
 
 fn test_sum_axis1_keepdims() raises:
@@ -2521,7 +2521,7 @@ fn test_sum_axis1_keepdims() raises:
 
     # ∂s/∂a = [[10, 10], [20, 20]]
     assert_true(
-        a.grad[].all_close(Tensor.d2([[10, 10], [20, 20]])),
+        a.gradbox[].all_close(Tensor.d2([[10, 10], [20, 20]])),
         "Keepdims should preserve dimension during broadcast",
     )
 
@@ -2535,7 +2535,7 @@ fn test_sum_axis0() raises:
 
     # ∂s/∂a = [[10, 20], [10, 20]]
     assert_true(
-        a.grad[].all_close(Tensor.d2([[10, 20], [10, 20]])),
+        a.gradbox[].all_close(Tensor.d2([[10, 20], [10, 20]])),
         "Gradient must be broadcast correctly",
     )
 
@@ -2546,7 +2546,7 @@ fn test_sum_all_elements() raises:
     var s = a.sum()
     s.backward()
     assert_true(s.item() == 10.0, "Sum of all elements should be 10")
-    assert_true(a.grad[].all_close(Tensor.d2([[1, 1], [1, 1]])), "∂s/∂a = ones")
+    assert_true(a.gradbox[].all_close(Tensor.d2([[1, 1], [1, 1]])), "∂s/∂a = ones")
 
 
 # Basic reshape gradient: forward shape is changed, but grads match original shape
@@ -2555,9 +2555,9 @@ fn test_reshape_gradient_2d() raises:
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.reshape(Shape.of(4))  # Flatten
     b.backward()
-    a.grad[].print()
+    a.gradbox[].print()
     assert_true(
-        a.grad[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])),
+        a.gradbox[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])),
         "∂b/∂a should be ones reshaped",
     )
 
@@ -2569,7 +2569,7 @@ fn test_reshape_gradient_flatten() raises:
     var z = y * 2.0
     z.backward()
     assert_true(
-        x.grad[].all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])), "∂z/∂x should be 2"
+        x.gradbox[].all_close(Tensor.d1([2.0, 2.0, 2.0, 2.0])), "∂z/∂x should be 2"
     )
 
 
@@ -2581,7 +2581,7 @@ fn test_multiple_reshapes() raises:
     var y = t3 * 3.0
     y.backward()
     assert_true(
-        t.grad[].all_close(Tensor.d1([3.0, 3.0, 3.0, 3.0])),
+        t.gradbox[].all_close(Tensor.d1([3.0, 3.0, 3.0, 3.0])),
         "Chain of reshapes should yield correct grad",
     )
 
@@ -2591,9 +2591,9 @@ fn test_reshape_noop() raises:
     var m = Tensor.d2([[5.0, 6.0]], requires_grad=True)
     var reshaped = m.reshape(Shape.of(1, 2))  # No shape change
     reshaped.backward()
-    m.grad[].print()
+    m.gradbox[].print()
     assert_true(
-        m.grad[].all_close(Tensor.d2([[1.0, 1.0]])),
+        m.gradbox[].all_close(Tensor.d2([[1.0, 1.0]])),
         "No-op reshape still propagates grad",
     )
 
@@ -2610,7 +2610,7 @@ fn test_tensor_div_scalar_2d() raises:
 
     b.backward()
     assert_true(
-        a.grad[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])),
+        a.gradbox[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])),
         "Gradient should be 1/2",
     )
 
@@ -2627,7 +2627,7 @@ fn test_tensor_div_scalar_nonuniform() raises:
     out.backward()
     # Gradient of each is 1/10
     assert_true(
-        a.grad[].all_close(Tensor.d1([0.1, 0.1, 0.1])), "Gradient of a wrong"
+        a.gradbox[].all_close(Tensor.d1([0.1, 0.1, 0.1])), "Gradient of a wrong"
     )
 
 
@@ -2640,7 +2640,7 @@ fn test_tensor_div_scalar() raises:
 
     s.backward()
     assert_true(
-        a.grad[].all_close(Tensor.d1([0.5, 0.5])),
+        a.gradbox[].all_close(Tensor.d1([0.5, 0.5])),
         "Grad of a: 1/2 for each element",
     )
 
@@ -2651,13 +2651,13 @@ fn test_tensor_scalar_subtract() raises:
     var a = Tensor.scalar(5.0, requires_grad=True)
     var b = a - 3.0
     b.backward()
-    assert_true(a.grad[].item() == 1.0, "∂(a - 3)/∂a = 1")
+    assert_true(a.gradbox[].item() == 1.0, "∂(a - 3)/∂a = 1")
 
     # test_scalar_rsub
     a = Tensor.scalar(5.0, requires_grad=True)
     b = 10.0 - a
     b.backward()
-    assert_true(a.grad[].item() == -1.0, "∂(10 - a)/∂a = -1")
+    assert_true(a.gradbox[].item() == -1.0, "∂(10 - a)/∂a = -1")
 
 
 fn test_tensor_scalar_add_mul_pow() raises:
@@ -2668,35 +2668,35 @@ fn test_tensor_scalar_add_mul_pow() raises:
     b.backward()
     # Expect: b = 5.0, ∂c/∂a = 1 → grad[a] = 1
     assert_true(b.item() == 5.0, "3.0 + 2.0 should be 5.0")
-    assert_true(a.grad[].item() == 1.0, "∂(a + 2.0)/∂a = 1")
+    assert_true(a.gradbox[].item() == 1.0, "∂(a + 2.0)/∂a = 1")
 
     # ─────── scalar + Tensor ───────
     a = Tensor.scalar(3.0, requires_grad=True)
     b = 2.0 + a  # should dispatch __radd__
     b.backward()
     assert_true(b.item() == 5.0, "2.0 + 3.0 should be 5.0")
-    assert_true(a.grad[].item() == 1.0, "∂(a + 2.0)/∂a = 1")
+    assert_true(a.gradbox[].item() == 1.0, "∂(a + 2.0)/∂a = 1")
 
     # ─────── Tensor * scalar ───────
     var c = Tensor.scalar(4.0, requires_grad=True)
     var d = c * 3.0
     d.backward()
     assert_true(d.item() == 12.0, "4.0 * 3.0")
-    assert_true(c.grad[].item() == 3.0, "∂(c * 3)/∂c = 3")
+    assert_true(c.gradbox[].item() == 3.0, "∂(c * 3)/∂c = 3")
 
     # ─────── scalar * Tensor ───────
     var e = Tensor.scalar(5.0, requires_grad=True)
     var f = 4.0 * e  # should dispatch __rmul__
     f.backward()
     assert_true(f.item() == 20.0, "4.0 * 5.0")
-    assert_true(e.grad[].item() == 4.0, "∂(4 * e)/∂e = 4")
+    assert_true(e.gradbox[].item() == 4.0, "∂(4 * e)/∂e = 4")
 
     # ─────── Tensor ** scalar ───────
     var g = Tensor.scalar(2.0, requires_grad=True)
     var h = g**3.0  # 2 ** 3 = 8
     h.backward()
     assert_true(h.item() == 8.0, "2.0 ** 3.0 = 8.0")
-    assert_true(g.grad[].item() == 12.0, "∂(g ** 3)/∂g = 3 * g^2 = 3 * 4 = 12")
+    assert_true(g.gradbox[].item() == 12.0, "∂(g ** 3)/∂g = 3 * g^2 = 3 * 4 = 12")
 
 
 fn test_slice_grad() raises:
@@ -2705,7 +2705,7 @@ fn test_slice_grad() raises:
     var b = a[1:3]  # [2,3]
     var c = b * Tensor.d1([10,20])
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d1([0,10,20,0])))"""
+    assert_true(a.gradbox[].all_close(Tensor.d1([0,10,20,0])))"""
 
 
 fn test_nested_operations() raises:
@@ -2715,8 +2715,8 @@ fn test_nested_operations() raises:
     var c = (a * b).sum() + (a + b).prod()
     c.backward()
     # Verify gradients numerically
-    assert_true(abs(a.grad[][0] - 11.0) < 1e-6)  # 3 + (3+4)*1
-    assert_true(abs(b.grad[][0] - 8.0) < 1e-6)  # 1 + (1+2)*1"""
+    assert_true(abs(a.gradbox[][0] - 11.0) < 1e-6)  # 3 + (3+4)*1
+    assert_true(abs(b.gradbox[][0] - 8.0) < 1e-6)  # 1 + (1+2)*1"""
 
 
 fn test_large_tensor_backprop() raises:
@@ -2726,8 +2726,8 @@ fn test_large_tensor_backprop() raises:
     var b = Tensor.rand(128, 100, requires_grad=True)
     var c = a.matmul(b).sum()
     c.backward()
-    assert_true(a.grad[].shape == a.shape)
-    assert_true(b.grad[].shape == b.shape)
+    assert_true(a.gradbox[].shape == a.shape)
+    assert_true(b.gradbox[].shape == b.shape)
     c.free()
     b.free()
     a.free()
@@ -2739,7 +2739,7 @@ fn test_detach() raises:
     var b = a.detach() * 2  # Should not propagate grad
     var c = a * b
     c.sum().backward()
-    assert_true(a.grad[].all_close(Tensor.d1([2,4])))  # Only from c = a*b"""
+    assert_true(a.gradbox[].all_close(Tensor.d1([2,4])))  # Only from c = a*b"""
 
 
 fn test_empty_tensor() raises:
@@ -2748,7 +2748,7 @@ fn test_empty_tensor() raises:
     var s = a.sum()
     s.backward()
     assert_true(s.item() == min_finite[DType.float32]())
-    assert_true(a.grad[].shape == Shape.Void)
+    assert_true(a.gradbox[].shape == Shape.Void)
 
 
 fn main() raises:
