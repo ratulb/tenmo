@@ -9,7 +9,7 @@ from addbackwardcopy import AddBackward, AddBackwardScalar
 #from subbackward import SubBackward, SubLeftRightBackwardScalar
 from broadcastbackwardcopy import BroadcastBackward
 from reshapebackwardcopy import ReshapeBackward
-#from mulbackward import MultiplyBackward, MulBackwardScalar
+from mulbackwardcopy import MultiplyBackward, MulBackwardScalar
 #from exponientionbackward import ExponientionBackward
 #from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
 #from transposebackward import TBackward, TransposeBackward
@@ -26,6 +26,8 @@ alias Delegate[dtype: DType] = Variant[
     BroadcastBackward[dtype, AddTensor, AddTensor, False],
     BroadcastBackward[dtype, AddTensor, AddTensor, True],
     BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
+    MultiplyBackward[dtype],
+    MulBackwardScalar[dtype],
 ]
 
 
@@ -67,15 +69,6 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
                 dtype
             ](output)
 
-        elif self.grad_fn.isa[MultiplyBackward[dtype]]():
-            return self.grad_fn[MultiplyBackward[dtype]].backward[dtype](
-                output
-            )
-
-        elif self.grad_fn.isa[MulBackwardScalar[dtype]]():
-            return self.grad_fn[MulBackwardScalar[dtype]].backward[dtype](
-                output
-            )
 
         elif self.grad_fn.isa[TrueDivBackwardScalar[dtype]]():
             return self.grad_fn[TrueDivBackwardScalar[dtype]].backward[dtype](
@@ -133,6 +126,17 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[
                 BroadcastBackward[dtype, AddTensor, AddTensor, False]
             ].backward[dtype](output)
+
+        elif self.grad_fn.isa[MultiplyBackward[dtype]]():
+            return self.grad_fn[MultiplyBackward[dtype]].backward[dtype](
+                output
+            )
+
+        elif self.grad_fn.isa[MulBackwardScalar[dtype]]():
+            return self.grad_fn[MulBackwardScalar[dtype]].backward[dtype](
+                output
+            )
+
 
         else:
             abort("I am not here to receive you")

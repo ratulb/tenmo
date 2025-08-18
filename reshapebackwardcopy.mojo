@@ -19,15 +19,11 @@ struct ReshapeBackward[dtype: DType](Copyable & Movable & Stringable):
             reshaped, output.base[]
         )"""
 
-        new_contrib = reshaped - output.tensor().base[]
-        print("\nnew_contrib new_contrib new_contrib", "child id", output.inner_id(), "parent id", ancestor.inner_id())
-        print()
-        new_contrib.print()
-        print()
-        print()
+        #new_contrib = reshaped - output.tensor().base[]
         # Update base accumulator
-        output.tensor().base.init_pointee_move(reshaped^)
-        return [(ancestor, new_contrib, AddTensor)]
+        #output.tensor().base.init_pointee_move(reshaped^)
+        #return [(ancestor, new_contrib, AddTensor)]
+        return [(ancestor, reshaped, AddTensor), (output, gradients, SubtractTensor)]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))

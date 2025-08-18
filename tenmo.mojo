@@ -1401,10 +1401,9 @@ struct Tensor[dtype: DType = DType.float32](
         out = Tensor[dtype](self.shape, buffer, requires_grad=requires_grad)
 
         if requires_grad:
-            _ = """backward_fn = MulBackwardScalar[dtype](factor).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)"""
-            pass
-            # out.add_ancestry(self)
+            backward_fn = MulBackwardScalar[dtype](factor).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(TensorLite.of(self))
 
         return out
 
@@ -1427,11 +1426,10 @@ struct Tensor[dtype: DType = DType.float32](
         out = Tensor[dtype](self.shape, buffer, requires_grad=requires_grad)
 
         if requires_grad:
-            _ = """backward_fn = MultiplyBackward[dtype]().into_backward_fn()
+            backward_fn = MultiplyBackward[dtype]().into_backward_fn()
 
-            out.backwardFn = Optional(backward_fn)"""
-            # out.add_ancestry(self, other)
-            pass
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
 
         return out
 
@@ -2062,7 +2060,8 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    test_reshape_backward()
+    test_reshape_exp()
+    #test_reshape_backward()
     #test_add_backward()
     # test_reshape_backward_scalar()
     _ = """test_add_tensor_and_view()
@@ -2414,3 +2413,21 @@ fn test_grads_on_tensor_init() raises:
     assert_true(not a.grad_is_zero(), "grad seeding assertion failed")
     a.zero_grad()
     assert_true(a.grad_is_zero(), "zero grad assertion failed")
+
+
+fn test_reshape_exp() raises:
+    print("test_reshape_exp")
+    tensor = Tensor.scalar(42, requires_grad=True)
+    result = tensor * 3
+    result.backward()
+    assert_true(tensor.gradbox[].item() == 3.0)
+    tensor2 = tensor.reshape(1)
+    result = tensor2 * 42
+
+    result.backward()
+    tensor.gradients()[].print()
+    tensor3 = tensor2.reshape(1, 1, 1, 1, 1)
+    result = tensor3 * 12
+    result.backward()
+    tensor.gradients()[].print()
+

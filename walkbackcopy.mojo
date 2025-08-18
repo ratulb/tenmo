@@ -6,7 +6,7 @@ from addbackwardcopy import AddBackward, AddBackwardScalar
 #from subbackward import SubBackward, SubLeftRightBackwardScalar
 from broadcastbackwardcopy import BroadcastBackward
 from reshapebackwardcopy import ReshapeBackward
-#from mulbackward import MultiplyBackward, MulBackwardScalar
+from mulbackwardcopy import MultiplyBackward, MulBackwardScalar
 #from exponientionbackward import ExponientionBackward
 #from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
 #from transposebackward import TBackward, TransposeBackward
