@@ -18,7 +18,13 @@ struct ReshapeBackward[dtype: DType](Copyable & Movable & Stringable):
         _="""new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
             reshaped, output.base[]
         )"""
+
         new_contrib = reshaped - output.tensor().base[]
+        print("\nnew_contrib new_contrib new_contrib", "child id", output.inner_id(), "parent id", ancestor.inner_id())
+        print()
+        new_contrib.print()
+        print()
+        print()
         # Update base accumulator
         output.tensor().base.init_pointee_move(reshaped^)
         return [(ancestor, new_contrib, AddTensor)]

@@ -1909,6 +1909,7 @@ fn test_reshape() raises:
 
     tensor3.gprint()
     tensor2.gprint()
+    print("This is the one")
     tensor.gprint()
 
 

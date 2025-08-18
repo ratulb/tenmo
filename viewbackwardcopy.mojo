@@ -20,16 +20,8 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        print("ViewBackward -> Landed here 1: output.inner_id: ", output.inner_id())
-        output.ancestry().print()
         parent = output.ancestry().get(0)[]
-        print("Landed here 10", parent)
-        print("Landed here 11", output.gradients().__as_bool__())
         gradients = output.gradients()[]
-
-
-        gradients.print()
-        print("Landed here 12")
         offset_delta = self.offset - parent.tensor().offset
         parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
         _ = """for child_indices in self.shape:
@@ -54,8 +46,7 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
             parent_grad[parent_flat] += gradients[child_indices]
         reshaped = parent_grad.reshape(parent_shape)
 
-        print("Landed here 2")
-        return [(parent, reshaped, AddTensor)]
+        return [(parent, reshaped, AddTensor), (output, gradients, SubtractTensor)]
 
     fn __str__(self) -> String:
         return "ViewBackward"

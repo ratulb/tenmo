@@ -250,6 +250,7 @@ struct GradStream[dtype: DType](Copyable & Movable):
 
     fn sink(self):
         grad_share = self.grad.value()
+        log_debug("sink(): to id=" + self.recipient.inner_id().__str__())
         if not self.recipient.owns_data() and not self.recipient.has_grad():
             self.recipient.init_grad()
         self.recipient.update_grad[AddTensor](
@@ -263,4 +264,10 @@ struct GradStream[dtype: DType](Copyable & Movable):
     fn edges(self) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         if not self.recipient.has_backward_fn():
             return []
-        return self.recipient.backward_fn()(self.recipient)
+        log_debug("edges(): firing backward_fn of id=" + self.recipient.inner_id().__str__())
+
+        out = self.recipient.backward_fn()(self.recipient)
+        for (ancestor, _, _) in out:
+            log_debug(" -> produced edge to id=" + ancestor.inner_id().__str__())
+        return out
+        #return self.recipient.backward_fn()(self.recipient)

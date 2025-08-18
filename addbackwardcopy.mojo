@@ -18,6 +18,7 @@ struct AddBackwardScalar[dtype: DType](Copyable & Movable & Stringable):
         ancestor = output.ancestry().get(0)[]
         if ancestor.shape() != gradients.shape:
             gradients = gradients.reshape(ancestor.shape())
+        gradients.print()
         # Gradient of addition is 1 → just pass through incoming grad
         return [(ancestor, gradients, AddTensor)]
 
