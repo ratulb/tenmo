@@ -3,15 +3,15 @@ from shared import TensorLite
 from operators import AddTensor, SubtractTensor
 from utils import Variant
 from os import abort
-#from sumbackward import SumBackward
-#from meanbackward import MeanBackward
+from sumbackward import SumBackward
+from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar
-#from subbackward import SubBackward, SubLeftRightBackwardScalar
+from subbackward import SubBackward, SubLeftRightBackwardScalar
 from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
-#from exponientionbackward import ExponientionBackward
-#from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
+from exponientionbackward import ExponientionBackward
+from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
 #from transposebackward import TBackward, TransposeBackward
 #from matmulbackward import MatmulBackward
 from viewbackward import ViewBackward
@@ -28,6 +28,13 @@ alias Delegate[dtype: DType] = Variant[
     BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
     MultiplyBackward[dtype],
     MulBackwardScalar[dtype],
+    SumBackward[dtype],
+    MeanBackward[dtype],
+    TrueDivBackwardScalar[dtype],
+    RightTrueDivBackwardScalar[dtype],
+    ExponientionBackward[dtype],
+    SubBackward[dtype],
+    SubLeftRightBackwardScalar[dtype],
 ]
 
 
