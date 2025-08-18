@@ -7,6 +7,7 @@ from os import abort
 from copyancestry import Ancestors
 from operators import AddTensor, SubtractTensor, Noop
 from common_utils import compute_output_shape, log_debug
+from collections import Deque
 
 
 fn main() raises:
@@ -109,7 +110,7 @@ struct TensorLite[dtype: DType](
         seed_tensor = Tensor[dtype].full(root.shape(), start_grad)
         root.backward(seed_tensor)
 
-    fn backward(root: Self, seed_tensor: Tensor[dtype]):
+        _ = """fn backward(root: Self, seed_tensor: Tensor[dtype]):
         if not root.requires_grad():
             return
         root.seed_grad(seed_tensor)
@@ -128,7 +129,82 @@ struct TensorLite[dtype: DType](
 
         log_debug("Traced ancestry: " + traced.__str__())
         for stream in streams:
-            stream.flow()
+            stream.flow()"""
+
+    fn backward(root: TensorLite[dtype], seed_tensor: Tensor[dtype]):
+        try:
+            if not root.requires_grad():
+                return
+
+            # seed the output grad
+            root.seed_grad(seed_tensor)
+
+            traced = IntList.Empty
+            streams = List[GradStream[dtype]]()
+            use_count = Dict[
+                Int, Int
+            ]()  # <-- new: how many children feed each parent?
+
+            # ---- trace phase ----
+            stack = [root]
+            while stack:
+                node = stack.pop()
+                sid = node.inner_id()
+                if sid in traced:
+                    continue
+                streams.append(GradStream[dtype](node))
+                traced.append(sid)
+
+                # For each parent, increment use_count
+                for origin in node.ancestry():
+                    parent = origin[]
+                    pid = parent.inner_id()
+                    use_count[pid] = use_count.get(pid, 0) + 1
+                    stack.append(parent)
+
+            log_debug("Traced ancestry: " + traced.__str__())
+
+            # Ensure root is schedulable immediately
+            rid = root.inner_id()
+            if rid not in use_count:
+                use_count[rid] = 0
+
+            # Build lookup for fast scheduling
+            node_by_id = Dict[Int, GradStream[dtype]]()
+            for s in streams:
+                node_by_id[s.inner_id()] = s
+
+            # ---- backward execution phase ----
+            ready = Deque[GradStream[dtype]]()
+            ready.append(node_by_id[rid])
+
+            while ready:
+                stream = ready.popleft()
+
+                if stream.has_backward_fn():
+                    edges = stream.edges()  # collect (recipient, grad, opcode)
+
+                    for recipient, grad_share, opcode in edges:
+                        # 1) sink grad into recipient (accumulate only!)
+                        gs = GradStream[dtype](
+                            recipient, Optional(grad_share), opcode
+                        )
+                        gs.sink()
+
+                        # 2) decrement parent's fan-in
+                        pid = recipient.inner_id()
+                        remaining = use_count.get(pid, 0) - 1
+                        use_count[pid] = remaining
+
+                        # 3) schedule recipient when all contributions received
+                        if remaining == 0 and recipient.has_backward_fn():
+                            if pid in node_by_id:
+                                ready.append(node_by_id[pid])
+                else:
+                    # leaf → grads already accumulated via sink
+                    pass
+        except e:
+            abort(e.__str__())
 
 
 struct GradStream[dtype: DType](Copyable & Movable):
@@ -160,6 +236,9 @@ struct GradStream[dtype: DType](Copyable & Movable):
 
     fn has_backward_fn(self) -> Bool:
         return self.recipient.has_backward_fn()
+
+    fn inner_id(self) -> Int:
+        return self.recipient.inner_id()
 
     fn flow(self):
         if self.recipient.has_backward_fn():
