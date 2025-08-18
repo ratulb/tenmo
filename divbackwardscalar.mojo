@@ -1,10 +1,8 @@
 from tensors import Tensor
-from shared import TensorLike
+from shared import TensorLite
 from backpropagation import Delegate, BackwardFn
 from operators import (
-    __tensor_op_scalar__,
     AddTensor,
-    DivideScalar,
     SubtractTensor,
 )
 
@@ -18,10 +16,9 @@ struct TrueDivBackwardScalar[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         var divisor: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
         ancestor = output.ancestry().get(0)[]
@@ -45,17 +42,14 @@ struct RightTrueDivBackwardScalar[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         var scalar: Scalar[dtype] = rebind[Scalar[dtype]](self.scalar)
         ancestor = output.ancestry().get(0)[]
         squared = ancestor.tensor().__pow__(2)
-        squared_reciprocal = __tensor_op_scalar__[dtype, DivideScalar](
-            squared, 1.0
-        )
+        squared_reciprocal = 1.0 / squared
         grad = (gradients * scalar) * squared_reciprocal
 
         return [

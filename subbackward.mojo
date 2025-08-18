@@ -28,10 +28,9 @@ struct SubBackward[dtype: DType](Copyable & Movable & Stringable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLite[dtype]]) -> List[
+    ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         count = len(output.ancestry())
         grad_outputs = List[Tuple[TensorLite[dtype], Tensor[dtype], Int]](

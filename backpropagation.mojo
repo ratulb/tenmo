@@ -19,22 +19,27 @@ from viewbackward import ViewBackward
 #from tensorviewbackward import TensorViewBackward
 
 alias Delegate[dtype: DType] = Variant[
+    #MatmulBackward[dtype],
     ReshapeBackward[dtype],
     ViewBackward[dtype],
-    AddBackward[dtype],
-    AddBackwardScalar[dtype],
-    BroadcastBackward[dtype, AddTensor, AddTensor, False],
-    BroadcastBackward[dtype, AddTensor, AddTensor, True],
-    BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
-    MultiplyBackward[dtype],
-    MulBackwardScalar[dtype],
+    #TensorViewBackward[dtype],
+    #PermuteBackward[dtype],
     SumBackward[dtype],
     MeanBackward[dtype],
+    AddBackward[dtype],
+    AddBackwardScalar[dtype],
+    SubBackward[dtype],
+    SubLeftRightBackwardScalar[dtype],
+    MultiplyBackward[dtype],
+    MulBackwardScalar[dtype],
     TrueDivBackwardScalar[dtype],
     RightTrueDivBackwardScalar[dtype],
     ExponientionBackward[dtype],
-    SubBackward[dtype],
-    SubLeftRightBackwardScalar[dtype],
+    #TransposeBackward[dtype],
+    #TBackward[dtype],
+    BroadcastBackward[dtype, AddTensor, AddTensor, False],
+    BroadcastBackward[dtype, AddTensor, AddTensor, True],
+    BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
 ]
 
 
@@ -56,17 +61,39 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         _="""if self.grad_fn.isa[MatmulBackward[dtype]]():
             return self.grad_fn[MatmulBackward[dtype]].backward[dtype](output)
 
-        if self.grad_fn.isa[TensorViewBackward[dtype]]():
-            return self.grad_fn[TensorViewBackward[dtype]].backward[dtype](output)
+        elif self.grad_fn.isa[TransposeBackward[dtype]]():
+            return self.grad_fn[TransposeBackward[dtype]].backward[dtype](output)
+
+        elif self.grad_fn.isa[TBackward[dtype]]():
+            return self.grad_fn[TBackward[dtype]].backward[dtype](output)
 
         if self.grad_fn.isa[PermuteBackward[dtype]]():
             return self.grad_fn[PermuteBackward[dtype]].backward[dtype](output)
+
+
+        if self.grad_fn.isa[TensorViewBackward[dtype]]():
+            return self.grad_fn[TensorViewBackward[dtype]].backward[dtype](output)"""
+
+        if self.grad_fn.isa[ReshapeBackward[dtype]]():
+            return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](output)
+
+        if self.grad_fn.isa[ViewBackward[dtype]]():
+            return self.grad_fn[ViewBackward[dtype]].backward[dtype](output)
+
 
         elif self.grad_fn.isa[SumBackward[dtype]]():
             return self.grad_fn[SumBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[MeanBackward[dtype]]():
             return self.grad_fn[MeanBackward[dtype]].backward[dtype](output)
+
+        elif self.grad_fn.isa[AddBackward[dtype]]():
+            return self.grad_fn[AddBackward[dtype]].backward[dtype](output)
+
+        elif self.grad_fn.isa[AddBackwardScalar[dtype]]():
+            return self.grad_fn[AddBackwardScalar[dtype]].backward[dtype](
+                output
+            )
 
         elif self.grad_fn.isa[SubBackward[dtype]]():
             return self.grad_fn[SubBackward[dtype]].backward[dtype](output)
@@ -76,6 +103,15 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
                 dtype
             ](output)
 
+        elif self.grad_fn.isa[MultiplyBackward[dtype]]():
+            return self.grad_fn[MultiplyBackward[dtype]].backward[dtype](
+                output
+            )
+
+        elif self.grad_fn.isa[MulBackwardScalar[dtype]]():
+            return self.grad_fn[MulBackwardScalar[dtype]].backward[dtype](
+                output
+            )
 
         elif self.grad_fn.isa[TrueDivBackwardScalar[dtype]]():
             return self.grad_fn[TrueDivBackwardScalar[dtype]].backward[dtype](
@@ -92,11 +128,12 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
                 output
             )
 
-        elif self.grad_fn.isa[TBackward[dtype]]():
-            return self.grad_fn[TBackward[dtype]].backward[dtype](output)
-
-        elif self.grad_fn.isa[TransposeBackward[dtype]]():
-            return self.grad_fn[TransposeBackward[dtype]].backward[dtype](output)
+        elif self.grad_fn.isa[
+            BroadcastBackward[dtype, AddTensor, AddTensor, False]
+        ]():
+            return self.grad_fn[
+                BroadcastBackward[dtype, AddTensor, AddTensor, False]
+            ].backward[dtype](output)
 
         elif self.grad_fn.isa[
             BroadcastBackward[dtype, AddTensor, AddTensor, True]
@@ -110,40 +147,7 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         ]():
             return self.grad_fn[
                 BroadcastBackward[dtype, AddTensor, SubtractTensor, False]
-            ].backward[dtype](output)"""
-
-        if self.grad_fn.isa[ViewBackward[dtype]]():
-            return self.grad_fn[ViewBackward[dtype]].backward[dtype](output)
-
-
-        if self.grad_fn.isa[ReshapeBackward[dtype]]():
-            return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](output)
-
-        elif self.grad_fn.isa[AddBackward[dtype]]():
-            return self.grad_fn[AddBackward[dtype]].backward[dtype](output)
-
-        elif self.grad_fn.isa[AddBackwardScalar[dtype]]():
-            return self.grad_fn[AddBackwardScalar[dtype]].backward[dtype](
-                output
-            )
-
-        elif self.grad_fn.isa[
-            BroadcastBackward[dtype, AddTensor, AddTensor, False]
-        ]():
-            return self.grad_fn[
-                BroadcastBackward[dtype, AddTensor, AddTensor, False]
             ].backward[dtype](output)
-
-        elif self.grad_fn.isa[MultiplyBackward[dtype]]():
-            return self.grad_fn[MultiplyBackward[dtype]].backward[dtype](
-                output
-            )
-
-        elif self.grad_fn.isa[MulBackwardScalar[dtype]]():
-            return self.grad_fn[MulBackwardScalar[dtype]].backward[dtype](
-                output
-            )
-
 
         else:
             abort("I am not here to receive you")
