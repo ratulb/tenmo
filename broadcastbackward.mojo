@@ -1,5 +1,5 @@
 from tensors import Tensor
-from shared import TensorLike
+from shared import TensorLite
 from backpropagation import Delegate, BackwardFn
 
 
@@ -12,13 +12,12 @@ struct BroadcastBackward[
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         var grad_outputs: List[
-            Tuple[TensorLike[dtype], Tensor[dtype], Int]
+            Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
         ancestors = output.ancestry()
         ancestor_1 = ancestors.get(0)[]

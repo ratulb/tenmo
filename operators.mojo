@@ -64,31 +64,31 @@ fn __tensor_op_tensor__[
 
     @parameter
     fn mul_elems[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
+        out.buffer.store[simdwidth=simd_width](
             idx,
             (
-                this.data.load[width=simd_width, volatile=True](idx)
-                * that.data.load[width=simd_width, volatile=True](idx)
+                this.buffer.load[simdwidth=simd_width](idx)
+                * that.buffer.load[simdwidth=simd_width](idx)
             ),
         )
 
     @parameter
     fn add_elems[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
+        out.buffer.store[simdwidth=simd_width](
             idx,
             (
-                this.data.load[width=simd_width, volatile=True](idx)
-                + that.data.load[width=simd_width, volatile=True](idx)
+                this.buffer.load[simdwidth=simd_width](idx)
+                + that.buffer.load[simdwidth=simd_width](idx)
             ),
         )
 
     @parameter
     fn subtract_elems[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
+        out.buffer.store[simdwidth=simd_width](
             idx,
             (
-                this.data.load[width=simd_width, volatile=True](idx)
-                - that.data.load[width=simd_width, volatile=True](idx)
+                this.buffer.load[simdwidth=simd_width](idx)
+                - that.buffer.load[simdwidth=simd_width](idx)
             ),
         )
 
@@ -110,51 +110,51 @@ fn __tensor_op_scalar__[
 
     @parameter
     fn add_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx, this.data.load[width=simd_width, volatile=True](idx) + scalar
+        out.buffer.store[simdwidth=simd_width](
+            idx, this.buffer.load[simdwidth=simd_width](idx) + scalar
         )
 
     @parameter
     fn subtract_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx, this.data.load[width=simd_width, volatile=True](idx) - scalar
+        out.buffer.store[simdwidth=simd_width](
+            idx, this.buffer.load[simdwidth=simd_width](idx) - scalar
         )
 
     @parameter
     fn subtract_from_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx, scalar - this.data.load[width=simd_width, volatile=True](idx)
+        out.buffer.store[simdwidth=simd_width](
+            idx, scalar - this.buffer.load[simdwidth=simd_width](idx)
         )
 
     @parameter
     fn mul_by_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx, this.data.load[width=simd_width, volatile=True](idx) * scalar
+        out.buffer.store[simdwidth=simd_width](
+            idx, this.buffer.load[simdwidth=simd_width](idx) * scalar
         )
 
     @parameter
     fn powered_by_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
+        out.buffer.store[simdwidth=simd_width](
             idx,
-            this.data.load[width=simd_width, volatile=True](idx).__pow__(
+            this.buffer.load[simdwidth=simd_width](idx).__pow__(
                 scalar
             ),
         )
 
     @parameter
     fn div_by_factor[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
+        out.buffer.store[simdwidth=simd_width](
             idx,
-            this.data.load[width=simd_width, volatile=True](idx).__truediv__(
+            this.buffer.load[simdwidth=simd_width](idx).__truediv__(
                 scalar
             ),
         )
 
     @parameter
     fn divide_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
+        out.buffer.store[simdwidth=simd_width](
             idx,
-            this.data.load[width=simd_width, volatile=True](idx).__rtruediv__(
+            this.buffer.load[simdwidth=simd_width](idx).__rtruediv__(
                 scalar
             ),
         )
@@ -186,39 +186,39 @@ fn tensor_compare_scalar[
     @parameter
     fn compare_elems[simd_width: Int](idx: Int):
         if op == Equal:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx) == scalar,
+                this.buffer.load[simdwidth=simd_width](idx) == scalar,
             )
 
         if op == NotEqual:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx) != scalar,
+                this.buffer.load[simdwidth=simd_width](idx) != scalar,
             )
 
         if op == LessThan:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx) < scalar,
+                this.buffer.load[simdwidth=simd_width](idx) < scalar,
             )
 
         if op == LessThanEqual:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx) <= scalar,
+                this.buffer.load[simdwidth=simd_width](idx) <= scalar,
             )
 
         if op == GreaterThan:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx) > scalar,
+                this.buffer.load[simdwidth=simd_width](idx) > scalar,
             )
 
         if op == GreaterThanEqual:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx) >= scalar,
+                this.buffer.load[simdwidth=simd_width](idx) >= scalar,
             )
 
     vectorize[compare_elems, simdwidthof[DType.bool]()](result.numels())
@@ -240,45 +240,45 @@ fn tensor_compare[
     @parameter
     fn compare_elems[simd_width: Int](idx: Int):
         if op == Equal:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx)
-                == other.data.load[width=simd_width](idx),
+                this.buffer.load[simdwidth=simd_width](idx)
+                == other.buffer.load[simdwidth=simd_width](idx),
             )
 
         if op == NotEqual:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx)
-                != other.data.load[width=simd_width](idx),
+                this.buffer.load[simdwidth=simd_width](idx)
+                != other.buffer.load[simdwidth=simd_width](idx),
             )
 
         if op == LessThan:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx)
-                < other.data.load[width=simd_width](idx),
+                this.buffer.load[simdwidth=simd_width](idx)
+                < other.buffer.load[simdwidth=simd_width](idx),
             )
 
         if op == LessThanEqual:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx)
-                <= other.data.load[width=simd_width](idx),
+                this.buffer.load[simdwidth=simd_width](idx)
+                <= other.buffer.load[simdwidth=simd_width](idx),
             )
 
         if op == GreaterThan:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx)
-                > other.data.load[width=simd_width](idx),
+                this.buffer.load[simdwidth=simd_width](idx)
+                > other.buffer.load[simdwidth=simd_width](idx),
             )
 
         if op == GreaterThanEqual:
-            result.data.store[width=simd_width, volatile=True](
+            result.buffer.store[simdwidth=simd_width](
                 idx,
-                this.data.load[width=simd_width](idx)
-                >= other.data.load[width=simd_width](idx),
+                this.buffer.load[simdwidth=simd_width](idx)
+                >= other.buffer.load[simdwidth=simd_width](idx),
             )
 
     vectorize[compare_elems, simdwidthof[DType.bool]()](result.numels())
@@ -294,7 +294,7 @@ fn sum_all[dtype: DType, //](input: Tensor[dtype]) -> Scalar[dtype]:
 
     @parameter
     fn sum_elems[simd_width: Int](idx: Int):
-        summ += input.data.load[width=simd_width](idx).reduce_add()
+        summ += input.buffer.load[simdwidth=simd_width](idx).reduce_add()
 
     vectorize[sum_elems, simdwidthof[dtype]()](input.numels())
     return summ

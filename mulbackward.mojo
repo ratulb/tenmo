@@ -1,12 +1,8 @@
 from tensors import Tensor
-from shared import TensorLike
+from shared import TensorLite
 from backpropagation import Delegate, BackwardFn
 from operators import (
     AddTensor,
-    MulTensor,
-    __tensor_op_tensor__,
-    __tensor_op_scalar__,
-    MulScalar,
 )
 
 
@@ -19,16 +15,13 @@ struct MulBackwardScalar[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         var value: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
         ancestor = output.ancestry().get(0)[]
-        scaled_gradients = __tensor_op_scalar__[dtype, MulScalar](
-            gradients, value
-        )
+        scaled_gradients = gradients * value
         return [
             (
                 ancestor,
@@ -45,21 +38,18 @@ struct MultiplyBackward[dtype: DType](Copyable & Movable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         var grad_outputs: List[
-            Tuple[TensorLike[dtype], Tensor[dtype], Int]
+            Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
         ancestor_1 = output.ancestry().get(0)[]
         ancestor_2 = output.ancestry().get(1)[]
 
         if ancestor_1.requires_grad():
-            product = __tensor_op_tensor__[dtype, MulTensor](
-                gradients, ancestor_2.tensor()
-            )
+            product = gradients * ancestor_2.tensor()
 
             product.requires_grad = False
             grad_outputs.append(
@@ -71,9 +61,7 @@ struct MultiplyBackward[dtype: DType](Copyable & Movable):
             )
 
         if ancestor_2.requires_grad():
-            product = __tensor_op_tensor__[dtype, MulTensor](
-                gradients, ancestor_1.tensor()
-            )
+            product = gradients * ancestor_1.tensor()
             product.requires_grad = False
             grad_outputs.append(
                 (

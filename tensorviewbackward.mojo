@@ -1,5 +1,5 @@
 from tensors import Tensor
-from shared import TensorLike
+from shared import TensorLite
 from shapes import Shape
 from strides import Strides
 from backpropagation import Delegate, BackwardFn
@@ -17,10 +17,9 @@ struct TensorViewBackward[dtype: DType](Copyable & Movable & Stringable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         parent = output.ancestry().get(0)[]
         parent_shape = parent.shape()

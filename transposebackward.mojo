@@ -1,5 +1,5 @@
 from tensors import Tensor
-from shared import TensorLike
+from shared import TensorLite
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
 from intlist import IntList
@@ -13,8 +13,8 @@ struct TBackward[dtype: DType](Copyable & Movable & Stringable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, out_ptr: UnsafePointer[TensorLite[dtype]]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
         gradients = output.gradients()[]
@@ -41,10 +41,9 @@ struct TransposeBackward[dtype: DType](Copyable & Movable & Stringable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
         inverted_axes = IntList.invert_permutation(self.axes)

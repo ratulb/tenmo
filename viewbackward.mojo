@@ -1,11 +1,10 @@
 from tensors import Tensor
-from shared import TensorLike
 from shapes import Shape
 from strides import Strides
 from backpropagation import Delegate, BackwardFn
-from operators import AddTensor
+from operators import AddTensor, SubtractTensor
 from intlist import IntList
-
+from shared import TensorLite
 
 @fieldwise_init
 struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
@@ -18,13 +17,12 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
-        gradients = output.gradients()[]
         parent = output.ancestry().get(0)[]
-        offset_delta = self.offset - parent.offset()
+        gradients = output.gradients()[]
+        offset_delta = self.offset - parent.tensor().offset
         parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
         _ = """for child_indices in self.shape:
             child_flat = (child_indices * self.strides.to_list()).sum()
@@ -47,7 +45,8 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
             parent_flat = child_flat + offset_delta
             parent_grad[parent_flat] += gradients[child_indices]
         reshaped = parent_grad.reshape(parent_shape)
-        return [(parent, reshaped, AddTensor)]
+
+        return [(parent, reshaped, AddTensor), (output, gradients, SubtractTensor)]
 
     fn __str__(self) -> String:
         return "ViewBackward"

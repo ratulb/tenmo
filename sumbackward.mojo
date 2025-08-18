@@ -1,7 +1,7 @@
 from tensors import Tensor
 from intlist import IntList
 from operators import AddTensor
-from shared import TensorLike
+from shared import TensorLite
 from shapes import Shape
 from backpropagation import Delegate, BackwardFn
 
@@ -26,13 +26,12 @@ struct SumBackward[dtype: DType](Copyable & Movable & Stringable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
-        rank = ancestor.rank()
+        rank = ancestor.shape().rank()
         if rank == 0:
             return [(ancestor, gradients, AddTensor)]
         shape = ancestor.shape()

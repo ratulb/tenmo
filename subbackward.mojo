@@ -1,7 +1,7 @@
 from tensors import Tensor
 from intlist import IntList
 from operators import AddTensor, SubtractTensor
-from shared import TensorLike
+from shared import TensorLite
 from backpropagation import Delegate, BackwardFn
 
 
@@ -28,13 +28,13 @@ struct SubBackward[dtype: DType](Copyable & Movable & Stringable):
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, out_ptr: UnsafePointer[TensorLite[dtype]]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         output = out_ptr[]
         gradients = output.gradients()[]
         count = len(output.ancestry())
-        grad_outputs = List[Tuple[TensorLike[dtype], Tensor[dtype], Int]](
+        grad_outputs = List[Tuple[TensorLite[dtype], Tensor[dtype], Int]](
             capacity=count
         )
         for i in range(count):
@@ -62,10 +62,9 @@ struct SubLeftRightBackwardScalar[dtype: DType](Copyable & Movable & Stringable)
 
     fn backward[
         dtype: DType
-    ](self, out_ptr: UnsafePointer[TensorLike[dtype]]) -> List[
-        Tuple[TensorLike[dtype], Tensor[dtype], Int]
+    ](self, output: TensorLite[dtype]) -> List[
+        Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        output = out_ptr[]
         gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
         return [

@@ -1,6 +1,6 @@
 from memory import memcpy, Pointer
 from os import abort
-from shared import TensorLike
+from shared import TensorLite
 from common_utils import log_debug
 
 
@@ -9,17 +9,17 @@ fn main() raises:
 
 
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
-    var ancestors: UnsafePointer[UnsafePointer[TensorLike[dtype]]]
+    var ancestors: UnsafePointer[UnsafePointer[TensorLite[dtype]]]
     var size: Int
     var capacity: Int
 
     fn __init__(out self):
-        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
+        self.ancestors = UnsafePointer[UnsafePointer[TensorLite[dtype]]]()
         self.capacity = 0
         self.size = 0
 
     fn __init__(out self, capacity: Int):
-        self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
+        self.ancestors = UnsafePointer[UnsafePointer[TensorLite[dtype]]].alloc(
             capacity
         )
         self.capacity = capacity
@@ -31,22 +31,22 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         self.capacity = existing.capacity
         if existing.size > 0:
             self.ancestors = UnsafePointer[
-                UnsafePointer[TensorLike[dtype]]
+                UnsafePointer[TensorLite[dtype]]
             ].alloc(existing.size)
             memcpy(self.ancestors, existing.ancestors, existing.size)
         else:
-            self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
+            self.ancestors = UnsafePointer[UnsafePointer[TensorLite[dtype]]]()
 
     fn __moveinit__(out self, owned existing: Self):
         self.size = existing.size
         self.capacity = existing.capacity
         if existing.size > 0:
             self.ancestors = UnsafePointer[
-                UnsafePointer[TensorLike[dtype]]
+                UnsafePointer[TensorLite[dtype]]
             ].alloc(existing.size)
             memcpy(self.ancestors, existing.ancestors, existing.size)
         else:
-            self.ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]]()
+            self.ancestors = UnsafePointer[UnsafePointer[TensorLite[dtype]]]()
 
     @staticmethod
     fn untracked() -> Ancestors[dtype]:
@@ -61,7 +61,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
                 (self.ancestors + idx).destroy_pointee()
             self.ancestors.free()
 
-    fn get(self, idx: Int) -> UnsafePointer[TensorLike[dtype]]:
+    fn get(self, idx: Int) -> UnsafePointer[TensorLite[dtype]]:
         if idx < 0 or idx >= len(self):
             abort("Ancestors get → Out-of-bounds read")
         address = (self.ancestors + idx)[]
@@ -80,7 +80,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         """
         return len(self) > 0
 
-    fn append(mut self, addr: UnsafePointer[TensorLike[dtype]]):
+    fn append(mut self, addr: UnsafePointer[TensorLite[dtype]]):
         if self.size == self.capacity:
             new_capacity = max(1, self.capacity * 2)
             self.resize(new_capacity)
@@ -93,7 +93,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     fn reserve(mut self, new_capacity: Int):
         if new_capacity <= self.capacity:
             return
-        new_ancestors = UnsafePointer[UnsafePointer[TensorLike[dtype]]].alloc(
+        new_ancestors = UnsafePointer[UnsafePointer[TensorLite[dtype]]].alloc(
             new_capacity
         )
         if self.size > 0:
@@ -119,7 +119,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
                 print(each.__str__(), end=" ")
         print()
 
-    fn __contains__(self, tensor_like: TensorLike[dtype]) -> Bool:
+    fn __contains__(self, tensor_like: TensorLite[dtype]) -> Bool:
         for each in self:
             entry = each[]
             inner_id = entry.inner_id()
@@ -127,7 +127,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
                 return True
         return False
 
-    fn pop(mut self, index: Int = -1) -> UnsafePointer[TensorLike[dtype]]:
+    fn pop(mut self, index: Int = -1) -> UnsafePointer[TensorLite[dtype]]:
         if len(self) < 1:
             abort("Ancestors → pop: empty ancestors")
 
@@ -168,7 +168,7 @@ struct _AncestorsIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(mut self) -> UnsafePointer[TensorLike[dtype]]:
+    fn __next__(mut self) -> UnsafePointer[TensorLite[dtype]]:
         @parameter
         if forward:
             self.index += 1
