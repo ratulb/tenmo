@@ -1199,9 +1199,9 @@ struct Tensor[dtype: DType = DType.float32](
 
         if requires_grad:
             #Using base to keep track of grad already contributed to parent
-            base = Tensor[dtype].zeros(self.shape)
-            out.base = UnsafePointer[Tensor[dtype]].alloc(1)
-            out.base.init_pointee_move(base^)
+            #base = Tensor[dtype].zeros(self.shape)
+            #out.base = UnsafePointer[Tensor[dtype]].alloc(1)
+            #out.base.init_pointee_move(base^)
 
             backward_fn = ReshapeBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
@@ -1519,11 +1519,11 @@ struct Tensor[dtype: DType = DType.float32](
                 + other.shape.__str__()
             )
         if self.owns_data:
-            self.buffer *= (
+            self.buffer.__imul__(
                 other.buffer if other.owns_data else other.base_address()[].buffer
             )
         else:
-            self.base_address()[].buffer *= (
+            self.base_address()[].buffer.__imul__(
                 other.buffer if other.owns_data else other.base_address()[].buffer
             )
 
@@ -2060,11 +2060,11 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    test_reshape_exp()
-    #test_reshape_backward()
-    #test_add_backward()
-    # test_reshape_backward_scalar()
-    _ = """test_add_tensor_and_view()
+    test_reshape_backward()
+    _="""test_reshape_exp()
+    test_add_backward()
+    test_reshape_backward_scalar()
+    test_add_tensor_and_view()
     test_add_tensors()
     test_subtract_scalar()
     test_add_scalar()
@@ -2083,6 +2083,7 @@ fn main() raises:
 from testing import assert_true
 
 fn test_reshape_backward() raises:
+    print("test_reshape_backward")
     a = Tensor.d2([[1, 2, 3]], requires_grad=True)
     r = a.reshape(3)
     b = r + 100
@@ -2090,7 +2091,6 @@ fn test_reshape_backward() raises:
     d = b + c
     d.backward()
 
-    print()
     assert_true(
         (a.gradients()[] == Tensor.d2([[2, 2, 2]])).all_true(),
         "Tensor view reshape grad assertion failed",
@@ -2102,6 +2102,7 @@ fn test_reshape_backward() raises:
     _ = a
 
 fn test_add_backward() raises:
+    print("test_add_backward")
     A1 = Tensor.d2([[1, 2, 3]], requires_grad=True)
     AV = A1.into_view()
     AV.backward(3)
@@ -2171,6 +2172,7 @@ fn test_add_backward() raises:
 
 
 fn test_reshape_backward_scalar() raises:
+    print("test_reshape_backward_scalar")
     a = Tensor.scalar(100, requires_grad=True)
     r = a.reshape()
     v = r.into_view()
@@ -2184,6 +2186,7 @@ fn test_reshape_backward_scalar() raises:
 
 
 fn test_add_tensor_and_view() raises:
+    print("test_add_tensor_and_view")
     a = Tensor.full(Shape.of(3, 3), 2)
     av = a.into_view()
     expected = Tensor.full(Shape.of(3, 3), 4)
@@ -2231,6 +2234,7 @@ fn test_add_tensor_and_view() raises:
 
 
 fn test_add_tensors() raises:
+    print("test_add_tensors")
     a = Tensor.full(Shape.of(3, 3), 2)
     b = Tensor.full(Shape.of(3, 3), 42)
     expected = Tensor.full(Shape.of(3, 3), 44)
@@ -2269,6 +2273,7 @@ fn test_add_tensors() raises:
 
 
 fn test_add_scalar() raises:
+    print("test_add_scalar")
     a = Tensor.full(Shape.of(3, 3), 2)
     b = a + 3
     c = 3 + a
@@ -2278,6 +2283,7 @@ fn test_add_scalar() raises:
 
 
 fn test_subtract_scalar() raises:
+    print("test_subtract_scalar")
     a = Tensor.full(Shape.of(3, 3), 5)
     b = a - 3
     c = 7 - a
@@ -2287,6 +2293,7 @@ fn test_subtract_scalar() raises:
 
 
 fn test_powering() raises:
+    print("test_powering")
     a = Tensor.full(Shape.of(3, 3), 2)
     b = a**3
     expected = Tensor.full(Shape.of(3, 3), 8)
@@ -2294,6 +2301,7 @@ fn test_powering() raises:
 
 
 fn test_invert() raises:
+    print("test_invert")
     a = Tensor[DType.bool].full(Shape.of(3, 3), True)
     b = ~a
     expected = Tensor[DType.bool].full(Shape.of(3, 3), False)
@@ -2302,6 +2310,7 @@ fn test_invert() raises:
 
 
 fn test_negate_absolute() raises:
+    print("test_negate_absolute")
     a = Tensor[DType.float32].full(Shape.of(3, 3), 42)
     negated = -a
     expected = Tensor.full(Shape.of(3, 3), -42)
@@ -2311,6 +2320,7 @@ fn test_negate_absolute() raises:
 
 
 fn test_inplace_update() raises:
+    print("test_inplace_update")
     a = Tensor.zeros(3, 3)
     b = Tensor.full(Shape.of(3, 3), 42)
     a += b
@@ -2318,6 +2328,7 @@ fn test_inplace_update() raises:
 
 
 fn test_exponentiation() raises:
+    print("test_exponentiation")
     a = Tensor.full(Shape.of(3, 3), 2)
     expected = Tensor.full(Shape.of(3, 3), 7.38905).float()
     b = a.exp()
@@ -2325,6 +2336,7 @@ fn test_exponentiation() raises:
 
 
 fn test_grad_update() raises:
+    print("test_grad_update")
     a = Tensor.rand(3, 4, requires_grad=True)
     v = a.into_view()
     v.init_gradbox()
@@ -2337,6 +2349,7 @@ fn test_grad_update() raises:
 
 
 fn test_sum_all() raises:
+    print("test_sum_all")
     a = Tensor.arange(3 * 4 * 5).reshape(3, 4, 5)
     v = a.view(shape=Shape.of(2, 5, 5), offset=5)
     v2 = a.view(shape=[3, 5, 4], strides=[20, 1, 5], offset=0)
@@ -2364,6 +2377,7 @@ fn test_sum_all() raises:
 
 
 fn test_view_of_view() raises:
+    print("test_view_of_view")
     a = Tensor.scalar(10)
     v1 = a.into_view()
     v2 = v1.view(shape=Shape.Void, strides=Strides.Zero, offset=0)
@@ -2376,6 +2390,7 @@ fn test_view_of_view() raises:
 
 
 fn test_scalar_indexing() raises:
+    print("test_scalar_indexing")
     a = Tensor.scalar(10)
     v = a.into_view()
     v1 = a.into_view()
@@ -2396,6 +2411,7 @@ fn test_scalar_indexing() raises:
 
 
 fn test_grads_on_tensor_init() raises:
+    print("test_grads_on_tensor_init")
     a = Tensor(6, 3, 4, requires_grad=True)
     b = Tensor(6, 3, 4)
     assert_true(
@@ -2425,9 +2441,7 @@ fn test_reshape_exp() raises:
     result = tensor2 * 42
 
     result.backward()
-    tensor.gradients()[].print()
     tensor3 = tensor2.reshape(1, 1, 1, 1, 1)
     result = tensor3 * 12
     result.backward()
-    tensor.gradients()[].print()
 

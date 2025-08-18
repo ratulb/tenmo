@@ -319,7 +319,7 @@ struct Tensor[dtype: DType = DType.float32](
             self.data.free()
         log_debug("Tensor__del__ → called free on data")
         if self.base:
-            self.base[].free()
+            #self.base[].free()
             self.base.destroy_pointee()
             self.base.free()
             log_debug("Tensor__del__ → called free on base")
@@ -1709,9 +1709,61 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    a = Tensor.rand(3, 4, 5)
+    _="""a = Tensor.rand(3, 4, 5)
     v = a[:, :, :]
     print(v.is_contiguous())
-
+    test_scalar_indexing()"""
+    a = Tensor.d2([[1, 2, 3]], requires_grad=True)
+    r = a.reshape(3)
+    print("The reshaped tensor")
+    r.print()
+    b = r + 100
+    c = r + 200
+    d = b + c
+    d.backward()
+    print("\n r's ancestors\n")
+    r.ancestors.print()
+    print("and a's id: ", id(a), )
+    print("\ngradients of all\n")
+    r.grad[].print()
+    print()
+    a.grad[].print()
+    _ = a
+    _ = b
+    _ = c
+    _ = d
+    _ = r
 
 from testing import assert_true
+fn test_scalar_indexing() raises:
+    a = Tensor.scalar(10)
+    v = a.into_view()
+    print(
+        "check1: "#, a.keep_alive.value().count(), #v.keep_alive.value().count()
+    )
+    #v1 = a.into_view()
+    print(
+        "check2: ",
+        #a.keep_alive.value().count(),
+        #v.keep_alive.value().count(),
+        #v1.keep_alive.value().count(),
+    )
+    _ = a^
+    _ = a^
+    _ = a^
+    _ = a^
+    _="""index = a.flatten_index([])
+    assert_true(index == 0, "scalar indexing failed")
+    idx = List[Int]()
+    assert_true(a.__getitem__(idx) == 10, "scalar indexing get failed")
+    assert_true(a[[]] == 10, "scalar indexing get list literal failed")
+    a[[]] = 100
+    assert_true(
+        a[[]] == 100, "scalar indexing get after set list literal failed"
+    )
+    assert_true(a.item() == 100, "scalar indexing item call failed")"""
+    print("v.item(): ", v[IntList()])
+    assert_true(v[IntList()] == 10, "scalar indexing on view - item call failed")
+    print()
+    #print(a.keep_alive.value().count(), v.keep_alive.value().count())
+    #print(v1.keep_alive.value().count(), v.keep_alive.value().count())
