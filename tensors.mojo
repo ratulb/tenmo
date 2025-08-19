@@ -12,11 +12,11 @@ from intlist import IntList
 from ancestry import Ancestors
 from strides import Strides
 from common_utils_imports import *
-from operators import __tensor_op_tensor__, __tensor_op_scalar__
 from operators_imports import *
 from walkback import *
 from buffers import Buffer
-from time import perf_counter_ns
+
+# from time import perf_counter_ns
 from shared import TensorLite
 
 
@@ -1999,6 +1999,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn backward(self, seed_tensor: Tensor[dtype]):
         TensorLite.of(self).backward(seed_tensor)
 
+    fn requires_grad_(mut self, requires_grad: Bool = True):
+        self.requires_grad = requires_grad
+        self.init_gradbox()
+
     fn matmul[
         simd_width: Int = simdwidthof[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
@@ -2007,7 +2011,49 @@ struct Tensor[dtype: DType = DType.float32](
         cols_a = A.cols()
         cols_b = B.cols()
         C = Tensor[dtype].zeros(rows_a, cols_b)
+        is_b_contiguous = B.is_contiguous()
+
         for i in range(rows_a):
+            for k in range(0, cols_b, simd_width):
+                remaining = cols_b - k
+                process_width = min(remaining, simd_width)
+
+                # Initialize accumulator for this output segment
+                var accumulator = SIMD[dtype, simd_width](0)
+
+                for j in range(cols_a):
+                    # Load scalar from A
+                    a_val = A.load(i, j)
+
+                    # Load vector from B (optimized for contiguity)
+                    var b_vec = SIMD[dtype, simd_width](0)
+                    if is_b_contiguous:
+                        # Direct vector load from contiguous memory
+                        b_offset = j * cols_b + k
+                        b_vec = b_vec.insert(B.buffer.load[simdwidth=simd_width](b_offset))
+                    else:
+                        # Manual gathering for non-contiguous B
+                        #var b_vec = SIMD[dtype, simd_width](0)
+                        for w in range(process_width):
+                            b_vec[w] = B.load(j, k + w)
+
+                    # Fused multiply-add operation
+                    accumulator += SIMD[dtype, simd_width](a_val) * b_vec
+
+                # Store result with proper tail handling
+                c_offset = i * cols_b + k
+                if process_width == simd_width:
+                    # Full vector store - optimal case
+                    C.buffer.store[simdwidth=simd_width](
+                        c_offset,
+                        C.buffer.load[simdwidth=simd_width](c_offset) + accumulator
+                    )
+                else:
+                    # Tail handling - extract individual elements from SIMD
+                    for w in range(process_width):
+                        current = C.load(i, k + w)
+                        C.store(i, k + w, current + accumulator[w])
+        _="""for i in range(rows_a):
             for j in range(cols_a):
                 scalar_a = A.load(i, j)
 
@@ -2022,7 +2068,7 @@ struct Tensor[dtype: DType = DType.float32](
                         C.buffer.load[simdwidth=width](offset) + product,
                     )
 
-                vectorize[mul_add, simd_width](cols_b)
+                vectorize[mul_add, simd_width](cols_b)"""
         requires_grad = A.requires_grad or B.requires_grad
         if requires_grad:
             C.requires_grad = True
@@ -2096,7 +2142,14 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    test_flat_view_chain_backprop()
+    cols = 5
+    for i in range(0, cols, 10):
+        print("Do I come here?", i, cols - i)
+
+    s = SIMD[DType.float32, 4](0)
+    print("simd: ", s)
+    test_tensorlite_inner_tensor_requires_grad()
+    # test_flat_view_chain_backprop()
     _ = """test_reshape_backward()
     test_reshape_exp()
     test_add_backward()
@@ -2118,6 +2171,19 @@ fn main() raises:
 
 
 from testing import assert_true
+
+
+fn test_tensorlite_inner_tensor_requires_grad() raises:
+    a = Tensor.rand(2, 7, requires_grad=True)
+    tensorlite = TensorLite.of(a)
+    inner = tensorlite.tensor()
+    inner.requires_grad = False
+    assert_true(
+        inner.requires_grad == False
+        and tensorlite.tensor().requires_grad
+        and tensorlite.requires_grad()
+        and a.requires_grad
+    )
 
 
 fn test_flat_view_chain_backprop() raises:
