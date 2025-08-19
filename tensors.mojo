@@ -6,7 +6,7 @@ from algorithm import vectorize
 from sys import simdwidthof
 from utils.numerics import max_finite, min_finite
 from os import abort
-from memory import memcpy, memset, memset_zero, ArcPointer
+from memory import memcpy, memset, memset_zero
 from shapes import Shape
 from intlist import IntList
 from ancestry import Ancestors
@@ -39,7 +39,6 @@ struct Tensor[dtype: DType = DType.float32](
     var base: UnsafePointer[Tensor[dtype]]  # Only allocated on need basis
     var backwardFn: Optional[BackwardFn[dtype]]
     var owns_data: Bool
-    var keep_alive: Optional[ArcPointer[Bool]]
 
     # An empty tensor - fill in the voids as required
     fn __init__(out self):
@@ -53,7 +52,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.ancestors = Ancestors[dtype].untracked()
         self.buffer = Buffer[dtype].Empty
         self.owns_data = False
-        self.keep_alive = None
         self._contiguous = False
         self._contiguous = self.is_contiguous()
 
@@ -81,7 +79,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = UnsafePointer[Tensor[dtype]]()
         self.buffer = buffer
         self.owns_data = True
-        self.keep_alive = Optional(ArcPointer(True))
         self._contiguous = False
         self._contiguous = self.is_contiguous()
         self.init_gradbox()
@@ -101,7 +98,6 @@ struct Tensor[dtype: DType = DType.float32](
             shape.num_elements()
         )
         self.owns_data = True
-        self.keep_alive = Optional(ArcPointer(True))
         self._contiguous = False
         self._contiguous = self.is_contiguous()
         self.init_gradbox()
@@ -118,7 +114,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = other.base
         self.backwardFn = other.backwardFn
         self.owns_data = other.owns_data
-        self.keep_alive = other.keep_alive
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
@@ -132,7 +127,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.base = other.base
         self.backwardFn = other.backwardFn
         self.owns_data = other.owns_data
-        self.keep_alive = other.keep_alive
 
     fn id(self) -> Int:
         return Int(UnsafePointer(to=self))
@@ -988,16 +982,16 @@ struct Tensor[dtype: DType = DType.float32](
         if not self.owns_data:
             abort("Tensor → into_view: not allowed on non-owning tensor")
         shape, strides = self.shape, self.strides
+        grad_required = (
+            requires_grad.value() if requires_grad else self.requires_grad
+        )
         out = Tensor[dtype].Empty
         out.shape = shape
         out.strides = strides
-        out.requires_grad = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
+        out.requires_grad_(grad_required)
         out.base = self.address()
-        out.keep_alive = self.keep_alive
 
-        if self.requires_grad:
+        if grad_required:
             backward_fn = ViewBackward[dtype](
                 shape, strides, 0
             ).into_backward_fn()
@@ -1053,13 +1047,13 @@ struct Tensor[dtype: DType = DType.float32](
         out.strides = strides
         out.offset = abs_offset
         out._contiguous = out.is_contiguous()
-        out.requires_grad = (
+        grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
+        out.requires_grad_(grad_required)
         out.base = self.address() if self.owns_data else self.base.copy()
-        out.keep_alive = self.keep_alive
 
-        if self.requires_grad:
+        if grad_required:
             backward_fn = ViewBackward[dtype](
                 shape, strides, abs_offset
             ).into_backward_fn()
@@ -1248,13 +1242,18 @@ struct Tensor[dtype: DType = DType.float32](
             new_shape,
             new_strides,
             offset=0,
-            requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
+            requires_grad=False,
+            # requires_grad=requires_grad.value() if requires_grad else self.requires_grad,
         )
-        if self.requires_grad:
+        grad_required = (
+            requires_grad.value() if requires_grad else self.requires_grad
+        )
+
+        if grad_required:
+            out.requires_grad_(True)
             backward_fn = TransposeBackward[dtype](
                 normalized_axes
             ).into_backward_fn()
-
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(TensorLite.of(self))
 
@@ -1337,12 +1336,15 @@ struct Tensor[dtype: DType = DType.float32](
         self,
         axes: IntList,
         keepdims: Bool = False,
+        track_grad: Bool = True,
     ) -> Tensor[dtype]:
         shape = self.shape
         rank = shape.rank()
         normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
         out_shape = compute_output_shape(shape, normalized_axes, keepdims)
-        out = Tensor[dtype].zeros(out_shape)
+        out = Tensor[dtype].zeros(
+            out_shape, requires_grad=self.requires_grad and track_grad
+        )
 
         if out_shape == Shape.Void:
             if rank == 0:  # Scalar case
@@ -1360,9 +1362,8 @@ struct Tensor[dtype: DType = DType.float32](
                     summ += self[full_idx]
                 out[out_idx] = summ
 
-        if self.requires_grad:
-            out.requires_grad = True
-            out.init_gradbox()
+        if self.requires_grad and track_grad:
+            out.requires_grad_(True)
             backward_fn = SumBackward[dtype](
                 normalized_axes.copy(), keepdims
             ).into_backward_fn()
@@ -1383,11 +1384,12 @@ struct Tensor[dtype: DType = DType.float32](
             self.shape, axes
         )
         count = self.shape.axes_spans.select(normalized_axes).product()
-        out = self.sum(normalized_axes, keepdims) / Scalar[dtype](count)
+        out = self.sum(normalized_axes, keepdims, track_grad=False) / Scalar[
+            dtype
+        ](count)
 
         if self.requires_grad:
-            out.requires_grad = True
-            out.init_gradbox()
+            out.requires_grad_(True)
             backward_fn = MeanBackward[dtype](
                 normalized_axes.copy(), keepdims
             ).into_backward_fn()
@@ -1942,52 +1944,19 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn free(owned self):
         # fn __del__(owned self):
-        if not self.owns_data:
-            alive_count = (
-                self.keep_alive.value().count() if self.keep_alive else 0
-            )
-            log_debug(
-                "Tensor__del__ → non-owning tensor got deleted - keep alive"
-                " count: "
-                + alive_count.__str__()
-            )
-            self.buffer.free()
-            self.shape.free()
-            self.strides.free()
-            if self.has_grad():
-                for i in range(self.numels()):
-                    (self.gradbox + i).destroy_pointee()
-                self.gradbox.free()
-            self.ancestors.free()
-            _ = self^
-
-        elif (
-            self.owns_data
-            and self.keep_alive
-            and self.keep_alive.value().count() > 1
-        ):
-            log_debug(
-                "Tensor__del__ → can not delete - has outstanding references -"
-                " keep alive count: "
-                + self.keep_alive.value().count().__str__()
-            )
-            return
-
-        else:
-            log_debug(
-                "Tensor__del__ → freeing up resources - keep alive count: "
-                + self.keep_alive.value().count().__str__()
-            )
-
-            if self.has_grad():
-                for i in range(self.numels()):
-                    (self.gradbox + i).destroy_pointee()
-                self.gradbox.free()
-                log_debug("Tensor__del__ → freed grad")
-            self.shape.free()
-            self.strides.free()
-            self.ancestors.free()
-            self.buffer.free()
+        log_debug(
+            "Tensor__del__ → deleting tensor with id: " + self.id().__str__()
+        )
+        log_debug("Tensor owns data? " + self.owns_data.__str__())
+        self.buffer.free()
+        self.shape.free()
+        self.strides.free()
+        self.ancestors.free()
+        if self.has_grad():
+            for i in range(self.numels()):
+                (self.gradbox + i).destroy_pointee()
+            self.gradbox.free()
+            log_debug("Tensor__del__ → freed grad")
         _ = self^
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
@@ -2012,6 +1981,7 @@ struct Tensor[dtype: DType = DType.float32](
         cols_b = B.cols()
         C = Tensor[dtype].zeros(rows_a, cols_b)
         is_b_contiguous = B.is_contiguous()
+        # print(A.is_contiguous(), B.is_contiguous() , A.owns_data , B.owns_data)
 
         for i in range(rows_a):
             for k in range(0, cols_b, simd_width):
@@ -2030,10 +2000,12 @@ struct Tensor[dtype: DType = DType.float32](
                     if is_b_contiguous:
                         # Direct vector load from contiguous memory
                         b_offset = j * cols_b + k
-                        b_vec = b_vec.insert(B.buffer.load[simdwidth=simd_width](b_offset))
+                        b_vec = b_vec.insert(
+                            B.buffer.load[simdwidth=simd_width](b_offset)
+                        )
                     else:
                         # Manual gathering for non-contiguous B
-                        #var b_vec = SIMD[dtype, simd_width](0)
+                        # var b_vec = SIMD[dtype, simd_width](0)
                         for w in range(process_width):
                             b_vec[w] = B.load(j, k + w)
 
@@ -2046,14 +2018,15 @@ struct Tensor[dtype: DType = DType.float32](
                     # Full vector store - optimal case
                     C.buffer.store[simdwidth=simd_width](
                         c_offset,
-                        C.buffer.load[simdwidth=simd_width](c_offset) + accumulator
+                        C.buffer.load[simdwidth=simd_width](c_offset)
+                        + accumulator,
                     )
                 else:
                     # Tail handling - extract individual elements from SIMD
                     for w in range(process_width):
                         current = C.load(i, k + w)
                         C.store(i, k + w, current + accumulator[w])
-        _="""for i in range(rows_a):
+        _ = """for i in range(rows_a):
             for j in range(cols_a):
                 scalar_a = A.load(i, j)
 
@@ -2142,13 +2115,12 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    cols = 5
-    for i in range(0, cols, 10):
-        print("Do I come here?", i, cols - i)
+    g = Tensor.d2([[1.0, 1.0], [1.0, 1.0]])
+    b_t = Tensor.d2([[5.0, 7.0], [6.0, 8.0]])
+    a_grad = g.matmul(b_t)
+    a_grad.print()
 
-    s = SIMD[DType.float32, 4](0)
-    print("simd: ", s)
-    test_tensorlite_inner_tensor_requires_grad()
+    # test_tensorlite_inner_tensor_requires_grad()
     # test_flat_view_chain_backprop()
     _ = """test_reshape_backward()
     test_reshape_exp()
