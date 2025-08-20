@@ -15,8 +15,6 @@ struct MatmulBackward[dtype: DType](Copyable & Movable & Stringable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.gradients()[]
-        print("gradients")
-        gradients.print()
         var grad_outputs: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []

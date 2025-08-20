@@ -53,7 +53,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.buffer = Buffer[dtype].Empty
         self.owns_data = False
         self._contiguous = False
-        self._contiguous = self.is_contiguous()
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -148,7 +147,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         if self.shape.rank() == 0:
             return True  # scalar is trivially contiguous
-
+        if not self.owns_data:
+            return False
         var expected_stride = 1
         for i in reversed(range(self.shape.rank())):
             #if self.shape[i] > 1 and self.strides[i] != expected_stride:
@@ -156,7 +156,7 @@ struct Tensor[dtype: DType = DType.float32](
                 return False
             expected_stride *= self.shape[i]
 
-        # Final safety: check that the last element maps to the last buffer slot
+            _="""# Final safety: check that the last element maps to the last buffer slot
         numels = self.numels()
         max_offset = self.offset
         for i in range(self.shape.rank()):
@@ -170,7 +170,7 @@ struct Tensor[dtype: DType = DType.float32](
                 continue
             for j in range(i+1, len(self.shape)):
                 if self.shape[j] > 1 and self.strides[i] == self.strides[j]:
-                    return False
+                    return False"""
         return True
 
     fn is_tensor(self) -> Bool:
@@ -1073,7 +1073,9 @@ struct Tensor[dtype: DType = DType.float32](
         out.shape = shape
         out.strides = strides
         out.offset = abs_offset
-        out._contiguous = out.is_contiguous()
+        out.owns_data = False
+        #out._contiguous = out.is_contiguous()
+        out._contiguous = False
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
@@ -2009,6 +2011,9 @@ struct Tensor[dtype: DType = DType.float32](
         C = Tensor[dtype].zeros(rows_a, cols_b)
         is_b_contiguous = B.is_contiguous()
         # print(A.is_contiguous(), B.is_contiguous() , A.owns_data , B.owns_data)
+        print("B.is_contiguous() =", is_b_contiguous)
+        print("B.owns_data =", B.owns_data)
+        print("B.strides =", B.strides)
 
         for i in range(rows_a):
             for k in range(0, cols_b, simd_width):
@@ -2032,10 +2037,15 @@ struct Tensor[dtype: DType = DType.float32](
                         )
                     else:
                         # Manual gathering for non-contiguous B
-                        # var b_vec = SIMD[dtype, simd_width](0)
+                        #var b_vec = SIMD[dtype, simd_width](0)
                         for w in range(process_width):
-                            b_vec[w] = B.load(j, k + w)
-
+                            b_idx = j * B.strides[0] + (k + w) * B.strides[1] + B.offset
+                            #b_vec[w] = B.load(j, k + w)
+                            value = B.buffer.load(b_idx)
+                            print("  w=", w, "b_idx=", b_idx, "value=", value)
+                            #b_vec[w] = B.buffer.load(b_idx)
+                            b_vec[w] = value
+                    print("  Final b_vec:", b_vec)
                     # Fused multiply-add operation
                     accumulator += SIMD[dtype, simd_width](a_val) * b_vec
 
@@ -2051,8 +2061,11 @@ struct Tensor[dtype: DType = DType.float32](
                 else:
                     # Tail handling - extract individual elements from SIMD
                     for w in range(process_width):
-                        current = C.load(i, k + w)
-                        C.store(i, k + w, current + accumulator[w])
+                        c_idx = i * C.strides[0] + (k + w) * C.strides[1]
+                        #current = C.load(i, k + w)
+                        current = C.buffer.load(c_idx)
+                        #C.store(i, k + w, current + accumulator[w])
+                        C.buffer.store(c_idx, current + accumulator[w])
         _ = """for i in range(rows_a):
             for j in range(cols_a):
                 scalar_a = A.load(i, j)
