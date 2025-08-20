@@ -138,12 +138,39 @@ struct Tensor[dtype: DType = DType.float32](
             self.gradbox.init_pointee_move(gradbox^)
             self.zero_grad()
 
-    fn is_contiguous(self) -> Bool:
+            _="""fn is_contiguous(self) -> Bool:
         var expected_stride = 1
         for i in reversed(range(self.shape.rank())):
             if self.strides[i] != expected_stride:
                 return False
             expected_stride *= self.shape[i]
+        return True"""
+    fn is_contiguous(self) -> Bool:
+        if self.shape.rank() == 0:
+            return True  # scalar is trivially contiguous
+
+        var expected_stride = 1
+        for i in reversed(range(self.shape.rank())):
+            #if self.shape[i] > 1 and self.strides[i] != expected_stride:
+            if self.strides[i] != expected_stride:
+                return False
+            expected_stride *= self.shape[i]
+
+        # Final safety: check that the last element maps to the last buffer slot
+        numels = self.numels()
+        max_offset = self.offset
+        for i in range(self.shape.rank()):
+            #if self.shape[i] > 0:
+            max_offset += (self.shape[i] - 1) * self.strides[i]
+
+        if not max_offset - self.offset + 1 == numels:
+            return False
+        for i in range(len(self.shape)):
+            if self.shape[i] <= 1:
+                continue
+            for j in range(i+1, len(self.shape)):
+                if self.shape[j] > 1 and self.strides[i] == self.strides[j]:
+                    return False
         return True
 
     fn is_tensor(self) -> Bool:
