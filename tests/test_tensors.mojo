@@ -167,9 +167,7 @@ fn test_matmul_view_tensor() raises:
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
     var b = Tensor.d2([[5.0], [6.0]])
     var view_a = a.view(shape=[2, 2], strides=[2, 1], offset=0)
-    print("view_a contiguous? ", view_a.is_contiguous())
     var out = view_a.matmul(b)
-    out.print()
     assert_true((out == Tensor.d2([[17.0], [39.0]])).all_true())
 
 
@@ -180,6 +178,7 @@ fn test_matmul_view_view() raises:
     var view_a = a.view(shape=[2, 2], strides=[2, 1], offset=0)
     var view_b = b.view(shape=[2, 1], strides=[1, 1], offset=0)
     var out = view_a.matmul(view_b)
+    out.print()
     assert_true((out == Tensor.d2([[17.0], [39.0]])).all_true())
     _ = a
     _ = b
