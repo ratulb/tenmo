@@ -2194,7 +2194,9 @@ struct Tensor[dtype: DType = DType.float32](
             C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
 
         return C
-
+    @staticmethod
+    fn mat(this: Tensor[dtype], that: Tensor[dtype]) -> Tensor[dtype]:
+        return this.matmulx(UnsafePointer(to=that))
 
 fn main() raises:
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
@@ -2220,7 +2222,8 @@ fn main() raises:
             print("av idx, data: (", i, j, ") ", av.load(i, j))
     print()
 
-    out = av.matmulx(UnsafePointer(to=b))
+    #out = av.matmulx(UnsafePointer(to=b))
+    out = Tensor.mat(av, b)
     out.print()
 
     print("\nThis is b's view for all you know\n")
