@@ -137,13 +137,6 @@ struct Tensor[dtype: DType = DType.float32](
             self.gradbox.init_pointee_move(gradbox^)
             self.zero_grad()
 
-            _="""fn is_contiguous(self) -> Bool:
-        var expected_stride = 1
-        for i in reversed(range(self.shape.rank())):
-            if self.strides[i] != expected_stride:
-                return False
-            expected_stride *= self.shape[i]
-        return True"""
     fn is_contiguous(self) -> Bool:
         if self.shape.rank() == 0:
             return True  # scalar is trivially contiguous
@@ -151,26 +144,10 @@ struct Tensor[dtype: DType = DType.float32](
             return False
         var expected_stride = 1
         for i in reversed(range(self.shape.rank())):
-            #if self.shape[i] > 1 and self.strides[i] != expected_stride:
-            if self.strides[i] != expected_stride:
+            if self.shape[i] > 1 and self.strides[i] != expected_stride:
                 return False
             expected_stride *= self.shape[i]
 
-            _="""# Final safety: check that the last element maps to the last buffer slot
-        numels = self.numels()
-        max_offset = self.offset
-        for i in range(self.shape.rank()):
-            #if self.shape[i] > 0:
-            max_offset += (self.shape[i] - 1) * self.strides[i]
-
-        if not max_offset - self.offset + 1 == numels:
-            return False
-        for i in range(len(self.shape)):
-            if self.shape[i] <= 1:
-                continue
-            for j in range(i+1, len(self.shape)):
-                if self.shape[j] > 1 and self.strides[i] == self.strides[j]:
-                    return False"""
         return True
 
     fn is_tensor(self) -> Bool:
@@ -956,11 +933,7 @@ struct Tensor[dtype: DType = DType.float32](
                 " single-element loads are permitted for non-contiguous tensor"
             )
 
-        addr = (
-            row * self.strides[0]
-            + col * self.strides[1]
-            + 0 if self.owns_data else self.offset
-        )
+        addr = row * self.strides[0] + col * self.strides[1] + self.offset
         return self.buffer.load[simdwidth](
             addr
         ) if self.owns_data else self.base_address()[].buffer.load[simdwidth](
@@ -993,11 +966,7 @@ struct Tensor[dtype: DType = DType.float32](
                 " single-element stores are permitted for non-contiguous tensor"
             )
 
-        addr = (
-            row * self.strides[0]
-            + col * self.strides[1]
-            + 0 if self.owns_data else self.offset
-        )
+        addr = row * self.strides[0] + col * self.strides[1] + self.offset
 
         self.buffer.store[simdwidth](
             addr, value
@@ -1074,8 +1043,8 @@ struct Tensor[dtype: DType = DType.float32](
         out.strides = strides
         out.offset = abs_offset
         out.owns_data = False
-        #out._contiguous = out.is_contiguous()
-        out._contiguous = False
+        out._contiguous = out.is_contiguous()
+        # out._contiguous = False
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
@@ -2001,7 +1970,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.init_gradbox()
 
-    fn matmul[
+    fn matmul2[
         simd_width: Int = simdwidthof[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         Validator.validate_matrix_shapes(A, B)
@@ -2010,10 +1979,6 @@ struct Tensor[dtype: DType = DType.float32](
         cols_b = B.cols()
         C = Tensor[dtype].zeros(rows_a, cols_b)
         is_b_contiguous = B.is_contiguous()
-        # print(A.is_contiguous(), B.is_contiguous() , A.owns_data , B.owns_data)
-        print("B.is_contiguous() =", is_b_contiguous)
-        print("B.owns_data =", B.owns_data)
-        print("B.strides =", B.strides)
 
         for i in range(rows_a):
             for k in range(0, cols_b, simd_width):
@@ -2025,27 +1990,38 @@ struct Tensor[dtype: DType = DType.float32](
 
                 for j in range(cols_a):
                     # Load scalar from A
-                    a_val = A.load(i, j)
-
+                    # a_val = A.load(i, j)
+                    a_idx = i * A.strides[0] + j * A.strides[1] + A.offset
+                    a_val = A.buffer.load(a_idx)
                     # Load vector from B (optimized for contiguity)
                     var b_vec = SIMD[dtype, simd_width](0)
                     if is_b_contiguous:
                         # Direct vector load from contiguous memory
-                        b_offset = j * cols_b + k
+                        # b_offset = j * cols_b + k
+                        b_offset = (
+                            (j * cols_b) * B.strides[0]
+                            + k * A.strides[1]
+                            + B.offset
+                        )
                         b_vec = b_vec.insert(
                             B.buffer.load[simdwidth=simd_width](b_offset)
                         )
+                        # b_vec = B.buffer.load[simdwidth=simd_width](b_offset)
                     else:
                         # Manual gathering for non-contiguous B
-                        #var b_vec = SIMD[dtype, simd_width](0)
+                        # var b_vec = SIMD[dtype, simd_width](0)
                         for w in range(process_width):
-                            b_idx = j * B.strides[0] + (k + w) * B.strides[1] + B.offset
-                            #b_vec[w] = B.load(j, k + w)
+                            b_idx = (
+                                j * B.strides[0]
+                                + (k + w) * B.strides[1]
+                                + B.offset
+                            )
+                            # b_vec[w] = B.load(j, k + w)
                             value = B.buffer.load(b_idx)
                             print("  w=", w, "b_idx=", b_idx, "value=", value)
-                            #b_vec[w] = B.buffer.load(b_idx)
+                            # b_vec[w] = B.buffer.load(b_idx)
                             b_vec[w] = value
-                    print("  Final b_vec:", b_vec)
+                    # print("  Final b_vec:", b_vec)
                     # Fused multiply-add operation
                     accumulator += SIMD[dtype, simd_width](a_val) * b_vec
 
@@ -2062,9 +2038,9 @@ struct Tensor[dtype: DType = DType.float32](
                     # Tail handling - extract individual elements from SIMD
                     for w in range(process_width):
                         c_idx = i * C.strides[0] + (k + w) * C.strides[1]
-                        #current = C.load(i, k + w)
+                        # current = C.load(i, k + w)
                         current = C.buffer.load(c_idx)
-                        #C.store(i, k + w, current + accumulator[w])
+                        # C.store(i, k + w, current + accumulator[w])
                         C.buffer.store(c_idx, current + accumulator[w])
         _ = """for i in range(rows_a):
             for j in range(cols_a):
@@ -2089,6 +2065,65 @@ struct Tensor[dtype: DType = DType.float32](
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
             C.backwardFn = Optional(backward_fn)
             C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
+
+        return C
+
+    fn matmul1[
+        simd_width: Int = simdwidthof[dtype]()
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+        Validator.validate_matrix_shapes(A, B)
+        rows_a = A.rows()
+        cols_a = A.cols()
+        cols_b = B.cols()
+        C = Tensor[dtype].zeros(rows_a, cols_b)
+        is_b_contiguous = B.is_contiguous()
+
+        for i in range(rows_a):
+            for k in range(0, cols_b, simd_width):
+                remaining = cols_b - k
+                process_width = min(remaining, simd_width)
+
+                # Initialize accumulator for this output segment
+                var accumulator = SIMD[dtype, simd_width](0)
+
+                for j in range(cols_a):
+                    # Load scalar from A using strides (works for both contiguous and non-contiguous)
+                    a_idx = i * A.strides[0] + j * A.strides[1] + A.offset
+                    a_val = A.buffer.load(a_idx)
+
+                    # Load vector from B (optimized for contiguity)
+                    var b_vec = SIMD[dtype, simd_width](0)
+                    if is_b_contiguous:
+                        # Direct vector load from contiguous memory
+                        b_offset = j * cols_b + k
+                        b_vec = b_vec.insert(
+                            B.buffer.load[simdwidth=simd_width](b_offset)
+                        )
+                    else:
+                        # Manual gathering for non-contiguous B with zero-padding
+                        for w in range(simd_width):
+                            if w < process_width:
+                                # Valid element - load from B
+                                b_idx = (
+                                    j * B.strides[0]
+                                    + (k + w) * B.strides[1]
+                                    + B.offset
+                                )
+                                b_val = B.buffer.load(b_idx)
+                                # b_vec = b_vec.insert(SIMD[dtype, 1](b_val), w)
+                                b_vec[w] = b_val
+                            else:
+                                # Zero padding for unused lanes
+                                b_vec[w] = 0
+
+                    # Fused multiply-add operation
+                    accumulator += SIMD[dtype, simd_width](a_val) * b_vec
+
+                # Store result with proper tail handling
+                for w in range(process_width):
+                    c_idx = i * C.strides[0] + (k + w) * C.strides[1]
+                    current = C.buffer.load(c_idx)
+                    C.buffer.store(c_idx, current + accumulator[w])
 
         return C
 
@@ -2153,12 +2188,97 @@ struct Tensor[dtype: DType = DType.float32](
 
         """
 
+    fn matmul[
+        simd_width: Int = simdwidthof[dtype]()
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+        Validator.validate_matrix_shapes(A, B)
+
+        m = A.rows()  # rows of A / C
+        kN = A.cols()  # cols of A == rows of B
+        p = B.cols()  # cols of B / C
+
+        # We assume C is freshly allocated -> contiguous in last dim.
+        C = Tensor[dtype].zeros(m, p)
+
+        # We only care if B is contiguous **in its last dimension** (columns),
+        # because we vectorize over j. No need to care about A's contiguity.
+        b_lastdim_contig = B.is_contiguous()
+
+        for i in range(m):
+            for k in range(kN):
+                a_val = A.load(i, k)
+
+                if b_lastdim_contig:
+                    # -------- FAST PATH: B[k, j..] is contiguous => true SIMD loads
+                    @parameter
+                    fn muladd_fast[width: Int](j0: Int):
+                        # base offsets for this block
+                        b_off = B.offset + k * B.strides[0] + j0 * B.strides[1]
+                        c_off = C.offset + i * C.strides[0] + j0 * C.strides[1]
+
+                        # vector load from B, broadcast a, fused update into C
+                        vb = B.buffer.load[simdwidth=width](b_off)
+                        va = SIMD[dtype, width](a_val)
+                        vc = C.buffer.load[simdwidth=width](c_off)
+                        C.buffer.store[simdwidth=width](c_off, vc + va * vb)
+
+                    vectorize[muladd_fast, simd_width](p)
+
+                else:
+                    # -------- SLOW PATH: arbitrary B layout => gather per lane
+                    # Still chunk by `width` with vectorize (for unrolling + tail)
+                    @parameter
+                    fn muladd_gather[width: Int](j0: Int):
+                        # Update C block lane-by-lane using scalar B loads.
+                        # This keeps correctness without forcing a copy.
+                        for lane in range(width):
+                            j = j0 + lane
+                            if j >= p:
+                                break
+                            b_elt = B.load(k, j)  # stride-aware scalar
+                            c_old = C.load(
+                                i, j
+                            )  # stride-aware scalar (contiguous by design)
+                            C.store(i, j, c_old + a_val * b_elt)
+
+                    vectorize[muladd_gather, simd_width](p)
+
+        requires_grad = A.requires_grad or B.requires_grad
+        if requires_grad:
+            C.requires_grad = True
+            C.init_gradbox()
+            backward_fn = MatmulBackward[dtype]().into_backward_fn()
+            C.backwardFn = Optional(backward_fn)
+            C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
+
+        return C
+
 
 fn main() raises:
-    g = Tensor.d2([[1.0, 1.0], [1.0, 1.0]])
-    b_t = Tensor.d2([[5.0, 7.0], [6.0, 8.0]])
-    a_grad = g.matmul(b_t)
-    a_grad.print()
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
+    var b = Tensor.d2([[5.0], [6.0]])
+    var av = a.view(shape=[2, 2], strides=[2, 1], offset=0)
+    print("\nThis is a's view for all you know\n")
+    av.print()
+    print()
+    print(
+        "av.owns_data, av._contiguous, av.is_contiguous: ",
+        av.owns_data,
+        av._contiguous,
+        av.is_contiguous(),
+    )
+    print()
+
+    print("\nav data\n")
+    for i in range(av.rows()):
+        for j in range(av.cols()):
+            idx = i * av.strides[0] + j * av.strides[1] + av.offset
+            print("av idx, data: ", idx, av.base_address()[].buffer.load(idx))
+            print("av idx, data: (", i, j, ") ", av.load(i, j))
+    print()
+
+    out = av.matmul(b)
+    out.print()
 
     # test_tensorlite_inner_tensor_requires_grad()
     # test_flat_view_chain_backprop()
