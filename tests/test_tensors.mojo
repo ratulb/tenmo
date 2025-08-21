@@ -568,11 +568,10 @@ fn test_transpose_gradients() raises:
     # Case 2: Transpose + reshape with non-square
     a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2, 3)
     b = a.transpose()
-    r = b.reshape(Shape.of(2, 3))  # (3, 2) → (2, 3)  #revisit
+    r = b.reshape(Shape.of(2, 3))  # (3, 2) → (2, 3)
     s = r.sum()
     s.backward()
     assert_true((a.gradbox[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())
-    
 
     # Case 3: Chain transposes (A.T().T())
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
@@ -634,11 +633,10 @@ fn test_reshape_grad_flow() raises:
     assert_true(a.gradbox[].shape == Shape.of(0,))"""
 
     # Case 7: Non-contiguous reshape
-    _ = """a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
-    b = a.T().reshape(Shape.of(2, 3))  # Tests view tracking  #revisit
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    b = a.transpose().reshape(Shape.of(2, 3))  # Tests view tracking
     b.sum().backward()
-    a.gradbox[].print()
-    assert_true((a.gradbox[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())"""
+    assert_true((a.gradbox[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())
 
     # === Advanced Cases ===
     # Case 8: Chained reshapes
@@ -689,7 +687,7 @@ fn test_reshape_gradient() raises:
     assert_grad(a, Tensor.d1([10, 20, 30, 40]), "1D → 2D → 1D grad")
     _ = b
     _ = c
- 
+
     # 3. Reshape 2D to 1D and multiply
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)  # shape (2,2)
     b = a.reshape(
@@ -702,7 +700,7 @@ fn test_reshape_gradient() raises:
     assert_grad(a, Tensor.d2([[10, 20], [30, 40]]), "2D → 1D grad")
     _ = b
     _ = c
- 
+
     # 4. Reshape 3D to 1D and back
     a = Tensor.d3(
         [[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True
@@ -1901,6 +1899,7 @@ fn test_reshape() raises:
     _ = tensor2
     _ = tensor3
 
+
 fn test_tensor_multiplications() raises:
     print("test_tensor_multiplications")
     test_scalar_mul_scalar()
@@ -2004,7 +2003,7 @@ fn test_transpose_grad() raises:
     print("test_transpose_grad")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var b = a.transpose()
-    var c = b * Tensor.d2([[10, 30], [20, 40]]) #revisit
+    var c = b * Tensor.d2([[10, 30], [20, 40]])
     s = c.sum()
     s.backward()
     assert_true(a.gradbox[].all_close(Tensor.d2([[10, 20], [30, 40]])))
@@ -2750,6 +2749,7 @@ fn test_empty_tensor() raises:
     assert_true(s.item() == min_finite[DType.float32]())
     assert_true(a.gradbox[].shape == Shape.Void)
 
+
 fn test_tensorlite_inner_tensor_requires_grad() raises:
     a = Tensor.rand(2, 7, requires_grad=True)
     tensorlite = TensorLite.of(a)
@@ -3141,6 +3141,7 @@ fn test_reshape_exp() raises:
     result = tensor3 * 12
     result.backward()
 
+
 fn main() raises:
     print("Starting tensor test cases")
     test_reshape_gradient_2d()
@@ -3245,7 +3246,7 @@ fn main() raises:
     # View tensor multiplication
     test_matmul_scalar_output()
     test_matmul_tensor_tensor()
-    #test_matmul_tensor_view()
+    # test_matmul_tensor_view()
     test_matmul_view_tensor()
     test_matmul_view_view()
     test_matmul_transposed_tensor_tensor()
@@ -3304,5 +3305,3 @@ fn main() raises:
     test_view_of_view()
     test_sum_all()
     print("Finished running tensor test cases")
-
-
