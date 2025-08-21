@@ -46,6 +46,27 @@ struct Buffer[dtype: DType = DType.float32](
     fn __len__(self) -> Int:
         return self.size
 
+    fn __getitem__(self, slice: Slice) -> Buffer[dtype]:
+        var start, end, step = slice.indices(len(self))
+        var spread = range(start, end, step)
+
+        if not len(spread):
+            return Buffer[dtype].Empty
+
+        # Calculate the correct size based on the actual number of elements
+        var result_size = len(spread)
+        var result = Buffer[dtype](result_size)
+
+        # Use consecutive indices for the result buffer
+        var result_index = 0
+        for i in spread:
+            result[result_index] = self[
+                i
+            ]  # Copy the element from source to result
+            result_index += 1
+
+        return result^
+
     fn __getitem__(self, index: Int) -> Scalar[dtype]:
         return self.data.load[width=1, volatile=True](index)
 
@@ -913,8 +934,15 @@ struct Buffer[dtype: DType = DType.float32](
         log_debug("Buffer__del__ → freed data pointees")
         _ = this^
 
+    @staticmethod
+    fn of(elems: List[Scalar[dtype]]) -> Buffer[dtype]:
+        buffer = Buffer[dtype](len(elems))
+        memcpy(buffer.data, elems.data, len(elems))
+        return buffer^
+
 
 fn main() raises:
+    test_buffer_slice()
     test_buffer_buffer_mul()
     test_buffer_buffer_add()
     test_buffer_buffer_mul()
@@ -936,6 +964,15 @@ fn main() raises:
 
 
 from testing import assert_true, assert_false
+
+
+fn test_buffer_slice() raises:
+    buff = Buffer.of([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    print(buff)
+    sliced = buff[1::2]
+    for i in range(len(sliced)):
+        print(sliced[i])
+    print(sliced)
 
 
 fn test_buffer_buffer_mul() raises:
