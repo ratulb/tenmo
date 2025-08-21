@@ -4,6 +4,7 @@ from algorithm import vectorize, parallelize
 from sys import simdwidthof
 from shapes import Shape
 from os import abort
+from buffers import Buffer
 
 # from runtime.asyncrt import num_physical_cores
 from sys import num_logical_cores, num_physical_cores
@@ -136,27 +137,21 @@ fn __tensor_op_scalar__[
     fn powered_by_scalar[simd_width: Int](idx: Int):
         out.buffer.store[simdwidth=simd_width](
             idx,
-            this.buffer.load[simdwidth=simd_width](idx).__pow__(
-                scalar
-            ),
+            this.buffer.load[simdwidth=simd_width](idx).__pow__(scalar),
         )
 
     @parameter
     fn div_by_factor[simd_width: Int](idx: Int):
         out.buffer.store[simdwidth=simd_width](
             idx,
-            this.buffer.load[simdwidth=simd_width](idx).__truediv__(
-                scalar
-            ),
+            this.buffer.load[simdwidth=simd_width](idx).__truediv__(scalar),
         )
 
     @parameter
     fn divide_scalar[simd_width: Int](idx: Int):
         out.buffer.store[simdwidth=simd_width](
             idx,
-            this.buffer.load[simdwidth=simd_width](idx).__rtruediv__(
-                scalar
-            ),
+            this.buffer.load[simdwidth=simd_width](idx).__rtruediv__(scalar),
         )
 
     if op == MulScalar:
@@ -223,6 +218,51 @@ fn tensor_compare_scalar[
 
     vectorize[compare_elems, simdwidthof[DType.bool]()](result.numels())
     return result
+
+
+alias messages = {Equal: "__eq__", NotEqual: "__ne__"}
+
+
+@fieldwise_init
+struct Comparator(Copyable):
+    @staticmethod
+    fn compare[
+        dtype: DType, //, op: Int
+    ](this: Tensor[dtype], that: Tensor[dtype]) -> Tensor[DType.bool]:
+        if this.shape != that.shape:
+            panic(
+                "Tensor compare → Dimension mismatch:",
+                this.shape.__str__(),
+                ",",
+                that.shape.__str__(),
+            )
+        var this_buffer: Buffer[dtype] = Buffer[dtype].Empty
+        var that_buffer: Buffer[dtype] = Buffer[dtype].Empty
+        if this.is_contiguous() and that.is_contiguous():
+            if this.owns_data and that.owns_data:
+                this_buffer = this.buffer
+                that_buffer = that.buffer
+            elif this.owns_data and not that.owns_data:
+                this_buffer = this.buffer
+                that_buffer = that.base_address()[].buffer[
+                    that.offset : that.offset + that.numels()
+                ]
+            elif not this.owns_data and that.owns_data:
+                this_buffer = this.base_address()[].buffer[
+                    this.offset : this.offset + this.numels()
+                ]
+                that_buffer = that.buffer
+            else:
+                this_buffer = this.base_address()[].buffer[
+                    this.offset : this.offset + this.numels()
+                ]
+                that_buffer = that.base_address()[].buffer[
+                    that.offset : that.offset + that.numels()
+                ]
+        if op == Equal:
+            return Tensor[DType.bool](this.shape, (this_buffer == that_buffer), False)
+
+        return Tensor[DType.bool].scalar(False)
 
 
 fn tensor_compare[
@@ -301,4 +341,15 @@ fn sum_all[dtype: DType, //](input: Tensor[dtype]) -> Scalar[dtype]:
 
 
 fn main() raises:
-    pass
+    this = Tensor.d1([1, 5, 3, 5])
+    this_view = this[1::]
+    that = Tensor.d1([1, 2, 3, 4])
+    that_view = that.view(shape=[3], offset=1)
+    this_view.print()
+    print()
+    that_view.print()
+    print()
+    cmp = Comparator.compare[Equal](this_view, that_view)
+    cmp.print()
+    _ = this
+    _ = that
