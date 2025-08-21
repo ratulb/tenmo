@@ -46,6 +46,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn __len__(self) -> Int:
         return self.size
 
+    fn __iter__(ref self) -> Iterator[dtype, __origin_of(self)]:
+        return Iterator(0, Pointer(to=self))
+
     fn __getitem__(self, slice: Slice) -> Buffer[dtype]:
         var start, end, step = slice.indices(len(self))
         var spread = range(start, end, step)
@@ -941,7 +944,34 @@ struct Buffer[dtype: DType = DType.float32](
         return buffer^
 
 
+struct Iterator[
+    dtype: DType,
+    origin: Origin[False],
+](Sized & Copyable):
+    var index: Int
+    var src: Pointer[Buffer[dtype], origin]
+
+    fn __init__(out self, idx: Int, src: Pointer[Buffer[dtype], origin]):
+        self.src = src
+        self.index = idx
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(mut self) -> Scalar[dtype]:
+        self.index += 1
+        return self.src[][self.index - 1]
+
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        return self.__len__() > 0
+
+    fn __len__(self) -> Int:
+        return len(self.src[]) - self.index
+
+
 fn main() raises:
+    test_buffer_iter()
     test_buffer_slice()
     test_buffer_buffer_mul()
     test_buffer_buffer_add()
@@ -966,13 +996,22 @@ fn main() raises:
 from testing import assert_true, assert_false
 
 
+fn test_buffer_iter() raises:
+    buff = Buffer.of([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    sliced = buff[4:1:-1]
+    var expect = 5
+    for elem in sliced:
+        assert_true(elem == expect, "Buffer iter assertion failed")
+        expect -= 1
+
+
 fn test_buffer_slice() raises:
     buff = Buffer.of([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    print(buff)
-    sliced = buff[1::2]
-    for i in range(len(sliced)):
-        print(sliced[i])
-    print(sliced)
+    sliced = buff[4:1:-2]
+    assert_true(
+        (sliced == Buffer.of([5, 3])).all_true(),
+        "Buffer slicing assertion failed",
+    )
 
 
 fn test_buffer_buffer_mul() raises:
