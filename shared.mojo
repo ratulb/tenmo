@@ -54,6 +54,10 @@ struct TensorLite[dtype: DType](
         return Int(self.tensor_address)
 
     @always_inline
+    fn inner_address(self) -> UnsafePointer[Tensor[dtype]]:
+        return self.tensor_address
+
+    @always_inline
     fn tensor(self) -> Tensor[dtype]:
         return self.tensor_address[]
 
