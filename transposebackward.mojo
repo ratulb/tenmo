@@ -44,9 +44,17 @@ struct TransposeBackward[dtype: DType](Copyable & Movable & Stringable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.gradients()[]
+        print("here\n")
+
+        gradients.print()
+        print()
         ancestor = output.ancestry().get(0)[]
         inverted_axes = IntList.invert_permutation(self.axes)
-        grad_transposed = gradients.transpose(inverted_axes)
+        print("inverted axes, self.axes: ", inverted_axes, self.axes)
+        #grad_transposed = gradients.transpose(inverted_axes)
+        grad_transposed = gradients.transpose(self.axes)
+        print("The following is grad transposed!")
+        grad_transposed.print()
         return [
             (
                 ancestor,

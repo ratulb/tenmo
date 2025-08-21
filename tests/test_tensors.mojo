@@ -6,6 +6,8 @@ from intlist import IntList
 from shapes import Shape
 from common_utils import *
 from utils.numerics import min_finite
+from operators import AddTensor
+from shared import TensorLite
 
 
 fn test_shared_tensor_twice() raises:
@@ -178,7 +180,6 @@ fn test_matmul_view_view() raises:
     var view_a = a.view(shape=[2, 2], strides=[2, 1], offset=0)
     var view_b = b.view(shape=[2, 1], strides=[1, 1], offset=0)
     var out = view_a.matmul(view_b)
-    out.print()
     assert_true((out == Tensor.d2([[17.0], [39.0]])).all_true())
     _ = a
     _ = b
@@ -358,10 +359,7 @@ fn test_broadcast_2d_1d_mul() raises:
     var b = Tensor.d1([5.0, 6.0], requires_grad=True).to_dtype[DType.float32]()
 
     var c = a * b  # broadcasts b along rows
-    c.print()
     summ = c.sum()
-    summ.print()
-
     summ.backward()
 
     assert_true((c == Tensor.d2([[5.0, 12.0], [15.0, 24.0]])).all_true())
@@ -430,11 +428,7 @@ fn test_unsqueeze() raises:
     print("test_unsqueeze")
     _ = """tensor = Tensor.rand(2,3, requires_grad=True)
     tensor2 = tensor.unsqueeze(0)
-    tensor.print()
-    tensor2.target[].print()
-    tensor2[IntList(0, 0, 0)] = 100
-    tensor.print()
-    tensor2.target[].print()"""
+    tensor2[IntList(0, 0, 0)] = 100"""
     pass
 
 
@@ -573,9 +567,12 @@ fn test_transpose_gradients() raises:
 
     # Case 2: Transpose + reshape with non-square
     a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2, 3)
-    # b = a.transpose().reshape(Shape.of(2, 3))  # (3, 2) → (2, 3)  #revisit
-    # b.sum().backward()
-    # assert_true((a.gradbox[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())
+    b = a.transpose()
+    r = b.reshape(Shape.of(2, 3))  # (3, 2) → (2, 3)  #revisit
+    s = r.sum()
+    s.backward()
+    assert_true((a.gradbox[] == Tensor.d2([[1, 1, 1], [1, 1, 1]])).all_true())
+    
 
     # Case 3: Chain transposes (A.T().T())
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
@@ -676,9 +673,9 @@ fn test_reshape_gradient() raises:
     c = b.reshape(Shape.of(1))  # back to scalar
     d = c * Tensor.scalar(2)
     d.backward()
-    a.gradbox[].print()
     assert_grad(a, Tensor.scalar(2), "scalar reshape chain → a")
-
+    _ = b
+    _ = c
     # 2. Reshape 1D → 2D → back to 1D
     a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
     b = a.reshape(Shape.of(2, 2))
@@ -688,11 +685,11 @@ fn test_reshape_gradient() raises:
         )
     )
     d = c * Tensor.d1([10, 20, 30, 40])
-    # d.backward()
     d.backward()
-    a.gradbox[].print()
     assert_grad(a, Tensor.d1([10, 20, 30, 40]), "1D → 2D → 1D grad")
-
+    _ = b
+    _ = c
+ 
     # 3. Reshape 2D to 1D and multiply
     a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)  # shape (2,2)
     b = a.reshape(
@@ -703,7 +700,9 @@ fn test_reshape_gradient() raises:
     c = b * Tensor.d1([10, 20, 30, 40])
     c.backward()
     assert_grad(a, Tensor.d2([[10, 20], [30, 40]]), "2D → 1D grad")
-
+    _ = b
+    _ = c
+ 
     # 4. Reshape 3D to 1D and back
     a = Tensor.d3(
         [[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True
@@ -721,7 +720,6 @@ fn test_reshape_gradient() raises:
         ]
     )
     d.backward()
-    a.gradbox[].print()
     assert_grad(
         a,
         Tensor.d3(
@@ -732,14 +730,15 @@ fn test_reshape_gradient() raises:
         ),
         "3D reshape roundtrip grad",
     )
-
+    _ = b
+    _ = c
     # 5. Reshape + sum + broadcast backward
     a = Tensor.d1([1, 2, 3, 4], requires_grad=True)  # shape (4,)
     b = a.reshape(Shape.of(2, 2))
     c = b.sum()  # scalar
     c.backward()
     assert_grad(a, Tensor.d1([1, 1, 1, 1]), "reshape → sum → backward")
-
+    _ = b
     # 6. Reshape with degenerate axis: (4,) → (1, 4) → (4,)
     a = Tensor.d1([5, 6, 7, 8], requires_grad=True)
     b = a.reshape(Shape.of(1, 4))
@@ -750,23 +749,22 @@ fn test_reshape_gradient() raises:
     )
     d = c * Tensor.d1([1, 2, 3, 4])
     d.backward()
-    a.gradbox[].print()
-    a.print()
     assert_grad(a, Tensor.d1([1, 2, 3, 4]), "reshape with (1,4) roundtrip")
     assert_true(
         (a.gradbox[] == Tensor.d1([1, 2, 3, 4])).all_true(),
         "reshape with (1,4) roundtrip",
     )
-
+    _ = c
+    _ = b
     # 7. Reshape then broadcast in op
     a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
     b = a.reshape(Shape.of(2, 2))
     c = b + Tensor.scalar(10)  # broadcast add
     d = c.sum()
     d.backward()
-    a.gradbox[].print()
     assert_grad(a, Tensor.d1([1, 1, 1, 1]), "reshape + broadcast add + sum")
-
+    _ = b
+    _ = c
     _ = """# 8. Illegal reshape (shape mismatch) — should raise error
     try:
         a = Tensor.d1([1, 2, 3, 4])
@@ -1114,7 +1112,6 @@ fn test_broadcast_sub() raises:
         "3D - 2D → a",
     )
     assert_grad(b, Tensor.d2([[-2.0, -2.0], [-2.0, -2.0]]), "3D - 2D → b")
-    c.print()
     do_assert(
         c,
         Tensor.d3(
@@ -1760,7 +1757,6 @@ fn test_arange() raises:
 fn test_random() raises:
     print("test_random")
     rand_tensor = Tensor.rand(10)
-    rand_tensor.print()
 
     fn each(e: Scalar[DType.float32]) -> Bool:
         return e >= 0 and e < 1
@@ -1892,24 +1888,18 @@ fn test_reshape() raises:
     result.backward()
     assert_true(tensor.gradbox[].item() == 3.0)
     tensor2 = tensor.reshape(1)
-    tensor.gprint()
     result = tensor2 * 42
-    tensor.gprint()
-    tensor2.gprint()
 
     result.backward()
-    tensor.gprint()
-    tensor2.gprint()
 
     tensor3 = tensor2.reshape(1, 1, 1, 1, 1)
     result = tensor3 * 12
 
     result.backward()
 
-    tensor3.gprint()
-    tensor2.gprint()
-    tensor.gprint()
-
+    _ = tensor
+    _ = tensor2
+    _ = tensor3
 
 fn test_tensor_multiplications() raises:
     print("test_tensor_multiplications")
@@ -1986,8 +1976,6 @@ fn test_matmul_shapes() raises:
     var mm = m1.matmul(m2)
     ss = mm.sum()
     ss.backward()
-    m1.gradbox[].print()
-    m2.gradbox[].print()
     assert_true(mm.all_close(Tensor.d2([[19, 22], [43, 50]])))
     assert_true(m1.gradbox[].all_close(Tensor.d2([[11, 15], [11, 15]])))
     assert_true(m2.gradbox[].all_close(Tensor.d2([[4, 4], [6, 6]])))
@@ -2016,9 +2004,13 @@ fn test_transpose_grad() raises:
     print("test_transpose_grad")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
     var b = a.transpose()
-    _ = """var c = b * Tensor.d2([[10, 30], [20, 40]]) #revisit
-    c.sum().backward()
-    assert_true(a.gradbox[].all_close(Tensor.d2([[10, 20], [30, 40]])))"""
+    var c = b * Tensor.d2([[10, 30], [20, 40]]) #revisit
+    s = c.sum()
+    s.backward()
+    assert_true(a.gradbox[].all_close(Tensor.d2([[10, 20], [30, 40]])))
+    _ = c
+    _ = b
+    _ = a
 
 
 fn test_scalar_div_tensor() raises:
@@ -2562,7 +2554,6 @@ fn test_reshape_gradient_2d() raises:
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var b = a.reshape(Shape.of(4))  # Flatten
     b.backward()
-    a.gradbox[].print()
     assert_true(
         a.gradbox[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])),
         "∂b/∂a should be ones reshaped",
@@ -2599,7 +2590,6 @@ fn test_reshape_noop() raises:
     var m = Tensor.d2([[5.0, 6.0]], requires_grad=True)
     var reshaped = m.reshape(Shape.of(1, 2))  # No shape change
     reshaped.backward()
-    m.gradbox[].print()
     assert_true(
         m.gradbox[].all_close(Tensor.d2([[1.0, 1.0]])),
         "No-op reshape still propagates grad",
@@ -2760,6 +2750,396 @@ fn test_empty_tensor() raises:
     assert_true(s.item() == min_finite[DType.float32]())
     assert_true(a.gradbox[].shape == Shape.Void)
 
+fn test_tensorlite_inner_tensor_requires_grad() raises:
+    a = Tensor.rand(2, 7, requires_grad=True)
+    tensorlite = TensorLite.of(a)
+    inner = tensorlite.tensor()
+    inner.requires_grad = False
+    assert_true(
+        inner.requires_grad == False
+        and tensorlite.tensor().requires_grad
+        and tensorlite.requires_grad()
+        and a.requires_grad
+    )
+
+
+fn test_flat_view_chain_backprop() raises:
+    print("test_flat_view_chain_backprop")
+    var a = Tensor.arange(10, requires_grad=True)
+    var v1 = a.view([4, 2], offset=2)
+    var v2 = v1.view([2, 4])
+    var v3 = v2.view([8])
+    v3.backward()
+    # assert_eq(a.grad[], Tensor.ones_like(a).slice(2, 10).pad_left(2))
+    assert_true(
+        (a.gradbox[] == Tensor.of(0, 0, 1, 1, 1, 1, 1, 1, 1, 1)).all_true()
+    )
+    a.free()
+
+
+fn test_reshape_backward() raises:
+    print("test_reshape_backward")
+    a = Tensor.d2([[1, 2, 3]], requires_grad=True)
+    r = a.reshape(3)
+    b = r + 100
+    c = r + 200
+    d = b + c
+    d.backward()
+
+    assert_true(
+        (a.gradients()[] == Tensor.d2([[2, 2, 2]])).all_true(),
+        "Tensor view reshape grad assertion failed",
+    )
+    _ = r
+    _ = b
+    _ = c
+    _ = d
+    _ = a
+
+
+fn test_add_backward() raises:
+    print("test_add_backward")
+    A1 = Tensor.d2([[1, 2, 3]], requires_grad=True)
+    AV = A1.into_view()
+    AV.backward(3)
+    AV.backward()
+    AV.backward()
+    assert_true(
+        (A1.gradients()[] == Tensor.d2([[5, 5, 5]])).all_true(),
+        "Tensor view backward 4 times grad assertion failed",
+    )
+
+    a = Tensor.d2([[1, 2, 3]], requires_grad=True)
+    b = Tensor.d1([1, 2, 3], requires_grad=True)
+    c = a + b
+    d = b + a
+    e = c + d
+    e.backward(26)
+    assert_true(
+        (a.gradients()[] == Tensor.d2([[52, 52, 52]])).all_true(),
+        "2D + 1D grad assertion 1 failed",
+    )
+    assert_true(
+        (b.gradients()[] == Tensor.d1([52, 52, 52])).all_true(),
+        "2D + 1D grad assertion 2 failed",
+    )
+    _ = """print("After first pass a, b, c, d, e grads")
+    a.gradients()[].print()
+    print()
+    b.gradients()[].print()
+    print()
+    c.gradients()[].print()
+    print()
+    d.gradients()[].print()
+    print()
+    e.gradients()[].print()
+    print()"""
+
+    ev = e.into_view()
+
+    ev.backward()
+    _ = """print("After second pass a, b, c, d, e, ev grads")
+    a.gradients()[].print()
+    print()
+    b.gradients()[].print()
+    print()
+    c.gradients()[].print()
+    print()
+    d.gradients()[].print()
+    print()
+    e.gradients()[].print()
+    print()
+    ev.gradients()[].print()"""
+
+    assert_true(
+        (a.gradients()[] == Tensor.d2([[158, 158, 158]])).all_true(),
+        "2D + 1D grad assertion 3 failed",
+    )
+    assert_true(
+        (b.gradients()[] == Tensor.d1([158, 158, 158])).all_true(),
+        "2D + 1D grad assertion 4 failed",
+    )
+    _ = a
+    _ = b
+    _ = c
+    _ = d
+    _ = e
+    _ = ev
+
+
+fn test_reshape_backward_scalar() raises:
+    print("test_reshape_backward_scalar")
+    a = Tensor.scalar(100, requires_grad=True)
+    r = a.reshape()
+    v = r.into_view()
+    v.backward(42)
+    assert_true(
+        a.gradients()[].item() == 42,
+        "reshape -> view -> scalar grad assertion failed",
+    )
+    _ = r
+    _ = a
+
+
+fn test_add_tensor_and_view() raises:
+    print("test_add_tensor_and_view")
+    a = Tensor.full(Shape.of(3, 3), 2)
+    av = a.into_view()
+    expected = Tensor.full(Shape.of(3, 3), 4)
+    assert_true(
+        (a + av == expected).all_true(),
+        "add tensor and view assertion 1 failed",
+    )
+
+    expected = Tensor.full(Shape.of(3, 3), 84)
+
+    c = Tensor.full(Shape.of(3, 1), 42)
+    cv = c.into_view()
+    d = Tensor.full(Shape.of(1, 3), 42)
+    dv = d.into_view()
+    cvdv = cv + dv
+    assert_true((cvdv == expected).all_true(), "add views assertion 1 failed")
+    expected = Tensor.full(Shape.of(3, 3), 44)
+    assert_true(
+        (a + cv == expected).all_true(),
+        "add tensor and view assertion 2 failed",
+    )
+    _ = c
+
+    a = Tensor.full(Shape.of(2, 1, 3), 2)
+    av = a.into_view()
+    b = Tensor.full(Shape.of(3, 1), 2)
+    bv = b.into_view()
+    expected = Tensor.full(Shape.of(2, 3, 3), 4)
+    assert_true(
+        (av + bv == expected).all_true(), "add views assertion 2 failed"
+    )
+    assert_true(
+        (bv + av == expected).all_true(), "add views assertion 3 failed"
+    )
+    assert_true(
+        (b + av == expected).all_true(),
+        "add tensor and view assertion 3 failed",
+    )
+    assert_true(
+        (bv + a == expected).all_true(),
+        "add tensor and view assertion 4 failed",
+    )
+    _ = a
+    _ = b
+
+
+fn test_add_tensors() raises:
+    print("test_add_tensors")
+    a = Tensor.full(Shape.of(3, 3), 2)
+    b = Tensor.full(Shape.of(3, 3), 42)
+    expected = Tensor.full(Shape.of(3, 3), 44)
+    assert_true(
+        (a + b == expected).all_true(), "add tensors assertion 1 failed"
+    )
+
+    c = Tensor.full(Shape.of(3, 1), 42)
+    assert_true(
+        (a + c == expected).all_true(), "add tensors assertion 2 failed"
+    )
+    d = Tensor.full(Shape.of(1, 3), 42)
+    assert_true(
+        (a + d == expected).all_true(), "add tensors assertion 3 failed"
+    )
+
+    expected = Tensor.full(Shape.of(3, 3), 84)
+    assert_true(
+        (c + d == expected).all_true(), "add tensors assertion 4 failed"
+    )
+
+    expected = Tensor.full(Shape.of(3, 3), 4)
+    assert_true(
+        (a + a == expected).all_true(), "add tensors assertion 5 failed"
+    )
+
+    a = Tensor.full(Shape.of(2, 1, 3), 2)
+    b = Tensor.full(Shape.of(3, 1), 2)
+    expected = Tensor.full(Shape.of(2, 3, 3), 4)
+    assert_true(
+        (a + b == expected).all_true(), "add tensors assertion 5 failed"
+    )
+    assert_true(
+        (b + a == expected).all_true(), "add tensors assertion 5 failed"
+    )
+
+
+fn test_add_scalar() raises:
+    print("test_add_scalar")
+    a = Tensor.full(Shape.of(3, 3), 2)
+    b = a + 3
+    c = 3 + a
+    expected = Tensor.full(Shape.of(3, 3), 5)
+    assert_true((b == expected).all_true(), "add scalar assertion failed")
+    assert_true((c == expected).all_true(), "__radd__ scalar assertion failed")
+
+
+fn test_subtract_scalar() raises:
+    print("test_subtract_scalar")
+    a = Tensor.full(Shape.of(3, 3), 5)
+    b = a - 3
+    c = 7 - a
+    expected = Tensor.full(Shape.of(3, 3), 2)
+    assert_true((b == expected).all_true(), "subtract scalar assertion failed")
+    assert_true((c == expected).all_true(), "__rsub__ scalar assertion failed")
+
+
+fn test_powering() raises:
+    print("test_powering")
+    a = Tensor.full(Shape.of(3, 3), 2)
+    b = a**3
+    expected = Tensor.full(Shape.of(3, 3), 8)
+    assert_true((b == expected).all_true(), "pow assertion failed")
+
+
+fn test_invert() raises:
+    print("test_invert")
+    a = Tensor[DType.bool].full(Shape.of(3, 3), True)
+    b = ~a
+    expected = Tensor[DType.bool].full(Shape.of(3, 3), False)
+    assert_true((b == expected).all_true(), "invertion assertion failed")
+    assert_true((~b == a).all_true(), "invertion assertion 2 failed")
+
+
+fn test_negate_absolute() raises:
+    print("test_negate_absolute")
+    a = Tensor[DType.float32].full(Shape.of(3, 3), 42)
+    negated = -a
+    expected = Tensor.full(Shape.of(3, 3), -42)
+    assert_true((negated == expected).all_true(), "negation assertion failed")
+    assert_true((negated.__abs__() == a).all_true(), "__abs__ assertion failed")
+    assert_true((abs(negated) == a).all_true(), "abs assertion failed")
+
+
+fn test_inplace_update() raises:
+    print("test_inplace_update")
+    a = Tensor.zeros(3, 3)
+    b = Tensor.full(Shape.of(3, 3), 42)
+    a += b
+    assert_true((a == b).all_true(), "inplace tensor update assertion failed")
+
+
+fn test_exponentiation() raises:
+    print("test_exponentiation")
+    a = Tensor.full(Shape.of(3, 3), 2)
+    expected = Tensor.full(Shape.of(3, 3), 7.38905).float()
+    b = a.exp()
+    assert_true(b.all_close(expected), "exponentiation assertion failed")
+
+
+fn test_grad_update() raises:
+    print("test_grad_update")
+    a = Tensor.rand(3, 4, requires_grad=True)
+    v = a.into_view()
+    v.init_gradbox()
+    grad = Tensor.full(Shape.of(3, 4), 42)
+    v.update_grad[AddTensor](grad)
+    assert_true(
+        (v.gradients()[] == grad).all_true(),
+        "update_grad assertion failed",
+    )
+
+
+fn test_sum_all() raises:
+    print("test_sum_all")
+    a = Tensor.arange(3 * 4 * 5).reshape(3, 4, 5)
+    v = a.view(shape=Shape.of(2, 5, 5), offset=5)
+    v2 = a.view(shape=[3, 5, 4], strides=[20, 1, 5], offset=0)
+    v3 = a.view(shape=[3, 5, 3], strides=[15, 1, 3], offset=15)
+    v4 = v3.view(shape=[5, 3], offset=15)
+    v5 = v3.view(shape=[3, 5], strides=[1, 3], offset=15)
+    s3 = v4.sum_all()
+    s4 = v4.sum_all()
+    s5 = v5.sum_all()
+    assert_true(
+        s3 == s4 and s4 == s5 and s5 == 555, "view sum_all assertion failed"
+    )
+    assert_true(v._contiguous and v4._contiguous, "contiguity assertion failed")
+    assert_true(
+        v.sum_all() == 1475,
+        "non-owning contiguous tensor sum_all assertion failed",
+    )
+    assert_true(
+        a.sum_all()[0] == 1770, "owning tensor sum_all assertion failed"
+    )
+    assert_true(
+        v2.sum_all()[0] == 1770,
+        "owning tensor non-contiguous sum_all assertion failed",
+    )
+
+
+fn test_view_of_view() raises:
+    print("test_view_of_view")
+    a = Tensor.scalar(10)
+    v1 = a.into_view()
+    v2 = v1.view(shape=Shape.Void, strides=Strides.Zero, offset=0)
+    v3 = v2.view(shape=Shape.Void, strides=Strides.Zero, offset=0)
+    v4 = v3.view(shape=Shape.Void, strides=Strides.Zero, offset=0)
+    assert_true(v2.item() == 10, "view's view(v2) - item() assertion failed")
+    assert_true(v3.item() == 10, "view's view(v3) - item() assertion failed")
+    assert_true(v4.item() == 10, "view's view(v4) - item() assertion failed")
+    _ = a
+
+
+fn test_scalar_indexing() raises:
+    print("test_scalar_indexing")
+    a = Tensor.scalar(10)
+    v = a.into_view()
+    v1 = a.into_view()
+    index = a.flatten_index([])
+    assert_true(index == 0, "scalar indexing failed")
+    idx = List[Int]()
+    assert_true(a.__getitem__(idx) == 10, "scalar indexing get failed")
+    assert_true(a[[]] == 10, "scalar indexing get list literal failed")
+    a[[]] = 100
+    assert_true(
+        a[[]] == 100, "scalar indexing get after set list literal failed"
+    )
+    assert_true(a.item() == 100, "scalar indexing item call failed")
+    assert_true(v.item() == 100, "scalar indexing on view - item call failed")
+    assert_true(
+        v1.item() == 100, "scalar indexing on view 1 - item call failed"
+    )
+
+
+fn test_grads_on_tensor_init() raises:
+    print("test_grads_on_tensor_init")
+    a = Tensor(6, 3, 4, requires_grad=True)
+    b = Tensor(6, 3, 4)
+    assert_true(
+        a.has_grad() and a.grad_is_zero() and not b.has_grad(),
+        "Initialization grad assertions failed",
+    )
+    b.fill(42)
+    a.seed_grad(b)
+    grad = Tensor.full(a.shape, 42)
+
+    result = a.gradbox[] == grad
+    result2 = result.all_true()
+
+    assert_true(result2, "grad and expected does not match")
+    assert_true(not a.grad_is_zero(), "grad seeding assertion failed")
+    a.zero_grad()
+    assert_true(a.grad_is_zero(), "zero grad assertion failed")
+
+
+fn test_reshape_exp() raises:
+    print("test_reshape_exp")
+    tensor = Tensor.scalar(42, requires_grad=True)
+    result = tensor * 3
+    result.backward()
+    assert_true(tensor.gradbox[].item() == 3.0)
+    tensor2 = tensor.reshape(1)
+    result = tensor2 * 42
+
+    result.backward()
+    tensor3 = tensor2.reshape(1, 1, 1, 1, 1)
+    result = tensor3 * 12
+    result.backward()
 
 fn main() raises:
     print("Starting tensor test cases")
@@ -2799,7 +3179,6 @@ fn main() raises:
     # test_grad_copy_on_reshape()
     test_mean()
     test_arange()
-    test_reshape()
     test_scalar_tensor()
     test_sum()
     test_item()
@@ -2904,4 +3283,26 @@ fn main() raises:
     test_scalar_div_tensor_2d()
     test_empty_tensor()
     test_large_tensor_backprop()
+    test_tensorlite_inner_tensor_requires_grad()
+    test_flat_view_chain_backprop()
+    test_reshape_backward()
+    test_reshape_exp()
+    test_add_backward()
+    test_reshape_backward_scalar()
+    test_add_tensor_and_view()
+    test_add_tensors()
+    test_subtract_scalar()
+    test_add_scalar()
+    test_powering()
+    test_invert()
+    test_negate_absolute()
+    test_exponentiation()
+    test_inplace_update()
+    test_grad_update()
+    test_grads_on_tensor_init()
+    test_scalar_indexing()
+    test_view_of_view()
+    test_sum_all()
     print("Finished running tensor test cases")
+
+

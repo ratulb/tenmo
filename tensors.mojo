@@ -938,11 +938,6 @@ struct Tensor[dtype: DType = DType.float32](
             return self.buffer.load[simdwidth](addr)
         else:
             return self.base_address()[].buffer.load[simdwidth](addr)
-            _ = """return self.buffer.load[simdwidth](
-            addr
-        ) if self.owns_data else self.base_address()[].buffer.load[simdwidth](
-            addr
-        )"""
 
     @always_inline
     fn store[
@@ -1250,7 +1245,8 @@ struct Tensor[dtype: DType = DType.float32](
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
-
+        print("out")
+        out.print()
         if grad_required:
             out.requires_grad_(True)
             backward_fn = TransposeBackward[dtype](
@@ -1974,104 +1970,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.init_gradbox()
 
-    fn matmul2[
-        simd_width: Int = simdwidthof[dtype]()
-    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        Validator.validate_matrix_shapes(A, B)
-        rows_a = A.rows()
-        cols_a = A.cols()
-        cols_b = B.cols()
-        C = Tensor[dtype].zeros(rows_a, cols_b)
-        is_b_contiguous = B.is_contiguous()
-
-        for i in range(rows_a):
-            for k in range(0, cols_b, simd_width):
-                remaining = cols_b - k
-                process_width = min(remaining, simd_width)
-
-                # Initialize accumulator for this output segment
-                var accumulator = SIMD[dtype, simd_width](0)
-
-                for j in range(cols_a):
-                    # Load scalar from A
-                    # a_val = A.load(i, j)
-                    a_idx = i * A.strides[0] + j * A.strides[1] + A.offset
-                    a_val = A.buffer.load(a_idx)
-                    # Load vector from B (optimized for contiguity)
-                    var b_vec = SIMD[dtype, simd_width](0)
-                    if is_b_contiguous:
-                        # Direct vector load from contiguous memory
-                        # b_offset = j * cols_b + k
-                        b_offset = (
-                            (j * cols_b) * B.strides[0]
-                            + k * A.strides[1]
-                            + B.offset
-                        )
-                        b_vec = b_vec.insert(
-                            B.buffer.load[simdwidth=simd_width](b_offset)
-                        )
-                        # b_vec = B.buffer.load[simdwidth=simd_width](b_offset)
-                    else:
-                        # Manual gathering for non-contiguous B
-                        # var b_vec = SIMD[dtype, simd_width](0)
-                        for w in range(process_width):
-                            b_idx = (
-                                j * B.strides[0]
-                                + (k + w) * B.strides[1]
-                                + B.offset
-                            )
-                            # b_vec[w] = B.load(j, k + w)
-                            value = B.buffer.load(b_idx)
-                            print("  w=", w, "b_idx=", b_idx, "value=", value)
-                            # b_vec[w] = B.buffer.load(b_idx)
-                            b_vec[w] = value
-                    # print("  Final b_vec:", b_vec)
-                    # Fused multiply-add operation
-                    accumulator += SIMD[dtype, simd_width](a_val) * b_vec
-
-                # Store result with proper tail handling
-                c_offset = i * cols_b + k
-                if process_width == simd_width:
-                    # Full vector store - optimal case
-                    C.buffer.store[simdwidth=simd_width](
-                        c_offset,
-                        C.buffer.load[simdwidth=simd_width](c_offset)
-                        + accumulator,
-                    )
-                else:
-                    # Tail handling - extract individual elements from SIMD
-                    for w in range(process_width):
-                        c_idx = i * C.strides[0] + (k + w) * C.strides[1]
-                        # current = C.load(i, k + w)
-                        current = C.buffer.load(c_idx)
-                        # C.store(i, k + w, current + accumulator[w])
-                        C.buffer.store(c_idx, current + accumulator[w])
-        _ = """for i in range(rows_a):
-            for j in range(cols_a):
-                scalar_a = A.load(i, j)
-
-                @parameter
-                fn mul_add[width: Int](k: Int):
-                    vectorized_a = SIMD[dtype, width](scalar_a)
-                    vector_b = B.load[simdwidth=width](j, k)
-                    product = vectorized_a * vector_b
-                    offset = i * cols_b + k
-                    C.buffer.store[simdwidth=width](
-                        offset,
-                        C.buffer.load[simdwidth=width](offset) + product,
-                    )
-
-                vectorize[mul_add, simd_width](cols_b)"""
-        requires_grad = A.requires_grad or B.requires_grad
-        if requires_grad:
-            C.requires_grad = True
-            C.init_gradbox()
-            backward_fn = MatmulBackward[dtype]().into_backward_fn()
-            C.backwardFn = Optional(backward_fn)
-            C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
-
-        return C
-
     fn matmul[
         simd_width: Int = simdwidthof[dtype]()
     ](A: Tensor[dtype], B: UnsafePointer[Tensor[dtype]]) -> Tensor[dtype]:
@@ -2119,7 +2017,7 @@ struct Tensor[dtype: DType = DType.float32](
             C.add_ancestry(TensorLite.of(B))
         return C
 
-    fn matmul0[
+    fn _matmul[
         simd_width: Int = simdwidthof[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         Validator.validate_matrix_shapes(A, B)
@@ -2188,71 +2086,19 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-    var b = Tensor.d2([[5.0], [6.0]], requires_grad=True)
-    var av = a.view(shape=[2, 2], strides=[2, 1], offset=0)
-    var bv = b.view(shape=[2, 1], strides=[1, 1], offset=0)
-    _ = """print("\nThis is a's view for all you know\n")
-    av.print()
-    print()
-    print(
-        "av.owns_data, av._contiguous, av.is_contiguous: ",
-        av.owns_data,
-        av._contiguous,
-        av.is_contiguous(),
-    )
-    print()
-
-    print("\nav data\n")
-    for i in range(av.rows()):
-        for j in range(av.cols()):
-            idx = i * av.strides[0] + j * av.strides[1] + av.offset
-            print("av idx, data: ", idx, av.base_address()[].buffer.load(idx))
-            print("av idx, data: (", i, j, ") ", av.load(i, j))"""
-    print()
-
-    out = av.matmul(UnsafePointer(to=bv))
-    # out = av.matmul(UnsafePointer(to=b))
-    # out = a.matmul(b)
-    out.print()
-    print()
+    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    var b = a.transpose()
+    var c = b * Tensor.d2([[10, 30], [20, 40]]) #revisit
+    s = c.sum()
+    s.backward()
     a.gradbox[].print()
-    print()
-    b.gradbox[].print()
-    print()
-    out.backward()
-    print()
-    a.gradbox[].print()
-    print()
-    b.gradbox[].print()
-    print()
-    # _ = a
-    # _ = b
-    _ = """print("\nThis is b's view for all you know\n")
-    bv.print()
-    print()
-    print(
-        "bv.owns_data, bv._contiguous, bv.is_contiguous: ",
-        bv.owns_data,
-        bv._contiguous,
-        bv.is_contiguous(),
-    )
-    print()
+    assert_true(a.gradbox[].all_close(Tensor.d2([[10, 20], [30, 40]])))
 
-    print("\nbv data\n")
-    for i in range(bv.rows()):
-        for j in range(bv.cols()):
-            idx = i * bv.strides[0] + j * bv.strides[1] + bv.offset
-            print("bv idx, data: ", idx, bv.base_address()[].buffer.load(idx))
-            print("bv idx, data: (", i, j, ") ", bv.load(i, j))
-    print()
 
-    out = av.matmul(bv)
-    out.print()"""
 
-    # test_tensorlite_inner_tensor_requires_grad()
-    # test_flat_view_chain_backprop()
-    _ = """test_reshape_backward()
+    _="""test_tensorlite_inner_tensor_requires_grad()
+    test_flat_view_chain_backprop()
+    test_reshape_backward()
     test_reshape_exp()
     test_add_backward()
     test_reshape_backward_scalar()
