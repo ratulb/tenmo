@@ -140,8 +140,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         if self.shape.rank() == 0:
             return True  # scalar is trivially contiguous
-        #if not self.owns_data:
-            #return False
+        # if not self.owns_data:
+        # return False
         var expected_stride = 1
         for i in reversed(range(self.shape.rank())):
             if self.shape[i] > 1 and self.strides[i] != expected_stride:
@@ -938,7 +938,7 @@ struct Tensor[dtype: DType = DType.float32](
             return self.buffer.load[simdwidth](addr)
         else:
             return self.base_address()[].buffer.load[simdwidth](addr)
-            _="""return self.buffer.load[simdwidth](
+            _ = """return self.buffer.load[simdwidth](
             addr
         ) if self.owns_data else self.base_address()[].buffer.load[simdwidth](
             addr
@@ -1114,7 +1114,6 @@ struct Tensor[dtype: DType = DType.float32](
             offset=offset,
             requires_grad=self.requires_grad,
         )
-
 
     fn __getitem__(self, *indices: Idx) -> Tensor[dtype]:
         # Compute view metadata
@@ -2073,17 +2072,14 @@ struct Tensor[dtype: DType = DType.float32](
 
         return C
 
-
-
-
-
-    fn matmulx[
+    fn matmul[
         simd_width: Int = simdwidthof[dtype]()
-    ](
-        A: Tensor[dtype],
-        B_ptr: UnsafePointer[Tensor[dtype]],
-    ) -> Tensor[dtype]:
-        B = B_ptr[]
+    ](A: Tensor[dtype], B: UnsafePointer[Tensor[dtype]]) -> Tensor[dtype]:
+        return A.matmul[simd_width](B[])
+
+    fn matmul[
+        simd_width: Int = simdwidthof[dtype]()
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         Validator.validate_matrix_shapes(A, B)
         rows_a = A.shape[0]
         cols_a = A.shape[1]
@@ -2115,20 +2111,15 @@ struct Tensor[dtype: DType = DType.float32](
 
         requires_grad = A.requires_grad or B.requires_grad
         if requires_grad:
-            pass
-            _="""C.requires_grad = True
+            C.requires_grad = True
             C.init_gradbox()
             backward_fn = MatmulBackward[dtype]().into_backward_fn()
             C.backwardFn = Optional(backward_fn)
             C.add_ancestry(TensorLite.of(A))
-            C.add_ancestry(TensorLite.of(B))"""
-
+            C.add_ancestry(TensorLite.of(B))
         return C
 
-
-
-
-    fn matmul[
+    fn matmul0[
         simd_width: Int = simdwidthof[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         Validator.validate_matrix_shapes(A, B)
@@ -2147,7 +2138,7 @@ struct Tensor[dtype: DType = DType.float32](
         for i in range(m):
             for k in range(kN):
                 a_val = A.load(i, k)
-                #print("a_val: ", a_val, i, k)
+                # print("a_val: ", a_val, i, k)
                 if b_lastdim_contig:
                     # -------- FAST PATH: B[k, j..] is contiguous => true SIMD loads
                     @parameter
@@ -2159,8 +2150,8 @@ struct Tensor[dtype: DType = DType.float32](
                         # vector load from B, broadcast a, fused update into C
                         vb = B.buffer.load[simdwidth=width](b_off)
                         va = SIMD[dtype, width](a_val)
-                        #print(b_off, c_off, width, vb, va)
-                        #print(va)
+                        # print(b_off, c_off, width, vb, va)
+                        # print(va)
                         vc = C.buffer.load[simdwidth=width](c_off)
                         C.buffer.store[simdwidth=width](c_off, vc + va * vb)
 
@@ -2194,16 +2185,14 @@ struct Tensor[dtype: DType = DType.float32](
             C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
 
         return C
-    @staticmethod
-    fn mat(this: Tensor[dtype], that: Tensor[dtype]) -> Tensor[dtype]:
-        return this.matmulx(UnsafePointer(to=that))
+
 
 fn main() raises:
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
-    var b = Tensor.d2([[5.0], [6.0]])
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = Tensor.d2([[5.0], [6.0]], requires_grad=True)
     var av = a.view(shape=[2, 2], strides=[2, 1], offset=0)
     var bv = b.view(shape=[2, 1], strides=[1, 1], offset=0)
-    print("\nThis is a's view for all you know\n")
+    _ = """print("\nThis is a's view for all you know\n")
     av.print()
     print()
     print(
@@ -2219,14 +2208,27 @@ fn main() raises:
         for j in range(av.cols()):
             idx = i * av.strides[0] + j * av.strides[1] + av.offset
             print("av idx, data: ", idx, av.base_address()[].buffer.load(idx))
-            print("av idx, data: (", i, j, ") ", av.load(i, j))
+            print("av idx, data: (", i, j, ") ", av.load(i, j))"""
     print()
 
-    #out = av.matmulx(UnsafePointer(to=b))
-    out = Tensor.mat(av, b)
+    out = av.matmul(UnsafePointer(to=bv))
+    # out = av.matmul(UnsafePointer(to=b))
+    # out = a.matmul(b)
     out.print()
-
-    print("\nThis is b's view for all you know\n")
+    print()
+    a.gradbox[].print()
+    print()
+    b.gradbox[].print()
+    print()
+    out.backward()
+    print()
+    a.gradbox[].print()
+    print()
+    b.gradbox[].print()
+    print()
+    # _ = a
+    # _ = b
+    _ = """print("\nThis is b's view for all you know\n")
     bv.print()
     print()
     print(
@@ -2245,9 +2247,8 @@ fn main() raises:
             print("bv idx, data: (", i, j, ") ", bv.load(i, j))
     print()
 
-    out = av.matmulx(UnsafePointer(to=bv))
-    out.print()
-
+    out = av.matmul(bv)
+    out.print()"""
 
     # test_tensorlite_inner_tensor_requires_grad()
     # test_flat_view_chain_backprop()
