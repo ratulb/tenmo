@@ -15,8 +15,6 @@ from common_utils_imports import *
 from operators_imports import *
 from walkback import *
 from buffers import Buffer
-
-# from time import perf_counter_ns
 from shared import TensorLite
 
 
@@ -27,7 +25,6 @@ struct Tensor[dtype: DType = DType.float32](
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
     alias Blocks = List[Self.Block]
-    alias Empty = Tensor[dtype]()
     var shape: Shape
     var strides: Strides
     var offset: Int
@@ -40,26 +37,34 @@ struct Tensor[dtype: DType = DType.float32](
     var backwardFn: Optional[BackwardFn[dtype]]
     var owns_data: Bool
 
-    # An empty tensor - fill in the voids as required
-    fn __init__(out self):
-        self.shape = Shape.Void
-        self.strides = Strides.Zero
-        self.offset = 0
-        self.requires_grad = False
-        self.gradbox = UnsafePointer[Tensor[dtype]]()
-        self.base = UnsafePointer[Tensor[dtype]]()
-        self.backwardFn = None
-        self.ancestors = Ancestors[dtype].untracked()
-        self.buffer = Buffer[dtype].Empty
-        self.owns_data = False
-        self._contiguous = False
-
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
         self = Self(shape, requires_grad)
 
     fn __init__(out self, row: Self.Row, requires_grad: Bool = False):
         self = Self.d1(row, requires_grad=requires_grad)
+
+    fn __init__(
+        out self,
+        shape: Shape,
+        base: UnsafePointer[Tensor[dtype]],
+        strides: Optional[Strides] = None,
+        offset: Int = 0,
+        requires_grad: Bool = False,
+    ):
+        self.shape = shape
+        self.base = base
+        self.strides = strides.value() if strides else Strides.default(shape)
+        self.offset = offset
+        self.requires_grad = requires_grad
+        self.gradbox = UnsafePointer[Tensor[dtype]]()
+        self.backwardFn = None
+        self.ancestors = Ancestors[dtype].untracked()
+        self.buffer = Buffer[dtype].Empty
+        self.owns_data = False
+        self._contiguous = False
+        self._contiguous = self.is_contiguous()
+        self.init_gradbox()
 
     fn __init__(
         out self,
@@ -389,14 +394,22 @@ struct Tensor[dtype: DType = DType.float32](
         return Tensor[DType.bool](self.shape, self.buffer >= scalar, False)
 
     fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](
-            self.shape, self.buffer == other.buffer, False
+        s_buffer = (
+            self.buffer if self.owns_data else self.base_address()[].buffer
         )
+        o_buffer = (
+            other.buffer if other.owns_data else other.base_address()[].buffer
+        )
+        return Tensor[DType.bool](self.shape, s_buffer == o_buffer, False)
 
     fn __ne__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](
-            self.shape, self.buffer != other.buffer, False
+        s_buffer = (
+            self.buffer if self.owns_data else self.base_address()[].buffer
         )
+        o_buffer = (
+            other.buffer if other.owns_data else other.base_address()[].buffer
+        )
+        return Tensor[DType.bool](self.shape, s_buffer != o_buffer, False)
 
     fn __lt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.shape, self.buffer < other.buffer, False)
@@ -980,11 +993,7 @@ struct Tensor[dtype: DType = DType.float32](
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
-        out = Tensor[dtype].Empty
-        out.shape = shape
-        out.strides = strides
-        out.requires_grad_(grad_required)
-        out.base = self.address()
+        out = Tensor[dtype](shape, self.address(), strides, 0, grad_required)
 
         if grad_required:
             backward_fn = ViewBackward[dtype](
@@ -996,7 +1005,7 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn view(
-        self,
+        ref self,
         shape: Shape,
         strides: Strides,
         offset: Int = 0,
@@ -1037,18 +1046,14 @@ struct Tensor[dtype: DType = DType.float32](
             if lo < parent_lo or hi > parent_hi:
                 abort("Tensor → view: exceeds parent tensor's memory bounds")
 
-        var out = Tensor[dtype].Empty
-        out.shape = shape
-        out.strides = strides
-        out.offset = abs_offset
-        out.owns_data = False
-        out._contiguous = out.is_contiguous()
-        # out._contiguous = False
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
-        out.requires_grad_(grad_required)
-        out.base = self.address() if self.owns_data else self.base.copy()
+        base_addr = self.address() if self.owns_data else self.base.copy()
+
+        out = Tensor[dtype](
+            shape, base_addr, strides, abs_offset, grad_required
+        )
 
         if grad_required:
             backward_fn = ViewBackward[dtype](
@@ -2086,12 +2091,35 @@ from testing import assert_true
 
 
 fn main() raises:
-    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
-    var b = a.transpose()
-    var c = b * Tensor.d2([[10, 30], [20, 40]])  # revisit
-    s = c.sum()
+    var a = Tensor.arange(6, requires_grad=True)
+    r = a.reshape([2, 3])
 
-    a.gradbox[].print()
+    # Full slice
+    # var full_slice = r[s(), s()]
+    var full_slice = r[:, :]
+    assert_true((full_slice == r).all_true())
+    print("check 1")
+    # Row slice
+    var row = r[1, s()]
+    assert_true((row == Tensor([3, 4, 5])).all_true())
+
+    # Column slice with step
+    var col_step = r[s(), s(0, 3, 2)]
+    expect = Tensor.d2([[0, 2], [3, 5]])
+    assert_true((col_step == Tensor.d2([[0, 2], [3, 5]])).all_true())
+
+    print("check 2")
+    # Gradient check
+    var y = r[0:1, 1:3]
+    z = y.contiguous()
+    s = z.sum()
     s.backward()
-    a.gradbox[].print()
-    assert_true(a.gradbox[].all_close(Tensor.d2([[10, 20], [30, 40]])))
+    var expected_grad = Tensor.d2([[0, 1, 1], [0, 0, 0]])
+    assert_true((r.gradbox[] == expected_grad).all_true())
+
+    print("check 3")
+    s.free()
+    z.free()
+    y.free()
+    r.free()
+    a.free()
