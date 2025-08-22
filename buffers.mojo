@@ -562,7 +562,7 @@ struct Buffer[dtype: DType = DType.float32](
             cmp = lhs.load[simd_width](idx) == rhs.load[simd_width](idx)
             for k in range(simd_width):
                 out.store[simd_width](idx + k, cmp[idx + k])
-            # out.store[simd_width](idx, cmp)
+            #out.store[simd_width](idx, cmp)
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -595,7 +595,7 @@ struct Buffer[dtype: DType = DType.float32](
             out.store(k, lhs.load(k) != rhs.load(k))
         return out
 
-    fn __lt__[
+    fn __lt__[dtype: DType,
         simd_width: Int = simdwidthof[dtype]()
     ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Buffer[DType.bool]:
         if not lhs.size == rhs.size:
@@ -620,7 +620,7 @@ struct Buffer[dtype: DType = DType.float32](
             out.store(k, lhs.load(k) < rhs.load(k))
         return out
 
-    fn __le__[
+    fn __le__[dtype: DType,
         simd_width: Int = simdwidthof[dtype]()
     ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Buffer[DType.bool]:
         if not lhs.size == rhs.size:
@@ -645,7 +645,7 @@ struct Buffer[dtype: DType = DType.float32](
             out.store(k, lhs.load(k) <= rhs.load(k))
         return out
 
-    fn __gt__[
+    fn __gt__[dtype: DType,
         simd_width: Int = simdwidthof[dtype]()
     ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Buffer[DType.bool]:
         if not lhs.size == rhs.size:
@@ -670,7 +670,7 @@ struct Buffer[dtype: DType = DType.float32](
             out.store(k, lhs.load(k) > rhs.load(k))
         return out
 
-    fn __ge__[
+    fn __ge__[dtype: DType,
         simd_width: Int = simdwidthof[dtype]()
     ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Buffer[DType.bool]:
         if not lhs.size == rhs.size:

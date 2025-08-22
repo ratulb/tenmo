@@ -394,38 +394,64 @@ struct Tensor[dtype: DType = DType.float32](
         return Tensor[DType.bool](self.shape, self.buffer >= scalar, False)
 
     fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        s_buffer = (
-            self.buffer if self.owns_data else self.base_address()[].buffer
-        )
-        o_buffer = (
-            other.buffer if other.owns_data else other.base_address()[].buffer
-        )
-        return Tensor[DType.bool](self.shape, s_buffer == o_buffer, False)
+        if self.shape != other.shape:
+            panic(
+                "Tensor __eq__ → Dimension mismatch:",
+                self.shape.__str__(),
+                ",",
+                other.shape.__str__(),
+            )
+        return Comparator.compare[Equal](self, other)
 
     fn __ne__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        s_buffer = (
-            self.buffer if self.owns_data else self.base_address()[].buffer
-        )
-        o_buffer = (
-            other.buffer if other.owns_data else other.base_address()[].buffer
-        )
-        return Tensor[DType.bool](self.shape, s_buffer != o_buffer, False)
+        if self.shape != other.shape:
+            panic(
+                "Tensor __ne__ → Dimension mismatch:",
+                self.shape.__str__(),
+                ",",
+                other.shape.__str__(),
+            )
+        return Comparator.compare[NotEqual](self, other)
 
     fn __lt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.buffer < other.buffer, False)
+        if self.shape != other.shape:
+            panic(
+                "Tensor __lt__ → Dimension mismatch:",
+                self.shape.__str__(),
+                ",",
+                other.shape.__str__(),
+            )
+        return Comparator.compare[LessThan](self, other)
 
     fn __le__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](
-            self.shape, self.buffer <= other.buffer, False
-        )
+        if self.shape != other.shape:
+            panic(
+                "Tensor __le__ → Dimension mismatch:",
+                self.shape.__str__(),
+                ",",
+                other.shape.__str__(),
+            )
+        return Comparator.compare[LessThanEqual](self, other)
 
     fn __gt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.buffer > other.buffer, False)
+        if self.shape != other.shape:
+            panic(
+                "Tensor __gt__ → Dimension mismatch:",
+                self.shape.__str__(),
+                ",",
+                other.shape.__str__(),
+            )
+        return Comparator.compare[GreaterThan](self, other)
 
     fn __ge__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](
-            self.shape, self.buffer >= other.buffer, False
-        )
+        if self.shape != other.shape:
+            panic(
+                "Tensor __ge__ → Dimension mismatch:",
+                self.shape.__str__(),
+                ",",
+                other.shape.__str__(),
+            )
+        return Comparator.compare[GreaterThanEqual](self, other)
 
     fn float(self) -> Tensor[DType.float32]:
         if dtype == DType.float32:
@@ -2093,33 +2119,42 @@ from testing import assert_true
 fn main() raises:
     var a = Tensor.arange(6, requires_grad=True)
     r = a.reshape([2, 3])
-
+    r.print()
+    print()
     # Full slice
     # var full_slice = r[s(), s()]
     var full_slice = r[:, :]
     assert_true((full_slice == r).all_true())
-    print("check 1")
     # Row slice
     var row = r[1, s()]
     assert_true((row == Tensor([3, 4, 5])).all_true())
 
+    print("check 1")
     # Column slice with step
     var col_step = r[s(), s(0, 3, 2)]
+    print(
+        col_step.owns_data,
+        col_step.is_contiguous(),
+        col_step.base_address()[].buffer,
+        col_step.shape,
+    )
+    col_step.print()
     expect = Tensor.d2([[0, 2], [3, 5]])
-    assert_true((col_step == Tensor.d2([[0, 2], [3, 5]])).all_true())
+    assert_true((col_step == expect).all_true())
 
     print("check 2")
     # Gradient check
     var y = r[0:1, 1:3]
-    z = y.contiguous()
-    s = z.sum()
+    # z = y.contiguous()
+    s = y.sum()
     s.backward()
+    r.gradbox[].print()
     var expected_grad = Tensor.d2([[0, 1, 1], [0, 0, 0]])
     assert_true((r.gradbox[] == expected_grad).all_true())
 
     print("check 3")
     s.free()
-    z.free()
+    # z.free()
     y.free()
     r.free()
     a.free()

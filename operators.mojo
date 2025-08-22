@@ -325,7 +325,7 @@ struct Comparator(Copyable):
 
             if op == GreaterThanEqual:
                 for indices in this.shape:
-                    out[indices] = this[indices] => that[indices]
+                    out[indices] = this[indices] >= that[indices]
                 return out
 
         log_debug(

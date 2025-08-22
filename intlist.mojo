@@ -715,6 +715,11 @@ struct ZipIterator[
 
 
 fn main() raises:
+    ll = IntList.new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    sliced = ll[2::3]
+    print(sliced)
+
+
     test_negative_indices()
     test_any()
     inferred_dim = 10

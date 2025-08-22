@@ -22,4 +22,5 @@ from operators import (
     GreaterThanEqual,
     Subtract,
     Multiply,
+    Comparator,
 )
