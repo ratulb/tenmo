@@ -2117,44 +2117,4 @@ from testing import assert_true
 
 
 fn main() raises:
-    var a = Tensor.arange(6, requires_grad=True)
-    r = a.reshape([2, 3])
-    r.print()
-    print()
-    # Full slice
-    # var full_slice = r[s(), s()]
-    var full_slice = r[:, :]
-    assert_true((full_slice == r).all_true())
-    # Row slice
-    var row = r[1, s()]
-    assert_true((row == Tensor([3, 4, 5])).all_true())
-
-    print("check 1")
-    # Column slice with step
-    var col_step = r[s(), s(0, 3, 2)]
-    print(
-        col_step.owns_data,
-        col_step.is_contiguous(),
-        col_step.base_address()[].buffer,
-        col_step.shape,
-    )
-    col_step.print()
-    expect = Tensor.d2([[0, 2], [3, 5]])
-    assert_true((col_step == expect).all_true())
-
-    print("check 2")
-    # Gradient check
-    var y = r[0:1, 1:3]
-    # z = y.contiguous()
-    s = y.sum()
-    s.backward()
-    r.gradbox[].print()
-    var expected_grad = Tensor.d2([[0, 1, 1], [0, 0, 0]])
-    assert_true((r.gradbox[] == expected_grad).all_true())
-
-    print("check 3")
-    s.free()
-    # z.free()
-    y.free()
-    r.free()
-    a.free()
+    pass

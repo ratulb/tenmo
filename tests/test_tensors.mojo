@@ -9,6 +9,36 @@ from utils.numerics import min_finite
 from operators import AddTensor
 from shared import TensorLite
 
+fn test_reshape_slice_sum_backward() raises:
+    print("test_reshape_slice_sum_backward")
+    var a = Tensor.arange(6, requires_grad=True)
+    r = a.reshape([2, 3])
+    # Gradient check
+    var y = r[0:1, 1:3]
+    ss = y.sum()
+    ss.backward()
+    var expected_grad = Tensor.d1([0, 1, 1, 0, 0, 0])
+    assert_true((a.gradbox[] == expected_grad).all_true())
+
+
+    # Full slice
+    # var full_slice = r[s(), s()]
+    var full_slice = r[:, :]
+    assert_true((full_slice == r).all_true())
+    # Row slice
+    var row = r[1, s()]
+    assert_true((row == Tensor([3, 4, 5])).all_true())
+
+    # Column slice with step
+    var col_step = r[s(), s(0, 3, 2)]
+    expect = Tensor.d2([[0, 2], [3, 5]])
+    assert_true((col_step == expect).all_true())
+
+    ss.free()
+    y.free()
+    r.free()
+    a.free()
+
 
 fn test_shared_tensor_twice() raises:
     print("test_shared_tensor_twice")
@@ -3146,7 +3176,7 @@ fn main() raises:
     print("Starting tensor test cases")
     test_reshape_gradient_2d()
     test_reshape_noop()
-
+    test_reshape_slice_sum_backward()
     test_simple_chain()
     test_tensor_reuse_add()
     test_tensor_reuse_mixed()
