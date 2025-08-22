@@ -114,6 +114,9 @@ struct Tensor[dtype: DType = DType.float32](
         self.buffer = other.buffer
         self.requires_grad = other.requires_grad
         self.gradbox = other.gradbox
+        _="""if other.has_grad():
+            self.gradbox = UnsafePointer[Tensor[dtype]].alloc(1)
+            self.gradbox.init_pointee_copy(other.gradbox[])"""
         self.ancestors = other.ancestors
         self.base = other.base
         self.backwardFn = other.backwardFn
@@ -127,8 +130,11 @@ struct Tensor[dtype: DType = DType.float32](
         self.buffer = other.buffer
         self.requires_grad = other.requires_grad
         self.gradbox = other.gradbox
+        _="""if other.has_grad():
+            self.gradbox = UnsafePointer[Tensor[dtype]].alloc(1)
+            self.gradbox.init_pointee_copy(other.gradbox[])"""
         self.ancestors = other.ancestors
-        self.base = other.base
+        self.base = other.base.copy()
         self.backwardFn = other.backwardFn
         self.owns_data = other.owns_data
 
@@ -1161,7 +1167,7 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     fn contiguous(self) -> Tensor[dtype]:
-        if self.owns_data and self._contiguous:
+        if self.owns_data: # In this world owning tensor is always contiguous
             return self
         shape = self.shape
         out = Tensor[dtype](shape, requires_grad=self.requires_grad)
@@ -1185,6 +1191,15 @@ struct Tensor[dtype: DType = DType.float32](
                         if indices[dim] < shape[dim]:
                             break
                         indices[dim] = 0  # Carry to next dimension
+
+        if self.requires_grad:
+            strides = self.strides
+            backward_fn = ViewBackward[dtype](
+                shape, strides, self.offset * 2
+            ).into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(TensorLite[dtype].of(self))
+
         return out
 
     fn reshape(self) -> Tensor[dtype]:
@@ -1851,7 +1866,9 @@ struct Tensor[dtype: DType = DType.float32](
             shape=Shape(new_shape),
             strides=Strides(new_strides),
             offset=self.offset,  # Permute doesn't change offset
+            requires_grad=False,
         )
+        out.requires_grad_(self.requires_grad)
         if self.requires_grad:
             permutation = axes.copy()
             backward_fn = PermuteBackward[dtype](permutation).into_backward_fn()

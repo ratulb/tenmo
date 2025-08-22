@@ -50,11 +50,11 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
                 parent_shape.__str__(),
                 "\n",
             )
-            print("\nReshapeBackward - gradients\n")
+            print("\nViewBackward - gradients\n")
             gradients.print()
             print()
             print("\nreshaped\n")
-            print()
+            print("parent inner_id", parent.inner_id())
             reshaped.print()
         return [
             (parent, reshaped, AddTensor),

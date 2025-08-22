@@ -40,7 +40,7 @@ fn scalar_ops[
     return result
 
 @fieldwise_init
-struct Comparator(Copyable):
+struct Comparator(Copyable & Movable):
     @staticmethod
     fn compare[
         dtype: DType, //, op: Int, simd_width: Int = simdwidthof[dtype]()
@@ -49,6 +49,7 @@ struct Comparator(Copyable):
             if this.owns_data and that.owns_data:
                 this_buffer = this.buffer
                 that_buffer = that.buffer
+                #print("Comparator check1")
             elif this.owns_data and not that.owns_data:
                 this_buffer = this.buffer
                 that_buffer = that.base_address()[].buffer[
@@ -73,6 +74,7 @@ struct Comparator(Copyable):
                     this_buffer.__eq__[dtype, simd_width](that_buffer),
                     False,
                 )
+
             if op == NotEqual:
                 return Tensor[DType.bool](
                     this.shape,

@@ -37,7 +37,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
         memcpy(self.data, other.data, other.size)
 
-    fn clone(self) -> Buffer[dtype]:
+    fn copy(self) -> Buffer[dtype]:
         data = UnsafePointer[Scalar[dtype]].alloc(self.size)
         memcpy(data, self.data, self.size)
         clone = Buffer[dtype](self.size, data)

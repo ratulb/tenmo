@@ -7,19 +7,19 @@ from common_utils import i, newaxis, s
 
 
 fn main() raises:
-    #test_slice_every_second_row_column1()
+    test_identity_permutation()
+    test_slice_every_second_row_column1()
     # test_edge_case_indexing() #revist
     # test_mixed_indexing()
     # test_newaxis_dimension_insertion()
-    #test_basic_slicing()
-    #test_newaxis()
-    #test_scalar_view()
+    # test_basic_slicing()
+    # test_newaxis()
+    test_scalar_view()
     test_integer_indexing()
-
+    test_into_tensor_isolated_memory()
     test_nested_views_grad_propagation()
     test_reshape_slice_sum_backward()
     test_backward_through_nested_views_non_contiguous()
-    test_identity_permutation()
     test_backward_through_nested_views()
 
     test_permute_backward()
@@ -529,15 +529,16 @@ fn test_into_tensor_large_contiguous_copy() raises:
     assert_true(out.shape == Shape.of(N))
     assert_true(out[123456] == 123456)
 
-    _ = """fn test_into_tensor_isolated_memory() raises:
+
+fn test_into_tensor_isolated_memory() raises:
     print("test_into_tensor_isolated_memory")
     var t = Tensor.d1([1, 2, 3, 4])
-    var v = t.slice(1, 3)  # [2, 3]
+    var v = t[1:3]  # [2, 3]
     var out = v.contiguous()
     v[0] = 999
     assert_true(out.all_close(Tensor.d1([2, 3])))  # Unaffected by view mutation
 
-fn test_into_tensor_strided_view_rows() raises:
+    _ = """fn test_into_tensor_strided_view_rows() raises:
     print("test_into_tensor_strided_view_rows")
     var t = Tensor.d2([[1, 2], [3, 4], [5, 6], [7, 8]])
     var v = t.slice_rows(0, 4, 2)  # Should give rows [0, 2]
@@ -564,20 +565,24 @@ fn test_into_tensor_nested_view() raises:
 
 fn test_backward_through_nested_views_non_contiguous() raises:
     print("test_backward_through_nested_views_non_contiguous")
-    x4 = Tensor.rand(4, 4, requires_grad=True)
-    t4 = x4.transpose(0, 1)
-    y4 = t4.permute([1, 0])
-    yt4 = y4.contiguous()
-    loss4 = yt4.sum()
-    loss4.backward(42)
+    a = Tensor.rand(4, 4, requires_grad=True)
+    t = a.transpose(0, 1)
+    p = t.permute([1, 0])
+    c = p.contiguous()
+    s = c.sum()
+    s.backward(42)
     assert_true(
-        Strides.default(x4.gradbox[].shape) == Strides.default(x4.shape)
+        Strides.default(a.gradbox[].shape) == Strides.default(a.shape)
     )
-    loss4.free()
-    yt4.free()
-    y4.free()
-    t4.free()
-    x4.free()
+    assert_true(
+        (a.gradbox[] == Tensor.full(Shape([4, 4]), 42)).all_true(),
+        "grad propagation through contiguous failed",
+    )
+    s.free()
+    c.free()
+    p.free()
+    t.free()
+    a.free()
 
 
 fn test_identity_permutation() raises:
@@ -587,11 +592,10 @@ fn test_identity_permutation() raises:
     y3 = v3.permute([0, 1])
     loss3 = y3.sum()
     loss3.backward()
-    print("\nx3.id: ", x3.id(), "x3.gradbox[]\n")
-    x3.gradbox[].print()
     assert_true(x3.gradbox[].all_close(Tensor.ones(3, 3)))
     loss3.free()
     y3.free()
+    v3.free()
     x3.free()
 
 
@@ -794,7 +798,6 @@ fn test_basic_slicing() raises:
     ss.backward()
     var expected_grad = Tensor.d1([0, 1, 1, 0, 0, 0])
     assert_true((a.gradbox[] == expected_grad).all_true())
-
 
     # Full slice
     # var full_slice = r[s(), s()]
