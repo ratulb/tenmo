@@ -7,28 +7,21 @@ from os import abort
 from buffers import Buffer
 
 # from runtime.asyncrt import num_physical_cores
-from sys import num_logical_cores, num_physical_cores
+#from sys import num_logical_cores, num_physical_cores
 
 alias Noop = 0
-#alias AddScalar = 1
-#alias SubtractScalar = 2
-#alias MulScalar = 3
 alias MulTensor = 1
-alias AddTensor = 5
-alias SubtractTensor = 6
-#alias Power = 7
-alias Add = 8
-alias Subtract = 9
-alias Multiply = 10
-#alias SubtractFromScalar = 11
-#alias DivideByScalar = 12
-#alias DivideScalar = 13
-alias Equal = 14
-alias NotEqual = 15
-alias LessThan = 16
-alias LessThanEqual = 17
-alias GreaterThan = 18
-alias GreaterThanEqual = 19
+alias AddTensor = 2
+alias SubtractTensor = 3
+alias Add = 4
+alias Subtract = 5
+alias Multiply = 6
+alias Equal = 6
+alias NotEqual = 7
+alias LessThan = 8
+alias LessThanEqual = 9
+alias GreaterThan = 10
+alias GreaterThanEqual = 11
 
 
 @always_inline

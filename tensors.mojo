@@ -376,22 +376,22 @@ struct Tensor[dtype: DType = DType.float32](
         return self.numels() == 1 and self.shape == Shape.Void
 
     fn __eq__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.buffer == scalar, False)
+        return Comparator.compare_scalar[Equal](self, scalar)
 
     fn __ne__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.buffer != scalar, False)
+        return Comparator.compare_scalar[NotEqual](self, scalar)
 
     fn __lt__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.buffer < scalar, False)
+        return Comparator.compare_scalar[LessThan](self, scalar)
 
     fn __le__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.buffer <= scalar, False)
+        return Comparator.compare_scalar[LessThanEqual](self, scalar)
 
     fn __gt__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.buffer > scalar, False)
+        return Comparator.compare_scalar[GreaterThan](self, scalar)
 
     fn __ge__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-        return Tensor[DType.bool](self.shape, self.buffer >= scalar, False)
+        return Comparator.compare_scalar[GreaterThanEqual](self, scalar)
 
     fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
