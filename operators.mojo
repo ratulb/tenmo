@@ -1,5 +1,5 @@
 from tensors import Tensor
-from common_utils import panic
+from common_utils import panic, log_debug
 from algorithm import vectorize, parallelize
 from sys import simdwidthof
 from shapes import Shape
@@ -227,17 +227,16 @@ alias messages = {Equal: "__eq__", NotEqual: "__ne__"}
 struct Comparator(Copyable):
     @staticmethod
     fn compare[
-        dtype: DType, //, op: Int
+        dtype: DType, //, op: Int, simd_width: Int = simdwidthof[dtype]()
     ](this: Tensor[dtype], that: Tensor[dtype]) -> Tensor[DType.bool]:
         if this.shape != that.shape:
             panic(
-                "Tensor compare → Dimension mismatch:",
+                "Tensor compare ("+ op.__str__() +") → Dimension mismatch:",
                 this.shape.__str__(),
                 ",",
                 that.shape.__str__(),
             )
-        var this_buffer: Buffer[dtype] = Buffer[dtype].Empty
-        var that_buffer: Buffer[dtype] = Buffer[dtype].Empty
+
         if this.is_contiguous() and that.is_contiguous():
             if this.owns_data and that.owns_data:
                 this_buffer = this.buffer
@@ -259,9 +258,80 @@ struct Comparator(Copyable):
                 that_buffer = that.base_address()[].buffer[
                     that.offset : that.offset + that.numels()
                 ]
-        if op == Equal:
-            return Tensor[DType.bool](this.shape, (this_buffer == that_buffer), False)
 
+            if op == Equal:
+                return Tensor[DType.bool](
+                    this.shape,
+                    this_buffer.__eq__[dtype, simd_width](that_buffer),
+                    False,
+                )
+            if op == NotEqual:
+                return Tensor[DType.bool](
+                    this.shape,
+                    this_buffer.__ne__[dtype, simd_width](that_buffer),
+                    False,
+                )
+            if op == LessThan:
+                return Tensor[DType.bool](
+                    this.shape,
+                    this_buffer.__lt__[dtype, simd_width](that_buffer),
+                    False,
+                )
+            if op == LessThanEqual:
+                return Tensor[DType.bool](
+                    this.shape,
+                    this_buffer.__le__[dtype, simd_width](that_buffer),
+                    False,
+                )
+            if op == GreaterThan:
+                return Tensor[DType.bool](
+                    this.shape,
+                    this_buffer.__gt__[dtype, simd_width](that_buffer),
+                    False,
+                )
+            if op == GreaterThanEqual:
+                return Tensor[DType.bool](
+                    this.shape,
+                    this_buffer.__ge__[dtype, simd_width](that_buffer),
+                    False,
+                )
+        else:
+            out = Tensor[DType.bool].full(this.shape, False)
+
+            if op == Equal:
+                for indices in this.shape:
+                    out[indices] = this[indices] == that[indices]
+                return out
+
+            if op == NotEqual:
+                for indices in this.shape:
+                    out[indices] = this[indices] != that[indices]
+                return out
+
+            if op == LessThan:
+                for indices in this.shape:
+                    out[indices] = this[indices] < that[indices]
+                return out
+
+            if op == LessThanEqual:
+                for indices in this.shape:
+                    out[indices] = this[indices] <= that[indices]
+                return out
+
+            if op == GreaterThan:
+                for indices in this.shape:
+                    out[indices] = this[indices] > that[indices]
+                return out
+
+            if op == GreaterThanEqual:
+                for indices in this.shape:
+                    out[indices] = this[indices] => that[indices]
+                return out
+
+        log_debug(
+            "Tensor compare → we should never reach here - if we have something"
+            " have gone terribly wrong"
+        )
         return Tensor[DType.bool].scalar(False)
 
 
@@ -340,8 +410,34 @@ fn sum_all[dtype: DType, //](input: Tensor[dtype]) -> Scalar[dtype]:
     return summ
 
 
+from testing import assert_true, assert_false
+
+
 fn main() raises:
-    this = Tensor.d1([1, 5, 3, 5])
+    A = Tensor.arange(10)
+    C = A.reshape(5, 2)
+    C.print()
+    D = C.transpose()
+    D.print()
+    E = D.reshape(5, 2).transpose()
+    print()
+    E.print()
+    print(E.is_contiguous(), D.is_contiguous())
+    result = Comparator.compare[Equal](E, D)
+    assert_true(
+        result.all_true(),
+        "Equality assertion check failed for non-contguous views",
+    )
+
+    B = Tensor.arange(10)
+    result = Comparator.compare[Equal](A, B)
+    assert_true(result.all_true(), "Equality assertion 1 failed")
+    B[0] = 100
+    result = Comparator.compare[Equal](A, B)
+    assert_false(result.all_true(), "Nonequality assertion 1 failed")
+    _ = D
+    _ = E
+    _ = """this = Tensor.d1([1, 5, 3, 5])
     this_view = this[1::]
     that = Tensor.d1([1, 2, 3, 4])
     that_view = that.view(shape=[3], offset=1)
@@ -352,4 +448,4 @@ fn main() raises:
     cmp = Comparator.compare[Equal](this_view, that_view)
     cmp.print()
     _ = this
-    _ = that
+    _ = that"""
