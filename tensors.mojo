@@ -1229,11 +1229,6 @@ struct Tensor[dtype: DType = DType.float32](
         out = Tensor[dtype](shape, buffer, requires_grad)
 
         if requires_grad:
-            # Using base to keep track of grad already contributed to parent
-            # base = Tensor[dtype].zeros(self.shape)
-            # out.base = UnsafePointer[Tensor[dtype]].alloc(1)
-            # out.base.init_pointee_move(base^)
-
             backward_fn = ReshapeBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(TensorLite[dtype].of(self))
