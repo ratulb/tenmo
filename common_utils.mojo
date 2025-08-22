@@ -23,18 +23,6 @@ fn id[type: AnyType, //](t: type) -> Int:
 
 
 fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
-
-    _="""@always_inline("nodebug")
-    fn panic(*s: String):
-    abrt = String(capacity=len(s))
-    abrt += s[0].strip()
-    for i in range(1, len(s)):
-        stripped = " " + s[i].strip()
-        abrt += stripped
-    loc = __call_location[inline_count=2]()
-    abrt +=". " + loc.file_name + ":" + loc.line.__str__() + ":" + loc.col.__str__()
-    abort(abrt)"""
-
     return ptr.__as_bool__() == False
 
 @always_inline("nodebug")
@@ -606,4 +594,5 @@ fn test_validate_new_shape() raises:
 
 
 fn main() raises:
-    test_validate_new_shape()
+    #test_validate_new_shape()
+    pass

@@ -5,6 +5,8 @@ from backpropagation import Delegate, BackwardFn
 from operators import AddTensor, SubtractTensor
 from intlist import IntList
 from shared import TensorLite
+from common_utils import LOG_LEVEL
+
 
 @fieldwise_init
 struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
@@ -22,8 +24,6 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
     ]:
         parent = output.ancestry().get(0)[]
         gradients = output.gradients()[]
-        #print("ViewBackward -> gradients")
-        #gradients.print()
         offset_delta = self.offset - parent.tensor().offset
         parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
         parent_shape = parent.shape()
@@ -33,12 +33,37 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
             parent_flat = child_flat + offset_delta
             parent_grad[parent_flat] += gradients[child_indices]
         reshaped = parent_grad.reshape(parent_shape)
-        #print("ViewBackward -> reshaped")
-        #reshaped.print()
-        return [(parent, reshaped, AddTensor), (output, gradients, SubtractTensor)]
+
+        @parameter
+        if LOG_LEVEL == "debug":
+            print(
+                "\nViewBackward: output owns data? ",
+                output.tensor().owns_data.__str__(),
+                "parent owns data?",
+                parent.tensor().owns_data.__str__(),
+                "\n",
+            )
+            print(
+                "\nViewBackward - offset_delta",
+                offset_delta.__str__(),
+                "parent shape",
+                parent_shape.__str__(),
+                "\n",
+            )
+            print("\nReshapeBackward - gradients\n")
+            gradients.print()
+            print()
+            print("\nreshaped\n")
+            print()
+            reshaped.print()
+        return [
+            (parent, reshaped, AddTensor),
+            (output, gradients, SubtractTensor),
+        ]
 
     fn __str__(self) -> String:
         return "ViewBackward"
+
 
 fn main():
     pass

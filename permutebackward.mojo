@@ -3,6 +3,7 @@ from shared import TensorLite
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
 from intlist import IntList
+from common_utils import log_debug, LOG_LEVEL
 
 
 @fieldwise_init
@@ -19,7 +20,6 @@ struct PermuteBackward[dtype: DType](Copyable & Movable & Stringable):
     ]:
         gradients = output.gradients()[]
         parent = output.ancestry().get(0)[]
-
         # Compute inverse permutation
         inverse = IntList.filled(len(self.permutation), 0)
         for i in range(len(self.permutation)):
@@ -28,10 +28,29 @@ struct PermuteBackward[dtype: DType](Copyable & Movable & Stringable):
         # Apply inverse permutation to gradients
         parent_grad = gradients.permute(inverse)
 
+        @parameter
+        if LOG_LEVEL == "debug":
+            print(
+                "\nPermuteBackward: output is view? ",
+                output.tensor().owns_data.__str__(),
+                "parent is view?",
+                parent.tensor().owns_data.__str__(),
+                "\n",
+            )
+            print("\nPermuteBackward - gradients\n")
+            gradients.print()
+            print()
+            print("self.permutation", self.permutation)
+            print()
+            print("\ninverse permutation", inverse)
+            print("\nparent_grad\n")
+            parent_grad.print()
+
         return [(parent, parent_grad, AddTensor)]
 
     fn __str__(self) -> String:
         return "PermuteBackward"
+
 
 fn main() raises:
     pass

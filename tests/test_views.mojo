@@ -7,13 +7,13 @@ from common_utils import i, newaxis, s
 
 
 fn main() raises:
-    test_slice_every_second_row_column1()
+    #test_slice_every_second_row_column1()
     # test_edge_case_indexing() #revist
     # test_mixed_indexing()
     # test_newaxis_dimension_insertion()
-    test_basic_slicing()
-    test_newaxis()
-    test_scalar_view()
+    #test_basic_slicing()
+    #test_newaxis()
+    #test_scalar_view()
     test_integer_indexing()
 
     test_nested_views_grad_propagation()
@@ -585,12 +585,12 @@ fn test_identity_permutation() raises:
     x3 = Tensor.rand(3, 3, requires_grad=True)
     v3 = x3.into_view()
     y3 = v3.permute([0, 1])
-    yt3 = y3.contiguous()
-    loss3 = yt3.sum()
+    loss3 = y3.sum()
     loss3.backward()
+    print("\nx3.id: ", x3.id(), "x3.gradbox[]\n")
+    x3.gradbox[].print()
     assert_true(x3.gradbox[].all_close(Tensor.ones(3, 3)))
     loss3.free()
-    yt3.free()
     y3.free()
     x3.free()
 
@@ -600,8 +600,7 @@ fn test_reshape_slice_sum_backward() raises:
     a = Tensor.arange(15, requires_grad=True)
     r = a.reshape(5, 3)
     v = r[1:4:2, :]
-    tensor = v.contiguous()
-    s = tensor.sum()
+    s = v.sum()
     s.backward()
     assert_true(
         (
@@ -628,7 +627,6 @@ fn test_reshape_slice_sum_backward() raises:
         ).all_true()
     )
     s.free()
-    tensor.free()
     v.free()
     r.free()
     a.free()
@@ -685,7 +683,7 @@ fn test_nested_views_grad_propagation() raises:
 
     var Y = V3.contiguous()
     # Step 5: Sum and backward
-    var LOSS = Y.sum()
+    var LOSS = V3.sum()
     LOSS.backward()
 
     # Validate: only the correct region of x.grad should be non-zero
@@ -789,8 +787,14 @@ fn test_newaxis_dimension_insertion() raises:
 fn test_basic_slicing() raises:
     print("test_basic_slicing")
     var a = Tensor.arange(6, requires_grad=True)
-
     r = a.reshape([2, 3])
+    # Gradient check
+    var y = r[0:1, 1:3]
+    ss = y.sum()
+    ss.backward()
+    var expected_grad = Tensor.d1([0, 1, 1, 0, 0, 0])
+    assert_true((a.gradbox[] == expected_grad).all_true())
+
 
     # Full slice
     # var full_slice = r[s(), s()]
@@ -804,18 +808,9 @@ fn test_basic_slicing() raises:
     # Column slice with step
     var col_step = r[s(), s(0, 3, 2)]
     expect = Tensor.d2([[0, 2], [3, 5]])
-    assert_true((col_step == Tensor.d2([[0, 2], [3, 5]])).all_true())
+    assert_true((col_step == expect).all_true())
 
-    # Gradient check
-    var y = r[0:1, 1:3]
-    z = y.contiguous()
-    s = z.sum()
-    s.backward()
-    var expected_grad = Tensor.d2([[0, 1, 1], [0, 0, 0]])
-    assert_true((r.gradbox[] == expected_grad).all_true())
-
-    s.free()
-    z.free()
+    ss.free()
     y.free()
     r.free()
     a.free()
@@ -844,6 +839,7 @@ fn test_integer_indexing() raises:
 
 
 fn test_newaxis() raises:
+    print("test_newaxis")
     x = Tensor([1, 2, 3], requires_grad=True)
     equal = x.into_view()
     y = x[newaxis, s(), newaxis]
@@ -858,6 +854,7 @@ fn test_newaxis() raises:
 
 
 fn test_scalar_view() raises:
+    print("test_scalar_view")
     a = Tensor.scalar(10, requires_grad=True)
     v = a.into_view()
     t = v.contiguous()

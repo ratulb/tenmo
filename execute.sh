@@ -7,41 +7,46 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
+DEBUG_MODE=""
+if [ $# -ge 2 ] && [ "$2" = "d" ]; then
+    DEBUG_MODE="-D LOGGING_LEVEL=debug"
+fi
+
 # Determine which test to run based on the argument
 case $1 in
     tensors)
-        mojo -I . tests/test_tensors.mojo
+        mojo -I . $DEBUG_MODE tests/test_tensors.mojo
         ;;
     bench)
         echo "Running tensor multiplication benchmark"
-        mojo -I . tests/test_matmul_bench.mojo
+        mojo -I . $DEBUG_MODE tests/test_matmul_bench.mojo
         ;;
     views)
         echo "Running view test cases"
-        mojo -I . tests/test_views.mojo
+        mojo -I . $DEBUG_MODE tests/test_views.mojo
         ;;
     shapes)
         echo "Running shape test cases"
-        mojo -I . tests/test_shapes.mojo
+        mojo -I . $DEBUG_MODE tests/test_shapes.mojo
         ;;
     shared)
         echo "Running shared test cases"
-        mojo -I . tests/test_shared.mojo
+        mojo -I . $DEBUG_MODE tests/test_shared.mojo
         ;;
 
     strides)
         echo "Running strides test cases"
-        mojo -I . tests/test_strides.mojo
+        mojo -I . $DEBUG_MODE tests/test_strides.mojo
         ;;
 
     ancestry)
         echo "Running ancestry test cases"
-        mojo -I . tests/test_ancestry.mojo
+        mojo -I . $DEBUG_MODE tests/test_ancestry.mojo
         ;;
 
     intlist)
         echo "Running intlist test cases"
-        mojo -I . tests/test_intlist.mojo
+        mojo -I . $DEBUG_MODE tests/test_intlist.mojo
         ;;
     all)
         mojo -I . tests/test_tensors.mojo
