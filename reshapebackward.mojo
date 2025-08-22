@@ -12,17 +12,14 @@ struct ReshapeBackward[dtype: DType](Copyable & Movable & Stringable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.gradients()[]
+        #print("ReshapeBackward -> gradients")
+        #gradients.print()
         ancestor = output.ancestry().get(0)[]
         reshaped = gradients.reshape(ancestor.shape())
-        # Deduct already contributed portion
-        _="""new_contrib = __tensor_op_tensor__[dtype, SubtractTensor](
-            reshaped, output.base[]
-        )"""
 
-        #new_contrib = reshaped - output.tensor().base[]
-        # Update base accumulator
-        #output.tensor().base.init_pointee_move(reshaped^)
-        #return [(ancestor, new_contrib, AddTensor)]
+        #print("ReshapeBackward -> reshaped")
+        #reshaped.print()
+
         return [(ancestor, reshaped, AddTensor), (output, gradients, SubtractTensor)]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:

@@ -22,22 +22,10 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
     ]:
         parent = output.ancestry().get(0)[]
         gradients = output.gradients()[]
+        #print("ViewBackward -> gradients")
+        #gradients.print()
         offset_delta = self.offset - parent.tensor().offset
         parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
-        _ = """for child_indices in self.shape:
-            child_flat = (child_indices * self.strides.to_list()).sum()
-
-            parent_flat = child_flat + offset_delta
-
-            parent_indices = IntList.Empty
-            remaining = parent_flat
-            for stride in parent.strides().to_list():
-                dim_idx = remaining // stride
-                remaining = remaining % stride
-                parent_indices.append(dim_idx)
-            parent_grad[parent_indices] += gradients[child_indices]
-
-            return [(parent, parent_grad, AddTensor)]"""
         parent_shape = parent.shape()
 
         for child_indices in self.shape:
@@ -45,7 +33,8 @@ struct ViewBackward[dtype: DType](Copyable & Movable & Stringable):
             parent_flat = child_flat + offset_delta
             parent_grad[parent_flat] += gradients[child_indices]
         reshaped = parent_grad.reshape(parent_shape)
-
+        #print("ViewBackward -> reshaped")
+        #reshaped.print()
         return [(parent, reshaped, AddTensor), (output, gradients, SubtractTensor)]
 
     fn __str__(self) -> String:
