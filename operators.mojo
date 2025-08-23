@@ -7,7 +7,7 @@ from os import abort
 from buffers import Buffer
 
 # from runtime.asyncrt import num_physical_cores
-#from sys import num_logical_cores, num_physical_cores
+# from sys import num_logical_cores, num_physical_cores
 
 alias Noop = 0
 alias MulTensor = 1
@@ -39,6 +39,7 @@ fn scalar_ops[
         abort("operators -> scalar_ops: unsupported operation")
     return result
 
+
 @fieldwise_init
 struct Comparator(Copyable & Movable):
     @staticmethod
@@ -49,7 +50,7 @@ struct Comparator(Copyable & Movable):
             if this.owns_data and that.owns_data:
                 this_buffer = this.buffer
                 that_buffer = that.buffer
-                #print("Comparator check1")
+                # print("Comparator check1")
             elif this.owns_data and not that.owns_data:
                 this_buffer = this.buffer
                 that_buffer = that.base_address()[].buffer[
@@ -71,78 +72,90 @@ struct Comparator(Copyable & Movable):
             if op == Equal:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__eq__[dtype, simd_width](that_buffer),
+                    this_buffer.eq[simd_width](that_buffer),
                     False,
                 )
 
             if op == NotEqual:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__ne__[dtype, simd_width](that_buffer),
+                    this_buffer.ne[simd_width](that_buffer),
                     False,
                 )
             if op == LessThan:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__lt__[dtype, simd_width](that_buffer),
+                    this_buffer.lt[simd_width](that_buffer),
                     False,
                 )
             if op == LessThanEqual:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__le__[dtype, simd_width](that_buffer),
+                    this_buffer.le[simd_width](that_buffer),
                     False,
                 )
             if op == GreaterThan:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__gt__[dtype, simd_width](that_buffer),
+                    this_buffer.gt[simd_width](that_buffer),
                     False,
                 )
             if op == GreaterThanEqual:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__ge__[dtype, simd_width](that_buffer),
+                    this_buffer.ge[simd_width](that_buffer),
                     False,
                 )
         else:
-            out = Tensor[DType.bool].full(this.shape, False)
+            out = Tensor[DType.bool].full(this.shape, Scalar[DType.bool](False))
 
             if op == Equal:
                 for indices in this.shape:
-                    out[indices] = this[indices] == that[indices]
+                    out[indices] = Scalar[DType.bool](
+                        this[indices] == that[indices]
+                    )
                 return out
 
             if op == NotEqual:
                 for indices in this.shape:
-                    out[indices] = this[indices] != that[indices]
+                    out[indices] = Scalar[DType.bool](
+                        this[indices] != that[indices]
+                    )
                 return out
 
             if op == LessThan:
                 for indices in this.shape:
-                    out[indices] = this[indices] < that[indices]
+                    out[indices] = Scalar[DType.bool](
+                        this[indices] < that[indices]
+                    )
                 return out
 
             if op == LessThanEqual:
                 for indices in this.shape:
-                    out[indices] = this[indices] <= that[indices]
+                    out[indices] = Scalar[DType.bool](
+                        this[indices] <= that[indices]
+                    )
                 return out
 
             if op == GreaterThan:
                 for indices in this.shape:
-                    out[indices] = this[indices] > that[indices]
+                    out[indices] = Scalar[DType.bool](
+                        this[indices] > that[indices]
+                    )
                 return out
 
             if op == GreaterThanEqual:
                 for indices in this.shape:
-                    out[indices] = this[indices] >= that[indices]
+                    out[indices] = Scalar[DType.bool](
+                        this[indices] >= that[indices]
+                    )
                 return out
 
         log_debug(
-            "Tensor compare → we should never reach here - if we have, something"
-            " has gone terribly wrong"
+            "Tensor compare → we should never reach here - if we have,"
+            " something has gone terribly wrong"
         )
-        return Tensor[DType.bool].scalar(False)
+        return Tensor[DType.bool].scalar(Scalar[DType.bool](False))
 
     @staticmethod
     fn compare_scalar[
@@ -158,77 +171,77 @@ struct Comparator(Copyable & Movable):
             if op == Equal:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__eq__[simd_width](scalar),
+                    this_buffer.eq[simd_width](scalar),
                     False,
                 )
             if op == NotEqual:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__ne__[simd_width](scalar),
+                    this_buffer.ne[simd_width](scalar),
                     False,
                 )
             if op == LessThan:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__lt__[simd_width](scalar),
+                    this_buffer.lt[simd_width](scalar),
                     False,
                 )
             if op == LessThanEqual:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__le__[simd_width](scalar),
+                    this_buffer.le[simd_width](scalar),
                     False,
                 )
             if op == GreaterThan:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__gt__[simd_width](scalar),
+                    this_buffer.gt[simd_width](scalar),
                     False,
                 )
             if op == GreaterThanEqual:
                 return Tensor[DType.bool](
                     this.shape,
-                    this_buffer.__ge__[simd_width](scalar),
+                    this_buffer.ge[simd_width](scalar),
                     False,
                 )
         else:
-            out = Tensor[DType.bool].full(this.shape, False)
+            out = Tensor[DType.bool].full(this.shape, Scalar[DType.bool](False))
 
             if op == Equal:
                 for indices in this.shape:
-                    out[indices] = this[indices] == scalar
+                    out[indices] = Scalar[DType.bool](this[indices] == scalar)
                 return out
 
             if op == NotEqual:
                 for indices in this.shape:
-                    out[indices] = this[indices] != scalar
+                    out[indices] = Scalar[DType.bool](this[indices] != scalar)
                 return out
 
             if op == LessThan:
                 for indices in this.shape:
-                    out[indices] = this[indices] < scalar
+                    out[indices] = Scalar[DType.bool](this[indices] < scalar)
                 return out
 
             if op == LessThanEqual:
                 for indices in this.shape:
-                    out[indices] = this[indices] <= scalar
+                    out[indices] = Scalar[DType.bool](this[indices] <= scalar)
                 return out
 
             if op == GreaterThan:
                 for indices in this.shape:
-                    out[indices] = this[indices] > scalar
+                    out[indices] = Scalar[DType.bool](this[indices] > scalar)
                 return out
 
             if op == GreaterThanEqual:
                 for indices in this.shape:
-                    out[indices] = this[indices] >= scalar
+                    out[indices] = Scalar[DType.bool](this[indices] >= scalar)
                 return out
 
         log_debug(
-            "Tensor compare_scalar → we should never reach here - if we have, something"
-            " has gone terribly wrong"
+            "Tensor compare_scalar → we should never reach here - if we have,"
+            " something has gone terribly wrong"
         )
-        return Tensor[DType.bool].scalar(False)
+        return Tensor[DType.bool].scalar(Scalar[DType.bool](False))
 
 
 from testing import assert_true, assert_false
