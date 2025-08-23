@@ -9,10 +9,10 @@ from common_utils import i, newaxis, s
 fn main() raises:
     test_identity_permutation()
     test_slice_every_second_row_column1()
-    # test_edge_case_indexing() #revist
-    # test_mixed_indexing()
-    # test_newaxis_dimension_insertion()
-    # test_basic_slicing()
+    test_edge_case_indexing() #revist
+    #test_mixed_indexing()
+    #test_newaxis_dimension_insertion()
+    test_basic_slicing()
     # test_newaxis()
     test_scalar_view()
     test_integer_indexing()

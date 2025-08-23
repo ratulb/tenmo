@@ -510,12 +510,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn all_close[
         simd_width: Int = simdwidthof[dtype](),
-    ](
-        self,
-        other: Self,
         rtol: Scalar[dtype] = 1e-5,
         atol: Scalar[dtype] = 1e-8,
-    ) -> Bool:
+    ](self, other: Self,) -> Bool:
         constrained[
             dtype.is_floating_point(),
             "Tensor → all_close is for floating point data types only",
@@ -528,7 +525,8 @@ struct Tensor[dtype: DType = DType.float32](
                 + ", "
                 + other.shape.__str__()
             )
-        return self.buffer.all_close[simd_width](other.buffer, rtol, atol)
+        # return self.buffer.all_close[simd_width](other.buffer, rtol, atol)
+        return self.buffer.all_close[simd_width, rtol, atol](other.buffer)
 
     @always_inline
     fn data_buffer(self) -> Buffer[dtype]:
@@ -1035,8 +1033,7 @@ struct Tensor[dtype: DType = DType.float32](
         shape: Shape,
         strides: Strides,
         offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+        requires_grad: Optional[Bool] = None,) -> Tensor[dtype]:
         # Calculate logical bounds of new view (relative to parent)
         var min_index = offset
         var max_index = offset
@@ -1161,7 +1158,7 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     fn contiguous(self) -> Tensor[dtype]:
-        if self.owns_data: # In this world owning tensor is always contiguous
+        if self.owns_data:  # In this world owning tensor is always contiguous
             return self
         shape = self.shape
         out = Tensor[dtype](shape, requires_grad=self.requires_grad)
@@ -1975,7 +1972,7 @@ struct Tensor[dtype: DType = DType.float32](
             self.gradients()[].print(num_first, num_last)
 
     fn free(deinit self):
-        #fn __del__(owned self):
+        # fn __del__(owned self):
         log_debug(
             "Tensor__del__ → deleting tensor with id: " + self.id().__str__()
         )
@@ -2050,6 +2047,7 @@ struct Tensor[dtype: DType = DType.float32](
             C.add_ancestry(TensorLite.of(A))
             C.add_ancestry(TensorLite.of(B))
         return C
+
 
 from testing import assert_true
 
