@@ -37,7 +37,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         else:
             self.ancestors = UnsafePointer[UnsafePointer[TensorLite[dtype]]]()
 
-    fn __moveinit__(out self, owned existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         self.size = existing.size
         self.capacity = existing.capacity
         if existing.size > 0:
@@ -54,7 +54,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
 
     @always_inline("nodebug")
     # fn __del__(owned self):
-    fn free(owned self):
+    fn free(deinit self):
         if self.ancestors:
             log_debug("Ancestors __del__ called")
             for idx in range(len(self)):

@@ -28,7 +28,7 @@ struct Strides(
     fn __copyinit__(out self, existing: Self):
         self.strides = existing.strides
 
-    fn __moveinit__(out self, var existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         self.strides = existing.strides
 
     fn is_contiguous(self, shape: Shape) -> Bool:
@@ -139,6 +139,6 @@ struct Strides(
 
         return Strides(result)
 
-    fn free(owned self):
+    fn free(deinit self):
         """Free strides IntList."""
         self.strides.free()

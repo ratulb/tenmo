@@ -106,7 +106,7 @@ struct Tensor[dtype: DType = DType.float32](
         self._contiguous = self.is_contiguous()
         self.init_gradbox()
 
-    fn __moveinit__(out self, var other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         self.shape = other.shape
         self.strides = other.strides
         self.offset = other.offset
@@ -114,9 +114,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.buffer = other.buffer
         self.requires_grad = other.requires_grad
         self.gradbox = other.gradbox
-        _="""if other.has_grad():
-            self.gradbox = UnsafePointer[Tensor[dtype]].alloc(1)
-            self.gradbox.init_pointee_copy(other.gradbox[])"""
         self.ancestors = other.ancestors
         self.base = other.base
         self.backwardFn = other.backwardFn
@@ -130,9 +127,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.buffer = other.buffer
         self.requires_grad = other.requires_grad
         self.gradbox = other.gradbox
-        _="""if other.has_grad():
-            self.gradbox = UnsafePointer[Tensor[dtype]].alloc(1)
-            self.gradbox.init_pointee_copy(other.gradbox[])"""
         self.ancestors = other.ancestors
         self.base = other.base.copy()
         self.backwardFn = other.backwardFn
@@ -494,13 +488,13 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn all_true(self: Tensor[DType.bool]) -> Bool:
         fn all_truthy(ambivalent: Scalar[DType.bool]) -> Bool:
-            return ambivalent == True
+            return ambivalent == Scalar[DType.bool](True)
 
         return self.for_all(all_truthy)
 
     fn any_true(self: Tensor[DType.bool]) -> Bool:
         fn any_truthy(ambivalent: Scalar[DType.bool]) -> Bool:
-            return ambivalent == True
+            return ambivalent == Scalar[DType.bool](True)
 
         return self.any(any_truthy)
 
@@ -729,7 +723,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
         shape = Shape(IntList(len(row)))
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.buffer.data, row.data, len(row))
+        memcpy(tensor.buffer.data, row._data, len(row))
         return tensor
 
     @staticmethod
@@ -743,7 +737,7 @@ struct Tensor[dtype: DType = DType.float32](
             flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.buffer.data, flattened.data, tensor.numels())
+        memcpy(tensor.buffer.data, flattened._data, tensor.numels())
         return tensor
 
     @staticmethod
@@ -763,7 +757,7 @@ struct Tensor[dtype: DType = DType.float32](
                 flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.buffer.data, flattened.data, tensor.numels())
+        memcpy(tensor.buffer.data, flattened._data, tensor.numels())
         return tensor
 
     @staticmethod
@@ -799,7 +793,7 @@ struct Tensor[dtype: DType = DType.float32](
                     flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.buffer.data, flattened.data, tensor.numels())
+        memcpy(tensor.buffer.data, flattened._data, tensor.numels())
         return tensor
 
     @staticmethod
@@ -839,7 +833,7 @@ struct Tensor[dtype: DType = DType.float32](
                         flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
-        memcpy(tensor.buffer.data, flattened.data, tensor.numels())
+        memcpy(tensor.buffer.data, flattened._data, tensor.numels())
         return tensor
 
     @staticmethod
@@ -1980,8 +1974,8 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.gradients()[].print(num_first, num_last)
 
-    fn free(owned self):
-        # fn __del__(owned self):
+    fn free(deinit self):
+        #fn __del__(owned self):
         log_debug(
             "Tensor__del__ → deleting tensor with id: " + self.id().__str__()
         )

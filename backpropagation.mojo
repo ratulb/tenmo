@@ -49,7 +49,7 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     fn __init__(out self, grad_fn: Delegate[dtype]):
         self.grad_fn = grad_fn
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         self.grad_fn = other.grad_fn
 
     fn __copyinit__(out self, other: Self):

@@ -27,7 +27,7 @@ struct TensorLite[dtype: DType](
     fn __copyinit__(out self, other: Self):
         self.tensor_address = other.tensor_address
 
-    fn __moveinit__(out self, var other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         self.tensor_address = other.tensor_address
 
     fn __eq__(self, other: Self) -> Bool:
@@ -233,7 +233,7 @@ struct GradStream[dtype: DType](Copyable & Movable):
         self.grad = other.grad
         self.opcode = other.opcode
 
-    fn __moveinit__(out self, var other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         self.recipient = other.recipient
         self.grad = other.grad
         self.opcode = other.opcode

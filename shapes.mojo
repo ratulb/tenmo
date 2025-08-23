@@ -417,7 +417,7 @@ struct Shape(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         self.axes_spans = other.axes_spans
         self.ndim = other.ndim
         self.numels = other.numels
@@ -427,7 +427,7 @@ struct Shape(
         self.ndim = other.ndim
         self.numels = other.numels
 
-    fn free(owned self):
+    fn free(deinit self):
         log_debug("Freeing Shape")
         self.axes_spans.free()
         _ = self^

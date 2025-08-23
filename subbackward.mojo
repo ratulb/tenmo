@@ -11,7 +11,7 @@ struct SubBackward[dtype: DType](Copyable & Movable & Stringable):
     fn __init__(out self):
         self.signs = IntList.Empty
 
-    fn __moveinit__(out self, var other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         self.signs = other.signs
 
     fn __copyinit__(out self, other: Self):

@@ -16,7 +16,7 @@ struct MeanBackward[dtype: DType](Copyable & Movable & Stringable):
         self.axes = axes
         self.keepdims = keepdims
 
-    fn __moveinit__(out self, var other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         self.axes = other.axes
         self.keepdims = other.keepdims
 

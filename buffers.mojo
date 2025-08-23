@@ -1065,13 +1065,13 @@ struct Buffer[dtype: DType = DType.float32](
             vector2 = rhs.load[simd_width](i * simd_width)
             diff = abs(vector1 - vector2)
             tolerance = atol + rtol * abs(vector2)
-            # if (diff > tolerance).reduce_or():
-            if diff > tolerance:
+            exceeded = diff.gt(tolerance)
+            if exceeded == Boolean(True):
                 return False
         for k in range(tail_start, num_elems):
             value1 = lhs[simd_blocks * simd_width + k]
             value2 = rhs[simd_blocks * simd_width + k]
-            if abs(value1 - value2) > atol + rtol * abs(value2):
+            if abs(value1 - value2).gt(atol + rtol * abs(value2)):
                 return False
 
         return True

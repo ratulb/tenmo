@@ -57,7 +57,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
     @staticmethod
     fn new(src: List[Int]) -> IntList:
         result = IntList.with_capacity(len(src))
-        memcpy(result.data, src.data, len(src))
+        memcpy(result.data, src._data, len(src))
         result.size = len(src)
         return result
 
@@ -236,7 +236,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
 
     @always_inline("nodebug")
     # fn __del__(owned self):
-    fn free(owned self):
+    fn free(deinit self):
         """Destroy the `IntList` and free its memory."""
         if self.data:
             log_debug("Calling IntList __del__")
