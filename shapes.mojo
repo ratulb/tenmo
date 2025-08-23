@@ -1,4 +1,4 @@
-from common_utils import variadiclist_as_intlist, log_debug
+from common_utils import variadiclist_as_intlist, log_debug, panic
 from intlist import IntList
 from os import abort
 from memory import Pointer
@@ -164,6 +164,17 @@ struct Shape(
                     mask.append(0)  # match or both 1 → not broadcasted
 
         return mask
+
+    @always_inline
+    @staticmethod
+    fn validate_matrix_shapes(A_shape: Shape, B_shape: Shape):
+        if not A_shape[1] == B_shape[0]:
+            panic(
+                "Shape → validate_matrix_shapes: Incompatible shapes",
+                A_shape[1].__str__(),
+                "does not equal",
+                B_shape[0].__str__(),
+            )
 
     fn reverse(self) -> Self:
         dims = self.intlist()
