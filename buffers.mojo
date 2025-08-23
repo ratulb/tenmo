@@ -1043,14 +1043,12 @@ struct Buffer[dtype: DType = DType.float32](
             product *= this.load(k)
         return product
 
+
     fn all_close[
         simd_width: Int = simdwidthof[dtype](),
-    ](
-        lhs: Buffer[dtype],
-        rhs: Buffer[dtype],
         rtol: Scalar[dtype] = 1e-5,
         atol: Scalar[dtype] = 1e-8,
-    ) -> Bool:
+    ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Bool:
         constrained[
             dtype.is_floating_point(),
             "Buffer → all_close is for floating point data types only",
@@ -1063,14 +1061,16 @@ struct Buffer[dtype: DType = DType.float32](
         for i in range(simd_blocks):
             vector1 = lhs.load[simd_width](i * simd_width)
             vector2 = rhs.load[simd_width](i * simd_width)
+
             diff = abs(vector1 - vector2)
             tolerance = atol + rtol * abs(vector2)
-            exceeded = diff.gt(tolerance)
-            if exceeded == Boolean(True):
+            if not diff.le(tolerance).reduce_and():
                 return False
+
+        # Handle tail (non-SIMD leftover)
         for k in range(tail_start, num_elems):
-            value1 = lhs[simd_blocks * simd_width + k]
-            value2 = rhs[simd_blocks * simd_width + k]
+            value1 = lhs[k]
+            value2 = rhs[k]
             if abs(value1 - value2).gt(atol + rtol * abs(value2)):
                 return False
 
@@ -1087,25 +1087,26 @@ struct Buffer[dtype: DType = DType.float32](
     ) -> Bool:
         num_elems = len(this)
         simd_blocks = num_elems // simd_width
-        remaining = num_elems % simd_width
+        tail_start = simd_blocks * simd_width
 
         for i in range(simd_blocks):
             vector = this.load[simd_width](i * simd_width)
             if simd_pred:
-                any_true = simd_pred.value()(vector)
-                if any_true.reduce_or():
+                mask = simd_pred.value()(vector)
+                if mask.reduce_or():
                     return True
             else:
                 for j in range(simd_width):
                     if scalar_pred(vector[j]):
                         return True
 
-        for k in range(remaining):
-            scalar = this.load(simd_blocks * simd_width + k)
-            if scalar_pred(scalar):
+        # Handle tail elements
+        for k in range(tail_start, num_elems):
+            if scalar_pred(this[k]):
                 return True
 
         return False
+
 
     fn for_all[
         simd_width: Int = simdwidthof[dtype](),
@@ -1230,6 +1231,6 @@ struct Iterator[
 
 fn main() raises:
     pass
+
+
 from testing import assert_true, assert_false
-
-
