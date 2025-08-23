@@ -532,12 +532,13 @@ struct Buffer[dtype: DType = DType.float32](
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            if not this.load[simd_width](idx) < scalar:
+            cmp = this.load[simd_width](idx).lt(scalar)
+            if cmp == Boolean(False):
                 return False
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            if not this.load(k) < scalar:
+            if not this.load(k).lt(scalar):
                 return False
         return True
 
@@ -549,12 +550,13 @@ struct Buffer[dtype: DType = DType.float32](
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            if not this.load[simd_width](idx) <= scalar:
+            cmp = this.load[simd_width](idx).le(scalar)
+            if cmp == Boolean(False):
                 return False
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            if not this.load(k) <= scalar:
+            if not this.load(k).le(scalar):
                 return False
         return True
 
@@ -584,12 +586,13 @@ struct Buffer[dtype: DType = DType.float32](
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            if not this.load[simd_width](idx) > scalar:
+            cmp = this.load[simd_width](idx).gt(scalar)
+            if cmp == Boolean(False):
                 return False
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            if not this.load(k) > scalar:
+            if not this.load(k).gt(scalar):
                 return False
         return True
 
@@ -619,12 +622,13 @@ struct Buffer[dtype: DType = DType.float32](
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            if not this.load[simd_width](idx) >= scalar:
+            cmp = this.load[simd_width](idx).ge(scalar)
+            if cmp == Boolean(False):
                 return False
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            if not this.load(k) >= scalar:
+            if not this.load(k).ge(scalar):
                 return False
         return True
 
@@ -722,7 +726,6 @@ struct Buffer[dtype: DType = DType.float32](
         return out
 
     fn __ne__[
-        dtype: DType,
         simd_width: Int = simdwidthof[dtype](),
     ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Bool:
         if not lhs.size == rhs.size:
@@ -737,12 +740,13 @@ struct Buffer[dtype: DType = DType.float32](
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            if not lhs.load[simd_width](idx) != rhs.load[simd_width](idx):
+            cmp = lhs.load[simd_width](idx).ne(rhs.load[simd_width](idx))
+            if cmp == Boolean(False):
                 return False
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            if lhs.load(k) != rhs.load(k):
+            if not lhs.load(k).ne(rhs.load(k)):
                 return False
         return True
 
@@ -786,12 +790,13 @@ struct Buffer[dtype: DType = DType.float32](
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            if not lhs.load[simd_width](idx) < rhs.load[simd_width](idx):
+            cmp = lhs.load[simd_width](idx).lt(rhs.load[simd_width](idx))
+            if cmp == Boolean(False):
                 return False
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            if not lhs.load(k) < rhs.load(k):
+            if not lhs.load(k).lt(rhs.load(k)):
                 return False
         return True
 
@@ -835,7 +840,7 @@ struct Buffer[dtype: DType = DType.float32](
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            if not lhs.load[simd_width](idx) <= rhs.load[simd_width](idx):
+            if not lhs.load[simd_width](idx).le(rhs.load[simd_width](idx)):
                 return False
         i = simd_blocks * simd_width
 
@@ -859,12 +864,13 @@ struct Buffer[dtype: DType = DType.float32](
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            if not lhs.load[simd_width](idx) > rhs.load[simd_width](idx):
+            cmp = lhs.load[simd_width](idx).gt(rhs.load[simd_width](idx))
+            if cmp == Boolean(False):
                 return False
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            if not lhs.load(k) > rhs.load(k):
+            if not lhs.load(k).gt(rhs.load(k)):
                 return False
         return True
 
@@ -898,7 +904,7 @@ struct Buffer[dtype: DType = DType.float32](
     ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Bool:
         if not lhs.size == rhs.size:
             panic(
-                "Buffer → __ge__: buffer size does not match -> lhs:",
+                "Buffer → __ge__(buffer): Buffer size does not match -> lhs:",
                 lhs.size.__str__(),
                 "vs. rhs:",
                 rhs.size.__str__(),
@@ -908,12 +914,13 @@ struct Buffer[dtype: DType = DType.float32](
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
-            if not lhs.load[simd_width](idx) >= rhs.load[simd_width](idx):
+            cmp = lhs.load[simd_width](idx).ge(rhs.load[simd_width](idx))
+            if cmp == Boolean(False):
                 return False
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            if not lhs.load(k) >= rhs.load(k):
+            if not lhs.load(k).ge(rhs.load(k)):
                 return False
         return True
 
@@ -952,7 +959,9 @@ struct Buffer[dtype: DType = DType.float32](
             return rebind[Buffer[DType.float64]](self)
         return self.to_dtype[DType.float64]()
 
-    fn to_dtype[NewType: DType](self) -> Buffer[NewType]:
+    fn to_dtype[
+        NewType: DType, simdwidth: Int = simdwidthof[NewType]()
+    ](self) -> Buffer[NewType]:
         total = self.size
         out = Buffer[NewType](total)
 
@@ -965,16 +974,15 @@ struct Buffer[dtype: DType = DType.float32](
                     idx, self.load[simd_width](idx).cast[NewType]()
                 )
 
-            vectorize[cast_values, simdwidthof[NewType]()](self.size)
+            vectorize[cast_values, simdwidth](self.size)
         else:
-            alias simd_width: Int = simdwidthof[NewType]()
-            simd_blocks = total // simd_width
+            simd_blocks = total // simdwidth
             for block in range(simd_blocks):
-                idx = block * simd_width
-                cmp = self.load[simd_width](idx).cast[NewType]()
-                for k in range(simd_width):
-                    out.store[simd_width](idx + k, cmp[idx + k])
-            i = simd_blocks * simd_width
+                idx = block * simdwidth
+                cmp = self.load[simdwidth](idx).cast[NewType]()
+                for k in range(simdwidth):
+                    out.store[simdwidth](idx + k, cmp[idx + k])
+            i = simd_blocks * simdwidth
 
             for k in range(i, total):
                 out.store(k, self.load(k).cast[NewType]())
@@ -1222,3 +1230,6 @@ struct Iterator[
 
 fn main() raises:
     pass
+from testing import assert_true, assert_false
+
+
