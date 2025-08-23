@@ -25,6 +25,12 @@ struct Buffer[dtype: DType = DType.float32](
         self.data = UnsafePointer[Scalar[dtype]].alloc(size)
         self.size = size
 
+    fn __init__(out self, elems: List[Scalar[dtype]]):
+        length = len(elems)
+        self.data = UnsafePointer[Scalar[dtype]].alloc(length)
+        self.size = length
+        memcpy(self.data, elems._data, length)
+
     fn __init__(out self, size: Int, data: UnsafePointer[Scalar[dtype]]):
         self.size = size
         self.data = data
@@ -1043,7 +1049,6 @@ struct Buffer[dtype: DType = DType.float32](
             product *= this.load(k)
         return product
 
-
     fn all_close[
         simd_width: Int = simdwidthof[dtype](),
         rtol: Scalar[dtype] = 1e-5,
@@ -1087,48 +1092,35 @@ struct Buffer[dtype: DType = DType.float32](
     ) -> Bool:
         num_elems = len(this)
         simd_blocks = num_elems // simd_width
-        tail_start = simd_blocks * simd_width
+        remaining = num_elems % simd_width
 
         for i in range(simd_blocks):
             vector = this.load[simd_width](i * simd_width)
             if simd_pred:
-                mask = simd_pred.value()(vector)
-                if mask.reduce_or():
+                any_true = simd_pred.value()(vector)
+                if any_true.reduce_or():
                     return True
             else:
                 for j in range(simd_width):
                     if scalar_pred(vector[j]):
                         return True
 
-        # Handle tail elements
-        for k in range(tail_start, num_elems):
-            if scalar_pred(this[k]):
+        for k in range(remaining):
+            scalar = this.load(simd_blocks * simd_width + k)
+            if scalar_pred(scalar):
                 return True
 
         return False
-
 
     fn for_all[
         simd_width: Int = simdwidthof[dtype](),
     ](this: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Buffer[
         DType.bool
     ]:
-        total = this.size
-        out = Buffer[DType.bool](total)
+        out = Buffer[DType.bool](len(this))
 
-        simd_blocks = total // simd_width
-        for block in range(simd_blocks):
-            idx = block * simd_width
-            vector = this.load[simd_width](idx)
-
-            for k in range(simd_width):
-                out.store[simd_width](
-                    idx + k, Scalar[DType.bool](pred(vector[k]))
-                )
-
-        i = simd_blocks * simd_width
-        for k in range(i, total):
-            out.store(k, Scalar[DType.bool](pred(this.load(k))))
+        for i in range(len(this)):
+            out[i] = pred(this[i])
 
         return out
 
@@ -1196,12 +1188,6 @@ struct Buffer[dtype: DType = DType.float32](
         log_debug("Buffer__del__ → freed data pointees")
         _ = this^
 
-    @staticmethod
-    fn of(elems: List[Scalar[dtype]]) -> Buffer[dtype]:
-        buffer = Buffer[dtype](len(elems))
-        memcpy(buffer.data, elems._data, len(elems))
-        return buffer^
-
 
 struct Iterator[
     dtype: DType,
@@ -1230,7 +1216,12 @@ struct Iterator[
 
 
 fn main() raises:
-    pass
+    fn pred(x: Scalar[DType.int32]) -> Bool:
+        return x % 2 == 0
+
+    buf = Buffer[DType.int32]([1, 2, 3, 4, 5])
+    mask = buf.for_all(pred)
+    print(mask)  # [False, True, False, True, False]
 
 
 from testing import assert_true, assert_false

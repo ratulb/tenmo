@@ -1,5 +1,6 @@
 from buffers import Buffer, Boolean
 
+
 fn main() raises:
     print("Running buffer tests")
     test_buffer_iter()
@@ -28,9 +29,10 @@ fn main() raises:
 
 from testing import assert_true, assert_false
 
+
 fn test_buffer_iter() raises:
     print("test_buffer_iter")
-    buff = Buffer.of([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    buff = Buffer([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     sliced = buff[4:1:-1]
     var expect = 5
     for elem in sliced:
@@ -40,10 +42,10 @@ fn test_buffer_iter() raises:
 
 fn test_buffer_slice() raises:
     print("test_buffer_slice")
-    buff = Buffer.of([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    buff = Buffer([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     sliced = buff[4:1:-2]
     assert_true(
-        (sliced == Buffer.of([5, 3])),
+        (sliced == Buffer([5, 3])),
         "Buffer slicing assertion failed",
     )
 
@@ -119,9 +121,7 @@ fn test_buffer_scalar_float_greater_than() raises:
     a = Buffer(72)
     a.fill(42.0)
     result = a > 41
-    assert_true(
-        result, "Buffer scalar float greater than assertion failed"
-    )
+    assert_true(result, "Buffer scalar float greater than assertion failed")
 
 
 fn test_buffer_scalar_float_less_than() raises:
@@ -129,9 +129,7 @@ fn test_buffer_scalar_float_less_than() raises:
     a = Buffer(72)
     a.fill(42.0)
     result = a < 43
-    assert_true(
-        result, "Buffer scalar float less than assertion failed"
-    )
+    assert_true(result, "Buffer scalar float less than assertion failed")
 
 
 fn test_buffer_scalar_float_inequality() raises:
@@ -139,9 +137,7 @@ fn test_buffer_scalar_float_inequality() raises:
     a = Buffer(72)
     a.fill(42.0)
     result = a != 43
-    assert_true(
-        result, "Buffer scalar float inequality assertion failed"
-    )
+    assert_true(result, "Buffer scalar float inequality assertion failed")
 
 
 fn test_buffer_scalar_float_equality() raises:
@@ -149,9 +145,7 @@ fn test_buffer_scalar_float_equality() raises:
     a = Buffer(72)
     a.fill(42.0)
     result = a == 42
-    assert_true(
-        result, "Buffer scalar float equality assertion failed"
-    )
+    assert_true(result, "Buffer scalar float equality assertion failed")
 
 
 fn test_buffer_dot() raises:
@@ -281,4 +275,3 @@ fn test_buffer_float_inequality() raises:
     b.fill(420)
     result = a != b
     assert_true(result, "1024 float inequality assertion failed")
-
