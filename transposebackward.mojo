@@ -25,7 +25,7 @@ struct TransposeBackward[dtype: DType](Copyable & Movable & Stringable):
         return [
             (
                 ancestor,
-                grad_transposed.contiguous(),
+                grad_transposed,
                 AddTensor,
             )
         ]

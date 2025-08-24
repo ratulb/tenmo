@@ -165,15 +165,23 @@ struct Shape(
 
         return mask
 
+    fn __add__(self, other: Shape) -> Shape:
+        dims = self.intlist() + other.intlist()
+        return Shape(dims)
+
+    fn __add__(self, other: List[Int]) -> Shape:
+        dims = self.intlist() + IntList.new(other)
+        return Shape(dims)
+
     @always_inline
     @staticmethod
     fn validate_matrix_shapes(A_shape: Shape, B_shape: Shape):
-        if not A_shape[1] == B_shape[0]:
+        if not A_shape[-1] == B_shape[-2]:
             panic(
                 "Shape → validate_matrix_shapes: Incompatible shapes",
-                A_shape[1].__str__(),
+                A_shape[-1].__str__(),
                 "does not equal",
-                B_shape[0].__str__(),
+                B_shape[-2].__str__(),
             )
 
     fn reverse(self) -> Self:
