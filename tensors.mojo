@@ -1040,7 +1040,7 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         # Validate parameters and compute absolute bounds
-        var abs_min, abs_max, abs_offset = Validator.validate_view_params(
+        var _abs_min, _abs_max, abs_offset = Validator.validate_view_params(
             self, shape, strides, offset
         )
 
@@ -1881,98 +1881,18 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn print_tensor_recursive(
-        self,
-        mut indices: IntList,
-        level: Int,
-        num_first: Int = 10,
-        num_last: Int = 10,
-    ):
-        if self.rank() == 0:  # Tensor with Shape ()
-            print(self[IntList.Empty])
-            return
-        current_dim = len(indices)
-        indent = " " * (level * 2)
-
-        if current_dim >= self.rank():
-            print(
-                "ERROR: current_dim (",
-                current_dim,
-                ") >= ndim (",
-                self.rank(),
-                ")",
-            )
-            return
-
-        size = self.shape[current_dim]
-
-        if size < 0 or size > 1_000_000:
-            print(
-                "ERROR: suspicious size: ",
-                size,
-                "at dim ",
-                current_dim,
-                self.shape.__str__(),
-            )
-            return
-
-        # Base case: last dimension (print actual elements)
-        if current_dim == self.rank() - 1:
-            print(indent + "[", end="")
-
-            for i in range(size):
-                if i < num_first:
-                    indices.append(i)
-                    print(self[indices], end="")
-                    _ = indices.pop()
-                    if i != size - 1:
-                        print(", ", end="")
-                elif i == num_first and size > num_first + num_last:
-                    print("..., ", end="")
-                elif i >= size - num_last:
-                    indices.append(i)
-                    print(self[indices], end="")
-                    _ = indices.pop()
-                    if i != size - 1:
-                        print(", ", end="")
-
-            print("]", end="")
-
-        else:
-            print(indent + "[")
-            for i in range(size):
-                if i < num_first:
-                    indices.append(i)
-                    self.print_tensor_recursive(
-                        indices, level + 1, num_first, num_last
-                    )
-                    _ = indices.pop()
-                elif i == num_first and size > num_first + num_last:
-                    print(indent + "  ...,")
-                elif i >= size - num_last:
-                    indices.append(i)
-                    self.print_tensor_recursive(
-                        indices, level + 1, num_first, num_last
-                    )
-                    _ = indices.pop()
-
-                # Print comma and newline for all but last element
-                if i != size - 1 and (i < num_first or i >= size - num_last):
-                    print(",")
-                # Special case: last element needs newline before closing bracket
-                elif i == size - 1:
-                    print()  # Newline before closing bracket
-
-            print(indent + "]", end="")
-
     fn print(self, num_first: Int = 5, num_last: Int = 1):
         print(
             self.__str__(),
             end="\n",
         )
         empty = IntList()
-        self.print_tensor_recursive(
-            empty, 1, num_first=num_first, num_last=num_last
+        print_tensor_recursive(
+            UnsafePointer(to=self),
+            empty,
+            1,
+            num_first=num_first,
+            num_last=num_last,
         )
 
     # Always use this to print grad to avoid surprises of segmentation fault!
