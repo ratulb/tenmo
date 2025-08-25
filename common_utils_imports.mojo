@@ -1,5 +1,4 @@
 from common_utils import (
-    Validator,
     compute_output_shape,
     panic,
     log_debug,

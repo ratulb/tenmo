@@ -8,6 +8,7 @@ from common_utils import *
 from utils.numerics import min_finite
 from operators import AddTensor
 from shared import TensorLite
+from strides import Strides
 
 alias Boolean = Scalar[DType.bool]
 

@@ -224,14 +224,6 @@ struct Buffer[dtype: DType = DType.float32](
                 rhs.size.__str__(),
             )
 
-        _ = """@parameter
-        fn inplace_mul_elems[simdwidth: Int](idx: Int):
-            lhs.store[simdwidth](
-                idx,
-                (lhs.load[simdwidth](idx) * rhs.load[simdwidth](idx)),
-            )
-
-        vectorize[inplace_mul_elems, simd_width](lhs.size)"""
         total = lhs.size
         alias simd_width: Int = simdwidthof[dtype]()
         simd_blocks = total // simd_width
@@ -396,7 +388,10 @@ struct Buffer[dtype: DType = DType.float32](
         fn set_scalar[simdwidth: Int](idx: Int):
             this.store[simdwidth](idx, value)
 
-        vectorize[set_scalar, simd_width](this.size)
+        if dtype == DType.bool:
+            vectorize[set_scalar, 1](this.size)
+        else:
+            vectorize[set_scalar, simd_width](this.size)
 
     fn zero(this: Buffer[dtype]):
         memset_zero(this.data, this.size)
@@ -1049,6 +1044,14 @@ struct Buffer[dtype: DType = DType.float32](
             product *= this.load(k)
         return product
 
+
+    fn count(this: Buffer[dtype], key: Scalar[dtype]) -> Int:
+        total = 0
+        for val in this:
+            if key == val:
+                total += 1
+        return total
+
     fn all_close[
         simd_width: Int = simdwidthof[dtype](),
         rtol: Scalar[dtype] = 1e-5,
@@ -1144,13 +1147,11 @@ struct Buffer[dtype: DType = DType.float32](
 
         return True
 
-    fn all_true[
-        simd_width: Int = simdwidthof[DType.bool](),
-    ](buf: Buffer[DType.bool]) -> Bool:
+    fn all_true(buf: Buffer[DType.bool]) -> Bool:
         fn pred(scalar: Scalar[DType.bool]) -> Bool:
             return scalar == Scalar[DType.bool](True)
 
-        return buf.all_true[simd_width](pred)
+        return buf.all_true[1](pred)
 
     @no_inline
     fn __str__(self) -> String:

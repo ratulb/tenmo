@@ -61,7 +61,6 @@ struct MatmulBackward[dtype: DType](Copyable & Movable & Stringable):
         trans_a: Bool = False,
         trans_b: Bool = False,
     ) -> (Optional[Tensor[dtype]], Optional[Tensor[dtype]]):
-
         var dA: Optional[Tensor[dtype]] = None
         var dB: Optional[Tensor[dtype]] = None
 
@@ -115,6 +114,26 @@ struct MatmulBackward[dtype: DType](Copyable & Movable & Stringable):
                 )
 
         return dA, dB
+
+    @staticmethod
+    fn sum_over_broadcasted_axes(
+        tensor: Tensor[dtype], target_shape: List[Int]
+    ) -> Tensor[dtype]:
+        """Sum over dimensions that were broadcasted in the forward pass."""
+        result = tensor
+        current_shape = tensor.shape
+
+        # Sum over extra leading dimensions
+        while len(current_shape) > len(target_shape):
+            result = result.sum(axes=[0], keepdims=False)
+            current_shape = result.shape
+
+        # Sum over mismatched dimensions
+        for i in range(len(target_shape)):
+            if current_shape[i] != target_shape[i] and current_shape[i] > 1:
+                result = result.sum(axes=[i], keepdims=True)
+                current_shape = result.shape
+        return result
 
 
 fn main():
