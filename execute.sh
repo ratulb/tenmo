@@ -15,6 +15,7 @@ fi
 # Determine which test to run based on the argument
 case $1 in
     tensors)
+        echo "Running tensor tests"
         mojo -I . $DEBUG_MODE tests/test_tensors.mojo
         ;;
     buffers)
