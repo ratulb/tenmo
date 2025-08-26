@@ -1235,7 +1235,9 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         shape = self.shape
         normalized_axes = (
-            Validator.validate_axes(axes, shape) if len(axes)
+            Validator.validate_and_normalize_axes(
+                shape, axes, ordered=False, fill_missing=True
+            ) if len(axes)
             > 0 else IntList.range_list(shape.rank()).reversed()
         )
 

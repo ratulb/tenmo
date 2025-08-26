@@ -5,6 +5,24 @@ from validators import Validator
 
 from testing import assert_true
 
+fn test_validate_and_normalize_axes() raises:
+    print("test_validate_and_normalize_axes")
+    shape = Shape([2, 3, 4])
+    axes = Validator.validate_and_normalize_axes(shape, IntList.Empty)
+    assert_true(
+        axes == IntList(0, 1, 2), "Assertion failed for empty axes list"
+    )
+    axes = Validator.validate_and_normalize_axes(Shape.Void, IntList.Empty)
+    assert_true(
+        axes == IntList(), "Assertion failed for empty shape and empy axes list"
+    )
+    axes = Validator.validate_and_normalize_axes(
+        shape, IntList(-1, -2), ordered=False, fill_missing=True
+    )
+    assert_true(
+        axes == IntList(0, 2, 1),
+        "Assertion failed for ordered False and fill missing",
+    )
 
 fn test_validate_new_shape() raises:
     print("test_validate_new_shape")
@@ -24,3 +42,4 @@ fn test_validate_new_shape() raises:
 
 fn main() raises:
     test_validate_new_shape()
+    test_validate_and_normalize_axes()

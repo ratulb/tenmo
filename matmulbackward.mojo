@@ -1,7 +1,6 @@
 from tensors import Tensor
 from shared import TensorLite
 from shapes import Shape
-from intlist import IntList
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
 
@@ -179,19 +178,15 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
         if not trans_a and not trans_b:
             # Forward: C = A @ B
             if A.requires_grad:
-                axes = IntList.range_list(B.rank())
-                axes.swap(-2, -1)
                 A_batch_grad = gradients.matmul_nd(
-                    B.transpose(axes=axes, requires_grad=False)
+                    B.transpose(axes=[-1, -2], requires_grad=False)
                 )
                 dA = Optional(
                     Self.sum_over_broadcasted_axes[dtype](A_batch_grad, A.shape)
                 )
             if B.requires_grad:
-                axes = IntList.range_list(A.rank())
-                axes.swap(-2, -1)
                 B_batch_grad = A.transpose(
-                    axes=axes, requires_grad=False
+                    axes=[-1, -2], requires_grad=False
                 ).matmul_nd(gradients)
                 dB = Optional(
                     Self.sum_over_broadcasted_axes[dtype](B_batch_grad, B.shape)
@@ -243,9 +238,9 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
         return dA, dB
 
     @staticmethod
-    fn sum_over_broadcasted_axes[dtype: DType](
-        batch_grad: Tensor[dtype], recipient_shape: Shape
-    ) -> Tensor[dtype]:
+    fn sum_over_broadcasted_axes[
+        dtype: DType
+    ](batch_grad: Tensor[dtype], recipient_shape: Shape) -> Tensor[dtype]:
         """Sum over dimensions that were broadcasted in the forward pass."""
         result = batch_grad
         current_shape = batch_grad.shape

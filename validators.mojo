@@ -20,22 +20,31 @@ struct Validator:
                 )
 
     @staticmethod
-    fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
+    fn validate_and_normalize_axes(
+        shape: Shape,
+        axes: IntList,
+        ordered: Bool = True,
+        fill_missing: Bool = False,
+    ) -> IntList:
         """Validate and normalize axes for reduction operations.
         Args:
-            shape: Tensor shape to validate against
-            axes: Input axes to normalize
+            shape: Tensor shape to validate against.
+            axes: Input axes to normalize.
+            ordered: Wheather to sort the axes.
+            fill_missing: Wheather add missing axes.
         Returns:
-            Normalized, sorted, and deduplicated axes
+            Normalized, sorted(default) axes.
         Behavior:
             - For scalar tensors (rank=0):
-                - `[-1]` → empty list (reduce all)
-                - Any other non-empty axes → error
+                - `[-1]` → empty list (reduce all).
+                - Any other non-empty axes → error.
             - For non-scalar tensors:
-                - Empty list → reduce all axes (return 0..rank-1)
-                - Normalize negative indices
-                - Validate bounds
-                - Sort and deduplicate.
+                - Empty list → reduce all axes (return 0..rank-1).
+                - Normalize negative indices.
+                - Validate bounds.
+                - Error on deduplicate axes.
+                - Fill missing axes if explicitly asked.
+
         """
         rank = shape.rank()
         # Handle scalar case (rank=0)
@@ -63,105 +72,36 @@ struct Validator:
             normalized_axis = axis if axis >= 0 else axis + rank
             if normalized_axis < 0 or normalized_axis >= rank:
                 panic(
-                    "Tensor → validate_and_normalize_axes - invalid axis: "
+                    "Validator → validate_and_normalize_axes - invalid axis: "
                     + String(axis)
                     + " for tensor shape: "
                     + shape.__str__()
                 )
             normalized.append(normalized_axis)
 
-        # Ensure uniqueness and sorted order
-        normalized.sort_and_deduplicate()
-        if len(normalized) == rank:
+        # Validate uniqueness always
+        unique = IntList()
+        for axis in normalized:
+            if axis in unique:
+                panic(
+                    "validate_and_normalize_axes → duplicate axis",
+                    axis.__str__(),
+                )
+            unique.append(axis)
+        unique.free()
+
+        # Sorted order
+        if ordered:
+            normalized.sort()
+        if not fill_missing:
             return normalized
         # If partial: specified axes go to front, others follow in original order
         seen = normalized
         result = normalized  # Start with specified axes
         for i in range(rank):
             if i not in seen:
-                result.append(i)
+                result = result.insert(i, i)
         return result
-
-    @staticmethod
-    fn validate_axes(axes: IntList, shape: Shape) -> IntList:
-        rank = shape.rank()
-        var normalized_axes = IntList.with_capacity(rank)
-        if axes.len() != rank:
-            panic(
-                "Validator → validate_axes: transpose axes must have length",
-                String(rank) + ",",
-                "but got",
-                String(axes.len()),
-            )
-        var seen = IntList.filled(rank, 0)
-        # Normalize/validate/check duplicate
-        for axis in axes:
-            normalized_axis = axis if axis >= 0 else axis + rank
-            if normalized_axis < 0 or normalized_axis >= rank:
-                panic(
-                    "Validator → validate_axes: invalid axis",
-                    String(axis),
-                    "in transpose: must be in range [0,"
-                    + String(rank - 1)
-                    + "]",
-                )
-
-            if seen[normalized_axis] == 1:
-                panic(
-                    "Validator → validate_axes: duplicate axis",
-                    String(axis),
-                    "in transpose axes",
-                )
-
-            seen[normalized_axis] = 1
-            normalized_axes.append(normalized_axis)
-        return normalized_axes
-
-    @staticmethod
-    fn validate_indices(
-        indices: IntList,
-        shape: Shape,
-        prefix: String = "",
-        do_panic: Bool = True,
-    ) -> Bool:
-        # Check rank match
-        if len(indices) != shape.rank():
-            if do_panic:
-                panic(
-                    prefix + " →" if prefix else "",
-                    "Incorrect number of indices: expected "
-                    + String(shape.rank())
-                    + ", got "
-                    + String(len(indices)),
-                )
-            return False
-
-        # Check each index
-        for i in range(shape.rank()):
-            if indices[i] < 0:
-                if do_panic:
-                    panic(
-                        prefix + " →" if prefix else "",
-                        "Negative index at dimension "
-                        + String(i)
-                        + ": "
-                        + String(indices[i]),
-                    )
-                return False
-            if indices[i] >= shape[i]:
-                if do_panic:
-                    panic(
-                        prefix + " →" if prefix else "",
-                        "Index out of bounds at dimension "
-                        + String(i)
-                        + ": "
-                        + String(indices[i])
-                        + " >= "
-                        + String(shape[i]),
-                    )
-                return False
-
-        return True
 
     @staticmethod
     fn validate_new_shape(curr_dims: IntList, new_dims: IntList) -> Shape:
@@ -484,3 +424,6 @@ struct Validator:
 
 fn main() raises:
     pass
+
+
+from testing import assert_true
