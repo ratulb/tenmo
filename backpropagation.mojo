@@ -3,19 +3,7 @@ from shared import TensorLite
 from operators import AddTensor, SubtractTensor
 from utils import Variant
 from os import abort
-from sumbackward import SumBackward
-from meanbackward import MeanBackward
-from addbackward import AddBackward, AddBackwardScalar
-from subbackward import SubBackward, SubLeftRightBackwardScalar
-from broadcastbackward import BroadcastBackward
-from reshapebackward import ReshapeBackward
-from mulbackward import MultiplyBackward, MulBackwardScalar
-from exponientionbackward import ExponientionBackward
-from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
-from transposebackward import TBackward, TransposeBackward
-from matmulbackward import MatmulBackward, BatchedMatmulBackward
-from viewbackward import ViewBackward
-from permutebackward import PermuteBackward
+from walkback import *
 
 alias Delegate[dtype: DType] = Variant[
     MatmulBackward[dtype],
@@ -38,6 +26,7 @@ alias Delegate[dtype: DType] = Variant[
     BroadcastBackward[dtype, AddTensor, AddTensor, False],
     BroadcastBackward[dtype, AddTensor, AddTensor, True],
     BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
+    DotBackward[dtype],
 ]
 
 
@@ -104,6 +93,10 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[MulBackwardScalar[dtype]]():
             return self.grad_fn[MulBackwardScalar[dtype]].backward[dtype](
+                output
+            )
+        elif self.grad_fn.isa[DotBackward[dtype]]():
+            return self.grad_fn[DotBackward[dtype]].backward[dtype](
                 output
             )
 
