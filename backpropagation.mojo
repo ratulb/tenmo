@@ -13,16 +13,15 @@ from mulbackward import MultiplyBackward, MulBackwardScalar
 from exponientionbackward import ExponientionBackward
 from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
 from transposebackward import TBackward, TransposeBackward
-from matmulbackward import MatmulBackward
+from matmulbackward import MatmulBackward, BatchedMatmulBackward
 from viewbackward import ViewBackward
 from permutebackward import PermuteBackward
-#from tensorviewbackward import TensorViewBackward
 
 alias Delegate[dtype: DType] = Variant[
     MatmulBackward[dtype],
+    BatchedMatmulBackward[dtype],
     ReshapeBackward[dtype],
     ViewBackward[dtype],
-    #TensorViewBackward[dtype],
     PermuteBackward[dtype],
     SumBackward[dtype],
     MeanBackward[dtype],
@@ -36,7 +35,6 @@ alias Delegate[dtype: DType] = Variant[
     RightTrueDivBackwardScalar[dtype],
     ExponientionBackward[dtype],
     TransposeBackward[dtype],
-    #TBackward[dtype],
     BroadcastBackward[dtype, AddTensor, AddTensor, False],
     BroadcastBackward[dtype, AddTensor, AddTensor, True],
     BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
@@ -58,15 +56,12 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     fn __call__(
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        _="""
-           elif self.grad_fn.isa[TBackward[dtype]]():
-            return self.grad_fn[TBackward[dtype]].backward[dtype](output)
-
-           if self.grad_fn.isa[TensorViewBackward[dtype]]():
-            return self.grad_fn[TensorViewBackward[dtype]].backward[dtype](output)"""
 
         if self.grad_fn.isa[MatmulBackward[dtype]]():
             return self.grad_fn[MatmulBackward[dtype]].backward[dtype](output)
+
+        if self.grad_fn.isa[BatchedMatmulBackward[dtype]]():
+            return self.grad_fn[BatchedMatmulBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[ReshapeBackward[dtype]]():
             return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](output)

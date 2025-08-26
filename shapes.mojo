@@ -176,6 +176,7 @@ struct Shape(
     @always_inline
     @staticmethod
     fn validate_matrix_shapes(A_shape: Shape, B_shape: Shape):
+        print("Incoming shapes: ", A_shape, B_shape, A_shape[-1], B_shape[-2])
         if not A_shape[-1] == B_shape[-2]:
             panic(
                 "Shape → validate_matrix_shapes: Incompatible shapes",

@@ -1,5 +1,5 @@
 from backpropagation import BackwardFn
-from matmulbackward import MatmulBackward
+from matmulbackward import MatmulBackward, BatchedMatmulBackward
 from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar

@@ -351,6 +351,21 @@ struct Validator:
                     )
                 offset += axis * stride_dim
                 # No shape/strides append (reduces rank)
+            elif idx.isa[IntList]():
+                list = idx[IntList]
+                for t in range(len(list)):
+                    shape_dim = original_shape[dim_counter]
+                    stride_dim = original_strides[dim_counter]
+                    dim_counter += 1
+
+                    var ai = list[t]
+                    if ai < 0: ai += shape_dim
+                    if not 0 <= ai < shape_dim:
+                        panic("Index ", String(ai), " out of bounds for dim ", String(shape_dim))
+
+                    offset += ai * stride_dim
+                # Multiple dims consumed; rank reduced by len(list)
+
             elif idx.isa[Slice]():
                 # Case 3: Slicing
                 s = idx[Slice]

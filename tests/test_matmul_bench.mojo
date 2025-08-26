@@ -7,13 +7,13 @@ from sys import simdwidthof
 
 
 fn main() raises:
-    A_rows, A_cols = 64, 64
-    B_rows, B_cols = 64, 64
+    A_rows, A_cols = 65, 128
+    B_rows, B_cols = 128, 65
 
     A = Tensor.rand(A_rows, A_cols)
     B = Tensor.rand(B_rows, B_cols)
     #A = A.into_view()
-    B = B.into_view()
+    #B = B.into_view()
     expected, t1 = mm_naive(A, B)
     result, t2 = bench_tensor_tensor(A, B)
     assert_true(expected.all_close(result))

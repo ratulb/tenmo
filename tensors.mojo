@@ -959,7 +959,8 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         if self.rank() != 2:
-            abort("Tensor → load: supported only for 2D tensors")
+            #abort("Tensor → load: supported only for 2D tensors")
+            pass
 
         if (
             row < 0
@@ -1233,6 +1234,7 @@ struct Tensor[dtype: DType = DType.float32](
         self, axes: IntList, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         shape = self.shape
+        print("Transposed getting invoked for shape: ", shape)
         var normalized_axes = Validator.validate_axes(
             axes if len(axes)
             > 0 else IntList.range_list(shape.rank()).reversed(),
@@ -1936,11 +1938,6 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn matmul[
         simd_width: Int = simdwidthof[dtype]()
-    ](A: Tensor[dtype], B: UnsafePointer[Tensor[dtype]]) -> Tensor[dtype]:
-        return A.matmul[simd_width](B[])
-
-    fn matmul[
-        simd_width: Int = simdwidthof[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         Shape.validate_matrix_shapes(A.shape, B.shape)
         rows_a = A.shape[0]
@@ -1980,6 +1977,57 @@ struct Tensor[dtype: DType = DType.float32](
             C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
         return C
 
+    @staticmethod
+    fn matmul_2d[
+        simd_width: Int = simdwidthof[dtype]()
+    ](
+        A_ptr: UnsafePointer[Tensor[dtype]],
+        B_ptr: UnsafePointer[Tensor[dtype]],
+        C_ptr: UnsafePointer[Tensor[dtype]] = UnsafePointer[Tensor[dtype]](),
+        track_grad: Bool = True,
+    ) -> Tensor[dtype]:
+        A = A_ptr[]
+        B = B_ptr[]
+        Shape.validate_matrix_shapes(A.shape, B.shape)
+        rows_a = A.shape[0]
+        cols_a = A.shape[1]
+        cols_b = B.shape[1]
+        packed = B.is_contiguous()
+
+        C = C_ptr[] if C_ptr.__as_bool__() else Tensor[dtype].zeros(
+            rows_a, cols_b
+        )
+        for i in range(0, rows_a):
+            for j in range(0, cols_b, simd_width):
+                mbatch = min(simd_width, cols_b - j)
+                var accum = SIMD[dtype, simd_width](0)
+
+                for k in range(0, cols_a):
+                    scalar_a = A.load(i, k)
+                    if packed and mbatch == simd_width:
+                        simd_vector = B.load[simd_width](k, j)
+                        accum += simd_vector * scalar_a
+                    else:
+                        # mbatch < simd_width or scattered B cols
+                        for step in range(0, mbatch):
+                            scalar_b = B.load(k, j + step)
+                            accum[step] += scalar_a * scalar_b
+
+                if mbatch == simd_width:
+                    C.store[simd_width](i, j, accum)
+                else:
+                    for step in range(0, mbatch):
+                        C.store(i, j + step, accum[step])
+
+        requires_grad = A.requires_grad or B.requires_grad
+        if requires_grad and track_grad:
+            C.requires_grad = True
+            C.init_gradbox()
+            backward_fn = MatmulBackward[dtype]().into_backward_fn()
+            C.backwardFn = Optional(backward_fn)
+            C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
+        return C
+
     fn matmul_nd(A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         Shape.validate_matrix_shapes(A.shape, B.shape)
 
@@ -1988,39 +2036,111 @@ struct Tensor[dtype: DType = DType.float32](
             A.shape[0:-2], B.shape[0:-2]
         )  # all dims except last 2
         m = A.shape[-2]
-        k = A.shape[-1]
         n = B.shape[-1]
-
+        batch_dims_a = A.shape[:-2]
+        batch_dims_b = B.shape[:-2]
         out_shape = batch_shape + [m, n]
         C = Tensor[dtype].zeros(out_shape)
 
-        # flatten batch into single dimension
-        _ = """batch_size = product(batch_shape)
-
-        for b in range(0, batch_size):
+        for indices in batch_shape:
             # select batch slices
-            A_slice = A.index_select_batch(b, batch_shape)
-            B_slice = B.index_select_batch(b, batch_shape)
-            C_slice = C.index_select_batch(b, batch_shape)
+            A_indices = Self.broadcasted_indices(
+                indices, batch_shape, batch_dims_a
+            )
+            B_indices = Self.broadcasted_indices(
+                indices, batch_shape, batch_dims_b
+            )
 
-            # call your fast 2D kernel
-            matmul2d_inplace(A_slice, B_slice, C_slice)"""
+            A_slice = A[il(A_indices), s(), s()]
+            B_slice = B[il(B_indices), s(), s()]
+            C_slice = C[il(indices), s(), s()]
+
+            _ = Self.matmul_2d(
+                UnsafePointer(to=A_slice),
+                UnsafePointer(to=B_slice),
+                UnsafePointer(to=C_slice),
+                track_grad=False,
+            )
+
+        two_dim  = A.rank() == 2 and B.rank() == 2
+        if  A.requires_grad or B.requires_grad:
+            C.requires_grad_()
+
+            if two_dim:
+                mbfn = MatmulBackward[dtype]().into_backward_fn()
+                C.backwardFn = Optional(mbfn)
+            else:
+                bmbfn = BatchedMatmulBackward[dtype]().into_backward_fn()
+                C.backwardFn = Optional(bmbfn)
+
+            C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
 
         return C
+
+    @staticmethod
+    fn broadcasted_indices(
+        target_indices: IntList, target_shape: Shape, source_shape: Shape
+    ) -> IntList:
+        """Get coordinates for source tensor given target coordinates."""
+        var source_indices = IntList.with_capacity(len(source_shape))
+
+        for i in range(len(source_shape)):
+            target_idx = len(target_shape) - len(source_shape) + i
+            if source_shape[i] == 1:
+                source_indices.append(0)  # Broadcasted dimension → use 0
+            else:
+                source_indices.append(
+                    target_indices[target_idx]
+                )  # Normal dimension
+
+        return source_indices
+
 
 
 from testing import assert_true
 
 
 fn test_validate_matmul_last_2_dims() raises:
-    a = Tensor.rand(3, 4, 5)
-    b = Tensor.rand(5, 5)
-    Shape.validate_matrix_shapes(a.shape[-2:], b.shape[-2:])
+    a = Tensor.arange(2 * 3 * 5 * 4, requires_grad=True)
+    #a = Tensor.arange(5 * 4, requires_grad=True)
+    a_reshaped = a.reshape(2, 3, 5, -1)
+    #a_reshaped = a.reshape(5, -1)
+    b = Tensor.arange(4 * 5, requires_grad=True)
+    b_reshaped = b.reshape(4, 5)
+    # Shape.validate_matrix_shapes(a.shape[-2:], b.shape[-2:])
+    result = a_reshaped.matmul_nd(b_reshaped)
+    print("Forward is all done")
+    result.backward()
+    print()
+    print("a grad")
+    a.gradbox[].reshape(2, 3, 5, 4).print()
+    print()
+    b.gradbox[].reshape(4, 5).print()
 
+fn test_batched_tensor_transpose() raises:
+
+    # Test transpose behavior
+    test_tensor = Tensor.zeros(2, 3, 5, 4)
+    print("Original shape:", test_tensor.shape)
+
+    # Test default transpose (probably wrong)
+    transposed_default = test_tensor.transpose()
+    print("Default transpose:", transposed_default.shape)  # Probably (4, 5, 3, 2)
+
+    # Test matrix-only transpose (what you want)
+    transposed_matrix = test_tensor.transpose(axes=[0, 1, 3, 2])
+    print("Matrix transpose:", transposed_matrix.shape)  # Should be (2, 3, 4, 5)
 
 fn main() raises:
-    # test_validate_matmul_last_2_dims()
-    a = Tensor.rand(3, 2, 4)
-    b = Tensor.rand(4, 3)
+    #test_batched_tensor_transpose()
+    test_validate_matmul_last_2_dims()
+    _ = """a = Tensor.arange(2 * 3 * 4, requires_grad=True).reshape(2, 3, 4)
+    a.print()
+    print()
+    v = a[il(1), s(), s()]
+    print(v.is_contiguous())
+    v.print()
+    print()"""
+    _ = """b = Tensor.rand(4, 3)
     c = a.matmul_nd(b)
-    c.print()
+    c.print()"""

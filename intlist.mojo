@@ -107,6 +107,17 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
 
         return False
 
+    fn swap(mut self, this_index: Int, that_index: Int):
+        """Swaps elements at different indices."""
+        index1 = this_index + len(self) if this_index < 0 else this_index
+        index2 = that_index + len(self) if that_index < 0 else that_index
+
+        if not 0 <= index1 < len(self) and 0 <= index2 < len(self):
+            panic("IntList → swap: provided index(indices) is(are) out of bounds")
+
+        if index1 != index2:
+            swap((self.data + index1)[], (self.data + index2)[])
+
     fn sort_and_deduplicate(mut self):
         if len(self) == 0:
             return
@@ -718,7 +729,8 @@ fn main() raises:
     ll = IntList.new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     sliced = ll[2::3]
     print(sliced)
-
+    sliced.swap(-1, -2)
+    print(sliced)
 
     test_negative_indices()
     test_any()
