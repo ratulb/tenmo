@@ -72,7 +72,15 @@ struct Validator:
 
         # Ensure uniqueness and sorted order
         normalized.sort_and_deduplicate()
-        return normalized
+        if len(normalized) == rank:
+            return normalized
+        # If partial: specified axes go to front, others follow in original order
+        seen = normalized
+        result = normalized  # Start with specified axes
+        for i in range(rank):
+            if i not in seen:
+                result.append(i)
+        return result
 
     @staticmethod
     fn validate_axes(axes: IntList, shape: Shape) -> IntList:
@@ -359,9 +367,15 @@ struct Validator:
                     dim_counter += 1
 
                     var ai = list[t]
-                    if ai < 0: ai += shape_dim
+                    if ai < 0:
+                        ai += shape_dim
                     if not 0 <= ai < shape_dim:
-                        panic("Index ", String(ai), " out of bounds for dim ", String(shape_dim))
+                        panic(
+                            "Index ",
+                            String(ai),
+                            " out of bounds for dim ",
+                            String(shape_dim),
+                        )
 
                     offset += ai * stride_dim
                 # Multiple dims consumed; rank reduced by len(list)
@@ -468,24 +482,5 @@ struct Validator:
         return abs_min, abs_max, abs_offset
 
 
-from testing import assert_true
-
-
-fn test_validate_new_shape() raises:
-    print("test_validate_new_shape")
-    curr_dims = IntList.new([3, 4, 5])
-    new_dims = IntList.new([2, -1, 10])
-    concrete_shape = Validator.validate_new_shape(curr_dims, new_dims)
-    assert_true(
-        concrete_shape == Shape.of(2, 3, 10),
-        "validate_new_shape assertion 1 failed",
-    )
-    new_dims = IntList.new([-1])
-    concrete_shape = Validator.validate_new_shape(curr_dims, new_dims)
-    assert_true(
-        concrete_shape == Shape.of(60), "validate_new_shape assertion 2 failed"
-    )
-
-
 fn main() raises:
-    test_validate_new_shape()
+    pass

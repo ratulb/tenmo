@@ -959,7 +959,7 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         if self.rank() != 2:
-            #abort("Tensor → load: supported only for 2D tensors")
+            # abort("Tensor → load: supported only for 2D tensors")
             pass
 
         if (
@@ -1234,25 +1234,24 @@ struct Tensor[dtype: DType = DType.float32](
         self, axes: IntList, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         shape = self.shape
-        print("Transposed getting invoked for shape: ", shape)
-        var normalized_axes = Validator.validate_axes(
-            axes if len(axes)
-            > 0 else IntList.range_list(shape.rank()).reversed(),
-            shape,
+        normalized_axes = (
+            Validator.validate_axes(axes, shape) if len(axes)
+            > 0 else IntList.range_list(shape.rank()).reversed()
         )
 
         # Permute shape and create default strides and permute
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides.permute(normalized_axes)
-        out = self.view(
-            new_shape,
-            new_strides,
-            offset=0,
-            requires_grad=False,
-        )
+
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
+
+        base_addr = self.address() if self.owns_data else self.base.copy()
+        out = Tensor[dtype](
+            new_shape, base_addr, new_strides, self.offset, grad_required
+        )
+
         if grad_required:
             out.requires_grad_(True)
             backward_fn = TransposeBackward[dtype](
@@ -2062,8 +2061,8 @@ struct Tensor[dtype: DType = DType.float32](
                 track_grad=False,
             )
 
-        two_dim  = A.rank() == 2 and B.rank() == 2
-        if  A.requires_grad or B.requires_grad:
+        two_dim = A.rank() == 2 and B.rank() == 2
+        if A.requires_grad or B.requires_grad:
             C.requires_grad_()
 
             if two_dim:
@@ -2096,15 +2095,14 @@ struct Tensor[dtype: DType = DType.float32](
         return source_indices
 
 
-
 from testing import assert_true
 
 
 fn test_validate_matmul_last_2_dims() raises:
     a = Tensor.arange(2 * 3 * 5 * 4, requires_grad=True)
-    #a = Tensor.arange(5 * 4, requires_grad=True)
+    # a = Tensor.arange(5 * 4, requires_grad=True)
     a_reshaped = a.reshape(2, 3, 5, -1)
-    #a_reshaped = a.reshape(5, -1)
+    # a_reshaped = a.reshape(5, -1)
     b = Tensor.arange(4 * 5, requires_grad=True)
     b_reshaped = b.reshape(4, 5)
     # Shape.validate_matrix_shapes(a.shape[-2:], b.shape[-2:])
@@ -2117,22 +2115,27 @@ fn test_validate_matmul_last_2_dims() raises:
     print()
     b.gradbox[].reshape(4, 5).print()
 
-fn test_batched_tensor_transpose() raises:
 
+fn test_batched_tensor_transpose() raises:
     # Test transpose behavior
     test_tensor = Tensor.zeros(2, 3, 5, 4)
     print("Original shape:", test_tensor.shape)
 
     # Test default transpose (probably wrong)
     transposed_default = test_tensor.transpose()
-    print("Default transpose:", transposed_default.shape)  # Probably (4, 5, 3, 2)
+    print(
+        "Default transpose:", transposed_default.shape
+    )  # Probably (4, 5, 3, 2)
 
     # Test matrix-only transpose (what you want)
     transposed_matrix = test_tensor.transpose(axes=[0, 1, 3, 2])
-    print("Matrix transpose:", transposed_matrix.shape)  # Should be (2, 3, 4, 5)
+    print(
+        "Matrix transpose:", transposed_matrix.shape
+    )  # Should be (2, 3, 4, 5)
+
 
 fn main() raises:
-    #test_batched_tensor_transpose()
+    # test_batched_tensor_transpose()
     test_validate_matmul_last_2_dims()
     _ = """a = Tensor.arange(2 * 3 * 4, requires_grad=True).reshape(2, 3, 4)
     a.print()
