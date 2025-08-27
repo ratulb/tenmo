@@ -163,15 +163,16 @@ struct Buffer[dtype: DType = DType.float32](
             )
         total = lhs.size
         out = Buffer[DType.bool](total)
-        _ = """@parameter
+        @parameter
         fn mul_elems[simdwidth: Int](idx: Int):
             out.store[simdwidth](
                 idx,
                 (lhs.load[simdwidth](idx) * rhs.load[simdwidth](idx)),
             )
 
-        vectorize[mul_elems, simdwidthof[DType.bool]()](lhs.size)"""
-        alias simd_width = simdwidthof[DType.bool]()
+        #vectorize[mul_elems, simdwidthof[DType.bool]()](lhs.size)
+        vectorize[mul_elems, 1](lhs.size)
+        _="""alias simd_width = simdwidthof[DType.bool]()
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
@@ -182,7 +183,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Scalar[DType.bool](lhs.load(k) == rhs.load(k)))
+            out.store(k, Scalar[DType.bool](lhs.load(k) == rhs.load(k)))"""
         return out
 
     fn __mul__[

@@ -5,7 +5,6 @@ fn main() raises:
     print("Running buffer tests")
     test_buffer_iter()
     test_buffer_slice()
-    test_buffer_buffer_mul()
     test_buffer_buffer_add()
     test_buffer_buffer_mul()
     test_buffer_scalar_float_greater_than()
@@ -60,7 +59,6 @@ fn test_buffer_buffer_mul() raises:
     expect.fill(Boolean(True))
     mul_result = x * y
     cmp_result = mul_result == expect
-
     assert_true(
         cmp_result,
         "Buffer buffer mul for boolean - assertion failed",
