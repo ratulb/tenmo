@@ -27,6 +27,8 @@ alias Delegate[dtype: DType] = Variant[
     BroadcastBackward[dtype, AddTensor, AddTensor, True],
     BroadcastBackward[dtype, AddTensor, SubtractTensor, False],
     DotBackward[dtype],
+    VectorMatrixMMBackward[dtype],
+    MatrixVectorMMBackward[dtype],
 ]
 
 
@@ -95,8 +97,19 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[MulBackwardScalar[dtype]].backward[dtype](
                 output
             )
+
         elif self.grad_fn.isa[DotBackward[dtype]]():
             return self.grad_fn[DotBackward[dtype]].backward[dtype](
+                output
+            )
+
+        elif self.grad_fn.isa[VectorMatrixMMBackward[dtype]]():
+            return self.grad_fn[VectorMatrixMMBackward[dtype]].backward[dtype](
+                output
+            )
+
+        elif self.grad_fn.isa[MatrixVectorMMBackward[dtype]]():
+            return self.grad_fn[MatrixVectorMMBackward[dtype]].backward[dtype](
                 output
             )
 

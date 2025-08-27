@@ -12,4 +12,7 @@ from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
 from transposebackward import TransposeBackward
 from viewbackward import ViewBackward
 from permutebackward import PermuteBackward
-#from tensorviewbackward import TensorViewBackward
+from dotbackward import DotBackward
+from vectormatrixmmbackward import VectorMatrixMMBackward
+from matrixvectormmbackward import MatrixVectorMMBackward
+

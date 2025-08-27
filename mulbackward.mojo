@@ -7,6 +7,7 @@ from operators import (
 
 
 @fieldwise_init
+@register_passable
 struct MulBackwardScalar[dtype: DType](Copyable & Movable):
     var factor: Scalar[dtype]
 
@@ -32,6 +33,7 @@ struct MulBackwardScalar[dtype: DType](Copyable & Movable):
 
 
 @fieldwise_init
+@register_passable
 struct MultiplyBackward[dtype: DType](Copyable & Movable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))

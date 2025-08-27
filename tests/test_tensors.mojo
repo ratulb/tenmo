@@ -3176,9 +3176,86 @@ fn test_reshape_exp() raises:
     result = tensor3 * 12
     result.backward()
 
+fn test_validate_matmul_last_2_dims() raises:
+    print("test_validate_matmul_last_2_dims")
+    a = Tensor.arange(2 * 3 * 5 * 4, requires_grad=True)
+    a_reshaped = a.reshape(2, 3, 5, -1)
+    b = Tensor.arange(4 * 5, requires_grad=True)
+    b_reshaped = b.reshape(4, 5)
+    result = a_reshaped.matmul(b_reshaped)
+    result.backward()
+    #a.gradbox[].reshape(2, 3, 5, 4).print()
+    expected = Tensor.d2([[1740, 1740, 1740, 1740, 1740],[1770, 1770, 1770, 1770, 1770],[1800, 1800, 1800, 1800, 1800], [1830, 1830, 1830, 1830, 1830]])
+
+    assert_true((b.gradbox[].reshape(4, 5) == expected).all_true(), "batched tensor multiplication assertion failed")
+
+
+fn test_tensor_dot() raises:
+    print("test_tensor_dot")
+    a = Tensor.scalar(5, requires_grad=True)
+    b = Tensor.scalar(15, requires_grad=True)
+    c = a.matmul(b)
+    c.backward()
+    assert_true(a.gradbox[].item() == 15)
+    assert_true(b.gradbox[].item() == 5)
+
+    d = a.into_view()
+    e = d.matmul(b)
+    e.backward()
+    assert_true(a.gradbox[].item() == 30)
+    assert_true(b.gradbox[].item() == 10)
+    assert_true(d.gradbox[].item() == 0)
+    a.free()
+    b.free()
+    c.free()
+    d.free()
+    e.free()
+
+    a = Tensor.arange(10, requires_grad=True)
+    b = a[5::2]
+    c = Tensor.d1([3, 4, 5])
+    d = b.matmul(c)
+    d.backward()
+    assert_true(
+        a.gradbox[].all_close(Tensor.d1([0, 0, 0, 0, 0, 3, 0, 4, 0, 5]))
+    )
+
+
+fn test_vector_matrix_matmul() raises:
+    print("test_vector_matrix_matmul")
+    a = Tensor.arange(3, requires_grad=True)
+    b = Tensor.d2([[1, 2, 3], [4, 5, 6], [7, 8, 9]], requires_grad=True)
+    # c = a.vector_matrix_mm(b)
+    c = a.matmul(b)
+    c.backward()
+    assert_true(a.gradbox[].all_close(Tensor.d1([6, 15, 24])))
+    assert_true(
+        b.gradbox[].all_close(Tensor.d2([[0, 0, 0], [1, 1, 1], [2, 2, 2]]))
+    )
+
+
+fn test_matrix_vector_matmul() raises:
+    print("test_matrix_vector_matmul")
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6], [7, 8, 9]], requires_grad=True)
+    b = Tensor.arange(3, requires_grad=True)
+    # c = a.matrix_vector_mm(b)
+    c = a.matmul(b)
+    c.backward()
+    assert_true(
+        a.gradbox[].all_close(Tensor.d2([[0, 1, 2], [0, 1, 2], [0, 1, 2]]))
+    )
+    assert_true(b.gradbox[].all_close(Tensor.d1([12, 15, 18])))
+
+
 
 fn main() raises:
     print("Starting tensor test cases")
+
+    test_matrix_vector_matmul()
+    test_vector_matrix_matmul()
+    test_tensor_dot()
+    test_validate_matmul_last_2_dims()
+
     test_reshape_gradient_2d()
     test_reshape_noop()
     test_reshape_slice_sum_backward()
@@ -3340,3 +3417,7 @@ fn main() raises:
     test_view_of_view()
     test_sum_all()
     print("Finished running tensor test cases")
+
+
+
+
