@@ -1175,8 +1175,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn reshape(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         if self.numels() != 1:
             abort(
-                "Only tensor with single element can be reshaped to scalar"
-                " tensor"
+                "Tensor → reshape: only tensor with single element can be"
+                " reshaped to scalar tensor"
             )
         return self.reshape(Shape.Void, requires_grad)
 
@@ -1209,7 +1209,7 @@ struct Tensor[dtype: DType = DType.float32](
         )
         if self.numels() != shape.num_elements():
             abort(
-                "Tensor with "
+                "Tensor → reshape: tensor with "
                 + String(self.numels())
                 + " element(s) can't be converted to a tensor containing "
                 + String(shape.num_elements())
@@ -1856,21 +1856,16 @@ struct Tensor[dtype: DType = DType.float32](
     fn matrix_vector_mm(A, B: Self, track_grad: Bool = True) -> Tensor[dtype]:
         if not A.rank() == 2 and not B.rank() == 1:
             panic("Tensor → matrix_vector_mm: wrong dimesions")
-        if not A.shape[1] == B.shape[0]:
+        if not A.shape[-1] == B.shape[0]:
             panic(
                 "Tensor → matrix_vector_mm: wrong row(s)/element(s) count in"
                 " matrix or vector"
             )
 
         B_lifted = B.reshape(-1, 1, requires_grad=False)
+        C = A.matmul_nd(B_lifted, track_grad=False)
 
-        C = Self.matmul_2d(
-            UnsafePointer(to=A),
-            UnsafePointer(to=B_lifted),
-            track_grad=False,
-        )
-
-        out = C.reshape(A.shape[0], requires_grad=False)
+        out = C.reshape(A.shape[:-1], requires_grad=False)
         requires_grad = (A.requires_grad or B.requires_grad) and track_grad
         if requires_grad:
             out.requires_grad_()
@@ -1983,6 +1978,55 @@ struct Tensor[dtype: DType = DType.float32](
             permutation = axes.copy()
             backward_fn = PermuteBackward[dtype](permutation).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(TensorLite.of(self))
+
+        return out
+
+    fn unsqueeze[
+        dtype: DType
+    ](
+        self: Tensor[dtype], axis: Int, requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
+        rank = self.shape.rank()
+        ax = (
+            axis if axis >= 0 else rank + 1 + axis
+        )  # allow axis==rank => append
+        if ax < 0 or ax > rank:
+            panic("unsqueeze: axis out of range")
+
+        # New shape: insert 1 at position ax
+        var new_shape = IntList()
+        for i in range(0, ax):
+            new_shape.append(self.shape[i])
+        new_shape.append(1)
+        for i in range(ax, rank):
+            new_shape.append(self.shape[i])
+
+        # New strides: insert stride value appropriate for a view.
+        # If ax < rank: copy stride at position ax; else (append) use 1
+        var new_strides = IntList()
+        for i in range(0, ax):
+            new_strides.append(self.strides[i])
+        inserted_stride = self.strides[ax] if ax < rank else 1
+        new_strides.append(inserted_stride)
+        for i in range(ax, rank):
+            new_strides.append(self.strides[i])
+
+        shape = Shape(new_shape)
+        strides = Strides(new_strides)
+        grad_required = (
+            requires_grad.value() if requires_grad else self.requires_grad
+        )
+
+        base_addr = self.address() if self.owns_data else self.base.copy()
+        out = Tensor[dtype](
+            shape, base_addr, strides, self.offset, grad_required
+        )
+
+        if out.requires_grad:
+            out.init_gradbox()
+            bfn = UnsqueezeBackward[dtype](axis=ax).into_backward_fn()
+            out.backwardFn = Optional(bfn)
             out.add_ancestry(TensorLite.of(self))
 
         return out
@@ -2145,7 +2189,6 @@ struct Tensor[dtype: DType = DType.float32](
         A: Tensor[dtype], B: Tensor[dtype], track_grad: Bool = True
     ) -> Tensor[dtype]:
         Shape.validate_matrix_shapes(A.shape, B.shape)
-
         # shapes: batch + [m, k], batch + [k, n]
         batch_shape = Shape.broadcast_shape(
             A.shape[0:-2], B.shape[0:-2]
@@ -2216,8 +2259,43 @@ struct Tensor[dtype: DType = DType.float32](
         return source_indices
 
 
-from testing import assert_true
+from testing import assert_true, assert_false
 
 
 fn main() raises:
-    pass
+    test_batched_matmul_vector_rhs_broadcast()
+
+
+fn test_batched_matmul_vector_rhs_broadcast() raises:
+    print("test_batched_matmul_vector_rhs_broadcast")
+    # A: (2,3,4)  v: (4,)  -> out (2,3)
+    A = Tensor.arange(2 * 3 * 4, requires_grad=True)
+    r = A.reshape(2, 3, 4)
+    r.print()
+    print()
+    v = Tensor.ones(4, requires_grad=True)
+    v.print()
+    print()
+    out = r.matmul(v)  # row sums over last axis
+    out.print()
+    print()
+    # forward check: sums along last axis
+    s00 = 0 + 1 + 2 + 3
+    s01 = 4 + 5 + 6 + 7
+    s02 = 8 + 9 + 10 + 11
+    s10 = 12 + 13 + 14 + 15
+    s11 = 16 + 17 + 18 + 19
+    s12 = 20 + 21 + 22 + 23
+    expected = Tensor.d2([[s00, s01, s02], [s10, s11, s12]])
+    print()
+    expected.print()
+    expected_grad = Tensor.full(Shape([4]), 6)
+    print()
+    expected_grad.print()
+    assert_true(out.all_close(Tensor.d2([[s00, s01, s02], [s10, s11, s12]])))
+    out.backward()
+
+    # assert_true(r.gradbox[].shape == r.shape)
+    # dv = sum over all A elements per position count (each v_k used 6 times)
+    # v.gradbox[].print()
+    # assert_true(v.gradbox[].all_close(Tensor.full(Shape([4]), 6)))

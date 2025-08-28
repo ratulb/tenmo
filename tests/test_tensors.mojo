@@ -1,6 +1,6 @@
 # %s/Tensor\.walk_backward(\([^)]*\))/\1.backward()/g
 # %s/^\(fn test_\(.*\)() raises:\)$/&\r    print("test_\2")/
-from testing import assert_true, assert_raises
+from testing import assert_true, assert_false, assert_raises
 from tensors import Tensor
 from intlist import IntList
 from shapes import Shape
@@ -3221,13 +3221,33 @@ fn test_tensor_dot() raises:
     )
 
 
+fn test_dot_product() raises:
+    print("test_dot_product")
+    # 1D @ 1D -> scalar (dot product)
+    a = Tensor.d1([1, 2, 3], requires_grad=True)
+    b = Tensor.d1([4, 5, 6], requires_grad=True)
+    c = a.matmul(b)
+
+    # Verify result: 1*4 + 2*5 + 3*6 = 4 + 10 + 18 = 32
+    assert_true(c.all_close(Tensor.scalar(32)))
+
+    c.backward()
+    # da = b, db = a
+    assert_true(a.gradbox[].all_close(Tensor.d1([4, 5, 6])))
+    assert_true(b.gradbox[].all_close(Tensor.d1([1, 2, 3])))
+
+
 fn test_vector_matrix_matmul() raises:
     print("test_vector_matrix_matmul")
+    # 1D @ 2D -> 1D
     a = Tensor.arange(3, requires_grad=True)
     b = Tensor.d2([[1, 2, 3], [4, 5, 6], [7, 8, 9]], requires_grad=True)
-    # c = a.vector_matrix_mm(b)
     c = a.matmul(b)
+    # Verify result: [0*1+1*4+2*7, 0*2+1*5+2*8, 0*3+1*6+2*9] = [18, 21, 24]
+    assert_true(c.all_close(Tensor.d1([18, 21, 24])))
+
     c.backward()
+    # db = outer(a, ones) = [[0,0,0], [1,1,1], [2,2,2]]
     assert_true(a.gradbox[].all_close(Tensor.d1([6, 15, 24])))
     assert_true(
         b.gradbox[].all_close(Tensor.d2([[0, 0, 0], [1, 1, 1], [2, 2, 2]]))
@@ -3236,22 +3256,193 @@ fn test_vector_matrix_matmul() raises:
 
 fn test_matrix_vector_matmul() raises:
     print("test_matrix_vector_matmul")
+    # 2D @ 1D -> 1D
     a = Tensor.d2([[1, 2, 3], [4, 5, 6], [7, 8, 9]], requires_grad=True)
     b = Tensor.arange(3, requires_grad=True)
-    # c = a.matrix_vector_mm(b)
     c = a.matmul(b)
+
+    # Verify result: [1*0+2*1+3*2, 4*0+5*1+6*2, 7*0+8*1+9*2] = [8, 17, 26]
+    assert_true(c.all_close(Tensor.d1([8, 17, 26])))
+
     c.backward()
+    # da = outer(ones, b) = [[0,1,2], [0,1,2], [0,1,2]]
+
     assert_true(
         a.gradbox[].all_close(Tensor.d2([[0, 1, 2], [0, 1, 2], [0, 1, 2]]))
     )
     assert_true(b.gradbox[].all_close(Tensor.d1([12, 15, 18])))
+
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    b = Tensor.d1([7, 8, 9], requires_grad=True)
+    c = a.matmul(b)  # (2,3) @ (3,) -> (2,)
+    c.backward()
+    # forward: [50, 122]
+    assert_true(c.all_close(Tensor.d1([50, 122])))
+    assert_true(a.gradbox[].all_close(Tensor.d2([[7, 8, 9], [7, 8, 9]])))
+    assert_true(b.gradbox[].all_close(Tensor.d1([5, 7, 9])))
+
+
+fn test_matrix_matrix_matmul() raises:
+    print("test_matrix_matrix_matmul")
+    # 2D @ 2D -> 2D
+    a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
+    b = Tensor.d2([[5, 6], [7, 8]], requires_grad=True)
+    c = a.matmul(b)
+
+    # Verify result: [[1*5+2*7, 1*6+2*8], [3*5+4*7, 3*6+4*8]] = [[19, 22], [43, 50]]
+    assert_true(c.all_close(Tensor.d2([[19, 22], [43, 50]])))
+
+    c.backward()
+    # da = b^T broadcasted: [[5+6, 7+8], [5+6, 7+8]] = [[11, 15], [11, 15]]
+
+    assert_true(a.gradbox[].all_close(Tensor.d2([[11, 15], [11, 15]])))
+    assert_true(b.gradbox[].all_close(Tensor.d2([[4, 4], [6, 6]])))
+    a = Tensor.d3(
+        [[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True
+    )  # (2,2,2)
+    b = Tensor.d3(
+        [[[9, 10], [11, 12]], [[13, 14], [15, 16]]], requires_grad=True
+    )  # (2,2,2)
+    c = a.matmul(b)  # (2,2,2)
+    assert_true(
+        c.all_close(Tensor.d3([[[31, 34], [71, 78]], [[155, 166], [211, 226]]]))
+    )
+
+fn test_batched_matrix_matmul() raises:
+    print("test_batched_matrix_matmul")
+    # 3D @ 3D -> 3D (batched matrix multiplication)
+    a = Tensor.d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True)
+    b = Tensor.d3([[[2, 0], [1, 2]], [[1, 0], [0, 1]]], requires_grad=True)
+    c = a.matmul(b)
+
+    # Batch 0: [[1,2],[3,4]] @ [[2,0],[1,2]] = [[4,4],[10,8]]
+    # Batch 1: [[5,6],[7,8]] @ [[1,0],[0,1]] = [[5,6],[7,8]]
+    assert_true(c.all_close(Tensor.d3([[[4, 4], [10, 8]], [[5, 6], [7, 8]]])))
+
+    c.backward()
+    # For batched matmul, gradients are computed per batch
+    # da: [[[2+0, 1+2], [2+0, 1+2]], [[1+0, 0+1], [1+0, 0+1]]] = [[[2,3],[2,3]], [[1,1],[1,1]]]
+
+    assert_true(
+        a.gradbox[].all_close(Tensor.d3([[[2, 3], [2, 3]], [[1, 1], [1, 1]]]))
+    )
+    assert_true(
+        b.gradbox[].all_close(
+            Tensor.d3([[[4, 4], [6, 6]], [[12, 12], [14, 14]]])
+        )
+    )
+
+
+fn test_broadcasted_matrix_matmul() raises:
+    print("test_broadcasted_matrix_matmul")
+    # 3D @ 2D -> 3D (broadcasted matmul)
+    a = Tensor.d3([[[1, 2]], [[3, 4]]], requires_grad=True)  # shape: (2, 1, 2)
+    b = Tensor.d2([[5, 6], [7, 8]], requires_grad=True)  # shape: (2, 2)
+    c = a.matmul(b)
+    # Batch 0: [[1,2]] @ [[5,6],[7,8]] = [[19,22]]
+    # Batch 1: [[3,4]] @ [[5,6],[7,8]] = [[43,50]]
+    assert_true(c.all_close(Tensor.d3([[[19, 22]], [[43, 50]]])))
+
+    c.backward()
+    # da gradients are computed per batch with broadcasting
+    # db gradient accumulates across all batches
+
+    assert_true(
+        a.gradbox[].all_close(Tensor.d3([[[11, 15]], [[11, 15]]]))
+    )  # [[5+6,7+8]] per batch
+    assert_true(b.gradbox[].all_close(Tensor.d2([[4, 4], [6, 6]])))
+
+
+fn test_high_dim_batched_matmul() raises:
+    print("test_high_dim_batched_matmul")
+    # 4D @ 4D -> 4D (higher dimensional batched matmul)
+    a = Tensor.d4(
+        [[[[1, 2], [3, 4]]]], requires_grad=True
+    )  # shape: (1, 1, 2, 2)
+    b = Tensor.d4(
+        [[[[5, 6], [7, 8]]]], requires_grad=True
+    )  # shape: (1, 1, 2, 2)
+    c = a.matmul(b)
+    # Should be same as 2x2 @ 2x2: [[19,22],[43,50]]
+    assert_true(c.all_close(Tensor.d4([[[[19, 22], [43, 50]]]])))
+
+    c.backward()
+    # Gradients should match the 2D case but with additional batch dimensions
+
+    assert_true(a.gradbox[].all_close(Tensor.d4([[[[11, 15], [11, 15]]]])))
+    assert_true(b.gradbox[].all_close(Tensor.d4([[[[4, 4], [6, 6]]]])))
+
+
+fn test_matmul_no_grad() raises:
+    print("test_matmul_no_grad")
+    # Test matmul without requiring gradients
+    a = Tensor.d1([1, 2, 3])
+    b = Tensor.d1([4, 5, 6])
+    c = a.matmul(b)
+
+    assert_true(c.all_close(Tensor.scalar(32)))
+    # No gradients should be computed
+    assert_false(a.requires_grad)
+    assert_false(b.requires_grad)
+
+
+fn test_matmul_mixed_grad() raises:
+    print("test_matmul_mixed_grad")
+    # Test matmul with only one tensor requiring grad
+    a = Tensor.d1([1, 2, 3], requires_grad=True)
+    b = Tensor.d1([4, 5, 6])  # no grad
+    c = a.matmul(b)
+
+    assert_true(c.all_close(Tensor.scalar(32)))
+    c.backward()
+
+    # Only a should have gradients
+    assert_true(a.gradbox[].all_close(Tensor.d1([4, 5, 6])))
+    # b should not have gradbox since it doesn't require grad
+    assert_false(b.requires_grad)
+
+
+fn test_matmul_shape_validation() raises:
+    print("test_matmul_shape_validation")
+    # These should work (valid shapes)
+    a1 = Tensor.d1([1, 2, 3])
+    b1 = Tensor.d2([[4], [5], [6]])
+    c1 = a1.matmul(b1)  # 1D @ 2D -> 1D
+
+    a2 = Tensor.d2([[1, 2]])
+    b2 = Tensor.d1([3, 4])
+    c2 = a2.matmul(b2)  # 2D @ 1D -> 1D
+
+    assert_true(c1.all_close(Tensor.scalar(32).reshape(1)))
+    assert_true(c2.all_close(Tensor.scalar(11).reshape(1)))
+
+
+fn test_batched_matrix_vector_matmul() raises:
+    print("test_batched_matrix_vector_matmul")
+    a = Tensor.d3(
+        [[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]], requires_grad=True
+    )  # (2,2,3)
+    b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2,3)
+    b_transposed = b.transpose()
+    c = a.matmul(b_transposed)  # (2,2,2)
+    c.backward(Tensor.ones_like(c))
+
+    assert_true(
+        c.all_close(Tensor.d3([[[14, 32], [32, 77]], [[50, 122], [68, 167]]]))
+    )
+
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d3([[[5, 7, 9], [5, 7, 9]], [[5, 7, 9], [5, 7, 9]]])
+        )
+    )
+    assert_true(b.gradbox[].all_close(Tensor.d2([[22, 26, 30], [22, 26, 30]])))
 
 
 
 fn main() raises:
     print("Starting tensor test cases")
 
-    test_matrix_vector_matmul()
     test_vector_matrix_matmul()
     test_tensor_dot()
     test_validate_matmul_last_2_dims()
@@ -3416,8 +3607,20 @@ fn main() raises:
     test_scalar_indexing()
     test_view_of_view()
     test_sum_all()
-    print("Finished running tensor test cases")
+    test_dot_product()
+    test_matrix_vector_matmul()
+    test_matrix_matrix_matmul()
+    test_batched_matrix_matmul()
+    test_broadcasted_matrix_matmul()
+    test_high_dim_batched_matmul()
+    test_matmul_no_grad()
+    test_matmul_mixed_grad()
+    test_matmul_shape_validation()
+    test_batched_matrix_vector_matmul()
+    #test_batched_matmul_vector_rhs_broadcast()
 
+
+    print("Finished running tensor test cases")
 
 
 

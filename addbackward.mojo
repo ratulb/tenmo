@@ -5,7 +5,8 @@ from backpropagation import Delegate, BackwardFn
 
 
 @fieldwise_init
-struct AddBackwardScalar[dtype: DType](Copyable & Movable & Stringable):
+@register_passable
+struct AddBackwardScalar[dtype: DType](Copyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
@@ -22,11 +23,9 @@ struct AddBackwardScalar[dtype: DType](Copyable & Movable & Stringable):
         return [(ancestor, gradients, AddTensor)]
 
 
-    fn __str__(self) -> String:
-        return "AddBackwardScalar"
-
 @fieldwise_init
-struct AddBackward[dtype: DType](Copyable & Movable & Stringable):
+@register_passable
+struct AddBackward[dtype: DType](Copyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
@@ -44,10 +43,6 @@ struct AddBackward[dtype: DType](Copyable & Movable & Stringable):
             ancestor = output.ancestry().get(i)[]
             grad_outputs.append((ancestor, gradients, AddTensor))
         return grad_outputs
-
-    fn __str__(self) -> String:
-        return "AddBackward"
-
 
 
 fn main():

@@ -15,4 +15,5 @@ from permutebackward import PermuteBackward
 from dotbackward import DotBackward
 from vectormatrixmmbackward import VectorMatrixMMBackward
 from matrixvectormmbackward import MatrixVectorMMBackward
+from unsqueezebackward import UnsqueezeBackward
 

@@ -29,6 +29,7 @@ alias Delegate[dtype: DType] = Variant[
     DotBackward[dtype],
     VectorMatrixMMBackward[dtype],
     MatrixVectorMMBackward[dtype],
+    UnsqueezeBackward[dtype],
 ]
 
 
@@ -110,6 +111,11 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[MatrixVectorMMBackward[dtype]]():
             return self.grad_fn[MatrixVectorMMBackward[dtype]].backward[dtype](
+                output
+            )
+
+        elif self.grad_fn.isa[UnsqueezeBackward[dtype]]():
+            return self.grad_fn[UnsqueezeBackward[dtype]].backward[dtype](
                 output
             )
 
