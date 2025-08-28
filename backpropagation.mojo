@@ -30,6 +30,7 @@ alias Delegate[dtype: DType] = Variant[
     VectorMatrixMMBackward[dtype],
     MatrixVectorMMBackward[dtype],
     UnsqueezeBackward[dtype],
+    SqueezeBackward[dtype],
 ]
 
 
@@ -48,12 +49,13 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     fn __call__(
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-
         if self.grad_fn.isa[MatmulBackward[dtype]]():
             return self.grad_fn[MatmulBackward[dtype]].backward[dtype](output)
 
         if self.grad_fn.isa[BatchedMatmulBackward[dtype]]():
-            return self.grad_fn[BatchedMatmulBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[BatchedMatmulBackward[dtype]].backward[dtype](
+                output
+            )
 
         elif self.grad_fn.isa[ReshapeBackward[dtype]]():
             return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](output)
@@ -62,7 +64,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[ViewBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[TransposeBackward[dtype]]():
-            return self.grad_fn[TransposeBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[TransposeBackward[dtype]].backward[dtype](
+                output
+            )
 
         elif self.grad_fn.isa[PermuteBackward[dtype]]():
             return self.grad_fn[PermuteBackward[dtype]].backward[dtype](output)
@@ -90,9 +94,7 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             ](output)
 
         elif self.grad_fn.isa[MultiplyBackward[dtype]]():
-            return self.grad_fn[MultiplyBackward[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[MultiplyBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[MulBackwardScalar[dtype]]():
             return self.grad_fn[MulBackwardScalar[dtype]].backward[dtype](
@@ -100,9 +102,7 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             )
 
         elif self.grad_fn.isa[DotBackward[dtype]]():
-            return self.grad_fn[DotBackward[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[DotBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[VectorMatrixMMBackward[dtype]]():
             return self.grad_fn[VectorMatrixMMBackward[dtype]].backward[dtype](
@@ -118,6 +118,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[UnsqueezeBackward[dtype]].backward[dtype](
                 output
             )
+
+        elif self.grad_fn.isa[SqueezeBackward[dtype]]():
+            return self.grad_fn[SqueezeBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[TrueDivBackwardScalar[dtype]]():
             return self.grad_fn[TrueDivBackwardScalar[dtype]].backward[dtype](

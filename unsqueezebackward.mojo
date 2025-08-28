@@ -19,8 +19,7 @@ struct UnsqueezeBackward[dtype: DType](Copyable & Movable):
     ]:
         gradients = output.gradients()[]
         # Remove the axis we had inserted
-        # gradients_squeezed = gradients.squeeze(self.axis)
-        gradients_squeezed = gradients
+        gradients_squeezed = gradients.squeeze(self.axis)
         ancestor = output.ancestry().get(0)[]
         return [(ancestor, gradients_squeezed, AddTensor)]
 

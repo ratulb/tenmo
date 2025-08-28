@@ -1982,10 +1982,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn unsqueeze[
-        dtype: DType
-    ](
-        self: Tensor[dtype], axis: Int, requires_grad: Optional[Bool] = None
+    fn unsqueeze(
+        self, axis: Int, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         rank = self.shape.rank()
         ax = (
@@ -2026,6 +2024,69 @@ struct Tensor[dtype: DType = DType.float32](
         if out.requires_grad:
             out.init_gradbox()
             bfn = UnsqueezeBackward[dtype](axis=ax).into_backward_fn()
+            out.backwardFn = Optional(bfn)
+            out.add_ancestry(TensorLite.of(self))
+
+        return out
+
+    # Squeeze single axis if provided, otherwise squeeze all dims of size 1
+    fn squeeze(
+        self,
+        axis: Optional[Int] = None,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        count = self.shape.intlist().count(1)
+        if count == 0:  # No squeezable axis
+            return self
+
+        rank = self.shape.rank()
+        var new_shape: IntList
+        var new_strides: IntList
+        normalized = Int.MIN # Would get initialzed if required
+
+        if axis:
+            ax = axis.value()
+            normalized = ax if ax >= 0 else rank + ax
+            if normalized < 0 or normalized >= rank:
+                panic("squeeze: axis out of range")
+            if self.shape[normalized] != 1:
+                # nothing to squeeze, return self
+                return self
+            # Build new shape/strides without that axis
+            new_shape = IntList.with_capacity(rank - 1)
+            new_strides = IntList.with_capacity(rank - 1)
+            for i in range(0, rank):
+                if i == normalized:
+                    continue
+                new_shape.append(self.shape[i])
+                new_strides.append(self.strides[i])
+
+        else:
+            # Squeeze all dims == 1
+            new_shape = IntList.with_capacity(rank - count)
+            new_strides = IntList.with_capacity(rank - count)
+            for i in range(0, rank):
+                if self.shape[i] == 1:
+                    continue
+                else:
+                    new_shape.append(self.shape[i])
+                    new_strides.append(self.strides[i])
+
+        shape = Shape(new_shape)
+        strides = Strides(new_strides)
+        grad_required = (
+            requires_grad.value() if requires_grad else self.requires_grad
+        )
+
+        base_addr = self.address() if self.owns_data else self.base.copy()
+        out = Tensor[dtype](
+            shape, base_addr, strides, self.offset, grad_required
+        )
+        if grad_required:
+            out.requires_grad_()
+            bfn = SqueezeBackward[dtype](
+                axis=normalized if axis else -1
+            ).into_backward_fn()
             out.backwardFn = Optional(bfn)
             out.add_ancestry(TensorLite.of(self))
 
