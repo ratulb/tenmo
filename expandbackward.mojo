@@ -6,9 +6,7 @@ from backpropagation import Delegate, BackwardFn
 
 @fieldwise_init
 @register_passable
-struct UnsqueezeBackward[dtype: DType](Copyable):
-    var axis: Int  # where axis was inserted
-
+struct ExpandBackward[dtype: DType](Copyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
@@ -18,10 +16,15 @@ struct UnsqueezeBackward[dtype: DType](Copyable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.gradients()[]
-        # Remove the axis we had inserted
-        gradients_squeezed = gradients.squeeze(self.axis, requires_grad=False)
+        print("\nWhat did I receive here?\n")
+        gradients.print()
         ancestor = output.ancestry().get(0)[]
-        return [(ancestor, gradients_squeezed, AddTensor)]
+        recipient_shape = ancestor.shape()
+        reduced_grad = Tensor[dtype].sum_over_broadcasted_axes(
+            gradients, recipient_shape
+        )
+
+        return [(ancestor, reduced_grad, AddTensor)]
 
 
 fn main():

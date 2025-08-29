@@ -4,23 +4,43 @@ from shapes import Shape
 
 from testing import assert_true, assert_raises
 
+fn test_slice_shape() raises:
+    shape = Shape([1, 2, 3, 4])
+    assert_true(
+        shape[:-1] == Shape.of(1, 2, 3)
+        and shape[:-2] == Shape.of(1, 2)
+        and shape[:-3] == Shape(1)
+        and shape[2::4] == Shape.of(3)
+        and shape[-1:] == Shape.of(4)
+        and shape[-2:] == Shape.of(3, 4),
+        "Shape slice assertion failed",
+    )
+
+
+fn test_negative_indices() raises:
+    shape = Shape([1, 2, 3])
+    assert_true(
+        shape[-1] == 3 and shape[-2] == 2 and shape[-3] == 1,
+        "Shape negative indices assertion failed",
+    )
+
 
 fn test_slice_from() raises:
     shape = Shape.of(2, 3, 4)
     assert_true(
-        shape.slice_from(0) == shape,
+        shape[0:] == shape,
         "slice_from assertion from beginning failed",
     )
     assert_true(
-        shape.slice_from(1) == Shape.of(3, 4),
+        shape[1:] == Shape.of(3, 4),
         "slice_from assertion from from index 1 failed",
     )
     assert_true(
-        shape.slice_from(2) == Shape.of(4),
+        shape[2:] == Shape.of(4),
         "slice_from assertion from from index 2 failed",
     )
     assert_true(
-        shape.slice_from(3) == Shape.Void,
+        shape[3:] == Shape.Void,
         "slice_from assertion from from index 3 failed",
     )
 
@@ -230,6 +250,8 @@ fn test_zip_reversed() raises:
 
 
 fn main() raises:
+    test_negative_indices()
+    test_slice_shape()
     test_slice_from()
     test_reverse()
     test_equivalence()

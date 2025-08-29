@@ -31,6 +31,7 @@ alias Delegate[dtype: DType] = Variant[
     MatrixVectorMMBackward[dtype],
     UnsqueezeBackward[dtype],
     SqueezeBackward[dtype],
+    ExpandBackward[dtype],
 ]
 
 
@@ -121,6 +122,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[SqueezeBackward[dtype]]():
             return self.grad_fn[SqueezeBackward[dtype]].backward[dtype](output)
+
+        elif self.grad_fn.isa[ExpandBackward[dtype]]():
+            return self.grad_fn[ExpandBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[TrueDivBackwardScalar[dtype]]():
             return self.grad_fn[TrueDivBackwardScalar[dtype]].backward[dtype](

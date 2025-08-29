@@ -576,8 +576,12 @@ struct Tensor[dtype: DType = DType.float32](
                 with_tensor.shape.__str__(),
             )
         if not self.has_grad():
-            self.init_gradbox()
-        self.gradbox[].buffer += with_tensor.buffer
+            self.requires_grad_()
+        if with_tensor.owns_data:
+            self.gradbox[].buffer += with_tensor.buffer
+        else:
+            for indices in self.shape:
+                self.gradbox[][indices] = with_tensor[indices]
 
     fn seed_grad(mut self, value: Scalar[dtype]):
         if self.has_grad():
@@ -1079,6 +1083,14 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn view(
         self,
+        *shape_dims: Int,
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return self.view(Shape(shape_dims), offset, requires_grad)
+
+    fn view(
+        self,
         shape: List[Int],
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
@@ -1113,6 +1125,22 @@ struct Tensor[dtype: DType = DType.float32](
             offset=offset,
             requires_grad=self.requires_grad,
         )
+
+    fn __setitem__(self, *indices: Idx, value: Scalar[dtype]):
+        # Compute view metadata
+        shape, strides, offset = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                self.shape, self.strides, indices
+            )
+        )
+        index = (shape.intlist() * strides.to_list()).sum() + offset
+        print("I am being called? ", index)
+        self.buffer.store(
+            index, value
+        ) if self.owns_data else self.base_address()[].buffer.store(
+            index, value
+        )
+
 
     fn __getitem__(self, *indices: Idx) -> Tensor[dtype]:
         # Compute view metadata
@@ -1990,7 +2018,13 @@ struct Tensor[dtype: DType = DType.float32](
             axis if axis >= 0 else rank + 1 + axis
         )  # allow axis==rank => append
         if ax < 0 or ax > rank:
-            panic("unsqueeze: axis out of range")
+            panic(
+                "unsqueeze: axis out of range",
+                "axis=",
+                ax.__str__(),
+                "rank=",
+                rank.__str__(),
+            )
 
         # New shape: insert 1 at position ax
         var new_shape = IntList()
@@ -2022,8 +2056,43 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         if out.requires_grad:
-            out.init_gradbox()
+            out.requires_grad_()
             bfn = UnsqueezeBackward[dtype](axis=ax).into_backward_fn()
+            out.backwardFn = Optional(bfn)
+            out.add_ancestry(TensorLite.of(self))
+
+        return out
+
+    fn expand(
+        self: Tensor[dtype],
+        *target_dims: Int,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return self.expand(Shape(target_dims), requires_grad)
+
+
+    fn expand(
+        self: Tensor[dtype],
+        target: Shape,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        exp_shape = Shape.broadcast_shape(self.shape, target)
+        exp_strides = Shape.broadcast_strides(
+            self.shape, target, self.strides.strides
+        )
+        strides = Strides(exp_strides)
+
+        grad_required = (
+            requires_grad.value() if requires_grad else self.requires_grad
+        )
+
+        base_addr = self.address() if self.owns_data else self.base.copy()
+        out = Tensor[dtype](
+            exp_shape, base_addr, strides, self.offset, grad_required
+        )
+        if out.requires_grad:
+            out.requires_grad_()
+            bfn = ExpandBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(bfn)
             out.add_ancestry(TensorLite.of(self))
 
@@ -2042,7 +2111,7 @@ struct Tensor[dtype: DType = DType.float32](
         rank = self.shape.rank()
         var new_shape: IntList
         var new_strides: IntList
-        normalized = Int.MIN # Would get initialzed if required
+        var removed_axes: IntList  # will hold indices (ascending)
 
         if axis:
             ax = axis.value()
@@ -2052,6 +2121,9 @@ struct Tensor[dtype: DType = DType.float32](
             if self.shape[normalized] != 1:
                 # nothing to squeeze, return self
                 return self
+            removed_axes = IntList.filled(
+                1, normalized
+            )  # capacity 1 and the value
             # Build new shape/strides without that axis
             new_shape = IntList.with_capacity(rank - 1)
             new_strides = IntList.with_capacity(rank - 1)
@@ -2063,11 +2135,12 @@ struct Tensor[dtype: DType = DType.float32](
 
         else:
             # Squeeze all dims == 1
+            removed_axes = IntList.with_capacity(count)
             new_shape = IntList.with_capacity(rank - count)
             new_strides = IntList.with_capacity(rank - count)
             for i in range(0, rank):
                 if self.shape[i] == 1:
-                    continue
+                    removed_axes.append(i)
                 else:
                     new_shape.append(self.shape[i])
                     new_strides.append(self.strides[i])
@@ -2084,9 +2157,7 @@ struct Tensor[dtype: DType = DType.float32](
         )
         if grad_required:
             out.requires_grad_()
-            bfn = SqueezeBackward[dtype](
-                axis=normalized if axis else -1
-            ).into_backward_fn()
+            bfn = SqueezeBackward[dtype](removed_axes).into_backward_fn()
             out.backwardFn = Optional(bfn)
             out.add_ancestry(TensorLite.of(self))
 
@@ -2319,12 +2390,121 @@ struct Tensor[dtype: DType = DType.float32](
 
         return source_indices
 
+    @staticmethod
+    fn sum_over_broadcasted_axes(
+        batch_grad: Tensor[dtype], recipient_shape: Shape
+    ) -> Tensor[dtype]:
+        """Sum over dimensions that were broadcasted in the forward pass."""
+        result = batch_grad
+        current_shape = batch_grad.shape
+
+        # Sum over extra leading dimensions
+        while len(current_shape) > len(recipient_shape):
+            result = result.sum(axes=[0], keepdims=False)
+            current_shape = result.shape
+
+        # Sum over mismatched dimensions
+        for i in range(len(recipient_shape)):
+            if current_shape[i] != recipient_shape[i] and current_shape[i] > 1:
+                result = result.sum(axes=[i], keepdims=True)
+                current_shape = result.shape
+        return result
+
 
 from testing import assert_true, assert_false
 
 
 fn main() raises:
-    test_batched_matmul_vector_rhs_broadcast()
+    # test_batched_matmul_vector_rhs_broadcast()
+    _="""a = Tensor.rand(2, 1, 3, requires_grad=True)
+    b = a.transpose()
+    print()
+    c = b.squeeze()
+    print()
+    c.backward(42)
+    a.gradbox[].print()"""
+    a = Tensor.rand(2, 1, 3, requires_grad=True)
+    b = a.expand(Shape([2, 4, 3]))
+    
+    print()
+    b.backward(42)
+    a.gradbox[].print()
+
+    a = Tensor.rand(2, 1, 3, requires_grad=True)
+    b = a.expand(Shape([2, 2, 3]))
+    
+    print()
+    b.backward(42)
+    a.gradbox[].print()
+
+    a = Tensor.rand(1, 3, 1, requires_grad=True)
+    b = a.expand(Shape([2, 3, 4]))
+    
+    print()
+    b.backward()
+    a.gradbox[].print()
+
+    print()
+    a = Tensor.d3([[[1.0], [2.0], [3.0]]], requires_grad=True)
+    b = a.expand(2, 3, 4)
+    seed = Tensor.ones_like(b) * 10
+    b.backward(seed)
+    a.gradbox[].print()
+   
+    print()
+
+    a = Tensor.d2([[1.0, 2.0, 3.0]], requires_grad=True)  
+    b = a.expand(4, 3) 
+    seed = Tensor.ones(4, 3) * 5.0
+    b.backward(seed)
+    a.gradbox[].print()
+    
+    print()
+
+    a = Tensor.rand(1, 4, 1, 2, requires_grad=True)  # shape: [1, 4, 1, 2]
+    b = a.expand(3, 4, 5, 2)  # shape: [3, 4, 5, 2]
+    seed = Tensor.arange(3*4*5*2).view(3, 4, 5, 2)
+    b.backward(seed)
+    a.gradbox[].print()
+    
+    print()
+
+    a = Tensor.rand(3, 4, requires_grad=True)  
+    b = a.expand(3, 4) 
+    seed = Tensor.ones(3, 4) * 7.0
+    b.backward(seed)
+    a.gradbox[].print()
+   
+    print()
+
+    a = Tensor.d4([[[[1.0, 2.0]]]], requires_grad=True)  # shape: [1, 1, 1, 2]
+    b = a.expand(2, 3, 4, 2)  # shape: [2, 3, 4, 2]
+    seed = Tensor.ones(2, 3, 4, 2)
+    seed.__setitem__(s(), s(), s(), i(0),  value = Scalar[DType.float32](2))
+    seed.__setitem__(s(), s(), s(), i(1),  value = Scalar[DType.float32](3))
+    var mask_first = Tensor.zeros([2, 3, 4, 2], requires_grad=False)
+    for i in range(2):
+        for j in range(3):
+            for k in range(4):
+                mask_first[i, j, k, 0] = 1 
+
+    var mask_second = Tensor.zeros([2, 3, 4, 2], requires_grad=False)
+    for i in range(2):
+        for j in range(3):
+            for k in range(4):
+                mask_second[i, j, k, 1] = 1
+
+    seed = Tensor.full(Shape([2, 3, 4, 2]), 1, requires_grad=False)
+    seed = seed + mask_first * 1 + mask_second * 2
+
+    #seed[s(), s(), s(), i(1)] = Scalar[DType.float32](3)
+    #seed[1, 2, 3, 0] = Scalar[DType.float32](3)
+    b.backward(seed)
+    a.gradbox[].print()
+    seed.print()
+   
+     
+
 
 
 fn test_batched_matmul_vector_rhs_broadcast() raises:

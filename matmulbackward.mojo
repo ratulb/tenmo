@@ -182,14 +182,18 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                     B.transpose(axes=[-1, -2], requires_grad=False)
                 )
                 dA = Optional(
-                    Self.sum_over_broadcasted_axes[dtype](A_batch_grad, A.shape)
+                    Tensor[dtype].sum_over_broadcasted_axes(
+                        A_batch_grad, A.shape
+                    )
                 )
             if B.requires_grad:
                 B_batch_grad = A.transpose(
                     axes=[-1, -2], requires_grad=False
                 ).matmul_nd(gradients)
                 dB = Optional(
-                    Self.sum_over_broadcasted_axes[dtype](B_batch_grad, B.shape)
+                    Tensor[dtype].sum_over_broadcasted_axes(
+                        B_batch_grad, B.shape
+                    )
                 )
 
         elif trans_a and not trans_b:
@@ -201,13 +205,17 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                     gradients.transpose(axes=axes, requires_grad=False)
                 )
                 dA = Optional(
-                    Self.sum_over_broadcasted_axes[dtype](A_batch_grad, A.shape)
+                    Tensor[dtype].sum_over_broadcasted_axes(
+                        A_batch_grad, A.shape
+                    )
                 )
 
             if B.requires_grad:
                 B_batch_grad = A.matmul_nd(gradients)
                 dB = Optional(
-                    Self.sum_over_broadcasted_axes[dtype](B_batch_grad, B.shape)
+                    Tensor[dtype].sum_over_broadcasted_axes(
+                        B_batch_grad, B.shape
+                    )
                 )
 
         elif not trans_a and trans_b:
@@ -236,26 +244,6 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                 )
 
         return dA, dB
-
-    @staticmethod
-    fn sum_over_broadcasted_axes[
-        dtype: DType
-    ](batch_grad: Tensor[dtype], recipient_shape: Shape) -> Tensor[dtype]:
-        """Sum over dimensions that were broadcasted in the forward pass."""
-        result = batch_grad
-        current_shape = batch_grad.shape
-
-        # Sum over extra leading dimensions
-        while len(current_shape) > len(recipient_shape):
-            result = result.sum(axes=[0], keepdims=False)
-            current_shape = result.shape
-
-        # Sum over mismatched dimensions
-        for i in range(len(recipient_shape)):
-            if current_shape[i] != recipient_shape[i] and current_shape[i] > 1:
-                result = result.sum(axes=[i], keepdims=True)
-                current_shape = result.shape
-        return result
 
 
 fn main():

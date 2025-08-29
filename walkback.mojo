@@ -17,4 +17,5 @@ from vectormatrixmmbackward import VectorMatrixMMBackward
 from matrixvectormmbackward import MatrixVectorMMBackward
 from unsqueezebackward import UnsqueezeBackward
 from squeezebackward import SqueezeBackward
+from expandbackward import ExpandBackward
 
