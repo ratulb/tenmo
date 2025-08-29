@@ -2,9 +2,20 @@ from common_utils import variadiclist_as_intlist, log_debug, panic
 from intlist import IntList
 from memory import Pointer
 
+from strides import Strides
+
 
 fn main() raises:
-    pass
+    src = Shape([2, 3])
+    target = Shape([2, 1, 3])
+    mask = src.broadcast_mask(target)
+    print("mask: ", mask, target[0:])
+    broadcast_shape = Shape.broadcast_shape(src, target)
+    print("broadcast_shape: ", broadcast_shape)
+    strides = Strides.default(src)
+    bstrides = Shape.broadcast_strides(src, broadcast_shape, strides.strides)
+    print()
+    print("bstrides", bstrides)
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
@@ -90,18 +101,6 @@ struct Shape(
     fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
         return ShapeIndexIter(Pointer(to=self))
 
-    fn slice_from(self, axis: Int) -> Shape:
-        if axis < 0 or axis > self.rank():
-            panic(
-                "Shape -> slice_from: axis "
-                + String(axis)
-                + " out of bounds for ndim "
-                + String(self.ndim)
-            )
-
-        new_axes_spans = self.axes_spans[axis:]
-        return Shape(new_axes_spans)
-
     @always_inline
     fn broadcastable(self, to: Shape) -> Bool:
         dims1 = self.intlist()
@@ -138,6 +137,23 @@ struct Shape(
                     mask.append(0)  # match or both 1 → not broadcasted
 
         return mask
+
+    @staticmethod
+    fn broadcast_strides(
+        original_shape: Shape,
+        target_shape: Shape,
+        original_strides: IntList,  # use original strides - for transpose etc default is not enough
+    ) -> IntList:
+        mask = original_shape.broadcast_mask(target_shape)
+        var strides = IntList.with_capacity(len(mask))
+        var orig_index = 0
+        for i in range(len(mask)):
+            if mask[i] == 1:
+                strides.append(0)  # broadcasted dim → zero stride
+            else:
+                strides.append(original_strides[orig_index])
+                orig_index += 1
+        return strides
 
     fn __mul__(self, factor: Int) -> Shape:
         repeated = self.intlist() * factor
