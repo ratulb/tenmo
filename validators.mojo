@@ -103,72 +103,57 @@ struct Validator:
                 result = result.insert(i, i)
         return result
 
+    @always_inline
     @staticmethod
-    fn validate_new_shape(curr_dims: IntList, new_dims: IntList) -> Shape:
+    fn validate_and_construct_new_shape(
+        current_shape: Shape, newdims: IntList
+    ) -> Shape:
         """
 
         Validates if a tensor can be reshaped from `current_shape` to `new_shape`.
 
         Args:
-            curr_dims: Original shape of the tensor (e.g., `3, 4, 5`).
-            new_dims: Requested new shape (e.g., `2, -1, 10`). May contain at most one `-1`.
+            current_shape: Original shape of the tensor (e.g., `3, 4, 5`).
+            newdims: Requested new shape (e.g., `2, -1, 10`). May contain at most one `-1`.
 
         Returns:
             Shape: Validated concrete shape (e.g., `Shape(2, 6, 10)`).
 
         """
-        var concrete_dims: IntList
 
-        # --- Step 1: Check for invalid values in `new_shape` ---
-        if new_dims.any(Self.invalid_dim):
-            panic(
-                "Shape dimensions must be positive or -1 got ",
-                new_dims.__str__(),
+        var estimated_size = 1
+        var concrete_dims = IntList.with_capacity(len(newdims))
+        var infer_index = -1
+
+        for i in range(len(newdims)):
+            if newdims[i] == -1:
+                if infer_index != -1:
+                    panic("Tensor → reshape: only one -1 allowed in reshape")
+                infer_index = i
+                concrete_dims.append(1)  # temporary placeholder
+
+            elif newdims[i] == 0 or newdims[i] < -1:
+                panic("Tensor → reshape: invalid dim: ", newdims[i].__str__())
+
+            else:
+                concrete_dims.append(newdims[i])
+                estimated_size *= newdims[i]
+
+        if infer_index != -1:
+            concrete_dims[infer_index] = Int(
+                current_shape.num_elements() / estimated_size
             )
 
-        # --- Step 2: Count `-1` entries (only one allowed) ---
-        neg_one_count = new_dims.count(-1)
-        if neg_one_count > 1:
+        if concrete_dims.product() != current_shape.num_elements():
             panic(
-                "At most one -1 allowed in new_shape got ", new_dims.__str__()
-            )
-
-        # Calculate concrete shape (replacing -1 if needed)
-        curr_product = curr_dims.product()
-        if neg_one_count == 1:
-            # Infer the dimension marked as -1
-            known_dims_product = 1
-            for dim in new_dims:
-                if dim != -1:
-                    known_dims_product *= dim
-            if curr_product % known_dims_product != 0:
-                panic(
-                    "Cannot infer -1:",
-                    String(curr_product),
-                    "elements not divisible by",
-                    String(known_dims_product),
-                )
-            inferred_dim = curr_product // known_dims_product
-            concrete_dims = IntList.new(
-                [inferred_dim if dim == -1 else dim for dim in new_dims]
-            )
-        else:
-            concrete_dims = new_dims.copy()
-
-        if concrete_dims.product() != curr_product:
-            panic(
-                "Shape mismatch: ",
-                String(curr_product),
-                " elements vs. ",
-                String(concrete_dims.product()),
+                "Tensor → reshape: can't reshape tensor containing ",
+                current_shape.num_elements().__str__(),
+                "elements to a tensor of ",
+                concrete_dims.product().__str__(),
+                "elements",
             )
 
         return Shape(concrete_dims)
-
-    @always_inline
-    @staticmethod
-    fn invalid_dim(dim: Int) -> Bool:
-        return dim == 0 or dim < -1
 
     @always_inline
     @staticmethod
