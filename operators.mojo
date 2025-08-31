@@ -13,15 +13,16 @@ alias Noop = 0
 alias MulTensor = 1
 alias AddTensor = 2
 alias SubtractTensor = 3
-alias Add = 4
-alias Subtract = 5
-alias Multiply = 6
-alias Equal = 6
-alias NotEqual = 7
-alias LessThan = 8
-alias LessThanEqual = 9
-alias GreaterThan = 10
-alias GreaterThanEqual = 11
+alias ZeroGrad = 4
+alias Add = 5
+alias Subtract = 6
+alias Multiply = 7
+alias Equal = 8
+alias NotEqual = 9
+alias LessThan = 10
+alias LessThanEqual = 11
+alias GreaterThan = 12
+alias GreaterThanEqual = 13
 
 
 @always_inline
@@ -50,7 +51,6 @@ struct Comparator(Copyable & Movable):
             if this.owns_data and that.owns_data:
                 this_buffer = this.buffer
                 that_buffer = that.buffer
-                # print("Comparator check1")
             elif this.owns_data and not that.owns_data:
                 this_buffer = this.buffer
                 that_buffer = that.base_address()[].buffer[

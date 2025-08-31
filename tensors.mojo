@@ -98,7 +98,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.backwardFn = None
         self.gradbox = UnsafePointer[Tensor[dtype]]()
         self.ancestors = Ancestors[dtype].untracked()
-        # Take of Tensor with Shape.Void
+        # Take care of Tensor with Shape.Void
         self.buffer = Buffer[dtype](1) if shape.rank() == 0 else Buffer[dtype](
             shape.num_elements()
         )
