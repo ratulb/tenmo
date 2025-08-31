@@ -601,6 +601,12 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn full(
+        shape: List[Int], value: Scalar[dtype], requires_grad: Bool = False
+    ) -> Tensor[dtype]:
+        return Self.full(Shape(shape), value, requires_grad)
+
+    @staticmethod
+    fn full(
         shape: Shape, value: Scalar[dtype], requires_grad: Bool = False
     ) -> Tensor[dtype]:
         tensor = Tensor[dtype](shape, requires_grad=requires_grad)
@@ -1127,19 +1133,66 @@ struct Tensor[dtype: DType = DType.float32](
             requires_grad=self.requires_grad,
         )
 
-    fn __setitem__(self, *indices: Idx, value: Scalar[dtype]):
+    fn set(self, tensor: Tensor[dtype], *indices: Idx):
+        shape, strides, offset = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                self.shape, self.strides, indices
+            )
+        )
+        print("The shape: ", shape)
+        if len(shape) == 0:
+            if not tensor.numels() == 1:
+                panic(
+                    (
+                        "Tensor → set: expected single element tensor. Received"
+                        " tensor with"
+                    ),
+                    tensor.numels().__str__(),
+                    "elements tensor",
+                )
+
+            else:
+                elem = (
+                    tensor.item() if tensor.shape
+                    == Shape.Void else (tensor.squeeze(requires_grad=False))[
+                        IntList.Empty
+                    ]
+                )
+                self.buffer.store(
+                    offset, elem
+                ) if self.owns_data else self.base_address()[].buffer.store(
+                    offset, elem
+                )
+        else:
+            if not tensor.shape.broadcastable(shape):
+                panic(
+                    "Tensor → set: input tensor not broadcastable to shape",
+                    shape.__str__(),
+                )
+            else:
+                mask = tensor.shape.broadcast_mask(shape)
+                sliced = self.view(shape, strides, offset, False)
+                for idx in shape:
+                    tensor_idx = tensor.shape.translate_index(idx, mask, shape)
+                    sliced[idx] = tensor[tensor_idx]
+
+    fn set(self, value: Scalar[dtype], *indices: Idx):
         # Compute view metadata
         shape, strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
                 self.shape, self.strides, indices
             )
         )
-        index = (shape.intlist() * strides.to_list()).sum() + offset
-        self.buffer.store(
-            index, value
-        ) if self.owns_data else self.base_address()[].buffer.store(
-            index, value
-        )
+        if len(shape) == 0:
+            self.buffer.store(
+                offset, value
+            ) if self.owns_data else self.base_address()[].buffer.store(
+                offset, value
+            )
+        else:
+            sliced = self.view(shape, strides, offset, False)
+            for idx in shape:
+                sliced[idx] = value
 
     fn __getitem__(self, *indices: Idx) -> Tensor[dtype]:
         # Compute view metadata
@@ -1571,7 +1624,6 @@ struct Tensor[dtype: DType = DType.float32](
         if opcode == ZeroGrad:
             self.zero_grad()
 
-
     fn __iadd__(mut self, other: Self):
         if self.is_leaf():
             abort(
@@ -1880,9 +1932,9 @@ struct Tensor[dtype: DType = DType.float32](
                 current = intermediates[-1]
                 unsqueezed = current.unsqueeze(0, requires_grad=False)
                 intermediates.append(unsqueezed)
-                #A_expanded = A_expanded.unsqueeze(
-                 #   0, requires_grad = False 
-                #)  # add leading dims to the front
+                # A_expanded = A_expanded.unsqueeze(
+                #   0, requires_grad = False
+                # )  # add leading dims to the front
             # Now A_expanded.shape == (1,...,1, n) ; expand to batch_shape + [1, n]
             A_last_padded = intermediates[-1].contiguous()
             A_expanded = A_last_padded.expand(
@@ -1973,7 +2025,6 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(TensorLite[dtype].of(A), TensorLite[dtype].of(B))
 
         return out
-
 
     fn __add__(self, other: Self) -> Tensor[dtype]:
         if self.address() == other.address():
@@ -2496,32 +2547,47 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
+    seed = Tensor.full(Shape([2, 3, 4, 3]), 0, requires_grad=False)
+    # seed.set(3, i(1), s(None, None, 2), s(None, None, 2), i(3))
+    # seed.set(Tensor.scalar(42), i(1), s(None, None, 2), s(None, None, 2), i(3))
+    seed.set(
+        Tensor.d2([[1, 2], [3, 4]]),
+        i(1),
+        s(None, None, 2),
+        s(None, None, 2),
+        i(2),
+    )
+    seed.print()
 
-    a = Tensor.d4([[[[1.0, 2.0]]]], requires_grad=True)  # shape: [1, 1, 1, 2]
+    _ = """a = Tensor.d4([[[[1.0, 2.0]]]], requires_grad=True)  # shape: [1, 1, 1, 2]
     b = a.expand(2, 3, 4, 2)  # shape: [2, 3, 4, 2]
     seed = Tensor.ones(2, 3, 4, 2)
-    seed.__setitem__(s(), s(), s(), i(0),  value = Scalar[DType.float32](2))
-    seed.__setitem__(s(), s(), s(), i(1),  value = Scalar[DType.float32](3))
+    seed.__setitem__(s(), s(), s(), i(0), value=Scalar[DType.float32](2))
+    seed.__setitem__(s(), s(), s(), i(1), value=Scalar[DType.float32](3))
     var mask_first = Tensor.zeros([2, 3, 4, 2], requires_grad=False)
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                mask_first[i, j, k, 0] = 1 
+                mask_first[i, j, k, 0] = 1
 
     var mask_second = Tensor.zeros([2, 3, 4, 2], requires_grad=False)
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                mask_second[i, j, k, 1] = 1
+                mask_second[i, j, k, 1] = 1"""
 
-    seed = Tensor.full(Shape([2, 3, 4, 2]), 1, requires_grad=False)
-    seed = seed + mask_first * 1 + mask_second * 2
+    # seed = seed + mask_first * 1 + mask_second * 2
 
-    #seed[s(), s(), s(), i(1)] = Scalar[DType.float32](3)
-    #seed[1, 2, 3, 0] = Scalar[DType.float32](3)
-    b.backward(seed)
-    a.gradbox[].print()
-    seed.print()
+    # seed[s(), s(), s(), i(1)] = Scalar[DType.float32](3)
+    # seed.set(s(), s(), s(), s(None,None, 1), value=3)
+    # seed.set(s(), s(None, None, 2), s(None, None, 2), s(None,None, 2), value=3)
+    _ = """seed.set(
+        i(1), s(None, None, 2), s(None, None, 2), s(None, None, 2), value=3
+    )"""
+    _ = """seed.set(
+        i(1), s(None, None, 2), s(None, None, 2), i(3), value=3
+    )"""
 
-
+    # seed[1, 2, 3, 0] = Scalar[DType.float32](3)
+    # b.backward(seed)
+    # a.gradbox[].print()
