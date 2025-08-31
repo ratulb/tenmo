@@ -4,6 +4,7 @@ from operators import (
     MulTensor,
     AddScalar,
     SubtractScalar,
+    ZeroGrad,
     SubtractFromScalar,
     DivideByScalar,
     DivideScalar,

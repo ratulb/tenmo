@@ -1568,6 +1568,9 @@ struct Tensor[dtype: DType = DType.float32](
             self.gradbox[].__iadd__(incoming)
         if opcode == SubtractTensor:
             self.gradbox[].__isub__(incoming)
+        if opcode == ZeroGrad:
+            self.zero_grad()
+
 
     fn __iadd__(mut self, other: Self):
         if self.is_leaf():

@@ -9,9 +9,9 @@ fn main():
         print(i)
     print(Strides.Zero)
 
-
+@register_passable
 struct Strides(
-    Sized & Copyable & Movable & Stringable & Representable & Writable
+    Sized & Copyable & Stringable & Representable & Writable
 ):
     var strides: IntList
     alias Zero = Self(IntList.Empty)
@@ -28,8 +28,8 @@ struct Strides(
     fn __copyinit__(out self, existing: Self):
         self.strides = existing.strides
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self.strides = existing.strides
+        _="""fn __moveinit__(out self, deinit existing: Self):
+        self.strides = existing.strides"""
 
     fn is_contiguous(self, shape: Shape) -> Bool:
         if shape.rank() != self.strides.size:

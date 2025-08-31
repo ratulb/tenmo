@@ -50,8 +50,9 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
         return self.shape[].num_elements() - self.index > 0
 
 
+@register_passable
 struct Shape(
-    Sized & Stringable & Writable & Representable & Copyable & Movable
+    Sized & Stringable & Writable & Representable & Copyable #& Movable
 ):
     alias Unit = Shape.of(1)
     alias Void = Shape(IntList.Empty)
@@ -370,10 +371,10 @@ struct Shape(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn __moveinit__(out self, deinit other: Self):
+        _="""fn __moveinit__(out self, deinit other: Self):
         self.axes_spans = other.axes_spans
         self.ndim = other.ndim
-        self.numels = other.numels
+        self.numels = other.numels"""
 
     fn __copyinit__(out self, other: Self):
         self.axes_spans = other.axes_spans
