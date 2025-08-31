@@ -3438,6 +3438,235 @@ fn test_batched_matrix_vector_matmul() raises:
     )
     assert_true(b.gradbox[].all_close(Tensor.d2([[22, 26, 30], [22, 26, 30]])))
 
+fn test_matrix_vector_mm_simple() raises:
+    print("test_matrix_vector_mm_simple")
+    var A = Tensor.d2([[1, 2], [3, 4]])  # (2,2)
+    var b = Tensor.d1([5, 6])  # (2,)
+    var y = A.matmul(b)  # (2,)
+    var expected = Tensor.d1([1 * 5 + 2 * 6, 3 * 5 + 4 * 6])  # 17  # 39
+    assert_true(y.shape == [2])
+    assert_true(y.all_close(expected))
+
+
+fn test_matrix_vector_mm_backward_A() raises:
+    print("test_matrix_vector_mm_backward_A")
+    var A = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)  # (2,2)
+    var b = Tensor.d1([5, 6])  # (2,)
+    var y = A.matmul(b)  # (2,)
+    var s = y.sum()
+    s.backward()
+    # dA = outer(ones(m), b) => each row == b
+    var expected_grad = Tensor.d2([[5, 6], [5, 6]])
+    assert_true(A.gradbox[].all_close(expected_grad))
+
+
+fn test_matrix_vector_mm_backward_b() raises:
+    print("test_matrix_vector_mm_backward_b")
+    var A = Tensor.d2([[1, 2], [3, 4]])  # (2,2)
+    var b = Tensor.d1([5, 6], requires_grad=True)  # (2,)
+    var y = A.matmul(b)  # (2,)
+    var s = y.sum()
+    s.backward()
+    # db = A^T @ ones(m) -> column sums of A
+    var expected_grad = Tensor.d1([1 + 3, 2 + 4])  # 4  # 6
+    assert_true(b.gradbox[].all_close(expected_grad))
+
+
+fn test_matrix_vector_mm_batched_forward() raises:
+    print("test_matrix_vector_mm_batched_forward")
+    var A = Tensor.d3(
+        [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]  # batch 0  # batch 1
+    )  # (2,2,2)
+    var b = Tensor.d1([1, 1])  # (2,) broadcast
+    var y = A.matmul(b)  # (2,2)
+    # batch0: [1,2;3,4]*[1,1]=[3,7]
+    # batch1: [5,6;7,8]*[1,1]=[11,15]
+    var expected = Tensor.d2([[3, 7], [11, 15]])
+    assert_true(y.shape == [2, 2])
+    assert_true(y.all_close(expected))
+
+
+fn test_matrix_vector_mm_backward_b_batched() raises:
+    print("test_matrix_vector_mm_backward_b_batched")
+    var A = Tensor.d3(
+        [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]  # batch 0  # batch 1
+    )  # (2,2,2)
+    var b = Tensor.d1([3, 4], requires_grad=True)  # (2,) broadcast
+    var y = A.matmul(b)  # (2,2)
+    var s = y.sum()
+    s.backward()
+    # db = sum_over_batch_rows(A)
+    # batch0 col sums = [1+3, 2+4] = [4, 6]
+    # batch1 col sums = [5+7, 6+8] = [12, 14]
+    # total = [16, 20]
+    var expected_grad = Tensor.d1([16, 20])
+    assert_true(b.gradbox[].all_close(expected_grad))
+
+
+fn test_matrix_vector_mm_backward_A_batched() raises:
+    print("test_matrix_vector_mm_backward_A_batched")
+    var A = Tensor.d3(
+        [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],  # batch 0  # batch 1
+        requires_grad=True,
+    )  # (2,2,2)
+    var b = Tensor.d1([2, 3])  # (2,) broadcast
+    var y = A.matmul(b)  # (2,2)
+    var s = y.sum()
+    s.backward()
+    # dA per batch: each row == b
+    var expected_grad = Tensor.d3([[[2, 3], [2, 3]], [[2, 3], [2, 3]]])
+    assert_true(A.gradbox[].all_close(expected_grad))
+
+
+fn test_matrix_vector_mm_deeper_batch_forward() raises:
+    print("test_matrix_vector_mm_deeper_batch_forward")
+    var A = Tensor.d3(
+        [
+            [[1, 2], [3, 4], [5, 6]],  # batch 0: (3,2)
+            [[7, 8], [9, 10], [11, 12]],  # batch 1: (3,2)
+        ]
+    )  # (2,3,2) = (batch, m, n)
+    var b = Tensor.d1([1, 2])  # (2,)
+    var y = A.matmul(b)  # (2,3)
+    # batch0 rows·b = [5, 11, 17]
+    # batch1 rows·b = [23, 29, 35]
+    var expected = Tensor.d2([[5, 11, 17], [23, 29, 35]])
+    assert_true(y.shape == [2, 3])
+    assert_true(y.all_close(expected))
+
+
+fn test_matrix_vector_mm_backward_b_deeper_batch() raises:
+    print("test_matrix_vector_mm_backward_b_deeper_batch")
+    var A = Tensor.d3(
+        [
+            [[1, 2], [3, 4], [5, 6]],  # batch 0
+            [[7, 8], [9, 10], [11, 12]],  # batch 1
+        ]
+    )  # (2,3,2)
+    var b = Tensor.d1([1, 1], requires_grad=True)  # (2,)
+    var y = A.matmul(b)  # (2,3)
+    var s = y.sum()
+    s.backward()
+    # db = sum over all batch rows:
+    # col0 sum = 1+3+5+7+9+11 = 36
+    # col1 sum = 2+4+6+8+10+12 = 42
+    var expected_grad = Tensor.d1([36, 42])
+    assert_true(b.gradbox[].all_close(expected_grad))
+
+fn test_batched_matmul_vector_rhs_broadcast() raises:
+    print("test_batched_matmul_vector_rhs_broadcast")
+    # A: (2,3,4)  v: (4,)  -> out (2,3)
+    A = Tensor.arange(2 * 3 * 4, requires_grad=True)
+    r = A.reshape(2, 3, 4)
+    v = Tensor.ones(4, requires_grad=True)
+    out = r.matmul(v)  # row sums over last axis
+    # forward check: sums along last axis
+    s00 = 0 + 1 + 2 + 3
+    s01 = 4 + 5 + 6 + 7
+    s02 = 8 + 9 + 10 + 11
+    s10 = 12 + 13 + 14 + 15
+    s11 = 16 + 17 + 18 + 19
+    s12 = 20 + 21 + 22 + 23
+    assert_true(out.all_close(Tensor.d2([[s00, s01, s02], [s10, s11, s12]])))
+    out.backward()
+    # dv = sum over all A elements per position count (each v_k used 6 times)
+    assert_true(v.gradbox[].all_close(Tensor.d1([60, 66, 72, 78])))
+
+fn test_vector_matrix_mm_simple() raises:
+    print("test_vector_matrix_mm_simple")
+    var a = Tensor.d1([1, 2, 3], requires_grad=True)  # shape (3,)
+    # B must have shape (3, 2) so that (3,) @ (3,2) -> (2,)
+    var b = Tensor.d2(
+        [[1, 4], [2, 5], [3, 6]], requires_grad=True
+    )  # shape (3,2)
+    var y = a.matmul(b)  # expected shape (2,)
+
+    # expected: [1*1 + 2*2 + 3*3, 1*4 + 2*5 + 3*6] = [14, 32]
+    var expected = Tensor.d1([14, 32])
+    assert_true(y.shape == [2])
+    assert_true(y.all_close(expected))
+
+
+fn test_vector_matrix_mm_backward_vector() raises:
+    print("test_vector_matrix_mm_backward_vector")
+    var a = Tensor.d1([1, 2, 3], requires_grad=True)  # shape (3,)
+    # var a = Tensor.d2([[1, 2, 3]], requires_grad=True)           # shape (3,)
+    var b = Tensor.d2(
+        [[1, 2], [3, 4], [5, 6]], requires_grad=False
+    )  # shape (3,2)
+    var y = a.matmul(b)  # shape (2,)
+    var s = y.sum()  # scalar loss
+    s.backward()
+    # dy/da = sum over columns of b -> sums of each row
+    # row sums: [1+2, 3+4, 5+6] = [3, 7, 11]
+    var expected_grad = Tensor.d1([3, 7, 11])
+    assert_true(a.gradbox[].all_close(expected_grad))
+
+
+fn test_vector_matrix_mm_backward_matrix() raises:
+    print("test_vector_matrix_mm_backward_matrix")
+    var a = Tensor.d1([2, 3], requires_grad=False)  # shape (2,)
+    var b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # shape (2,3)
+    var y = a.matmul(b)  # shape (3,)
+    var s = y.sum()
+    s.backward()
+    # dy/db = outer(a, ones(cols)) => each column has the vector a
+    # expected shape matches b: [[2,2,2], [3,3,3]]
+    var expected_grad = Tensor.d2([[2, 2, 2], [3, 3, 3]])
+    assert_true(b.gradbox[].all_close(expected_grad))
+
+
+fn test_vector_matrix_mm_batched_matrix() raises:
+    print("test_vector_matrix_mm_batched_matrix")
+    var a = Tensor.d1([1, 2], requires_grad=True)  # shape (2,)
+    # b: batch of 2 matrices, each (2,2) ; shape (2, 2, 2)
+    var b = Tensor.d3(
+        [
+            [[1, 2], [3, 4]],  # batch 0, shape (2,2)
+            [[5, 6], [7, 8]],  # batch 1, shape (2,2)
+        ],
+        requires_grad=True,
+    )
+    var y = a.matmul(b)
+    y.backward()
+    #var y = a.matmul(b)  # expected shape (2,2): (batch, m)
+    # For batch 0: [1,2] @ [[1,2],[3,4]] = [7,10]
+    # For batch 1: [1,2] @ [[5,6],[7,8]] = [19,22]
+    var expected = Tensor.d2([[7, 10], [19, 22]])
+    assert_true(y.shape == [2, 2])  # (batch, m)
+    assert_true(y.all_close(expected))
+
+
+fn test_vector_matrix_mm_backward_batched_matrix_vector_grad() raises:
+    print("test_vector_matrix_mm_backward_batched_matrix_vector_grad")
+    var a = Tensor.d1([1, 2], requires_grad=True)  # shape (2,)
+    var b = Tensor.d3(
+        [[[1, 0], [0, 1]], [[2, 3], [4, 5]]],  # batch 0  # batch 1
+        requires_grad=False,
+    )  # shape (2,2,2)
+    var y = a.matmul(b)  # shape (2,2)
+    var s = y.sum()
+    s.backward()
+    # grad wrt vector = sum across batch of column-sums
+    # batch0 column sums = [1,1]; batch1 column sums = [6,8]; total = [7,9]
+    var expected_grad = Tensor.d1([6, 10])
+    assert_true(a.gradbox[].all_close(expected_grad))
+
+
+fn test_vector_matrix_mm_backward_batched_matrix_matrix_grad() raises:
+    print("test_vector_matrix_mm_backward_batched_matrix_matrix_grad")
+    var a = Tensor.d1([3, 4], requires_grad=False)  # shape (2,)
+    var b = Tensor.d3(
+        [[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True
+    )  # shape (2,2,2)
+    var y = a.matmul(b)  # shape (2,2)
+    # var y1 = a1.matmul_nd(b1)  # shape (2,2)
+    var s = y.sum()
+    s.backward()
+    # grad wrt b = outer(a, ones(cols)) broadcast across each batch slice
+    var expected_grad = Tensor.d3([[[3, 3], [4, 4]], [[3, 3], [4, 4]]])
+    assert_true(b.gradbox[].all_close(expected_grad))
+
 
 
 fn main() raises:
@@ -3617,8 +3846,25 @@ fn main() raises:
     test_matmul_mixed_grad()
     test_matmul_shape_validation()
     test_batched_matrix_vector_matmul()
-    #test_batched_matmul_vector_rhs_broadcast()
+    test_matrix_vector_mm_backward_A_batched()
+    test_matrix_vector_mm_batched_forward()
+    test_matrix_vector_mm_simple()
+    test_matrix_vector_mm_backward_A()
+    test_matrix_vector_mm_backward_b()
+    test_matrix_vector_mm_backward_b_batched()    
+    test_matrix_vector_mm_deeper_batch_forward()
+    test_matrix_vector_mm_backward_b_deeper_batch()
+    test_batched_matmul_vector_rhs_broadcast()
 
+    test_vector_matrix_mm_batched_matrix()
+    test_batched_matmul_vector_rhs_broadcast()
+    test_vector_matrix_mm_simple()
+    test_vector_matrix_mm_backward_vector()
+
+    test_vector_matrix_mm_backward_matrix()
+
+    test_vector_matrix_mm_backward_batched_matrix_vector_grad()
+    test_vector_matrix_mm_backward_batched_matrix_matrix_grad()
 
     print("Finished running tensor test cases")
 
