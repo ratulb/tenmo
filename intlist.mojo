@@ -727,6 +727,8 @@ struct ZipIterator[
 
 fn main() raises:
     ll = IntList.new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    padded_strides = IntList(0) * 3  + ll
+    print(padded_strides)
     sliced = ll[2::3]
     print(sliced)
     sliced.swap(-1, -2)

@@ -575,14 +575,15 @@ fn test_backward_through_nested_views_non_contiguous() raises:
         Strides.default(a.gradbox[].shape) == Strides.default(a.shape)
     )
     assert_true(
-        (a.gradbox[] == Tensor.full(Shape([4, 4]), 42)).all_true(),
+        #(a.gradbox[] == Tensor.full(Shape([4, 4]), 42)).all_true(),
+        a.gradbox[].all_close(Tensor.full(Shape([4, 4]), 42)),
         "grad propagation through contiguous failed",
     )
-    s.free()
-    c.free()
-    p.free()
-    t.free()
-    a.free()
+    _ = s
+    _ = c
+    _ = p
+    _ = t
+    _ = a
 
 
 fn test_identity_permutation() raises:

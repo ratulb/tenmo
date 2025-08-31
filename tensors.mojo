@@ -964,6 +964,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         if self.rank() != 2:
             # abort("Tensor → load: supported only for 2D tensors")
+            # abort("Tensor → load: supported only for 2D tensors")
             pass
 
         if (
@@ -1134,13 +1135,11 @@ struct Tensor[dtype: DType = DType.float32](
             )
         )
         index = (shape.intlist() * strides.to_list()).sum() + offset
-        print("I am being called? ", index)
         self.buffer.store(
             index, value
         ) if self.owns_data else self.base_address()[].buffer.store(
             index, value
         )
-
 
     fn __getitem__(self, *indices: Idx) -> Tensor[dtype]:
         # Compute view metadata
@@ -1213,16 +1212,16 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         if len(newdims) == 1 and newdims[0] == 0:
             return self.reshape(requires_grad)
-        shape = Validator.validate_new_shape(
-            self.shape.intlist(), IntList(newdims)
+        shape = Validator.validate_and_construct_new_shape(
+            self.shape, IntList(newdims)
         )
         return self.reshape(shape, requires_grad, validated=True)
 
     fn reshape(
         self, shape: List[Int], requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
-        new_shape = Validator.validate_new_shape(
-            self.shape.intlist(), IntList.new(shape)
+        new_shape = Validator.validate_and_construct_new_shape(
+            self.shape, IntList.new(shape)
         )
         return self.reshape(new_shape, requires_grad, validated=True)
 
@@ -1232,17 +1231,9 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[dtype]:
-        shape = new_shape if validated else Validator.validate_new_shape(
-            self.shape.intlist(), new_shape.intlist()
+        shape = new_shape if validated else Validator.validate_and_construct_new_shape(
+            self.shape, new_shape.intlist()
         )
-        if self.numels() != shape.num_elements():
-            abort(
-                "Tensor → reshape: tensor with "
-                + String(self.numels())
-                + " element(s) can't be converted to a tensor containing "
-                + String(shape.num_elements())
-                + " element(s)"
-            )
 
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
@@ -1260,10 +1251,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn transpose(
         self, *axes: Int, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
-        transpose_axes = IntList.with_capacity(len(axes))
-        for axis in transpose_axes:
-            transpose_axes.append(axis)
-        return self.transpose(transpose_axes, requires_grad)
+        return self.transpose(IntList(axes), requires_grad)
 
     fn transpose(
         self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
@@ -1853,47 +1841,121 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn vector_matrix_mm(A, B: Self, track_grad: Bool = True) -> Tensor[dtype]:
-        if not A.rank() == 1 and not B.rank() == 2:
-            panic("Tensor → vector_matrix_mm: wrong dimesions")
-        if not A.shape[0] == B.shape[0]:
+    fn vector_matrix_mm(
+        A: Tensor[dtype], B: Tensor[dtype], track_grad: Bool = True
+    ) -> Tensor[dtype]:
+        # A: (n,)(or batched: batch_A..., n)
+        # B: (..., n, m)  (rank >= 2)
+        if A.rank() != 1:
+            panic("vector_matrix_mm: A must be rank-1 (vector)")
+        if B.rank() < 2:
+            panic("vector_matrix_mm: B must be rank>=2 (matrix or higher)")
+
+        # n = contraction dim
+        n = A.shape[0]
+        if B.shape[-2] != n:
             panic(
-                "Tensor → vector_matrix_mm: wrong element(s)/row(s) count in"
-                " vector or matrix"
+                "vector_matrix_mm: incompatible shapes (A.shape[0] !="
+                " B.shape[-2])"
             )
 
-        A_lifted = A.reshape(1, -1, requires_grad=False)
+        # --- Lift A to (..., 1, n) so it matches matmul_nd's A shape of (..., m, k)
+        # Start as (1, n)
+        A_lifted = A.reshape(1, -1, requires_grad=False)  # shape (1, n)
 
-        C = Self.matmul_2d(
-            UnsafePointer(to=A_lifted),
-            UnsafePointer(to=B),
-            track_grad=False,
-        )
+        # Determine target batch_shape from B (all dims except last two)
+        batch_shape = B.shape[0:-2]  # can be empty
+        var A_expanded: Tensor[dtype]
+        # Expand A_lifted to broadcast over B's batch dims:
+        # - If batch_shape is empty, A_expanded stays (1, n)
+        # - Otherwise we want shape batch_shape + [1, n]
+        if len(batch_shape) > 0:
+            # prepend required number of leading dims = len(batch_shape)
+            A_expanded = A_lifted
+            for _ in range(len(batch_shape)):
+                A_expanded = A_expanded.unsqueeze(
+                    0
+                )  # add leading dims to the front
+            # Now A_expanded.shape == (1,...,1, n) ; expand to batch_shape + [1, n]
+            A_expanded = A_expanded.expand(
+                batch_shape + [1, n], requires_grad=False
+            )
+        else:
+            A_expanded = A_lifted  # shape (1,n)
 
-        out = C.reshape(B.shape[1], requires_grad=False)
+        # --- Call matmul_nd (handles batching/broadcasting across batch_shape)
+        # Note: matmul_nd expects A.shape = batch + [m, k], B.shape = batch + [k, n_out]
+        # For us m == 1 and k == n
+        C = Self.matmul_nd(
+            A_expanded, B, track_grad=False
+        )  # shape: batch_shape + [1, m_out]
+
+        # --- Squeeze out the intermediary m==1 dimension to match PyTorch-style (batch, m_out) -> if no batch, just (m_out,)
+        # m_out == B.shape[-1]
+        if len(batch_shape) == 0:
+            out = C.reshape([C.shape[1]], requires_grad=False)  # (m_out,)
+        else:
+            # remove the singular second-last dim (axis = -2)
+            # we can reshape: batch_shape + [B.shape[-1]]
+            out = C.reshape(batch_shape + [B.shape[-1]], requires_grad=False)
+
+        # --- Attach autograd wrapper that routes backward to VectorMatrixMMBackward
         requires_grad = (A.requires_grad or B.requires_grad) and track_grad
         if requires_grad:
             out.requires_grad_()
-
-            backward_fn = VectorMatrixMMBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
+            out.backwardFn = Optional(
+                VectorMatrixMMBackward[dtype]().into_backward_fn()
+            )
             out.add_ancestry(TensorLite[dtype].of(A), TensorLite[dtype].of(B))
 
         return out
 
-    fn matrix_vector_mm(A, B: Self, track_grad: Bool = True) -> Tensor[dtype]:
-        if not A.rank() == 2 and not B.rank() == 1:
-            panic("Tensor → matrix_vector_mm: wrong dimesions")
-        if not A.shape[-1] == B.shape[0]:
-            panic(
-                "Tensor → matrix_vector_mm: wrong row(s)/element(s) count in"
-                " matrix or vector"
-            )
+    fn matrix_vector_mm(
+        A: Tensor[dtype], B: Tensor[dtype], track_grad: Bool = True
+    ) -> Tensor[dtype]:
+        # --------------------------
+        # Shapes
+        # --------------------------
+        # A: batch_shape + [n, m]
+        # B: shape [m] or batch_shape + [m]
+        # result: batch_shape + [n]
+        var a_shape = A.shape
+        var b_shape = B.shape
 
-        B_lifted = B.reshape(-1, 1, requires_grad=False)
-        C = A.matmul_nd(B_lifted, track_grad=False)
+        var batch_shape = a_shape[0:-2]  # may be empty
+        var n = a_shape[-2]
+        var m = a_shape[-1]
 
-        out = C.reshape(A.shape[:-1], requires_grad=False)
+        # --------------------------
+        # Lift B to batch shape if needed
+        # --------------------------
+        var B_lifted: Tensor[dtype]
+        if len(b_shape) == 1:
+            # B is 1D vector -> reshape to [1, m] then expand to batch_shape + [1, m]
+            var B_reshaped = B.reshape([1, m], requires_grad=False)
+            if len(batch_shape) > 0:
+                B_lifted = B_reshaped.expand(
+                    batch_shape + [1, m], requires_grad=False
+                )
+            else:
+                B_lifted = B_reshaped
+        else:
+            # B already has batch dimensions
+            B_lifted = B
+
+        # --------------------------
+        # Compute result: batch matrix-vector multiplication
+        # result = A @ B_lifted^T ? Actually, B_lifted is (batch_shape + [1, m]),
+        # A: (batch_shape + [n, m]), so matmul_nd(A, B_lifted.T)
+        # --------------------------
+        B_T = (
+            B_lifted.contiguous()
+            .transpose(axes=[-1, -2], requires_grad=False)
+            .contiguous()
+        )  # shape: batch_shape + [m,1]
+
+        out = A.matmul_nd(B_T)  # shape: batch_shape + [n,1]
+        out = out.reshape(batch_shape + [n], requires_grad=False)
         requires_grad = (A.requires_grad or B.requires_grad) and track_grad
         if requires_grad:
             out.requires_grad_()
@@ -1903,6 +1965,7 @@ struct Tensor[dtype: DType = DType.float32](
             out.add_ancestry(TensorLite[dtype].of(A), TensorLite[dtype].of(B))
 
         return out
+
 
     fn __add__(self, other: Self) -> Tensor[dtype]:
         if self.address() == other.address():
@@ -2065,38 +2128,50 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn expand(
         self: Tensor[dtype],
-        *target_dims: Int,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return self.expand(Shape(target_dims), requires_grad)
-
-
-    fn expand(
-        self: Tensor[dtype],
         target: Shape,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         exp_shape = Shape.broadcast_shape(self.shape, target)
-        exp_strides = Shape.broadcast_strides(
-            self.shape, target, self.strides.strides
-        )
-        strides = Strides(exp_strides)
+
+        ndim_diff = len(exp_shape) - len(self.shape)
+        padded_shape = Shape.Unit * ndim_diff + self.shape
+        padded_strides = IntList(0) * ndim_diff + self.strides.strides
+
+        exp_strides_list = IntList.Empty
+        for i in range(len(exp_shape)):
+            if padded_shape[i] == 1 and exp_shape[i] > 1:
+                # Broadcasted dimension → stride 0
+                exp_strides_list.append(0)
+            else:
+                exp_strides_list.append(padded_strides[i])
+
+        strides = Strides(exp_strides_list)
+
+        base_addr = self.address() if self.owns_data else self.base.copy()
+        offset = self.offset  # keep same as current tensor
 
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
 
-        base_addr = self.address() if self.owns_data else self.base.copy()
-        out = Tensor[dtype](
-            exp_shape, base_addr, strides, self.offset, grad_required
+        var out = Tensor[dtype](
+            exp_shape, base_addr, strides, offset, grad_required
         )
-        if out.requires_grad:
+
+        if grad_required:
             out.requires_grad_()
-            bfn = ExpandBackward[dtype]().into_backward_fn()
+            var bfn = ExpandBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(bfn)
             out.add_ancestry(TensorLite.of(self))
 
         return out
+
+    fn expand(
+        self: Tensor[dtype],
+        *target_dims: Int,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return self.expand(Shape(target_dims), requires_grad)
 
     # Squeeze single axis if provided, otherwise squeeze all dims of size 1
     fn squeeze(
@@ -2157,7 +2232,8 @@ struct Tensor[dtype: DType = DType.float32](
         )
         if grad_required:
             out.requires_grad_()
-            bfn = SqueezeBackward[dtype](removed_axes).into_backward_fn()
+            # bfn = SqueezeBackward[dtype](removed_axes).into_backward_fn()
+            bfn = SqueezeBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(bfn)
             out.add_ancestry(TensorLite.of(self))
 
@@ -2232,7 +2308,7 @@ struct Tensor[dtype: DType = DType.float32](
                 C.add_ancestry(TensorLite[dtype].of(A), TensorLite[dtype].of(B))
             return C
 
-        elif rank_a == 1 and rank_b > 1:
+        elif rank_a == 1 and rank_b >= 2:
             C = A.vector_matrix_mm(B, track_grad=False)
             if requires_grad:
                 C.requires_grad_()
@@ -2241,7 +2317,7 @@ struct Tensor[dtype: DType = DType.float32](
                 C.add_ancestry(TensorLite[dtype].of(A), TensorLite[dtype].of(B))
             return C
 
-        elif rank_a > 1 and rank_b == 1:
+        elif rank_a >= 2 and rank_b == 1:
             C = A.matrix_vector_mm(B, track_grad=False)
             if requires_grad:
                 C.requires_grad_()
@@ -2415,15 +2491,127 @@ from testing import assert_true, assert_false
 
 
 fn main() raises:
+    test_batched_matmul_vector_rhs_broadcast()
+    test_vector_matrix_mm_simple()
+    test_vector_matrix_mm_backward_vector()
+
+    test_vector_matrix_mm_backward_matrix()
+    test_vector_matrix_mm_batched_matrix()
+
+    test_vector_matrix_mm_backward_batched_matrix_vector_grad()
+    test_vector_matrix_mm_backward_batched_matrix_matrix_grad()
+
+
+fn test_vector_matrix_mm_simple() raises:
+    print("test_vector_matrix_mm_simple")
+    var a = Tensor.d1([1, 2, 3], requires_grad=True)  # shape (3,)
+    # B must have shape (3, 2) so that (3,) @ (3,2) -> (2,)
+    var b = Tensor.d2(
+        [[1, 4], [2, 5], [3, 6]], requires_grad=True
+    )  # shape (3,2)
+    var y = a.matmul(b)  # expected shape (2,)
+
+    # expected: [1*1 + 2*2 + 3*3, 1*4 + 2*5 + 3*6] = [14, 32]
+    var expected = Tensor.d1([14, 32])
+    assert_true(y.shape == [2])
+    assert_true(y.all_close(expected))
+
+
+fn test_vector_matrix_mm_backward_vector() raises:
+    print("test_vector_matrix_mm_backward_vector")
+    var a = Tensor.d1([1, 2, 3], requires_grad=True)  # shape (3,)
+    # var a = Tensor.d2([[1, 2, 3]], requires_grad=True)           # shape (3,)
+    var b = Tensor.d2(
+        [[1, 2], [3, 4], [5, 6]], requires_grad=False
+    )  # shape (3,2)
+    var y = a.matmul(b)  # shape (2,)
+    var s = y.sum()  # scalar loss
+    s.backward()
+    # dy/da = sum over columns of b -> sums of each row
+    # row sums: [1+2, 3+4, 5+6] = [3, 7, 11]
+    var expected_grad = Tensor.d1([3, 7, 11])
+    assert_true(a.gradbox[].all_close(expected_grad))
+
+
+fn test_vector_matrix_mm_backward_matrix() raises:
+    print("test_vector_matrix_mm_backward_matrix")
+    var a = Tensor.d1([2, 3], requires_grad=False)  # shape (2,)
+    var b = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # shape (2,3)
+    var y = a.matmul(b)  # shape (3,)
+    var s = y.sum()
+    s.backward()
+    # dy/db = outer(a, ones(cols)) => each column has the vector a
+    # expected shape matches b: [[2,2,2], [3,3,3]]
+    var expected_grad = Tensor.d2([[2, 2, 2], [3, 3, 3]])
+    assert_true(b.gradbox[].all_close(expected_grad))
+
+
+fn test_vector_matrix_mm_batched_matrix() raises:
+    print("test_vector_matrix_mm_batched_matrix")
+    var a = Tensor.d1([1, 2], requires_grad=True)  # shape (2,)
+    # b: batch of 2 matrices, each (2,2) ; shape (2, 2, 2)
+    var b = Tensor.d3(
+        [
+            [[1, 2], [3, 4]],  # batch 0, shape (2,2)
+            [[5, 6], [7, 8]],  # batch 1, shape (2,2)
+        ],
+        requires_grad=True,
+    )
+    var y = a.vector_matrix_mm(b)
+    print()
+    a.print()
+    b.print()
+    #var y = a.matmul(b)  # expected shape (2,2): (batch, m)
+    # For batch 0: [1,2] @ [[1,2],[3,4]] = [7,10]
+    # For batch 1: [1,2] @ [[5,6],[7,8]] = [19,22]
+    var expected = Tensor.d2([[7, 10], [19, 22]])
+    assert_true(y.shape == [2, 2])  # (batch, m)
+    assert_true(y.all_close(expected))
+
+
+fn test_vector_matrix_mm_backward_batched_matrix_vector_grad() raises:
+    print("test_vector_matrix_mm_backward_batched_matrix_vector_grad")
+    var a = Tensor.d1([1, 2], requires_grad=True)  # shape (2,)
+    var b = Tensor.d3(
+        [[[1, 0], [0, 1]], [[2, 3], [4, 5]]],  # batch 0  # batch 1
+        requires_grad=False,
+    )  # shape (2,2,2)
+    var y = a.matmul(b)  # shape (2,2)
+    var s = y.sum()
+    s.backward()
+    # grad wrt vector = sum across batch of column-sums
+    # batch0 column sums = [1,1]; batch1 column sums = [6,8]; total = [7,9]
+    var expected_grad = Tensor.d1([6, 10])
+    assert_true(a.gradbox[].all_close(expected_grad))
+
+
+fn test_vector_matrix_mm_backward_batched_matrix_matrix_grad() raises:
+    print("test_vector_matrix_mm_backward_batched_matrix_matrix_grad")
+    var a = Tensor.d1([3, 4], requires_grad=False)  # shape (2,)
+    var b = Tensor.d3(
+        [[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True
+    )  # shape (2,2,2)
+    var y = a.matmul(b)  # shape (2,2)
+    # var y1 = a1.matmul_nd(b1)  # shape (2,2)
+    var s = y.sum()
+    s.backward()
+    # grad wrt b = outer(a, ones(cols)) broadcast across each batch slice
+    var expected_grad = Tensor.d3([[[3, 3], [4, 4]], [[3, 3], [4, 4]]])
+    assert_true(b.gradbox[].all_close(expected_grad))
+    _ = s
+    _ = y
+    _ = b
+    _ = a
+
     # test_batched_matmul_vector_rhs_broadcast()
-    _="""a = Tensor.rand(2, 1, 3, requires_grad=True)
+    _ = """a = Tensor.rand(2, 1, 3, requires_grad=True)
     b = a.transpose()
     print()
     c = b.squeeze()
     print()
     c.backward(42)
     a.gradbox[].print()"""
-    a = Tensor.rand(2, 1, 3, requires_grad=True)
+    _ = """a = Tensor.rand(2, 1, 3, requires_grad=True)
     b = a.expand(Shape([2, 4, 3]))
     
     print()
@@ -2501,10 +2689,7 @@ fn main() raises:
     #seed[1, 2, 3, 0] = Scalar[DType.float32](3)
     b.backward(seed)
     a.gradbox[].print()
-    seed.print()
-   
-     
-
+    seed.print()"""
 
 
 fn test_batched_matmul_vector_rhs_broadcast() raises:
@@ -2512,14 +2697,8 @@ fn test_batched_matmul_vector_rhs_broadcast() raises:
     # A: (2,3,4)  v: (4,)  -> out (2,3)
     A = Tensor.arange(2 * 3 * 4, requires_grad=True)
     r = A.reshape(2, 3, 4)
-    r.print()
-    print()
     v = Tensor.ones(4, requires_grad=True)
-    v.print()
-    print()
     out = r.matmul(v)  # row sums over last axis
-    out.print()
-    print()
     # forward check: sums along last axis
     s00 = 0 + 1 + 2 + 3
     s01 = 4 + 5 + 6 + 7
@@ -2528,15 +2707,11 @@ fn test_batched_matmul_vector_rhs_broadcast() raises:
     s11 = 16 + 17 + 18 + 19
     s12 = 20 + 21 + 22 + 23
     expected = Tensor.d2([[s00, s01, s02], [s10, s11, s12]])
-    print()
-    expected.print()
     expected_grad = Tensor.full(Shape([4]), 6)
-    print()
-    expected_grad.print()
     assert_true(out.all_close(Tensor.d2([[s00, s01, s02], [s10, s11, s12]])))
     out.backward()
 
-    # assert_true(r.gradbox[].shape == r.shape)
+    assert_true(r.gradbox[].shape == r.shape)
     # dv = sum over all A elements per position count (each v_k used 6 times)
-    # v.gradbox[].print()
+    v.gradbox[].print()
     # assert_true(v.gradbox[].all_close(Tensor.full(Shape([4]), 6)))

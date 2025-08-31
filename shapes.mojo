@@ -176,9 +176,9 @@ struct Shape(
         if not A_shape[-1] == B_shape[-2]:
             panic(
                 "Shape → validate_matrix_shapes: Incompatible shapes",
-                A_shape[-1].__str__(),
+                A_shape[-1].__str__(), A_shape.__str__(), 
                 "does not equal",
-                B_shape[-2].__str__(),
+                B_shape[-2].__str__(), B_shape.__str__()
             )
 
     fn reverse(self) -> Self:
@@ -398,6 +398,10 @@ struct Shape(
     @always_inline
     fn intlist(self) -> IntList:
         return self.axes_spans
+
+    
+    fn product(shape: Shape) -> Int:
+        return shape.intlist().product()    
 
     @staticmethod
     fn of(*dims: Int) -> Shape:

@@ -16,55 +16,78 @@ struct VectorMatrixMMBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        ancestor_1 = output.ancestry().get(0)[]
-        ancestor_2 = output.ancestry().get(1)[]
-
-        gradients = output.gradients()[]
-        grad_reshaped = gradients.reshape(1, -1)
+        # Ancestors (original inputs)
+        var ancestor_1 = output.ancestry().get(0)[]  # vector A
+        var ancestor_2 = output.ancestry().get(1)[]  # tensor B
 
         var outgoing_grads: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
 
+        # Upstream gradient: batch_shape + [m_out]
+        var gradients = output.gradients()[]
+
+        # Tensor B and its shapes
+        var tensor_b = ancestor_2.tensor()
+        var b_shape = tensor_b.shape
+        var batch_shape = b_shape[0:-2]  # may be empty
+        var m_out = b_shape[-1]
+
+        # --- Lift gradients to ensure shape batch_shape + [1, m_out]
+        var grad_lifted: Tensor[dtype]
+        if len(batch_shape) > 0:
+            grad_lifted = gradients.reshape(
+                batch_shape + [1, m_out], requires_grad=False
+            )
+        else:
+            grad_lifted = gradients.reshape([1, m_out], requires_grad=False)
+
+        # -----------------------
+        # Gradient w.r.t. vector A
+        # -----------------------
         if ancestor_1.requires_grad():
-            tensor_2 = ancestor_2.tensor()
-            tensor_2_transposed = tensor_2.transpose(requires_grad=False)
-            ancestor_1_reshaped_grad = Tensor[dtype].matmul_2d(
-                UnsafePointer(to=grad_reshaped),
-                UnsafePointer(to=tensor_2_transposed),
-                track_grad=False,
+            var B_t = tensor_b.transpose(
+                axes=[-1, -2], requires_grad=False
+            )  # batch_shape + [m_out, n]
+            var A_batch_grad = grad_lifted.matmul_nd(
+                B_t
+            )  # batch_shape + [1, n]
+            var dA = Tensor[dtype].sum_over_broadcasted_axes(
+                A_batch_grad, ancestor_1.shape()
             )
+            outgoing_grads.append((ancestor_1, dA, AddTensor))
 
-            ancestor_1_grad = ancestor_1_reshaped_grad.reshape(
-                ancestor_1_reshaped_grad.shape[1], requires_grad=False
-            )
-            outgoing_grads.append(
-                (
-                    ancestor_1,
-                    ancestor_1_grad,
-                    AddTensor,
-                )
-            )
+        # -----------------------
+        # Gradient w.r.t. tensor B
+        # -----------------------
         if ancestor_2.requires_grad():
-            tensor_1 = ancestor_1.tensor()
-            tensor_1_reshaped = tensor_1.reshape(1, -1)
-            tensor_1_reshaped_transposed = tensor_1_reshaped.transpose(
-                requires_grad=False
+            # Prepare A as [1, n] and expand to batch_shape + [1, n] using reshape + expand
+            var A_tensor = ancestor_1.tensor()  # shape [n]
+            var A_lifted = A_tensor.reshape(
+                [1, A_tensor.shape[0]], requires_grad=False
             )
 
-            ancestor_2_grad = Tensor[dtype].matmul_2d(
-                UnsafePointer(to=tensor_1_reshaped_transposed),
-                UnsafePointer(to=grad_reshaped),
-                track_grad=False,
+            var A_expanded_shape = batch_shape + [1, A_tensor.shape[0]]
+            var A_padded = A_lifted.reshape(
+                Shape.Unit * len(batch_shape) + [1, A_tensor.shape[0]],
+                requires_grad=False,
             )
+            A_expanded = A_padded.expand(A_expanded_shape, requires_grad=False)
 
-            outgoing_grads.append(
-                (
-                    ancestor_2,
-                    ancestor_2_grad,
-                    AddTensor,
-                )
+            # Compute per-batch (n,1) @ (1, m_out)
+            var A_expanded_T = A_expanded.transpose(
+                axes=[-1, -2], requires_grad=False
+            ).contiguous()  # batch_shape + [n,1]
+
+            var B_batch_grad = A_expanded_T.matmul_nd(
+                grad_lifted
+            )  # batch_shape + [n, m_out]
+
+            # Reduce broadcasted axes to match original B shape
+            var dB = Tensor[dtype].sum_over_broadcasted_axes(
+                B_batch_grad, tensor_b.shape
             )
+            outgoing_grads.append((ancestor_2, dB, AddTensor))
 
         return outgoing_grads
 
