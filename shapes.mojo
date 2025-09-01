@@ -405,6 +405,7 @@ struct Shape(
     fn intlist(self) -> IntList:
         return self.axes_spans
 
+    @always_inline
     fn product(shape: Shape) -> Int:
         return shape.intlist().product()
 
