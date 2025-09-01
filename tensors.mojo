@@ -1139,7 +1139,6 @@ struct Tensor[dtype: DType = DType.float32](
                 self.shape, self.strides, indices
             )
         )
-        print("The shape: ", shape)
         if len(shape) == 0:
             if not tensor.numels() == 1:
                 panic(
@@ -1170,11 +1169,17 @@ struct Tensor[dtype: DType = DType.float32](
                     shape.__str__(),
                 )
             else:
-                mask = tensor.shape.broadcast_mask(shape)
                 sliced = self.view(shape, strides, offset, False)
-                for idx in shape:
-                    tensor_idx = tensor.shape.translate_index(idx, mask, shape)
-                    sliced[idx] = tensor[tensor_idx]
+                if tensor.shape == shape:
+                    for idx in shape:
+                        sliced[idx] = tensor[idx]
+                else:
+                    mask = tensor.shape.broadcast_mask(shape)
+                    for idx in shape:
+                        tensor_idx = tensor.shape.translate_index(
+                            idx, mask, shape
+                        )
+                        sliced[idx] = tensor[tensor_idx]
 
     fn set(self, value: Scalar[dtype], *indices: Idx):
         # Compute view metadata
@@ -2238,44 +2243,40 @@ struct Tensor[dtype: DType = DType.float32](
         axis: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        count = self.shape.intlist().count(1)
-        if count == 0:  # No squeezable axis
+        # Early return if no squeezable dimensions
+        squeezable_count = self.shape.count_axes_of_size(1)
+        if squeezable_count == 0:
             return self
 
         rank = self.shape.rank()
         var new_shape: IntList
         var new_strides: IntList
-        var removed_axes: IntList  # will hold indices (ascending)
 
         if axis:
             ax = axis.value()
             normalized = ax if ax >= 0 else rank + ax
+
             if normalized < 0 or normalized >= rank:
                 panic("squeeze: axis out of range")
             if self.shape[normalized] != 1:
-                # nothing to squeeze, return self
-                return self
-            removed_axes = IntList.filled(
-                1, normalized
-            )  # capacity 1 and the value
-            # Build new shape/strides without that axis
+                return self  # Nothing to squeeze
+
+            # Pre-allocate with exact capacity
             new_shape = IntList.with_capacity(rank - 1)
             new_strides = IntList.with_capacity(rank - 1)
-            for i in range(0, rank):
-                if i == normalized:
-                    continue
-                new_shape.append(self.shape[i])
-                new_strides.append(self.strides[i])
+
+            # Build new shape/strides without the specified axis
+            for i in range(rank):
+                if i != normalized:
+                    new_shape.append(self.shape[i])
+                    new_strides.append(self.strides[i])
 
         else:
-            # Squeeze all dims == 1
-            removed_axes = IntList.with_capacity(count)
-            new_shape = IntList.with_capacity(rank - count)
-            new_strides = IntList.with_capacity(rank - count)
-            for i in range(0, rank):
-                if self.shape[i] == 1:
-                    removed_axes.append(i)
-                else:
+            new_shape = IntList.with_capacity(rank - squeezable_count)
+            new_strides = IntList.with_capacity(rank - squeezable_count)
+            # Build new shape/strides excluding dims == 1
+            for i in range(rank):
+                if self.shape[i] != 1:
                     new_shape.append(self.shape[i])
                     new_strides.append(self.strides[i])
 
@@ -2286,12 +2287,13 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         base_addr = self.address() if self.owns_data else self.base.copy()
-        out = Tensor[dtype](
+
+        var out = Tensor[dtype](
             shape, base_addr, strides, self.offset, grad_required
         )
+
         if grad_required:
             out.requires_grad_()
-            # bfn = SqueezeBackward[dtype](removed_axes).into_backward_fn()
             bfn = SqueezeBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(bfn)
             out.add_ancestry(TensorLite.of(self))
@@ -2547,47 +2549,4 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    seed = Tensor.full(Shape([2, 3, 4, 3]), 0, requires_grad=False)
-    # seed.set(3, i(1), s(None, None, 2), s(None, None, 2), i(3))
-    # seed.set(Tensor.scalar(42), i(1), s(None, None, 2), s(None, None, 2), i(3))
-    seed.set(
-        Tensor.d2([[1, 2], [3, 4]]),
-        i(1),
-        s(None, None, 2),
-        s(None, None, 2),
-        i(2),
-    )
-    seed.print()
-
-    _ = """a = Tensor.d4([[[[1.0, 2.0]]]], requires_grad=True)  # shape: [1, 1, 1, 2]
-    b = a.expand(2, 3, 4, 2)  # shape: [2, 3, 4, 2]
-    seed = Tensor.ones(2, 3, 4, 2)
-    seed.__setitem__(s(), s(), s(), i(0), value=Scalar[DType.float32](2))
-    seed.__setitem__(s(), s(), s(), i(1), value=Scalar[DType.float32](3))
-    var mask_first = Tensor.zeros([2, 3, 4, 2], requires_grad=False)
-    for i in range(2):
-        for j in range(3):
-            for k in range(4):
-                mask_first[i, j, k, 0] = 1
-
-    var mask_second = Tensor.zeros([2, 3, 4, 2], requires_grad=False)
-    for i in range(2):
-        for j in range(3):
-            for k in range(4):
-                mask_second[i, j, k, 1] = 1"""
-
-    # seed = seed + mask_first * 1 + mask_second * 2
-
-    # seed[s(), s(), s(), i(1)] = Scalar[DType.float32](3)
-    # seed.set(s(), s(), s(), s(None,None, 1), value=3)
-    # seed.set(s(), s(None, None, 2), s(None, None, 2), s(None,None, 2), value=3)
-    _ = """seed.set(
-        i(1), s(None, None, 2), s(None, None, 2), s(None, None, 2), value=3
-    )"""
-    _ = """seed.set(
-        i(1), s(None, None, 2), s(None, None, 2), i(3), value=3
-    )"""
-
-    # seed[1, 2, 3, 0] = Scalar[DType.float32](3)
-    # b.backward(seed)
-    # a.gradbox[].print()
+    pass

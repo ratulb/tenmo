@@ -135,6 +135,14 @@ fn s() -> Idx:
     return s(None, None, None)
 
 
+fn s(end: Int) -> Idx:
+    return Idx(slice(end))
+
+
+fn s(start: Int, end: Int) -> Idx:
+    return Idx(slice(start, end))
+
+
 fn s(start: Optional[Int], end: Optional[Int], step: Optional[Int]) -> Idx:
     return Idx(slice(start, end, step))
 

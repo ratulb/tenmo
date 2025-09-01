@@ -52,7 +52,7 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
 
 @register_passable
 struct Shape(
-    Sized & Stringable & Writable & Representable & Copyable #& Movable
+    Sized & Stringable & Writable & Representable & Copyable  # & Movable
 ):
     alias Unit = Shape.of(1)
     alias Void = Shape(IntList.Empty)
@@ -156,6 +156,10 @@ struct Shape(
                 orig_index += 1
         return strides
 
+    @always_inline
+    fn count_axes_of_size(self, axis_size: Int) -> Int:
+        return self.axes_spans.count(axis_size)
+
     fn __mul__(self, factor: Int) -> Shape:
         repeated = self.intlist() * factor
         return Shape(repeated)
@@ -177,9 +181,11 @@ struct Shape(
         if not A_shape[-1] == B_shape[-2]:
             panic(
                 "Shape → validate_matrix_shapes: Incompatible shapes",
-                A_shape[-1].__str__(), A_shape.__str__(), 
+                A_shape[-1].__str__(),
+                A_shape.__str__(),
                 "does not equal",
-                B_shape[-2].__str__(), B_shape.__str__()
+                B_shape[-2].__str__(),
+                B_shape.__str__(),
             )
 
     fn reverse(self) -> Self:
@@ -371,7 +377,7 @@ struct Shape(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-        _="""fn __moveinit__(out self, deinit other: Self):
+        _ = """fn __moveinit__(out self, deinit other: Self):
         self.axes_spans = other.axes_spans
         self.ndim = other.ndim
         self.numels = other.numels"""
@@ -400,9 +406,8 @@ struct Shape(
     fn intlist(self) -> IntList:
         return self.axes_spans
 
-    
     fn product(shape: Shape) -> Int:
-        return shape.intlist().product()    
+        return shape.intlist().product()
 
     @staticmethod
     fn of(*dims: Int) -> Shape:
