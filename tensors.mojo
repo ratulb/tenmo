@@ -2137,40 +2137,70 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn unsqueeze(
-        self, axis: Int, requires_grad: Optional[Bool] = None
+    fn unsqueezen(
+        self, axes: IntList, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
+        """Unsqueeze multiple axes by inserting dimensions of size 1."""
         rank = self.shape.rank()
-        ax = (
-            axis if axis >= 0 else rank + 1 + axis
-        )  # allow axis==rank => append
-        if ax < 0 or ax > rank:
-            panic(
-                "unsqueeze: axis out of range",
-                "axis=",
-                ax.__str__(),
-                "rank=",
-                rank.__str__(),
-            )
+        new_axes_count = len(axes)
 
-        # New shape: insert 1 at position ax
-        var new_shape = IntList()
-        for i in range(0, ax):
-            new_shape.append(self.shape[i])
-        new_shape.append(1)
-        for i in range(ax, rank):
-            new_shape.append(self.shape[i])
+        if new_axes_count == 0:
+            return self
 
-        # New strides: insert stride value appropriate for a view.
-        # If ax < rank: copy stride at position ax; else (append) use 1
-        var new_strides = IntList()
-        for i in range(0, ax):
-            new_strides.append(self.strides[i])
-        inserted_stride = self.strides[ax] if ax < rank else 1
-        new_strides.append(inserted_stride)
-        for i in range(ax, rank):
-            new_strides.append(self.strides[i])
+        new_rank = rank + new_axes_count
 
+        normalized_axes = IntList.with_capacity(new_axes_count)
+        seen = IntList.with_capacity(new_axes_count)
+
+        for axis in axes:
+            normalized = axis if axis >= 0 else new_rank + axis
+            if normalized < 0 or normalized >= new_rank:
+                panic("unsqueeze: axis", axis.__str__(), "out of range")
+
+            # Check for duplicates
+            if normalized in seen:
+                panic("unsqueeze: duplicate axis", axis.__str__())
+            seen.append(normalized)
+            normalized_axes.append(normalized)
+
+        # Sort axes for efficient insertion
+        normalized_axes.sort()
+
+        # Pre-allocate with exact capacity
+        new_rank = rank + new_axes_count
+        var new_shape = IntList.with_capacity(new_rank)
+        var new_strides = IntList.with_capacity(new_rank)
+
+        var orig_axis_index = 0
+        var new_axis_index = 0
+
+        # Build new shape and strides by inserting 1's at specified positions
+        for i in range(new_rank):
+            if (
+                new_axis_index < new_axes_count
+                and i == normalized_axes[new_axis_index]
+            ):
+                # Insert new dimension
+                new_shape.append(1)
+
+                # Calculate stride for inserted dimension
+                # If inserting before existing dimensions, use stride of next dimension
+                # If inserting at the end, use stride 1
+                insert_stride = (
+                    self.strides[orig_axis_index] if orig_axis_index
+                    < rank else 1
+                )
+
+                new_strides.append(insert_stride)
+
+                new_axis_index += 1
+            else:
+                # Copy existing dimension
+                new_shape.append(self.shape[orig_axis_index])
+                new_strides.append(self.strides[orig_axis_index])
+                orig_axis_index += 1
+
+        # Create the unsqueezed tensor
         shape = Shape(new_shape)
         strides = Strides(new_strides)
         grad_required = (
@@ -2178,17 +2208,25 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         base_addr = self.address() if self.owns_data else self.base.copy()
-        out = Tensor[dtype](
+
+        var out = Tensor[dtype](
             shape, base_addr, strides, self.offset, grad_required
         )
 
-        if out.requires_grad:
+        if grad_required:
             out.requires_grad_()
-            bfn = UnsqueezeBackward[dtype](axis=ax).into_backward_fn()
+            bfn = UnsqueezeBackward[dtype](
+                axes=normalized_axes
+            ).into_backward_fn()
             out.backwardFn = Optional(bfn)
             out.add_ancestry(TensorLite.of(self))
 
         return out
+
+    fn unsqueeze(
+        self, axis: Int, requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
+        return self.unsqueezen(IntList(axis), requires_grad)
 
     fn expand(
         self: Tensor[dtype],
@@ -2237,48 +2275,64 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         return self.expand(Shape(target_dims), requires_grad)
 
-    # Squeeze single axis if provided, otherwise squeeze all dims of size 1
-    fn squeeze(
+    # Squeeze specified axes or all dims of size 1 if no axes provided
+    fn squeezen(
         self,
-        axis: Optional[Int] = None,
+        axes: Optional[IntList] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        # Early return if no squeezable dimensions
-        squeezable_count = self.shape.count_axes_of_size(1)
-        if squeezable_count == 0:
+        """
+        Squeeze dimensions of size 1.
+
+        Args:
+            axes: Optional list of axes to squeeze. If None, squeeze all dims of size 1.
+            requires_grad: Optional override for gradient requirement.
+
+        Returns:
+            Tensor with specified dimensions squeezed.
+        """
+        if self.shape.count_axes_of_size(1) == 0:
             return self
-
         rank = self.shape.rank()
-        var new_shape: IntList
-        var new_strides: IntList
 
-        if axis:
-            ax = axis.value()
-            normalized = ax if ax >= 0 else rank + ax
+        # Determine which axes to squeeze
+        var axes_to_squeeze: IntList
+        if axes:
+            # Use the specified axes after validation
+            axes_to_squeeze = IntList.with_capacity(rank)
+            seen = IntList.with_capacity(len(axes.value()))
+            for axis in axes.value():
+                normalized = axis if axis >= 0 else axis + rank
+                if normalized < 0 or normalized >= rank:
+                    panic("squeeze: axis ", axis.__str__(), " out of range")
+                if self.shape[normalized] != 1:
+                    panic(
+                        "squeeze: cannot squeeze axis ",
+                        axis.__str__(),
+                        " with size ",
+                        self.shape[normalized].__str__(),
+                    )
+                if normalized in seen:
+                    panic("squeeze dupliacte axis", axis.__str__())
+                seen.append(normalized)
+                axes_to_squeeze.append(normalized)
 
-            if normalized < 0 or normalized >= rank:
-                panic("squeeze: axis out of range")
-            if self.shape[normalized] != 1:
-                return self  # Nothing to squeeze
-
-            # Pre-allocate with exact capacity
-            new_shape = IntList.with_capacity(rank - 1)
-            new_strides = IntList.with_capacity(rank - 1)
-
-            # Build new shape/strides without the specified axis
-            for i in range(rank):
-                if i != normalized:
-                    new_shape.append(self.shape[i])
-                    new_strides.append(self.strides[i])
+            axes_to_squeeze.sort()
 
         else:
-            new_shape = IntList.with_capacity(rank - squeezable_count)
-            new_strides = IntList.with_capacity(rank - squeezable_count)
-            # Build new shape/strides excluding dims == 1
-            for i in range(rank):
-                if self.shape[i] != 1:
-                    new_shape.append(self.shape[i])
-                    new_strides.append(self.strides[i])
+            axes_to_squeeze = self.shape.indices_of_axes_with_size(1)
+
+        if len(axes_to_squeeze) == 0:
+            return self
+
+        new_size = rank - len(axes_to_squeeze)
+        new_shape = IntList.with_capacity(new_size)
+        new_strides = IntList.with_capacity(new_size)
+
+        for i in range(rank):
+            if i not in axes_to_squeeze:
+                new_shape.append(self.shape[i])
+                new_strides.append(self.strides[i])
 
         shape = Shape(new_shape)
         strides = Strides(new_strides)
@@ -2300,8 +2354,19 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
+    # Squeeze single axis if provided, otherwise squeeze all dims of size 1
+    fn squeeze(
+        self,
+        axis: Optional[Int] = None,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return self.squeezen(
+            Optional(IntList(axis.value())) if axis else None, requires_grad
+        )
+
     fn print(self, num_first: Int = 5, num_last: Int = 1):
         print(
+            "\n",
             self.__str__(),
             end="\n",
         )

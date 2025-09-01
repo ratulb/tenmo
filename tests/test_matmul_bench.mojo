@@ -7,8 +7,8 @@ from sys import simdwidthof
 
 
 fn main() raises:
-    A_rows, A_cols = 65, 128
-    B_rows, B_cols = 128, 65
+    A_rows, A_cols = 128, 64
+    B_rows, B_cols = 64, 128
 
     A = Tensor.rand(A_rows, A_cols)
     B = Tensor.rand(B_rows, B_cols)

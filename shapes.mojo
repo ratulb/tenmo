@@ -6,16 +6,7 @@ from strides import Strides
 
 
 fn main() raises:
-    src = Shape([2, 3])
-    target = Shape([2, 1, 3])
-    mask = src.broadcast_mask(target)
-    print("mask: ", mask, target[0:])
-    broadcast_shape = Shape.broadcast_shape(src, target)
-    print("broadcast_shape: ", broadcast_shape)
-    strides = Strides.default(src)
-    bstrides = Shape.broadcast_strides(src, broadcast_shape, strides.strides)
-    print()
-    print("bstrides", bstrides)
+    pass
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
@@ -159,6 +150,14 @@ struct Shape(
     @always_inline
     fn count_axes_of_size(self, axis_size: Int) -> Int:
         return self.axes_spans.count(axis_size)
+
+    @always_inline
+    fn indices_of_axes_with_size(self, axis_size: Int) -> IntList:
+        indices = IntList.with_capacity(len(self))
+        for i in self.axes_spans:
+            if self.axes_spans[i] == axis_size:
+                indices.append(i)
+        return indices
 
     fn __mul__(self, factor: Int) -> Shape:
         repeated = self.intlist() * factor
