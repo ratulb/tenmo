@@ -21,6 +21,7 @@ from squeeze import SqueezeForward
 from unsqueeze import UnsqueezeForward
 from expand import ExpandForward
 from argminmax import Argmin, Argmax
+from tenmomax import MaxForward
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -2154,6 +2155,14 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
         return UnsqueezeForward[dtype].unsqueeze(self, axes, requires_grad)
+
+    fn max(
+        self,
+        axes: IntList,
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return MaxForward[dtype].max(self, axes, keepdims, requires_grad)
 
     fn argmax(self, axis: Int = 0) -> Tensor[DType.int32]:
         return Argmax[dtype].argmax(tensor=self, axis=axis)
