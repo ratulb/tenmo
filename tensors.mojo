@@ -17,6 +17,10 @@ from walkback import *
 from buffers import Buffer
 from shared import TensorLite
 from validators import Validator
+from squeeze import SqueezeForward
+from unsqueeze import UnsqueezeForward
+from expand import ExpandForward
+from argminmax import Argmin, Argmax
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -240,7 +244,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
         if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
-            abort("Tensor → __getitem__: Scalar tensor expects no indices")
+            panic("Tensor → __getitem__: Scalar tensor expects no indices")
         index = self.flatten_index(indices)
         return self.buffer.load(
             index
@@ -248,7 +252,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
         if self.rank() == 0:  # Tensor with Shape ()
-            abort(
+            panic(
                 "Tensor → __getitem__(*indices: Int): api not supported for"
                 " scalar tensor. Use __getitem__(IntList())"
             )
@@ -260,7 +264,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
         if self.rank() == 0:  # Tensor with Shape ()
-            abort(
+            panic(
                 "Tensor → __setitem__(*indices: Int): api not supported for"
                 " scalar tensor. Use __setitem__(IntList())"
             )
@@ -277,7 +281,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
         if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
-            abort("Tensor → __setitem__: Scalar tensor expects no indices")
+            panic("Tensor → __setitem__: Scalar tensor expects no indices")
         index = self.flatten_index(indices)
         self.buffer.store(
             index, value
@@ -289,7 +293,7 @@ struct Tensor[dtype: DType = DType.float32](
         if (
             self.shape != Shape.Unit and self.rank() != 0
         ):  # Tensor with Shape ()
-            abort(
+            panic(
                 "Tensor.item(): Only valid for scalar or singleton tensors, got"
                 " shape: "
                 + self.shape.__str__()
@@ -368,12 +372,12 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn rows(self) -> Int:
         if not self.rank() == 2:
-            abort("Tensor → rows: tensor rank is not 2")
+            panic("Tensor → rows: tensor rank is not 2")
         return self.shape[0]
 
     fn cols(self) -> Int:
         if not self.rank() == 2:
-            abort("Tensor → cols: tensor rank is not 2")
+            panic("Tensor → cols: tensor rank is not 2")
         return self.shape[1]
 
     fn is_scalar(self) -> Bool:
@@ -523,7 +527,7 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         if self.shape != other.shape:
-            abort(
+            panic(
                 "Tensor → all_close expects same shaped tensors: "
                 + self.shape.__str__()
                 + ", "
@@ -555,7 +559,7 @@ struct Tensor[dtype: DType = DType.float32](
         origin = __origin_of(self),
     ]:
         if self.owns_data and not self.base.__as_bool__():
-            abort(
+            panic(
                 "Tensor → base_address: called on owning tensor. Valid only for"
                 " view type tensor"
             )
@@ -667,13 +671,13 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         if step == 0:
-            abort("step can not be zero")
+            panic("step can not be zero")
         if (step > 0 and start >= end) or (step < 0 and start <= end):
-            abort("Invalid range for the given step")
+            panic("Invalid range for the given step")
         delta = end - start
         size = floor(delta / step)
         if size <= 0:
-            abort("Error: computed arange size is zero")
+            panic("Error: computed arange size is zero")
         count = size.__int__()
         buffer = Buffer[dtype](count)
 
@@ -745,7 +749,7 @@ struct Tensor[dtype: DType = DType.float32](
         flattened = List[Scalar[dtype]](capacity=dims.product())
         for row in rows:
             if len(row) != dims[1]:
-                abort("Tensor → d2 → not all rows equal in length")
+                panic("Tensor → d2 → not all rows equal in length")
             flattened.extend(row)
         shape = Shape(dims)
         tensor = Tensor[dtype](shape, requires_grad)
@@ -761,10 +765,10 @@ struct Tensor[dtype: DType = DType.float32](
         flattened = List[Scalar[dtype]](capacity=dims.product())
         for block in blocks:
             if len(block) != dims[1]:
-                abort("Tensor → d3 → not all blocks equal in length")
+                panic("Tensor → d3 → not all blocks equal in length")
             for row in block:
                 if len(row) != dims[2]:
-                    abort("Tensor → d3 → not all rows equal in length")
+                    panic("Tensor → d3 → not all rows equal in length")
 
                 flattened.extend(row)
         shape = Shape(dims)
@@ -786,19 +790,19 @@ struct Tensor[dtype: DType = DType.float32](
         flattened = List[Scalar[dtype]](capacity=dims.product())
         for block in blockgrid:
             if len(block) != dims[1]:
-                abort(
+                panic(
                     "Tensor → d4 → not all blocks are of equal length in the"
                     " blockgrid"
                 )
             for matrix in block:
                 if len(matrix) != dims[2]:
-                    abort(
+                    panic(
                         "Tensor → d4 → not all matrices are of equal length"
                         " in block"
                     )
                 for row in matrix:
                     if len(row) != dims[3]:
-                        abort(
+                        panic(
                             "Tensor → d4 not all rows are of equal length in"
                             " matrix"
                         )
@@ -823,22 +827,22 @@ struct Tensor[dtype: DType = DType.float32](
         flattened = List[Scalar[dtype]](capacity=dims.product())
         for blocks in blockhive:
             if len(blocks) != dims[1]:
-                abort(
+                panic(
                     "Tensor → d5 → not all blocks are of equal length in the"
                     " input"
                 )
             for block in blocks:
                 if len(block) != dims[2]:
-                    abort("Tensor → d5 → unequal block length")
+                    panic("Tensor → d5 → unequal block length")
                 for matrix in block:
                     if len(matrix) != dims[3]:
-                        abort(
+                        panic(
                             "Tensor → d5 not all matrices are of equal length"
                             " in block"
                         )
                     for row in matrix:
                         if len(row) != dims[4]:
-                            abort(
+                            panic(
                                 "Tensor → d5 not all rows are of equal length"
                                 " in matrix"
                             )
@@ -878,7 +882,7 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
         if not (row_size >= 1 and row_size <= len(elems)):
-            abort(
+            panic(
                 (
                     "Tensor → of[row_size] → invalid row size or not enough"
                     " elements"
@@ -933,7 +937,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn broadcast_to(self, target_shape: Shape) -> Tensor[dtype]:
         if not self.shape.broadcastable(target_shape):
-            abort(
+            panic(
                 "Tensor → broadcast_to: shape "
                 + self.shape.__str__()
                 + " not broadcastable to "
@@ -969,8 +973,8 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         if self.rank() != 2:
-            # abort("Tensor → load: supported only for 2D tensors")
-            # abort("Tensor → load: supported only for 2D tensors")
+            # panic("Tensor → load: supported only for 2D tensors")
+            # panic("Tensor → load: supported only for 2D tensors")
             pass
 
         if (
@@ -979,9 +983,9 @@ struct Tensor[dtype: DType = DType.float32](
             or col < 0
             or col + simdwidth > self.shape[1]
         ):
-            abort("Tensor → load: Out-of-bounds access")
+            panic("Tensor → load: Out-of-bounds access")
         if not self.owns_data and self.strides[1] != 1 and simdwidth > 1:
-            abort(
+            panic(
                 "Tensor → SIMD load attempted on non-contiguous Tensor - only"
                 " single-element loads are permitted for non-contiguous tensor"
             )
@@ -1002,7 +1006,7 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         if self.rank() != 2:
-            abort("Tensor → store is supported only for 2D tensors")
+            panic("Tensor → store is supported only for 2D tensors")
 
         if (
             row < 0
@@ -1010,10 +1014,10 @@ struct Tensor[dtype: DType = DType.float32](
             or col < 0
             or col + simdwidth > self.shape[1]
         ):
-            abort("Tensor → store: out-of-bounds access")
+            panic("Tensor → store: out-of-bounds access")
 
         if not self.owns_data and self.strides[1] != 1 and simdwidth > 1:
-            abort(
+            panic(
                 "Tensor → SIMD store attempted on non-contiguous Tensor - only"
                 " single-element stores are permitted for non-contiguous tensor"
             )
@@ -1028,7 +1032,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn into_view(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         if not self.owns_data:
-            abort("Tensor → into_view: not allowed on non-owning tensor")
+            panic("Tensor → into_view: not allowed on non-owning tensor")
         shape, strides = self.shape, self.strides
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
@@ -1153,9 +1157,9 @@ struct Tensor[dtype: DType = DType.float32](
             else:
                 elem = (
                     tensor.item() if tensor.shape
-                    == Shape.Void else (tensor.squeeze(requires_grad=False))[
-                        IntList.Empty
-                    ]
+                    == Shape.Void else (
+                        tensor.squeeze([], requires_grad=False)
+                    )[IntList.Empty]
                 )
                 self.buffer.store(
                     offset, elem
@@ -1259,7 +1263,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn reshape(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         if self.numels() != 1:
-            abort(
+            panic(
                 "Tensor → reshape: only tensor with single element can be"
                 " reshaped to scalar tensor"
             )
@@ -1523,7 +1527,7 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         if scalar == Scalar[dtype](0):
-            abort("Tensor → __truediv__ : canot divide by " + scalar.__str__())
+            panic("Tensor → __truediv__ : canot divide by " + scalar.__str__())
 
         var buffer: Buffer[dtype]
         if self.owns_data:
@@ -1573,7 +1577,7 @@ struct Tensor[dtype: DType = DType.float32](
     # Element wise multiplication of two tensors
     fn __mul__(self, other: Self) -> Tensor[dtype]:
         if not self.broadcastable(other):
-            abort(
+            panic(
                 "__mul__(self * other) → Dimension mismatch: "
                 + self.shape.__str__()
                 + " <=> "
@@ -1631,13 +1635,13 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __iadd__(mut self, other: Self):
         if self.is_leaf():
-            abort(
+            panic(
                 "Tensor → __iadd__(self, other): can not perform in-place"
                 " operation on a leaf tensor requiring grad."
             )
 
         if self.shape != other.shape:
-            abort(
+            panic(
                 "Tensor → __iadd__(self, other): dimension mismatch: "
                 + self.shape.__str__()
                 + ", "
@@ -1651,13 +1655,13 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __isub__(mut self, other: Self):
         if self.is_leaf():
-            abort(
+            panic(
                 "Tensor → __isub__(self, other): can not perform in-place"
                 " operation on a leaf tensor requiring grad."
             )
 
         if self.shape != other.shape:
-            abort(
+            panic(
                 "Tensor → __isub__(self, other): dimension mismatch: "
                 + self.shape.__str__()
                 + ", "
@@ -1671,13 +1675,13 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __imul__(mut self, other: Self):
         if self.is_leaf():
-            abort(
+            panic(
                 "Tensor → __imul__(self, other): can not perform in-place"
                 " operation on a leaf tensor requiring grad."
             )
 
         if self.shape != other.shape:
-            abort(
+            panic(
                 "Tensor → __imul__(self, other): dimension mismatch: "
                 + self.shape.__str__()
                 + ", "
@@ -1830,7 +1834,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __sub__(self, other: Self) -> Tensor[dtype]:
         if not self.broadcastable(other):
-            abort(
+            panic(
                 "__sub__ → Dimension mismatch: "
                 + self.shape.__str__()
                 + " <=> "
@@ -2035,7 +2039,7 @@ struct Tensor[dtype: DType = DType.float32](
         if self.address() == other.address():
             return self.__mul__(2)
         if not self.broadcastable(other):
-            abort(
+            panic(
                 "__add__ → Dimension mismatch: "
                 + self.shape.__str__()
                 + " <=> "
@@ -2072,7 +2076,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __iadd__(mut self, scalar: Scalar[dtype]):
         if self.is_leaf():
-            abort(
+            panic(
                 "Tensor → Cannot perform in-place operation on a leaf tensor"
                 " requiring grad."
             )
@@ -2103,15 +2107,15 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn permute(self, axes: IntList) -> Tensor[dtype]:
         if len(axes) != self.shape.rank():
-            abort("Tensor → permute: number of axes must match tensor rank")
+            panic("Tensor → permute: number of axes must match tensor rank")
 
         # Check for valid permutation
         seen = IntList.with_capacity(len(axes))
         for axis in axes:
             if axis < 0 or axis >= self.shape.rank():
-                abort("Tensor → permute: invalid axis index")
+                panic("Tensor → permute: invalid axis index")
             if axis in seen:
-                abort("Tensor → permute: duplicate axis in permutation")
+                panic("Tensor → permute: duplicate axis in permutation")
             seen.append(axis)
 
         # Create new shape and strides
@@ -2137,148 +2141,53 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn unsqueezen(
+    fn unsqueeze(
+        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
+        """Unsqueeze multiple axes by inserting dimensions of size 1."""
+        return UnsqueezeForward[dtype].unsqueeze(
+            self, IntList.new(axes), requires_grad
+        )
+
+    fn unsqueeze(
         self, axes: IntList, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
-        rank = self.shape.rank()
-        new_axes_count = len(axes)
+        return UnsqueezeForward[dtype].unsqueeze(self, axes, requires_grad)
 
-        if new_axes_count == 0:
-            return self
+    fn argmax(self, axis: Int = 0) -> Tensor[DType.int32]:
+        return Argmax[dtype].argmax(tensor=self, axis=axis)
 
-        new_rank = rank + new_axes_count
-
-        normalized_axes = IntList.with_capacity(new_axes_count)
-        seen = IntList.with_capacity(new_axes_count)
-
-        for axis in axes:
-            normalized = axis if axis >= 0 else new_rank + axis
-            if normalized < 0 or normalized >= new_rank:
-                panic("unsqueeze: axis", axis.__str__(), "out of range")
-
-            # Check for duplicates
-            if normalized in seen:
-                panic("unsqueeze: duplicate axis", axis.__str__())
-            seen.append(normalized)
-            normalized_axes.append(normalized)
-
-        # Sort axes for efficient insertion
-        normalized_axes.sort()
-
-        # Pre-allocate with exact capacity
-        new_rank = rank + new_axes_count
-        var new_shape = IntList.with_capacity(new_rank)
-        var new_strides = IntList.with_capacity(new_rank)
-
-        var orig_axis_index = 0
-        var new_axis_index = 0
-
-        # Build new shape and strides by inserting 1's at specified positions
-        for i in range(new_rank):
-            if (
-                new_axis_index < new_axes_count
-                and i == normalized_axes[new_axis_index]
-            ):
-                # Insert new dimension
-                new_shape.append(1)
-
-                # Calculate stride for inserted dimension
-                # If inserting before existing dimensions, use stride of next dimension
-                # If inserting at the end, use stride 1
-                insert_stride = (
-                    self.strides[orig_axis_index] if orig_axis_index
-                    < rank else 1
-                )
-
-                new_strides.append(insert_stride)
-
-                new_axis_index += 1
-            else:
-                # Copy existing dimension
-                new_shape.append(self.shape[orig_axis_index])
-                new_strides.append(self.strides[orig_axis_index])
-                orig_axis_index += 1
-
-        # Create the unsqueezed tensor
-        shape = Shape(new_shape)
-        strides = Strides(new_strides)
-        grad_required = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
-
-        base_addr = self.address() if self.owns_data else self.base.copy()
-
-        var out = Tensor[dtype](
-            shape, base_addr, strides, self.offset, grad_required
-        )
-
-        if grad_required:
-            out.requires_grad_()
-            bfn = UnsqueezeBackward[dtype](
-                axes=normalized_axes
-            ).into_backward_fn()
-            out.backwardFn = Optional(bfn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
+    fn argmin(self, axis: Int = 0) -> Tensor[DType.int32]:
+        return Argmin[dtype].argmin(tensor=self, axis=axis)
 
     fn unsqueeze(
         self, axis: Int, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
-        return self.unsqueezen(IntList(axis), requires_grad)
+        return UnsqueezeForward[dtype].unsqueeze(
+            self, IntList(axis), requires_grad
+        )
 
     fn expand(
         self: Tensor[dtype],
         target: Shape,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        exp_shape = Shape.broadcast_shape(self.shape, target)
-
-        ndim_diff = len(exp_shape) - len(self.shape)
-        padded_shape = Shape.Unit * ndim_diff + self.shape
-        padded_strides = IntList(0) * ndim_diff + self.strides.strides
-
-        exp_strides_list = IntList.Empty
-        for i in range(len(exp_shape)):
-            if padded_shape[i] == 1 and exp_shape[i] > 1:
-                # Broadcasted dimension → stride 0
-                exp_strides_list.append(0)
-            else:
-                exp_strides_list.append(padded_strides[i])
-
-        strides = Strides(exp_strides_list)
-
-        base_addr = self.address() if self.owns_data else self.base.copy()
-        offset = self.offset  # keep same as current tensor
-
-        grad_required = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
-
-        var out = Tensor[dtype](
-            exp_shape, base_addr, strides, offset, grad_required
-        )
-
-        if grad_required:
-            out.requires_grad_()
-            var bfn = ExpandBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(bfn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
+        return ExpandForward[dtype].expand(self, target, requires_grad)
 
     fn expand(
         self: Tensor[dtype],
         *target_dims: Int,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return self.expand(Shape(target_dims), requires_grad)
+        return ExpandForward[dtype].expand(
+            self, Shape(target_dims), requires_grad
+        )
 
     # Squeeze specified axes or all dims of size 1 if no axes provided
-    fn squeezen(
+    fn squeeze(
         self,
-        axes: Optional[IntList] = None,
+        axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         """
@@ -2291,68 +2200,9 @@ struct Tensor[dtype: DType = DType.float32](
         Returns:
             Tensor with specified dimensions squeezed.
         """
-        if self.shape.count_axes_of_size(1) == 0:
-            return self
-        rank = self.shape.rank()
-
-        # Determine which axes to squeeze
-        var axes_to_squeeze: IntList
-        if axes:
-            # Use the specified axes after validation
-            axes_to_squeeze = IntList.with_capacity(rank)
-            seen = IntList.with_capacity(len(axes.value()))
-            for axis in axes.value():
-                normalized = axis if axis >= 0 else axis + rank
-                if normalized < 0 or normalized >= rank:
-                    panic("squeeze: axis ", axis.__str__(), " out of range")
-                if self.shape[normalized] != 1:
-                    panic(
-                        "squeeze: cannot squeeze axis ",
-                        axis.__str__(),
-                        " with size ",
-                        self.shape[normalized].__str__(),
-                    )
-                if normalized in seen:
-                    panic("squeeze dupliacte axis", axis.__str__())
-                seen.append(normalized)
-                axes_to_squeeze.append(normalized)
-
-            axes_to_squeeze.sort()
-
-        else:
-            axes_to_squeeze = self.shape.indices_of_axes_with_size(1)
-
-        if len(axes_to_squeeze) == 0:
-            return self
-
-        new_size = rank - len(axes_to_squeeze)
-        new_shape = IntList.with_capacity(new_size)
-        new_strides = IntList.with_capacity(new_size)
-
-        for i in range(rank):
-            if i not in axes_to_squeeze:
-                new_shape.append(self.shape[i])
-                new_strides.append(self.strides[i])
-
-        shape = Shape(new_shape)
-        strides = Strides(new_strides)
-        grad_required = (
-            requires_grad.value() if requires_grad else self.requires_grad
+        return SqueezeForward[dtype].squeeze(
+            self, IntList.new(axes), requires_grad
         )
-
-        base_addr = self.address() if self.owns_data else self.base.copy()
-
-        var out = Tensor[dtype](
-            shape, base_addr, strides, self.offset, grad_required
-        )
-
-        if grad_required:
-            out.requires_grad_()
-            bfn = SqueezeBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(bfn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
 
     # Squeeze single axis if provided, otherwise squeeze all dims of size 1
     fn squeeze(
@@ -2360,11 +2210,13 @@ struct Tensor[dtype: DType = DType.float32](
         axis: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return self.squeezen(
-            Optional(IntList(axis.value())) if axis else None, requires_grad
+        return SqueezeForward[dtype].squeeze(
+            self,
+            IntList(axis.value()) if axis else IntList.Empty,
+            requires_grad,
         )
 
-    fn print(self, num_first: Int = 5, num_last: Int = 1):
+    fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(
             "\n",
             self.__str__(),
@@ -2614,4 +2466,5 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
+    print(min_finite[DType.float32]())
     pass
