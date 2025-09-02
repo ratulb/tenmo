@@ -2,12 +2,8 @@ from common_utils import variadiclist_as_intlist, log_debug, panic
 from intlist import IntList
 from memory import Pointer
 
-from strides import Strides
-
-
 fn main() raises:
     pass
-
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
     var shape: Pointer[Shape, origin]
@@ -43,7 +39,7 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
 
 @register_passable
 struct Shape(
-    Sized & Stringable & Writable & Representable & Copyable  # & Movable
+    Sized & Stringable & Writable & Representable & Copyable
 ):
     alias Unit = Shape.of(1)
     alias Void = Shape(IntList.Empty)
@@ -158,6 +154,10 @@ struct Shape(
             if self.axes_spans[i] == axis_size:
                 indices.append(i)
         return indices
+
+    @always_inline
+    fn first_index(self) -> IntList:
+        return IntList.filled(len(self), 0)
 
     fn __mul__(self, factor: Int) -> Shape:
         repeated = self.intlist() * factor

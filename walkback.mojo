@@ -15,7 +15,8 @@ from permutebackward import PermuteBackward
 from dotbackward import DotBackward
 from vectormatrixmmbackward import VectorMatrixMMBackward
 from matrixvectormmbackward import MatrixVectorMMBackward
-from unsqueezebackward import UnsqueezeBackward
-from squeezebackward import SqueezeBackward
-from expandbackward import ExpandBackward
+from unsqueeze import UnsqueezeBackward
+from squeeze import SqueezeBackward
+from expand import ExpandBackward
+from tenmomax import MaxBackward
 

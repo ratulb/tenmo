@@ -7,6 +7,21 @@ from common_utils import Slicer, panic, Idx, NewAxis, i, s, il, newaxis
 
 struct Validator:
     @staticmethod
+    fn check_permutation(permutation: List[Int], axis_len: Int):
+        # Must have correct length
+        if len(permutation) != axis_len:
+            panic("Permutation length must match axis length.")
+
+        # Must contain all indices 0..axis_len-1 exactly once
+        var seen = IntList.with_capacity(axis_len)
+        for v in permutation:
+            if v < 0 or v >= axis_len:
+                panic("Permutation index out of range.")
+            if v in seen:
+                panic("Permutation contains duplicates.")
+            seen.append(v)
+
+    @staticmethod
     fn validate_dtype_consistency(
         dtype: DType, requires_grad: Bool, label: String
     ):
