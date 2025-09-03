@@ -21,7 +21,7 @@ from squeeze import SqueezeForward
 from unsqueeze import UnsqueezeForward
 from expand import ExpandForward
 from argminmax import Argmin, Argmax
-from tenmomax import MaxForward
+from minmax import MinMaxForward
 from shuffle import ShuffleForward
 
 
@@ -2159,11 +2159,38 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn max(
         self,
+        axes: List[Int] = [],
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return MinMaxForward[dtype].minmax[True](self, IntList.new(axes), keepdims, requires_grad)
+
+
+    fn max(
+        self,
         axes: IntList,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MaxForward[dtype].max(self, axes, keepdims, requires_grad)
+        return MinMaxForward[dtype].minmax[True](self, axes, keepdims, requires_grad)
+
+    fn min(
+        self,
+        axes: List[Int] = [],
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return MinMaxForward[dtype].minmax[False](self, IntList.new(axes), keepdims, requires_grad)
+
+
+    fn min(
+        self,
+        axes: IntList,
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return MinMaxForward[dtype].minmax[False](self, axes, keepdims, requires_grad)
+
 
     fn shuffle(
         self,

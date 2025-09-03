@@ -6,12 +6,12 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn
 from common_utils import panic, compute_output_shape
 from validators import Validator
-from utils.numerics import min_finite
+from utils.numerics import min_finite, max_finite
 
 
 @fieldwise_init
 @register_passable
-struct MaxBackward[dtype: DType](Copyable):
+struct MinMaxBackward[dtype: DType](Copyable):
     var axes: IntList
     var keepdims: Bool
 
@@ -66,9 +66,11 @@ struct MaxBackward[dtype: DType](Copyable):
 
 @fieldwise_init
 @register_passable
-struct MaxForward[dtype: DType]:
+struct MinMaxForward[dtype: DType]:
     @staticmethod
-    fn max(
+    fn minmax[
+        max: Bool
+    ](
         self: Tensor[dtype],
         axes: IntList,
         keepdims: Bool = False,
@@ -89,7 +91,7 @@ struct MaxForward[dtype: DType]:
 
         if out_shape == Shape.Void:
             if rank == 0:
-                # scalar input -> max is the value itself; mask = 1
+                # scalar input -> min/max is the value itself; mask = 1
                 var v = self[IntList.Empty]
                 out[IntList.Empty] = v
             elif rank == len(normalized_axes) and not keepdims:
@@ -105,12 +107,23 @@ struct MaxForward[dtype: DType]:
                         best_positions.append(idx)
                         inited = True
                     else:
-                        if cur > max_val:
-                            max_val = cur
-                            best_positions.clear()
-                            best_positions.append(idx)
-                        elif cur == max_val:
-                            best_positions.append(idx)
+
+                        @parameter
+                        if max:
+                            if cur > max_val:
+                                max_val = cur
+                                best_positions.clear()
+                                best_positions.append(idx)
+                            elif cur == max_val:
+                                best_positions.append(idx)
+                        else:
+                            if cur < max_val:
+                                max_val = cur
+                                best_positions.clear()
+                                best_positions.append(idx)
+                            elif cur == max_val:
+                                best_positions.append(idx)
+
                 out[IntList.Empty] = max_val
 
                 # Split responsibility among ties
@@ -140,12 +153,22 @@ struct MaxForward[dtype: DType]:
                         best_positions.append(full_idx)
                         inited = True
                     else:
-                        if cur > max_val:
-                            max_val = cur
-                            best_positions.clear()
-                            best_positions.append(full_idx)
-                        elif cur == max_val:
-                            best_positions.append(full_idx)
+
+                        @parameter
+                        if max:
+                            if cur > max_val:
+                                max_val = cur
+                                best_positions.clear()
+                                best_positions.append(full_idx)
+                            elif cur == max_val:
+                                best_positions.append(full_idx)
+                        else:
+                            if cur < max_val:
+                                max_val = cur
+                                best_positions.clear()
+                                best_positions.append(full_idx)
+                            elif cur == max_val:
+                                best_positions.append(full_idx)
 
                 # write max to output
                 out[out_idx] = max_val
@@ -160,7 +183,7 @@ struct MaxForward[dtype: DType]:
         # Attach autograd info: save input and mask as ancestors so backward can use mask
         if grad_required:
             out.requires_grad_(True)
-            var backward_fn = MaxBackward[dtype](
+            var backward_fn = MinMaxBackward[dtype](
                 normalized_axes.copy(), keepdims
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
@@ -175,6 +198,7 @@ fn main():
     print("passes")
     a = Tensor.zeros(3, 3, requires_grad=True)
     a[0, 0] = 42
+    a[0, 2] = -5
     a[1, 1] = 35
     a[2, 2] = 51
     a[2, 0] = 51
@@ -186,4 +210,10 @@ fn main():
     print()
     max_result.print()
     max_result.backward()
+    a.gradbox[].print()
+    
+    min_result = a.min([1])
+    print()
+    min_result.print()
+    min_result.backward()
     a.gradbox[].print()

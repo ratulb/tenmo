@@ -32,7 +32,7 @@ alias Delegate[dtype: DType] = Variant[
     UnsqueezeBackward[dtype],
     SqueezeBackward[dtype],
     ExpandBackward[dtype],
-    MaxBackward[dtype],
+    MinMaxBackward[dtype],
     ShuffleBackward[dtype],
 ]
 
@@ -128,8 +128,8 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.grad_fn.isa[ExpandBackward[dtype]]():
             return self.grad_fn[ExpandBackward[dtype]].backward[dtype](output)
 
-        elif self.grad_fn.isa[MaxBackward[dtype]]():
-            return self.grad_fn[MaxBackward[dtype]].backward[dtype](output)
+        elif self.grad_fn.isa[MinMaxBackward[dtype]]():
+            return self.grad_fn[MinMaxBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[ShuffleBackward[dtype]]():
             return self.grad_fn[ShuffleBackward[dtype]].backward[dtype](output)
