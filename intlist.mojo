@@ -61,6 +61,12 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         result.size = len(src)
         return result
 
+    fn tolist(self) -> List[Int]:
+        l = List[Int](capacity=len(self))
+        for i in range(len(self)):  
+            l.append(self[i])
+        return l
+
     @staticmethod
     fn range_list(n: Int) -> IntList:
         var out = IntList.with_capacity(n)

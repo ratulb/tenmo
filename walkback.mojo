@@ -19,4 +19,4 @@ from unsqueeze import UnsqueezeBackward
 from squeeze import SqueezeBackward
 from expand import ExpandBackward
 from tenmomax import MaxBackward
-
+from shuffle import ShuffleBackward

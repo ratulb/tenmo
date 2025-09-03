@@ -22,6 +22,7 @@ from unsqueeze import UnsqueezeForward
 from expand import ExpandForward
 from argminmax import Argmin, Argmax
 from tenmomax import MaxForward
+from shuffle import ShuffleForward
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -2163,6 +2164,22 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         return MaxForward[dtype].max(self, axes, keepdims, requires_grad)
+
+    fn shuffle(
+        self,
+        axis: Int = 0,
+        perm: List[Int] = [],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return self.shuffle(axis, IntList.new(perm), requires_grad)
+
+    fn shuffle(
+        self,
+        axis: Int = 0,
+        perm: Optional[IntList] = None,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return ShuffleForward[dtype].shuffle(self, axis, perm, requires_grad)
 
     fn argmax(self, axis: Int = 0) -> Tensor[DType.int32]:
         return Argmax[dtype].argmax(tensor=self, axis=axis)
