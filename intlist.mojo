@@ -20,6 +20,18 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         self.size = 0
 
     @always_inline("nodebug")
+    fn __init__(out self, src: List[Int]):
+        """Initialize a new `IntList` from elements of a list.
+        Args:
+            src: Original list containig the ints.
+        """
+
+        self.data = UnsafePointer[Int].alloc(len(src))
+        memcpy(self.data, src._data, len(src))
+        self.size = len(src)
+        self.capacity = len(src)
+
+    @always_inline("nodebug")
     fn __init__(out self, *elems: Int):
         """Initialize a new `IntList` with variadic number of elements.
         Args:
@@ -63,7 +75,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
 
     fn tolist(self) -> List[Int]:
         l = List[Int](capacity=len(self))
-        for i in range(len(self)):  
+        for i in range(len(self)):
             l.append(self[i])
         return l
 
@@ -119,7 +131,9 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         index2 = that_index + len(self) if that_index < 0 else that_index
 
         if not 0 <= index1 < len(self) and 0 <= index2 < len(self):
-            panic("IntList → swap: provided index(indices) is(are) out of bounds")
+            panic(
+                "IntList → swap: provided index(indices) is(are) out of bounds"
+            )
 
         if index1 != index2:
             swap((self.data + index1)[], (self.data + index2)[])
@@ -733,7 +747,7 @@ struct ZipIterator[
 
 fn main() raises:
     ll = IntList.new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    padded_strides = IntList(0) * 3  + ll
+    padded_strides = IntList(0) * 3 + ll
     print(padded_strides)
     sliced = ll[2::3]
     print(sliced)
