@@ -545,7 +545,15 @@ struct Tensor[dtype: DType = DType.float32](
                 + ", "
                 + other.shape.__str__()
             )
-        return self.buffer.all_close[simd_width, rtol, atol](other.buffer)
+        if self.owns_data and other.owns_data:
+            return self.buffer.all_close[simd_width, rtol, atol](other.buffer)
+        else:
+            for indices in self.shape:
+                value1 = self[indices]
+                value2 = other[indices]
+                if abs(value1 - value2).gt(atol + rtol * abs(value2)):
+                    return False
+            return True
 
     @always_inline
     fn data_buffer(self) -> Buffer[dtype]:
