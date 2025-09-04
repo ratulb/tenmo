@@ -23,6 +23,7 @@ from expand import ExpandForward
 from argminmax import Argmin, Argmax
 from minmax import MinMaxForward
 from shuffle import ShuffleForward
+from relu import ReLUForward
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -485,9 +486,18 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn add_ancestry(mut self, *parents: TensorLite[dtype]):
         for parent in parents:
+            inner_ptr = UnsafePointer[Tensor[dtype]].alloc(1)
+            inner_ptr.init_pointee_move(parent.tensor())
+            var ptr = UnsafePointer[TensorLite[dtype]].alloc(1)
+            new_tensor_lite = TensorLite[dtype](inner_ptr)
+            ptr.init_pointee_move(new_tensor_lite)
+            self.ancestors.append(ptr)
+
+        _ = """fn add_ancestry(mut self, *parents: TensorLite[dtype]):
+        for parent in parents:
             var ptr = UnsafePointer[TensorLite[dtype]].alloc(1)
             ptr.init_pointee_copy(parent)
-            self.ancestors.append(ptr)
+            self.ancestors.append(ptr)"""
 
     fn ancestry(self) -> Ancestors[dtype]:
         return self.ancestors
@@ -2215,6 +2225,12 @@ struct Tensor[dtype: DType = DType.float32](
         return MinMaxForward[dtype].minmax[False](
             self, axes, keepdims, requires_grad
         )
+
+    fn relu(
+        self,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return ReLUForward[dtype].relu(self, requires_grad)
 
     fn shuffle(
         self,

@@ -1,5 +1,5 @@
 from tensors import Tensor
-from common_utils import panic
+from common_utils import panic, log_debug, RED, CYAN, MAGENTA
 from utils import Variant
 
 
@@ -28,6 +28,35 @@ struct Module[dtype: DType = DType.float32](Copyable & Movable):
             return self.layer[ReLU[dtype]].parameters()
         else:
             return List[Tensor[dtype]]()
+
+    fn num_parameters(self) -> Int:
+        if self.layer.isa[Linear[dtype]]():
+            return self.layer[Linear[dtype]].num_parameters()
+        elif self.layer.isa[ReLU[dtype]]():
+            return self.layer[ReLU[dtype]].num_parameters()
+        else:
+            return 0
+
+    # Free all learnable params inside this module
+    fn free_params(self):
+        if self.layer.isa[Linear[dtype]]():
+            var lin = self.layer[Linear[dtype]]
+            log_debug(
+                "Freeing Linear weights - shape: "
+                + lin.weights.shape.__str__(),
+                RED,
+            )
+            lin.weights.free()
+            log_debug(
+                "Freeing Linear bias - shape: " + lin.bias.shape.__str__(), RED
+            )
+            lin.bias.free()
+        elif self.layer.isa[ReLU[dtype]]():
+            log_debug("ReLU has no learnable params", MAGENTA)
+
+    fn free_all(self):
+        # Currently just frees parameters; if layer had internal buffers, free them here
+        self.free_params()
 
 
 # --------------------
@@ -58,6 +87,12 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
     fn into(self) -> Module[dtype]:
         return Module[dtype](Layer[dtype](self))
 
+    fn num_parameters(self) -> Int:
+        return self.weights.numels() + self.bias.numels()
+
+
+#
+
 
 # --------------------
 # ReLU
@@ -65,14 +100,16 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
 @fieldwise_init
 struct ReLU[dtype: DType = DType.float32](Copyable & Movable):
     fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
-        # return x.relu()
-        return Tensor[dtype].scalar(10)
+        return x.relu()
 
     fn parameters(self) -> List[Tensor[dtype]]:
         return List[Tensor[dtype]]()
 
     fn into(self) -> Module[dtype]:
         return Module[dtype](Layer[dtype](self))
+
+    fn num_parameters(self) -> Int:
+        return 0
 
 
 # --------------------
@@ -105,6 +142,98 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
                 params.append(p)
         return params
 
+    fn num_parameters(self) -> Int:
+        var total: Int = 0
+        for p in self.parameters():
+            total += p.numels()  # each tensor knows its total elements
+        return total
+
+    # Free just parameters across all modules
+    fn free_params(self):
+        for m in self.modules:
+            m.free_params()
+
+    # Free everything (params + clear module list)
+    fn free_all(mut self):
+        log_debug("Freeing Sequential modules...", CYAN)
+        for m in self.modules:
+            m.free_all()
+        self.modules.clear()
+        log_debug("Sequential cleared", CYAN)
+
+    fn print_summary(self):
+        print("Sequential Model Summary")
+        print("------------------------")
+        for i in range(len(self.modules)):
+            m = self.modules[i]
+            var name = "Unknown"
+            var nparams = 0
+            if m.layer.isa[Linear[dtype]]():
+                name = "Linear"
+                nparams = m.layer[Linear[dtype]].num_parameters()
+            elif m.layer.isa[ReLU[dtype]]():
+                name = "ReLU"
+                nparams = m.layer[ReLU[dtype]].num_parameters()
+
+            print("Layer ", i, ": ", name, " | Parameters: ", nparams)
+        print("------------------------")
+        print("Total learnable parameters: ", self.num_parameters())
+
+    fn print_summary(self, input_shape: List[Int]):
+        print("Sequential Model Summary")
+        print("------------------------")
+
+        var x = Tensor[dtype].zeros(input_shape, requires_grad=False)
+
+        for i in range(len(self.modules)):
+            m = self.modules[i]
+            var name = "Unknown"
+            var nparams = m.num_parameters()
+            var in_shape = x.shape
+            var details = ""
+            var trainable = "No"
+
+            if m.layer.isa[Linear[dtype]]():
+                name = "Linear"
+                l = m.layer[Linear[dtype]]
+                details = (
+                    "weight="
+                    + l.weights.shape.__str__()
+                    + ", bias="
+                    + l.bias.shape.__str__()
+                )
+                # if either weight or bias requires grad, mark trainable
+                if l.weights.requires_grad or l.bias.requires_grad:
+                    trainable = "Yes"
+                x = l(x)
+
+            elif m.layer.isa[ReLU[dtype]]():
+                name = "ReLU"
+                details = ""
+                trainable = "No"
+                x = m.layer[ReLU[dtype]](x)
+
+            var out_shape = x.shape
+
+            print(
+                "Layer ",
+                i,
+                ": ",
+                name,
+                " | Input: ",
+                in_shape,
+                " -> Output: ",
+                out_shape,
+                " | Parameters: ",
+                nparams,
+                (" | " + details if details != "" else ""),
+                " | Trainable: ",
+                trainable,
+            )
+
+        print("------------------------")
+        print("Total learnable parameters: ", self.num_parameters())
+
 
 # --------------------
 # Example usage
@@ -127,4 +256,20 @@ fn main():
     print("Output:")
     out.print()
 
-    print("Number of learnable parameters: ", len(net.parameters()))
+    print("Number of learnable parameters: \n", len(net.parameters()), "\n")
+    print("Out has backward fn? \n", out.has_backward_fn())
+    out.backward()
+    print("Total number of learnable scalars: ", net.num_parameters())
+    print()
+    print("gradbox\n")
+
+    x.gradbox[].print()
+    print()
+
+    for p in net.parameters():
+        print("Param grad:\n")
+        p.gradbox[].print()
+
+    net.print_summary([2, 4])
+    net.free_all()
+

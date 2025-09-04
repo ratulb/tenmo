@@ -34,6 +34,7 @@ alias Delegate[dtype: DType] = Variant[
     ExpandBackward[dtype],
     MinMaxBackward[dtype],
     ShuffleBackward[dtype],
+    ReLUBackward[dtype],
 ]
 
 
@@ -70,6 +71,8 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[TransposeBackward[dtype]].backward[dtype](
                 output
             )
+        elif self.grad_fn.isa[ReLUBackward[dtype]]():
+            return self.grad_fn[ReLUBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[PermuteBackward[dtype]]():
             return self.grad_fn[PermuteBackward[dtype]].backward[dtype](output)

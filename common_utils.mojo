@@ -13,6 +13,11 @@ from testing import assert_true
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
 
+# Color codes
+alias RED: String = "\033[31m"
+alias CYAN: String = "\033[36m"
+alias MAGENTA: String = "\033[35m"
+
 
 @always_inline
 fn is_power_of_two(x: Int) -> Bool:
@@ -47,8 +52,9 @@ fn panic[depth: Int = 1](*s: String):
     abort(message)
 
 
-fn log_debug(msg: String):
-    log.debug(msg)
+fn log_debug(msg: String, color: String = ""):
+    var reset = "\033[0m"
+    log.debug(color + msg + reset)
 
 
 fn log_info(msg: String):

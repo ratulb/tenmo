@@ -20,3 +20,4 @@ from squeeze import SqueezeBackward
 from expand import ExpandBackward
 from minmax import MinMaxBackward
 from shuffle import ShuffleBackward
+from relu import ReLUBackward
