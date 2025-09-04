@@ -2754,15 +2754,17 @@ fn test_nested_operations() raises:
 fn test_large_tensor_backprop() raises:
     print("test_large_tensor_backprop")
     # Test memory efficiency
-    var a = Tensor.rand(500, 128, requires_grad=True)
-    var b = Tensor.rand(128, 100, requires_grad=True)
-    var c = a.matmul(b).sum()
-    c.backward()
+    var a = Tensor.rand(Shape([100, 128]), requires_grad=True)
+    var b = Tensor.rand(Shape([128, 512]), requires_grad=True)
+    var c = a.matmul(b)
+    s = c.sum()
+    s.backward()
     assert_true(a.gradbox[].shape == a.shape)
     assert_true(b.gradbox[].shape == b.shape)
-    c.free()
-    b.free()
     a.free()
+    b.free()
+    c.free()
+    s.free()
 
 
 fn test_detach() raises:
@@ -3667,11 +3669,206 @@ fn test_vector_matrix_mm_backward_batched_matrix_matrix_grad() raises:
     var expected_grad = Tensor.d3([[[3, 3], [4, 4]], [[3, 3], [4, 4]]])
     assert_true(b.gradbox[].all_close(expected_grad))
 
+fn test_max_min_mixed() raises:
+    print("test_max_min")
+    
+    # Test 1: Basic max reduction along axis 1
+    var a = Tensor.d2(
+        [[42.0, 0.0, -5.0], [0.0, 35.0, 0.0], [51.0, 0.0, 51.0]],
+        requires_grad=True,
+    )
+    var max_result = a.max(IntList(1))
+    var expected = Tensor.d1([42.0, 35.0, 51.0]).float()
+    assert_true(max_result.all_close(expected))
+
+    max_result.backward()
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d2(
+                [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.5, 0.0, 0.5]]
+            ).float()
+        )
+    )
+
+    # Reset gradients for next test
+    a.zero_grad()
+
+    # Test 2: Basic min reduction along axis 1
+    var min_result = a.min(IntList(1))
+    assert_true(min_result.all_close(Tensor.d1([-5.0, 0.0, 0.0]).float()))
+    min_result.backward()
+
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d2(
+                [[0.0, 0.0, 1.0], [0.5, 0.0, 0.5], [0.0, 1.0, 0.0]]
+            ).float()
+        )
+    )
+
+    # Test 3: Max reduction along axis 0
+    a.zero_grad()
+    var max_axis0 = a.max(IntList(0))
+    assert_true(max_axis0.all_close(Tensor.d1([51.0, 35.0, 51.0]).float()))
+    max_axis0.backward()
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d2(
+                [[0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0, 1.0]]
+            ).float()
+        )
+    )
+
+    # Test 4: Min reduction along axis 0
+    a.zero_grad()
+    var min_axis0 = a.min(IntList(0))
+    assert_true(min_axis0.all_close(Tensor.d1([0.0, 0.0, -5.0]).float()))
+    min_axis0.backward()
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d2(
+                [[0.0, 0.5, 1.0], [1.0, 0.0, 0.0], [0.0, 0.5, 0.0]]
+            ).float()
+        )
+    )
+
+    # Test 5: Global max (no axis)
+    a.zero_grad()
+    var global_max = a.max()
+    assert_true(global_max.all_close(Tensor.scalar(51.0).float()))
+    global_max.backward()
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d2(
+                [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.5, 0.0, 0.5]]
+            ).float()
+        )
+    )
+
+    # Test 6: Global min (no axis)
+    a.zero_grad()
+    var global_min = a.min()
+    assert_true(global_min.all_close(Tensor.scalar(-5.0).float()))
+    global_min.backward()
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d2(
+                [[0.0, 0.0, 1.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+            ).float()
+        )
+    )
+
+    # Test 7: Multiple axes reduction
+    var b = Tensor.d3(
+        [
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]]
+        ],
+        requires_grad=True
+    )
+    
+    var max_axes_01 = b.max(IntList([0, 1]))
+    assert_true(max_axes_01.all_close(Tensor.d1([7.0, 8.0]).float()))
+    max_axes_01.backward()
+    assert_true(
+        b.gradbox[].all_close(
+            Tensor.d3(
+                [
+                    [[0.0, 0.0], [0.0, 0.0]],
+                    [[0.0, 0.0], [1.0, 1.0]]
+                ]
+            ).float()
+        )
+    )
+
+    # Test 8: Edge case - all same values
+    var c = Tensor.d2(
+        [[5.0, 5.0], [5.0, 5.0]],
+        requires_grad=True
+    )
+    
+    var max_same = c.max(IntList(1))
+    assert_true(max_same.all_close(Tensor.d1([5.0, 5.0]).float()))
+    max_same.backward()
+    assert_true(
+        c.gradbox[].all_close(
+            Tensor.d2(
+                [[0.5, 0.5], [0.5, 0.5]]
+            ).float()
+        )
+    )
+
+    # Test 9: Edge case - negative infinity
+    var d = Tensor.d2(
+        [[-3.4028235e+38, 0.0], [1.0, 2.0]],
+        requires_grad=True
+    )
+    
+    var max_with_inf = d.max(IntList(1))
+    assert_true(max_with_inf.all_close(Tensor.d1([0.0, 2.0]).float()))
+    max_with_inf.backward()
+    assert_true(
+        d.gradbox[].all_close(
+            Tensor.d2(
+                [[0.0, 1.0], [0.0, 1.0]]
+            ).float()
+        )
+    )
+
+    # Test 10: Keep dimensions
+    var e = Tensor.d2(
+        [[1.0, 2.0], [3.0, 4.0]],
+        requires_grad=True
+    )
+    
+    var max_keepdim = e.max(IntList(1), keepdims=True)
+    assert_true(max_keepdim.all_close(Tensor.d2([[2.0], [4.0]]).float()))
+    max_keepdim.backward()
+    assert_true(
+        e.gradbox[].all_close(
+            Tensor.d2(
+                [[0.0, 1.0], [0.0, 1.0]]
+            ).float()
+        )
+    )
+
+fn test_max_min() raises:
+    print("test_max_min")
+    a = Tensor.d2(
+        [[42.0, 0.0, -5.0], [0.0, 35.0, 0.0], [51.0, 0.0, 51.0]],
+        requires_grad=True,
+    )
+
+    max_result = a.max(IntList(1))
+    expected = Tensor.d1([42.0, 35.0, 51.0]).float()
+    assert_true(max_result.all_close(expected))
+
+    max_result.backward()
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d2(
+                [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.5, 0.0, 0.5]]
+            ).float()
+        )
+    )
+
+    min_result = a.min([1])
+    assert_true(min_result.all_close(Tensor.d1([-5.0, 0.0, 0.0]).float()))
+    min_result.backward()
+
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d2(
+                [[1.0, 0.0, 1.0], [0.5, 1.0, 0.5], [0.5, 1.0, 0.5]]
+            ).float()
+        )
+    )
 
 
 fn main() raises:
     print("Starting tensor test cases")
-
+    test_max_min()
+    test_max_min_mixed()
     test_vector_matrix_matmul()
     test_tensor_dot()
     test_validate_matmul_last_2_dims()
@@ -3733,7 +3930,6 @@ fn main() raises:
     test_sum_specific_axis()
 
     # test_nested_operations()
-    # test_large_tensor_backprop()
     # These need to be enabled
     test_reshape_gradient_flatten()
     test_multiple_reshapes()
@@ -3815,7 +4011,6 @@ fn main() raises:
     test_scalar_div_tensor_multiple()
     test_scalar_div_tensor_2d()
     test_empty_tensor()
-    test_large_tensor_backprop()
     test_tensorlite_inner_tensor_requires_grad()
     test_flat_view_chain_backprop()
     test_reshape_backward()
@@ -3865,7 +4060,7 @@ fn main() raises:
 
     test_vector_matrix_mm_backward_batched_matrix_vector_grad()
     test_vector_matrix_mm_backward_batched_matrix_matrix_grad()
-
+    test_large_tensor_backprop()
     print("Finished running tensor test cases")
 
 

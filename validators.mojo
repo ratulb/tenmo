@@ -112,7 +112,6 @@ struct Validator:
                     axis.__str__(),
                 )
             unique.append(axis)
-        unique.free()
 
         # Sorted order
         if ordered:

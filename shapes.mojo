@@ -2,8 +2,10 @@ from common_utils import variadiclist_as_intlist, log_debug, panic
 from intlist import IntList
 from memory import Pointer
 
+
 fn main() raises:
     pass
+
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
     var shape: Pointer[Shape, origin]
@@ -38,9 +40,7 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
 
 
 @register_passable
-struct Shape(
-    Sized & Stringable & Writable & Representable & Copyable
-):
+struct Shape(Sized & Stringable & Writable & Representable & Copyable):
     alias Unit = Shape.of(1)
     alias Void = Shape(IntList.Empty)
     var axes_spans: IntList
@@ -176,15 +176,64 @@ struct Shape(
 
     @always_inline
     @staticmethod
-    fn validate_matrix_shapes(A_shape: Shape, B_shape: Shape):
-        if not A_shape[-1] == B_shape[-2]:
+    fn validate_matrix_shapes_nd(A_shape: Shape, B_shape: Shape):
+        if len(A_shape) < 2 or len(B_shape) < 2:
             panic(
-                "Shape → validate_matrix_shapes: Incompatible shapes",
-                A_shape[-1].__str__(),
-                A_shape.__str__(),
-                "does not equal",
-                B_shape[-2].__str__(),
-                B_shape.__str__(),
+                "Tensor → validate_matrix_shapes_nd: matmul_nd expects rank >="
+                " 2. Got A = "
+                + A_shape.__str__()
+                + ", B = "
+                + B_shape.__str__()
+            )
+
+        if A_shape[-1] != B_shape[-2]:
+            panic(
+                "Tensor → validate_matrix_shapes_nd: inner dimensions"
+                " mismatch: "
+                + "A(...,"
+                + A_shape[-1].__str__()
+                + ") vs "
+                + "B("
+                + B_shape[-2].__str__()
+                + ",...). "
+                + "Full A = "
+                + A_shape.__str__()
+                + ", B = "
+                + B_shape.__str__()
+            )
+
+        A_batch = A_shape[0:-2]
+        B_batch = B_shape[0:-2]
+        _ = Shape.broadcast_shape(
+            A_batch, B_batch
+        )  # will panic internally if not compatible
+
+    @always_inline
+    @staticmethod
+    fn validate_matrix_shapes_2d(A_shape: Shape, B_shape: Shape):
+        if len(A_shape) != 2 or len(B_shape) != 2:
+            panic(
+                "Tensor → validate_matrix_shapes_2d: matmul_2d expects rank =="
+                " 2. Got A = "
+                + A_shape.__str__()
+                + ", B = "
+                + B_shape.__str__()
+            )
+
+        if A_shape[1] != B_shape[0]:
+            panic(
+                "Tensor → validate_matrix_shapes_2d: inner dimensions mismatch"
+                " in matmul_2d: "
+                + "A(m,"
+                + A_shape[1].__str__()
+                + ") vs "
+                + "B("
+                + B_shape[0].__str__()
+                + ",n). "
+                + "Full A = "
+                + A_shape.__str__()
+                + ", B = "
+                + B_shape.__str__()
             )
 
     fn reverse(self) -> Self:

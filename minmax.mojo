@@ -8,12 +8,14 @@ from common_utils import panic, compute_output_shape
 from validators import Validator
 from utils.numerics import min_finite, max_finite
 
+alias Gradbag[dtype: DType] = List[(IntList, Scalar[dtype])]
+
 
 @fieldwise_init
-@register_passable
-struct MinMaxBackward[dtype: DType](Copyable):
+struct MinMaxBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     var keepdims: Bool
+    var gradbox: Gradbag[dtype]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -26,9 +28,9 @@ struct MinMaxBackward[dtype: DType](Copyable):
         # Retrieve upstream grad and saved tensors
         var gradients = output.gradients()[]
         var ancestor = output.ancestry().get(0)[]  # original input
-        var ancestor_mask = output.ancestry().get(1)[]  # saved argmax mask
-        var mask = ancestor_mask.tensor()
-
+        var mask = Tensor[dtype].zeros(ancestor.shape())
+        for grad in self.gradbox:
+            mask[grad[0]] = rebind[Scalar[dtype]](grad[1])
         var shape = ancestor.shape()
         var rank = shape.rank()
 
@@ -86,8 +88,8 @@ struct MinMaxForward[dtype: DType]:
         var out = Tensor[dtype].zeros(out_shape)
 
         # Mask stores fractional responsibility: 1/count_of_maxes for positions that are maxima
-        # Mask has same shape as input and requires_grad=False
-        var mask = Tensor[dtype].zeros(shape, requires_grad=False)
+        # Keep grad shares in gradbox which contains index, grad value(IntList, Scalar)
+        gradbox = Gradbag[dtype]()
 
         if out_shape == Shape.Void:
             if rank == 0:
@@ -97,12 +99,12 @@ struct MinMaxForward[dtype: DType]:
             elif rank == len(normalized_axes) and not keepdims:
                 # reduce all dims -> scalar: find all positions equal to global max
                 var inited = False
-                var max_val = self[shape.first_index()]
+                var best_value = self[shape.first_index()]
                 var best_positions = List[IntList]()
                 for idx in shape:
                     var cur = self[idx]
                     if not inited:
-                        max_val = cur
+                        best_value = cur
                         best_positions = List[IntList]()
                         best_positions.append(idx)
                         inited = True
@@ -110,36 +112,42 @@ struct MinMaxForward[dtype: DType]:
 
                         @parameter
                         if max:
-                            if cur > max_val:
-                                max_val = cur
+                            if cur > best_value:
+                                best_value = cur
                                 best_positions.clear()
                                 best_positions.append(idx)
-                            elif cur == max_val:
+                            elif cur == best_value:
                                 best_positions.append(idx)
                         else:
-                            if cur < max_val:
-                                max_val = cur
+                            if cur < best_value:
+                                best_value = cur
                                 best_positions.clear()
                                 best_positions.append(idx)
-                            elif cur == max_val:
+                            elif cur == best_value:
                                 best_positions.append(idx)
 
-                out[IntList.Empty] = max_val
+                out[IntList.Empty] = best_value
 
                 # Split responsibility among ties
                 var count = len(best_positions)
                 if count > 0:
                     var inv = Scalar[dtype](1) / count
                     for p in best_positions:
-                        mask[p] = inv
+                        gradbox.append((p, inv))
         else:
             # Partial reduction
             var reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
 
             for out_idx in out_shape:
                 # Track best value and all positions with that best (in the reduced block)
+                var best_value: Scalar[dtype]
+
+                @parameter
+                if max:
+                    best_value = min_finite[dtype]()
+                else:
+                    best_value = max_finite[dtype]()
                 var inited = False
-                var max_val = min_finite[dtype]()
                 var best_positions = List[IntList]()
 
                 for red_idx in reduced_shape:
@@ -148,7 +156,7 @@ struct MinMaxForward[dtype: DType]:
                     ) if keepdims else out_idx.insert(normalized_axes, red_idx)
                     var cur = self[full_idx]
                     if not inited:
-                        max_val = cur
+                        best_value = cur
                         best_positions = List[IntList]()
                         best_positions.append(full_idx)
                         inited = True
@@ -156,64 +164,44 @@ struct MinMaxForward[dtype: DType]:
 
                         @parameter
                         if max:
-                            if cur > max_val:
-                                max_val = cur
+                            if cur > best_value:
+                                best_value = cur
                                 best_positions.clear()
                                 best_positions.append(full_idx)
-                            elif cur == max_val:
+                            elif cur == best_value:
                                 best_positions.append(full_idx)
                         else:
-                            if cur < max_val:
-                                max_val = cur
+                            if cur < best_value:
+                                best_value = cur
                                 best_positions.clear()
                                 best_positions.append(full_idx)
-                            elif cur == max_val:
+                            elif cur == best_value:
                                 best_positions.append(full_idx)
 
                 # write max to output
-                out[out_idx] = max_val
+                out[out_idx] = best_value
 
                 # split responsibility among ties in this reduced block
                 var count = len(best_positions)
                 if count > 0:
                     var inv = Scalar[dtype](1) / count
                     for p in best_positions:
-                        mask[p] = inv
+                        # print("select reduce: ", p, inv, count)
+                        gradbox.append((p, inv))
 
-        # Attach autograd info: save input and mask as ancestors so backward can use mask
         if grad_required:
             out.requires_grad_(True)
             var backward_fn = MinMaxBackward[dtype](
-                normalized_axes.copy(), keepdims
+                normalized_axes.copy(), keepdims, gradbox
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(
-                TensorLite[dtype].of(self), TensorLite[dtype].of(mask)
-            )
+            out.add_ancestry(TensorLite[dtype].of(self))
 
         return out
 
 
-fn main():
-    print("passes")
-    a = Tensor.zeros(3, 3, requires_grad=True)
-    a[0, 0] = 42
-    a[0, 2] = -5
-    a[1, 1] = 35
-    a[2, 2] = 51
-    a[2, 0] = 51
-    a.print()
+fn main() raises:
+    pass
 
-    print()
 
-    max_result = a.max(IntList(1))
-    print()
-    max_result.print()
-    max_result.backward()
-    a.gradbox[].print()
-    
-    min_result = a.min([1])
-    print()
-    min_result.print()
-    min_result.backward()
-    a.gradbox[].print()
+from testing import assert_true

@@ -621,7 +621,27 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn rand(
+        shape: List[Int],
+        min: Scalar[dtype] = 0,
+        max: Scalar[dtype] = 1,
+        init_seed: Optional[Int] = None,
+        requires_grad: Bool = False,
+    ) -> Tensor[dtype]:
+        return Self.rand(Shape(shape), min, max, init_seed, requires_grad)
+
+    @staticmethod
+    fn rand(
         *axes_spans: Int,
+        min: Scalar[dtype] = 0,
+        max: Scalar[dtype] = 1,
+        init_seed: Optional[Int] = None,
+        requires_grad: Bool = False,
+    ) -> Tensor[dtype]:
+        return Self.rand(Shape(axes_spans), min, max, init_seed, requires_grad)
+
+    @staticmethod
+    fn rand(
+        shape: Shape,
         min: Scalar[dtype] = 0,
         max: Scalar[dtype] = 1,
         init_seed: Optional[Int] = None,
@@ -631,7 +651,6 @@ struct Tensor[dtype: DType = DType.float32](
             seed(init_seed.value())
         else:
             seed()
-        shape = Shape(axes_spans)
         tensor = Tensor[dtype](shape, requires_grad)
         for i in range(tensor.numels()):  # To be vectorized
             tensor.buffer.store(
@@ -2163,8 +2182,9 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMaxForward[dtype].minmax[True](self, IntList.new(axes), keepdims, requires_grad)
-
+        return MinMaxForward[dtype].minmax[True](
+            self, IntList.new(axes), keepdims, requires_grad
+        )
 
     fn max(
         self,
@@ -2172,7 +2192,9 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMaxForward[dtype].minmax[True](self, axes, keepdims, requires_grad)
+        return MinMaxForward[dtype].minmax[True](
+            self, axes, keepdims, requires_grad
+        )
 
     fn min(
         self,
@@ -2180,8 +2202,9 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMaxForward[dtype].minmax[False](self, IntList.new(axes), keepdims, requires_grad)
-
+        return MinMaxForward[dtype].minmax[False](
+            self, IntList.new(axes), keepdims, requires_grad
+        )
 
     fn min(
         self,
@@ -2189,8 +2212,9 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMaxForward[dtype].minmax[False](self, axes, keepdims, requires_grad)
-
+        return MinMaxForward[dtype].minmax[False](
+            self, axes, keepdims, requires_grad
+        )
 
     fn shuffle(
         self,
@@ -2298,16 +2322,16 @@ struct Tensor[dtype: DType = DType.float32](
         log_debug(
             "Tensor__del__ → deleting tensor with id: " + self.id().__str__()
         )
-        log_debug("Tensor owns data? " + self.owns_data.__str__())
-        self.buffer.free()
+        if self.owns_data:
+            self.buffer.free()
+        if self.has_grad():
+            self.gradbox[].free()
+            self.gradbox.destroy_pointee()
+            self.gradbox.free()
+            log_debug("Tensor__del__ → freed grad")
         self.shape.free()
         self.strides.free()
         self.ancestors.free()
-        if self.has_grad():
-            for i in range(self.numels()):
-                (self.gradbox + i).destroy_pointee()
-            self.gradbox.free()
-            log_debug("Tensor__del__ → freed grad")
         _ = self^
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
@@ -2383,7 +2407,7 @@ struct Tensor[dtype: DType = DType.float32](
         A = A_ptr[]
         B = B_ptr[]
 
-        Shape.validate_matrix_shapes(A.shape, B.shape)
+        Shape.validate_matrix_shapes_2d(A.shape, B.shape)
 
         rows_a = A.shape[0]
         cols_a = A.shape[1]
@@ -2427,7 +2451,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn matmul_nd(
         A: Tensor[dtype], B: Tensor[dtype], track_grad: Bool = True
     ) -> Tensor[dtype]:
-        Shape.validate_matrix_shapes(A.shape, B.shape)
+        Shape.validate_matrix_shapes_nd(A.shape, B.shape)
         # shapes: batch + [m, k], batch + [k, n]
         batch_shape = Shape.broadcast_shape(
             A.shape[0:-2], B.shape[0:-2]
