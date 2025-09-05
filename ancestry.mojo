@@ -58,6 +58,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         if self.ancestors:
             log_debug("Ancestors __del__ called")
             for idx in range(len(self)):
+                (self.ancestors + idx)[].free()
                 (self.ancestors + idx).destroy_pointee()
             self.ancestors.free()
 

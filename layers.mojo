@@ -180,7 +180,7 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
         print("Total learnable parameters: ", self.num_parameters())
 
     fn print_summary(self, input_shape: List[Int]):
-        print("Sequential Model Summary")
+        print("\nSequential Model Summary")
         print("------------------------")
 
         var x = Tensor[dtype].zeros(input_shape, requires_grad=False)
@@ -220,11 +220,11 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
                 i,
                 ": ",
                 name,
-                " | Input: ",
+                " | I/P: ",
                 in_shape,
-                " -> Output: ",
+                " -> O/P: ",
                 out_shape,
-                " | Parameters: ",
+                " | Params: ",
                 nparams,
                 (" | " + details if details != "" else ""),
                 " | Trainable: ",

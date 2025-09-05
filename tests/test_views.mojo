@@ -7,6 +7,7 @@ from common_utils import i, newaxis, s
 
 
 fn main() raises:
+    test_into_tensor_isolated_memory()
     test_identity_permutation()
     test_slice_every_second_row_column1()
     test_edge_case_indexing() #revist
@@ -16,7 +17,6 @@ fn main() raises:
     # test_newaxis()
     test_scalar_view()
     test_integer_indexing()
-    test_into_tensor_isolated_memory()
     test_nested_views_grad_propagation()
     test_reshape_slice_sum_backward()
     test_backward_through_nested_views_non_contiguous()
@@ -532,12 +532,13 @@ fn test_into_tensor_large_contiguous_copy() raises:
 
 fn test_into_tensor_isolated_memory() raises:
     print("test_into_tensor_isolated_memory")
-    var t = Tensor.d1([1, 2, 3, 4])
-    var v = t[1:3]  # [2, 3]
+    t = Tensor.d1([1, 2, 3, 4])
+    v = t[1:3]  # [2, 3]
     var out = v.contiguous()
     v[0] = 999
+    
     assert_true(out.all_close(Tensor.d1([2, 3])))  # Unaffected by view mutation
-
+    _ = t
     _ = """fn test_into_tensor_strided_view_rows() raises:
     print("test_into_tensor_strided_view_rows")
     var t = Tensor.d2([[1, 2], [3, 4], [5, 6], [7, 8]])

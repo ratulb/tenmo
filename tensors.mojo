@@ -486,18 +486,12 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn add_ancestry(mut self, *parents: TensorLite[dtype]):
         for parent in parents:
-            inner_ptr = UnsafePointer[Tensor[dtype]].alloc(1)
-            inner_ptr.init_pointee_move(parent.tensor())
-            var ptr = UnsafePointer[TensorLite[dtype]].alloc(1)
-            new_tensor_lite = TensorLite[dtype](inner_ptr)
-            ptr.init_pointee_move(new_tensor_lite)
-            self.ancestors.append(ptr)
-
-        _ = """fn add_ancestry(mut self, *parents: TensorLite[dtype]):
-        for parent in parents:
-            var ptr = UnsafePointer[TensorLite[dtype]].alloc(1)
-            ptr.init_pointee_copy(parent)
-            self.ancestors.append(ptr)"""
+            parent_ptr = UnsafePointer[Tensor[dtype]].alloc(1)
+            parent_ptr.init_pointee_move(parent.tensor())
+            ptr_shield = TensorLite[dtype](parent_ptr)
+            shield_ptr = UnsafePointer[TensorLite[dtype]].alloc(1)
+            shield_ptr.init_pointee_move(ptr_shield)
+            self.ancestors.append(shield_ptr)
 
     fn ancestry(self) -> Ancestors[dtype]:
         return self.ancestors
@@ -1262,38 +1256,28 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     fn contiguous(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        if self.owns_data:  # In this world owning tensor is always contiguous
-            return self
-        shape = self.shape
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
-        out = Tensor[dtype](shape, requires_grad=grad_required)
-        numels = shape.num_elements()
-
-        if self.is_contiguous():  # View is contiguous
-            # Fast path: single memcpy
-            src_data = self.base_address()[].buffer.data + self.offset
-            memcpy(out.buffer.data, src_data, numels)
-        else:
-            # Slow path: iterate and copy
-            if shape.rank() == 0:
-                out[IntList.Empty] = self[IntList.Empty]  # Handle 0D tensors
+        shape = self.shape
+        offset = self.offset
+        numels = self.numels()
+        out = Tensor[dtype].zeros(shape, grad_required)
+        if self.is_contiguous():
+            if self.owns_data:
+                memcpy(out.buffer.data, self.buffer.data, numels)
             else:
-                indices = IntList(0) * shape.rank()  # Initialize to zeros
-                for _ in range(numels):
-                    out[indices] = self[indices]
-                    # Increment multi-dimensional index
-                    for dim in reversed(range(shape.rank())):
-                        indices[dim] += 1
-                        if indices[dim] < shape[dim]:
-                            break
-                        indices[dim] = 0  # Carry to next dimension
+                memcpy(
+                    out.buffer.data, self.base[].buffer.data + offset, numels
+                )
+        else:
+            for indices in shape:
+                out[indices] = self[indices]
 
         if grad_required:
             strides = self.strides
             backward_fn = ViewBackward[dtype](
-                shape, strides, self.offset * 2
+                shape, strides, offset * 2
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(TensorLite[dtype].of(self))

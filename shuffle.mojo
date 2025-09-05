@@ -103,7 +103,7 @@ struct ShuffleForward[dtype: DType]:
                 axis, perm
             ).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite[dtype].of(self))
+            out.add_ancestry(TensorLite.of(self))
 
         return out
 
