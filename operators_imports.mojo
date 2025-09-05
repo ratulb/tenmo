@@ -23,5 +23,6 @@ from operators import (
     GreaterThanEqual,
     Subtract,
     Multiply,
+    Divide,
     Comparator,
 )

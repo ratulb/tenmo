@@ -1,5 +1,5 @@
 from tensors import Tensor
-from common_utils import panic, log_debug, RED, CYAN, MAGENTA
+from common_utils import panic, log_debug, RED, CYAN, MAGENTA, print_summary
 from utils import Variant
 
 
@@ -161,7 +161,7 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
         self.modules.clear()
         log_debug("Sequential cleared", CYAN)
 
-    fn print_summary(self):
+    fn print_summary_old(self):
         print("Sequential Model Summary")
         print("------------------------")
         for i in range(len(self.modules)):

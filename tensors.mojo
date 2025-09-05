@@ -1,6 +1,6 @@
 ### Mojo Tensor
 ### Implement tensor library in mojo from first principles
-from math import iota, exp, floor
+from math import iota, exp, floor, log
 from random import seed, random_float64
 from algorithm import vectorize
 from sys import simdwidthof
@@ -136,7 +136,8 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = other.requires_grad
         self.gradbox = other.gradbox
         self.ancestors = other.ancestors
-        self.base = other.base.copy()
+        # self.base = other.base.copy()
+        self.base = other.base
         self.backwardFn = other.backwardFn
         self.owns_data = other.owns_data
 
@@ -153,8 +154,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         if self.shape.rank() == 0:
             return True  # scalar is trivially contiguous
-        # if not self.owns_data:
-        # return False
         var expected_stride = 1
         for i in reversed(range(self.shape.rank())):
             if self.shape[i] > 1 and self.strides[i] != expected_stride:
@@ -521,6 +520,31 @@ struct Tensor[dtype: DType = DType.float32](
         simd_width: Int = simdwidthof[dtype]()
     ](self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
         return self.buffer.any[simd_width](pred)
+
+    fn log[
+        simd_width: Int = simdwidthof[dtype](),
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
+        grad_required = (
+            requires_grad.value() if requires_grad else self.requires_grad
+        )
+        shape = self.shape
+        offset = self.offset
+        numels = shape.num_elements()
+        out = Tensor[dtype](shape, requires_grad=grad_required)
+        if self.is_contiguous():
+            if self.owns_data:
+                buffer = self.buffer.log()
+                memcpy(out.buffer.data, buffer.data, numels)
+            else:
+                buffer = Buffer[dtype](numels)
+                memcpy(buffer.data, self.base[].buffer.data + offset, numels)
+                buffer = buffer.log()
+                memcpy(out.buffer.data, buffer.data, numels)
+        else:
+            for indices in self.shape:
+                out[indices] = log(self[indices])
+
+        return out
 
     fn all_close[
         simd_width: Int = simdwidthof[dtype](),
@@ -1646,6 +1670,41 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
+    # Element wise division of two tensors
+    fn __truediv__(self, other: Self) -> Tensor[dtype]:
+        if not self.broadcastable(other):
+            panic(
+                "Tensor →__truediv__(self * other): dimension mismatch: "
+                + self.shape.__str__()
+                + " <=> "
+                + other.shape.__str__()
+            )
+
+        var out: Tensor[dtype]
+        if self.shape != other.shape:
+            out = self.broadcast_op(other, scalar_ops[dtype, Divide])
+        else:
+            var buffer: Buffer[dtype]
+            if self.owns_data and other.owns_data:
+                buffer = self.buffer / other.buffer
+            else:
+                buffer = Buffer[dtype](self.numels())
+                idx = 0
+                for indices in self.shape:
+                    buffer[idx] = self[indices] / other[indices]
+                    idx += 1
+
+            out = Tensor[dtype](self.shape, buffer)
+
+        requires_grad = self.requires_grad or other.requires_grad
+        if requires_grad:
+            out.requires_grad_(True)
+            backward_fn = DivideBackward[dtype]().into_backward_fn()
+            out.backwardFn = Optional(backward_fn)
+            out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
+
+        return out
+
     fn update_grad[opcode: Int](mut self, incoming: Tensor[dtype]):
         if opcode == MulTensor:
             self.gradbox[].__imul__(incoming)
@@ -2551,5 +2610,28 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    print(min_finite[DType.float32]())
-    pass
+    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True) 
+    b = Tensor.d1([2, 1, 3], requires_grad=True)      # shape (3,)
+
+    # Broadcast b to (2, 3): [[2, 1, 3],
+    #                         [2, 1, 3]]
+    c = b / a #= [[0.5, 2.0, 1.0],  [2.0, 5.0, 2.0]]
+    
+    c.print()
+    c.backward()
+
+    a.gradbox[].print()
+    print()
+    b.gradbox[].print()
+
+
+
+    _="""a = Tensor.arange(100)
+    v = a[slice(-1, 49, -1)]
+    logs = v.log()
+    logs.print()
+    # print("contiguous: ", v.is_contiguous())
+    # a.print()
+    _ = a
+    # print(min_finite[DType.float32]())
+    pass"""

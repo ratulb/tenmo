@@ -3,7 +3,7 @@ from tensors import Tensor
 from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
-
+from layers import Sequential, Linear, ReLU
 # from strides import Strides
 from os import abort
 from utils import Variant
@@ -287,6 +287,115 @@ fn print_tensor_recursive[
                 print()  # Newline before closing bracket
 
         print(indent + "]", end="")
+
+
+# Utility repeat function
+fn str_repeat(s: String, n: Int) -> String:
+    if n <= 0:
+        return ""
+    var parts = List[String]()
+    for _ in range(n):
+        parts.append(s)
+    return StringSlice("").join(parts)
+
+fn print_summary[dtype: DType](mod: Sequential[dtype], 
+                               sample_input: Optional[Tensor[dtype]] = None):
+    # Table headers
+    var headers = List[String]()
+    headers.append("Name")
+    headers.append("Type")
+    headers.append("Input Shape")
+    headers.append("Output Shape")
+    headers.append("Params")
+    headers.append("Trainable")
+
+    var rows = List[List[String]]()
+    rows.append(headers)
+
+    var total_params = 0
+    var trainable_params = 0
+
+    # If sample_input is provided → run a dry forward pass to get shapes
+    var x = sample_input
+    var current_shape = "(?, ?)"  
+
+    for i in range(len(mod.modules)):
+        m = mod.modules[i]
+        var name = "Layer" + i.__str__()
+
+        if m.layer.isa[Linear[dtype]]():
+            var l = m.layer[Linear[dtype]]
+
+            # Infer input/output shapes
+            var in_features = l.weights.shape[0]
+            var out_features = l.weights.shape[1]
+
+            var input_shape = "(?, " + in_features.__str__() + ")"
+            var output_shape = "(?, " + out_features.__str__() + ")"
+
+            if x:
+                input_shape = x.value().shape.__str__()
+                x = Optional(m(x.value()))
+                output_shape = x.value().shape.__str__()
+
+            current_shape = output_shape
+
+            # Params
+            var params = l.weights.shape.num_elements() + l.bias.shape.num_elements()
+            total_params += params
+            if l.weights.requires_grad or l.bias.requires_grad:
+                trainable_params += params
+
+            rows.append([name, "Linear", input_shape, output_shape,
+                         params.__str__(),
+                         (l.weights.requires_grad or l.bias.requires_grad).__str__()])
+
+        elif m.layer.isa[ReLU[dtype]]():
+            var input_shape = current_shape
+            var output_shape = current_shape
+
+            if x:
+                input_shape = x.value().shape.__str__()
+                x = Optional(m(x.value()))
+                output_shape = x.value().shape.__str__()
+                current_shape = output_shape
+
+            rows.append([name, "ReLU", input_shape, output_shape, "0", "False"])
+
+    # Compute column widths
+    var widths = List[Int]()
+    for j in range(len(headers)):
+        var maxw = 0
+        for row in rows:
+            if len(row[j]) > maxw:
+                maxw = len(row[j])
+        widths.append(maxw)
+
+    # Print horizontal rule
+    fn print_rule():
+        var line = ""
+        for w in widths:
+            line += "+" + str_repeat("-", w + 2)
+        line += "+"
+        print(line)
+
+    # Print table
+    print_rule()
+    for idx in range(len(rows)):
+        var line = ""
+        for j in range(len(rows[idx])):
+            var val = rows[idx][j]
+            line += "| " + val + str_repeat(" ", widths[j] - len(val)) + " "
+        line += "|"
+        print(line)
+        print_rule()
+
+    # Footer summary
+    var non_trainable_params = total_params - trainable_params
+    print("\nSummary:")
+    print("  Total params:        ", total_params)
+    print("  Trainable params:    ", trainable_params)
+    print("  Non-trainable params:", non_trainable_params)
 
 
 fn main() raises:

@@ -17,12 +17,13 @@ alias ZeroGrad = 4
 alias Add = 5
 alias Subtract = 6
 alias Multiply = 7
-alias Equal = 8
-alias NotEqual = 9
-alias LessThan = 10
-alias LessThanEqual = 11
-alias GreaterThan = 12
-alias GreaterThanEqual = 13
+alias Divide = 8
+alias Equal = 9
+alias NotEqual = 10
+alias LessThan = 11
+alias LessThanEqual = 12
+alias GreaterThan = 13
+alias GreaterThanEqual = 14
 
 
 @always_inline
@@ -36,6 +37,8 @@ fn scalar_ops[
         result = lhs - rhs
     elif op == Multiply:
         result = lhs * rhs
+    elif op == Divide:
+        result = lhs / rhs
     else:
         abort("operators -> scalar_ops: unsupported operation")
     return result

@@ -1,7 +1,7 @@
 from algorithm import vectorize
 from sys import simdwidthof
 from memory import memset_zero, memcpy
-from math import exp
+from math import exp, log
 
 # from runtime.asyncrt import num_physical_cores
 from sys import num_logical_cores, num_physical_cores
@@ -189,6 +189,17 @@ struct Buffer[dtype: DType = DType.float32](
     fn __mul__[
         simd_width: Int = simdwidthof[dtype]()
     ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Buffer[dtype]:
+        if not lhs.size == rhs.size:
+            panic(
+                (
+                    "Buffer → __mul__(Buffer[dtype]: buffer size does not"
+                    " match -> lhs:"
+                ),
+                lhs.size.__str__(),
+                "vs. rhs:",
+                rhs.size.__str__(),
+            )
+
         out = Buffer[dtype](lhs.size)
 
         @parameter
@@ -204,6 +215,17 @@ struct Buffer[dtype: DType = DType.float32](
     fn __imul__[
         simd_width: Int = simdwidthof[dtype]()
     ](lhs: Buffer[dtype], rhs: Buffer[dtype]):
+        if not lhs.size == rhs.size:
+            panic(
+                (
+                    "Buffer → __imul__(Buffer[DType.bool]: buffer size does not"
+                    " match -> lhs:"
+                ),
+                lhs.size.__str__(),
+                "vs. rhs:",
+                rhs.size.__str__(),
+            )
+
         @parameter
         fn inplace_mul_elems[simdwidth: Int](idx: Int):
             lhs.store[simdwidth](
@@ -238,6 +260,33 @@ struct Buffer[dtype: DType = DType.float32](
 
         for k in range(i, total):
             lhs.store(k, Scalar[DType.bool](lhs.load(k) == rhs.load(k)))
+
+    fn __truediv__[
+        simd_width: Int = simdwidthof[dtype]()
+    ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Buffer[dtype]:
+        if not lhs.size == rhs.size:
+            panic(
+                (
+                    "Buffer → __trudiv__(Buffer[dtype]: buffer size does not"
+                    " match -> lhs:"
+                ),
+                lhs.size.__str__(),
+                "vs. rhs:",
+                rhs.size.__str__(),
+            )
+
+        out = Buffer[dtype](lhs.size)
+
+        @parameter
+        fn mul_elems[simdwidth: Int](idx: Int):
+            out.store[simdwidth](
+                idx,
+                (lhs.load[simdwidth](idx) / rhs.load[simdwidth](idx)),
+            )
+
+        vectorize[mul_elems, simd_width](lhs.size)
+        return out
+
 
     fn __radd__[
         simd_width: Int = simdwidthof[dtype]()
@@ -412,6 +461,24 @@ struct Buffer[dtype: DType = DType.float32](
             out.store[simdwidth](idx, this.load[simdwidth](idx).__neg__())
 
         vectorize[negate_elems, simd_width](this.size)
+        return out
+
+    fn log[
+        simd_width: Int = simdwidthof[dtype]()
+    ](this: Buffer[dtype]) -> Buffer[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Buffer → log is for numeric data types only",
+        ]()
+
+        total = this.size
+        out = Buffer[dtype](total)
+
+        @parameter
+        fn log_of[simdwidth: Int](idx: Int):
+            out.store[simdwidth](idx, log(this.load[simdwidth](idx)))
+
+        vectorize[log_of, simd_width](total)
         return out
 
     fn __invert__[
@@ -1218,6 +1285,7 @@ struct Iterator[
 
 
 fn main() raises:
+    test_log()
     fn pred(x: Scalar[DType.int32]) -> Bool:
         return x % 2 == 0
 
@@ -1227,3 +1295,13 @@ fn main() raises:
 
 
 from testing import assert_true, assert_false
+
+fn test_log() raises:
+    ll = List[Scalar[DType.float32]](capacity=100)
+    for i in range(1, 100):
+        ll.insert(0, Scalar[DType.float32](i))
+    buf = Buffer[DType.float32](ll)
+    logs = buf.log()
+
+    assert_true(logs[len(logs) - 1] == 0, "Buffer log zero assertion failed")
+    assert_true(logs[0] == 4.59512, "Buffer log assertion failed for value at index 0")

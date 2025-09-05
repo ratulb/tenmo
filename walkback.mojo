@@ -8,7 +8,11 @@ from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
 from exponientionbackward import ExponientionBackward
-from divbackwardscalar import TrueDivBackwardScalar, RightTrueDivBackwardScalar
+from divide import (
+    TrueDivBackwardScalar,
+    RightTrueDivBackwardScalar,
+    DivideBackward,
+)
 from transposebackward import TransposeBackward
 from viewbackward import ViewBackward
 from permutebackward import PermuteBackward
@@ -21,3 +25,4 @@ from expand import ExpandBackward
 from minmax import MinMaxBackward
 from shuffle import ShuffleBackward
 from relu import ReLUBackward
+from softmax import SoftmaxBackward
