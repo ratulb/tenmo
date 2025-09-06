@@ -1,7 +1,6 @@
 from tensors import Tensor
 from shared import TensorLite
 from intlist import IntList
-from shapes import Shape
 from operators import AddTensor
 from validators import Validator
 from backpropagation import Delegate, BackwardFn
@@ -38,6 +37,7 @@ struct ShuffleBackward[dtype: DType](Copyable):
 
         # Scatter gradients back along inverse permutation
         for idx in shape:
+            #src, dst = idx, idx
             var src = idx.copy()
             var dst = idx.copy()
             src[self.axis] = idx[self.axis]
@@ -45,17 +45,6 @@ struct ShuffleBackward[dtype: DType](Copyable):
             grad_in[dst] = grad[src]
 
         return [(ancestor, grad_in, AddTensor)]
-
-
-fn unravel_index(flat: Int, shape: Shape) -> IntList:
-    rank = shape.rank()
-    var idx = IntList(rank)
-    var rem = flat
-    for i in range(rank - 1, -1, -1):  # from last axis backward
-        dim = shape[i]
-        idx[i] = rem % dim
-        rem //= dim
-    return idx
 
 
 @fieldwise_init
@@ -88,8 +77,9 @@ struct ShuffleForward[dtype: DType]:
         var out = Tensor[dtype].zeros(shape)
 
         for flat in range(self.numels()):
-            idx = unravel_index(flat, shape)
+            idx = shape.unravel_index(flat)
             src_idx = idx.copy()
+            #src_idx = idx
             src_idx[axis] = perm[idx[axis]]
             out[idx] = self[src_idx]
 
@@ -99,9 +89,7 @@ struct ShuffleForward[dtype: DType]:
         )
         if grad_required:
             out.requires_grad_(True)
-            var backward_fn = ShuffleBackward[dtype](
-                axis, perm
-            ).into_backward_fn()
+            backward_fn = ShuffleBackward[dtype](axis, perm).into_backward_fn()
             out.backwardFn = Optional(backward_fn)
             out.add_ancestry(TensorLite.of(self))
 
@@ -109,5 +97,19 @@ struct ShuffleForward[dtype: DType]:
 
 
 fn main():
-    ShuffleForward[DType.float32].shuffle(Tensor.arange(5)).print()
+    permutation=IntList(2, 3, 0, 4, 1)
+    a = Tensor.arange(5, requires_grad=True)
+    shuffled = ShuffleForward[DType.float32].shuffle(
+        a, permutation=permutation
+    )
+    print("Shuffled")
+    shuffled.print()
+    print()
+    print()
+    b = shuffled[1:4]
+    b.print()
+    c = b * 42
+    c.backward()
+    a.gradbox[].print()
+    print()
     print("passes")

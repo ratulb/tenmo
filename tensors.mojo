@@ -24,6 +24,10 @@ from argminmax import Argmin, Argmax
 from minmax import MinMaxForward
 from shuffle import ShuffleForward
 from relu import ReLUForward
+from softmax import Softmax
+from subtract import SubtractScalar, SubtractFromScalar, Subtractor
+from multiplication import MultiplyScalar, Multiplicator
+from addition import AddScalar, Adder
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -786,6 +790,28 @@ struct Tensor[dtype: DType = DType.float32](
         )
         return out
 
+    fn onehot(self: Tensor[DType.int64], num_classes: Int) -> Tensor[dtype]:
+        """Convert tensor of class indices to one-hot encoding.
+        Args:
+            self: Tensor of shape (...,) containing class indices.
+            num_classes: Number of classes.
+        Returns: Tensor of shape (..., num_classes).
+        """
+        shape = self.shape
+        result = Tensor[dtype](shape + [num_classes])
+
+        result.fill(Scalar[dtype](0))
+
+        # Set appropriate positions to 1.0
+        for idx in self.shape:
+            var class_idx = self[idx].__int__()
+
+            if class_idx >= 0 and class_idx < num_classes:
+                var one_hot_idx = idx + [class_idx]
+                result[one_hot_idx] = Scalar[dtype](1)
+
+        return result
+
     @staticmethod
     fn d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "d1")
@@ -1419,8 +1445,7 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         # Decide result shape
         result_shape = other.shape if self.shape.rank() == 0 else self.shape
-        requires_grad = self.requires_grad or other.requires_grad
-        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
+        result = Tensor[dtype](result_shape, requires_grad=False)
 
         for indices in result_shape:
             self_val = self.item() if self.shape.rank() == 0 else self[indices]
@@ -1439,8 +1464,7 @@ struct Tensor[dtype: DType = DType.float32](
         result_shape = Shape.broadcast_shape(self.shape, other.shape)
         mask1 = self.broadcast_mask(result_shape)
         mask2 = other.broadcast_mask(result_shape)
-        requires_grad = self.requires_grad or other.requires_grad
-        result = Tensor[dtype](result_shape, requires_grad=requires_grad)
+        result = Tensor[dtype](result_shape, requires_grad=False)
         for indices in result_shape:
             self_indices = self.translate_index(indices, mask1, result_shape)
             other_indices = other.translate_index(indices, mask2, result_shape)
@@ -1601,74 +1625,11 @@ struct Tensor[dtype: DType = DType.float32](
         return self.__mul__(scalar)
 
     fn __mul__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
-        var buffer: Buffer[dtype]
-        if self.owns_data:
-            buffer = self.buffer * factor
-        else:
-            idx = 0
-            buffer = Buffer[dtype](self.numels())
-            for indices in self.shape:
-                buffer[idx] = self[indices] * factor
-                idx += 1
-
-        requires_grad = self.requires_grad
-        out = Tensor[dtype](self.shape, buffer, requires_grad=requires_grad)
-
-        if requires_grad:
-            backward_fn = MulBackwardScalar[dtype](factor).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
+        return MultiplyScalar[dtype].forward[True](self, factor)
 
     # Element wise multiplication of two tensors
     fn __mul__(self, other: Self) -> Tensor[dtype]:
-        if not self.broadcastable(other):
-            panic(
-                "__mul__(self * other) → Dimension mismatch: "
-                + self.shape.__str__()
-                + " <=> "
-                + other.shape.__str__()
-            )
-
-        if self.shape != other.shape:
-            return self.broadcast_mul_operation(other)
-        var buffer: Buffer[dtype]
-        if self.owns_data and other.owns_data:
-            buffer = self.buffer * other.buffer
-        else:
-            buffer = Buffer[dtype](self.numels())
-            idx = 0
-            for indices in self.shape:
-                buffer[idx] = self[indices] * other[indices]
-                idx += 1
-
-        requires_grad = self.requires_grad or other.requires_grad
-        out = Tensor[dtype](self.shape, buffer, requires_grad=requires_grad)
-
-        if requires_grad:
-            backward_fn = MultiplyBackward[dtype]().into_backward_fn()
-
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
-
-        return out
-
-    fn broadcast_mul_operation(
-        self: Self,
-        other: Self,
-    ) -> Tensor[dtype]:
-        out = self.broadcast_op(other, scalar_ops[dtype, Multiply])
-        requires_grad = self.requires_grad or other.requires_grad
-        if requires_grad:
-            backward_fn = BroadcastBackward[
-                dtype, AddTensor, AddTensor, True
-            ]().into_backward_fn()
-
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
-
-        return out
+        return Multiplicator[dtype].forward[True](self, other)
 
     # Element wise division of two tensors
     fn __truediv__(self, other: Self) -> Tensor[dtype]:
@@ -1825,26 +1786,14 @@ struct Tensor[dtype: DType = DType.float32](
                 tensor[indices] = abs(self[indices])
             return tensor
 
-    fn __radd__(self, scalar: Scalar[dtype]) raises -> Tensor[dtype]:
+    fn __radd__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__add__(scalar)
 
     fn __add__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        var out: Tensor[dtype]
-        if self.owns_data:
-            buffer = self.buffer + scalar
-            out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-        else:
-            buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                out[indices] = self[indices] + scalar
+        return AddScalar[dtype].forward[True](self, scalar)
 
-        if self.requires_grad:
-            backward_fn = AddBackwardScalar[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite[dtype].of(self))
-
-        return out
+    fn __add__(self, other: Self) -> Tensor[dtype]:
+        return Adder[dtype].forward[True](self, other)
 
     fn __pow__(self, exponent: Scalar[dtype]) -> Tensor[dtype]:
         constrained[
@@ -1873,84 +1822,13 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn __rsub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        var out: Tensor[dtype]
-        if self.owns_data:
-            out = Tensor[dtype](
-                self.shape, scalar - self.buffer, self.requires_grad
-            )
-        else:
-            buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                out[indices] = scalar - self[indices]
-
-        if self.requires_grad:
-            backward_fn = SubLeftRightBackwardScalar[dtype](
-                True
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
+        return SubtractFromScalar[dtype].forward[True](self, scalar)
 
     fn __sub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        var out: Tensor[dtype]
-        if self.owns_data:
-            out = Tensor[dtype](
-                self.shape, self.buffer - scalar, self.requires_grad
-            )
-        else:
-            buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                out[indices] = self[indices] - scalar
-
-        if self.requires_grad:
-            backward_fn = SubLeftRightBackwardScalar[dtype](
-                False
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
+        return SubtractScalar[dtype].forward[True](self, scalar)
 
     fn __sub__(self, other: Self) -> Tensor[dtype]:
-        if not self.broadcastable(other):
-            panic(
-                "__sub__ → Dimension mismatch: "
-                + self.shape.__str__()
-                + " <=> "
-                + other.shape.__str__()
-            )
-
-        if self.shape != other.shape:
-            return self.broadcast_add_subtract_operation[
-                Subtract, AddTensor, SubtractTensor
-            ](other)
-
-        var out: Tensor[dtype]
-        requires_grad = self.requires_grad or other.requires_grad
-
-        if self.owns_data and other.owns_data:
-            buffer = self.buffer - other.buffer
-            out = Tensor[dtype](self.shape, buffer, requires_grad)
-        else:
-            out = Tensor[dtype].zeros(self.shape, requires_grad)
-            for indices in self.shape:
-                out[indices] = self[indices] - other[indices]
-
-        if requires_grad:
-            sub_backward = SubBackward[dtype]()
-            if self.requires_grad:
-                out.add_ancestry(TensorLite.of(self))
-                sub_backward.negate(False)
-            if other.requires_grad:
-                out.add_ancestry(TensorLite.of(other))
-                sub_backward.negate(True)
-            backward_fn = sub_backward.into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-
-        return out
+        return Subtractor[dtype].forward[True](self, other)
 
     fn dot(self, other: Self, track_grad: Bool = True) -> Tensor[dtype]:
         rank1 = self.rank()
@@ -2117,45 +1995,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn __add__(self, other: Self) -> Tensor[dtype]:
-        if self.address() == other.address():
-            return self.__mul__(2)
-        if not self.broadcastable(other):
-            panic(
-                "__add__ → Dimension mismatch: "
-                + self.shape.__str__()
-                + " <=> "
-                + other.shape.__str__()
-            )
-
-        if self.shape != other.shape:
-            return self.broadcast_add_subtract_operation[
-                Add, AddTensor, AddTensor
-            ](
-                other,
-            )
-
-        var out: Tensor[dtype]
-        requires_grad = self.requires_grad or other.requires_grad
-
-        if self.owns_data and other.owns_data:
-            buffer = self.buffer + other.buffer
-            out = Tensor[dtype](self.shape, buffer, requires_grad)
-        else:
-            out = Tensor[dtype].zeros(self.shape, requires_grad)
-            for indices in self.shape:
-                out[indices] = self[indices] + other[indices]
-
-        if requires_grad:
-            backward_fn = AddBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            if self.requires_grad:
-                out.add_ancestry(TensorLite[dtype].of(self))
-            if other.requires_grad:
-                out.add_ancestry(TensorLite[dtype].of(other))
-
-        return out
-
     fn __iadd__(mut self, scalar: Scalar[dtype]):
         if self.is_leaf():
             panic(
@@ -2168,21 +2007,6 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             for indices in self.shape:
                 self[indices] += scalar
-
-    fn broadcast_add_subtract_operation[
-        Element_Wise_Op: Int, Tensor_Op_First: Int, Tensor_Op_Second: Int
-    ](self, other: Self) -> Tensor[dtype]:
-        var out = self.broadcast_op(other, scalar_ops[dtype, Element_Wise_Op])
-        if self.requires_grad or other.requires_grad:
-            backward_fn = BroadcastBackward[
-                dtype, Tensor_Op_First, Tensor_Op_Second, False
-            ]().into_backward_fn()
-
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
-            pass
-
-        return out
 
     fn permute(self, axes: List[Int]) -> Tensor[dtype]:
         return self.permute(IntList.new(axes))
@@ -2236,6 +2060,13 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
         return UnsqueezeForward[dtype].unsqueeze(self, axes, requires_grad)
+
+    fn softmax(
+        self,
+        axes: List[Int] = [],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Softmax[dtype].softmax(self, IntList.new(axes), requires_grad)
 
     fn max(
         self,
@@ -2610,7 +2441,26 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True) 
+    z = Tensor[DType.int64].d3(
+        [
+            [[4], [2]],
+            [[3], [1]],
+        ],
+        requires_grad=False,
+    )
+    z.print()
+    print()
+    onehot = z.onehot(5)
+    onehot.print()
+    _ = """softmax_res = z.softmax([1])
+    softmax_res.print()
+    softmax_res.backward()"""
+
+    print()
+
+    # z.gradbox[].print()
+
+    _ = """a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True) 
     b = Tensor.d1([2, 1, 3], requires_grad=True)      # shape (3,)
 
     # Broadcast b to (2, 3): [[2, 1, 3],
@@ -2622,11 +2472,9 @@ fn main() raises:
 
     a.gradbox[].print()
     print()
-    b.gradbox[].print()
+    b.gradbox[].print()"""
 
-
-
-    _="""a = Tensor.arange(100)
+    _ = """a = Tensor.arange(100)
     v = a[slice(-1, 49, -1)]
     logs = v.log()
     logs.print()

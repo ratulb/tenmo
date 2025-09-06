@@ -26,10 +26,11 @@ struct SoftmaxBackward[dtype: DType](Copyable & Movable):
         softmax_out = Tensor[dtype].zeros(incoming.shape)
         for indices, value in self.softmax_out:
             softmax_out[indices] = rebind[Scalar[dtype]](value)
-
+        
         sum_grad = (incoming * softmax_out).sum(
             self.axes, keepdims=True, track_grad=False
         )
+
         grad_share = softmax_out * (incoming - sum_grad)
 
         ancestor = output.ancestry().get(0)[]
