@@ -25,10 +25,10 @@ from minmax import MinMaxForward
 from shuffle import ShuffleForward
 from relu import ReLUForward
 from softmax import Softmax
-from subtract import SubtractScalar, SubtractFromScalar, Subtractor
+from subtraction import SubtractScalar, SubtractFromScalar, Subtractor
 from multiplication import MultiplyScalar, Multiplicator
 from addition import AddScalar, Adder
-
+from division import DivideScalar, DivideByScalar, Divider
 
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Representable & Writable & Absable
@@ -1565,61 +1565,15 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        constrained[
-            dtype.is_numeric(),
-            "Tensor → __rtruediv__ is for numeric data types only",
-        ]()
-
-        var buffer: Buffer[dtype]
-        if self.owns_data:
-            buffer = self.buffer
-        else:
-            idx = 0
-            buffer = Buffer[dtype](self.numels())
-            for indices in self.shape:
-                buffer[idx] = self[indices]
-                idx += 1
-        buffer = scalar / buffer
-        out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-
-        if self.requires_grad:
-            backward_fn = RightTrueDivBackwardScalar[dtype](
-                scalar
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
+        return DivideScalar[dtype].forward[True](self, scalar)
 
     fn __truediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        constrained[
-            dtype.is_numeric(),
-            "Tensor → __truediv__ is for numeric data types only",
-        ]()
+        return DivideByScalar[dtype].forward[True](self, scalar)
 
-        if scalar == Scalar[dtype](0):
-            panic("Tensor → __truediv__ : canot divide by " + scalar.__str__())
+    # Element wise division of two tensors
+    fn __truediv__(self, other: Self) -> Tensor[dtype]:
+        return Divider[dtype].forward[True](self, other)
 
-        var buffer: Buffer[dtype]
-        if self.owns_data:
-            buffer = self.buffer
-        else:
-            idx = 0
-            buffer = Buffer[dtype](self.numels())
-            for indices in self.shape:
-                buffer[idx] = self[indices]
-                idx += 1
-        buffer = buffer / scalar
-        out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-
-        if self.requires_grad:
-            backward_fn = TrueDivBackwardScalar[dtype](
-                scalar
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
 
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
@@ -1631,41 +1585,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __mul__(self, other: Self) -> Tensor[dtype]:
         return Multiplicator[dtype].forward[True](self, other)
 
-    # Element wise division of two tensors
-    fn __truediv__(self, other: Self) -> Tensor[dtype]:
-        if not self.broadcastable(other):
-            panic(
-                "Tensor →__truediv__(self * other): dimension mismatch: "
-                + self.shape.__str__()
-                + " <=> "
-                + other.shape.__str__()
-            )
-
-        var out: Tensor[dtype]
-        if self.shape != other.shape:
-            out = self.broadcast_op(other, scalar_ops[dtype, Divide])
-        else:
-            var buffer: Buffer[dtype]
-            if self.owns_data and other.owns_data:
-                buffer = self.buffer / other.buffer
-            else:
-                buffer = Buffer[dtype](self.numels())
-                idx = 0
-                for indices in self.shape:
-                    buffer[idx] = self[indices] / other[indices]
-                    idx += 1
-
-            out = Tensor[dtype](self.shape, buffer)
-
-        requires_grad = self.requires_grad or other.requires_grad
-        if requires_grad:
-            out.requires_grad_(True)
-            backward_fn = DivideBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
-
-        return out
-
+    
     fn update_grad[opcode: Int](mut self, incoming: Tensor[dtype]):
         if opcode == MulTensor:
             self.gradbox[].__imul__(incoming)

@@ -3,12 +3,12 @@ from matmulbackward import MatmulBackward, BatchedMatmulBackward
 from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addition import AddBackward, AddBackwardScalar
-from subtract import SubBackward, SubLeftRightBackwardScalar
+from subtraction import SubBackward, SubLeftRightBackwardScalar
 from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
 from multiplication import MultiplyBackward, MulBackwardScalar
 from exponientionbackward import ExponientionBackward
-from divide import (
+from division import (
     TrueDivBackwardScalar,
     RightTrueDivBackwardScalar,
     DivideBackward,
