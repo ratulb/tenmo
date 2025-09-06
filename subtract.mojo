@@ -1,9 +1,11 @@
 from tensors import Tensor
 from intlist import IntList
-from operators import AddTensor, SubtractTensor
+from operators import AddTensor, SubtractTensor, Subtract, scalar_ops
 from shared import TensorLite
 from backpropagation import Delegate, BackwardFn
 from buffers import Buffer
+from broadcastbackward import BroadcastBackward
+from common_utils import panic
 
 
 @fieldwise_init
@@ -121,6 +123,63 @@ struct SubtractFromScalar[dtype: DType]:
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite.of(self))
+
+        return out
+
+
+@fieldwise_init
+@register_passable
+struct Subtractor[dtype: DType]:
+    @staticmethod
+    fn forward[
+        track_grad: Bool = True
+    ](self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
+        if not self.broadcastable(other):
+            panic(
+                "Tensor →__sub__(self, other): dimension mismatch: "
+                + self.shape.__str__()
+                + " <=> "
+                + other.shape.__str__(),
+                "→ at Subtractor → forward",
+            )
+
+        var out: Tensor[dtype]
+        if self.shape != other.shape:
+            out = self.broadcast_op(other, scalar_ops[dtype, Subtract])
+        else:
+            if self.owns_data and other.owns_data:
+                buffer = self.buffer - other.buffer
+                out = Tensor[dtype](self.shape, buffer, False)
+            else:
+                out = Tensor[dtype].zeros(self.shape, False)
+                for indices in self.shape:
+                    out[indices] = self[indices] - other[indices]
+
+        @parameter
+        if track_grad:
+            requires_grad = self.requires_grad or other.requires_grad
+
+            if requires_grad:
+                out.requires_grad_(True)
+
+                if self.shape == other.shape:
+                    sub_backward = SubBackward[dtype]()
+                    if self.requires_grad:
+                        out.add_ancestry(TensorLite.of(self))
+                        sub_backward.negate(False)
+                    if other.requires_grad:
+                        out.add_ancestry(TensorLite.of(other))
+                        sub_backward.negate(True)
+                    backward_fn = sub_backward.into_backward_fn()
+                    out.backwardFn = Optional(backward_fn)
+
+                else:
+                    backward_fn = BroadcastBackward[
+                        dtype, AddTensor, SubtractTensor, False
+                    ]().into_backward_fn()
+
+                    out.backwardFn = Optional(backward_fn)
+                    out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
 
         return out
 
