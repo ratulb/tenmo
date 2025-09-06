@@ -28,9 +28,9 @@ struct ExpandBackward[dtype: DType](Copyable):
         return [(ancestor, reduced_grad, AddTensor)]
 
 @register_passable
-struct ExpandForward[dtype: DType]:
+struct Expand[dtype: DType]:
     @staticmethod
-    fn expand(
+    fn forward(
         tensor: Tensor[dtype],
         target: Shape,
         requires_grad: Optional[Bool] = None,

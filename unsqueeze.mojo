@@ -5,7 +5,7 @@ from intlist import IntList
 from shapes import Shape
 from strides import Strides
 from backpropagation import Delegate, BackwardFn
-from squeeze import SqueezeForward
+from squeeze import Squeeze
 from common_utils import panic
 
 
@@ -24,7 +24,7 @@ struct UnsqueezeBackward[dtype: DType](Copyable):
     ]:
         gradients = output.gradients()[]
         # Remove the axis we had inserted
-        gradients_squeezed = SqueezeForward[dtype].squeeze(
+        gradients_squeezed = Squeeze[dtype].squeeze(
             gradients, self.axes, requires_grad=False
         )
         ancestor = output.ancestry().get(0)[]
@@ -32,7 +32,7 @@ struct UnsqueezeBackward[dtype: DType](Copyable):
 
 
 @register_passable
-struct UnsqueezeForward[dtype: DType]:
+struct Unsqueeze[dtype: DType]:
     @staticmethod
     fn unsqueeze(
         tensor: Tensor[dtype],

@@ -30,9 +30,9 @@ struct ReLUBackward[dtype: DType](Copyable):
 
 @fieldwise_init
 @register_passable
-struct ReLUForward[dtype: DType]:
+struct ReLU[dtype: DType]:
     @staticmethod
-    fn relu(
+    fn forward(
         self: Tensor[dtype],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:

@@ -49,9 +49,9 @@ struct ShuffleBackward[dtype: DType](Copyable):
 
 @fieldwise_init
 @register_passable
-struct ShuffleForward[dtype: DType]:
+struct Shuffle[dtype: DType]:
     @staticmethod
-    fn shuffle(
+    fn forward(
         self: Tensor[dtype],
         axis: Int = 0,
         permutation: Optional[IntList] = None,

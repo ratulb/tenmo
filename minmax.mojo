@@ -68,9 +68,9 @@ struct MinMaxBackward[dtype: DType](Copyable & Movable):
 
 @fieldwise_init
 @register_passable
-struct MinMaxForward[dtype: DType]:
+struct MinMax[dtype: DType]:
     @staticmethod
-    fn minmax[
+    fn forward[
         max: Bool
     ](
         self: Tensor[dtype],

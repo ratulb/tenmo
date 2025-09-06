@@ -29,7 +29,7 @@ struct SqueezeBackward[dtype: DType](Copyable):
         return [(ancestor, final_grad, AddTensor)]
 
 
-struct SqueezeForward[dtype: DType]:
+struct Squeeze[dtype: DType]:
     # Squeeze specified axes or all dims of size 1 if no axes provided
     @staticmethod
     fn squeeze(

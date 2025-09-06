@@ -17,13 +17,13 @@ from walkback import *
 from buffers import Buffer
 from shared import TensorLite
 from validators import Validator
-from squeeze import SqueezeForward
-from unsqueeze import UnsqueezeForward
-from expand import ExpandForward
+from squeeze import Squeeze
+from unsqueeze import Unsqueeze
+from expand import Expand
 from argminmax import Argmin, Argmax
-from minmax import MinMaxForward
-from shuffle import ShuffleForward
-from relu import ReLUForward
+from minmax import MinMax
+from shuffle import Shuffle
+from relu import ReLU
 from softmax import Softmax
 from subtraction import SubtractScalar, SubtractFromScalar, Subtractor
 from multiplication import MultiplyScalar, Multiplicator
@@ -1971,7 +1971,7 @@ struct Tensor[dtype: DType = DType.float32](
         self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
-        return UnsqueezeForward[dtype].unsqueeze(
+        return Unsqueeze[dtype].unsqueeze(
             self, IntList.new(axes), requires_grad
         )
 
@@ -1979,7 +1979,7 @@ struct Tensor[dtype: DType = DType.float32](
         self, axes: IntList, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
-        return UnsqueezeForward[dtype].unsqueeze(self, axes, requires_grad)
+        return Unsqueeze[dtype].unsqueeze(self, axes, requires_grad)
 
     fn softmax(
         self,
@@ -1994,7 +1994,7 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMaxForward[dtype].minmax[True](
+        return MinMax[dtype].forward[True](
             self, IntList.new(axes), keepdims, requires_grad
         )
 
@@ -2004,7 +2004,7 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMaxForward[dtype].minmax[True](
+        return MinMax[dtype].forward[True](
             self, axes, keepdims, requires_grad
         )
 
@@ -2014,7 +2014,7 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMaxForward[dtype].minmax[False](
+        return MinMax[dtype].forward[False](
             self, IntList.new(axes), keepdims, requires_grad
         )
 
@@ -2024,7 +2024,7 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMaxForward[dtype].minmax[False](
+        return MinMax[dtype].forward[False](
             self, axes, keepdims, requires_grad
         )
 
@@ -2032,7 +2032,7 @@ struct Tensor[dtype: DType = DType.float32](
         self,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return ReLUForward[dtype].relu(self, requires_grad)
+        return ReLU[dtype].forward(self, requires_grad)
 
     fn shuffle(
         self,
@@ -2048,7 +2048,7 @@ struct Tensor[dtype: DType = DType.float32](
         perm: Optional[IntList] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return ShuffleForward[dtype].shuffle(self, axis, perm, requires_grad)
+        return Shuffle[dtype].forward(self, axis, perm, requires_grad)
 
     fn argmax(self, axis: Int = 0) -> Tensor[DType.int32]:
         return Argmax[dtype].argmax(tensor=self, axis=axis)
@@ -2059,7 +2059,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn unsqueeze(
         self, axis: Int, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
-        return UnsqueezeForward[dtype].unsqueeze(
+        return Unsqueeze[dtype].unsqueeze(
             self, IntList(axis), requires_grad
         )
 
@@ -2068,14 +2068,14 @@ struct Tensor[dtype: DType = DType.float32](
         target: Shape,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return ExpandForward[dtype].expand(self, target, requires_grad)
+        return Expand[dtype].forward(self, target, requires_grad)
 
     fn expand(
         self: Tensor[dtype],
         *target_dims: Int,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return ExpandForward[dtype].expand(
+        return Expand[dtype].forward(
             self, Shape(target_dims), requires_grad
         )
 
@@ -2095,7 +2095,7 @@ struct Tensor[dtype: DType = DType.float32](
         Returns:
             Tensor with specified dimensions squeezed.
         """
-        return SqueezeForward[dtype].squeeze(
+        return Squeeze[dtype].squeeze(
             self, IntList.new(axes), requires_grad
         )
 
@@ -2105,7 +2105,7 @@ struct Tensor[dtype: DType = DType.float32](
         axis: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return SqueezeForward[dtype].squeeze(
+        return Squeeze[dtype].squeeze(
             self,
             IntList(axis.value()) if axis else IntList.Empty,
             requires_grad,
