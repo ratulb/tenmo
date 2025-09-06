@@ -3,7 +3,7 @@ from matmulbackward import MatmulBackward, BatchedMatmulBackward
 from sumbackward import SumBackward
 from meanbackward import MeanBackward
 from addbackward import AddBackward, AddBackwardScalar
-from subbackward import SubBackward, SubLeftRightBackwardScalar
+from subtract import SubBackward, SubLeftRightBackwardScalar
 from broadcastbackward import BroadcastBackward
 from reshapebackward import ReshapeBackward
 from mulbackward import MultiplyBackward, MulBackwardScalar
