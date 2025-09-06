@@ -4,9 +4,8 @@ from memory import Pointer
 
 
 fn main() raises:
-    s = Shape([2, 4, 3])
-    r = s + [2]
-    print(r)
+    idx = Shape([2, 3]).unravel_index(3)
+    print(idx)
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
@@ -144,6 +143,25 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
                 strides.append(original_strides[orig_index])
                 orig_index += 1
         return strides
+
+    fn unravel_index(self, flat_index: Int) -> IntList:
+        if flat_index < 0 or flat_index >= self.num_elements():
+            panic(
+                "Shape → unravel_index: flat_index",
+                flat_index.__str__(),
+                "out of bounds.",
+                "Should be between 0 <= and <",
+                self.num_elements().__str__(),
+            )
+        rank = self.rank()
+        indices = IntList.filled(rank, 0)
+        remaining = flat_index
+        for i in range(rank - 1, -1, -1):  # from last axis backward
+            dim = self[i]
+            indices[i] = remaining % dim
+            remaining //= dim
+            
+        return indices
 
     @always_inline
     fn count_axes_of_size(self, axis_size: Int) -> Int:
