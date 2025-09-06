@@ -271,9 +271,10 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         """Destroy the `IntList` and free its memory."""
         if self.data:
             log_debug("Calling IntList __del__")
-            _ = """for i in range(len(self)):
-                (self.data + i).destroy_pointee()"""
             self.data.free()
+
+    fn __rmul__(self: IntList, factor: Int) -> IntList:
+        return self.__mul__(factor)
 
     fn __mul__(self: IntList, factor: Int) -> IntList:
         if factor < 1 or self.data.__as_bool__() == False:
@@ -326,6 +327,12 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         self.size -= 1
         return val
 
+    fn __radd__(self: IntList, other: List[Int]) -> IntList:
+        return IntList(other).__add__(self)
+
+    fn __add__(self: IntList, other: List[Int]) -> IntList:
+        return self.__add__(IntList(other))
+
     fn __add__(self: IntList, other: IntList) -> IntList:
         if (
             self.data.__as_bool__() == False
@@ -333,12 +340,8 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         ):
             return IntList()
         if self.data.__as_bool__() == False:
-            # _other = other
-            # return _other
             return other
         if other.data.__as_bool__() == False:
-            # _self = self
-            # return _self
             return self
 
         result = IntList.with_capacity(len(self) + len(other))
@@ -548,8 +551,6 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         if self.size > 0:
             memcpy(new_data, self.data, self.size)
         if self.data:
-            _ = """for i in range(len(self)):
-                (self.data + i).destroy_pointee()"""
             self.data.free()
         self.data = new_data
         self.capacity = new_capacity
@@ -746,6 +747,10 @@ struct ZipIterator[
 
 
 fn main() raises:
+    l1 = IntList() + [2,3]
+    l2 = [5, 3] + l1
+    print(l1, l2)
+
     ll = IntList.new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     padded_strides = IntList(0) * 3 + ll
     print(padded_strides)

@@ -4,7 +4,9 @@ from memory import Pointer
 
 
 fn main() raises:
-    pass
+    s = Shape([2, 4, 3])
+    r = s + [2]
+    print(r)
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
@@ -169,6 +171,9 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
     fn __add__(self, other: Shape) -> Shape:
         dims = self.intlist() + other.intlist()
         return Shape(dims)
+
+    fn __radd__(self, other: List[Int]) -> Shape:
+        return Shape(IntList(other) + self.intlist())
 
     fn __add__(self, other: List[Int]) -> Shape:
         dims = self.intlist() + IntList.new(other)
