@@ -271,8 +271,8 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         """Destroy the `IntList` and free its memory."""
         if self.data:
             log_debug("Calling IntList __del__")
-            for i in range(len(self)):
-                (self.data + i).destroy_pointee()
+            _ = """for i in range(len(self)):
+                (self.data + i).destroy_pointee()"""
             self.data.free()
 
     fn __mul__(self: IntList, factor: Int) -> IntList:
@@ -548,8 +548,8 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         if self.size > 0:
             memcpy(new_data, self.data, self.size)
         if self.data:
-            for i in range(len(self)):
-                (self.data + i).destroy_pointee()
+            _ = """for i in range(len(self)):
+                (self.data + i).destroy_pointee()"""
             self.data.free()
         self.data = new_data
         self.capacity = new_capacity
@@ -597,7 +597,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             left += 1
             right -= 1
 
-    fn print(self, limit: Int = 5) -> None:
+    fn print(self, limit: Int = 20) -> None:
         total = len(self)
         print("IntList[", total, "] = ", end="")
 
