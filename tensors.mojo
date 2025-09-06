@@ -805,7 +805,8 @@ struct Tensor[dtype: DType = DType.float32](
         # Set appropriate positions to 1.0
         for idx in self.shape:
             var class_idx = self[idx].__int__()
-
+            if class_idx < 0 or class_idx >= num_classes:
+                panic("Tensor → onehot: invalid class at coordinate: ", idx.__str__())
             if class_idx >= 0 and class_idx < num_classes:
                 var one_hot_idx = idx + [class_idx]
                 result[one_hot_idx] = Scalar[dtype](1)
@@ -2363,7 +2364,7 @@ struct Tensor[dtype: DType = DType.float32](
 fn main() raises:
     z = Tensor[DType.int64].d3(
         [
-            [[4], [2]],
+            [[0], [2]],
             [[3], [1]],
         ],
         requires_grad=False,
