@@ -30,6 +30,7 @@ from multiplication import MultiplyScalar, Multiplicator
 from addition import AddScalar, Adder
 from division import DivideScalar, DivideByScalar, Divider
 
+
 struct Tensor[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Representable & Writable & Absable
 ):
@@ -216,8 +217,12 @@ struct Tensor[dtype: DType = DType.float32](
         # 1. Rank check
         if len(indices) != self.rank():
             panic(
-                "Tensor → flatten_index: number of indices does not match"
-                " tensor rank"
+                "Tensor → flatten_index: number of indices does not match",
+                " tensor rank",
+                ": indices →",
+                indices.__str__(),
+                "rank →",
+                self.rank().__str__(),
             )
 
         flat = self.offset  # absolute base offset (0 for owning tensors)
@@ -806,7 +811,10 @@ struct Tensor[dtype: DType = DType.float32](
         for idx in self.shape:
             var class_idx = self[idx].__int__()
             if class_idx < 0 or class_idx >= num_classes:
-                panic("Tensor → onehot: invalid class at coordinate: ", idx.__str__())
+                panic(
+                    "Tensor → onehot: invalid class at coordinate: ",
+                    idx.__str__(),
+                )
             if class_idx >= 0 and class_idx < num_classes:
                 var one_hot_idx = idx + [class_idx]
                 result[one_hot_idx] = Scalar[dtype](1)
@@ -1575,7 +1583,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn __truediv__(self, other: Self) -> Tensor[dtype]:
         return Divider[dtype].forward[True](self, other)
 
-
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
 
@@ -1586,7 +1593,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn __mul__(self, other: Self) -> Tensor[dtype]:
         return Multiplicator[dtype].forward[True](self, other)
 
-    
     fn update_grad[opcode: Int](mut self, incoming: Tensor[dtype]):
         if opcode == MulTensor:
             self.gradbox[].__imul__(incoming)
@@ -2005,9 +2011,7 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMax[dtype].forward[True](
-            self, axes, keepdims, requires_grad
-        )
+        return MinMax[dtype].forward[True](self, axes, keepdims, requires_grad)
 
     fn min(
         self,
@@ -2025,9 +2029,7 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return MinMax[dtype].forward[False](
-            self, axes, keepdims, requires_grad
-        )
+        return MinMax[dtype].forward[False](self, axes, keepdims, requires_grad)
 
     fn relu(
         self,
@@ -2060,9 +2062,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn unsqueeze(
         self, axis: Int, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
-        return Unsqueeze[dtype].unsqueeze(
-            self, IntList(axis), requires_grad
-        )
+        return Unsqueeze[dtype].unsqueeze(self, IntList(axis), requires_grad)
 
     fn expand(
         self: Tensor[dtype],
@@ -2076,9 +2076,7 @@ struct Tensor[dtype: DType = DType.float32](
         *target_dims: Int,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return Expand[dtype].forward(
-            self, Shape(target_dims), requires_grad
-        )
+        return Expand[dtype].forward(self, Shape(target_dims), requires_grad)
 
     # Squeeze specified axes or all dims of size 1 if no axes provided
     fn squeeze(
@@ -2096,9 +2094,7 @@ struct Tensor[dtype: DType = DType.float32](
         Returns:
             Tensor with specified dimensions squeezed.
         """
-        return Squeeze[dtype].squeeze(
-            self, IntList.new(axes), requires_grad
-        )
+        return Squeeze[dtype].squeeze(self, IntList.new(axes), requires_grad)
 
     # Squeeze single axis if provided, otherwise squeeze all dims of size 1
     fn squeeze(

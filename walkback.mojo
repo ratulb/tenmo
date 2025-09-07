@@ -26,3 +26,4 @@ from minmax import MinMaxBackward
 from shuffle import ShuffleBackward
 from relu import ReLUBackward
 from softmax import SoftmaxBackward
+from crossentropy import CrossEntropyBackward

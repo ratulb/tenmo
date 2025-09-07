@@ -1,21 +1,20 @@
 from tensors import Tensor
 from shared import TensorLite
-from operators import AddTensor
 from intlist import IntList
 from shapes import Shape
-from validators import Validator
-from backpropagation import Delegate, BackwardFn
-from subtraction import Subtractor
 from common_utils import panic
 from math import log
-
-alias SoftmaxOutput[dtype: DType] = List[(IntList, Scalar[dtype])]
+from subtraction import Subtractor
+from backpropagation import Delegate, BackwardFn
+from operators import AddTensor
 
 
 @fieldwise_init
-struct SoftmaxBackward[dtype: DType](Copyable & Movable):
-    var axes: IntList
-    var softmax_out: SoftmaxOutput[dtype]
+@register_passable
+struct CrossEntropyBackward[dtype: DType](Copyable):
+    var reduction: Int  # '0-> mean', '1-> sum', '2 -> none'
+    var ignore_index: Int  # index to ignore (-1 for none)
+    var label_smoothing: Scalar[dtype]  # usually 0.0
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -25,86 +24,87 @@ struct SoftmaxBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        incoming = output.gradients()[]
-        softmax_out = Tensor[dtype].zeros(incoming.shape)
-        for indices, value in self.softmax_out:
-            softmax_out[indices] = rebind[Scalar[dtype]](value)
+        gradients = output.gradients()[]
+        ancestor_1 = output.ancestry().get(0)[]
+        ancestor_2 = output.ancestry().get(1)[]
+        logits = ancestor_1.tensor()
+        target = ancestor_2.tensor()
 
-        print("incoming")
-        print()
-        incoming.print()
-        print()
-        softmax_out.print()
-        sum_grad = (incoming * softmax_out).sum(
-            self.axes, keepdims=True, track_grad=False
-        )
-        print()
-        print("sum_grad")
-        sum_grad.print()
+        # Backward pass: ∂L/∂input = softmax(input) - one_hot(target)
+        var input_shape = logits.shape
+        var N = input_shape[0]
+        var C = input_shape[1]
+        var spatial_dims: Int
 
-        grad_share = softmax_out * (incoming - sum_grad)
+        # Reshape inputs consistently
+        var logits_reshaped: Tensor[dtype]
+        var target_reshaped: Tensor[dtype]
 
-        print()
-        print("grad_share")
-        grad_share.print()
-        ancestor = output.ancestry().get(0)[]
-        return [(ancestor, grad_share, AddTensor)]
+        if input_shape.rank() > 2:
+            spatial_dims = input_shape[2:].num_elements()
+            logits_reshaped = logits.reshape(Shape([N, C, spatial_dims]))
+            target_reshaped = target.reshape(Shape([N, spatial_dims]))
+        else:
+            # Reshape 2D case to 3D for consistency
+            spatial_dims = 1
+            logits_reshaped = logits.reshape(Shape([N, C, 1]))
+            target_reshaped = target.reshape(Shape([N, 1]))
 
+        # 1. Compute softmax probabilities
+        var softmax_probs = logits_reshaped.softmax([1], requires_grad=False)
 
-@fieldwise_init
-@register_passable
-struct Softmax[dtype: DType]:
-    @staticmethod
-    fn softmax(
-        this: Tensor[dtype],
-        axes: IntList,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        shape = this.shape
-        # Normalize axes
-        normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
-        max_vals = this.max(normalized_axes, keepdims=True, requires_grad=False)
-        # Numerical stability: subtract max along axes
-        stable = this - max_vals
-        # Compute exponentials
-        stable_exp = stable.exp()
-        exp_sum = stable_exp.sum(
-            normalized_axes, keepdims=True, track_grad=False
-        )
-        # Softmax = exp(x) / sum(exp(x))
-        out = stable_exp / exp_sum
+        # 2. Create gradient tensor
+        var grad_input = Tensor[dtype].zeros_like(softmax_probs)
 
-        grad_required = (
-            requires_grad.value() if requires_grad else this.requires_grad
-        )
+        # 3. Compute gradients for ALL class positions (CRITICAL FIX)
+        for n in range(N):
+            for s in range(spatial_dims):
+                var class_idx = target_reshaped[n, s].__int__()
 
-        if grad_required:
-            out.requires_grad_(True)
-            softmax_out = SoftmaxOutput[dtype](capacity=out.numels())
-            for indices in out.shape:
-                softmax_out.append((indices, out[indices]))
-            print("Forward pass: ", len(softmax_out))
-            backward_fn = SoftmaxBackward[dtype](
-                normalized_axes, softmax_out
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(this))
-        return out
+                # Skip if ignore_index
+                if class_idx == self.ignore_index:
+                    continue
 
+                # Update gradients for ALL classes, not just the correct one
+                for j in range(C):
+                    if j == class_idx:
+                        # Correct class: softmax - 1
+                        grad_input[n, j, s] = softmax_probs[n, j, s] - Scalar[
+                            dtype
+                        ](1.0)
+                    else:
+                        # Incorrect classes: softmax - 0 = softmax
+                        grad_input[n, j, s] = softmax_probs[n, j, s]
 
-fn main():
-    _a = Tensor.arange(5, requires_grad=True)
-    print("passes")
+        # 4. Apply reduction scaling
+        if self.reduction == 0:  # "mean"
+            grad_input = grad_input / (N * spatial_dims)
+        elif self.reduction == 1:  # "sum"
+            # grad_input remains as is for sum reduction
+            pass
+
+        # 5. Reshape grad_input back to original logits shape
+        var final_grad_input = grad_input.reshape(input_shape)
+
+        # 6. Multiply by upstream gradient
+        return [(ancestor_1, final_grad_input * gradients, AddTensor)]
 
 
 @fieldwise_init
 @register_passable
-struct CrossEntropyLoss[dtype: DType]:
+struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
+    Copyable
+):
     var reduction: Int  # '0-> mean', '1-> sum', '2 -> none'
     var ignore_index: Int  # index to ignore (-1 for none)
     var label_smoothing: Scalar[dtype]  # usually 0.0
 
-    fn forward(
+    fn __init__(out self):
+        self.reduction = 0
+        self.ignore_index = -1
+        self.label_smoothing = Scalar[dtype](0)
+
+    fn __call__(
         self, logits: Tensor[dtype], target: Tensor[dtype]
     ) -> Tensor[dtype]:
         """
@@ -115,7 +115,6 @@ struct CrossEntropyLoss[dtype: DType]:
         # 1. Validate input shapes
         var input_shape = logits.shape
         var target_shape = target.shape
-
         if input_shape.rank() < 2:
             panic("Input must have at least 2 dimensions")
 
@@ -126,25 +125,54 @@ struct CrossEntropyLoss[dtype: DType]:
         var N = input_shape[0]  # batch size
         var C = input_shape[1]  # number of classes
         var spatial_dims: Int
+        var logits_reshaped: Tensor[dtype]
+        var target_reshaped: Tensor[dtype]
+
         if input_shape.rank() > 2:
             # Reshape to (N, C, -1) and (N, -1)
             spatial_dims = input_shape[2:].num_elements()
-            # input = input.reshape(Shape([N, C, spatial_dims]))
-            # target = target.reshape(Shape([N, spatial_dims]))
+            logits_reshaped = logits.reshape(Shape([N, C, spatial_dims]))
+            target_reshaped = target.reshape(Shape([N, spatial_dims]))
         else:
+            # CRITICAL FIX: Even for 2D case, reshape target to (N, 1)
             spatial_dims = 1
+            target_reshaped = target.reshape(
+                Shape([N, 1])
+            )  # Reshape (N,) to (N, 1)
+            logits_reshaped = logits.reshape(
+                Shape([N, C, 1])
+            )  # Reshape (N, C) to (N, C, 1)
 
         # 3. Compute softmax probabilities
-        var log_softmax = self._log_softmax(logits)
+        var log_softmax = self._log_softmax(logits_reshaped)
 
         # 4. Compute loss
-        var loss = self._compute_loss(log_softmax, target, N, C, spatial_dims)
+        var loss = self._compute_loss(
+            log_softmax, target_reshaped, N, C, spatial_dims
+        )
 
         # 5. Apply reduction
-        return self._apply_reduction(loss)
+        out = self._apply_reduction(loss)
+
+        @parameter
+        if track_grad:
+            if logits.requires_grad:
+                out.requires_grad_(True)
+                reduction = self.reduction
+                ignore_index = self.ignore_index
+                label_smoothing = self.label_smoothing
+
+                backward_fn = CrossEntropyBackward[dtype](
+                    reduction, ignore_index, label_smoothing
+                ).into_backward_fn()
+                out.backwardFn = Optional(backward_fn)
+                out.add_ancestry(TensorLite[dtype].of(logits))
+                out.add_ancestry(TensorLite[dtype].of(target))
+
+        return out
 
     fn _log_softmax(self, logits: Tensor[dtype]) -> Tensor[dtype]:
-        """Numerically stable log(softmax(x))"""
+        """Numerically stable log(softmax(x))."""
         # Subtract max for numerical stability
         var max_vals = logits.max(
             IntList(1), keepdims=True, requires_grad=False
@@ -169,12 +197,13 @@ struct CrossEntropyLoss[dtype: DType]:
         spatial_dims: Int,
     ) -> Tensor[dtype]:
         """Compute the actual loss value."""
-        # Create one-hot encoding if needed, or use gather
         var loss = Tensor[dtype](
-            Shape([N, spatial_dims]), requires_grad=log_softmax.requires_grad
+            # Shape([N, spatial_dims]), requires_grad=log_softmax.requires_grad
+            Shape([N, spatial_dims]),
+            requires_grad=False,
         )
 
-        # Use gather to get the log probability of the correct class
+        # Use consistent 3D access pattern for all cases
         for n in range(N):
             for s in range(spatial_dims):
                 var class_idx = target[n, s].__int__()
@@ -184,11 +213,11 @@ struct CrossEntropyLoss[dtype: DType]:
                     loss[n, s] = Scalar[dtype](0)
                     continue
 
-                # Get log probability of correct class
+                # Get log probability of correct class - now always 3D access
                 var log_prob = log_softmax[n, class_idx, s]
 
                 # Apply label smoothing if needed
-                if self.label_smoothing > 0.0:
+                if self.label_smoothing > Scalar[dtype](0):
                     var smooth_prob = self.label_smoothing / C
                     var smooth_term = log(smooth_prob) * (C - 1) / C
                     loss[n, s] = (
@@ -208,41 +237,32 @@ struct CrossEntropyLoss[dtype: DType]:
         else:  # "none"
             return loss
 
-    fn backward(
-        self,
-        grad_output: Tensor[dtype],
-        logits: Tensor[dtype],
-        target: Tensor[dtype],
-    ) -> Tensor[dtype]:
-        """Backward pass: ∂L/∂input = softmax(input) - one_hot(target)."""
-        var N = logits.shape[0]
-        var _C = logits.shape[1]
-        var spatial_dims = (
-            logits.shape[2:].num_elements() if logits.shape.rank() > 2 else 1
-        )
 
-        # 1. Compute softmax probabilities
-        var softmax_probs = logits.softmax([1], requires_grad=False)
+fn main() raises:
+    test_cross_entropy()
+    print("passes")
 
-        # 2. Create one-hot encoding of target
-        var grad_input = Tensor[dtype].zeros_like(softmax_probs)
 
-        # 3. Subtract 1 from the correct class probabilities
-        for n in range(N):
-            for s in range(spatial_dims):
-                var class_idx = target[n, s].__int__()
-                if class_idx != self.ignore_index:
-                    grad_input[n, class_idx, s] = softmax_probs[
-                        n, class_idx, s
-                    ] - Scalar[dtype](1.0)
-                # Other classes remain softmax_probs[n, j, s] - 0 = softmax_probs[n, j, s]
+fn test_cross_entropy() raises:
+    print("Testing CrossEntropyLoss...")
 
-        # 4. Apply reduction scaling
-        if self.reduction == 0:  # "mean"
-            grad_input = grad_input / (N * spatial_dims)
-        elif self.reduction == 1:  # "sum"
-            # grad_input remains as is for sum reduction
-            pass
+    # Example 1: Basic classification
+    var logits = Tensor.d2(
+        [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]],  # Sample 1  # Sample 2
+        requires_grad=True,
+    )
 
-        # 5. Multiply by upstream gradient
-        return grad_input * grad_output
+    var target = Tensor.d1([0, 1])  # Class indices
+
+    var criterion = CrossEntropyLoss()
+    var loss = criterion(logits, target)
+
+    print("Loss:", loss.item())
+    loss.backward()
+    print("Gradient of logits:")
+    logits.gradbox[].print()
+
+    # Example 2: With ignore_index
+    # var target_with_ignore = Tensor.d1([0, -1, 1])  # Ignore sample 2
+    # var loss_ignore = criterion.forward(logits, target_with_ignore)
+    # print("Loss with ignore_index:", loss_ignore.item())
