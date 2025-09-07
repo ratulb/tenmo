@@ -121,82 +121,28 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
             logits: Logits tensor of shape (N, C) or (N, C, d1, d2, ...).
             target: Ground truth of shape (N,) or (N, d1, d2, ...) with class indices.
         """
-        # 1. Validate input shapes
-        var input_shape = logits.shape
-        var target_shape = target.shape
-        if input_shape.rank() < 2:
-            panic("Input must have at least 2 dimensions")
+        # Validate inputs and get processed tensors
+        var (N, C, spatial_dims, logits_reshaped, target_reshaped) = 
+            Self.validate_cross_entropy_inputs[dtype](logits, target)
 
-        if target_shape.rank() != input_shape.rank() - 1:
-            panic("Target must have one fewer dimension than input")
+        # Compute softmax probabilities
+        var log_softmax = self.log_softmax(logits_reshaped)
 
-        # 2. Validate number of samples matches
-        var N = input_shape[0]  # batch size
-        if target_shape[0] != N:
-            panic(
-                "Target must have the same number of samples as logits."
-                " Expected "
-                + N.__str__()
-                + ", got "
-                + target_shape[0].__str__()
-            )
-        # 3. Validate spatial dimensions match (if any)
-        # Check that spatial dimensions match: target_shape[1:] vs input_shape[2:]
-        if target_shape.rank() > 1:
-            for i in range(1, target_shape.rank()):
-                if i + 1 < input_shape.rank():
-                    if target_shape[i] != input_shape[i + 1]:
-                        panic(
-                            "Spatial dimension mismatch at dim "
-                            + i.__str__()
-                            + ": expected "
-                            + input_shape[i + 1].__str__()
-                            + ", got "
-                            + target_shape[i].__str__()
-                        )
-
-        # 4. Flatten spatial dimensions if needed (for segmentation etc.)
-        var C = input_shape[1]  # number of classes
-        var spatial_dims: Int
-        var logits_reshaped: Tensor[dtype]
-        var target_reshaped: Tensor[dtype]
-
-        if input_shape.rank() > 2:
-            # Reshape to (N, C, -1) and (N, -1)
-            spatial_dims = input_shape[2:].num_elements()
-            logits_reshaped = logits.reshape(Shape([N, C, spatial_dims]))
-            target_reshaped = target.reshape(Shape([N, spatial_dims]))
-        else:
-            # CRITICAL FIX: Even for 2D case, reshape target to (N, 1)
-            spatial_dims = 1
-            target_reshaped = target.reshape(
-                Shape([N, 1])
-            )  # Reshape (N,) to (N, 1)
-            logits_reshaped = logits.reshape(
-                Shape([N, C, 1])
-            )  # Reshape (N, C) to (N, C, 1)
-
-        # 3. Compute softmax probabilities
-        var log_softmax = self._log_softmax(logits_reshaped)
-
-        # 4. Compute loss
-        var loss = self._compute_loss(
+        # Compute loss
+        var loss = self.compute_loss(
             log_softmax, target_reshaped, N, C, spatial_dims
         )
 
-        # 5. Apply reduction
-        out = self._apply_reduction(loss)
+        # Apply reduction
+        var out = self.reduce(loss)
 
+        # Setup autograd if needed
         @parameter
         if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
-                reduction = self.reduction
-                ignore_index = self.ignore_index
-                label_smoothing = self.label_smoothing
-
-                backward_fn = CrossEntropyBackward[dtype](
-                    reduction, ignore_index, label_smoothing
+                var backward_fn = CrossEntropyBackward[dtype](
+                    self.reduction, self.ignore_index, self.label_smoothing
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite[dtype].of(logits))
@@ -204,7 +150,8 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
 
         return out
 
-    fn _log_softmax(self, logits: Tensor[dtype]) -> Tensor[dtype]:
+    
+    fn log_softmax(self, logits: Tensor[dtype]) -> Tensor[dtype]:
         """Numerically stable log(softmax(x))."""
         # Subtract max for numerical stability
         var max_vals = logits.max(
@@ -221,7 +168,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         # log_softmax = x - max - log(sum(exp(x - max)))
         return logits_stable - log_sum_exp
 
-    fn _compute_loss(
+    fn compute_loss(
         self,
         log_softmax: Tensor[dtype],
         target: Tensor[dtype],
@@ -261,8 +208,8 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
 
         return loss
 
-    fn _apply_reduction(self, loss: Tensor[dtype]) -> Tensor[dtype]:
-        """Apply reduction: 'mean' -> 0, 'sum -> 1', or 'none - 2'"""
+    fn reduce(self, loss: Tensor[dtype]) -> Tensor[dtype]:
+        """Apply reduction: 'mean' -> 0, 'sum -> 1', or 'none - 2'."""
         if self.reduction == 0:
             return loss.mean()
         elif self.reduction == 1:
@@ -270,6 +217,73 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         else:  # "none"
             return loss
 
+    @staticmethod
+    fn validate_cross_entropy_inputs[dtype: DType](
+        logits: Tensor[dtype], target: Tensor[dtype]
+    ) -> Tuple[Int, Int, Int, Tensor[dtype], Tensor[dtype]]:
+        """
+        Validate CrossEntropyLoss inputs and return processed tensors.
+        
+        Returns:
+            N: batch size.
+            C: number of classes.
+            spatial_dims: number of spatial elements.
+            logits_reshaped: reshaped logits tensor.
+            target_reshaped: reshaped target tensor.
+        """
+        var input_shape = logits.shape
+        var target_shape = target.shape
+        
+        # 1. Validate input ranks
+        if input_shape.rank() < 2:
+            panic("Input must have at least 2 dimensions")
+
+        if target_shape.rank() != input_shape.rank() - 1:
+            panic("Target must have one fewer dimension than input")
+
+        # 2. Validate number of samples matches
+        var N = input_shape[0]  # batch size
+        if target_shape[0] != N:
+            panic(
+                "Target must have the same number of samples as logits."
+                " Expected "
+                + N.__str__()
+                + ", got "
+                + target_shape[0].__str__()
+            )
+        
+        # 3. Validate spatial dimensions match (if any)
+        if target_shape.rank() > 1:
+            for i in range(1, target_shape.rank()):
+                if i + 1 < input_shape.rank():
+                    if target_shape[i] != input_shape[i + 1]:
+                        panic(
+                            "Spatial dimension mismatch at dim "
+                            + i.__str__()
+                            + ": expected "
+                            + input_shape[i + 1].__str__()
+                            + ", got "
+                            + target_shape[i].__str__()
+                        )
+
+        # 4. Flatten spatial dimensions if needed
+        var C = input_shape[1]  # number of classes
+        var spatial_dims: Int
+        var logits_reshaped: Tensor[dtype]
+        var target_reshaped: Tensor[dtype]
+
+        if input_shape.rank() > 2:
+            # Reshape to (N, C, -1) and (N, -1)
+            spatial_dims = input_shape[2:].num_elements()
+            logits_reshaped = logits.reshape(Shape([N, C, spatial_dims]))
+            target_reshaped = target.reshape(Shape([N, spatial_dims]))
+        else:
+            # For 2D case, reshape target to (N, 1) and logits to (N, C, 1)
+            spatial_dims = 1
+            target_reshaped = target.reshape(Shape([N, 1]))
+            logits_reshaped = logits.reshape(Shape([N, C, 1]))
+
+        return (N, C, spatial_dims, logits_reshaped, target_reshaped)
 
 fn main() raises:
     print("passes")
