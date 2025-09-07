@@ -90,7 +90,6 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
         return [(ancestor_1, final_grad_input * gradients, AddTensor)]
 
 
-@fieldwise_init
 @register_passable
 struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
     Copyable
@@ -99,10 +98,20 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
     var ignore_index: Int  # index to ignore (-1 for none)
     var label_smoothing: Scalar[dtype]  # usually 0.0
 
-    fn __init__(out self):
-        self.reduction = 0
-        self.ignore_index = -1
-        self.label_smoothing = Scalar[dtype](0)
+    fn __init__(
+        out self,
+        reduction: Int = 0,
+        ignore_index: Int = -1,
+        label_smoothing: Scalar[dtype] = Scalar[dtype](0),
+    ):
+        self.reduction = reduction
+        self.ignore_index = ignore_index
+        self.label_smoothing = label_smoothing
+
+    fn __copyinit__(out self, existing: Self):
+        self.reduction = existing.reduction
+        self.ignore_index = existing.ignore_index
+        self.label_smoothing = existing.label_smoothing
 
     fn __call__(
         self, logits: Tensor[dtype], target: Tensor[dtype]
@@ -121,8 +130,32 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         if target_shape.rank() != input_shape.rank() - 1:
             panic("Target must have one fewer dimension than input")
 
-        # 2. Flatten spatial dimensions if needed (for segmentation etc.)
+        # 2. Validate number of samples matches
         var N = input_shape[0]  # batch size
+        if target_shape[0] != N:
+            panic(
+                "Target must have the same number of samples as logits."
+                " Expected "
+                + N.__str__()
+                + ", got "
+                + target_shape[0].__str__()
+            )
+        # 3. Validate spatial dimensions match (if any)
+        # Check that spatial dimensions match: target_shape[1:] vs input_shape[2:]
+        if target_shape.rank() > 1:
+            for i in range(1, target_shape.rank()):
+                if i + 1 < input_shape.rank():
+                    if target_shape[i] != input_shape[i + 1]:
+                        panic(
+                            "Spatial dimension mismatch at dim "
+                            + i.__str__()
+                            + ": expected "
+                            + input_shape[i + 1].__str__()
+                            + ", got "
+                            + target_shape[i].__str__()
+                        )
+
+        # 4. Flatten spatial dimensions if needed (for segmentation etc.)
         var C = input_shape[1]  # number of classes
         var spatial_dims: Int
         var logits_reshaped: Tensor[dtype]
@@ -239,30 +272,4 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
 
 
 fn main() raises:
-    test_cross_entropy()
     print("passes")
-
-
-fn test_cross_entropy() raises:
-    print("Testing CrossEntropyLoss...")
-
-    # Example 1: Basic classification
-    var logits = Tensor.d2(
-        [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]],  # Sample 1  # Sample 2
-        requires_grad=True,
-    )
-
-    var target = Tensor.d1([0, 1])  # Class indices
-
-    var criterion = CrossEntropyLoss()
-    var loss = criterion(logits, target)
-
-    print("Loss:", loss.item())
-    loss.backward()
-    print("Gradient of logits:")
-    logits.gradbox[].print()
-
-    # Example 2: With ignore_index
-    # var target_with_ignore = Tensor.d1([0, -1, 1])  # Ignore sample 2
-    # var loss_ignore = criterion.forward(logits, target_with_ignore)
-    # print("Loss with ignore_index:", loss_ignore.item())

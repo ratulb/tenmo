@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|buffers|views|intlist|shapes|strides|ancestry|shared|bench|validators|all]"
+    echo "Usage: $0 [tensors|buffers|views|intlist|shapes|strides|ancestry|shared|bench|validators|ce]all]"
     exit 1
 fi
 
@@ -18,6 +18,11 @@ case $1 in
         echo "Running tensor tests"
         mojo -I . $DEBUG_MODE tests/test_tensors.mojo
         ;;
+    ce)
+        echo "Running crossentropy loss tests"
+        mojo -I . $DEBUG_MODE tests/test_cross_entropy.mojo
+        ;;
+
     buffers)
         mojo -I . $DEBUG_MODE tests/test_buffers.mojo
         ;;
@@ -61,6 +66,8 @@ case $1 in
     all)
         mojo -I . tests/test_tensors.mojo
         mojo -I . tests/test_buffers.mojo
+        echo "Running crossentropy loss tests"
+        mojo -I . tests/test_cross_entropy.mojo
         echo "Running view test cases"
         mojo -I . tests/test_views.mojo
         echo "Running shape test cases"
@@ -80,7 +87,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: tensors, buffers, views, shapes, intlists, strides, ancestry, shared, bench, validators, all"
+        echo "Available tests: tensors, buffers, views, shapes, intlists, strides, ancestry, shared, bench, validators, ce, all"
         exit 1
         ;;
 esac
