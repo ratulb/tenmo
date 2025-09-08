@@ -4,6 +4,7 @@ from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
 from layers import Sequential, Linear, ReLU
+
 # from strides import Strides
 from os import abort
 from utils import Variant
@@ -26,6 +27,17 @@ fn is_power_of_two(x: Int) -> Bool:
 
 fn id[type: AnyType, //](t: type) -> Int:
     return Int(UnsafePointer(to=t))
+
+
+fn addr[type: AnyType, //](t: type) -> UnsafePointer[type]:
+    return UnsafePointer(to=t)
+
+
+fn addrs[type: AnyType, //](*ts: type) -> List[UnsafePointer[type]]:
+    l = List[UnsafePointer[type]](capacity=len(ts))
+    for t in ts:
+        l.append(UnsafePointer(to=t))
+    return l
 
 
 fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
@@ -298,8 +310,10 @@ fn str_repeat(s: String, n: Int) -> String:
         parts.append(s)
     return StringSlice("").join(parts)
 
-fn print_summary[dtype: DType](mod: Sequential[dtype], 
-                               sample_input: Optional[Tensor[dtype]] = None):
+
+fn print_summary[
+    dtype: DType
+](mod: Sequential[dtype], sample_input: Optional[Tensor[dtype]] = None):
     # Table headers
     var headers = List[String]()
     headers.append("Name")
@@ -317,7 +331,7 @@ fn print_summary[dtype: DType](mod: Sequential[dtype],
 
     # If sample_input is provided → run a dry forward pass to get shapes
     var x = sample_input
-    var current_shape = "(?, ?)"  
+    var current_shape = "(?, ?)"
 
     for i in range(len(mod.modules)):
         m = mod.modules[i]
@@ -341,14 +355,23 @@ fn print_summary[dtype: DType](mod: Sequential[dtype],
             current_shape = output_shape
 
             # Params
-            var params = l.weights.shape.num_elements() + l.bias.shape.num_elements()
+            var params = (
+                l.weights.shape.num_elements() + l.bias.shape.num_elements()
+            )
             total_params += params
             if l.weights.requires_grad or l.bias.requires_grad:
                 trainable_params += params
 
-            rows.append([name, "Linear", input_shape, output_shape,
-                         params.__str__(),
-                         (l.weights.requires_grad or l.bias.requires_grad).__str__()])
+            rows.append(
+                [
+                    name,
+                    "Linear",
+                    input_shape,
+                    output_shape,
+                    params.__str__(),
+                    (l.weights.requires_grad or l.bias.requires_grad).__str__(),
+                ]
+            )
 
         elif m.layer.isa[ReLU[dtype]]():
             var input_shape = current_shape
@@ -400,5 +423,7 @@ fn print_summary[dtype: DType](mod: Sequential[dtype],
 
 fn main() raises:
     a = Tensor.arange(24, requires_grad=True).reshape(2, 3, 4)
-    l = IntList.Empty
-    print_tensor_recursive(UnsafePointer(to=a), l, 2)
+    b = Tensor.scalar(10)
+    l = addrs(a, b)
+    for e in l:
+        e[].print()
