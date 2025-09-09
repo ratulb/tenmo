@@ -178,42 +178,6 @@ struct Slicer:
         return _start, _end, _step
 
 
-fn compute_output_shape(
-    original_shape: Shape, normalized_axes: IntList, keepdims: Bool
-) -> Shape:
-    """Compute the output shape after reduction along specified axes.
-
-    Args:
-        original_shape: Shape of the tensor before reduction.
-        normalized_axes: Sorted list of axes to reduce over (must be valid for shape).
-        keepdims: Whether to keep reduced dimensions as size 1.
-
-    Returns:
-        Shape after reduction
-
-    Behavior:
-        - If reducing all axes and keepdims=False → returns Shape.Void (scalar)
-        - Otherwise:
-            - For reduced axes: keep as 1 if keepdims=True, else remove
-            - For non-reduced axes: keep original size.
-    """
-    rank = original_shape.rank()
-
-    # Full reduction case (return scalar shape if not keeping dims)
-    if rank == 0 or (len(normalized_axes) == rank and not keepdims):
-        return Shape.Void
-
-    var spans = IntList.with_capacity(rank)
-    for dim in range(rank):
-        if dim in normalized_axes:
-            if keepdims:
-                spans.append(1)  # Keep reduced dim as size 1
-        else:
-            spans.append(original_shape[dim])  # Keep original size
-
-    return Shape(spans)
-
-
 fn print_tensor_recursive[
     dtype: DType, //
 ](
