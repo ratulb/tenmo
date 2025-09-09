@@ -1,12 +1,10 @@
-# gradcheck.mojo
 from tensors import Tensor
 from common_utils import log_debug, RED, CYAN
-from crossentropy import CrossEntropyLoss
-from layers import Sequential, Linear, ReLU
+from layers import Sequential
 
 
 # --------------------
-# Gradient checker (pluggable)
+# Gradient checker (safe using parameters_ptrs)
 # --------------------
 fn gradcheck_param[
     dtype: DType = DType.float32
@@ -14,12 +12,13 @@ fn gradcheck_param[
     model: Sequential[dtype],
     x: Tensor[dtype],
     y: Tensor[dtype],
-    criterion: CrossEntropyLoss[dtype],
+    loss_fn: fn (Tensor[dtype], Tensor[dtype]) -> Tensor[dtype],
     eps: Scalar[dtype] = Scalar[dtype](1e-3),
     tol: Scalar[dtype] = Scalar[dtype](1e-2),
 ) raises -> Bool:
+    # Run forward/backward once to populate analytical gradients
     var logits = model(x)
-    var loss = criterion(logits, y)
+    var loss = loss_fn(logits, y)
     loss.backward()
 
     var ok = True
@@ -40,12 +39,15 @@ fn gradcheck_param[
         for i in range(n):
             orig = p.buffer[i]
 
+            # f(x + eps)
             p.buffer[i] = orig + eps
-            var lp = criterion(model(x), y).item()
+            var lp = loss_fn(model(x), y).item()
 
+            # f(x - eps)
             p.buffer[i] = orig - eps
-            var lm = criterion(model(x), y).item()
+            var lm = loss_fn(model(x), y).item()
 
+            # restore
             p.buffer[i] = orig
 
             grad_num = (lp - lm) / (2.0 * eps)
@@ -75,9 +77,13 @@ fn gradcheck_param[
 
 
 # --------------------
-# Example usage
+# Example test in main
 # --------------------
-fn test_gradcheck() raises:
+from crossentropy import CrossEntropyLoss
+from layers import Linear, ReLU
+
+
+fn test_gradcheck1() raises:
     var model = Sequential()
     model.append(Linear(4, 5).into())
     model.append(ReLU().into())
@@ -86,9 +92,20 @@ fn test_gradcheck() raises:
     var x = Tensor.rand([2, 4], requires_grad=True)
     var y = Tensor.d1([1, 2])
 
-    var criterion = CrossEntropyLoss()
+    fn criterion[
+        dtype: DType
+    ](logits: Tensor[dtype], target: Tensor[dtype]) -> Tensor[dtype]:
+        var criterion = CrossEntropyLoss[dtype]()
+        return criterion(logits, target)
 
-    var passed = gradcheck_param(model, x, y, criterion)
+    var passed = gradcheck_param(
+        model,
+        x,
+        y,
+        criterion[DType.float32],
+        Scalar[DType.float32](1e-3),
+        Scalar[DType.float32](1e-2),
+    )
     if passed:
         print(CYAN, "Gradient check PASSED ✅")
     else:
@@ -97,5 +114,38 @@ fn test_gradcheck() raises:
     _ = model
 
 
+from mse import MSELoss
+
+
+fn test_gradcheck2() raises:
+    var model = Sequential()
+    model.append(Linear(4, 5).into())
+    model.append(ReLU().into())
+    model.append(Linear(5, 3).into())
+
+    var x = Tensor.rand([2, 4], requires_grad=True)
+    # Target must match output shape [2, 3]
+    var y = Tensor.rand([2, 3])
+
+    fn mse_loss[
+        dtype: DType
+    ](preds: Tensor[dtype], target: Tensor[dtype]) -> Tensor[dtype]:
+        var mse = MSELoss[dtype]()
+        return mse(preds, target)
+
+    var passed = gradcheck_param(
+        model,
+        x,
+        y,
+        mse_loss[DType.float32],
+        Scalar[DType.float32](1e-3),
+        Scalar[DType.float32](1e-2),
+    )
+    if passed:
+        print(CYAN, "Gradient check PASSED ✅ (MSE)")
+    else:
+        print(RED, "Gradient check FAILED ❌ (MSE)")
+
+
 fn main() raises:
-    test_gradcheck()
+    test_gradcheck2()
