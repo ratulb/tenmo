@@ -5,7 +5,7 @@ from intlist import IntList
 from operators import AddTensor, Multiply, scalar_ops
 from buffers import Buffer
 from broadcastbackward import BroadcastBackward
-from common_utils import panic
+from common_utils import panic, id
 
 
 @fieldwise_init
@@ -24,6 +24,7 @@ struct MulBackwardScalar[dtype: DType](Copyable & Movable):
         gradients = output.gradients()[]
         var value: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
         ancestor = output.ancestry().get(0)[]
+
         scaled_gradients = gradients * value
         return [
             (
@@ -49,7 +50,18 @@ struct MultiplyBackward[dtype: DType](Copyable & Movable):
         var grad_outputs: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
+
+        count = len(output.ancestry())
         ancestor_1 = output.ancestry().get(0)[]
+
+        if count == 1:  # B = A * A, A is the only ancestor of B
+            tensor_1 = ancestor_1.tensor()
+            product = Multiplicator[dtype].forward[False](gradients, tensor_1)
+            product = MultiplyScalar[dtype].forward[False](
+                product, Scalar[dtype](2)
+            )
+            return [(ancestor_1, product, AddTensor)]
+
         ancestor_2 = output.ancestry().get(1)[]
 
         if ancestor_1.requires_grad():
@@ -151,14 +163,18 @@ struct Multiplicator[dtype: DType]:
                 if self.shape == other.shape:
                     backward_fn = MultiplyBackward[dtype]().into_backward_fn()
                     out.backwardFn = Optional(backward_fn)
-
+                    if id(self) == id(other):  # B = A * A, self == other == A
+                        out.add_ancestry(TensorLite.of(self))
+                    else:
+                        out.add_ancestry(
+                            TensorLite.of(self), TensorLite.of(other)
+                        )
                 else:
                     backward_fn = BroadcastBackward[
                         dtype, AddTensor, AddTensor, True
                     ]().into_backward_fn()
                     out.backwardFn = Optional(backward_fn)
-
-                out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
+                    out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
 
         return out
 
