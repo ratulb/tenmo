@@ -22,11 +22,82 @@ fn main() raises:
     test_buffer_float_less_than()
     test_buffer_float_inequality()
     test_buffer_float_less_eq_than()
+    test_count()
+    test_log()
 
     print("Done running buffer tests")
 
 
 from testing import assert_true, assert_false
+
+
+fn test_count() raises:
+    print("test_count")
+    size = 135
+    ll = List[Scalar[DType.int64]](capacity=size)
+    for _ in range(size):
+        ll.append(Scalar[DType.int64](2))
+    buffer = Buffer[DType.int64](ll)
+    assert_true(
+        buffer.count(Scalar[DType.int64](2)) == size, "count assertion 1 failed"
+    )
+
+    buffer[0] = 3
+    assert_true(
+        buffer.count(2) == size - 1,
+        "count assertion 2 failed",
+    )
+    buffer[10] = 3
+    assert_true(
+        buffer.count(2) == size - 2,
+        "count assertion 3 failed",
+    )
+
+    assert_true(
+        buffer.count(3) == 2,
+        "count assertion 4 failed",
+    )
+
+    assert_true(
+        buffer.count(42) == 0,
+        "count assertion 5 failed",
+    )
+
+    lb = List[Scalar[DType.bool]](capacity=size)
+    for _ in range(size):
+        lb.append(Scalar[DType.bool](True))
+    buffer_b = Buffer[DType.bool](lb)
+    assert_true(buffer_b.count(True) == size, "count assertion 6 failed")
+
+    buffer_b[0] = False
+    assert_true(
+        buffer_b.count(True) == size - 1,
+        "count assertion 7 failed",
+    )
+    buffer_b[10] = False
+    assert_true(
+        buffer_b.count(True) == size - 2,
+        "count assertion 8 failed",
+    )
+
+    assert_true(
+        buffer_b.count(False) == 2,
+        "count assertion 9 failed",
+    )
+
+
+fn test_log() raises:
+    print("test_log")
+    ll = List[Scalar[DType.float32]](capacity=100)
+    for i in range(1, 100):
+        ll.insert(0, Scalar[DType.float32](i))
+    buf = Buffer[DType.float32](ll)
+    logs = buf.log()
+
+    assert_true(logs[len(logs) - 1] == 0, "Buffer log zero assertion failed")
+    assert_true(
+        logs[0] == 4.59512, "Buffer log assertion failed for value at index 0"
+    )
 
 
 fn test_buffer_iter() raises:

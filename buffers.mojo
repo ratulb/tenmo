@@ -163,6 +163,7 @@ struct Buffer[dtype: DType = DType.float32](
             )
         total = lhs.size
         out = Buffer[DType.bool](total)
+
         @parameter
         fn mul_elems[simdwidth: Int](idx: Int):
             out.store[simdwidth](
@@ -170,9 +171,9 @@ struct Buffer[dtype: DType = DType.float32](
                 (lhs.load[simdwidth](idx) * rhs.load[simdwidth](idx)),
             )
 
-        #vectorize[mul_elems, simdwidthof[DType.bool]()](lhs.size)
+        # vectorize[mul_elems, simdwidthof[DType.bool]()](lhs.size)
         vectorize[mul_elems, 1](lhs.size)
-        _="""alias simd_width = simdwidthof[DType.bool]()
+        _ = """alias simd_width = simdwidthof[DType.bool]()
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
@@ -286,7 +287,6 @@ struct Buffer[dtype: DType = DType.float32](
 
         vectorize[mul_elems, simd_width](lhs.size)
         return out
-
 
     fn __radd__[
         simd_width: Int = simdwidthof[dtype]()
@@ -1112,12 +1112,28 @@ struct Buffer[dtype: DType = DType.float32](
             product *= this.load(k)
         return product
 
-
-    fn count(this: Buffer[dtype], key: Scalar[dtype]) -> Int:
+    fn count[
+        simd_width: Int = simdwidthof[dtype]()
+    ](this: Buffer[dtype], key: Scalar[dtype]) -> Int:
         total = 0
-        for val in this:
-            if key == val:
-                total += 1
+
+        @parameter
+        fn matches[simdwidth: Int](idx: Int):
+            block = this.load[simdwidth](idx)
+            result = block == key
+            if result:
+                total += simdwidth
+            elif not result and simdwidth > 1:
+                for i in range(simdwidth):
+                    if block[i] == key:
+                        total += 1
+
+        @parameter
+        if dtype == DType.bool:
+            vectorize[matches, 1](this.size)
+        else:
+            vectorize[matches, simd_width](this.size)
+
         return total
 
     fn all_close[
@@ -1285,23 +1301,8 @@ struct Iterator[
 
 
 fn main() raises:
-    test_log()
-    fn pred(x: Scalar[DType.int32]) -> Bool:
-        return x % 2 == 0
-
-    buf = Buffer[DType.int32]([1, 2, 3, 4, 5])
-    mask = buf.for_all(pred)
-    print(mask)  # [False, True, False, True, False]
-
-
+    pass
 from testing import assert_true, assert_false
 
-fn test_log() raises:
-    ll = List[Scalar[DType.float32]](capacity=100)
-    for i in range(1, 100):
-        ll.insert(0, Scalar[DType.float32](i))
-    buf = Buffer[DType.float32](ll)
-    logs = buf.log()
 
-    assert_true(logs[len(logs) - 1] == 0, "Buffer log zero assertion failed")
-    assert_true(logs[0] == 4.59512, "Buffer log assertion failed for value at index 0")
+
