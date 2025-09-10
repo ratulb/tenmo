@@ -17,18 +17,7 @@ from walkback import *
 from buffers import Buffer
 from shared import TensorLite
 from validators import Validator
-from squeeze import Squeeze
-from unsqueeze import Unsqueeze
-from expand import Expand
 from argminmax import Argmin, Argmax
-from minmax import MinMax
-from shuffle import Shuffle
-from relu import ReLU
-from softmax import Softmax
-from subtraction import SubtractScalar, SubtractFromScalar, Subtractor
-from multiplication import MultiplyScalar, Multiplicator
-from addition import AddScalar, Adder
-from division import DivideScalar, DivideByScalar, Divider
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -1504,49 +1493,49 @@ struct Tensor[dtype: DType = DType.float32](
 
         return grad_contrib
 
-    fn sum(self, axes: List[Int] = [], keepdims: Bool = False) -> Tensor[dtype]:
-        return self.sum(IntList.new(axes), keepdims)
-
-    fn sum(
-        self,
-        axes: IntList,
-        keepdims: Bool = False,
-    ) -> Tensor[dtype]:
-        return Summer[dtype].forward[True](self, axes, keepdims)
-
-    fn mean(
+    fn sum[
+        track_grad: Bool = True
+    ](
         self,
         axes: List[Int] = [],
         keepdims: Bool = False,
-        track_grad: Optional[Bool] = True,
+        requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return self.mean(IntList.new(axes), keepdims, track_grad)
+        return self.sum[track_grad](IntList.new(axes), keepdims, requires_grad)
 
-    fn mean(
+    fn sum[
+        track_grad: Bool = True
+    ](
+        self,
+        axes: IntList,
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Summer[dtype].forward[track_grad](
+            self, axes, keepdims, requires_grad
+        )
+
+    fn mean[
+        track_grad: Bool = True
+    ](
+        self,
+        axes: List[Int] = [],
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return self.mean[track_grad](IntList.new(axes), keepdims, requires_grad)
+
+    fn mean[
+        track_grad: Bool = True
+    ](
         self: Tensor[dtype],
         axes: IntList,
         keepdims: Bool = False,
-        track_grad: Optional[Bool] = True,
+        requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        normalized_axes = Validator.validate_and_normalize_axes(
-            self.shape, axes
+        return Mean[dtype].forward[track_grad](
+            self, axes, keepdims, requires_grad
         )
-        count = self.shape.axes_spans.select(normalized_axes).product()
-        out = Summer[dtype].forward[False](
-            self, normalized_axes, keepdims
-        ) / Scalar[dtype](count)
-
-        requires_grad = track_grad.value() if track_grad else self.requires_grad
-
-        if requires_grad:
-            out.requires_grad_(True)
-            backward_fn = MeanBackward[dtype](
-                normalized_axes.copy(), keepdims
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
 
     fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return DivideScalar[dtype].forward[True](self, scalar)
