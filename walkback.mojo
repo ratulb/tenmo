@@ -1,6 +1,6 @@
 from backpropagation import BackwardFn
 from matmulbackward import MatmulBackward, BatchedMatmulBackward
-from sumbackward import SumBackward
+from summation import SumBackward, Summer
 from meanbackward import MeanBackward
 from addition import AddBackward, AddBackwardScalar
 from subtraction import SubBackward, SubLeftRightBackwardScalar

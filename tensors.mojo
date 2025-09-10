@@ -1511,59 +1511,34 @@ struct Tensor[dtype: DType = DType.float32](
         self,
         axes: IntList,
         keepdims: Bool = False,
-        track_grad: Bool = True,
     ) -> Tensor[dtype]:
-        shape = self.shape
-        rank = shape.rank()
-        normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
-        out_shape = compute_output_shape(shape, normalized_axes, keepdims)
-        out = Tensor[dtype].zeros(
-            out_shape, requires_grad=self.requires_grad and track_grad
-        )
-
-        if out_shape == Shape.Void:
-            if rank == 0:  # Scalar case
-                out[IntList.Empty] = self[IntList.Empty]
-            elif rank == len(normalized_axes) and not keepdims:  # Reducing all
-                out[IntList.Empty] = self.sum_all()
-        else:
-            reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
-            for out_idx in out_shape:
-                var summ = Scalar[dtype](0)
-                for red_idx in reduced_shape:
-                    full_idx = out_idx.replace(
-                        normalized_axes, red_idx
-                    ) if keepdims else out_idx.insert(normalized_axes, red_idx)
-                    summ += self[full_idx]
-                out[out_idx] = summ
-
-        if self.requires_grad and track_grad:
-            out.requires_grad_(True)
-            backward_fn = SumBackward[dtype](
-                normalized_axes.copy(), keepdims
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self))
-
-        return out
+        return Summer[dtype].forward[True](self, axes, keepdims)
 
     fn mean(
-        self, axes: List[Int] = [], keepdims: Bool = False
+        self,
+        axes: List[Int] = [],
+        keepdims: Bool = False,
+        track_grad: Optional[Bool] = True,
     ) -> Tensor[dtype]:
-        return self.mean(IntList.new(axes), keepdims)
+        return self.mean(IntList.new(axes), keepdims, track_grad)
 
     fn mean(
-        self: Tensor[dtype], axes: IntList, keepdims: Bool = False
+        self: Tensor[dtype],
+        axes: IntList,
+        keepdims: Bool = False,
+        track_grad: Optional[Bool] = True,
     ) -> Tensor[dtype]:
         normalized_axes = Validator.validate_and_normalize_axes(
             self.shape, axes
         )
         count = self.shape.axes_spans.select(normalized_axes).product()
-        out = self.sum(normalized_axes, keepdims, track_grad=False) / Scalar[
-            dtype
-        ](count)
+        out = Summer[dtype].forward[False](
+            self, normalized_axes, keepdims
+        ) / Scalar[dtype](count)
 
-        if self.requires_grad:
+        requires_grad = track_grad.value() if track_grad else self.requires_grad
+
+        if requires_grad:
             out.requires_grad_(True)
             backward_fn = MeanBackward[dtype](
                 normalized_axes.copy(), keepdims
@@ -1993,7 +1968,9 @@ struct Tensor[dtype: DType = DType.float32](
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return Softmax[dtype].softmax(self, IntList.new(axes), requires_grad)
+        return Softmax[dtype].forward[True](
+            self, IntList.new(axes), requires_grad
+        )
 
     fn max(
         self,

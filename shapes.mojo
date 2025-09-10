@@ -160,7 +160,7 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
             dim = self[i]
             indices[i] = remaining % dim
             remaining //= dim
-            
+
         return indices
 
     @always_inline
@@ -196,6 +196,40 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
     fn __add__(self, other: List[Int]) -> Shape:
         dims = self.intlist() + IntList.new(other)
         return Shape(dims)
+
+    fn compute_output_shape(
+        self, normalized_axes: IntList, keepdims: Bool
+    ) -> Shape:
+        """Compute the output shape after reduction along specified axes.
+
+        Args:
+            normalized_axes: Sorted list of axes to reduce over.
+            keepdims: Whether to keep reduced dimensions as size 1.
+
+        Returns:
+            Shape after reduction
+
+        Behavior:
+            - If reducing all axes and keepdims=False → returns Shape.Void (scalar)
+            - Otherwise:
+                - For reduced axes: keep as 1 if keepdims=True, else remove
+                - For non-reduced axes: keep original size.
+        """
+        rank = self.rank()
+
+        # Full reduction case (return scalar shape if not keeping dims)
+        if rank == 0 or (len(normalized_axes) == rank and not keepdims):
+            return Shape.Void
+
+        var spans = IntList.with_capacity(rank)
+        for dim in range(rank):
+            if dim in normalized_axes:
+                if keepdims:
+                    spans.append(1)  # Keep reduced dim as size 1
+            else:
+                spans.append(self[dim])  # Keep original size
+
+        return Shape(spans)
 
     @always_inline
     @staticmethod

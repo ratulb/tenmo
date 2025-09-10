@@ -4,7 +4,11 @@ from operators import AddTensor
 from intlist import IntList
 from validators import Validator
 from backpropagation import Delegate, BackwardFn
-
+from summation import Summer
+from multiplication import Multiplicator
+from subtraction import Subtractor
+from division import Divider
+from minmax import MinMax
 
 alias SoftmaxOutput[dtype: DType] = List[(IntList, Scalar[dtype])]
 
@@ -26,12 +30,17 @@ struct SoftmaxBackward[dtype: DType](Copyable & Movable):
         softmax_out = Tensor[dtype].zeros(incoming.shape)
         for indices, value in self.softmax_out:
             softmax_out[indices] = rebind[Scalar[dtype]](value)
-        
-        sum_grad = (incoming * softmax_out).sum(
+       
+        product = Multiplicator[dtype].forward[False](incoming, softmax_out)
+        sum_grad = Summer[dtype].forward[False](product, self.axes, True) 
+        _="""sum_grad = (incoming * softmax_out).sum(
             self.axes, keepdims=True, track_grad=False
-        )
+        )"""
 
-        grad_share = softmax_out * (incoming - sum_grad)
+        #grad_share = softmax_out * (incoming - sum_grad)
+
+        diff = Subtractor[dtype].forward[False](incoming, sum_grad)
+        grad_share = Multiplicator[dtype].forward[False](softmax_out, diff)
 
         ancestor = output.ancestry().get(0)[]
         return [(ancestor, grad_share, AddTensor)]
@@ -41,7 +50,7 @@ struct SoftmaxBackward[dtype: DType](Copyable & Movable):
 @register_passable
 struct Softmax[dtype: DType]:
     @staticmethod
-    fn softmax(
+    fn forward[track_grad: Bool=True](
         this: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
@@ -49,31 +58,40 @@ struct Softmax[dtype: DType]:
         shape = this.shape
         # Normalize axes
         normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
-        max_vals = this.max(normalized_axes, keepdims=True, requires_grad=False)
+        #max_vals = this.max(normalized_axes, keepdims=True, requires_grad=False)
+        max_vals = MinMax[dtype].forward[True](this, normalized_axes, True, False)
         # Numerical stability: subtract max along axes
-        stable = this - max_vals
+        #stable = this - max_vals
+        stable = Subtractor[dtype].forward[False](this, max_vals)
         # Compute exponentials
-        stable_exp = stable.exp()
-        exp_sum = stable_exp.sum(
+        stable_exp = stable.exp()#Revisit
+        exp_sum = Summer[dtype].forward[False](stable_exp, normalized_axes, True)
+        _="""exp_sum = stable_exp.sum(
             normalized_axes, keepdims=True, track_grad=False
-        )
+        )"""
         # Softmax = exp(x) / sum(exp(x))
-        out = stable_exp / exp_sum
+        #out = stable_exp / exp_sum
+        out = Divider[dtype].forward[False](stable_exp, exp_sum)
 
-        grad_required = (
-            requires_grad.value() if requires_grad else this.requires_grad
-        )
+       
+        @parameter
+        if track_grad:
 
-        if grad_required:
-            out.requires_grad_(True)
-            softmax_out = SoftmaxOutput[dtype](capacity=out.numels())
-            for indices in out.shape:
-                softmax_out.append((indices, out[indices]))
-            backward_fn = SoftmaxBackward[dtype](
-                normalized_axes, softmax_out
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(this))
+            grad_required = (
+                requires_grad.value() if requires_grad else this.requires_grad
+            )
+     
+            if grad_required:
+                out.requires_grad_(True)
+                softmax_out = SoftmaxOutput[dtype](capacity=out.numels())
+                for indices in out.shape:
+                    softmax_out.append((indices, out[indices]))
+                backward_fn = SoftmaxBackward[dtype](
+                    normalized_axes, softmax_out
+                ).into_backward_fn()
+                out.backwardFn = Optional(backward_fn)
+                out.add_ancestry(TensorLite.of(this))
+
         return out
 
 

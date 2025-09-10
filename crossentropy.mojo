@@ -7,6 +7,8 @@ from math import log
 from subtraction import Subtractor
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
+from minmax import MinMax
+from summation import Summer
 
 
 @fieldwise_init
@@ -122,8 +124,10 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
             target: Ground truth of shape (N,) or (N, d1, d2, ...) with class indices.
         """
         # Validate inputs and get processed tensors
-        var (N, C, spatial_dims, logits_reshaped, target_reshaped) = 
+        # var (N, C, spatial_dims, logits_reshaped, target_reshaped) =
+        N, C, spatial_dims, logits_reshaped, target_reshaped = (
             Self.validate_cross_entropy_inputs[dtype](logits, target)
+        )
 
         # Compute softmax probabilities
         var log_softmax = self.log_softmax(logits_reshaped)
@@ -150,18 +154,24 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
 
         return out
 
-    
     fn log_softmax(self, logits: Tensor[dtype]) -> Tensor[dtype]:
         """Numerically stable log(softmax(x))."""
         # Subtract max for numerical stability
-        var max_vals = logits.max(
+        _ = """var max_vals = logits.max(
             IntList(1), keepdims=True, requires_grad=False
+        )"""
+        max_vals = MinMax.forward[max=True, track_grad=False](
+            logits, IntList(1), True, False
         )
-        var logits_stable = Subtractor[dtype].forward[False](logits, max_vals)
+        logits_stable = Subtractor[dtype].forward[False](logits, max_vals)
 
         # Compute log sum exp
-        var sum_exp = logits_stable.exp().sum(
+        logit_stable_exp = logits_stable.exp()
+        _ = """var sum_exp = logits_stable.exp().sum(
             IntList(1), keepdims=True, track_grad=False
+        )"""
+        sum_exp = Summer[dtype].forward[track_grad=False](
+            logit_stable_exp, IntList(1), True
         )
         var log_sum_exp = sum_exp.log(requires_grad=False)
 
@@ -218,12 +228,14 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
             return loss
 
     @staticmethod
-    fn validate_cross_entropy_inputs[dtype: DType](
-        logits: Tensor[dtype], target: Tensor[dtype]
-    ) -> Tuple[Int, Int, Int, Tensor[dtype], Tensor[dtype]]:
+    fn validate_cross_entropy_inputs[
+        dtype: DType
+    ](logits: Tensor[dtype], target: Tensor[dtype]) -> Tuple[
+        Int, Int, Int, Tensor[dtype], Tensor[dtype]
+    ]:
         """
         Validate CrossEntropyLoss inputs and return processed tensors.
-        
+
         Returns:
             N: batch size.
             C: number of classes.
@@ -233,7 +245,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         """
         var input_shape = logits.shape
         var target_shape = target.shape
-        
+
         # 1. Validate input ranks
         if input_shape.rank() < 2:
             panic("Input must have at least 2 dimensions")
@@ -251,7 +263,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                 + ", got "
                 + target_shape[0].__str__()
             )
-        
+
         # 3. Validate spatial dimensions match (if any)
         if target_shape.rank() > 1:
             for i in range(1, target_shape.rank()):
@@ -284,6 +296,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
             logits_reshaped = logits.reshape(Shape([N, C, 1]))
 
         return (N, C, spatial_dims, logits_reshaped, target_reshaped)
+
 
 fn main() raises:
     print("passes")
