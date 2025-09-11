@@ -143,8 +143,6 @@ struct Validator:
             Shape: Validated concrete shape (e.g., `Shape(2, 6, 10)`).
 
         """
-        if 0 in newdims:
-            panic("Tensor → reshape: can not construct shape with 0 dim")
         var estimated_size = 1
         var concrete_dims = IntList.with_capacity(len(newdims))
         var infer_index = -1
