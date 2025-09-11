@@ -4,8 +4,7 @@ from memory import Pointer
 
 
 fn main() raises:
-    idx = Shape([2, 3]).unravel_index(3)
-    print(idx)
+    pass
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
