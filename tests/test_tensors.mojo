@@ -3867,8 +3867,18 @@ fn test_max_min() raises:
     )
 
 
+fn test_mask() raises:
+    a = Tensor.arange(2 * 3).reshape(2, 3)
+    mask = (a != 2).float()
+    assert_true(
+        (mask == Tensor.d2([[1.0, 1.0, 0.0], [1.0, 1.0, 1.0]])).all_true(),
+        "Mask assertion failed",
+    )
+
+
 fn main() raises:
     print("Starting tensor test cases")
+    test_mask()
     test_count()
     test_max_min()
     test_max_min_mixed()
