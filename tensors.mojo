@@ -130,7 +130,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = other.requires_grad
         self.gradbox = other.gradbox
         self.ancestors = other.ancestors
-        # self.base = other.base.copy()
         self.base = other.base
         self.backwardFn = other.backwardFn
         self.owns_data = other.owns_data
@@ -404,7 +403,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
             panic(
-                "Tensor __eq__ → Dimension mismatch:",
+                "Tensor __eq__ → dimension mismatch:",
                 self.shape.__str__(),
                 ",",
                 other.shape.__str__(),
@@ -414,7 +413,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __ne__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
             panic(
-                "Tensor __ne__ → Dimension mismatch:",
+                "Tensor __ne__ → dimension mismatch:",
                 self.shape.__str__(),
                 ",",
                 other.shape.__str__(),
@@ -424,7 +423,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __lt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
             panic(
-                "Tensor __lt__ → Dimension mismatch:",
+                "Tensor __lt__ → dimension mismatch:",
                 self.shape.__str__(),
                 ",",
                 other.shape.__str__(),
@@ -434,7 +433,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __le__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
             panic(
-                "Tensor __le__ → Dimension mismatch:",
+                "Tensor __le__ → dimension mismatch:",
                 self.shape.__str__(),
                 ",",
                 other.shape.__str__(),
@@ -444,7 +443,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __gt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
             panic(
-                "Tensor __gt__ → Dimension mismatch:",
+                "Tensor __gt__ → dimension mismatch:",
                 self.shape.__str__(),
                 ",",
                 other.shape.__str__(),
@@ -454,7 +453,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __ge__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         if self.shape != other.shape:
             panic(
-                "Tensor __ge__ → Dimension mismatch:",
+                "Tensor __ge__ → dimension mismatch:",
                 self.shape.__str__(),
                 ",",
                 other.shape.__str__(),
@@ -570,6 +569,16 @@ struct Tensor[dtype: DType = DType.float32](
                 if abs(value1 - value2).gt(atol + rtol * abs(value2)):
                     return False
             return True
+
+    fn count(self, key: Scalar[dtype]) -> Int:
+        if self.owns_data:
+            return self.buffer.count(key)
+        else:
+            count = 0
+            for coord in self.shape:
+                if key == self[coord]:
+                    count += 1
+            return count
 
     @always_inline
     fn data_buffer(self) -> Buffer[dtype]:
@@ -1961,6 +1970,13 @@ struct Tensor[dtype: DType = DType.float32](
             self, IntList.new(axes), requires_grad
         )
 
+    fn softmax(
+        self,
+        axes: IntList,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Softmax[dtype].forward[True](self, axes, requires_grad)
+
     fn max(
         self,
         axes: List[Int] = [],
@@ -2324,45 +2340,7 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    z = Tensor[DType.int64].d3(
-        [
-            [[0], [2]],
-            [[3], [1]],
-        ],
-        requires_grad=False,
-    )
-    z.print()
-    print()
-    onehot = z.onehot(5)
-    onehot.print()
-    _ = """softmax_res = z.softmax([1])
-    softmax_res.print()
-    softmax_res.backward()"""
+    pass
 
-    print()
 
-    # z.gradbox[].print()
-
-    _ = """a = Tensor.d2([[1, 2, 3], [4, 5, 6]], requires_grad=True) 
-    b = Tensor.d1([2, 1, 3], requires_grad=True)      # shape (3,)
-
-    # Broadcast b to (2, 3): [[2, 1, 3],
-    #                         [2, 1, 3]]
-    c = b / a #= [[0.5, 2.0, 1.0],  [2.0, 5.0, 2.0]]
-    
-    c.print()
-    c.backward()
-
-    a.gradbox[].print()
-    print()
-    b.gradbox[].print()"""
-
-    _ = """a = Tensor.arange(100)
-    v = a[slice(-1, 49, -1)]
-    logs = v.log()
-    logs.print()
-    # print("contiguous: ", v.is_contiguous())
-    # a.print()
-    _ = a
-    # print(min_finite[DType.float32]())
-    pass"""
+from testing import assert_true
