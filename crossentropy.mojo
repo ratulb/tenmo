@@ -145,10 +145,15 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
 
     fn __init__(
         out self,
-        reduction: Int = 0,
-        ignore_index: Int = -1,
+        reduction: Int = 0,  # Default to mean reduction
+        ignore_index: Int = -100,
         label_smoothing: Scalar[dtype] = Scalar[dtype](0),
     ):
+        # Validate reduction parameter
+        if reduction < 0 or reduction > 2:
+            panic(
+                "Invalid reduction type. Must be 0 (mean), 1 (sum), or 2 (none)"
+            )
         self.reduction = reduction
         self.ignore_index = ignore_index
         self.label_smoothing = label_smoothing
@@ -165,13 +170,10 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         Unified implementation that handles all shapes the same way.
         """
 
-        # 1. Validate basic input shapes
-        if logits.rank() < 2:
-            panic("Logits must have at least 2 dimensions")
-        if target.rank() != logits.rank() - 1:
-            panic("Target must have one fewer dimension than logits")
-        if logits.shape[0] != target.shape[0]:
-            panic("Batch size mismatch between logits and target")
+        # 1. Validate inputs thoroughly
+        Self.validate_cross_entropy_inputs[dtype](
+            logits, target, self.ignore_index
+        )
 
         # 2. Reshape to unified 2D format: (total_elements, C)
         var N = logits.shape[0]
@@ -225,26 +227,23 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                 # Standard cross entropy
                 losses[m] = -log_probs[m, class_idx]
 
-        # 6. Apply reduction
-        var out: Tensor[dtype] = losses
+        # 6. Apply reduction - FIXED: Ensure 'out' is always initialized
+        var out: Tensor[dtype]
 
         if self.reduction == 2:  # none
             # Reshape back to original target shape
             out = losses.reshape(target.shape)
-        else:
-            if self.reduction == 0:  # mean
-                if valid_count > 0:
-                    var total_loss = losses.sum()
-                    out = Tensor.scalar(
-                        total_loss.item() / Scalar[dtype](valid_count)
-                    )
-                else:
-                    out = Tensor.scalar(Scalar[dtype](0))
-            elif self.reduction == 1:  # sum
+        elif self.reduction == 1:  # sum
+            var total_loss = losses.sum()
+            out = Tensor.scalar(total_loss.item())
+        else:  # mean (default case - reduction == 0 or any other value)
+            if valid_count > 0:
                 var total_loss = losses.sum()
-                out = Tensor.scalar(total_loss.item())
+                out = Tensor.scalar(
+                    total_loss.item() / Scalar[dtype](valid_count)
+                )
             else:
-                panic("Invalid reduction type: " + self.reduction.__str__())
+                out = Tensor.scalar(Scalar[dtype](0))
 
         # Setup autograd if needed
         @parameter
