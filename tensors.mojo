@@ -1962,21 +1962,21 @@ struct Tensor[dtype: DType = DType.float32](
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
         return Unsqueeze[dtype].unsqueeze(self, axes, requires_grad)
 
-    fn softmax(
+    fn softmax[track_grad: Bool = True](
         self,
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return Softmax[dtype].forward[True](
+        return Softmax[dtype].forward[track_grad](
             self, IntList.new(axes), requires_grad
         )
 
-    fn softmax(
+    fn softmax[track_grad: Bool=True](
         self,
         axes: IntList,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return Softmax[dtype].forward[True](self, axes, requires_grad)
+        return Softmax[dtype].forward[track_grad](self, axes, requires_grad)
 
     fn max(
         self,
