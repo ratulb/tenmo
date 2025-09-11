@@ -1341,54 +1341,55 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn reshape(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
+    fn reshape[
+        track_grad: Bool = True
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         if self.numels() != 1:
             panic(
                 "Tensor → reshape: only tensor with single element can be"
                 " reshaped to scalar tensor"
             )
-        return self.reshape(Shape.Void, requires_grad)
+        return self.reshape[track_grad](
+            Shape.Void, requires_grad=requires_grad, validated=True
+        )
 
-    fn reshape(
-        self, *newdims: Int, requires_grad: Optional[Bool] = None
-    ) -> Tensor[dtype]:
+    fn reshape[
+        track_grad: Bool = True
+    ](self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
         if len(newdims) == 1 and newdims[0] == 0:
-            return self.reshape(requires_grad)
+            return self.reshape[track_grad](requires_grad=requires_grad)
         shape = Validator.validate_and_construct_new_shape(
             self.shape, IntList(newdims)
         )
-        return self.reshape(shape, requires_grad, validated=True)
+        return self.reshape[track_grad](
+            shape, requires_grad=requires_grad, validated=True
+        )
 
-    fn reshape(
-        self, shape: List[Int], requires_grad: Optional[Bool] = None
-    ) -> Tensor[dtype]:
+    fn reshape[
+        track_grad: Bool = True
+    ](self, shape: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
         new_shape = Validator.validate_and_construct_new_shape(
             self.shape, IntList.new(shape)
         )
-        return self.reshape(new_shape, requires_grad, validated=True)
+        return self.reshape[track_grad](
+            new_shape, requires_grad=requires_grad, validated=True
+        )
 
-    fn reshape(
+    fn reshape[
+        track_grad: Bool = True
+    ](
         self,
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[dtype]:
-        shape = new_shape if validated else Validator.validate_and_construct_new_shape(
-            self.shape, new_shape.intlist()
+        return Reshape[dtype].forward[track_grad](
+            self, new_shape, requires_grad, validated
         )
-
-        grad_required = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
-        buffer = self.buffer if self.owns_data else self.base_address()[].buffer
-        out = Tensor[dtype](shape, buffer, grad_required)
-
-        if grad_required:
-            backward_fn = ReshapeBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite[dtype].of(self))
-
-        return out
 
     fn transpose(
         self, *axes: Int, requires_grad: Optional[Bool] = None
@@ -2340,7 +2341,14 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
+    test_mask()
 
 
 from testing import assert_true
+
+
+fn test_mask() raises:
+    a = Tensor.arange(2 * 3).reshape(2, 3)
+    mask = (a != 2).float()
+    mask = mask.reshape(1, 1, 6)
+    mask.print()

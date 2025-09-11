@@ -11,7 +11,7 @@ from subtraction import (
     Subtractor,
 )
 from broadcastbackward import BroadcastBackward
-from reshapebackward import ReshapeBackward
+from reshape import ReshapeBackward, Reshape
 from multiplication import (
     MultiplyBackward,
     MulBackwardScalar,

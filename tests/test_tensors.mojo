@@ -12,6 +12,22 @@ from strides import Strides
 
 alias Boolean = Scalar[DType.bool]
 
+
+fn test_count() raises:
+    scalar = Tensor.scalar(10)
+    assert_true(scalar.count(10) == 1, "Scalar count assertion 1 failed")
+    assert_true(scalar.count(42) == 0, "Scalar count assertion 2 failed")
+
+    full = Tensor.full([2, 3, 4], 42)
+    assert_true(full.count(42) == 24, "Tensor count assertion 3 failed")
+
+    v = full[i(0), s(), s()]
+    v2 = full[i(1), s(), s()]
+
+    assert_true(v.count(42) == 12, "Tensor view count assertion 4 failed")
+    assert_true(v2.count(42) == 12, "Tensor view count assertion 5 failed")
+
+
 fn test_reshape_slice_sum_backward() raises:
     print("test_reshape_slice_sum_backward")
     var a = Tensor.arange(6, requires_grad=True)
@@ -22,7 +38,6 @@ fn test_reshape_slice_sum_backward() raises:
     ss.backward()
     var expected_grad = Tensor.d1([0, 1, 1, 0, 0, 0])
     assert_true((a.gradbox[] == expected_grad).all_true())
-
 
     # Full slice
     # var full_slice = r[s(), s()]
@@ -3178,6 +3193,7 @@ fn test_reshape_exp() raises:
     result = tensor3 * 12
     result.backward()
 
+
 fn test_validate_matmul_last_2_dims() raises:
     print("test_validate_matmul_last_2_dims")
     a = Tensor.arange(2 * 3 * 5 * 4, requires_grad=True)
@@ -3186,10 +3202,18 @@ fn test_validate_matmul_last_2_dims() raises:
     b_reshaped = b.reshape(4, 5)
     result = a_reshaped.matmul(b_reshaped)
     result.backward()
-    #a.gradbox[].reshape(2, 3, 5, 4).print()
-    expected = Tensor.d2([[1740, 1740, 1740, 1740, 1740],[1770, 1770, 1770, 1770, 1770],[1800, 1800, 1800, 1800, 1800], [1830, 1830, 1830, 1830, 1830]])
-
-    assert_true((b.gradbox[].reshape(4, 5) == expected).all_true(), "batched tensor multiplication assertion failed")
+    expected = Tensor.d2(
+        [
+            [1740, 1740, 1740, 1740, 1740],
+            [1770, 1770, 1770, 1770, 1770],
+            [1800, 1800, 1800, 1800, 1800],
+            [1830, 1830, 1830, 1830, 1830],
+        ]
+    )
+    assert_true(
+        (b.gradbox[].reshape(4, 5) == expected).all_true(),
+        "batched tensor multiplication assertion failed",
+    )
 
 
 fn test_tensor_dot() raises:
@@ -3309,6 +3333,7 @@ fn test_matrix_matrix_matmul() raises:
     assert_true(
         c.all_close(Tensor.d3([[[31, 34], [71, 78]], [[155, 166], [211, 226]]]))
     )
+
 
 fn test_batched_matrix_matmul() raises:
     print("test_batched_matrix_matmul")
@@ -3440,6 +3465,7 @@ fn test_batched_matrix_vector_matmul() raises:
     )
     assert_true(b.gradbox[].all_close(Tensor.d2([[22, 26, 30], [22, 26, 30]])))
 
+
 fn test_matrix_vector_mm_simple() raises:
     print("test_matrix_vector_mm_simple")
     var A = Tensor.d2([[1, 2], [3, 4]])  # (2,2)
@@ -3555,6 +3581,7 @@ fn test_matrix_vector_mm_backward_b_deeper_batch() raises:
     var expected_grad = Tensor.d1([36, 42])
     assert_true(b.gradbox[].all_close(expected_grad))
 
+
 fn test_batched_matmul_vector_rhs_broadcast() raises:
     print("test_batched_matmul_vector_rhs_broadcast")
     # A: (2,3,4)  v: (4,)  -> out (2,3)
@@ -3573,6 +3600,7 @@ fn test_batched_matmul_vector_rhs_broadcast() raises:
     out.backward()
     # dv = sum over all A elements per position count (each v_k used 6 times)
     assert_true(v.gradbox[].all_close(Tensor.d1([60, 66, 72, 78])))
+
 
 fn test_vector_matrix_mm_simple() raises:
     print("test_vector_matrix_mm_simple")
@@ -3631,7 +3659,7 @@ fn test_vector_matrix_mm_batched_matrix() raises:
     )
     var y = a.matmul(b)
     y.backward()
-    #var y = a.matmul(b)  # expected shape (2,2): (batch, m)
+    # var y = a.matmul(b)  # expected shape (2,2): (batch, m)
     # For batch 0: [1,2] @ [[1,2],[3,4]] = [7,10]
     # For batch 1: [1,2] @ [[5,6],[7,8]] = [19,22]
     var expected = Tensor.d2([[7, 10], [19, 22]])
@@ -3669,9 +3697,10 @@ fn test_vector_matrix_mm_backward_batched_matrix_matrix_grad() raises:
     var expected_grad = Tensor.d3([[[3, 3], [4, 4]], [[3, 3], [4, 4]]])
     assert_true(b.gradbox[].all_close(expected_grad))
 
+
 fn test_max_min_mixed() raises:
     print("test_max_min")
-    
+
     # Test 1: Basic max reduction along axis 1
     var a = Tensor.d2(
         [[42.0, 0.0, -5.0], [0.0, 35.0, 0.0], [51.0, 0.0, 51.0]],
@@ -3760,77 +3789,50 @@ fn test_max_min_mixed() raises:
 
     # Test 7: Multiple axes reduction
     var b = Tensor.d3(
-        [
-            [[1.0, 2.0], [3.0, 4.0]],
-            [[5.0, 6.0], [7.0, 8.0]]
-        ],
-        requires_grad=True
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
-    
+
     var max_axes_01 = b.max(IntList([0, 1]))
     assert_true(max_axes_01.all_close(Tensor.d1([7.0, 8.0]).float()))
     max_axes_01.backward()
     assert_true(
         b.gradbox[].all_close(
             Tensor.d3(
-                [
-                    [[0.0, 0.0], [0.0, 0.0]],
-                    [[0.0, 0.0], [1.0, 1.0]]
-                ]
+                [[[0.0, 0.0], [0.0, 0.0]], [[0.0, 0.0], [1.0, 1.0]]]
             ).float()
         )
     )
 
     # Test 8: Edge case - all same values
-    var c = Tensor.d2(
-        [[5.0, 5.0], [5.0, 5.0]],
-        requires_grad=True
-    )
-    
+    var c = Tensor.d2([[5.0, 5.0], [5.0, 5.0]], requires_grad=True)
+
     var max_same = c.max(IntList(1))
     assert_true(max_same.all_close(Tensor.d1([5.0, 5.0]).float()))
     max_same.backward()
     assert_true(
-        c.gradbox[].all_close(
-            Tensor.d2(
-                [[0.5, 0.5], [0.5, 0.5]]
-            ).float()
-        )
+        c.gradbox[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]]).float())
     )
 
     # Test 9: Edge case - negative infinity
-    var d = Tensor.d2(
-        [[-3.4028235e+38, 0.0], [1.0, 2.0]],
-        requires_grad=True
-    )
-    
+    var d = Tensor.d2([[-3.4028235e38, 0.0], [1.0, 2.0]], requires_grad=True)
+
     var max_with_inf = d.max(IntList(1))
     assert_true(max_with_inf.all_close(Tensor.d1([0.0, 2.0]).float()))
     max_with_inf.backward()
     assert_true(
-        d.gradbox[].all_close(
-            Tensor.d2(
-                [[0.0, 1.0], [0.0, 1.0]]
-            ).float()
-        )
+        d.gradbox[].all_close(Tensor.d2([[0.0, 1.0], [0.0, 1.0]]).float())
     )
 
     # Test 10: Keep dimensions
-    var e = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0]],
-        requires_grad=True
-    )
-    
+    var e = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+
     var max_keepdim = e.max(IntList(1), keepdims=True)
     assert_true(max_keepdim.all_close(Tensor.d2([[2.0], [4.0]]).float()))
     max_keepdim.backward()
     assert_true(
-        e.gradbox[].all_close(
-            Tensor.d2(
-                [[0.0, 1.0], [0.0, 1.0]]
-            ).float()
-        )
+        e.gradbox[].all_close(Tensor.d2([[0.0, 1.0], [0.0, 1.0]]).float())
     )
+
 
 fn test_max_min() raises:
     print("test_max_min")
@@ -3867,6 +3869,7 @@ fn test_max_min() raises:
 
 fn main() raises:
     print("Starting tensor test cases")
+    test_count()
     test_max_min()
     test_max_min_mixed()
     test_vector_matrix_matmul()
@@ -4024,7 +4027,7 @@ fn main() raises:
     test_powering()
     test_invert()
     test_negate_absolute()
-    #test_exponentiation()
+    # test_exponentiation()
     test_inplace_update()
     test_grad_update()
     test_grads_on_tensor_init()
@@ -4046,7 +4049,7 @@ fn main() raises:
     test_matrix_vector_mm_simple()
     test_matrix_vector_mm_backward_A()
     test_matrix_vector_mm_backward_b()
-    test_matrix_vector_mm_backward_b_batched()    
+    test_matrix_vector_mm_backward_b_batched()
     test_matrix_vector_mm_deeper_batch_forward()
     test_matrix_vector_mm_backward_b_deeper_batch()
     test_batched_matmul_vector_rhs_broadcast()
@@ -4062,6 +4065,3 @@ fn main() raises:
     test_vector_matrix_mm_backward_batched_matrix_matrix_grad()
     test_large_tensor_backprop()
     print("Finished running tensor test cases")
-
-
-
