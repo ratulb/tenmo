@@ -96,6 +96,7 @@ fn test_gradcheck1() raises:
         dtype: DType
     ](logits: Tensor[dtype], target: Tensor[dtype]) -> Tensor[dtype]:
         var criterion = CrossEntropyLoss[dtype]()
+        # print("ce logits/target shapes: ", logits.shape, target.shape)
         return criterion(logits, target)
 
     var passed = gradcheck_param(
@@ -148,4 +149,5 @@ fn test_gradcheck2() raises:
 
 
 fn main() raises:
+    test_gradcheck1()
     test_gradcheck2()
