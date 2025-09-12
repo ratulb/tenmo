@@ -3876,8 +3876,139 @@ fn test_mask() raises:
     )
 
 
+fn test_randint() raises:
+    print("test_randint")
+    low = 10
+    high = 30
+    a = Tensor.randint([3, 4], low, high)
+    count_low = a.count(low)
+    count_high = a.count(high)
+    assert_true(
+        count_low >= 0 and count_high == 0,
+        "randint low and high count assertion failed",
+    )
+
+
+# ===================== SINGLE-AXIS SLICES =====================
+
+
+fn test_slice_single_axis() raises:
+    print("test_slice_single_axis")
+    x = Tensor.arange(0, 12).reshape([3, 4])
+
+    y = x.slice(1, 3)  # slice along axis 0 (rows 1..2)
+    z = x.slice(0, 4, 2, 1)  # slice along axis 1 (cols 0,2)
+
+    assert_true(
+        (
+            y
+            == Tensor.d2([[4.0, 5.0, 6.0, 7.0], [8.0, 9.0, 10.0, 11.0]]).float()
+        ).all_true()
+    )
+    assert_true(
+        (
+            z == Tensor.d2([[0.0, 2.0], [4.0, 6.0], [8.0, 10.0]]).float()
+        ).all_true()
+    )
+
+
+fn test_slice_single_axis_positive() raises:
+    print("test_slice_single_axis_positive")
+    var x = Tensor.arange(0, 10).reshape([10])
+    var y = x.slice(axes=[0], starts=[2], ends=[7])
+    assert_true((y == Tensor.arange(2, 7)).all_true())
+
+
+fn test_slice_single_axis_negative_indices() raises:
+    print("test_slice_single_axis_negative_indices")
+    var x = Tensor.arange(0, 10).reshape([10])
+    var y = x.slice(axes=[0], starts=[-7], ends=[-2])
+    assert_true((y == Tensor.arange(3, 8)).all_true())
+
+
+fn test_slice_single_axis_step_greater_than_1() raises:
+    print("test_slice_single_axis_step_greater_than_1")
+    var x = Tensor.arange(0, 10).reshape([10])
+    var y = x.slice(axes=[0], starts=[1], ends=[9], steps=[2])
+    assert_true((y == Tensor([1, 3, 5, 7])).all_true())
+
+
+fn test_slice_single_axis_step_negative() raises:
+    print("test_slice_single_axis_step_negative")
+    var x = Tensor.arange(0, 10).reshape([10])
+    var y = x.slice(axes=[0], starts=[8], ends=[2], steps=[-2])
+    assert_true((y == Tensor([8, 6, 4])).all_true())
+
+
+fn test_slice_single_axis_full_axis() raises:
+    print("test_slice_single_axis_full_axis")
+    var x = Tensor.arange(0, 5).reshape([5])
+    var y = x.slice(axes=[0], starts=[0], ends=[5])
+    assert_true((y == x).all_true())
+
+
+fn test_slice_single_axis_single_element() raises:
+    print("test_slice_single_axis_single_element")
+    var x = Tensor.arange(0, 5).reshape([5])
+    var y = x.slice(axes=[0], starts=[2], ends=[3])
+    assert_true((y == Tensor([2])).all_true())
+
+
+# ===================== MULTI-AXIS SLICES =====================
+
+
+fn test_slice_multi_axis_basic() raises:
+    print("test_slice_multi_axis_basic")
+    var x = Tensor.arange(0, 24).reshape([4, 6])
+    var y = x.slice(axes=[0, 1], starts=[1, 2], ends=[3, 5])
+    assert_true((y == Tensor.d2([[8, 9, 10], [14, 15, 16]])).all_true())
+
+
+fn test_slice_multi_axis_negative_indices() raises:
+    print("test_slice_multi_axis_negative_indices")
+    var x = Tensor.arange(0, 24).reshape([4, 6])
+    var y = x.slice(axes=[0, 1], starts=[-3, -4], ends=[-1, -1])
+    assert_true((y == Tensor.d2([[8, 9, 10], [14, 15, 16]])).all_true())
+
+
+fn test_slice_multi_axis_step() raises:
+    print("test_slice_multi_axis_step")
+    var x = Tensor.arange(0, 24).reshape([4, 6])
+    var y = x.slice(axes=[0, 1], starts=[0, 0], ends=[4, 6], steps=[2, 3])
+    assert_true((y == Tensor.d2([[0, 3], [12, 15]])).all_true())
+
+
+fn test_slice_multi_axis_mixed() raises:
+    print("test_slice_multi_axis_mixed")
+    var x = Tensor.arange(0, 24).reshape([4, 6])
+    var y = x.slice(axes=[0, 1], starts=[3, 5], ends=[0, 0], steps=[-1, -2])
+    var expected = Tensor.d2([[23, 21, 19], [17, 15, 13], [11, 9, 7]])
+    assert_true((y == expected).all_true())
+
+    assert_true(
+        (
+            y.transpose() == Tensor.d2([[23, 17, 11], [21, 15, 9], [19, 13, 7]])
+        ).all_true()
+    )
+    _ = y
+    _ = x
+
+
 fn main() raises:
     print("Starting tensor test cases")
+    test_randint()
+    test_slice_single_axis()
+    test_slice_single_axis_positive()
+    test_slice_single_axis_negative_indices()
+    test_slice_single_axis_step_greater_than_1()
+    test_slice_single_axis_step_negative()
+    test_slice_single_axis_full_axis()
+    test_slice_single_axis_single_element()
+    test_slice_multi_axis_basic()
+    test_slice_multi_axis_negative_indices()
+    test_slice_multi_axis_step()
+    test_slice_multi_axis_mixed()
+
     test_mask()
     test_count()
     test_max_min()
