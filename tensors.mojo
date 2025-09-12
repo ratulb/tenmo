@@ -7,7 +7,7 @@ from sys import simdwidthof
 from utils.numerics import max_finite, min_finite
 from os import abort
 from memory import memcpy, memset, memset_zero
-from shapes import Shape
+from shapes import Shape, ShapeIndexIter
 from intlist import IntList
 from ancestry import Ancestors
 from strides import Strides
@@ -538,8 +538,8 @@ struct Tensor[dtype: DType = DType.float32](
                 buffer = buffer.log()
                 memcpy(out.buffer.data, buffer.data, numels)
         else:
-            for indices in self.shape:
-                out[indices] = log(self[indices])
+            for idx, value in self:
+                out[idx] = log(value)
 
         return out
 
@@ -563,10 +563,9 @@ struct Tensor[dtype: DType = DType.float32](
         if self.owns_data and other.owns_data:
             return self.buffer.all_close[simd_width, rtol, atol](other.buffer)
         else:
-            for indices in self.shape:
-                value1 = self[indices]
-                value2 = other[indices]
-                if abs(value1 - value2).gt(atol + rtol * abs(value2)):
+            for coord, value in self:
+                other_value = other[coord]
+                if abs(value - other_value).gt(atol + rtol * abs(other_value)):
                     return False
             return True
 
@@ -662,8 +661,11 @@ struct Tensor[dtype: DType = DType.float32](
         tensor.fill(value)
         return tensor
 
+    alias randint = Tensor[DType.int64].randnint
+    alias randint32 = Tensor[DType.int32].randnint
+
     @staticmethod
-    fn randint(
+    fn randnint(
         shape: List[Int],
         low: Scalar[dtype] = 0,
         high: Scalar[dtype] = 1,
@@ -676,21 +678,6 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         return Self.rand(Shape(shape), low, high, init_seed, requires_grad)
-
-    @staticmethod
-    fn randint(
-        *axes_spans: Int,
-        low: Scalar[dtype] = 0,
-        high: Scalar[dtype] = 1,
-        init_seed: Optional[Int] = None,
-        requires_grad: Bool = False,
-    ) -> Tensor[dtype]:
-        constrained[
-            dtype.is_integral(),
-            "Tensor → randint: is supported only for integral type",
-        ]()
-
-        return Self.rand(Shape(axes_spans), low, high, init_seed, requires_grad)
 
     @staticmethod
     fn rand(
@@ -1046,13 +1033,13 @@ struct Tensor[dtype: DType = DType.float32](
             return self.buffer.sum()
         else:
             if self._contiguous:
-                return self.base_address()[].buffer.sum(
+                return self.base[].buffer.sum(
                     self.offset, self.max_index() + self.offset + 1
                 )
             else:
                 summ = Scalar[dtype](0)
-                for indices in self.shape:
-                    summ += self[indices]
+                for _, value in self:
+                    summ += value
                 return summ
 
     fn broadcast_to(self, target_shape: Shape) -> Tensor[dtype]:
@@ -1418,8 +1405,8 @@ struct Tensor[dtype: DType = DType.float32](
                     out.buffer.data, self.base[].buffer.data + offset, numels
                 )
         else:
-            for indices in shape:
-                out[indices] = self[indices]
+            for idx, value in self:
+                out[idx] = value
 
         if grad_required:
             strides = self.strides
@@ -1735,8 +1722,8 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             buffer = Buffer[dtype](self.numels())
             tensor = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                tensor[indices] = exp(self[indices])
+            for idx, value in self:
+                tensor[idx] = exp(value)
             return tensor
 
     fn __neg__(self) -> Tensor[dtype]:
@@ -1749,8 +1736,8 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             buffer = Buffer[dtype](self.numels())
             tensor = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                tensor[indices] = -self[indices]
+            for idx, value in self:
+                tensor[idx] = -value
             return tensor
 
     fn __invert__(self: Tensor[DType.bool]) -> Tensor[DType.bool]:
@@ -1759,8 +1746,8 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             buffer = Buffer[DType.bool](self.numels())
             tensor = Tensor[DType.bool](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                tensor[indices] = ~self[indices]
+            for idx, value in self:
+                tensor[idx] = ~value
             return tensor
 
     fn __abs__(self) -> Tensor[dtype]:
@@ -1773,8 +1760,8 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             buffer = Buffer[dtype](self.numels())
             tensor = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                tensor[indices] = abs(self[indices])
+            for idx, value in self:
+                tensor[idx] = abs(value)
             return tensor
 
     fn __radd__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
@@ -1800,8 +1787,8 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             buffer = Buffer[dtype](self.numels())
             out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                out[indices] = self[indices] ** exponent
+            for idx, value in self:
+                out[idx] = value**exponent
 
         if self.requires_grad:
             backward_fn = ExponientionBackward[dtype](
@@ -2435,32 +2422,44 @@ struct Tensor[dtype: DType = DType.float32](
                 current_shape = result.shape
         return result
 
+    fn __iter__(ref self) -> ElemIterator[dtype, __origin_of(self)]:
+        return ElemIterator[dtype, __origin_of(self)](Pointer(to=self))
+
+
+@fieldwise_init
+@register_passable
+struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable):
+    var src: Pointer[Tensor[dtype], origin]
+    var index_itr: ShapeIndexIter[ImmutableAnyOrigin]
+
+    fn __init__(out self, src: Pointer[Tensor[dtype], origin]):
+        self.src = src
+        self.index_itr = rebind[ShapeIndexIter[ImmutableAnyOrigin]](
+            src[].shape.__iter__()
+        )
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(mut self) -> (IntList, Scalar[dtype]):
+        next = self.index_itr.__next__()
+        return next, self.src[][next]
+
+    fn __len__(self) -> Int:
+        return self.index_itr.__len__()
+
+    fn __has_next__(self) -> Bool:
+        return self.index_itr.__has_next__()
+
 
 fn main() raises:
-    _ = """a = Tensor[DType.int32].randint(3, 4, low=10, high=30)
-    a.print()"""
-    x = Tensor.arange(0, 12).reshape([3, 4])
+    a = Tensor.d1([1, 2, 3])  # shape (3,)
+    b = a.expand(2, 3)  # → shape (2, 3), rows share memory
 
-    y = x.slice(1, 3)  # slice along axis 0 (rows 1..2)
-    z = x.slice(0, 4, 2, 1)  # slice along axis 1 (cols 0,2)
-    x.print()
-    print()
-    y.print()
-    print()
-    z.print()
+    for idx, value in a:
+        print("idx: ", idx, " value: ", value)
 
-    x = Tensor.arange(0, 24).reshape([4, 6])
-    print()
-    x.print()
-
-    # Slice axis 0: 1:3, axis 1: 0:6:2
-    y = x.slice(axes=[0, 1], starts=[1, 0], ends=[3, 6], steps=[1, 2])
-    print()
-    y.print()
-    print()
-    # Negative indexing
-    z = x.slice(axes=[0, 1], starts=[-3, -5], ends=[-1, -1])
-    z.print()
+    b.print()
 
 
 from testing import assert_true
