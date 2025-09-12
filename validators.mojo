@@ -179,6 +179,180 @@ struct Validator:
 
     @always_inline
     @staticmethod
+    fn validate_and_compute_slice_metadata(
+        original_shape: Shape,
+        original_strides: Strides,
+        axis: Int,
+        start: Int,
+        end: Int,
+        step: Int = 1,
+    ) -> Tuple[Shape, Strides, Int]:
+        """
+        Compute new shape, strides, and offset for a single-axis slice.
+
+        Args:
+            original_shape: Shape of the tensor.
+            original_strides: Strides of the tensor.
+            axis: Axis to slice (can be negative).
+            start: Slice start index.
+            end: Slice end index.
+            step: Slice step (cannot be 0).
+
+        Returns:
+            Tuple of (new_shape, new_strides, new_offset).
+        """
+
+        # Normalize axis
+        var actual_axis = axis
+        if actual_axis < 0:
+            actual_axis += original_shape.rank()
+        if actual_axis < 0 or actual_axis >= original_shape.rank():
+            panic(
+                "Axis ",
+                String(axis),
+                " out of bounds for tensor of rank ",
+                String(original_shape.rank()),
+            )
+
+        # Validate step
+        if step == 0:
+            panic("Slice step cannot be zero")
+
+        # Prepare new shape, strides, offset
+        var new_shape: IntList = IntList.with_capacity(original_shape.rank())
+        var new_strides: IntList = IntList.with_capacity(original_shape.rank())
+        var new_offset: Int = 0
+
+        for i in range(original_shape.rank()):
+            var dim = original_shape[i]
+            var stride = original_strides[i]
+
+            if i == actual_axis:
+                # Adjust negative indices
+                var _start = start + dim if start < 0 else start
+                var _end = end + dim if end < 0 else end
+
+                # Clamp to bounds
+                _start = max(0, min(_start, dim))
+                _end = max(0, min(_end, dim))
+
+                # Compute length like Python slice
+                var length = 0
+                if step > 0 and _start < _end:
+                    length = (_end - _start + step - 1) // step
+                elif step < 0 and _start > _end:
+                    length = (_start - _end - step - 1) // (-step)
+
+                new_shape.append(length)
+                new_strides.append(stride * step)
+                new_offset += _start * stride
+            else:
+                new_shape.append(dim)
+                new_strides.append(stride)
+
+        return Shape(new_shape), Strides(new_strides), new_offset
+
+    @always_inline
+    @staticmethod
+    fn validate_and_compute_slice_metadata_multi(
+        original_shape: Shape,
+        original_strides: Strides,
+        axes: IntList,
+        starts: IntList,
+        ends: IntList,
+        steps: IntList,
+    ) -> Tuple[Shape, Strides, Int]:
+        """
+        Compute new shape, strides, offset for multi-axis slicing.
+
+        Args:
+            original_shape: Shape of the tensor.
+            original_strides: Strides of the tensor.
+            axes: List of axes to slice (can be negative).
+            starts: List of start indices.
+            ends: List of end indices.
+            steps: List of steps (cannot be 0).
+
+        Returns:
+            Tuple of (new_shape, new_strides, new_offset).
+        """
+
+        var rank = original_shape.rank()
+        if (
+            axes.len() != starts.len()
+            or axes.len() != ends.len()
+            or axes.len() != steps.len()
+        ):
+            panic("axes, starts, ends, steps must all have same length")
+
+        # Normalize axes
+        var actual_axes: IntList = IntList.with_capacity(axes.len())
+        for a in axes:
+            var axis = a
+            if axis < 0:
+                axis += rank
+            if axis < 0 or axis >= rank:
+                panic(
+                    "Axis ",
+                    String(a),
+                    " out of bounds for tensor of rank ",
+                    String(rank),
+                )
+            actual_axes.append(axis)
+
+        # Prepare new shape, strides, offset
+        var new_shape: IntList = IntList.with_capacity(rank)
+        var new_strides: IntList = IntList.with_capacity(rank)
+        var new_offset: Int = 0
+
+        for i in range(rank):
+            var dim = original_shape[i]
+            var stride = original_strides[i]
+
+            # Check if this axis is sliced
+            var idx = -1
+            for j in range(actual_axes.len()):
+                if actual_axes[j] == i:
+                    idx = j
+                    break
+
+            if idx != -1:
+                # This axis is sliced
+                var start = starts[idx]
+                var end = ends[idx]
+                var step = steps[idx]
+
+                if step == 0:
+                    panic("Slice step cannot be zero")
+
+                # Adjust negative indices
+                var _start = start + dim if start < 0 else start
+                var _end = end + dim if end < 0 else end
+
+                # Clamp to bounds
+                _start = max(0, min(_start, dim))
+                _end = max(0, min(_end, dim))
+
+                # Compute length
+                var length = 0
+                if step > 0 and _start < _end:
+                    length = (_end - _start + step - 1) // step
+                elif step < 0 and _start > _end:
+                    length = (_start - _end - step - 1) // (-step)
+                # else length remains 0
+
+                new_shape.append(length)
+                new_strides.append(stride * step)
+                new_offset += _start * stride
+            else:
+                # Full slice for other axes
+                new_shape.append(dim)
+                new_strides.append(stride)
+
+        return Shape(new_shape), Strides(new_strides), new_offset
+
+    @always_inline
+    @staticmethod
     fn validate_and_compute_view_metadata(
         original_shape: Shape,
         original_strides: Strides,

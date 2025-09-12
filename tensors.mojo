@@ -663,6 +663,36 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor
 
     @staticmethod
+    fn randint(
+        shape: List[Int],
+        low: Scalar[dtype] = 0,
+        high: Scalar[dtype] = 1,
+        init_seed: Optional[Int] = None,
+        requires_grad: Bool = False,
+    ) -> Tensor[dtype]:
+        constrained[
+            dtype.is_integral(),
+            "Tensor → randint: is supported only for integral type",
+        ]()
+
+        return Self.rand(Shape(shape), low, high, init_seed, requires_grad)
+
+    @staticmethod
+    fn randint(
+        *axes_spans: Int,
+        low: Scalar[dtype] = 0,
+        high: Scalar[dtype] = 1,
+        init_seed: Optional[Int] = None,
+        requires_grad: Bool = False,
+    ) -> Tensor[dtype]:
+        constrained[
+            dtype.is_integral(),
+            "Tensor → randint: is supported only for integral type",
+        ]()
+
+        return Self.rand(Shape(axes_spans), low, high, init_seed, requires_grad)
+
+    @staticmethod
     fn rand(
         shape: List[Int],
         min: Scalar[dtype] = 0,
@@ -1213,6 +1243,70 @@ struct Tensor[dtype: DType = DType.float32](
             requires_grad=requires_grad,
         )
 
+    fn slice(
+        self, start: Int, end: Int, step: Int = 1, axis: Int = 0
+    ) -> Tensor[dtype]:
+        """
+        Slice the tensor along a single axis and return a view.
+
+        Args:
+            start: Starting index (inclusive).
+            end: Ending index (exclusive).
+            step: Step size.
+            axis: Axis along which to slice (default 0).
+
+        Returns:
+            Tensor[dtype]: A view of the sliced tensor.
+        """
+        # Call Validator to compute everything
+        var new_shape, new_strides, new_offset = (
+            Validator.validate_and_compute_slice_metadata(
+                self.shape, self.strides, axis, start, end, step
+            )
+        )
+
+        # Return view
+        return self.view(
+            shape=new_shape,
+            strides=new_strides,
+            offset=new_offset,
+            requires_grad=self.requires_grad,
+        )
+
+    fn slice(
+        self,
+        axes: List[Int],
+        starts: List[Int],
+        ends: List[Int],
+        steps: List[Int] = [],
+    ) -> Tensor[dtype]:
+        # Default step = 1 if not provided
+        steps_ = IntList(steps)
+        if len(steps) == 0:
+            steps_ = IntList.filled(len(axes), 1)
+        elif len(steps) != len(axes):
+            panic("Tensor → slice: length of steps must match axes length")
+
+        # Call Validator
+        var new_shape, new_strides, new_offset = (
+            Validator.validate_and_compute_slice_metadata_multi(
+                self.shape,
+                self.strides,
+                IntList(axes),
+                IntList(starts),
+                IntList(ends),
+                steps_,
+            )
+        )
+
+        # Return view
+        return self.view(
+            shape=new_shape,
+            strides=new_strides,
+            offset=new_offset,
+            requires_grad=self.requires_grad,
+        )
+
     fn __getitem__(self, *slices: Slice) -> Tensor[dtype]:
         # Delegate shape/strides/offset computation
         shape, strides, offset = Validator.validate_and_compute_view_metadata(
@@ -1253,9 +1347,7 @@ struct Tensor[dtype: DType = DType.float32](
                 )
                 self.buffer.store(
                     offset, elem
-                ) if self.owns_data else self.base_address()[].buffer.store(
-                    offset, elem
-                )
+                ) if self.owns_data else self.base[].buffer.store(offset, elem)
         else:
             if not tensor.shape.broadcastable(shape):
                 panic(
@@ -1285,9 +1377,7 @@ struct Tensor[dtype: DType = DType.float32](
         if len(shape) == 0:
             self.buffer.store(
                 offset, value
-            ) if self.owns_data else self.base_address()[].buffer.store(
-                offset, value
-            )
+            ) if self.owns_data else self.base[].buffer.store(offset, value)
         else:
             sliced = self.view(shape, strides, offset, False)
             for idx in shape:
@@ -2347,8 +2437,30 @@ struct Tensor[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
+    _ = """a = Tensor[DType.int32].randint(3, 4, low=10, high=30)
+    a.print()"""
+    x = Tensor.arange(0, 12).reshape([3, 4])
+
+    y = x.slice(1, 3)  # slice along axis 0 (rows 1..2)
+    z = x.slice(0, 4, 2, 1)  # slice along axis 1 (cols 0,2)
+    x.print()
+    print()
+    y.print()
+    print()
+    z.print()
+
+    x = Tensor.arange(0, 24).reshape([4, 6])
+    print()
+    x.print()
+
+    # Slice axis 0: 1:3, axis 1: 0:6:2
+    y = x.slice(axes=[0, 1], starts=[1, 0], ends=[3, 6], steps=[1, 2])
+    print()
+    y.print()
+    print()
+    # Negative indexing
+    z = x.slice(axes=[0, 1], starts=[-3, -5], ends=[-1, -1])
+    z.print()
+
 
 from testing import assert_true
-
-
