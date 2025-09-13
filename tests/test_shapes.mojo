@@ -4,7 +4,9 @@ from shapes import Shape
 
 from testing import assert_true, assert_raises
 
+
 fn test_slice_shape() raises:
+    print("test_slice_shape")
     shape = Shape([1, 2, 3, 4])
     assert_true(
         shape[:-1] == Shape.of(1, 2, 3)
@@ -18,6 +20,7 @@ fn test_slice_shape() raises:
 
 
 fn test_negative_indices() raises:
+    print("test_negative_indices")
     shape = Shape([1, 2, 3])
     assert_true(
         shape[-1] == 3 and shape[-2] == 2 and shape[-3] == 1,
@@ -26,6 +29,7 @@ fn test_negative_indices() raises:
 
 
 fn test_slice_from() raises:
+    print("test_slice_from")
     shape = Shape.of(2, 3, 4)
     assert_true(
         shape[0:] == shape,
@@ -46,6 +50,7 @@ fn test_slice_from() raises:
 
 
 fn test_reverse() raises:
+    print("test_reverse")
     shape = Shape.of(1, 2, 3)
     assert_true(
         shape.reverse() == Shape.of(3, 2, 1), "Shape reversal assertion failed"
@@ -53,10 +58,12 @@ fn test_reverse() raises:
 
 
 fn test_equivalence() raises:
+    print("test_equivalence")
     assert_true(Shape(IntList(1, 4)) == Shape.of(1, 4), "Not equivalent")
 
 
 fn test_empty_shape() raises:
+    print("test_empty_shape")
     shape = Shape(IntList.Empty)
     assert_true(shape[0] == -1, "Empty shape __getitem__ assertion failed")
     for each in shape:
@@ -100,12 +107,14 @@ fn test_empty_shape() raises:
 
 
 fn test_replace() raises:
+    print("test_replace")
     shape = Shape.of(3, 4, 2)
     shape = shape.replace(2, 5)
     assert_true(shape == Shape.of(3, 4, 5), "replace assertion failed")
 
 
 fn test_broadcast_shape() raises:
+    print("test_broadcast_shape")
     shape1 = Shape.of(32, 16)
     shape2 = Shape.of(
         16,
@@ -154,6 +163,7 @@ fn test_broadcast_shape() raises:
 
 
 fn test_index_iter() raises:
+    print("test_index_iter")
     shape = Shape.of(1)
     for each in shape:
         assert_true(
@@ -170,6 +180,7 @@ fn test_index_iter() raises:
 
 
 fn test_broadcastable() raises:
+    print("test_broadcastable")
     assert_true(
         Shape.of(1).broadcastable(Shape.of(1)),
         "broadcastable assertion 1 failed",
@@ -196,6 +207,7 @@ fn test_broadcastable() raises:
 
 
 fn test_shape_as_intlist() raises:
+    print("test_shape_as_intlist")
     shape = Shape.of(2, 4, 5)
     fa = shape.intlist()
     assert_true(
@@ -205,6 +217,7 @@ fn test_shape_as_intlist() raises:
 
 
 fn test_pad_shapes() raises:
+    print("test_pad_shapes")
     shape1 = Shape.of(3, 4)
     shape2 = Shape.of(
         4,
@@ -240,6 +253,7 @@ fn test_pad_shapes() raises:
 
 
 fn test_zip_reversed() raises:
+    print("test_zip_reversed")
     shape1 = Shape.of(1, 2, 3, 4, 5)
     shape2 = Shape.of(6)
     rzipped = shape1.intlist().zip_reversed(shape2.intlist())
