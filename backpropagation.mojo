@@ -38,6 +38,7 @@ alias Delegate[dtype: DType] = Variant[
     SoftmaxBackward[dtype],
     DivideBackward[dtype],
     CrossEntropyBackward[dtype],
+    RepeatBackward[dtype],
 ]
 
 
@@ -71,7 +72,12 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[ViewBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[CrossEntropyBackward[dtype]]():
-            return self.grad_fn[CrossEntropyBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[CrossEntropyBackward[dtype]].backward[dtype](
+                output
+            )
+
+        elif self.grad_fn.isa[RepeatBackward[dtype]]():
+            return self.grad_fn[RepeatBackward[dtype]].backward[dtype](output)
 
         elif self.grad_fn.isa[TransposeBackward[dtype]]():
             return self.grad_fn[TransposeBackward[dtype]].backward[dtype](

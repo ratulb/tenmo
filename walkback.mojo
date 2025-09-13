@@ -41,3 +41,4 @@ from shuffle import ShuffleBackward, Shuffle
 from relu import ReLUBackward, ReLU
 from softmax import SoftmaxBackward, Softmax
 from crossentropy import CrossEntropyBackward, CrossEntropyLoss
+from repeat import RepeatBackward, Repeat
