@@ -42,3 +42,5 @@ from relu import ReLUBackward, ReLU
 from softmax import SoftmaxBackward, Softmax
 from crossentropy import CrossEntropyBackward, CrossEntropyLoss
 from repeat import RepeatBackward, Repeat
+from tiles import TileBackward, Tile
+from flatten import FlattenBackward, Flatten

@@ -750,4 +750,7 @@ struct ZipIterator[
 
 
 fn main() raises:
-    pass
+    a = IntList(1, 2, 3)
+    b = IntList(2, 4, 8)
+    c = a * b
+    print(c)

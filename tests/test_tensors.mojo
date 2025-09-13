@@ -3994,6 +3994,388 @@ fn test_slice_multi_axis_mixed() raises:
     _ = x
 
 
+fn test_repeat_1d_axis0() raises:
+    print("test_repeat_1d_axis0")
+    var a = Tensor.d1([10, 20, 30])
+    var r = a.repeat([2])
+    assert_true((r == Tensor.d1([10, 10, 20, 20, 30, 30])).all_true())
+
+
+fn test_repeat_backward_simple() raises:
+    print("test_repeat_backward_simple")
+    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True).float()
+    var r = a.repeat([2])  # [1,1,2,2,3,3]
+    var loss = r.sum()
+    loss.backward()
+    # each element of a is repeated twice → grad = 2 for each
+    assert_true((a.gradbox[].all_close(Tensor.d1([2.0, 2.0, 2.0]).float())))
+    _ = loss
+    _ = r
+    _ = a
+
+
+fn test_repeat_backward_with_view_slice() raises:
+    print("test_repeat_backward_with_view_slice")
+    var a = Tensor.d1([10.0, 20.0, 30.0, 40.0], requires_grad=True).float()
+    var v = a[s(1, 3)]  # view: [20, 30]
+    var r = v.repeat([2])  # [20,20,30,30]
+    var loss = r.sum()
+    loss.backward()
+    # a.grad should reflect contributions only to indices 1 and 2
+    assert_true(
+        (a.gradbox[].all_close(Tensor.d1([0.0, 2.0, 2.0, 0.0]).float()))
+    )
+
+    _ = loss
+    _ = r
+    _ = v
+    _ = a
+
+
+fn test_repeat_backward_with_strided_view() raises:
+    print("test_repeat_backward_with_strided_view")
+    var a = Tensor.d1(
+        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True
+    ).float()
+    var v = a[s(0, 6, 2)]  # [1,3,5] → stride view
+    var r = v.repeat([3])  # [1,1,1,3,3,3,5,5,5]
+    var loss = r.sum()
+    loss.backward()
+    # v has indices [0,2,4], each repeated 3 times → grads: [3,0,3,0,3,0]
+    assert_true(
+        (
+            a.gradbox[].all_close(
+                Tensor.d1([3.0, 0.0, 3.0, 0.0, 3.0, 0.0]).float()
+            )
+        )
+    )
+    _ = loss
+    _ = r
+    _ = v
+    _ = a
+
+
+fn test_repeat_backward_multi_axis() raises:
+    print("test_repeat_backward_multi_axis")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True).float()
+    var r = a.repeat([2, 3])  # shape (4, 6)
+    var loss = r.sum()
+    loss.backward()
+    # each element repeated 2 * 3 = 6 times
+    assert_true(
+        (a.gradbox[].all_close(Tensor.d2([[6.0, 6.0], [6.0, 6.0]]).float()))
+    )
+    _ = loss
+    _ = r
+    _ = a
+
+
+fn test_repeat_backward_chain_view_repeat() raises:
+    print("test_repeat_backward_chain_view_repeat")
+    var a = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    ).float()
+    var v = a[s(0, 2), s(1, 3)]  # [[2,3],[5,6]]
+    var r = v.repeat([2, 2])  # shape (4,4)
+    var loss = r.sum()
+    loss.backward()
+    # grads land in positions (0,1),(0,2),(1,1),(1,2), each repeated 4 times
+    assert_true(
+        (
+            a.gradbox[].all_close(
+                Tensor.d2([[0.0, 4.0, 4.0], [0.0, 4.0, 4.0]]).float()
+            )
+        )
+    )
+    _ = loss
+    _ = r
+    _ = v
+    _ = a
+
+
+fn test_tile_1d_basic() raises:
+    print("test_tile_1d_basic")
+    var a = Tensor.d1([1.0, 2.0, 3.0]).float()
+    var t = a.tile([2])
+    assert_true(
+        (t == Tensor.d1([1.0, 2.0, 3.0, 1.0, 2.0, 3.0]).float()).all_true()
+    )
+
+
+fn test_tile_1d_multi() raises:
+    print("test_tile_1d_multi")
+    var a = Tensor.d1([4.0, 5.0]).float()
+    var t = a.tile([3])
+    assert_true(
+        (t == Tensor.d1([4.0, 5.0, 4.0, 5.0, 4.0, 5.0]).float()).all_true()
+    )
+
+
+fn test_tile_2d_row() raises:
+    print("test_tile_2d_row")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var t = a.tile([1, 2])
+    var expected = Tensor.d2(
+        [[1.0, 2.0, 1.0, 2.0], [3.0, 4.0, 3.0, 4.0]]
+    ).float()
+    assert_true((t == expected).all_true())
+
+
+fn test_tile_2d_col() raises:
+    print("test_tile_2d_col")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var t = a.tile([2, 1])
+    var expected = Tensor.d2(
+        [[1.0, 2.0], [3.0, 4.0], [1.0, 2.0], [3.0, 4.0]]
+    ).float()
+    assert_true((t == expected).all_true())
+
+
+fn test_tile_2d_both_axes() raises:
+    print("test_tile_2d_both_axes")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var t = a.tile([2, 2])
+    var expected = Tensor.d2(
+        [
+            [1.0, 2.0, 1.0, 2.0],
+            [3.0, 4.0, 3.0, 4.0],
+            [1.0, 2.0, 1.0, 2.0],
+            [3.0, 4.0, 3.0, 4.0],
+        ]
+    ).float()
+    assert_true((t == expected).all_true())
+
+
+fn test_tile_backward_1d() raises:
+    print("test_tile_backward_1d")
+    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True).float()
+    var t = a.tile([2])
+    t.sum().backward()
+    assert_true((a.gradbox[].all_close(Tensor.d1([2.0, 2.0, 2.0]).float())))
+
+
+fn test_tile_backward_2d() raises:
+    print("test_tile_backward_2d")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True).float()
+    var t = a.tile([2, 3])
+    t.sum().backward()
+    var expected_grad = Tensor.d2([[6.0, 6.0], [6.0, 6.0]]).float()
+    assert_true(a.gradbox[].all_close(expected_grad))
+
+
+fn test_tile_single_axis_repeat_one() raises:
+    print("test_tile_single_axis_repeat_one")
+    var a = Tensor.d1([5.0, 6.0]).float()
+    var t = a.tile([1])
+    assert_true((t == a).all_true())
+
+
+fn test_tile_edge_empty_tensor() raises:
+    print("test_tile_edge_empty_tensor")
+    var a = Tensor.d1([]).float()
+    var t = a.tile([3])
+    assert_true(t.numels() == 0)
+
+
+fn test_tile_multi_axis_edge_case() raises:
+    print("test_tile_multi_axis_edge_case")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var t = a.tile([0, 3])
+    assert_true(t.numels() == 0)
+
+
+fn test_flatten_forward_contiguous_1d() raises:
+    print("test_flatten_forward_contiguous_1d")
+    var a = Tensor.d1([1.0, 2.0, 3.0]).float()
+    var f = a.flatten()
+    assert_true((f == Tensor.d1([1.0, 2.0, 3.0]).float()).all_true())
+    _ = a
+    _ = f
+
+
+fn test_flatten_forward_contiguous_2d() raises:
+    print("test_flatten_forward_contiguous_2d")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var f = a.flatten()
+    assert_true((f == Tensor.d1([1.0, 2.0, 3.0, 4.0]).float()).all_true())
+    _ = a
+    _ = f
+
+
+fn test_flatten_backward_contiguous() raises:
+    print("test_flatten_backward_contiguous")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True).float()
+    var f = a.flatten()
+    var loss = f.sum()
+    loss.backward()
+    # each element contributes once, so gradient should be 1 everywhere
+    assert_true(
+        (a.gradbox[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]]).float()))
+    )
+    _ = a
+    _ = f
+    _ = loss
+
+
+fn test_flatten_forward_view_slice() raises:
+    print("test_flatten_forward_view_slice")
+    var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).float()
+    var v = a.slice(0, 1)  # take first row: [[1,2,3]]
+    var f = v.flatten()
+    assert_true((f == Tensor.d1([1.0, 2.0, 3.0]).float()).all_true())
+    _ = a
+    _ = v
+    _ = f
+
+
+fn test_flatten_backward_view_slice() raises:
+    print("test_flatten_backward_view_slice")
+    var a = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    ).float()
+    var v = a.slice(0, 1)  # first row
+    var f = v.flatten()
+    var loss = f.sum()
+    loss.backward()
+    # only first row gets gradient ones, second row untouched
+    assert_true(
+        (
+            a.gradbox[].all_close(
+                Tensor.d2([[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]).float()
+            )
+        )
+    )
+    _ = a
+    _ = v
+    _ = f
+    _ = loss
+
+
+fn test_flatten_backward_non_contiguous_stride() raises:
+    print("test_flatten_backward_non_contiguous_stride")
+    var a = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    ).float()
+    var v = a.slice(1, 2, 1, axis=1)  # take column 1 → [[2],[5]]
+    var f = v.flatten()
+    var loss = f.sum()
+    loss.backward()
+    # gradient should land only in column 1
+    assert_true(
+        (
+            a.gradbox[].all_close(
+                Tensor.d2([[0.0, 1.0, 0.0], [0.0, 1.0, 0.0]]).float()
+            )
+        )
+    )
+    _ = a
+    _ = v
+    _ = f
+    _ = loss
+
+
+fn test_flatten_forward_contiguous_3d() raises:
+    print("test_flatten_forward_contiguous_3d")
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    ).float()
+    var f = a.flatten()
+    assert_true(
+        (
+            f == Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]).float()
+        ).all_true()
+    )
+    _ = a
+    _ = f
+
+
+fn test_flatten_backward_contiguous_3d() raises:
+    print("test_flatten_backward_contiguous_3d")
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    ).float()
+    var f = a.flatten()
+    var loss = f.sum()
+    loss.backward()
+    # every element contributes once → gradient all ones
+    assert_true(
+        (
+            a.gradbox[].all_close(
+                Tensor.d3(
+                    [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
+                ).float()
+            )
+        )
+    )
+    _ = a
+    _ = f
+    _ = loss
+
+
+fn test_flatten_forward_3d_slice() raises:
+    print("test_flatten_forward_3d_slice")
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    ).float()
+    var v = a.slice(0, 1)  # take first "batch": [[1,2],[3,4]]
+    var f = v.flatten()
+    assert_true((f == Tensor.d1([1.0, 2.0, 3.0, 4.0]).float()).all_true())
+    _ = a
+    _ = v
+    _ = f
+
+
+fn test_flatten_backward_3d_slice() raises:
+    print("test_flatten_backward_3d_slice")
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    ).float()
+    var v = a.slice(0, 1)  # first "batch"
+    var f = v.flatten()
+    var loss = f.sum()
+    loss.backward()
+    assert_true(
+        (
+            a.gradbox[].all_close(
+                Tensor.d3(
+                    [[[1.0, 1.0], [1.0, 1.0]], [[0.0, 0.0], [0.0, 0.0]]]
+                ).float()
+            )
+        )
+    )
+    _ = a
+    _ = v
+    _ = f
+    _ = loss
+
+
+fn test_flatten_backward_3d_strided_view() raises:
+    print("test_flatten_backward_3d_strided_view")
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    ).float()
+    var v = a.slice(
+        1, 2, axis=2
+    )  # take [:,:,1] (the second column across all dims)
+    var f = v.flatten()
+    var loss = f.sum()
+    loss.backward()
+    # gradient lands only in column-1 entries
+    assert_true(
+        (
+            a.gradbox[].all_close(
+                Tensor.d3(
+                    [[[0.0, 1.0], [0.0, 1.0]], [[0.0, 1.0], [0.0, 1.0]]]
+                ).float()
+            )
+        )
+    )
+    _ = a
+    _ = v
+    _ = f
+    _ = loss
+
+
 fn main() raises:
     print("Starting tensor test cases")
     test_randint()
@@ -4205,4 +4587,34 @@ fn main() raises:
     test_vector_matrix_mm_backward_batched_matrix_vector_grad()
     test_vector_matrix_mm_backward_batched_matrix_matrix_grad()
     test_large_tensor_backprop()
+
+    test_repeat_1d_axis0()
+    test_repeat_backward_simple()
+    test_repeat_backward_with_view_slice()
+    test_repeat_backward_with_strided_view()
+    test_repeat_backward_multi_axis()
+    test_repeat_backward_chain_view_repeat()
+    test_tile_1d_basic()
+    test_tile_1d_multi()
+    test_tile_2d_row()
+    test_tile_2d_col()
+    test_tile_2d_both_axes()
+    test_tile_backward_1d()
+    test_tile_backward_2d()
+    test_tile_single_axis_repeat_one()
+    # test_tile_edge_empty_tensor()
+    # test_tile_multi_axis_edge_case()"""
+
+    test_flatten_forward_contiguous_1d()
+    test_flatten_forward_contiguous_2d()
+    test_flatten_backward_contiguous()
+    test_flatten_forward_view_slice()
+    test_flatten_backward_view_slice()
+    test_flatten_backward_non_contiguous_stride()
+    test_flatten_forward_contiguous_3d()
+    test_flatten_backward_contiguous_3d()
+    test_flatten_forward_3d_slice()
+    test_flatten_backward_3d_slice()
+    test_flatten_backward_3d_strided_view()
+
     print("Finished running tensor test cases")

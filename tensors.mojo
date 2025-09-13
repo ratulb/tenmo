@@ -247,7 +247,7 @@ struct Tensor[dtype: DType = DType.float32](
         index = self.flatten_index(indices)
         return self.buffer.load(
             index
-        ) if self.owns_data else self.base_address()[].buffer.load(index)
+        ) if self.owns_data else self.base[].buffer.load(index)
 
     fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
         if self.rank() == 0:  # Tensor with Shape ()
@@ -1229,6 +1229,39 @@ struct Tensor[dtype: DType = DType.float32](
             offset=offset,
             requires_grad=requires_grad,
         )
+
+    fn flatten[
+        track_grad: Bool = True
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
+        return Flatten[dtype].forward[track_grad](self, requires_grad)
+
+    fn repeat[
+        track_grad: Bool = True
+    ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
+        return self.repeat[track_grad](IntList.new(repeat), requires_grad)
+
+    fn repeat[
+        track_grad: Bool = True
+    ](self, repeat: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
+        return Repeat.forward[track_grad](self, repeat, requires_grad)
+
+    fn tile[
+        track_grad: Bool = True
+    ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
+        return self.tile[track_grad](IntList.new(repeat), requires_grad)
+
+    fn tile[
+        track_grad: Bool = True
+    ](self, repeat: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
+        return Tile.forward[track_grad](self, repeat, requires_grad)
 
     fn slice(
         self, start: Int, end: Int, step: Int = 1, axis: Int = 0
@@ -2425,6 +2458,12 @@ struct Tensor[dtype: DType = DType.float32](
     fn __iter__(ref self) -> ElemIterator[dtype, __origin_of(self)]:
         return ElemIterator[dtype, __origin_of(self)](Pointer(to=self))
 
+    fn element_at(self, index: Int) -> Scalar[dtype]:
+        if self.owns_data:
+            return self.buffer[index]
+        else:
+            return self.base[].buffer.load(index)
+
 
 @fieldwise_init
 @register_passable
@@ -2453,13 +2492,9 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable):
 
 
 fn main() raises:
-    a = Tensor.d1([1, 2, 3])  # shape (3,)
-    b = a.expand(2, 3)  # → shape (2, 3), rows share memory
-
-    for idx, value in a:
-        print("idx: ", idx, " value: ", value)
-
-    b.print()
+    pass
 
 
 from testing import assert_true
+
+

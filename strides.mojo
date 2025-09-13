@@ -46,10 +46,6 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    @always_inline
-    fn rank1(self) -> Int:
-        return len(self)
-
     fn __getitem__(self, i: Int) -> Int:
         return self.strides[i]
 
@@ -60,6 +56,7 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     fn __len__(self) -> Int:
         return len(self.strides)
 
+    @always_inline
     fn to_list(self) -> IntList:
         return self.strides
 

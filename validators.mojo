@@ -7,6 +7,23 @@ from common_utils import Slicer, panic, Idx, NewAxis, i, s, il, newaxis
 
 struct Validator:
     @staticmethod
+    fn validate_repeat_args(
+        original_shape: Shape,
+        repeat: IntList,
+    ):
+        if len(repeat) != original_shape.rank():
+            panic(
+                "repeat expects repeat length = rank. Got ",
+                String(len(repeat)),
+                " vs rank ",
+                String(original_shape.rank()),
+            )
+
+        for i in range(original_shape.rank()):
+            if repeat[i] <= 0:
+                panic("repeat expects values > 0, got ", String(repeat[i]))
+
+    @staticmethod
     fn check_permutation(permutation: IntList, axis_len: Int):
         # Must have correct length
         if len(permutation) != axis_len:
