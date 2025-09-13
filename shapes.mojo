@@ -3,8 +3,9 @@ from intlist import IntList
 from memory import Pointer
 
 
-fn main() raises:
+fn main():
     pass
+
 
 @fieldwise_init
 @register_passable
@@ -22,7 +23,7 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
         return self
 
     fn __next__(mut self) -> IntList:
-        #result = self.current.copy()
+        # result = self.current.copy()
         result = self.current
         self.index += 1
         for i in range(self.shape[].ndim - 1, -1, -1):
