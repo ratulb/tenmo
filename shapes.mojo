@@ -23,7 +23,6 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
         return self
 
     fn __next__(mut self) -> IntList:
-        # result = self.current.copy()
         result = self.current
         self.index += 1
         for i in range(self.shape[].ndim - 1, -1, -1):
@@ -52,25 +51,26 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
         self = Self.Void
 
     fn __init__(out self, dims: VariadicList[Int]):
-        _dims = IntList.with_capacity(len(dims))
+        spans = IntList.with_capacity(len(dims))
         for each in dims:
-            _dims.append(each)
-        self = Self(_dims)
+            spans.append(each)
+        self = Self(spans)
 
     fn __init__(out self, dims: List[Int]):
         self = Self(IntList.new(dims))
 
     fn __init__(out self, dims: IntList):
-        _ = """if len(dims) < 1:
-            panic("Shape -> __init__: Shape dimension count should be > 0")"""
-        _ndims = len(dims)
+        if len(dims) < 0:
+            panic("Shape -> __init__: Shape dimension count should be >= 0")
+        ndim = len(dims)
         # Allow scalar tensors (rank 0, i.e., Shape())
-        if _ndims == 0:
+        if ndim == 0:
             self.axes_spans = IntList.Empty
             self.ndim = 0
             self.numels = 1
             return
-        for i in range(_ndims):
+        numels = 1
+        for i in range(ndim):
             if dims[i] < 1:
                 panic(
                     "Shape → __init__: negative or zero sized dimension(s) are"
@@ -80,12 +80,10 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
                     + " @index = "
                     + String(i)
                 )
-        _numels = 1
-        for idx in range(_ndims):
-            _numels *= dims[idx]
+            numels *= dims[i]
         self.axes_spans = dims
-        self.ndim = _ndims
-        self.numels = _numels
+        self.ndim = ndim
+        self.numels = numels
 
     fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
         return ShapeIndexIter(Pointer(to=self))
@@ -126,23 +124,6 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
                     mask.append(0)  # match or both 1 → not broadcasted
 
         return mask
-
-    @staticmethod
-    fn broadcast_strides(
-        original_shape: Shape,
-        target_shape: Shape,
-        original_strides: IntList,  # use original strides - for transpose etc default is not enough
-    ) -> IntList:
-        mask = original_shape.broadcast_mask(target_shape)
-        var strides = IntList.with_capacity(len(mask))
-        var orig_index = 0
-        for i in range(len(mask)):
-            if mask[i] == 1:
-                strides.append(0)  # broadcasted dim → zero stride
-            else:
-                strides.append(original_strides[orig_index])
-                orig_index += 1
-        return strides
 
     fn unravel_index(self, flat_index: Int) -> IntList:
         if flat_index < 0 or flat_index >= self.num_elements():
