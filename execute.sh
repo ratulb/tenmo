@@ -87,7 +87,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: tensors, buffers, views, shapes, intlists, strides, ancestry, shared, bench, validators, ce, all"
+        echo "Available tests: tensors, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, all"
         exit 1
         ;;
 esac

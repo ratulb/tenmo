@@ -273,6 +273,9 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             log_debug("Calling IntList __del__")
             self.data.free()
 
+    fn clear(mut self):
+        self.size = 0
+
     fn __rmul__(self: IntList, factor: Int) -> IntList:
         return self.__mul__(factor)
 
@@ -747,41 +750,4 @@ struct ZipIterator[
 
 
 fn main() raises:
-    l1 = IntList() + [2,3]
-    l2 = [5, 3] + l1
-    print(l1, l2)
-
-    ll = IntList.new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    padded_strides = IntList(0) * 3 + ll
-    print(padded_strides)
-    sliced = ll[2::3]
-    print(sliced)
-    sliced.swap(-1, -2)
-    print(sliced)
-
-    test_negative_indices()
-    test_any()
-    inferred_dim = 10
-    l = IntList(1, 2, 5, -1, 10)
-    concrete_shape = [inferred_dim if dim == -1 else dim for dim in l]
-    print(concrete_shape.__str__())
-
-
-from testing import assert_true
-
-
-fn test_any() raises:
-    l = IntList(1, 3, 0, -1)
-
-    fn check(e: Int) -> Bool:
-        return e == -1
-
-    assert_true(l.any(check), "Any assertion for -1 failed")
-
-
-fn test_negative_indices() raises:
-    l1 = IntList(1, 2, 3)
-    assert_true(
-        l1[-1] == 3 and l1[-2] == 2 and l1[-3] == 1,
-        "IntList negative indices assertion failed",
-    )
+    pass

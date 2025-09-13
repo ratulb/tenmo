@@ -1,7 +1,9 @@
 from intlist import IntList
 from testing import assert_true, assert_false
 
+
 fn test_large_list() raises:
+    print("test_large_list")
     var big = IntList()
     for i in range(100, 0, -1):  # 100 to 1
         big.append(i)
@@ -14,6 +16,7 @@ fn test_large_list() raises:
 
 
 fn test_contains_unsorted() raises:
+    print("test_contains_unsorted")
     var raw = IntList()
     raw.append(10)
     raw.append(3)
@@ -26,6 +29,7 @@ fn test_contains_unsorted() raises:
 
 
 fn test_negative_and_duplicates() raises:
+    print("test_negative_and_duplicates")
     var nums = IntList()
     nums.append(-10)
     nums.append(0)
@@ -42,6 +46,7 @@ fn test_negative_and_duplicates() raises:
 
 
 fn test_edge_cases() raises:
+    print("test_edge_cases")
     var empty = IntList()
     assert_true(42 not in empty)
 
@@ -55,6 +60,7 @@ fn test_edge_cases() raises:
 
 
 fn test_sorted_contains() raises:
+    print("test_sorted_contains")
     var list = IntList()
     list.append(5)
     list.append(1)
@@ -72,6 +78,7 @@ fn test_sorted_contains() raises:
 
 
 fn test_prepend() raises:
+    print("test_prepend")
     il = IntList()
     il.prepend(2)
     assert_true(il == IntList(2) and len(il) == 1, "append assertion 1 failed")
@@ -87,12 +94,14 @@ fn test_prepend() raises:
 
 
 fn test_slice() raises:
+    print("test_slice")
     il = IntList.range_list(15)
     sliced = il[2::3]
     assert_true(sliced == IntList(2, 5, 8, 11, 14), "slice assertion failed")
 
 
 fn test_deduplicate() raises:
+    print("test_deduplicate")
     il = IntList(9, 2, 9, 1, 4, 3, 1, 5, 7, 2, 1, 4, 7)
     il.sort_and_deduplicate()
     assert_true(
@@ -111,6 +120,7 @@ fn test_deduplicate() raises:
 
 
 fn test_new() raises:
+    print("test_new")
     l = List(1, 2, 3)
     il = IntList.new(l)
     assert_true(il == IntList(1, 2, 3), "new assertion 1 failed")
@@ -120,6 +130,7 @@ fn test_new() raises:
 
 
 fn test_range_list() raises:
+    print("test_range_list")
     il = IntList.range_list(3)
     assert_true(il == IntList(0, 1, 2), "range_list assertion 1 failed")
     il = IntList.range_list(0)
@@ -127,6 +138,7 @@ fn test_range_list() raises:
 
 
 fn test_has_duplicates() raises:
+    print("test_has_duplicates")
     il = IntList(1, 0, 1, 2, 1)
     assert_true(il.has_duplicates(), "has_duplicates True assertion failed")
     il = IntList(1)
@@ -138,6 +150,7 @@ fn test_has_duplicates() raises:
 
 
 fn test_indices_of() raises:
+    print("test_indices_of")
     il = IntList(1, 0, 1, 2, 1)
     indices = il.indices_of(1)
     assert_true(indices == IntList(0, 2, 4), "indices_of assertion 1 failed")
@@ -150,11 +163,13 @@ fn test_indices_of() raises:
 
 
 fn test_count() raises:
+    print("test_count")
     il = IntList(0, 3, 0, 5, 0)
     assert_true(il.count(0) == 3, "count assertion failed")
 
 
 fn test_bulk_replace() raises:
+    print("test_bulk_replace")
     il = IntList(0, 1, 0, 1, 0)
     result = il.replace(IntList(1, 3), IntList(3, 5))
     assert_true(
@@ -163,6 +178,7 @@ fn test_bulk_replace() raises:
 
 
 fn test_bulk_insert() raises:
+    print("test_bulk_insert")
     il = IntList(0, 0, 0)
     result = il.insert(IntList(1, 3), IntList(3, 5))
     assert_true(
@@ -171,6 +187,7 @@ fn test_bulk_insert() raises:
 
 
 fn test_with_capacity_fill() raises:
+    print("test_with_capacity_fill")
     il = IntList.with_capacity(3, -10)
     assert_true(
         il == IntList(-10, -10, -10) and len(il) == 3,
@@ -179,6 +196,7 @@ fn test_with_capacity_fill() raises:
 
 
 fn test_select() raises:
+    print("test_select")
     il = IntList(9, 2, 3, 4, 5, 6)
     assert_true(
         il.select(IntList(2, 5)) == IntList(3, 6),
@@ -191,6 +209,7 @@ fn test_select() raises:
 
 
 fn test_sorted() raises:
+    print("test_sorted")
     il = IntList(9, 2, 3, 4, 5, 6)
     assert_true(
         il.sorted() == IntList(2, 3, 4, 5, 6, 9),
@@ -203,6 +222,7 @@ fn test_sorted() raises:
 
 
 fn test_of() raises:
+    print("test_of")
     l = List(9, 2, 3, 4, 5, 6)
     il = IntList.new(l)
     il.sort()
@@ -219,6 +239,7 @@ fn test_of() raises:
 
 
 fn test_sort() raises:
+    print("test_sort")
     il = IntList(9, 2, 3, 4, 5, 6)
     il.sort()
     assert_true(
@@ -231,6 +252,7 @@ fn test_sort() raises:
 
 
 fn test_insert() raises:
+    print("test_insert")
     il = IntList(2, 3, 4, 5, 6)
     inserted = il.insert(0, 9)
     assert_true(
@@ -269,18 +291,21 @@ fn test_insert() raises:
 
 
 fn test_copy() raises:
+    print("test_copy")
     il = IntList(1, 2)
     copied = il.copy()
     assert_true(copied == IntList(1, 2), "copy assertion failed")
 
 
 fn test_reverse() raises:
+    print("test_reverse")
     il = IntList(1, 2)
     il.reverse()
     assert_true(il == IntList(2, 1), "reverse assertion failed")
 
 
 fn test_pop() raises:
+    print("test_pop")
     il = IntList(1, 2, 3)
     assert_true(
         il.pop() == 3 and il.pop() == 2 and il.pop() == 1 and len(il) == 0,
@@ -289,6 +314,7 @@ fn test_pop() raises:
 
 
 fn test_zip() raises:
+    print("test_zip")
     l1 = IntList(1, 2, 3)
     l2 = IntList(4, 5, 6, 7)
     zipped = l1.zip(l2)
@@ -313,6 +339,7 @@ fn test_zip() raises:
 
 
 fn test_zip_reversed() raises:
+    print("test_zip_reversed")
     l1 = IntList(1, 2, 3)
     l2 = IntList(4, 5, 6, 7)
     zipped = l1.zip_reversed(l2)
@@ -370,17 +397,21 @@ fn test_zip_reversed() raises:
 
 
 fn test_product() raises:
+    print("test_product")
     il = IntList(1, 3, 4, 10)
     assert_true(il.product() == 120, "product assertion failed")
 
 
 fn test_replace() raises:
+    print("test_replace")
     il = IntList(1, 2, 4)
     il = il.replace(2, 3)
     assert_true(il == IntList(1, 2, 3), "replace assertion failed")
 
 
 fn test_init() raises:
+    print("test_init")
+
     fn create_2(*elems: Int) raises:
         il = IntList.with_capacity(len(elems))
         for each in elems:
@@ -401,6 +432,35 @@ fn test_init() raises:
         )
 
     create_1(1, 2, 3)
+
+
+fn test_clear() raises:
+    print("test_clear")
+    ll = IntList.new([1, 2, 3, 4, 5])
+    ll.clear()
+    assert_true(ll == IntList(), "clear assertion 1 failed")
+    ll.append(200)
+    ll.prepend(100)
+    assert_true(ll == IntList(100, 200), "clear assertion 2 failed")
+
+
+fn test_any() raises:
+    print("test_any")
+    l = IntList(1, 3, 0, -1)
+
+    fn check(e: Int) -> Bool:
+        return e == -1
+
+    assert_true(l.any(check), "Any assertion for -1 failed")
+
+
+fn test_negative_indices() raises:
+    print("test_negative_indices")
+    l1 = IntList(1, 2, 3)
+    assert_true(
+        l1[-1] == 3 and l1[-2] == 2 and l1[-3] == 1,
+        "IntList negative indices assertion failed",
+    )
 
 
 fn main() raises:
@@ -434,7 +494,8 @@ fn main() raises:
     test_pop()
     test_zip()
     test_zip_reversed()
+    test_clear()
+    test_any()
+    test_negative_indices()
 
     print("Done running IntList test cases")
-
-
