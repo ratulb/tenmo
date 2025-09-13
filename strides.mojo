@@ -9,10 +9,9 @@ fn main():
         print(i)
     print(Strides.Zero)
 
+
 @register_passable
-struct Strides(
-    Sized & Copyable & Stringable & Representable & Writable
-):
+struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     var strides: IntList
     alias Zero = Self(IntList.Empty)
 
@@ -27,33 +26,6 @@ struct Strides(
 
     fn __copyinit__(out self, existing: Self):
         self.strides = existing.strides
-
-        _="""fn __moveinit__(out self, deinit existing: Self):
-        self.strides = existing.strides"""
-
-    fn is_contiguous(self, shape: Shape) -> Bool:
-        if shape.rank() != self.strides.size:
-            return False
-
-        var expected_stride = 1
-        for i in reversed(range(shape.rank())):
-            if self.strides[i] != expected_stride:
-                return False
-            expected_stride *= shape[i]
-
-        return True
-
-    fn slice_from(self, axis: Int) -> Strides:
-        if axis < 0 or axis > self.rank():
-            abort(
-                "Strides -> slice_from: axis "
-                + String(axis)
-                + " out of bounds for strides "
-                + self.strides.__str__()
-            )
-
-        new_strides = self.strides[axis:]
-        return Strides(new_strides)
 
     @staticmethod
     fn of(*values: Int) -> Self:
@@ -75,23 +47,21 @@ struct Strides(
         writer.write(self.__str__())
 
     @always_inline
-    fn rank(self) -> Int:
+    fn rank1(self) -> Int:
         return len(self)
 
     fn __getitem__(self, i: Int) -> Int:
         return self.strides[i]
+
+    fn __getitem__(self, slice: Slice) -> Self:
+        strides = self.strides[slice]
+        return Strides(strides)
 
     fn __len__(self) -> Int:
         return len(self.strides)
 
     fn to_list(self) -> IntList:
         return self.strides
-
-    fn clone(self) -> Self:
-        return Strides(self.strides.copy())
-
-    fn print(self):
-        print("Strides(" + self.strides.__str__() + ")")
 
     # Reorder dimensions (for transpose/permute)
     fn permute(self, axes: IntList) -> Self:
@@ -118,26 +88,6 @@ struct Strides(
             strides.prepend(acc)
             acc *= shape[i]
         return Strides(strides)
-
-    # Adjust strides for broadcasting to a new shape
-    fn broadcast_to(self, from_shape: Shape, to_shape: Shape) -> Self:
-        offset = to_shape.rank() - from_shape.rank()
-        var result = IntList.with_capacity(to_shape.rank())
-
-        for i in range(to_shape.rank()):
-            if i < offset:
-                result.append(0)  # new broadcasted dimension
-            else:
-                from_dim = from_shape[i - offset]
-                to_dim = to_shape[i]
-                if from_dim == to_dim:
-                    result.append(self[i - offset])
-                elif from_dim == 1:
-                    result.append(0)  # broadcasted dimension
-                else:
-                    abort("broadcast_to: incompatible shape")
-
-        return Strides(result)
 
     fn free(deinit self):
         """Free strides IntList."""
