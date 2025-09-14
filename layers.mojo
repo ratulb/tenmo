@@ -70,9 +70,14 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
     var weights: Tensor[dtype]
     var bias: Tensor[dtype]
 
-    fn __init__(out self, in_features: Int, out_features: Int):
+    fn __init__(
+        out self,
+        in_features: Int,
+        out_features: Int,
+        init_seed: Optional[Int] = None,
+    ):
         self.weights = Tensor[dtype].rand(
-            [in_features, out_features], requires_grad=True
+            [in_features, out_features], init_seed=init_seed, requires_grad=True
         )
         self.bias = Tensor[dtype].zeros([out_features], requires_grad=True)
 

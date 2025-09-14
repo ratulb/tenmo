@@ -4349,38 +4349,6 @@ fn test_flatten_backward_3d_slice() raises:
     _ = loss
 
 
-fn test_flatten_backward_3d_strided_view() raises:
-    print("test_flatten_backward_3d_strided_view")
-    var a = Tensor.d3(
-        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
-    ).float()
-    var v = a.slice(
-        1, 2, axis=2
-    )  # take [:,:,1] (the second column across all dims)
-    var f = v.flatten()
-    var loss = f.sum()
-    loss.backward()
-    # gradient lands only in column-1 entries
-    assert_true(
-        (
-            a.gradbox[].all_close(
-                Tensor.d3(
-                    [[[0.0, 1.0], [0.0, 1.0]], [[0.0, 1.0], [0.0, 1.0]]]
-                ).float()
-            )
-        )
-    )
-    _ = a
-    _ = v
-    _ = f
-    _ = loss
-
-
-
-
-
-
-
 fn test_flatten_full_default_forward_2d() raises:
     print("test_flatten_full_default_forward_2d")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
@@ -4394,16 +4362,41 @@ fn test_flatten_full_default_forward_2d() raises:
 
 fn test_flatten_partial_forward_3d() raises:
     print("test_flatten_partial_forward_3d")
-    var a = Tensor.d3([
-        [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]],
-        [[13.0, 14.0, 15.0, 16.0], [17.0, 18.0, 19.0, 20.0], [21.0, 22.0, 23.0, 24.0]]
-    ]).float()
+    var a = Tensor.d3(
+        [
+            [
+                [1.0, 2.0, 3.0, 4.0],
+                [5.0, 6.0, 7.0, 8.0],
+                [9.0, 10.0, 11.0, 12.0],
+            ],
+            [
+                [13.0, 14.0, 15.0, 16.0],
+                [17.0, 18.0, 19.0, 20.0],
+                [21.0, 22.0, 23.0, 24.0],
+            ],
+        ]
+    ).float()
     # collapse dims 1..2 => new shape (2, 12)
     var f = a.flatten(1, 2)
-    var expected = Tensor.d2([
-        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
-        [13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
-    ]).float()
+    var expected = Tensor.d2(
+        [
+            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0],
+            [
+                13.0,
+                14.0,
+                15.0,
+                16.0,
+                17.0,
+                18.0,
+                19.0,
+                20.0,
+                21.0,
+                22.0,
+                23.0,
+                24.0,
+            ],
+        ]
+    ).float()
     assert_true((f == expected).all_true())
     _ = a
     _ = f
@@ -4412,16 +4405,17 @@ fn test_flatten_partial_forward_3d() raises:
 
 fn test_flatten_start_only_forward_3d() raises:
     print("test_flatten_start_only_forward_3d")
-    var a = Tensor.d3([
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
-        [[7.0, 8.0], [9.0, 10.0], [11.0, 12.0]]
-    ]).float()  # shape (2,3,2)
+    var a = Tensor.d3(
+        [
+            [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+            [[7.0, 8.0], [9.0, 10.0], [11.0, 12.0]],
+        ]
+    ).float()  # shape (2,3,2)
     # flatten from axis=1 onward (1..end) => (2, 6)
     var f = a.flatten(1)
-    var expected = Tensor.d2([
-        [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-        [7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
-    ]).float()
+    var expected = Tensor.d2(
+        [[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [7.0, 8.0, 9.0, 10.0, 11.0, 12.0]]
+    ).float()
     assert_true((f == expected).all_true())
     _ = a
     _ = f
@@ -4430,10 +4424,9 @@ fn test_flatten_start_only_forward_3d() raises:
 
 fn test_flatten_start_eq_end_forward_noop_3d() raises:
     print("test_flatten_start_eq_end_forward_noop_3d")
-    var a = Tensor.d3([
-        [[1.0, 2.0], [3.0, 4.0]],
-        [[5.0, 6.0], [7.0, 8.0]]
-    ]).float()  # shape (2,2,2)
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    ).float()  # shape (2,2,2)
     # flatten a single axis (start == end) => shape should be identical and values unchanged
     var f = a.flatten(1, 1)
     assert_true((f == a).all_true())
@@ -4457,19 +4450,32 @@ fn test_flatten_backward_contiguous_2d() raises:
 
 fn test_flatten_backward_partial_3d() raises:
     print("test_flatten_backward_partial_3d")
-    var a = Tensor.d3([
-        [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]],
-        [[13.0, 14.0, 15.0, 16.0], [17.0, 18.0, 19.0, 20.0], [21.0, 22.0, 23.0, 24.0]]
-    ], requires_grad=True).float()
+    var a = Tensor.d3(
+        [
+            [
+                [1.0, 2.0, 3.0, 4.0],
+                [5.0, 6.0, 7.0, 8.0],
+                [9.0, 10.0, 11.0, 12.0],
+            ],
+            [
+                [13.0, 14.0, 15.0, 16.0],
+                [17.0, 18.0, 19.0, 20.0],
+                [21.0, 22.0, 23.0, 24.0],
+            ],
+        ],
+        requires_grad=True,
+    ).float()
     # collapse dims 1..2 => shape (2,12)
     var f = a.flatten(1, 2)
     var loss = f.sum()
     loss.backward()
     # every original element contributed exactly once -> ones everywhere
-    var expected_grad = Tensor.d3([
-        [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]],
-        [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]]
-    ]).float()
+    var expected_grad = Tensor.d3(
+        [
+            [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]],
+            [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]],
+        ]
+    ).float()
     assert_true(a.gradbox[].all_close(expected_grad))
     _ = a
     _ = f
@@ -4479,8 +4485,9 @@ fn test_flatten_backward_partial_3d() raises:
 
 fn test_flatten_backward_view_strided_2d() raises:
     print("test_flatten_backward_view_strided_2d")
-    var a = Tensor.d2([[1.0, 2.0, 3.0],
-                       [4.0, 5.0, 6.0]], requires_grad=True).float()
+    var a = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    ).float()
     # take columns 0 and 2 using step=2 -> view of shape (2,2)
     var v = a.slice(0, 3, 2, axis=1)
     var f = v.flatten()
@@ -4498,25 +4505,59 @@ fn test_flatten_backward_view_strided_2d() raises:
 
 fn test_flatten_backward_3d_strided_view() raises:
     print("test_flatten_backward_3d_strided_view")
-    var a = Tensor.d3([
-        [[1.0, 2.0], [3.0, 4.0]],
-        [[5.0, 6.0], [7.0, 8.0]]
-    ], requires_grad=True).float()
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    ).float()
     # take the index 1 along axis=2: axis=2 slice [1,2) for axis=2
     var v = a.slice(1, 2, axis=2)  # selects [:,:,1] -> shape (2,2,1)
     var f = v.flatten()
     var loss = f.sum()
     loss.backward()
-    var expected_grad = Tensor.d3([
-        [[0.0, 1.0], [0.0, 1.0]],
-        [[0.0, 1.0], [0.0, 1.0]]
-    ]).float()
+    var expected_grad = Tensor.d3(
+        [[[0.0, 1.0], [0.0, 1.0]], [[0.0, 1.0], [0.0, 1.0]]]
+    ).float()
     assert_true(a.gradbox[].all_close(expected_grad))
     _ = a
     _ = v
     _ = f
     _ = loss
     _ = expected_grad
+
+
+fn test_flatten_gradient_correctness_strided_view() raises:
+    print("test_flatten_gradient_correctness_strided_view")
+
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    ).float()
+
+    # take the second column across all dims → [:,:,1]
+    var v = a.slice(1, 2, axis=2)
+    var f = v.flatten()
+    var loss = f.sum()
+    loss.backward()
+
+    # gradient lands only in column-1 entries
+    var expected = Tensor.d3(
+        [[[0.0, 1.0], [0.0, 1.0]], [[0.0, 1.0], [0.0, 1.0]]]
+    ).float()
+    assert_true(a.gradbox[].all_close(expected))
+
+
+fn test_flatten_gradient_correctness() raises:
+    print("test_flatten_gradient_correctness")
+
+    var a = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    ).float()
+
+    var f = a.flatten()  # shape (6,)
+    var loss = f.sum()  # all elements contribute equally
+    loss.backward()
+
+    # each entry in `a` should get gradient 1.0
+    var expected = Tensor.d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]).float()
+    assert_true(a.gradbox[].all_close(expected))
 
 
 fn main() raises:
@@ -4760,15 +4801,14 @@ fn main() raises:
     test_flatten_backward_3d_slice()
     test_flatten_backward_3d_strided_view()
 
-    test_flatten_full_default_forward_2d
+    test_flatten_full_default_forward_2d()
     test_flatten_partial_forward_3d()
     test_flatten_start_only_forward_3d()
     test_flatten_start_eq_end_forward_noop_3d()
     test_flatten_backward_contiguous_2d()
     test_flatten_backward_partial_3d()
     test_flatten_backward_view_strided_2d()
-    test_flatten_backward_3d_strided_view()
-
-
+    test_flatten_gradient_correctness()
+    test_flatten_gradient_correctness_strided_view()
 
     print("Finished running tensor test cases")
