@@ -192,7 +192,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     @always_inline
     fn max_index(self) -> Int:
-        var max_index = 0
+        var max_index = self.offset
         for i in range(self.shape.rank()):
             max_index += (self.shape[i] - 1) * abs(self.strides[i])
         return max_index
@@ -585,10 +585,6 @@ struct Tensor[dtype: DType = DType.float32](
                     count += 1
             return count
 
-    @always_inline
-    fn data_buffer(self) -> Buffer[dtype]:
-        return self.buffer if self.owns_data else self.base_address()[].buffer
-
     fn address(
         ref self,
     ) -> UnsafePointer[
@@ -676,7 +672,7 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Bool = False,
     ) -> Tensor[dtype]:
         constrained[
-            dtype.is_integral(),
+            dtype.is_numeric(),
             "Tensor → randint: is supported only for integral type",
         ]()
 
@@ -1036,9 +1032,7 @@ struct Tensor[dtype: DType = DType.float32](
             return self.buffer.sum()
         else:
             if self._contiguous:
-                return self.base[].buffer.sum(
-                    self.offset, self.max_index() + self.offset + 1
-                )
+                return self.base[].buffer.sum(self.offset, self.max_index() + 1)
             else:
                 summ = Scalar[dtype](0)
                 for _, value in self:
@@ -2502,7 +2496,13 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable):
 
 
 fn main() raises:
-    pass
+    a = Tensor.arange(10)
+    a.print()
+    print()
+    v = a[s(2, 8, 2)]
+    v.print()
+    print()
+    print(v.max_index(), v.element_at(v.max_index()))
 
 
 from testing import assert_true
