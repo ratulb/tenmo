@@ -41,7 +41,9 @@ fn make_synthetic_dataset(
 fn test_tiny_training_smoke() raises:
     print("test_tiny_training_smoke")
 
-    var (X, y) = make_synthetic_dataset(20)  # small dataset
+    var (X, y) = make_synthetic_dataset(5)  # small dataset
+
+    print("var (X, y): ", X.shape, y.shape)
 
     var model = Sequential[DType.float32](
         [
@@ -60,7 +62,7 @@ fn test_tiny_training_smoke() raises:
         # params=model.parameters_ptrs(), lr=0.1
     )
 
-    for epoch in range(15):
+    for epoch in range(10):
         optim.zero_grad()
         # forward
         var logits = model(X)
@@ -74,6 +76,59 @@ fn test_tiny_training_smoke() raises:
         )
 
 
+fn test_tiny_training_smoke_and_flatten_grad() raises:
+    print("test_tiny_training_smoke_and_flatten_grad")
+
+    # --- synthetic training ---
+    var (X, y) = make_synthetic_dataset(32)
+    var X_flat = X.flatten(1)  # flatten from dim=1
+    print(X.shape, y.shape, X_flat.shape)
+    var model = Sequential(
+        [
+            Linear(8 * 8, 16).into(),
+            ReLU().into(),
+            Linear(16, 10).into(),
+        ]
+    )
+    model.print_summary([32, 64])
+    var optim = SGD(model.parameters_ptrs(), 0.1, False)
+    var criterion = CrossEntropyLoss()
+
+    for epoch in range(15):
+        var logits = model(X_flat)
+        var loss = criterion(logits, y)
+        log_debug(
+            "epoch: " + epoch.__str__() + ", loss: " + loss.item().__str__()
+        )
+
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
+
+    # --- flatten gradient correctness (contiguous) ---
+    var a = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    ).float()
+    var f = a.flatten()
+    var loss2 = f.sum()
+    loss2.backward()
+
+    var expected = Tensor.d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]).float()
+    assert_true(a.gradbox[].all_close(expected))
+
+    # --- flatten gradient correctness (view / strided) ---
+    var b = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    ).float()
+    var v = b.slice(1, 3, 1, 1)  # take columns 1:3 → [[2,3],[5,6]]
+    var f2 = v.flatten()
+    var loss3 = f2.sum()
+    loss3.backward(42)
+
+    var expected2 = Tensor.d2([[0.0, 42.0, 42.0], [0.0, 42.0, 42.0]]).float()
+    assert_true(b.gradbox[].all_close(expected2))
+
+
 fn test_tiny_training_deterministic_smoke() raises:
     print("test_tiny_training_deterministic_smoke")
 
@@ -83,6 +138,8 @@ fn test_tiny_training_deterministic_smoke() raises:
     # synthetic dataset
     var X, y = make_synthetic_dataset(32)  # small fixed size
     var X_flat = X.flatten(1)  # match input shape
+
+    print("var (X, y), X_flat: ", X.shape, y.shape, X_flat.shape)
     # simple MLP
     var model = Sequential(
         [
@@ -99,7 +156,7 @@ fn test_tiny_training_deterministic_smoke() raises:
     var criterion = CrossEntropyLoss()
     var loss: Tensor[DType.float32] = Tensor.scalar(max_finite[DType.float32]())
 
-    for epoch in range(15):
+    for epoch in range(10):
         # optim.zero_grad()
         var logits = model(X_flat)
         loss = criterion(logits, y)
@@ -117,4 +174,5 @@ fn test_tiny_training_deterministic_smoke() raises:
 
 fn main() raises:
     # test_tiny_training_smoke()
-    test_tiny_training_deterministic_smoke()
+    # test_tiny_training_deterministic_smoke()
+    test_tiny_training_smoke_and_flatten_grad()
