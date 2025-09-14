@@ -1232,8 +1232,15 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn flatten[
         track_grad: Bool = True
-    ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        return Flatten[dtype].forward[track_grad](self, requires_grad)
+    ](
+        self,
+        start_dim: Int = 0,
+        end_dim: Optional[Int] = None,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Flatten[dtype].forward[track_grad](
+            self, start_dim, end_dim, requires_grad
+        )
 
     fn repeat[
         track_grad: Bool = True
@@ -2494,7 +2501,7 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable):
 fn main() raises:
     pass
 
-
 from testing import assert_true
+
 
 

@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|buffers|views|intlist|shapes|strides|ancestry|shared|bench|validators|ce]all]"
+    echo "Usage: $0 [tensors|buffers|views|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|all]"
     exit 1
 fi
 
@@ -21,6 +21,10 @@ case $1 in
     ce)
         echo "Running crossentropy loss tests"
         mojo -I . $DEBUG_MODE tests/test_cross_entropy.mojo
+        ;;
+    synth_smoke)
+        echo "Running synthetic smoke tests"
+        mojo -I . $DEBUG_MODE tests/test_synthetic_smoke.mojo
         ;;
 
     buffers)
@@ -66,6 +70,8 @@ case $1 in
     all)
         mojo -I . tests/test_tensors.mojo
         mojo -I . tests/test_buffers.mojo
+        echo "Running synthetic smoke tests"
+        mojo -I . tests/test_synthetic_smoke.mojo
         echo "Running crossentropy loss tests"
         mojo -I . tests/test_cross_entropy.mojo
         echo "Running view test cases"

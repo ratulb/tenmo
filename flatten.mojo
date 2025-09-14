@@ -3,12 +3,16 @@ from shared import TensorLite
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
 from shapes import Shape
+from intlist import IntList
+from common_utils import panic
 
 
 @fieldwise_init
 @register_passable
 struct FlattenBackward[dtype: DType](Copyable):
-    # no fields needed; ancestor tensor is available from output.ancestry()
+    var start_dim: Int
+    var end_dim: Int
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
@@ -17,28 +21,20 @@ struct FlattenBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        # upstream gradients (1-D tensor)
         gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
-        
         tensor = ancestor.tensor()
-        offset = tensor.offset
-        tensor_shape = tensor.shape
-        grad_in = Tensor[dtype].zeros(tensor_shape)
+        grad_in = Tensor[dtype].zeros(tensor.shape)
 
+        # fast contiguous path
         if tensor.is_contiguous():
             n = gradients.shape.num_elements()
             for i in range(n):
-                if tensor.owns_data:
-                    grad_in.buffer[i] = gradients.buffer[i]
-                else:
-                    grad_in.buffer[i + offset] = gradients.buffer[i]
-
+                grad_in.buffer[i] = gradients.buffer[i]
         else:
-            out_shape = gradients.shape
-            out_numels = out_shape.num_elements()
+            out_numels = gradients.shape.num_elements()
             for flat_idx in range(out_numels):
-                idx = tensor_shape.unravel_index(flat_idx)
+                idx = tensor.shape.unravel_index(flat_idx)
                 grad_in[idx] = gradients[flat_idx]
 
         return [(ancestor, grad_in, AddTensor)]
@@ -51,22 +47,39 @@ struct Flatten[dtype: DType]:
         track_grad: Bool = True
     ](
         self: Tensor[dtype],
+        start_dim: Int = 0,
+        end_dim: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[
-        dtype
-    ]:
-        total_elems = self.shape.num_elements()
-        out = Tensor[dtype].zeros(Shape([total_elems]), requires_grad=False)
+    ) -> Tensor[dtype]:
+        rank = self.rank()
+        var endd = end_dim.value() if end_dim else rank - 1
+        if endd < start_dim:
+            panic("Flatten: end_dim must be >= start_dim")
 
-        # fast contiguous path (direct buffer copy)
+        # compute new shape
+        var new_shape = IntList()
+        for i in range(start_dim):
+            new_shape.append(self.shape[i])
+
+        var flat_dim = 1
+        for i in range(start_dim, endd + 1):
+            flat_dim *= self.shape[i]
+        new_shape.append(flat_dim)
+
+        for i in range(endd + 1, rank):
+            new_shape.append(self.shape[i])
+
+        var out = Tensor[dtype](Shape(new_shape), requires_grad=False)
+
+        # fast path: contiguous
         if self.is_contiguous():
-            for i in range(total_elems):
+            n = self.shape.num_elements()
+            for i in range(n):
                 if self.owns_data:
-                    out[i] = self.buffer[i]
+                    out.buffer[i] = self.buffer[i]
                 else:
-                    out[i] = self.base[].buffer[self.offset + i]
+                    out.buffer[i] = self.base[].buffer[self.offset + i]
         else:
-            # slow path: iterate logical indices and copy respecting offset/strides
             var flat_idx = 0
             for _, value in self:
                 out[flat_idx] = value
@@ -80,7 +93,9 @@ struct Flatten[dtype: DType]:
             )
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = FlattenBackward[dtype]().into_backward_fn()
+                backward_fn = FlattenBackward[dtype](
+                    start_dim, endd
+                ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite.of(self))
 
