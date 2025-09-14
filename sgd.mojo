@@ -70,6 +70,10 @@ struct SGD[dtype: DType = DType.float32](Copyable & Movable):
             if self.zero_grad_post_step:
                 param.zero_grad()
 
+    fn zero_grad(self):
+        for param_ptr in self.params:
+            var ref param = param_ptr[]  # Mutably borrow the pointee
+            param.zero_grad()
 
 from common_utils import addr, addrs
 
