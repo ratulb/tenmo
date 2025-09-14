@@ -2463,6 +2463,15 @@ struct Tensor[dtype: DType = DType.float32](
         return ElemIterator[dtype, __origin_of(self)](Pointer(to=self))
 
     fn element_at(self, index: Int) -> Scalar[dtype]:
+        idx = index + self.max_index() if index < 0 else index
+        if idx < 0 or idx > self.max_index():
+            panic(
+                "Tensor → element_at: index out of bounds.",
+                "Tensor max index",
+                self.max_index().__str__(),
+                ", provided index",
+                index.__str__(),
+            )
         if self.owns_data:
             return self.buffer[index]
         else:
@@ -2502,7 +2511,7 @@ fn main() raises:
     v = a[s(2, 8, 2)]
     v.print()
     print()
-    print(v.max_index(), v.element_at(v.max_index()))
+    print(v.max_index(), v.element_at(-4))
 
 
 from testing import assert_true
