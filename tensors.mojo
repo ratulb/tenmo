@@ -27,6 +27,12 @@ struct Tensor[dtype: DType = DType.float32](
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
     alias Blocks = List[Self.Block]
+
+    alias randint = Tensor[DType.int64].randn
+    alias randfloat = Tensor[DType.float64].randn
+    alias randint32 = Tensor[DType.int32].randn
+    alias randfloat32 = Tensor[DType.float32].randn
+
     var shape: Shape
     var strides: Strides
     var offset: Int
@@ -661,11 +667,8 @@ struct Tensor[dtype: DType = DType.float32](
         tensor.fill(value)
         return tensor
 
-    alias randint = Tensor[DType.int64].randnint
-    alias randint32 = Tensor[DType.int32].randnint
-
     @staticmethod
-    fn randnint(
+    fn randn(
         shape: List[Int],
         low: Scalar[dtype] = 0,
         high: Scalar[dtype] = 1,
@@ -2501,7 +2504,5 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable):
 fn main() raises:
     pass
 
+
 from testing import assert_true
-
-
-
