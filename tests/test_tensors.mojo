@@ -4559,9 +4559,24 @@ fn test_flatten_gradient_correctness() raises:
     var expected = Tensor.d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]).float()
     assert_true(a.gradbox[].all_close(expected))
 
+fn test_shuffle() raises:
+    print("test_shuffle")
+    perm = List(2, 3, 0, 4, 1)
+    a = Tensor.arange(5, requires_grad=True)
+    shuffled = a.shuffle(perm=perm)
+    sliced = shuffled[1:4]
+    c = sliced * 42
+    c.backward()
+    expected = Tensor.d1([42.0, 0.0, 0.0, 42.0, 42.0]).float()
+    assert_true(a.gradbox[].all_close(expected))
+    _ = a 
+    _ = shuffled
+    _ = sliced
+    _ = c
 
 fn main() raises:
     print("Starting tensor test cases")
+    test_shuffle()
     test_randint()
     test_slice_single_axis()
     test_slice_single_axis_positive()

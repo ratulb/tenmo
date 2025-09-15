@@ -24,9 +24,9 @@ struct Validator:
                 panic("repeat expects values > 0, got ", String(repeat[i]))
 
     @staticmethod
-    fn check_permutation(permutation: IntList, axis_len: Int):
+    fn check_permutation(permutation: List[Int], axis_length: Int):
         # Must have correct length
-        if len(permutation) != axis_len:
+        if len(permutation) != axis_length:
             panic(
                 (
                     "Tensor → check_permutation: permutation length must match"
@@ -35,13 +35,13 @@ struct Validator:
                 "perm length",
                 len(permutation).__str__(),
                 "and axis length",
-                axis_len.__str__(),
+                axis_length.__str__(),
             )
 
         # Must contain all indices 0..axis_len-1 exactly once
-        var seen = IntList.with_capacity(axis_len)
+        var seen = IntList.with_capacity(axis_length)
         for v in permutation:
-            if v < 0 or v >= axis_len:
+            if v < 0 or v >= axis_length:
                 panic(
                     "Tensor → check_permutation: permutation index out of"
                     " range."

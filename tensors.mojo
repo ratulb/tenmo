@@ -2144,12 +2144,12 @@ struct Tensor[dtype: DType = DType.float32](
         track_grad: Bool = True
     ](
         self,
-        axis: Int = 0,
         perm: List[Int] = [],
+        axis: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         return Shuffle[dtype].forward[track_grad](
-            self, IntList.new(perm), axis, requires_grad
+            self, perm, axis, requires_grad
         )
 
     fn argmax(self, axis: Int = 0) -> Tensor[DType.int32]:
