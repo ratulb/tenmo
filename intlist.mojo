@@ -125,6 +125,27 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
 
         return False
 
+    fn permute(self, axes: IntList) -> IntList:
+        if not len(self) == len(axes):
+            panic(
+                "IntList -> permute: axes length",
+                len(axes).__str__(),
+                "does not match list's length",
+                len(self).__str__(),
+            )
+        permuted = IntList.with_capacity(len(axes))
+        seen = IntList.with_capacity(len(axes))
+        for ax in axes:
+            axis = ax + len(self) if ax < 0 else ax
+            if axis < 0 or axis >= len(self):
+                panic("IntList -> permute: index out of bound", ax.__str__())
+            if axis in seen:
+                panic("IntList -> permute: duplicate axis", ax.__str__())
+            seen.append(axis)
+            permuted.append(self[axis])
+        seen.free()
+        return permuted
+
     fn swap(mut self, this_index: Int, that_index: Int):
         """Swaps elements at different indices."""
         index1 = this_index + len(self) if this_index < 0 else this_index
@@ -750,7 +771,14 @@ struct ZipIterator[
 
 
 fn main() raises:
+    test_permute()
+
+
+from testing import assert_true
+
+
+fn test_permute() raises:
     a = IntList(1, 2, 3)
-    b = IntList(2, 4, 8)
-    c = a * b
-    print(c)
+    perm = IntList(1, 2, -3)
+    permuted = a.permute(perm)
+    assert_true(permuted == IntList(2, 3, 1), "permute assertion failed")
