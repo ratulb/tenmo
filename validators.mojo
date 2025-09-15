@@ -28,8 +28,14 @@ struct Validator:
         # Must have correct length
         if len(permutation) != axis_len:
             panic(
-                "Tensor → check_permutation: permutation length must match axis"
-                " length."
+                (
+                    "Tensor → check_permutation: permutation length must match"
+                    " axis length."
+                ),
+                "perm length",
+                len(permutation).__str__(),
+                "and axis length",
+                axis_len.__str__(),
             )
 
         # Must contain all indices 0..axis_len-1 exactly once

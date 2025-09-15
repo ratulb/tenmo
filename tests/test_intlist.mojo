@@ -462,6 +462,12 @@ fn test_negative_indices() raises:
         "IntList negative indices assertion failed",
     )
 
+fn test_permute() raises:
+    print("test_permute")
+    a = IntList(1, 2, 3)
+    perm = IntList(1, 2, -3)
+    permuted = a.permute(perm)
+    assert_true(permuted == IntList(2, 3, 1), "permute assertion failed")
 
 fn main() raises:
     print("Running IntList test cases")
@@ -497,5 +503,6 @@ fn main() raises:
     test_clear()
     test_any()
     test_negative_indices()
+    test_permute()
 
     print("Done running IntList test cases")

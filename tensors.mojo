@@ -2140,21 +2140,17 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         return ReLU[dtype].forward(self, requires_grad)
 
-    fn shuffle(
+    fn shuffle[
+        track_grad: Bool = True
+    ](
         self,
         axis: Int = 0,
         perm: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return self.shuffle(axis, IntList.new(perm), requires_grad)
-
-    fn shuffle(
-        self,
-        axis: Int = 0,
-        perm: Optional[IntList] = None,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return Shuffle[dtype].forward(self, axis, perm, requires_grad)
+        return Shuffle[dtype].forward[track_grad](
+            self, IntList.new(perm), axis, requires_grad
+        )
 
     fn argmax(self, axis: Int = 0) -> Tensor[DType.int32]:
         return Argmax[dtype].argmax(tensor=self, axis=axis)

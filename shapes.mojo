@@ -383,15 +383,14 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
         return Self(l)
 
     fn permute(self, axes: IntList) -> Self:
-        if not len(axes) == len(self):
-            panic(
-                "Shape → permute: axes length not equal to shape's dimension"
-                " count"
-            )
-        result = IntList.with_capacity(len(axes))
-        for axis in axes:
-            result.append(self[axis])
-        return Shape(result)
+        log_debug(
+            "Stride -> permute: strides "
+            + self.axes_spans.__str__()
+            + ", axes: "
+            + axes.__str__()
+        )
+
+        return Shape(self.axes_spans.permute(axes))
 
     fn __eq__(self, other: List[Int]) -> Bool:
         shape = Self(other)

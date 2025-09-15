@@ -1,6 +1,7 @@
 from shapes import Shape
 from intlist import IntList
 from os import abort
+from common_utils import log_debug
 
 
 fn main():
@@ -62,14 +63,14 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
 
     # Reorder dimensions (for transpose/permute)
     fn permute(self, axes: IntList) -> Self:
-        if not len(axes) == len(self):
-            abort(
-                "Strides -> permute: axes length not equal to strides' length"
-            )
-        result = IntList.with_capacity(len(axes))
-        for axis in axes:
-            result.append(self[axis])
-        return Strides(result)
+        log_debug(
+            "Stride -> permute: strides "
+            + self.strides.__str__()
+            + ", axes: "
+            + axes.__str__()
+        )
+
+        return Strides(self.strides.permute(axes))
 
     # Compute strides from shape in row-major order
     @staticmethod

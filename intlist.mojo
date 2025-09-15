@@ -771,14 +771,7 @@ struct ZipIterator[
 
 
 fn main() raises:
-    test_permute()
+    pass
 
 
 from testing import assert_true
-
-
-fn test_permute() raises:
-    a = IntList(1, 2, 3)
-    perm = IntList(1, 2, -3)
-    permuted = a.permute(perm)
-    assert_true(permuted == IntList(2, 3, 1), "permute assertion failed")
