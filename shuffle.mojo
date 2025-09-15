@@ -8,10 +8,9 @@ from random import shuffle, seed
 
 
 @fieldwise_init
-@register_passable
-struct ShuffleBackward[dtype: DType](Copyable):
+struct ShuffleBackward[dtype: DType](Copyable & Movable):
     var axis: Int
-    var permutation: IntList
+    var permutation: List[Int]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -21,95 +20,75 @@ struct ShuffleBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        var grad = output.gradients()[]
-        var ancestor = output.ancestry().get(0)[]
+        var gradients = output.gradients()[]
+        var parent = output.ancestry().get(0)[]
 
-        var shape = grad.shape
-        var axis_len = shape[self.axis]
-
-        # Inverse permutation
-        var inv_perm = IntList.filled(axis_len, 0)
-        for i in range(axis_len):
-            inv_perm[self.permutation[i]] = i
+        var shape = gradients.shape
 
         # Allocate gradient w.r.t. ancestor
-        var grad_in = Tensor[dtype].zeros(shape)
+        var parent_grad = Tensor[dtype].zeros(
+            shape
+        )  # parent.shape == gradients.shape, only difference is coord postions along the permuted axis
 
-        # Scatter gradients back along inverse permutation
-        for idx in shape:
-            #src, dst = idx, idx
-            var src = idx.copy()
-            var dst = idx.copy()
-            src[self.axis] = idx[self.axis]
-            dst[self.axis] = inv_perm[idx[self.axis]]
-            grad_in[dst] = grad[src]
+        # Scatter gradients back using the original permutation
+        # For each position in the output gradient, find where it came from in the input
+        for grad_coord in shape:
+            parent_coord = grad_coord
+            parent_coord[self.axis] = self.permutation[grad_coord[self.axis]]
+            parent_grad[parent_coord] = gradients[grad_coord]
 
-        return [(ancestor, grad_in, AddTensor)]
+        return [(parent, parent_grad, AddTensor)]
 
 
 @fieldwise_init
-@register_passable
-struct Shuffle[dtype: DType]:
+struct Shuffle[dtype: DType](Copyable & Movable):
     @staticmethod
-    fn forward(
+    fn forward[
+        track_grad: Bool = True
+    ](
         self: Tensor[dtype],
+        perm: List[Int],  # permutation, length == axis length/span/spread
         axis: Int = 0,
-        permutation: Optional[IntList] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         shape = self.shape
-        axis_len = shape[axis]
+        axis_length = shape[axis]
 
-        var perm: IntList
-        if permutation:
-            perm = permutation.value()
-            Validator.check_permutation(perm, axis_len)
+        var permutation: List[Int]
+        if len(perm) > 0:
+            Validator.check_permutation(perm, axis_length)
+            permutation = perm
         else:
             seed()
-            perm = IntList.with_capacity(axis_len)
-            for i in range(axis_len):
-                perm.append(i)
-            list = perm.tolist()
-            shuffle(list)
-            perm = IntList.new(list)
+            permutation = List[Int](capacity=axis_length)
+            for i in range(axis_length):
+                permutation.append(i)
+            shuffle(permutation)
 
         # Allocate output
         var out = Tensor[dtype].zeros(shape)
 
-        for flat in range(self.numels()):
-            idx = shape.unravel_index(flat)
-            src_idx = idx.copy()
-            #src_idx = idx
-            src_idx[axis] = perm[idx[axis]]
-            out[idx] = self[src_idx]
+        for coord in self.shape:
+            shifted_src_coord = coord
+            shifted_src_coord[axis] = permutation[coord[axis]]
+            out[coord] = self[shifted_src_coord]
 
         # Attach autograd info
-        grad_required = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
-        if grad_required:
-            out.requires_grad_(True)
-            backward_fn = ShuffleBackward[dtype](axis, perm).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self))
+        @parameter
+        if track_grad:
+            grad_required = (
+                requires_grad.value() if requires_grad else self.requires_grad
+            )
+            if grad_required:
+                out.requires_grad_(True)
+                backward_fn = ShuffleBackward[dtype](
+                    axis, permutation
+                ).into_backward_fn()
+                out.backwardFn = Optional(backward_fn)
+                out.add_ancestry(TensorLite.of(self))
 
         return out
 
 
 fn main():
-    permutation=IntList(2, 3, 0, 4, 1)
-    a = Tensor.arange(5, requires_grad=True)
-    shuffled = ShuffleForward[DType.float32].shuffle(
-        a, permutation=permutation
-    )
-    print("Shuffled")
-    shuffled.print()
-    print()
-    print()
-    b = shuffled[1:4]
-    b.print()
-    c = b * 42
-    c.backward()
-    a.gradbox[].print()
-    print()
     print("passes")
