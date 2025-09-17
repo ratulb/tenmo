@@ -3699,7 +3699,7 @@ fn test_vector_matrix_mm_backward_batched_matrix_matrix_grad() raises:
 
 
 fn test_max_min_mixed() raises:
-    print("test_max_min")
+    print("test_max_min_mixed")
 
     # Test 1: Basic max reduction along axis 1
     var a = Tensor.d2(
@@ -4802,7 +4802,7 @@ fn main() raises:
     test_tile_backward_2d()
     test_tile_single_axis_repeat_one()
     # test_tile_edge_empty_tensor()
-    # test_tile_multi_axis_edge_case()"""
+    # test_tile_multi_axis_edge_case()
 
     test_flatten_forward_contiguous_1d()
     test_flatten_forward_contiguous_2d()
