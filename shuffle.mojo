@@ -23,7 +23,7 @@ struct ShuffleBackward[dtype: DType](Copyable & Movable):
         var gradients = output.gradients()[]
         var parent = output.ancestry().get(0)[]
 
-        var shape = gradients.shape
+        var shape = gradients.shape.copy()
 
         # Allocate gradient w.r.t. ancestor
         var parent_grad = Tensor[dtype].zeros(
@@ -33,15 +33,18 @@ struct ShuffleBackward[dtype: DType](Copyable & Movable):
         # Scatter gradients back using the original permutation
         # For each position in the output gradient, find where it came from in the input
         for grad_coord in shape:
-            parent_coord = grad_coord
+            parent_coord = grad_coord.copy()
             parent_coord[self.axis] = self.permutation[grad_coord[self.axis]]
             parent_grad[parent_coord] = gradients[grad_coord]
 
         return [(parent, parent_grad, AddTensor)]
 
 
-@fieldwise_init
-struct Shuffle[dtype: DType](Copyable & Movable):
+@register_passable
+struct Shuffle[dtype: DType](Copyable):
+    fn __copyinit__(out self, existing: Self):
+        pass
+
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -51,7 +54,7 @@ struct Shuffle[dtype: DType](Copyable & Movable):
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        shape = self.shape
+        shape = self.shape.copy()
         axis_length = shape[axis]
 
         var permutation: List[Int]
@@ -68,8 +71,8 @@ struct Shuffle[dtype: DType](Copyable & Movable):
         # Allocate output
         var out = Tensor[dtype].zeros(shape)
 
-        for coord in self.shape:
-            shifted_src_coord = coord
+        for coord in shape:
+            shifted_src_coord = coord.copy()
             shifted_src_coord[axis] = permutation[coord[axis]]
             out[coord] = self[shifted_src_coord]
 
@@ -81,6 +84,7 @@ struct Shuffle[dtype: DType](Copyable & Movable):
             )
             if grad_required:
                 out.requires_grad_(True)
+
                 backward_fn = ShuffleBackward[dtype](
                     axis, permutation
                 ).into_backward_fn()
@@ -90,5 +94,31 @@ struct Shuffle[dtype: DType](Copyable & Movable):
         return out
 
 
-fn main():
+fn main() raises:
+    test_shuffle()
     print("passes")
+
+
+from testing import assert_true
+
+
+fn test_shuffle() raises:
+    print("test_shuffle")
+    perm = List(2, 3, 0, 4, 1)
+    a = Tensor.arange(5, requires_grad=True)
+    shuffled = a.shuffle(perm=perm)
+    shuffled.print()
+
+    sliced = shuffled[1:4]
+    print()
+    sliced.print()
+    c = sliced * 42
+    c.backward()
+    expected = Tensor.d1([42.0, 0.0, 0.0, 42.0, 42.0]).float()
+    print()
+    a.gradbox[].print()
+    assert_true(a.gradbox[].all_close(expected))
+    _ = a
+    _ = shuffled
+    _ = sliced
+    _ = c

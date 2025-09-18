@@ -45,7 +45,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
         memcpy(self.data, other.data, other.size)
 
-    fn copy(self) -> Buffer[dtype]:
+    fn clone(self) -> Buffer[dtype]:
         data = UnsafePointer[Scalar[dtype]].alloc(self.size)
         memcpy(data, self.data, self.size)
         clone = Buffer[dtype](self.size, data)
@@ -76,7 +76,7 @@ struct Buffer[dtype: DType = DType.float32](
             ]  # Copy the element from source to result
             result_index += 1
 
-        return result^
+        return result
 
     fn __getitem__(self, index: Int) -> Scalar[dtype]:
         return self.data.load[width=1, volatile=True](index)
@@ -1302,7 +1302,6 @@ struct Iterator[
 
 fn main() raises:
     pass
+
+
 from testing import assert_true, assert_false
-
-
-

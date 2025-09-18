@@ -4574,8 +4574,92 @@ fn test_shuffle() raises:
     _ = sliced
     _ = c
 
+
+
+
+fn test_contiguous_tensor_equality() raises:
+    print("test_contiguous_tensor_equality")
+    
+    a = Tensor.arange(3 * 4).reshape(3, 4)
+    b_buffer = a.buffer
+    b = Tensor(a.shape, b_buffer)
+    r = a == b
+    assert_true(r.all_true(), "tensor equality assertion 1 failed")
+
+    a = Tensor.arange(42)
+    v = a.into_view()
+    a_buffer = a.buffer
+    v_buffer = v.base[].buffer
+
+    a_new = Tensor(a.shape, a_buffer)
+    v_new = Tensor(a.shape, v_buffer)
+
+    r = a_new == v_new
+    assert_true(r.all_true(), "tensor equality assertion 2 failed")
+
+    av = a.view(shape=[21], offset=21)
+    r = av != Tensor.arange(21, 42)
+    expected = Tensor[DType.bool].full([21], False)
+
+    assert_true(
+        (r == expected).all_true(), "tensor equality assertion 3 failed"
+    )
+
+    sliced = a.slice(7, 22)
+    expect = Tensor.arange(7, 22)
+    sliced_buffer = sliced.base[].buffer[
+        sliced.offset : sliced.offset + sliced.numels()
+    ]
+    expected_buffer = expect.buffer
+    result = sliced_buffer.eq(expected_buffer)
+    assert_true(result.all_true(), "tensor equality assertion 4 failed")
+    total = 133
+    a = Tensor.full([total], 42)
+    batch_size = 5
+    expect = Tensor.full([batch_size], 42)
+
+    i = 0
+    while i < total:
+        end = min(i + batch_size, total)
+        batch = a.slice(i, end)
+        outcome = (
+            batch
+            == expect if batch.numels()
+            == batch_size else batch
+            # == expect[s(None, batch.shape[0], None)]
+            == expect[s(batch.shape[0])]
+        )
+        assert_true(
+            outcome.all_true(), "tensor equality assertion failed on batch mode"
+        )
+        i += batch_size
+
+    x = a.slice(27, 56)
+    x_buffer = x.base[].buffer[x.offset : x.numels() + x.offset]
+    x_tensor = Tensor(x.shape, x_buffer)
+    assert_true(
+        (x_tensor == Tensor.full([29], 42)).all_true(),
+        "tensor equality assertion 5 failed",
+    )
+    empty1 = Tensor.d1([])
+    empty2 = Tensor.d1([])
+    assert_true(
+        (empty1 == empty2).all_true(), "Empty tensor equality assertion failed"
+    )
+
+
+
+fn test_max_index_and_element_at() raises:
+    print("test_max_index_and_element_at")
+    a = Tensor.arange(10)
+    v = a[s(2, 8, 2)]
+    assert_true(v.max_index() == 6 and v.element_at(-4) == 2)
+
 fn main() raises:
     print("Starting tensor test cases")
+    
+    test_max_index_and_element_at()
+    test_contiguous_tensor_equality()
     test_shuffle()
     test_randint()
     test_slice_single_axis()

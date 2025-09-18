@@ -3,12 +3,9 @@ from operators import (
     SubtractTensor,
     MulTensor,
     ZeroGrad,
-    Power,
+    #Power,
     scalar_ops,
     Add,
-    sum_all,
-    tensor_compare,
-    tensor_compare_scalar,
     Equal,
     NotEqual,
     LessThan,
@@ -18,5 +15,7 @@ from operators import (
     Subtract,
     Multiply,
     Divide,
-    Comparator,
 )
+
+fn main():
+    pass

@@ -9,10 +9,18 @@ from squeeze import Squeeze
 from common_utils import panic
 
 
-@fieldwise_init
 @register_passable
 struct UnsqueezeBackward[dtype: DType](Copyable):
     var axes: IntList  # where axes were inserted
+
+    fn __init__(out self, axes: IntList):
+        self.axes = axes
+
+    fn __copyinit__(out self, existing: Self):
+        self.axes = existing.axes.copy()
+
+        _ = """fn __moveinit__(out self, deinit existing: Self):
+        self.axes = existing.axes"""
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))

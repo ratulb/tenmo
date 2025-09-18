@@ -470,7 +470,7 @@ fn test_permute() raises:
     assert_true(permuted == IntList(2, 3, 1), "permute assertion failed")
 
 fn main() raises:
-    print("Running IntList test cases")
+    #print("Running IntList test cases")
     test_large_list()
     test_contains_unsorted()
     test_negative_and_duplicates()

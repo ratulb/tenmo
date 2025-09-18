@@ -6,24 +6,27 @@ from memory import Pointer
 fn main():
     pass
 
-
-@fieldwise_init
 @register_passable
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
     var shape: Pointer[Shape, origin]
     var current: IntList
     var index: Int
 
-    fn __init__(out self, shape: Pointer[Shape, origin]):
+    fn __init__(out self, shape: Pointer[Shape, origin], curr_index: IntList, pos: Int):
         self.shape = shape
-        self.current = IntList.filled(shape[].ndim, 0)
-        self.index = 0
+        self.current = curr_index
+        self.index = pos
+
+    fn __copyinit__(out self, other: Self):
+        self.shape = other.shape.copy()
+        self.current = other.current.copy()
+        self.index = other.index
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(mut self) -> IntList:
-        result = self.current
+        result = self.current[::]
         self.index += 1
         for i in range(self.shape[].ndim - 1, -1, -1):
             self.current[i] += 1
@@ -37,7 +40,6 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
 
     fn __has_next__(self) -> Bool:
         return self.shape[].num_elements() - self.index > 0
-
 
 @register_passable
 struct Shape(Sized & Stringable & Writable & Representable & Copyable):
@@ -58,6 +60,16 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
 
     fn __init__(out self, dims: List[Int]):
         self = Self(IntList.new(dims))
+
+    fn __copyinit__(out self, other: Self):
+        self.axes_spans = other.axes_spans.copy()
+        self.ndim = other.ndim
+        self.numels = other.numels
+
+        _="""fn __moveinit__(out self, deinit other: Self):
+        self.axes_spans = other.axes_spans
+        self.ndim = other.ndim
+        self.numels = other.numels"""
 
     fn __init__(out self, dims: IntList):
         if len(dims) < 0:
@@ -81,12 +93,12 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
                     + String(i)
                 )
             numels *= dims[i]
-        self.axes_spans = dims
+        self.axes_spans = dims.copy()
         self.ndim = ndim
         self.numels = numels
 
     fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
-        return ShapeIndexIter(Pointer(to=self))
+        return ShapeIndexIter(Pointer(to=self), IntList.filled(self.rank(), 0), 0)
 
     @always_inline
     fn broadcastable(self, to: Shape) -> Bool:
@@ -462,20 +474,11 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-        _ = """fn __moveinit__(out self, deinit other: Self):
-        self.axes_spans = other.axes_spans
-        self.ndim = other.ndim
-        self.numels = other.numels"""
-
-    fn __copyinit__(out self, other: Self):
-        self.axes_spans = other.axes_spans
-        self.ndim = other.ndim
-        self.numels = other.numels
-
     fn free(deinit self):
         log_debug("Freeing Shape")
         self.axes_spans.free()
         _ = self^
+
 
     @always_inline
     @staticmethod
@@ -498,3 +501,4 @@ struct Shape(Sized & Stringable & Writable & Representable & Copyable):
     @staticmethod
     fn of(*dims: Int) -> Shape:
         return Shape(dims)
+

@@ -12,7 +12,9 @@ fn main():
 
 
 @register_passable
-struct Strides(Sized & Copyable & Stringable & Representable & Writable):
+struct Strides(
+    Sized & Copyable & Stringable & Representable & Writable
+):
     var strides: IntList
     alias Zero = Self(IntList.Empty)
 
@@ -20,17 +22,13 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
         self.strides = IntList.new(values)
 
     fn __init__(out self, values: IntList):
-        self.strides = values
-
-    fn __eq__(self, other: Self) -> Bool:
-        return self.strides == other.strides
+        self.strides = values.copy()
 
     fn __copyinit__(out self, existing: Self):
-        self.strides = existing.strides
+        self.strides = existing.strides.copy()
 
-    @staticmethod
-    fn of(*values: Int) -> Self:
-        return Self(IntList(values))
+        _="""fn __moveinit__(out self, deinit existing: Self):
+        self.strides = existing.strides"""
 
     fn __str__(self) -> String:
         var s = String("(")
@@ -57,6 +55,9 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     fn __len__(self) -> Int:
         return len(self.strides)
 
+    fn __eq__(self, other: Self) -> Bool:
+        return self.strides == other.strides
+
     @always_inline
     fn to_list(self) -> IntList:
         return self.strides
@@ -72,21 +73,19 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
 
         return Strides(self.strides.permute(axes))
 
-    # Compute strides from shape in row-major order
+    @staticmethod
+    fn of(*values: Int) -> Self:
+        return Self(IntList(values))
+
     @staticmethod
     fn default(shape: Shape) -> Self:
-        _ = """var strides_list = IntList.filled(shape.rank(), 1)
-        for i in reversed(range(shape.rank() - 1)):
-            strides_list[i] = strides_list[i + 1] * shape[i + 1]
-        return Strides(strides_list)"""
-
-        var strides = IntList.with_capacity(shape.rank())
+        var rank = shape.rank()
+        var strides = IntList.filled(rank, 0)
         var acc = 1
-        for i in reversed(range(shape.rank())):
-            strides.prepend(acc)
+        for i in reversed(range(rank)):
+            strides[i] = acc
             acc *= shape[i]
         return Strides(strides)
 
     fn free(deinit self):
-        """Free strides IntList."""
         self.strides.free()

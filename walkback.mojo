@@ -28,7 +28,7 @@ from division import (
     Divider,
 )
 from transpose import TransposeBackward, Transpose
-from viewbackward import ViewBackward
+from views import ViewBackward, View
 from permutebackward import PermuteBackward
 from dotbackward import DotBackward
 from vectormatrixmmbackward import VectorMatrixMMBackward

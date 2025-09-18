@@ -2,30 +2,22 @@ from memory import memcpy, memset, Pointer
 from os import abort
 from common_utils import log_debug, panic
 
-
 @register_passable
-struct IntList(Sized & Copyable & Stringable & Representable & Writable):
-    """A memory-efficient, register-passable, dynamic array of Ints. Would abort on any erroneous condition.
-    """
-
+struct IntList(
+    Sized & Copyable & Stringable & Representable & Writable
+):
     alias Empty = IntList()
     var data: UnsafePointer[Int]
     var size: Int
     var capacity: Int
 
     fn __init__(out self):
-        """Constructs an empty IntList."""
         self.data = UnsafePointer[Int]()
         self.capacity = 0
         self.size = 0
 
     @always_inline("nodebug")
     fn __init__(out self, src: List[Int]):
-        """Initialize a new `IntList` from elements of a list.
-        Args:
-            src: Original list containig the ints.
-        """
-
         self.data = UnsafePointer[Int].alloc(len(src))
         memcpy(self.data, src._data, len(src))
         self.size = len(src)
@@ -45,7 +37,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
 
     @always_inline("nodebug")
     fn __init__(out self, elems: VariadicList[Int]):
-        """Initialize a new `IntList` with the with VariadicList[Int] - used primarily in Shape.
+        """Initialize a new `IntList` with the with VariadicList[Int].
         Args:
             elems: Number of Ints to allocate space for.
         """
@@ -55,16 +47,23 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         for idx in range(len(elems)):
             (self.data + idx)[] = elems[idx]
 
+        _="""@always_inline("nodebug")
+    fn __copyinit__(out self, existing: Self):
+        self.size = existing.size
+        self.capacity = existing.capacity
+        self.data = existing.data"""
+ 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
-        """Initialize by copying an existing `IntList`.
-        Args:
-            existing: The source array to copy from.
-        """
         self.size = existing.size
         self.capacity = existing.capacity
         self.data = UnsafePointer[Int].alloc(existing.capacity)
         memcpy(self.data, existing.data, existing.size)
+
+        _="""fn __moveinit__(out self, deinit existing: Self):
+        self.size = existing.size
+        self.capacity = existing.capacity
+        self.data = existing.data"""
 
     @staticmethod
     fn new(src: List[Int]) -> IntList:
@@ -364,9 +363,9 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         ):
             return IntList()
         if self.data.__as_bool__() == False:
-            return other
+            return other.copy()
         if other.data.__as_bool__() == False:
-            return self
+            return self.copy()
 
         result = IntList.with_capacity(len(self) + len(other))
         result.copy_from(0, self, 0, len(self))
@@ -433,7 +432,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
             if idx < 0 or idx >= n:
                 abort("IntList -> replace: index out of bounds: " + String(idx))
 
-        result = self.copy()
+        result = self[::]
 
         # Apply replacements
         for i in range(m):
@@ -586,17 +585,6 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
                 return True
         return False
 
-    fn copy(self) -> Self:
-        """Creates a deep copy of the given IntList.
-
-        Returns:
-            A copy of the value.
-        """
-        var copy = Self.with_capacity(capacity=len(self))
-        for e in self:
-            copy.append(e)
-        return copy^
-
     fn reversed(self) -> Self:
         copied = self.copy()
         copied.reverse()
@@ -678,6 +666,7 @@ struct IntList(Sized & Copyable & Stringable & Representable & Writable):
         )
 
 
+@register_passable
 struct Iterator[
     origin: Origin[False],
     forward: Bool = True,
@@ -688,6 +677,11 @@ struct Iterator[
     fn __init__(out self, idx: Int, src: Pointer[IntList, origin]):
         self.src = src
         self.index = idx
+
+    @always_inline("nodebug")
+    fn __copyinit__(out self, existing: Self):
+        self.index = existing.index
+        self.src = existing.src
 
     fn __iter__(self) -> Self:
         return self
@@ -734,6 +728,14 @@ struct ZipIterator[
         self.index = idx
         self.offset = abs(len(src_this[]) - len(src_that[]))
 
+    @always_inline("nodebug")
+    fn __copyinit__(out self, existing: Self):
+        self.index = existing.index
+        self.offset = existing.offset
+        self.src_this = existing.src_this
+        self.src_that = existing.src_that
+
+
     fn __iter__(self) -> Self:
         return self
 
@@ -772,6 +774,3 @@ struct ZipIterator[
 
 fn main() raises:
     pass
-
-
-from testing import assert_true

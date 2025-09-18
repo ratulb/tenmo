@@ -444,18 +444,6 @@ struct Validator:
         # Validate rank vs non-newaxis indices count
         # Count required rank: Int contributes 1; IntList contributes len(list); Slice contributes 1; NewAxis contributes 0
         var required_rank = 0
-        _ = """for idx in indices:
-            if not idx.isa[NewAxis]():  # Only count non-newaxis indices
-                required_rank += 1
-        if required_rank != original_shape.rank():
-            panic(
-                "Tensor indexing: axes count(",
-                String(original_shape.rank()),
-                ") and ",
-                "non-newaxis indices count(",
-                String(required_rank),
-                ") mismatch",
-            )"""
 
         for idx in indices:
             if idx.isa[NewAxis]():
@@ -574,7 +562,8 @@ struct Validator:
         shape: Shape,
         strides: Strides,
         offset: Int,
-    ) -> Tuple[Int, Int, Int]:
+        # ) -> Tuple[Int, Int, Int]:
+    ) -> Int:
         """
         Validate view parameters and compute absolute bounds.
 
@@ -585,7 +574,8 @@ struct Validator:
             offset: The offset for the view.
 
         Returns:
-            Tuple of (abs_min, abs_max, abs_offset) absolute coordinates.
+            #Tuple of (abs_min, abs_max, abs_offset) absolute coordinates.
+            Absolute offest with respect to base tensor.
 
         """
         # Calculate logical bounds of new view (relative to parent)
@@ -623,7 +613,8 @@ struct Validator:
             if lo < parent_lo or hi > parent_hi:
                 panic("Tensor → view: exceeds parent tensor's memory bounds")
 
-        return abs_min, abs_max, abs_offset
+        # return abs_min, abs_max, abs_offset
+        return abs_offset
 
 
 fn main() raises:

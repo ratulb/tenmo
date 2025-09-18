@@ -11,7 +11,7 @@ struct Argmin[dtype: DType]:
         tensor: Tensor[dtype],
         axis: Int = 0,
     ) -> Tensor[DType.int32]:
-        shape = tensor.shape
+        shape = tensor.shape.copy()
         rank = shape.rank()
         ax = axis if axis >= 0 else axis + rank
         if ax < 0 or ax >= rank:
@@ -23,7 +23,7 @@ struct Argmin[dtype: DType]:
             )
 
         # Output shape is same as input but without the reduced axis
-        var out_axes = IntList.filled(rank - 1, 0)
+        var out_axes = IntList()
         for i in range(rank):
             if i != ax:
                 out_axes.append(shape[i])
@@ -54,7 +54,7 @@ struct Argmax[dtype: DType]:
         tensor: Tensor[dtype],
         axis: Int = 0,
     ) -> Tensor[DType.int32]:
-        shape = tensor.shape
+        shape = tensor.shape.copy()
         rank = shape.rank()
         ax = axis if axis >= 0 else axis + rank
         if ax < 0 or ax >= rank:
@@ -66,7 +66,7 @@ struct Argmax[dtype: DType]:
             )
 
         # Output shape is same as input but without the reduced axis
-        var out_axes = IntList.filled(rank - 1, 0)
+        var out_axes = IntList()
         for i in range(rank):
             if i != ax:
                 out_axes.append(shape[i])
