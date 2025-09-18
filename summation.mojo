@@ -54,7 +54,9 @@ struct SumBackward[dtype: DType](Copyable):
             else:
                 # keepdims=True: shapes match except for broadcasting
                 grad_contrib = gradients.broadcast_to(shape)
+
         grad_contrib.requires_grad = False
+
         return [
             (
                 ancestor,
@@ -68,7 +70,7 @@ struct SumBackward[dtype: DType](Copyable):
 
 
 @register_passable
-struct Summer[dtype: DType]:
+struct Summer[dtype: DType](Copyable & Movable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -78,7 +80,7 @@ struct Summer[dtype: DType]:
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        shape = tensor.shape
+        shape = tensor.shape.copy()
         rank = shape.rank()
         normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
         out_shape = shape.compute_output_shape(normalized_axes, keepdims)
