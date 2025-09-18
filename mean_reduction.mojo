@@ -19,8 +19,12 @@ struct MeanBackward[dtype: DType](Copyable):
         self.keepdims = keepdims
 
     fn __copyinit__(out self, other: Self):
-        self.axes = other.axes
+        self.axes = other.axes.copy()
         self.keepdims = other.keepdims
+
+        _ = """fn __moveinit__(out self, deinit other: Self):
+        self.axes = other.axes
+        self.keepdims = other.keepdims"""
 
     fn backward[
         dtype: DType
@@ -92,9 +96,6 @@ struct Mean[dtype: DType]:
         out = tensor.sum[track_grad=False](
             axes=normalized_axes, keepdims=keepdims, requires_grad=False
         ) / Scalar[dtype](count)
-        _ = """out = Summer[dtype].forward[False](
-            tensor, normalized_axes, keepdims
-        ) / Scalar[dtype](count)"""
 
         @parameter
         if track_grad:
