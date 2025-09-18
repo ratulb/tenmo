@@ -7,10 +7,18 @@ from shapes import Shape
 from validators import Validator
 
 
-@fieldwise_init
 @register_passable
 struct TileBackward[dtype: DType](Copyable):
     var repeat: IntList
+
+    fn __init__(out self, repeat: IntList):
+        self.repeat = repeat
+
+    fn __copyinit__(out self, existing: Self):
+        self.repeat = existing.repeat.copy()
+
+        _ = """fn __moveinit__(out self, deinit existing: Self):
+        self.repeat = existing.repeat"""
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -25,7 +33,7 @@ struct TileBackward[dtype: DType](Copyable):
         var ancestor_shape = ancestor.shape()
 
         var grad_in = Tensor[dtype].zeros(ancestor_shape)
-        var out_shape = gradients.shape
+        var out_shape = gradients.shape.copy()
         var out_numels = out_shape.num_elements()
 
         for flat_idx in range(out_numels):
@@ -38,7 +46,6 @@ struct TileBackward[dtype: DType](Copyable):
         return [(ancestor, grad_in, AddTensor)]
 
 
-@fieldwise_init
 @register_passable
 struct Tile[dtype: DType]:
     @staticmethod
@@ -60,7 +67,7 @@ struct Tile[dtype: DType]:
         var out = Tensor[dtype](Shape(new_shape), requires_grad=False)
         var out_numels = out.numels()
         var rank = out.rank()
-        var out_shape = out.shape
+        var out_shape = out.shape.copy()
         var src_idx = IntList.with_capacity(rank)
 
         for flat_idx in range(out_numels):
