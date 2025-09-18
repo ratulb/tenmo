@@ -8,13 +8,18 @@ from broadcastbackward import BroadcastBackward
 from common_utils import panic
 
 
-@fieldwise_init
 @register_passable
 struct SubBackward[dtype: DType](Copyable):
     var signs: IntList
 
     fn __init__(out self):
         self.signs = IntList.Empty
+
+    fn __copyinit__(out self, existing: Self):
+        self.signs = existing.signs.copy()
+
+        _ = """fn __moveinit__(out self, deinit existing: Self):
+        self.signs = existing.signs"""
 
     fn negate(mut self, neg: Bool):
         if neg:
@@ -67,7 +72,6 @@ struct SubLeftRightBackwardScalar[dtype: DType](Copyable):
         ]
 
 
-@fieldwise_init
 @register_passable
 struct SubtractScalar[dtype: DType]:
     @staticmethod
@@ -75,19 +79,20 @@ struct SubtractScalar[dtype: DType]:
         track_grad: Bool = True
     ](self: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out: Tensor[dtype]
+        shape = self.shape.copy()
+
         if self.owns_data:
-            out = Tensor[dtype](
-                self.shape, self.buffer - scalar, self.requires_grad
-            )
+            out = Tensor[dtype](shape, self.buffer - scalar, False)
         else:
             buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                out[indices] = self[indices] - scalar
+            out = Tensor[dtype](shape, buffer, False)
+            for idx, value in self:
+                out[idx] = value - scalar
 
         @parameter
         if track_grad:
             if self.requires_grad:
+                out.requires_grad_(True)
                 backward_fn = SubLeftRightBackwardScalar[dtype](
                     False
                 ).into_backward_fn()
@@ -97,7 +102,6 @@ struct SubtractScalar[dtype: DType]:
         return out
 
 
-@fieldwise_init
 @register_passable
 struct SubtractFromScalar[dtype: DType]:
     @staticmethod
@@ -105,19 +109,19 @@ struct SubtractFromScalar[dtype: DType]:
         track_grad: Bool = True
     ](self: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out: Tensor[dtype]
+        shape = self.shape.copy()
         if self.owns_data:
-            out = Tensor[dtype](
-                self.shape, scalar - self.buffer, self.requires_grad
-            )
+            out = Tensor[dtype](shape, scalar - self.buffer, False)
         else:
             buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                out[indices] = scalar - self[indices]
+            out = Tensor[dtype](shape, buffer, False)
+            for idx, value in self:
+                out[idx] = scalar - value
 
         @parameter
         if track_grad:
             if self.requires_grad:
+                out.requires_grad_(True)
                 backward_fn = SubLeftRightBackwardScalar[dtype](
                     True
                 ).into_backward_fn()
@@ -127,7 +131,6 @@ struct SubtractFromScalar[dtype: DType]:
         return out
 
 
-@fieldwise_init
 @register_passable
 struct Subtractor[dtype: DType]:
     @staticmethod
@@ -144,16 +147,17 @@ struct Subtractor[dtype: DType]:
             )
 
         var out: Tensor[dtype]
+        this_shape = self.shape.copy()
         if self.shape != other.shape:
             out = self.broadcast_op(other, scalar_ops[dtype, Subtract])
         else:
             if self.owns_data and other.owns_data:
                 buffer = self.buffer - other.buffer
-                out = Tensor[dtype](self.shape, buffer, False)
+                out = Tensor[dtype](this_shape, buffer, False)
             else:
-                out = Tensor[dtype].zeros(self.shape, False)
-                for indices in self.shape:
-                    out[indices] = self[indices] - other[indices]
+                out = Tensor[dtype].zeros(this_shape, False)
+                for coord in this_shape:
+                    out[coord] = self[coord] - other[coord]
 
         @parameter
         if track_grad:
