@@ -7,11 +7,18 @@ from intlist import IntList
 from common_utils import panic
 
 
-@fieldwise_init
 @register_passable
 struct FlattenBackward[dtype: DType](Copyable):
     var start_dim: Int
     var end_dim: Int
+
+    fn __init__(out self, start_dim: Int, end_dim: Int):
+        self.start_dim = start_dim
+        self.end_dim = end_dim
+
+    fn __copyinit__(out self, existing: Self):
+        self.start_dim = existing.start_dim
+        self.end_dim = existing.end_dim
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
