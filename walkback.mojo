@@ -27,7 +27,7 @@ from division import (
     DivideByScalar,
     Divider,
 )
-from transposebackward import TransposeBackward
+from transpose import TransposeBackward, Transpose
 from viewbackward import ViewBackward
 from permutebackward import PermuteBackward
 from dotbackward import DotBackward
