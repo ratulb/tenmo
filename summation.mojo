@@ -18,6 +18,10 @@ struct SumBackward[dtype: DType](Copyable):
         self.axes = axes
         self.keepdims = keepdims
 
+    fn __copyinit__(out self, existing: Self):
+        self.axes = existing.axes
+        self.keepdims = existing.keepdims
+
     fn backward[
         dtype: DType
     ](self, output: TensorLite[dtype]) -> List[
@@ -70,7 +74,10 @@ struct SumBackward[dtype: DType](Copyable):
 
 
 @register_passable
-struct Summer[dtype: DType](Copyable & Movable):
+struct Summer[dtype: DType](Copyable):
+    fn __copyinit__(out self, existing: Self):
+        pass
+
     @staticmethod
     fn forward[
         track_grad: Bool = True
