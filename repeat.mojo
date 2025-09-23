@@ -7,8 +7,7 @@ from shapes import Shape
 from validators import Validator
 
 
-@register_passable
-struct RepeatBackward[dtype: DType](Copyable):
+struct RepeatBackward[dtype: DType](Copyable & Movable):
     var repeat: IntList
 
     fn __init__(out self, repeat: IntList):
@@ -17,8 +16,8 @@ struct RepeatBackward[dtype: DType](Copyable):
     fn __copyinit__(out self, existing: Self):
         self.repeat = existing.repeat.copy()
 
-        _ = """fn __moveinit__(out self, deinit existing: Self):
-        self.repeat = existing.repeat"""
+    fn __moveinit__(out self, deinit existing: Self):
+        self.repeat = existing.repeat
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -53,7 +52,12 @@ struct RepeatBackward[dtype: DType](Copyable):
 
 
 @register_passable
-struct Repeat[dtype: DType]:
+struct Repeat[dtype: DType](Copyable):
+
+
+    fn __copyinit__(out self, existing: Self):
+        pass
+
     @staticmethod
     fn forward[
         track_grad: Bool = True

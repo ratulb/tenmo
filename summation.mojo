@@ -7,13 +7,12 @@ from backpropagation import Delegate, BackwardFn
 from validators import Validator
 
 
-@register_passable
-struct SumBackward[dtype: DType](Copyable):
+struct SumBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     var keepdims: Bool
 
     fn __init__(
-        out self, axes: IntList = IntList.Empty, keepdims: Bool = False
+        out self, axes: IntList = IntList(), keepdims: Bool = False
     ):
         self.axes = axes
         self.keepdims = keepdims
@@ -22,6 +21,10 @@ struct SumBackward[dtype: DType](Copyable):
         self.axes = existing.axes
         self.keepdims = existing.keepdims
 
+    fn __moveinit__(out self, deinit existing: Self):
+        self.axes = existing.axes
+        self.keepdims = existing.keepdims
+    
     fn backward[
         dtype: DType
     ](self, output: TensorLite[dtype]) -> List[
@@ -37,7 +40,7 @@ struct SumBackward[dtype: DType](Copyable):
         var grad_contrib: Tensor[dtype]
 
         # Handle scalar gradient case (sum reduced to scalar)
-        if gradients.shape == Shape.Void:
+        if gradients.shape == Shape():
             grad_contrib = Tensor[dtype].full(
                 shape,
                 gradients.item(),
@@ -87,17 +90,17 @@ struct Summer[dtype: DType](Copyable):
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        shape = tensor.shape.copy()
+        shape = tensor.shape
         rank = shape.rank()
         normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
         out_shape = shape.compute_output_shape(normalized_axes, keepdims)
         out = Tensor[dtype].zeros(out_shape)
 
-        if out_shape == Shape.Void:
+        if out_shape == Shape():
             if rank == 0:  # Scalar case
-                out[IntList.Empty] = tensor[IntList.Empty]
+                out[IntList()] = tensor[IntList()]
             elif rank == len(normalized_axes) and not keepdims:  # Reducing all
-                out[IntList.Empty] = tensor.sum_all()
+                out[IntList()] = tensor.sum_all()
         else:
             reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
             for out_idx in out_shape:

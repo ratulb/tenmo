@@ -38,10 +38,10 @@ struct Expand[dtype: DType]:
         exp_shape = Shape.broadcast_shape(tensor.shape, target)
 
         ndim_diff = len(exp_shape) - len(tensor.shape)
-        padded_shape = Shape.Unit * ndim_diff + tensor.shape
+        padded_shape = Shape(1) * ndim_diff + tensor.shape
         padded_strides = IntList(0) * ndim_diff + tensor.strides.strides
 
-        exp_strides_list = IntList.Empty
+        exp_strides_list = IntList()
         for i in range(len(exp_shape)):
             if padded_shape[i] == 1 and exp_shape[i] > 1:
                 # Broadcasted dimension → stride 0

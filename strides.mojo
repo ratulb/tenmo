@@ -1,34 +1,32 @@
-from shapes import Shape
 from intlist import IntList
-from os import abort
+from shapes import Shape
 from common_utils import log_debug
 
 
 fn main():
-    strides = Strides([])
-    for i in strides.to_list().__reversed__():
-        print(i)
-    print(Strides.Zero)
+    pass
 
 
-@register_passable
 struct Strides(
-    Sized & Copyable & Stringable & Representable & Writable
+    Sized & Copyable & Movable & Stringable & Representable & Writable
 ):
     var strides: IntList
-    alias Zero = Self(IntList.Empty)
+    # alias Zero = Self(IntList.Empty)
+
+    fn __init__(out self):
+        self.strides = IntList()
 
     fn __init__(out self, values: List[Int]):
         self.strides = IntList.new(values)
 
     fn __init__(out self, values: IntList):
-        self.strides = values.copy()
+        self.strides = values
 
     fn __copyinit__(out self, existing: Self):
-        self.strides = existing.strides.copy()
+        self.strides = existing.strides[::]
 
-        _="""fn __moveinit__(out self, deinit existing: Self):
-        self.strides = existing.strides"""
+    fn __moveinit__(out self, deinit existing: Self):
+        self.strides = existing.strides^
 
     fn __str__(self) -> String:
         var s = String("(")
@@ -50,7 +48,8 @@ struct Strides(
 
     fn __getitem__(self, slice: Slice) -> Self:
         strides = self.strides[slice]
-        return Strides(strides)
+        result = Strides(strides)
+        return result
 
     fn __len__(self) -> Int:
         return len(self.strides)
@@ -70,12 +69,15 @@ struct Strides(
             + ", axes: "
             + axes.__str__()
         )
-
-        return Strides(self.strides.permute(axes))
+        ll = self.strides.permute(axes)
+        result = Strides(ll)
+        return result
 
     @staticmethod
     fn of(*values: Int) -> Self:
-        return Self(IntList(values))
+        ll = IntList(values)
+        result = Self(ll)
+        return result
 
     @staticmethod
     fn default(shape: Shape) -> Self:
@@ -85,7 +87,11 @@ struct Strides(
         for i in reversed(range(rank)):
             strides[i] = acc
             acc *= shape[i]
-        return Strides(strides)
+        result = Strides(strides)
+        return result
+
+    fn __del__(deinit self):
+        self.strides.free()
 
     fn free(deinit self):
         self.strides.free()

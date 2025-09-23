@@ -87,7 +87,7 @@ fn test_empty_shape() raises:
         Shape.of(1).broadcastable(shape),
         "broadcastable assertion 1 failed for empty shape",
     )
-
+    print("We have passed here")
     broadcast_shape = Shape.broadcast_shape(shape, Shape.of(1))
     assert_true(
         broadcast_shape == Shape.of(1),

@@ -166,6 +166,22 @@ struct Validator:
             Shape: Validated concrete shape (e.g., `Shape(2, 6, 10)`).
 
         """
+        if current_shape == Shape(1) and (
+            newdims == IntList() or newdims == IntList(-1)
+        ):
+            return Shape(True)
+
+        if current_shape == Shape() and newdims == IntList():
+            return Shape(True)
+
+        if current_shape == Shape() and (
+            newdims == IntList(1) or newdims == IntList(-1) 
+        ):
+            return Shape(1)
+        
+        if current_shape.num_elements() == newdims.product():
+            return Shape(newdims)
+
         var estimated_size = 1
         var concrete_dims = IntList.with_capacity(len(newdims))
         var infer_index = -1
@@ -272,7 +288,6 @@ struct Validator:
             else:
                 new_shape.append(dim)
                 new_strides.append(stride)
-
         return Shape(new_shape), Strides(new_strides), new_offset
 
     @always_inline

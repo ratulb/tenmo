@@ -54,7 +54,7 @@ struct Squeeze[dtype: DType]:
 
         # Determine which axes to squeeze
         var axes_to_squeeze: IntList
-        if not axes == IntList.Empty:
+        if not axes == IntList():
             # Use the specified axes after validation
             axes_to_squeeze = IntList.with_capacity(rank)
             seen = IntList.with_capacity(len(axes))

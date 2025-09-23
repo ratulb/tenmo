@@ -31,6 +31,7 @@ struct MinMaxBackward[dtype: DType=DType.float32](Copyable & Movable):
         var mask = Tensor[dtype].zeros(ancestor.shape())
         for grad in self.gradbox:
             mask[grad[0]] = rebind[Scalar[dtype]](grad[1])
+
         var shape = ancestor.shape()
         var rank = shape.rank()
 
@@ -38,7 +39,7 @@ struct MinMaxBackward[dtype: DType=DType.float32](Copyable & Movable):
         if rank == 0:
             return [(ancestor, gradients, AddTensor)]
 
-        if gradients.shape == Shape.Void:
+        if gradients.shape == Shape():
             # Scalar upstream grad → same scalar everywhere that was max
             # Build a tensor of that scalar, then mask it
             var filled = Tensor[dtype].full(
@@ -53,9 +54,11 @@ struct MinMaxBackward[dtype: DType=DType.float32](Copyable & Movable):
             var grad_like_input: Tensor[dtype]
             # Non-scalar upstream grad
             if not self.keepdims:
-                grad_like_input = gradients.unsqueeze(
+                grad_unsqueezed = gradients.unsqueeze(
                     self.axes, False
-                ).broadcast_to(shape)
+                )
+                grad_like_input = grad_unsqueezed.broadcast_to(shape)
+                
             else:
                 # keepdims=True: just broadcast to input shape
                 grad_like_input = gradients.broadcast_to(shape)
@@ -87,11 +90,11 @@ struct MinMax[dtype: DType=DType.float32]:
         # Keep grad shares in gradbox which contains index, grad value(IntList, Scalar)
         var gradbox: Gradbag[dtype] = Gradbag[dtype]()
 
-        if out_shape == Shape.Void:
+        if out_shape == Shape():
             if rank == 0:
                 # scalar input -> min/max is the value itself; mask = 1
-                var v = self[IntList.Empty]
-                out[IntList.Empty] = v
+                var v = self[IntList()]
+                out[IntList()] = v
             elif rank == len(normalized_axes) and not keepdims:
                 # reduce all dims -> scalar: find all positions equal to global max
                 var first_iter = True
@@ -141,7 +144,7 @@ struct MinMax[dtype: DType=DType.float32]:
                                     best_positions.append(idx)
                                 pass
 
-                out[IntList.Empty] = best_value
+                out[IntList()] = best_value
 
                 @parameter
                 if track_grad:
@@ -246,7 +249,7 @@ fn main() raises:
     mx.print()
     mx.backward()
     a.gradbox[].print()"""
-    min_ = MinMax.forward[False, False](a, IntList.Empty)
+    min_ = MinMax.forward[False, False](a, IntList())
     print("min_ has backward fn? ", min_.has_backward_fn())
     min_.backward()
     print()

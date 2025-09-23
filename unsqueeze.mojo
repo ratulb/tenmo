@@ -9,8 +9,7 @@ from squeeze import Squeeze
 from common_utils import panic
 
 
-@register_passable
-struct UnsqueezeBackward[dtype: DType](Copyable):
+struct UnsqueezeBackward[dtype: DType](Copyable & Movable):
     var axes: IntList  # where axes were inserted
 
     fn __init__(out self, axes: IntList):
@@ -19,8 +18,8 @@ struct UnsqueezeBackward[dtype: DType](Copyable):
     fn __copyinit__(out self, existing: Self):
         self.axes = existing.axes.copy()
 
-        _ = """fn __moveinit__(out self, deinit existing: Self):
-        self.axes = existing.axes"""
+    fn __moveinit__(out self, deinit existing: Self):
+        self.axes = existing.axes
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -40,7 +39,11 @@ struct UnsqueezeBackward[dtype: DType](Copyable):
 
 
 @register_passable
-struct Unsqueeze[dtype: DType]:
+struct Unsqueeze[dtype: DType](Copyable):
+
+    fn __copyinit__(out self, existing: Self):
+        pass
+
     @staticmethod
     fn unsqueeze(
         tensor: Tensor[dtype],

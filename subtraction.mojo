@@ -8,18 +8,17 @@ from broadcastbackward import BroadcastBackward
 from common_utils import panic
 
 
-@register_passable
-struct SubBackward[dtype: DType](Copyable):
+struct SubBackward[dtype: DType](Copyable & Movable):
     var signs: IntList
 
     fn __init__(out self):
-        self.signs = IntList.Empty
+        self.signs = IntList()
 
     fn __copyinit__(out self, existing: Self):
         self.signs = existing.signs.copy()
 
-        _ = """fn __moveinit__(out self, deinit existing: Self):
-        self.signs = existing.signs"""
+    fn __moveinit__(out self, deinit existing: Self):
+        self.signs = existing.signs
 
     fn negate(mut self, neg: Bool):
         if neg:
@@ -52,10 +51,15 @@ struct SubBackward[dtype: DType](Copyable):
         return grad_outputs
 
 
-@fieldwise_init
 @register_passable
 struct SubLeftRightBackwardScalar[dtype: DType](Copyable):
     var negate: Bool
+
+    fn __init__(out self, negate: Bool):
+        self.negate = negate
+
+    fn __copyinit__(out self, existing: Self):
+        self.negate = existing.negate
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -73,7 +77,11 @@ struct SubLeftRightBackwardScalar[dtype: DType](Copyable):
 
 
 @register_passable
-struct SubtractScalar[dtype: DType]:
+struct SubtractScalar[dtype: DType](Copyable):
+
+    fn __copyinit__(out self, existing: Self):
+        pass
+
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -103,7 +111,11 @@ struct SubtractScalar[dtype: DType]:
 
 
 @register_passable
-struct SubtractFromScalar[dtype: DType]:
+struct SubtractFromScalar[dtype: DType](Copyable):
+
+    fn __copyinit__(out self, existing: Self):
+        pass
+
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -132,7 +144,11 @@ struct SubtractFromScalar[dtype: DType]:
 
 
 @register_passable
-struct Subtractor[dtype: DType]:
+struct Subtractor[dtype: DType](Copyable):
+
+    fn __copyinit__(out self, existing: Self):
+        pass
+
     @staticmethod
     fn forward[
         track_grad: Bool = True

@@ -27,26 +27,29 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
-        self.size = existing.size
-        self.capacity = existing.capacity
         if existing.size > 0:
+            self.size = existing.size
+            self.capacity = existing.capacity
             self.ancestors = UnsafePointer[
                 UnsafePointer[TensorLite[dtype]]
             ].alloc(existing.size)
             memcpy(self.ancestors, existing.ancestors, existing.size)
         else:
             self.ancestors = UnsafePointer[UnsafePointer[TensorLite[dtype]]]()
+            self.size = 0
+            self.capacity = 0
 
     fn __moveinit__(out self, deinit existing: Self):
         self.size = existing.size
         self.capacity = existing.capacity
-        if existing.size > 0:
+        self.ancestors = existing.ancestors
+        _="""if existing.size > 0:
             self.ancestors = UnsafePointer[
                 UnsafePointer[TensorLite[dtype]]
             ].alloc(existing.size)
             memcpy(self.ancestors, existing.ancestors, existing.size)
         else:
-            self.ancestors = UnsafePointer[UnsafePointer[TensorLite[dtype]]]()
+            self.ancestors = UnsafePointer[UnsafePointer[TensorLite[dtype]]]()"""
 
     @staticmethod
     fn untracked() -> Ancestors[dtype]:

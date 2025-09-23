@@ -37,13 +37,14 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn __moveinit__(out self, deinit other: Self):
         self.size = other.size
-        self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
-        memcpy(self.data, other.data, other.size)
+        self.data = other.data
+
 
     fn __copyinit__(out self, other: Self):
         self.size = other.size
-        self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
-        memcpy(self.data, other.data, other.size)
+        self.data = other.data
+        #self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
+        #memcpy(self.data, other.data, other.size)
 
     fn clone(self) -> Buffer[dtype]:
         data = UnsafePointer[Scalar[dtype]].alloc(self.size)

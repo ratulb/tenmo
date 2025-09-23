@@ -7,24 +7,23 @@ from backpropagation import Delegate, BackwardFn
 from validators import Validator
 
 
-@register_passable
-struct MeanBackward[dtype: DType](Copyable):
+struct MeanBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     var keepdims: Bool
 
     fn __init__(
-        out self, axes: IntList = IntList.Empty, keepdims: Bool = False
+        out self, axes: IntList = IntList(), keepdims: Bool = False
     ):
         self.axes = axes
         self.keepdims = keepdims
 
     fn __copyinit__(out self, other: Self):
-        self.axes = other.axes.copy()
+        self.axes = other.axes
         self.keepdims = other.keepdims
 
-        _ = """fn __moveinit__(out self, deinit other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         self.axes = other.axes
-        self.keepdims = other.keepdims"""
+        self.keepdims = other.keepdims
 
     fn backward[
         dtype: DType
@@ -33,7 +32,7 @@ struct MeanBackward[dtype: DType](Copyable):
     ]:
         gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
-        if gradients.shape == Shape.Void:
+        if gradients.shape == Shape():
             scalar_grad = gradients.item() / ancestor.shape().num_elements()
             grad_contrib = Tensor[dtype].full(
                 ancestor.shape(),
@@ -79,7 +78,12 @@ struct MeanBackward[dtype: DType](Copyable):
 
 
 @register_passable
-struct Mean[dtype: DType]:
+struct Mean[dtype: DType](Copyable):
+
+
+    fn __copyinit__(out self, other: Self):
+        pass
+
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -105,7 +109,7 @@ struct Mean[dtype: DType]:
             if grad_required:
                 out.requires_grad_(True)
                 backward_fn = MeanBackward[dtype](
-                    normalized_axes.copy(), keepdims
+                    normalized_axes, keepdims
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite.of(tensor))

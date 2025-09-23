@@ -6,8 +6,7 @@ from intlist import IntList
 from validators import Validator
 
 
-@register_passable
-struct TransposeBackward[dtype: DType](Copyable):
+struct TransposeBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     
     fn __init__(out self, axes: IntList):
@@ -16,8 +15,8 @@ struct TransposeBackward[dtype: DType](Copyable):
     fn __copyinit__(out self, existing: Self):
         self.axes = existing.axes.copy()
 
-        _="""fn __moveinit__(out self, deinit existing: Self):
-        self.axes = existing.axes"""
+    fn __moveinit__(out self, deinit existing: Self):
+        self.axes = existing.axes
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))

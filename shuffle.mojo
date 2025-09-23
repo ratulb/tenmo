@@ -33,7 +33,7 @@ struct ShuffleBackward[dtype: DType](Copyable & Movable):
         # Scatter gradients back using the original permutation
         # For each position in the output gradient, find where it came from in the input
         for grad_coord in shape:
-            parent_coord = grad_coord.copy()
+            parent_coord = grad_coord
             parent_coord[self.axis] = self.permutation[grad_coord[self.axis]]
             parent_grad[parent_coord] = gradients[grad_coord]
 
@@ -72,10 +72,10 @@ struct Shuffle[dtype: DType](Copyable):
         var out = Tensor[dtype].zeros(shape)
 
         for coord in shape:
-            shifted_src_coord = coord.copy()
+            shifted_src_coord = coord[::]
             shifted_src_coord[axis] = permutation[coord[axis]]
             out[coord] = self[shifted_src_coord]
-
+        
         # Attach autograd info
         @parameter
         if track_grad:
@@ -90,7 +90,7 @@ struct Shuffle[dtype: DType](Copyable):
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite.of(self))
-
+        
         return out
 
 
@@ -103,12 +103,14 @@ from testing import assert_true
 
 
 fn test_shuffle() raises:
-    print("test_shuffle")
+    print("test_shuffle\n")
     perm = List(2, 3, 0, 4, 1)
     a = Tensor.arange(5, requires_grad=True)
     shuffled = a.shuffle(perm=perm)
+    print("\nshuffled: \n")
     shuffled.print()
-
+    print()
+    print()
     sliced = shuffled[1:4]
     print()
     sliced.print()

@@ -1,12 +1,15 @@
 from memory import memcpy, memset, Pointer
-from os import abort
-from common_utils import log_debug, panic
+from common_utils import log_debug, panic, is_null
 
-@register_passable
+
 struct IntList(
-    Sized & Copyable & Stringable & Representable & Writable
+    Sized
+    & Copyable
+    & Movable
+    & Stringable
+    & Representable
+    & Writable  # & UnknownDestructibility
 ):
-    alias Empty = IntList()
     var data: UnsafePointer[Int]
     var size: Int
     var capacity: Int
@@ -47,23 +50,18 @@ struct IntList(
         for idx in range(len(elems)):
             (self.data + idx)[] = elems[idx]
 
-        _="""@always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
         self.size = existing.size
         self.capacity = existing.capacity
-        self.data = existing.data"""
- 
-    @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
-        self.size = existing.size
-        self.capacity = existing.capacity
+        # self.data = existing.data
         self.data = UnsafePointer[Int].alloc(existing.capacity)
         memcpy(self.data, existing.data, existing.size)
 
-        _="""fn __moveinit__(out self, deinit existing: Self):
+    fn __moveinit__(out self, deinit existing: Self):
         self.size = existing.size
         self.capacity = existing.capacity
-        self.data = existing.data"""
+        self.data = existing.data
 
     @staticmethod
     fn new(src: List[Int]) -> IntList:
@@ -91,15 +89,15 @@ struct IntList(
 
     @staticmethod
     fn with_capacity(capacity: Int, fill: Optional[Int] = None) -> IntList:
-        array = Self()
-        array.data = UnsafePointer[Int].alloc(capacity)
-        array.capacity = capacity
-        array.size = 0
+        out = Self()
+        out.data = UnsafePointer[Int].alloc(capacity)
+        out.capacity = capacity
+        out.size = 0
         if fill:
             for idx in range(capacity):
-                (array.data + idx)[] = fill.value()
-            array.size = capacity
-        return array
+                (out.data + idx)[] = fill.value()
+            out.size = capacity
+        return out
 
     fn product(self) -> Int:
         result = 1
@@ -117,12 +115,14 @@ struct IntList(
         if len(self) <= 1:
             return False
         var sorted_list = self.sorted()
-
+        has_dupe = False
         for i in range(len(sorted_list) - 1):
             if sorted_list[i] == sorted_list[i + 1]:
-                return True
+                has_dupe = True
+                break
 
-        return False
+        # sorted_list.free()
+        return has_dupe
 
     fn permute(self, axes: IntList) -> IntList:
         if not len(self) == len(axes):
@@ -142,7 +142,7 @@ struct IntList(
                 panic("IntList -> permute: duplicate axis", ax.__str__())
             seen.append(axis)
             permuted.append(self[axis])
-        seen.free()
+        # seen.free()
         return permuted
 
     fn swap(mut self, this_index: Int, that_index: Int):
@@ -189,7 +189,7 @@ struct IntList(
 
         for i in indices:
             if i < 0 or i >= n:
-                abort(
+                panic(
                     "Index out of bounds in IntList - select: "
                     + String(i)
                     + ", not in [0, "
@@ -238,7 +238,7 @@ struct IntList(
 
     fn insert(self, indices: IntList, values: IntList) -> IntList:
         if len(indices) != len(values):
-            abort("IntList -> insert: indices and values must be same length")
+            panic("IntList -> insert: indices and values must be same length")
 
         n = len(self)
         m = len(indices)
@@ -247,7 +247,7 @@ struct IntList(
                 return IntList()
             # Ensure indices = [0, 1, ..., m-1]
             if not indices.is_strictly_increasing_from_zero():
-                abort(
+                panic(
                     "IntList -> insert: invalid idices for empty list insertion"
                 )
             return values
@@ -263,7 +263,7 @@ struct IntList(
                 red_cursor += 1
             else:
                 if orig_cursor >= n:
-                    abort(
+                    panic(
                         "IntList -> insert: ran out of source values too early"
                     )
                 result.append(self[orig_cursor])
@@ -274,7 +274,7 @@ struct IntList(
         # Insert `value` at position `at` in `self`, return a new IntList
         # `at` could be start, middle or end
         if at < 0 or at > len(self):
-            abort("IntList -> insert - index out of bounds: " + String(at))
+            panic("IntList -> insert - index out of bounds: " + String(at))
 
         result = IntList.with_capacity(len(self) + 1)
         for i in range(result.capacity):
@@ -286,11 +286,18 @@ struct IntList(
         return result
 
     @always_inline("nodebug")
-    # fn __del__(owned self):
     fn free(deinit self):
         """Destroy the `IntList` and free its memory."""
         if self.data:
             log_debug("Calling IntList __del__")
+            self.data.free()
+
+    @always_inline("nodebug")
+    fn __del__(deinit self):
+        """Destroy the `IntList` and free its memory."""
+        if self.data:
+            log_debug("Calling IntList __del__")
+            # print("Calling IntList __del__")
             self.data.free()
 
     fn clear(mut self):
@@ -335,13 +342,13 @@ struct IntList(
 
     fn pop(mut self, index: Int = -1) -> Int:
         if len(self) < 1:
-            abort("cannot pop from empty IntList")
+            panic("cannot pop from empty IntList")
 
         var i = index
         if i < 0:
             i += self.size
         if i < 0 or i >= len(self):
-            abort("pop index out of bounds")
+            panic("pop index out of bounds")
 
         val = (self.data + i).take_pointee()
         for j in range(i + 1, self.size):
@@ -351,10 +358,16 @@ struct IntList(
         return val
 
     fn __radd__(self: IntList, other: List[Int]) -> IntList:
-        return IntList(other).__add__(self)
+        ll = IntList(other)
+        result = ll.__add__(self)
+        # ll.free()
+        return result
 
     fn __add__(self: IntList, other: List[Int]) -> IntList:
-        return self.__add__(IntList(other))
+        ll = IntList(other)
+        result = self.__add__(ll)
+        # ll.free()
+        return result
 
     fn __add__(self: IntList, other: IntList) -> IntList:
         if (
@@ -384,7 +397,7 @@ struct IntList(
         """
         index = idx if idx >= 0 else idx + self.__len__()
         if index < 0 or index >= len(self):
-            abort("IntList __getitem__  → Out-of-bounds read: " + String(idx))
+            panic("IntList __getitem__  → Out-of-bounds read: " + String(idx))
 
         return (self.data + index)[]
 
@@ -399,7 +412,7 @@ struct IntList(
         """
 
         if idx < 0 or idx > len(self):
-            abort("IntList __setitem__ -> Cannot skip indices")
+            panic("IntList __setitem__ -> Cannot skip indices")
         if idx == self.size:
             self.append(value)
         else:
@@ -424,13 +437,13 @@ struct IntList(
         m = len(indices)
 
         if m != len(values):
-            abort("IntList -> replace: indices and values must be same length")
+            panic("IntList -> replace: indices and values must be same length")
 
         # Validate indices: no out-of-bounds, no duplicates
         for i in range(m):
             idx = indices[i]
             if idx < 0 or idx >= n:
-                abort("IntList -> replace: index out of bounds: " + String(idx))
+                panic("IntList -> replace: index out of bounds: " + String(idx))
 
         result = self[::]
 
@@ -505,10 +518,10 @@ struct IntList(
 
         # --- Safety checks ---
         if dst_offset < 0 or src_offset < 0 or size < 0:
-            abort("Negative offset/size not allowed")
+            panic("Negative offset/size not allowed")
 
         if src_offset + size > source.size:
-            abort("Source range out of bounds")
+            panic("Source range out of bounds")
 
         required_dst_size = dst_offset + size
 
@@ -735,7 +748,6 @@ struct ZipIterator[
         self.src_this = existing.src_this
         self.src_that = existing.src_that
 
-
     fn __iter__(self) -> Self:
         return self
 
@@ -770,7 +782,3 @@ struct ZipIterator[
             return min(len(self.src_this[]), len(self.src_that[])) - self.index
         else:
             return self.index
-
-
-fn main() raises:
-    pass

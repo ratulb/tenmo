@@ -61,5 +61,23 @@ struct Reshape[dtype: DType](Copyable):
         return out
 
 
-fn main():
-    print("passes")
+fn main() raises:
+
+    test_reshape_preserves_grad_accumulation()
+    print("\npasses\n")
+
+
+from testing import assert_true
+
+fn test_reshape_preserves_grad_accumulation() raises:
+    print("test_reshape_preserves_grad_accumulation")
+    # Chained reshape should still accumulate gradients
+    a = Tensor.of(1.0, 2.0, 3.0, requires_grad=True)
+    print("shapes: ", Shape.of(3), Shape.of(1, 3))
+    b = a.reshape(Shape.of(3))
+    c = b.reshape(Shape.of(1, 3))
+
+    #d = c.sum()
+    c.backward()
+    a.gradbox[].print()
+    assert_true((a.gradbox[] == Tensor.of(1.0, 1, 1)).all_true()) 

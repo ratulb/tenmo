@@ -111,8 +111,12 @@ struct TensorLite[dtype: DType](
     fn backward(root: Self, start_grad: Scalar[dtype] = 1.0):
         if not root.requires_grad():
             return
-        seed_tensor = Tensor[dtype].full(root.shape(), start_grad)
+        root_shape = root.shape()
+        shape = root_shape[::]
+        seed_tensor = Tensor[dtype].full(shape, start_grad)
         root.backward(seed_tensor)
+        root_shape.free()
+        shape.free()
 
         _ = """fn backward(root: Self, seed_tensor: Tensor[dtype]):
         if not root.requires_grad():
@@ -143,7 +147,8 @@ struct TensorLite[dtype: DType](
             # seed the output grad
             root.seed_grad(seed_tensor)
 
-            traced = IntList.Empty
+            #traced = IntList.Empty
+            traced = IntList()
             streams = List[GradStream[dtype]]()
             use_count = Dict[
                 Int, Int
