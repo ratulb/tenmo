@@ -3,12 +3,7 @@ from common_utils import log_debug, panic, is_null
 
 
 struct IntList(
-    Sized
-    & Copyable
-    & Movable
-    & Stringable
-    & Representable
-    & Writable  # & UnknownDestructibility
+    Sized & Copyable & Movable & Stringable & Representable & Writable
 ):
     var data: UnsafePointer[Int]
     var size: Int
@@ -54,7 +49,6 @@ struct IntList(
     fn __copyinit__(out self, existing: Self):
         self.size = existing.size
         self.capacity = existing.capacity
-        # self.data = existing.data
         self.data = UnsafePointer[Int].alloc(existing.capacity)
         memcpy(self.data, existing.data, existing.size)
 
@@ -121,7 +115,7 @@ struct IntList(
                 has_dupe = True
                 break
 
-        # sorted_list.free()
+        sorted_list.free()
         return has_dupe
 
     fn permute(self, axes: IntList) -> IntList:
@@ -142,7 +136,7 @@ struct IntList(
                 panic("IntList -> permute: duplicate axis", ax.__str__())
             seen.append(axis)
             permuted.append(self[axis])
-        # seen.free()
+        seen.free()
         return permuted
 
     fn swap(mut self, this_index: Int, that_index: Int):
@@ -360,13 +354,13 @@ struct IntList(
     fn __radd__(self: IntList, other: List[Int]) -> IntList:
         ll = IntList(other)
         result = ll.__add__(self)
-        # ll.free()
+        ll.free()
         return result
 
     fn __add__(self: IntList, other: List[Int]) -> IntList:
         ll = IntList(other)
         result = self.__add__(ll)
-        # ll.free()
+        ll.free()
         return result
 
     fn __add__(self: IntList, other: IntList) -> IntList:
