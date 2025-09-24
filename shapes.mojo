@@ -44,8 +44,6 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
 struct Shape(
     Sized & Stringable & Writable & Representable & Copyable & Movable
 ):
-    # alias Unit = Shape.of(1)
-    # alias Void = Shape(IntList.Empty)
     var axes_spans: IntList
     var ndim: Int
     var numels: Int
@@ -59,7 +57,6 @@ struct Shape(
         spans = IntList.with_capacity(len(dims))
         for each in dims:
             spans.append(each)
-        # self = Self(spans[::])
         self = Self(spans)
 
     fn __init__(out self, *values: Int):
@@ -85,10 +82,10 @@ struct Shape(
         ndim = len(dims)
         # Allow scalar tensors (rank 0, i.e., Shape())
         if ndim == 0:
-            # self.axes_spans = IntList.Empty
-            self.axes_spans = IntList()
-            self.ndim = 0
-            self.numels = 1
+            # self.axes_spans = IntList()
+            # self.ndim = 0
+            # self.numels = 1
+            self = Self(True)
             return
         numels = 1
         for i in range(ndim):

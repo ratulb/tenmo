@@ -11,7 +11,6 @@ struct Strides(
     Sized & Copyable & Movable & Stringable & Representable & Writable
 ):
     var strides: IntList
-    # alias Zero = Self(IntList.Empty)
 
     fn __init__(out self):
         self.strides = IntList()
