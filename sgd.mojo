@@ -44,12 +44,12 @@ struct SGD[dtype: DType = DType.float32](Copyable & Movable):
 
     # Copy/move initializers (default shallow pointer copies are fine).
     fn __copyinit__(out self, existing: Self):
-        self.params = existing.params
+        self.params = existing.params.copy()
         self.lr = existing.lr
         self.zero_grad_post_step = existing.zero_grad_post_step
 
     fn __moveinit__(out self, deinit existing: Self):
-        self.params = existing.params
+        self.params = existing.params^
         self.lr = existing.lr
         self.zero_grad_post_step = existing.zero_grad_post_step
 
