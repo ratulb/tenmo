@@ -487,9 +487,9 @@ fn test_into_tensor_offset_view() raises:
 fn test_into_tensor_scalar_view() raises:
     print("test_into_tensor_scalar_view")
     var t = Tensor.scalar(42)
-    var v = t.view(Shape.Void)
+    var v = t.view(Shape())
     var out = v.contiguous()
-    assert_true(out.shape == Shape.Void)
+    assert_true(out.shape == Shape())
     assert_true(out.item() == 42)
 
 
