@@ -496,6 +496,10 @@ struct Shape(
         return self.axes_spans[::]
 
     @always_inline
+    fn tolist(self) -> List[Int]:
+        return self.axes_spans.tolist()
+
+    @always_inline
     fn product(shape: Shape) -> Int:
         return shape.intlist().product()
 
@@ -504,5 +508,5 @@ struct Shape(
         return Shape(dims)
 
 
-fn main():
+fn main() raises:
     pass

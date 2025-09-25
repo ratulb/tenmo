@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|buffers|views|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
+    echo "Usage: $0 [tensors|buffers|views|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|numpy_io|all]"
     exit 1
 fi
 
@@ -22,6 +22,11 @@ case $1 in
         echo "Running crossentropy loss tests"
         mojo -I . $DEBUG_MODE tests/test_cross_entropy.mojo
         ;;
+    numpy_io)
+        echo "Running numpy interop tests"
+        mojo -I . $DEBUG_MODE tests/test_numpy_interop.mojo
+        ;;
+
     synth_smoke)
         echo "Running synthetic smoke tests"
         mojo -I . $DEBUG_MODE tests/test_synthetic_smoke.mojo
@@ -80,6 +85,8 @@ case $1 in
         mojo -I . tests/test_synthetic_smoke.mojo
         echo "Running crossentropy loss tests"
         mojo -I . tests/test_cross_entropy.mojo
+        echo "Running numpy interop tests"
+        mojo -I . tests/test_numpy_interop.mojo
         echo "Running view test cases"
         mojo -I . tests/test_views.mojo
         echo "Running shape test cases"
@@ -99,7 +106,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: tensors, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
+        echo "Available tests: tensors, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, numpy_io, all"
         exit 1
         ;;
 esac
