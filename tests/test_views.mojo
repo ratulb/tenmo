@@ -10,9 +10,9 @@ fn main() raises:
     test_into_tensor_isolated_memory()
     test_identity_permutation()
     test_slice_every_second_row_column1()
-    test_edge_case_indexing() #revist
-    #test_mixed_indexing()
-    #test_newaxis_dimension_insertion()
+    test_edge_case_indexing()  # revist
+    # test_mixed_indexing()
+    # test_newaxis_dimension_insertion()
     test_basic_slicing()
     # test_newaxis()
     test_scalar_view()
@@ -487,7 +487,7 @@ fn test_into_tensor_offset_view() raises:
 fn test_into_tensor_scalar_view() raises:
     print("test_into_tensor_scalar_view")
     var t = Tensor.scalar(42)
-    var v = t.view(Shape())
+    var v = t.view(Shape(True))
     var out = v.contiguous()
     assert_true(out.shape == Shape())
     assert_true(out.item() == 42)
@@ -536,7 +536,7 @@ fn test_into_tensor_isolated_memory() raises:
     v = t[1:3]  # [2, 3]
     var out = v.contiguous()
     v[0] = 999
-    
+
     assert_true(out.all_close(Tensor.d1([2, 3])))  # Unaffected by view mutation
     _ = t
     _ = """fn test_into_tensor_strided_view_rows() raises:
@@ -572,11 +572,9 @@ fn test_backward_through_nested_views_non_contiguous() raises:
     c = p.contiguous()
     s = c.sum()
     s.backward(42)
+    assert_true(Strides.default(a.gradbox[].shape) == Strides.default(a.shape))
     assert_true(
-        Strides.default(a.gradbox[].shape) == Strides.default(a.shape)
-    )
-    assert_true(
-        #(a.gradbox[] == Tensor.full(Shape([4, 4]), 42)).all_true(),
+        # (a.gradbox[] == Tensor.full(Shape([4, 4]), 42)).all_true(),
         a.gradbox[].all_close(Tensor.full(Shape([4, 4]), 42)),
         "grad propagation through contiguous failed",
     )

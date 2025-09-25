@@ -15,7 +15,6 @@ struct Buffer[dtype: DType = DType.float32](
 ):
     var size: Int
     var data: UnsafePointer[Scalar[dtype]]
-    alias Empty = Buffer[dtype]()
 
     fn __init__(out self):
         self.size = 0
@@ -39,12 +38,10 @@ struct Buffer[dtype: DType = DType.float32](
         self.size = other.size
         self.data = other.data
 
-
     fn __copyinit__(out self, other: Self):
         self.size = other.size
-        self.data = other.data
-        #self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
-        #memcpy(self.data, other.data, other.size)
+        self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
+        memcpy(self.data, other.data, other.size)
 
     fn clone(self) -> Buffer[dtype]:
         data = UnsafePointer[Scalar[dtype]].alloc(self.size)
@@ -63,7 +60,7 @@ struct Buffer[dtype: DType = DType.float32](
         var spread = range(start, end, step)
 
         if not len(spread):
-            return Buffer[dtype].Empty
+            return Buffer[dtype]()
 
         # Calculate the correct size based on the actual number of elements
         var result_size = len(spread)

@@ -12,6 +12,7 @@ from intlist import IntList
 from ancestry import Ancestors
 from strides import Strides
 from common_utils_imports import *
+from common_utils import id as identity
 from operators_imports import *
 from walkback import *
 from buffers import Buffer
@@ -67,7 +68,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.gradbox = UnsafePointer[Tensor[dtype]]()
         self.backwardFn = None
         self.ancestors = Ancestors[dtype].untracked()
-        self.buffer = Buffer[dtype].Empty
+        self.buffer = Buffer[dtype]()
         self.owns_data = False
         self._contiguous = False
         self._contiguous = self.is_contiguous()
@@ -127,11 +128,11 @@ struct Tensor[dtype: DType = DType.float32](
         self.owns_data = other.owns_data
 
     fn __copyinit__(out self, other: Self):
-        self.shape = other.shape[::]
-        self.strides = other.strides[::]
+        self.shape = other.shape.copy()
+        self.strides = other.strides.copy()
         self.offset = other.offset
         self._contiguous = other._contiguous
-        self.buffer = other.buffer.clone()
+        self.buffer = other.buffer.copy()
         self.requires_grad = other.requires_grad
         self.gradbox = other.gradbox
         self.ancestors = other.ancestors
@@ -140,7 +141,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.owns_data = other.owns_data
 
     fn id(self) -> Int:
-        return Int(UnsafePointer(to=self))
+        return identity(self)
 
     fn init_gradbox(mut self):
         if self.requires_grad and not self.gradbox.__as_bool__():
@@ -1004,9 +1005,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn scalar(val: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
-        # result = Tensor[dtype](Shape.Void, requires_grad=requires_grad)
         result = Tensor[dtype](Shape(True), requires_grad=requires_grad)
-        # result[IntList.Empty] = val
         result[IntList()] = val
         return result
 
@@ -1421,9 +1420,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         # Handle scalar (rank-0) case
         is_scalar = len(view_shape) == 0
-        # shape = Shape.Void if is_scalar else view_shape
         shape = Shape(True) if is_scalar else view_shape
-        # strides = Strides.Zero if is_scalar else view_strides
         strides = Strides() if is_scalar else view_strides
         return self.view(
             shape=shape,
@@ -1586,7 +1583,6 @@ struct Tensor[dtype: DType = DType.float32](
         do_multiply: Bool,
     ) -> Tensor[dtype]:
         var grad_contrib: Tensor[dtype]
-        # if upstream_grad.shape == Shape.Void:
         if upstream_grad.shape == Shape():
             grad_contrib = Tensor[dtype].full(
                 self.shape, upstream_grad.item(), requires_grad=False

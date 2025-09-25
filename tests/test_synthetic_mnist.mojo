@@ -153,15 +153,15 @@ fn main():
     var criterion = CrossEntropyLoss[DType.float32]()
     var optimizer = SGD[DType.float32](model.parameters_ptrs(), lr=0.01)
     # Train
-    fit(model, optimizer, criterion, train_x, train_y, epochs=40, batch_size=8)
-    _ = """epochs = 40
+    # fit(model, optimizer, criterion, train_x, train_y, epochs=40, batch_size=8)
+    epochs = 40
     batch_size = 8
     for epoch in range(epochs):
         var epoch_loss: Float32 = 0.0
         var correct: Int = 0
         var total: Int = 0
         batches = get_batches(train_x, train_y, batch_size)
-        for (xb, yb) in batches:
+        for xb, yb in batches:
             # Forward
             var logits = model(xb)
             var loss = criterion(logits, yb)
@@ -171,15 +171,20 @@ fn main():
 
             # Step
             optimizer.step()
-            
+
             # Track loss
             epoch_loss += loss.item()
             preds = logits.argmax(axis=1).float()
             result = preds == yb
-            
+
             correct += Int((result).float().sum().item())
             total += yb.shape[0]
-            
-        print("Epoch", epoch, 
-              "Loss:", epoch_loss / total, 
-              "Accuracy:", Float32(correct) / Float32(total))"""
+
+        print(
+            "Epoch",
+            epoch,
+            "Loss:",
+            epoch_loss / total,
+            "Accuracy:",
+            Float32(correct) / Float32(total),
+        )

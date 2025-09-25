@@ -33,10 +33,27 @@ fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
     np = Python.import_module("numpy")
     ndarray = np.zeros(tensor.numels(), dtype=numpy_dtype(tensor.dtype))
     ndarray_ptr = ndarray_ptr[dtype](ndarray)
-    buffer_ptr = tensor.data_ptr()
-    memcpy(ndarray_ptr, buffer_ptr, tensor.numels())
+    if tensor.owns_data:
+        buffer_ptr = tensor.buffer.data
+        memcpy(ndarray_ptr, buffer_ptr, tensor.numels())
+    else:
+        idx = 0
+        for coord in tensor.shape:
+            ndarray[idx] = tensor[coord]
+            idx += 1
     return ndarray
 
 
-fn main():
-    pass
+fn main() raises:
+    a = Tensor.arange(10)
+    a.print()  # print mojo Tensor
+    print()
+    result = to_ndarray(a)
+    print(result)  # numpy array
+    print()
+    b = a.view([5], offset=2)
+    b.print()  # mojo view
+    print()
+    from_view = to_ndarray(b)
+    print(from_view)  # numpy array
+    print()

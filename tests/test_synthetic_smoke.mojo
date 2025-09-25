@@ -41,7 +41,7 @@ fn make_synthetic_dataset(
 
 
 fn test_tiny_training_smoke() raises:
-    print("test_tiny_training_smoke_and_flatten_grad")
+    print("test_tiny_training_smoke")
 
     # --- synthetic training ---
     var (X, y) = make_synthetic_dataset(32)
