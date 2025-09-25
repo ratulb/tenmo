@@ -1,6 +1,8 @@
 from python import Python, PythonObject
 from tensors import Tensor
 from memory import memcpy
+from shapes import Shape
+from buffers import Buffer
 
 
 fn numpy_dtype(dtype: DType) raises -> PythonObject:
@@ -20,7 +22,16 @@ fn numpy_dtype(dtype: DType) raises -> PythonObject:
     elif dtype == DType.uint64:
         return np.uint64
     else:
-        return None
+        raise Error("Unsupported dtype for python interop")
+
+
+fn list_to_tuple(l: List[Int]) raises -> PythonObject:
+    py = Python.import_module("builtins")
+    var py_list_obj: PythonObject = []
+    for elem in l:
+        py_list_obj.append(elem)
+    py_tuple = py.tuple(py_list_obj)
+    return py_tuple
 
 
 fn ndarray_ptr[
@@ -31,29 +42,46 @@ fn ndarray_ptr[
 
 fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
     np = Python.import_module("numpy")
-    ndarray = np.zeros(tensor.numels(), dtype=numpy_dtype(tensor.dtype))
-    ndarray_ptr = ndarray_ptr[dtype](ndarray)
+    shape_tuple = list_to_tuple(tensor.shape.tolist())
+    ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(tensor.dtype))
     if tensor.owns_data:
+        dst_ptr = ndarray_ptr[dtype](ndarray)
         buffer_ptr = tensor.buffer.data
-        memcpy(ndarray_ptr, buffer_ptr, tensor.numels())
+        memcpy(dst_ptr, buffer_ptr, tensor.numels())
     else:
+        flat = ndarray.flat
         idx = 0
         for coord in tensor.shape:
-            ndarray[idx] = tensor[coord]
+            flat[idx] = tensor[coord]
             idx += 1
     return ndarray
 
 
+fn from_ndarray[
+    dtype: DType
+](
+    ndarray: PythonObject, requires_grad: Bool = False, copy: Bool = True
+) raises -> Tensor[dtype]:
+    # Convert Python shape -> Mojo Shape
+    shape_list = ndarray.shape
+    mojo_list = List[Int](capacity=len(shape_list))
+    for elem in shape_list:
+        mojo_list.append(Int(elem))
+    shape = Shape(mojo_list)
+
+    numels = shape.product()
+
+    if copy:
+        src_ptr = ndarray_ptr[dtype](ndarray)
+        buffer = Buffer[dtype](numels)
+        memcpy(buffer.data, src_ptr, numels)
+        result = Tensor[dtype](shape, buffer, requires_grad=requires_grad)
+        return result
+    else:
+        # Wrap external NumPy buffer (⚠️ lifetime must be managed externally)
+        data_ptr = ndarray_ptr[dtype](ndarray)
+        return Tensor[dtype](shape, data_ptr, requires_grad=requires_grad)
+
+
 fn main() raises:
-    a = Tensor.arange(10)
-    a.print()  # print mojo Tensor
-    print()
-    result = to_ndarray(a)
-    print(result)  # numpy array
-    print()
-    b = a.view([5], offset=2)
-    b.print()  # mojo view
-    print()
-    from_view = to_ndarray(b)
-    print(from_view)  # numpy array
-    print()
+    pass
