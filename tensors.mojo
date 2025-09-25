@@ -114,6 +114,27 @@ struct Tensor[dtype: DType = DType.float32](
         self._contiguous = self.is_contiguous()
         self.init_gradbox()
 
+    fn __init__(
+        out self,
+        shape: Shape,
+        ptr: UnsafePointer[Scalar[dtype]],
+        requires_grad: Bool = False,
+    ):
+        Shape.validate(shape)
+        self.shape = shape
+        self.strides = Strides.default(shape)
+        self.offset = 0
+        self.requires_grad = requires_grad
+        self.base = UnsafePointer[Tensor[dtype]]()
+        self.backwardFn = None
+        self.gradbox = UnsafePointer[Tensor[dtype]]()
+        self.ancestors = Ancestors[dtype].untracked()
+        self.buffer = Buffer[dtype](shape.num_elements(), ptr)
+        self.owns_data = True
+        self._contiguous = False
+        self._contiguous = self.is_contiguous()
+        self.init_gradbox()
+
     fn __moveinit__(out self, deinit other: Self):
         self.shape = other.shape^
         self.strides = other.strides^
