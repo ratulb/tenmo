@@ -141,7 +141,7 @@ fn fit(
 
 fn main():
     # Make synthetic dataset (like 1000 "images")
-    num_samples = 48
+    num_samples = 100
     (train_x, train_y) = make_synthetic_mnist_dataset(num_samples)
     # Define model
     model = Sequential[DType.float32]()
@@ -154,8 +154,8 @@ fn main():
     var optimizer = SGD[DType.float32](model.parameters_ptrs(), lr=0.01)
     # Train
     # fit(model, optimizer, criterion, train_x, train_y, epochs=40, batch_size=8)
-    epochs = 40
-    batch_size = 8
+    epochs = 2
+    batch_size = 32
     for epoch in range(epochs):
         var epoch_loss: Float32 = 0.0
         var correct: Int = 0

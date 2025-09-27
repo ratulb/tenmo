@@ -193,11 +193,11 @@ struct Tensor[dtype: DType = DType.float32](
         return not self.owns_data
 
     fn __len__(self) -> Int:
-        return self.shape.num_elements()
+        return self.shape[0]
 
     @always_inline
     fn len(self) -> Int:
-        return self.shape.num_elements()
+        return self.shape[0]
 
     @always_inline
     fn size(self) -> Int:

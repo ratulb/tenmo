@@ -83,5 +83,22 @@ fn from_ndarray[
         return Tensor[dtype](shape, data_ptr, requires_grad=requires_grad)
 
 
+from testing import assert_true
+
 fn main() raises:
-    pass
+    
+    mnist = Python.import_module("mnist_datasets")
+    loader = mnist.MNISTLoader(folder='/tmp')
+
+    # Load train dataset
+    var train_data: PythonObject = loader.load()
+    var images = train_data[0]
+    var labels = train_data[1]
+    assert_true(len(images) == 60000 and len(labels) == 60000)
+
+    # Load test dataset
+    var test_data: PythonObject = loader.load(train=False)
+    var test_images = test_data[0]
+    var test_labels = test_data[1]
+    assert_true(len(test_images) == 10000 and len(test_labels) == 10000)
+
