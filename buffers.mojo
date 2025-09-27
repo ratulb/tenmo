@@ -21,8 +21,13 @@ struct Buffer[dtype: DType = DType.float32](
         self.data = UnsafePointer[Scalar[dtype]]()
 
     fn __init__(out self, size: Int):
-        self.data = UnsafePointer[Scalar[dtype]].alloc(size)
+        if size < 0:
+            panic("Buffer size must be >= 0")
         self.size = size
+        if size == 0:
+            self.data = UnsafePointer[Scalar[dtype]]()
+        else:
+            self.data = UnsafePointer[Scalar[dtype]].alloc(size)
 
     fn __init__(out self, elems: List[Scalar[dtype]]):
         length = len(elems)
