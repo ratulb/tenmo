@@ -21,7 +21,7 @@ struct MulBackwardScalar[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         var value: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
         ancestor = output.ancestry().get(0)[]
 
@@ -98,16 +98,16 @@ struct MultiplyScalar[dtype: DType]:
         track_grad: Bool = True
     ](self: Tensor[dtype], factor: Scalar[dtype]) -> Tensor[dtype]:
         var buffer: Buffer[dtype]
-        if self.owns_data:
-            buffer = self.buffer * factor
+        if self.is_dense():
+            buffer = self.buffer.unbox() * factor
         else:
             idx = 0
             buffer = Buffer[dtype](self.numels())
-            for indices in self.shape:
-                buffer[idx] = self[indices] * factor
+            for coord in self.shape:
+                buffer[idx] = self[coord] * factor
                 idx += 1
 
-        out = Tensor[dtype](self.shape, buffer, requires_grad=False)
+        out = Tensor[dtype](self.shape, buffer.box(), requires_grad=False)
 
         @parameter
         if track_grad:
@@ -143,16 +143,16 @@ struct Multiplicator[dtype: DType]:
             out = self.broadcast_op(other, scalar_ops[dtype, Multiply])
         else:
             var buffer: Buffer[dtype]
-            if self.owns_data and other.owns_data:
-                buffer = self.buffer * other.buffer
+            if self.is_dense() and other.is_dense():
+                buffer = self.buffer.unbox() * other.buffer.unbox()
             else:
                 buffer = Buffer[dtype](self.numels())
                 idx = 0
-                for indices in self.shape:
-                    buffer[idx] = self[indices] * other[indices]
+                for coord in self.shape:
+                    buffer[idx] = self[coord] * other[coord]
                     idx += 1
 
-            out = Tensor[dtype](self.shape, buffer, requires_grad=False)
+            out = Tensor[dtype](self.shape, buffer.box(), requires_grad=False)
 
         @parameter
         if track_grad:

@@ -80,11 +80,6 @@ fn test_slice_every_second_row_column1() raises:
     assert_true(grad[7] == 1)  # r[2,1]
     assert_true(grad[13] == 1)  # r[4,1]
     assert_true(grad.sum().item() == 3)
-    _ = v.base_address()[]
-    loss.free()
-    v.free()
-    r.free()
-    a.free()
 
 
 fn test_permute_backward() raises:
@@ -98,11 +93,6 @@ fn test_permute_backward() raises:
     flat.backward()
     var expected = Tensor.d1([1, 1, 1, 1, 1, 1])
     assert_true((a.gradbox[] == expected).all_true())
-
-    flat.free()
-    p.free()
-    a.free()
-    expected.free()
 
 
 fn test_tensor_permute_flatten_backprop() raises:
@@ -118,12 +108,6 @@ fn test_tensor_permute_flatten_backprop() raises:
     var expected = Tensor.ones(12)
     assert_true((a.gradbox[] == expected).all_true())
 
-    flat.free()
-    p.free()
-    v.free()
-    a.free()
-    expected.free()
-
 
 fn test_flat_view_chain_backprop() raises:
     print("test_flat_view_chain_backprop")
@@ -136,7 +120,6 @@ fn test_flat_view_chain_backprop() raises:
     assert_true(
         (a.gradbox[] == Tensor.of(0, 0, 1, 1, 1, 1, 1, 1, 1, 1)).all_true()
     )
-    a.free()
 
 
 fn test_nonzero_offset_multi_view_chain() raises:
@@ -150,7 +133,6 @@ fn test_nonzero_offset_multi_view_chain() raises:
     for i in range(2, 20):
         expected[i] = 1.0
     assert_true((a.gradbox[] == expected).all_true())
-    a.free()
 
 
 fn test_strided_view_chain_2d_to_3d() raises:
@@ -164,7 +146,6 @@ fn test_strided_view_chain_2d_to_3d() raises:
     for i in range(30, 60):
         expected[i] = 0
     assert_true((a.gradbox[] == expected).all_true())
-    a.free()
 
 
 fn test_nested_views_with_interleaved_strides() raises:
@@ -175,7 +156,6 @@ fn test_nested_views_with_interleaved_strides() raises:
     var v3 = v2.view([36])
     v3.backward()
     assert_true((a.gradbox[] == Tensor.ones_like(a)).all_true())
-    a.free()
 
 
 fn test_view_chain_reversed_shape() raises:
@@ -186,7 +166,6 @@ fn test_view_chain_reversed_shape() raises:
     var v3 = v2.view([24])
     v3.backward()
     assert_true((a.gradbox[] == Tensor.ones_like(a)).all_true())
-    a.free()
 
 
 fn test_grad_propagation_with_offset_chain() raises:
@@ -200,7 +179,6 @@ fn test_grad_propagation_with_offset_chain() raises:
     for i in range(6, 26):
         expected[i] = 1.0
     assert_true((a.gradbox[] == expected).all_true())
-    a.free()
 
 
 fn test_nested_view_backward_indexing() raises:
@@ -218,12 +196,6 @@ fn test_nested_view_backward_indexing() raises:
         expected[i] = 1
 
     assert_true((a.gradbox[] == expected).all_true())
-
-    v3.free()
-    v2.free()
-    v1.free()
-    a.free()
-    expected.free()
 
 
 fn test_negative_offset_fails() raises:
@@ -431,7 +403,8 @@ fn test_view_reuse_data_storage() raises:
 fn test_view_identity() raises:
     print("test_view_identity")
     var t = Tensor.d2([[1, 2], [3, 4]])
-    var v = t.view(t.shape)
+    shape = t.shape
+    var v = t.view(shape)
     assert_true(v.is_contiguous(), "Identity view should be contiguous")
     assert_true(v.offset == 0, "Offset should be zero")
 
@@ -465,7 +438,9 @@ fn test_into_tensor_full_view_copy() raises:
     var v = t.view(Shape.of(2, 2))
     var out = v.contiguous()
     assert_true(out.all_close(t))
-    assert_true(out.buffer.data != t.buffer.data)  # Ensure deep copy
+    assert_true(
+        out.buffer.unbox().data != t.buffer.unbox().data
+    )  # Ensure deep copy
 
 
 fn test_into_tensor_transposed_view() raises:
@@ -593,10 +568,6 @@ fn test_identity_permutation() raises:
     loss3 = y3.sum()
     loss3.backward()
     assert_true(x3.gradbox[].all_close(Tensor.ones(3, 3)))
-    loss3.free()
-    y3.free()
-    v3.free()
-    x3.free()
 
 
 fn test_reshape_slice_sum_backward() raises:
@@ -630,10 +601,6 @@ fn test_reshape_slice_sum_backward() raises:
             ).float()
         ).all_true()
     )
-    s.free()
-    v.free()
-    r.free()
-    a.free()
 
 
 fn test_backward_through_nested_views() raises:
@@ -647,11 +614,7 @@ fn test_backward_through_nested_views() raises:
 
     loss1.backward()
     assert_true(x1.gradbox[].shape == [2, 3])
-    loss1.free()
-    yt1.free()
-    y1.free()
-    v1.free()
-    x1.free()
+
     # Test 2: 3D permutation
     x2 = Tensor.rand(4, 5, 6, requires_grad=True)
     v2 = x2.into_view()
@@ -661,11 +624,6 @@ fn test_backward_through_nested_views() raises:
 
     loss2.backward()
     assert_true(x2.gradbox[].shape == [4, 5, 6])
-    loss2.free()
-    yt2.free()
-    y2.free()
-    v2.free()
-    x2.free()
 
 
 fn test_nested_views_grad_propagation() raises:
@@ -713,10 +671,6 @@ fn test_nested_views_grad_propagation() raises:
     assert_true(zero_count == 4 * 30 - 80)
 
     # Cleanup
-    LOSS.free()
-    Y.free()
-    V3.free()
-    V2.free()
 
 
 fn test_edge_case_indexing() raises:
@@ -733,8 +687,7 @@ fn test_edge_case_indexing() raises:
 
     assert_true((oversized_slice == a).all_true())
     assert_true(
-        oversized_slice.base_address()[].buffer.size
-        == empty.base_address()[].buffer.size
+        oversized_slice.buffer.unbox().size == empty.buffer.unbox().size
     )
 
 
@@ -756,10 +709,6 @@ fn test_mixed_indexing() raises:
     expected_grad[1, 0] = 1.0
     expected_grad[1, 2] = 1.0
     assert_true((r.gradbox[] == expected_grad).all_true())
-    s.free()
-    z.free()
-    v.free()
-    a.free()
 
 
 fn test_newaxis_dimension_insertion() raises:
@@ -781,11 +730,6 @@ fn test_newaxis_dimension_insertion() raises:
     var s = b.sum()
     s.backward()
     assert_true((a.gradbox[] == Tensor([1, 1, 1])).all_true())
-    s.free()
-    b.free()
-    v2.free()
-    v1.free()
-    a.free()
 
 
 fn test_basic_slicing() raises:
@@ -813,11 +757,6 @@ fn test_basic_slicing() raises:
     expect = Tensor.d2([[0, 2], [3, 5]])
     assert_true((col_step == expect).all_true())
 
-    ss.free()
-    y.free()
-    r.free()
-    a.free()
-
 
 fn test_integer_indexing() raises:
     print("test_integer_indexing")
@@ -836,10 +775,6 @@ fn test_integer_indexing() raises:
     expected_grad[5] = 42
     assert_true((a.gradbox[] == expected_grad).all_true())
 
-    y.free()
-    r.free()
-    a.free()
-
 
 fn test_newaxis() raises:
     print("test_newaxis")
@@ -850,10 +785,6 @@ fn test_newaxis() raises:
     b = a * 2
     b.backward()
     assert_true((x.gradbox[] == Tensor([2, 2, 2])).all_true())
-    b.free()
-    a.free()
-    y.free()
-    x.free()
 
 
 fn test_scalar_view() raises:

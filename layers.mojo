@@ -84,7 +84,9 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
     fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
         if x.shape[-1] != self.weights.shape[0]:
             panic("Linear forward: input dim mismatch")
-        return x.matmul(self.weights) + self.bias
+        tx = x
+        weights = self.weights
+        return tx.matmul(weights) + self.bias
 
     fn parameters(self) -> List[Tensor[dtype]]:
         var p = List[Tensor[dtype]]()

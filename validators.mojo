@@ -175,10 +175,10 @@ struct Validator:
             return Shape(True)
 
         if current_shape == Shape() and (
-            newdims == IntList(1) or newdims == IntList(-1) 
+            newdims == IntList(1) or newdims == IntList(-1)
         ):
             return Shape(1)
-        
+
         if current_shape.num_elements() == newdims.product():
             return Shape(newdims)
 
@@ -617,7 +617,7 @@ struct Validator:
         hi = max(abs_min, abs_max)
 
         # Bounds checking - PyTorch style
-        if this.owns_data:
+        if this.is_dense():
             # For root tensor, check against storage size
             if lo < 0 or hi >= this.numels():
                 panic("Tensor → view: exceeds tensor's memory bounds")
@@ -634,6 +634,3 @@ struct Validator:
 
 fn main() raises:
     pass
-
-
-from testing import assert_true

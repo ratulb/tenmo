@@ -12,12 +12,10 @@ fn main() raises:
 
     A = Tensor.rand(A_rows, A_cols)
     B = Tensor.rand(B_rows, B_cols)
-    #A = A.into_view()
-    #B = B.into_view()
     expected, t1 = mm_naive(A, B)
     result, t2 = bench_tensor_tensor(A, B)
     assert_true(expected.all_close(result))
-    print("Naive vs tensor matmul without backward pass: ", t1/t2)
+    print("Naive vs tensor matmul without backward pass: ", t1 / t2)
 
     # backward
     A.requires_grad_()
@@ -25,12 +23,14 @@ fn main() raises:
     result, _, _, t3 = bench_tensor_tensor_backward(A, B)
 
     assert_true(expected.all_close(result))
-    print("Tensor matmul with/without backward pass: ", t3/t2)
+    print("Tensor matmul with/without backward pass: ", t3 / t2)
 
 
 fn bench_tensor_tensor[
     dtype: DType, //
-](A: Tensor[dtype], B: Tensor[dtype]) -> (Tensor[dtype], UInt):
+](A_t: Tensor[dtype], B_t: Tensor[dtype]) -> (Tensor[dtype], UInt):
+    A = A_t
+    B = B_t
     start = perf_counter_ns()
     C = A.matmul(B)
     end = perf_counter_ns()
@@ -39,14 +39,16 @@ fn bench_tensor_tensor[
     return C, (end - start)
 
 
-
 fn bench_tensor_tensor_backward[
     dtype: DType, //
-](A: Tensor[dtype], B: Tensor[dtype]) -> (
+](A_t: Tensor[dtype], B_t: Tensor[dtype]) -> (
     Tensor[dtype],
     Tensor[dtype],
-    Tensor[dtype], UInt
+    Tensor[dtype],
+    UInt,
 ):
+    A = A_t
+    B = B_t
     start = perf_counter_ns()
     C = A.matmul(B)
     end = perf_counter_ns()
@@ -83,17 +85,21 @@ fn mm_vectorize[
     cols_a = A.cols()
     cols_b = B.cols()
     C = Tensor[dtype].zeros(rows_a, cols_b, requires_grad=False)
+    A_buffer = A.buffer.unbox()
+    B_buffer = B.buffer.unbox()
+    C_buffer = C.buffer.unbox()
     start = perf_counter_ns()
     for i in range(rows_a):
         for j in range(cols_a):
-            A_value = A.buffer.load[simdwidth=1](i * cols_a + j)
+            A_value = A_buffer.load[simdwidth=1](i * cols_a + j)
 
             @parameter
             fn dot[simdwidth: Int](k: Int):
-                C.buffer.store[simdwidth=simdwidth](
+                C_buffer.store[simdwidth=simdwidth](
                     i * cols_b + k,
-                    C.buffer.load[simdwidth=simdwidth](i * cols_b + k)
-                    + A_value * B.buffer.load[simdwidth=simdwidth](j * cols_b + k),
+                    C_buffer.load[simdwidth=simdwidth](i * cols_b + k)
+                    + A_value
+                    * B_buffer.load[simdwidth=simdwidth](j * cols_b + k),
                 )
 
             vectorize[dot, simd_width](cols_b)
@@ -114,6 +120,9 @@ fn mm_simd_tiled[
     cols = A.cols()
     cols_b = B.cols()
     C = Tensor[dtype].zeros(rows, cols_b)
+    A_buffer = A.buffer.unbox()
+    B_buffer = B.buffer.unbox()
+    C_buffer = C.buffer.unbox()
 
     start = perf_counter_ns()
     # Tile the loops
@@ -124,19 +133,19 @@ fn mm_simd_tiled[
                 for i in range(i_tile, min(i_tile + TILE_I, rows)):
                     for j in range(j_tile, min(j_tile + TILE_J, cols)):
                         # Load A[i,j] once (scalar)
-                        a_val = A.buffer.load[simdwidth=1](i * cols + j)
+                        a_val = A_buffer.load[simdwidth=1](i * cols + j)
 
                         # Vectorize over k-tile
                         @parameter
                         fn dot[simdwidth: Int](k: Int):
                             k_start = k_tile + k
-                            B_vec = B.buffer.load[simdwidth=simdwidth](
+                            B_vec = B_buffer.load[simdwidth=simdwidth](
                                 j * cols_b + k_start
                             )
-                            C_vec = C.buffer.load[simdwidth=simdwidth](
+                            C_vec = C_buffer.load[simdwidth=simdwidth](
                                 i * cols_b + k_start
                             )
-                            C.buffer.store[simdwidth=simdwidth](
+                            C_buffer.store[simdwidth=simdwidth](
                                 i * cols_b + k_start, C_vec + a_val * B_vec
                             )
 
@@ -146,6 +155,3 @@ fn mm_simd_tiled[
     print("mm_simd_tiled -> Total:                          ", end - start)
 
     return C, (end - start)
-
-
-

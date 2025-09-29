@@ -70,20 +70,27 @@ struct MatmulBackward[dtype: DType](Copyable):
         if not trans_a and not trans_b:
             # Forward: C = A @ B
             if A.requires_grad:
-                dA = Optional(
-                    gradients.matmul(B.transpose(requires_grad=False))
+                B_transposed = B.transpose[track_grad=False](
+                    requires_grad=False
                 )
+
+                dA = Optional(gradients.matmul(B_transposed))
+
             if B.requires_grad:
-                dB = Optional(
-                    A.transpose(requires_grad=False).matmul(gradients)
+                A_transposed = A.transpose[track_grad=False](
+                    requires_grad=False
                 )
+                dB = Optional(A_transposed.matmul(gradients))
 
         elif trans_a and not trans_b:
             # Forward: C = A^T @ B
             if A.requires_grad:
-                dA = Optional(
-                    B.matmul(gradients.transpose(requires_grad=False))
+                grad_transposed = gradients.transpose[track_grad=False](
+                    requires_grad=False
                 )
+
+                dA = Optional(B.matmul(grad_transposed))
+
             if B.requires_grad:
                 dB = Optional(A.matmul(gradients))
 
@@ -91,26 +98,38 @@ struct MatmulBackward[dtype: DType](Copyable):
             # Forward: C = A @ B^T
             if A.requires_grad:
                 dA = Optional(gradients.matmul(B))
+
             if B.requires_grad:
-                dB = Optional(
-                    gradients.transpose(requires_grad=False).matmul(A)
+                grad_transposed = gradients.transpose[track_grad=False](
+                    requires_grad=False
                 )
+
+                dB = Optional(grad_transposed.matmul(A))
 
         else:
             # trans_a and trans_b
             # Forward: C = A^T @ B^T
             if A.requires_grad:
-                dA = Optional(
-                    B.transpose(requires_grad=False).matmul(
-                        gradients.transpose(requires_grad=False)
-                    )
+                B_transposed = B.transpose[track_grad=False](
+                    requires_grad=False
                 )
+
+                grad_transposed = gradients.transpose[track_grad=False](
+                    requires_grad=False
+                )
+
+                dA = Optional(B_transposed.matmul(grad_transposed))
+
             if B.requires_grad:
-                dB = Optional(
-                    gradients.transpose(requires_grad=False).matmul(
-                        A.transpose(requires_grad=False)
-                    )
+                grad_transposed = gradients.transpose[track_grad=False](
+                    requires_grad=False
                 )
+
+                A_transposed = A.transpose[track_grad=False](
+                    requires_grad=False
+                )
+
+                dB = Optional(grad_transposed.matmul(A_transposed))
 
         return dA, dB
 
@@ -178,18 +197,20 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
         if not trans_a and not trans_b:
             # Forward: C = A @ B
             if A.requires_grad:
-                A_batch_grad = gradients.matmul_nd(
-                    B.transpose(axes=[-1, -2], requires_grad=False)
+                B_transposed = B.transpose[track_grad=False](
+                    axes=[-1, -2], requires_grad=False
                 )
+                A_batch_grad = gradients.matmul_nd(B_transposed)
                 dA = Optional(
                     Tensor[dtype].sum_over_broadcasted_axes(
                         A_batch_grad, A.shape
                     )
                 )
             if B.requires_grad:
-                B_batch_grad = A.transpose(
+                A_transposed = A.transpose[track_grad=False](
                     axes=[-1, -2], requires_grad=False
-                ).matmul_nd(gradients)
+                )
+                B_batch_grad = A_transposed.matmul_nd(gradients)
                 dB = Optional(
                     Tensor[dtype].sum_over_broadcasted_axes(
                         B_batch_grad, B.shape
@@ -201,9 +222,10 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
             if A.requires_grad:
                 axes = gradients.shape.intlist()
                 axes.swap(-2, -1)
-                A_batch_grad = B.matmul_nd(
-                    gradients.transpose(axes=axes, requires_grad=False)
+                grad_transposed = gradients.transpose[track_grad=False](
+                    axes=axes, requires_grad=False
                 )
+                A_batch_grad = B.matmul_nd(grad_transposed)
                 dA = Optional(
                     Tensor[dtype].sum_over_broadcasted_axes(
                         A_batch_grad, A.shape
@@ -223,25 +245,33 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
             if A.requires_grad:
                 dA = Optional(gradients.matmul(B))
             if B.requires_grad:
-                dB = Optional(
-                    gradients.transpose(requires_grad=False).matmul(A)
+                grad_transposed = gradients.transpose[track_grad=False](
+                    requires_grad=False
                 )
+                dB = Optional(grad_transposed.matmul(A))
 
         else:
             # trans_a and trans_b
             # Forward: C = A^T @ B^T
             if A.requires_grad:
-                dA = Optional(
-                    B.transpose(requires_grad=False).matmul(
-                        gradients.transpose(requires_grad=False)
-                    )
+                B_transposed = B.transpose[track_grad=False](
+                    requires_grad=False
                 )
+                grad_transposed = gradients.transpose[track_grad=False](
+                    requires_grad=False
+                )
+
+                dA = Optional(B_transposed.matmul(grad_transposed))
+
             if B.requires_grad:
-                dB = Optional(
-                    gradients.transpose(requires_grad=False).matmul(
-                        A.transpose(requires_grad=False)
-                    )
+                grad_transposed = gradients.transpose[track_grad=False](
+                    requires_grad=False
                 )
+                A_transposed = A.transpose[track_grad=False](
+                    requires_grad=False
+                )
+
+                dB = Optional(grad_transposed.matmul(A_transposed))
 
         return dA, dB
 

@@ -29,9 +29,10 @@ struct UnsqueezeBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        # gradients = output.gradients()[]
+        gradients = output.grad()
         # Remove the axis we had inserted
-        gradients_squeezed = Squeeze[dtype].squeeze(
+        gradients_squeezed = Squeeze[dtype].forward[track_grad=False](
             gradients, self.axes, requires_grad=False
         )
         ancestor = output.ancestry().get(0)[]
@@ -40,12 +41,13 @@ struct UnsqueezeBackward[dtype: DType](Copyable & Movable):
 
 @register_passable
 struct Unsqueeze[dtype: DType](Copyable):
-
     fn __copyinit__(out self, existing: Self):
         pass
 
     @staticmethod
-    fn unsqueeze(
+    fn forward[
+        track_grad: Bool = True
+    ](
         tensor: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
@@ -115,26 +117,28 @@ struct Unsqueeze[dtype: DType](Copyable):
         # Create the unsqueezed tensor
         shape = Shape(new_shape)
         strides = Strides(new_strides)
-        grad_required = (
-            requires_grad.value() if requires_grad else tensor.requires_grad
-        )
-
-        base_addr = tensor.address() if tensor.owns_data else tensor.base.copy()
+        buffer = tensor.buffer.copy()
 
         var out = Tensor[dtype](
-            shape, base_addr, strides, tensor.offset, grad_required
+            shape, buffer, strides, tensor.offset, requires_grad=False
         )
 
-        if grad_required:
-            out.requires_grad_()
-            bfn = UnsqueezeBackward[dtype](
-                axes=normalized_axes
-            ).into_backward_fn()
-            out.backwardFn = Optional(bfn)
-            out.add_ancestry(TensorLite.of(tensor))
+        @parameter
+        if track_grad:
+            grad_required = (
+                requires_grad.value() if requires_grad else tensor.requires_grad
+            )
+
+            if grad_required:
+                out.requires_grad_()
+                bfn = UnsqueezeBackward[dtype](
+                    axes=normalized_axes
+                ).into_backward_fn()
+                out.backwardFn = Optional(bfn)
+                out.add_ancestry(TensorLite.of(tensor))
 
         return out
 
 
 fn main():
-    print("passes")
+    print("passes")  # Unsqueeze, expand, reshape

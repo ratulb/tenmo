@@ -1,18 +1,15 @@
 from tensors import Tensor
 from shapes import Shape
 from intlist import IntList
-from strides import Strides
 from backpropagation import BackwardFn
-from os import abort
 from ancestry import Ancestors
 from operators import AddTensor, SubtractTensor, Noop
-from common_utils import compute_output_shape, log_debug
+from common_utils import log_debug, panic
 from collections import Deque
 
 
 fn main() raises:
-    a = Tensor.arange(6 * 5 * 10).reshape(6, 5, 10)
-    a.print(3, 3)
+    pass
 
 
 struct TensorLite[dtype: DType](
@@ -41,13 +38,13 @@ struct TensorLite[dtype: DType](
     fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
         return self.tensor_address[].gradients()
 
+    @always_inline
+    fn grad(self) -> Tensor[dtype]:
+        return self.tensor_address[].grad()
+
     @staticmethod
     fn of(tensor: Tensor[dtype]) -> Self:
         return Self(UnsafePointer(to=tensor))
-
-    @always_inline
-    fn owns_data(self) -> Bool:
-        return self.tensor_address[].owns_data
 
     @always_inline
     fn inner_id(self) -> Int:
@@ -103,10 +100,7 @@ struct TensorLite[dtype: DType](
         self.tensor_address[].seed_grad(with_tensor)
 
     fn init_grad(self):
-        if (
-            not self.tensor_address[].owns_data
-        ):  # Currently for tensors requiring grad, we initialize grad upfront
-            self.tensor_address[].init_gradbox()
+        self.tensor_address[].init_gradbox()
 
     fn backward(root: Self, start_grad: Scalar[dtype] = 1.0):
         if not root.requires_grad():
@@ -115,29 +109,6 @@ struct TensorLite[dtype: DType](
         shape = root_shape[::]
         seed_tensor = Tensor[dtype].full(shape, start_grad)
         root.backward(seed_tensor)
-        root_shape.free()
-        shape.free()
-
-        _ = """fn backward(root: Self, seed_tensor: Tensor[dtype]):
-        if not root.requires_grad():
-            return
-        root.seed_grad(seed_tensor)
-        traced = IntList.Empty
-        streams = List[GradStream[dtype]]()
-
-        stack = [root]
-        while stack:
-            stream = stack.pop()
-            if stream.inner_id() in traced:
-                continue
-            streams.append(GradStream[dtype](stream))
-            traced.append(stream.inner_id())
-            for origin in stream.ancestry():
-                stack.append(origin[])
-
-        log_debug("Traced ancestry: " + traced.__str__())
-        for stream in streams:
-            stream.flow()"""
 
     fn backward(root: TensorLite[dtype], seed_tensor: Tensor[dtype]):
         try:
@@ -147,7 +118,6 @@ struct TensorLite[dtype: DType](
             # seed the output grad
             root.seed_grad(seed_tensor)
 
-            #traced = IntList.Empty
             traced = IntList()
             streams = List[GradStream[dtype]]()
             use_count = Dict[
@@ -213,7 +183,7 @@ struct TensorLite[dtype: DType](
                     # leaf → grads already accumulated via sink
                     pass
         except e:
-            abort(e.__str__())
+            panic(e.__str__())
 
 
 struct GradStream[dtype: DType](Copyable & Movable):
@@ -260,8 +230,7 @@ struct GradStream[dtype: DType](Copyable & Movable):
     fn sink(self):
         grad_share = self.grad.value()
         log_debug("sink(): to id=" + self.recipient.inner_id().__str__())
-        if not self.recipient.owns_data() and not self.recipient.has_grad():
-            self.recipient.init_grad()
+        self.recipient.init_grad()
         self.recipient.update_grad[AddTensor](
             grad_share
         ) if self.opcode == AddTensor else self.recipient.update_grad[
@@ -273,10 +242,14 @@ struct GradStream[dtype: DType](Copyable & Movable):
     fn edges(self) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         if not self.recipient.has_backward_fn():
             return []
-        log_debug("edges(): firing backward_fn of id=" + self.recipient.inner_id().__str__())
+        log_debug(
+            "edges(): firing backward_fn of id="
+            + self.recipient.inner_id().__str__()
+        )
 
         out = self.recipient.backward_fn()(self.recipient)
-        for (ancestor, _, _) in out:
-            log_debug(" -> produced edge to id=" + ancestor.inner_id().__str__())
+        for ancestor, _, _ in out:
+            log_debug(
+                " -> produced edge to id=" + ancestor.inner_id().__str__()
+            )
         return out
-        #return self.recipient.backward_fn()(self.recipient)

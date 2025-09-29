@@ -471,16 +471,6 @@ struct Shape(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn free(deinit self):
-        log_debug("Freeing Shape")
-        self.axes_spans.free()
-        _ = self^
-
-    fn __del__(deinit self):
-        # print("Freeing Shape")
-        self.axes_spans.free()
-        _ = self^
-
     @always_inline
     @staticmethod
     fn validate(shape: Shape):

@@ -21,7 +21,7 @@ struct TrueDivBackwardScalar[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         var divisor: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
         ancestor = output.ancestry().get(0)[]
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
@@ -124,16 +124,16 @@ struct DivideScalar[dtype: DType]:
         ]()
 
         var buffer: Buffer[dtype]
-        if self.owns_data:
-            buffer = self.buffer
+        if self.is_dense():
+            buffer = self.buffer.unbox()
         else:
             idx = 0
             buffer = Buffer[dtype](self.numels())
-            for indices in self.shape:
-                buffer[idx] = self[indices]
+            for coord in self.shape:
+                buffer[idx] = self[coord]
                 idx += 1
         buffer = scalar / buffer
-        out = Tensor[dtype](self.shape, buffer, False)
+        out = Tensor[dtype](self.shape, buffer.box(), requires_grad=False)
 
         @parameter
         if track_grad:
@@ -164,16 +164,16 @@ struct DivideByScalar[dtype: DType]:
             panic("Tensor → __truediv__ : canot divide by " + scalar.__str__())
 
         var buffer: Buffer[dtype]
-        if self.owns_data:
-            buffer = self.buffer
+        if self.is_dense():
+            buffer = self.buffer.unbox()
         else:
             idx = 0
             buffer = Buffer[dtype](self.numels())
-            for indices in self.shape:
-                buffer[idx] = self[indices]
+            for coord in self.shape:
+                buffer[idx] = self[coord]
                 idx += 1
         buffer = buffer / scalar
-        out = Tensor[dtype](self.shape, buffer, False)
+        out = Tensor[dtype](self.shape, buffer.box(), requires_grad=False)
 
         @parameter
         if track_grad:
@@ -211,16 +211,16 @@ struct Divider[dtype: DType]:
             out = self.broadcast_op(other, scalar_ops[dtype, Divide])
         else:
             var buffer: Buffer[dtype]
-            if self.owns_data and other.owns_data:
-                buffer = self.buffer / other.buffer
+            if self.is_dense() and other.is_dense():
+                buffer = self.buffer.unbox() / other.buffer.unbox()
             else:
                 buffer = Buffer[dtype](self.numels())
                 idx = 0
-                for indices in self.shape:
-                    buffer[idx] = self[indices] / other[indices]
+                for coord in self.shape:
+                    buffer[idx] = self[coord] / other[coord]
                     idx += 1
 
-            out = Tensor[dtype](self.shape, buffer)
+            out = Tensor[dtype](self.shape, buffer.box(), requires_grad=False)
 
         @parameter
         if track_grad:

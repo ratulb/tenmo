@@ -27,7 +27,8 @@ struct TileBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        var gradients = output.gradients()[]
+        # var gradients = output.gradients()[]
+        var gradients = output.grad()
         var ancestor = output.ancestry().get(0)[]
         var ancestor_shape = ancestor.shape()
 
@@ -47,7 +48,6 @@ struct TileBackward[dtype: DType](Copyable & Movable):
 
 @register_passable
 struct Tile[dtype: DType](Copyable):
-
     fn __copyinit__(out self, existing: Self):
         pass
 

@@ -6,6 +6,7 @@ from backpropagation import Delegate, BackwardFn
 from buffers import Buffer
 from broadcastbackward import BroadcastBackward
 from common_utils import panic
+from memory import ArcPointer
 
 
 struct SubBackward[dtype: DType](Copyable & Movable):
@@ -34,7 +35,7 @@ struct SubBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         count = len(output.ancestry())
         grad_outputs = List[Tuple[TensorLite[dtype], Tensor[dtype], Int]](
             capacity=count
@@ -78,7 +79,6 @@ struct SubLeftRightBackwardScalar[dtype: DType](Copyable):
 
 @register_passable
 struct SubtractScalar[dtype: DType](Copyable):
-
     fn __copyinit__(out self, existing: Self):
         pass
 
@@ -89,11 +89,11 @@ struct SubtractScalar[dtype: DType](Copyable):
         var out: Tensor[dtype]
         shape = self.shape.copy()
 
-        if self.owns_data:
-            out = Tensor[dtype](shape, self.buffer - scalar, False)
+        if self.is_dense():
+            buffer = self.buffer.unbox() - scalar
+            out = Tensor[dtype](shape, buffer.box(), requires_grad=False)
         else:
-            buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](shape, buffer, False)
+            out = Tensor[dtype](shape, requires_grad=False)
             for idx, value in self:
                 out[idx] = value - scalar
 
@@ -112,7 +112,6 @@ struct SubtractScalar[dtype: DType](Copyable):
 
 @register_passable
 struct SubtractFromScalar[dtype: DType](Copyable):
-
     fn __copyinit__(out self, existing: Self):
         pass
 
@@ -122,11 +121,11 @@ struct SubtractFromScalar[dtype: DType](Copyable):
     ](self: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out: Tensor[dtype]
         shape = self.shape.copy()
-        if self.owns_data:
-            out = Tensor[dtype](shape, scalar - self.buffer, False)
+        if self.is_dense():
+            buffer = scalar - self.buffer.unbox()
+            out = Tensor[dtype](shape, buffer.box(), requires_grad=False)
         else:
-            buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](shape, buffer, False)
+            out = Tensor[dtype](shape, requires_grad=False)
             for idx, value in self:
                 out[idx] = scalar - value
 
@@ -145,7 +144,6 @@ struct SubtractFromScalar[dtype: DType](Copyable):
 
 @register_passable
 struct Subtractor[dtype: DType](Copyable):
-
     fn __copyinit__(out self, existing: Self):
         pass
 
@@ -167,11 +165,13 @@ struct Subtractor[dtype: DType](Copyable):
         if self.shape != other.shape:
             out = self.broadcast_op(other, scalar_ops[dtype, Subtract])
         else:
-            if self.owns_data and other.owns_data:
-                buffer = self.buffer - other.buffer
-                out = Tensor[dtype](this_shape, buffer, False)
+            if self.is_dense() and other.is_dense():
+                buffer = self.buffer.unbox() - other.buffer.unbox()
+                out = Tensor[dtype](
+                    this_shape, buffer.box(), requires_grad=False
+                )
             else:
-                out = Tensor[dtype].zeros(this_shape, False)
+                out = Tensor[dtype](this_shape, False)
                 for coord in this_shape:
                     out[coord] = self[coord] - other[coord]
 

@@ -4,11 +4,12 @@ from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
 from intlist import IntList
 from validators import Validator
+from memory import ArcPointer
 
 
 struct TransposeBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
-    
+
     fn __init__(out self, axes: IntList):
         self.axes = axes
 
@@ -26,7 +27,8 @@ struct TransposeBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        # gradients = output.gradients()[]
+        gradients = output.grad()
         ancestor = output.ancestry().get(0)[]
         inverted_axes = IntList.invert_permutation(self.axes)
         grad_transposed = gradients.transpose(inverted_axes)
@@ -41,7 +43,6 @@ struct TransposeBackward[dtype: DType](Copyable & Movable):
 
 @register_passable
 struct Transpose[dtype: DType](Copyable):
-
     fn __copyinit__(out self, existing: Self):
         pass
 
@@ -63,11 +64,8 @@ struct Transpose[dtype: DType](Copyable):
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides.permute(normalized_axes)
 
-        base_addr = self.address() if self.owns_data else self.base.copy()
-        out = Tensor[dtype](
-            new_shape, base_addr, new_strides, self.offset, False
-        )
-
+        buffer = self.buffer.copy()
+        out = Tensor[dtype](new_shape, buffer, new_strides, self.offset, False)
 
         @parameter
         if track_grad:
@@ -88,5 +86,3 @@ struct Transpose[dtype: DType](Copyable):
 
 fn main():
     pass
-
-

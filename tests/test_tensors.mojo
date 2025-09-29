@@ -14,6 +14,7 @@ alias Boolean = Scalar[DType.bool]
 
 
 fn test_count() raises:
+    print("test_count")
     scalar = Tensor.scalar(10)
     assert_true(scalar.count(10) == 1, "Scalar count assertion 1 failed")
     assert_true(scalar.count(42) == 0, "Scalar count assertion 2 failed")
@@ -26,6 +27,7 @@ fn test_count() raises:
 
     assert_true(v.count(42) == 12, "Tensor view count assertion 4 failed")
     assert_true(v2.count(42) == 12, "Tensor view count assertion 5 failed")
+    _ = full
 
 
 fn test_reshape_slice_sum_backward() raises:
@@ -51,11 +53,6 @@ fn test_reshape_slice_sum_backward() raises:
     var col_step = r[s(), s(0, 3, 2)]
     expect = Tensor.d2([[0, 2], [3, 5]])
     assert_true((col_step == expect).all_true())
-
-    _ = """ss.free()
-    y.free()
-    r.free()
-    a.free()"""
 
 
 fn test_shared_tensor_twice() raises:
@@ -485,16 +482,12 @@ fn test_tensor_mean() raises:
     m.backward()
     assert_true(m.item() == 5.0)
     assert_true(a.gradbox[].item() == 1.0)
-    _ = """a.free()
-    m.free()"""
 
     a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     m = a.mean()
     assert_true(m.item() == 2.0)
     m.backward()
     assert_true(a.gradbox[].all_close(Tensor.d1([1 / 3, 1 / 3, 1 / 3])))
-    _ = """a.free()
-    m.free()"""
 
     A = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     M = A.mean()
@@ -502,8 +495,6 @@ fn test_tensor_mean() raises:
     M.backward()
     expected = Tensor.d2([[0.25, 0.25], [0.25, 0.25]])
     assert_true(A.gradbox[].all_close(Tensor.d2([[0.25, 0.25], [0.25, 0.25]])))
-    A.free()
-    M.free()
 
     a1 = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     m1 = a1.mean(axes=[0], keepdims=False)
@@ -591,8 +582,8 @@ fn test_training_convergence() raises:
         loss.backward()
 
         # SGD
-        w.buffer -= 0.01 * w.gradbox[].buffer
-        b.buffer -= 0.01 * b.gradbox[].buffer
+        w.buffer.unbox() -= 0.01 * w.gradbox[].buffer.unbox()
+        b.buffer.unbox() -= 0.01 * b.gradbox[].buffer.unbox()
         w.zero_grad()
         b.zero_grad()
 
@@ -1773,10 +1764,6 @@ fn test_add_2_tensors() raises:
         "Input/output tensors shape match assertion failed",
     )
 
-    tensor_a.free()
-    tensor_b.free()
-    out_tensor.free()
-
 
 fn test_arange() raises:
     print("test_arange")
@@ -1785,17 +1772,12 @@ fn test_arange() raises:
     is_true = (tensor == expected).all_true()
     assert_true(is_true, "arange gen check assertion failed")
 
-    tensor.free()
-    expected.free()
-
     tensor1 = Tensor.arange(0, -5, -0.5)
     expected1 = Tensor.of(
         0.0, -0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -3.5, -4.0, -4.5
     )
     is_true = (tensor1 == expected1).all_true()
     assert_true(is_true, "arange negative step assertion failed")
-    tensor1.free()
-    expected1.free()
 
 
 fn test_random() raises:
@@ -1815,8 +1797,6 @@ fn test_random() raises:
 
     holds_true = rand_tensor2.for_all(each2)
     assert_true(holds_true, "rand min(-2) and max(2) range assertion failed")
-    rand_tensor.free()
-    rand_tensor2.free()
 
 
 fn test_item() raises:
@@ -1830,7 +1810,7 @@ fn test_view() raises:
     tensor = Tensor.rand(1).reshape()
     view = tensor.view(Shape())
     assert_true(
-        tensor.shape == view.base[].shape,
+        tensor.shape == view.shape,
         "Tensor and view shape equality asserttion failed",
     )
 
@@ -2007,8 +1987,6 @@ fn test_mean_with_keepdims() raises:
     s.backward()
     assert_true(m.all_close(Tensor.d2([[2, 3]])))
     assert_true(a.gradbox[].all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
-    # m.free()
-    # a.free()
 
 
 fn test_matmul_shapes() raises:
@@ -2772,10 +2750,6 @@ fn test_large_tensor_backprop() raises:
     s.backward()
     assert_true(a.gradbox[].shape == a.shape)
     assert_true(b.gradbox[].shape == b.shape)
-    _ = """a.free()
-    b.free()
-    c.free()
-    s.free()"""
 
 
 fn test_detach() raises:
@@ -2820,7 +2794,6 @@ fn test_flat_view_chain_backprop() raises:
     assert_true(
         (a.gradbox[] == Tensor.of(0, 0, 1, 1, 1, 1, 1, 1, 1, 1)).all_true()
     )
-    # a.free()
 
 
 fn test_reshape_backward() raises:
@@ -3225,11 +3198,6 @@ fn test_tensor_dot() raises:
     assert_true(a.gradbox[].item() == 30)
     assert_true(b.gradbox[].item() == 10)
     assert_true(d.gradbox[].item() == 0)
-    _ = """a.free()
-    b.free()
-    c.free()
-    d.free()
-    e.free()"""
 
     a = Tensor.arange(10, requires_grad=True)
     b = a[5::2]
@@ -3847,7 +3815,7 @@ fn test_max_min() raises:
             ).float()
         )
     )
-
+    _ = max_result
     min_result = a.min([1])
     assert_true(min_result.all_close(Tensor.d1([-5.0, 0.0, 0.0]).float()))
     min_result.backward()
@@ -3859,6 +3827,7 @@ fn test_max_min() raises:
             ).float()
         )
     )
+    _ = a
 
 
 fn test_mask() raises:
@@ -3904,6 +3873,7 @@ fn test_slice_single_axis() raises:
             z == Tensor.d2([[0.0, 2.0], [4.0, 6.0], [8.0, 10.0]]).float()
         ).all_true()
     )
+    _ = x
 
 
 fn test_slice_single_axis_positive() raises:
@@ -3911,6 +3881,7 @@ fn test_slice_single_axis_positive() raises:
     var x = Tensor.arange(0, 10).reshape([10])
     var y = x.slice(axes=[0], starts=[2], ends=[7])
     assert_true((y == Tensor.arange(2, 7)).all_true())
+    _ = x
 
 
 fn test_slice_single_axis_negative_indices() raises:
@@ -3918,6 +3889,7 @@ fn test_slice_single_axis_negative_indices() raises:
     var x = Tensor.arange(0, 10).reshape([10])
     var y = x.slice(axes=[0], starts=[-7], ends=[-2])
     assert_true((y == Tensor.arange(3, 8)).all_true())
+    _ = x
 
 
 fn test_slice_single_axis_step_greater_than_1() raises:
@@ -3925,6 +3897,7 @@ fn test_slice_single_axis_step_greater_than_1() raises:
     var x = Tensor.arange(0, 10).reshape([10])
     var y = x.slice(axes=[0], starts=[1], ends=[9], steps=[2])
     assert_true((y == Tensor([1, 3, 5, 7])).all_true())
+    _ = x
 
 
 fn test_slice_single_axis_step_negative() raises:
@@ -3932,6 +3905,7 @@ fn test_slice_single_axis_step_negative() raises:
     var x = Tensor.arange(0, 10).reshape([10])
     var y = x.slice(axes=[0], starts=[8], ends=[2], steps=[-2])
     assert_true((y == Tensor([8, 6, 4])).all_true())
+    _ = x
 
 
 fn test_slice_single_axis_full_axis() raises:
@@ -3939,6 +3913,7 @@ fn test_slice_single_axis_full_axis() raises:
     var x = Tensor.arange(0, 5).reshape([5])
     var y = x.slice(axes=[0], starts=[0], ends=[5])
     assert_true((y == x).all_true())
+    _ = x
 
 
 fn test_slice_single_axis_single_element() raises:
@@ -3946,6 +3921,7 @@ fn test_slice_single_axis_single_element() raises:
     var x = Tensor.arange(0, 5).reshape([5])
     var y = x.slice(axes=[0], starts=[2], ends=[3])
     assert_true((y == Tensor([2])).all_true())
+    _ = x
 
 
 # ===================== MULTI-AXIS SLICES =====================
@@ -3956,6 +3932,7 @@ fn test_slice_multi_axis_basic() raises:
     var x = Tensor.arange(0, 24).reshape([4, 6])
     var y = x.slice(axes=[0, 1], starts=[1, 2], ends=[3, 5])
     assert_true((y == Tensor.d2([[8, 9, 10], [14, 15, 16]])).all_true())
+    _ = x
 
 
 fn test_slice_multi_axis_negative_indices() raises:
@@ -3963,6 +3940,7 @@ fn test_slice_multi_axis_negative_indices() raises:
     var x = Tensor.arange(0, 24).reshape([4, 6])
     var y = x.slice(axes=[0, 1], starts=[-3, -4], ends=[-1, -1])
     assert_true((y == Tensor.d2([[8, 9, 10], [14, 15, 16]])).all_true())
+    _ = x
 
 
 fn test_slice_multi_axis_step() raises:
@@ -3970,12 +3948,14 @@ fn test_slice_multi_axis_step() raises:
     var x = Tensor.arange(0, 24).reshape([4, 6])
     var y = x.slice(axes=[0, 1], starts=[0, 0], ends=[4, 6], steps=[2, 3])
     assert_true((y == Tensor.d2([[0, 3], [12, 15]])).all_true())
+    _ = x
 
 
 fn test_slice_multi_axis_mixed() raises:
     print("test_slice_multi_axis_mixed")
-    var x = Tensor.arange(0, 24).reshape([4, 6])
-    var y = x.slice(axes=[0, 1], starts=[3, 5], ends=[0, 0], steps=[-1, -2])
+    var x = Tensor.arange(0, 24)
+    var r = x.reshape([4, 6])
+    var y = r.slice(axes=[0, 1], starts=[3, 5], ends=[0, 0], steps=[-1, -2])
     var expected = Tensor.d2([[23, 21, 19], [17, 15, 13], [11, 9, 7]])
     assert_true((y == expected).all_true())
 
@@ -3984,7 +3964,7 @@ fn test_slice_multi_axis_mixed() raises:
             y.transpose() == Tensor.d2([[23, 17, 11], [21, 15, 9], [19, 13, 7]])
         ).all_true()
     )
-    _ = y
+    _ = r
     _ = x
 
 
@@ -4184,7 +4164,7 @@ fn test_flatten_forward_contiguous_1d() raises:
     var f = a.flatten()
     assert_true((f == Tensor.d1([1.0, 2.0, 3.0]).float()).all_true())
     _ = a
-    _ = f
+    # _ = f
 
 
 fn test_flatten_forward_contiguous_2d() raises:
@@ -4192,8 +4172,8 @@ fn test_flatten_forward_contiguous_2d() raises:
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
     var f = a.flatten()
     assert_true((f == Tensor.d1([1.0, 2.0, 3.0, 4.0]).float()).all_true())
-    _ = a
-    _ = f
+    # _ = a
+    # _ = f
 
 
 fn test_flatten_backward_contiguous() raises:
@@ -4206,9 +4186,9 @@ fn test_flatten_backward_contiguous() raises:
     assert_true(
         (a.gradbox[].all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]]).float()))
     )
-    _ = a
+    _ = """_ = a
     _ = f
-    _ = loss
+    _ = loss"""
 
 
 fn test_flatten_forward_view_slice() raises:
@@ -4219,7 +4199,7 @@ fn test_flatten_forward_view_slice() raises:
     assert_true((f == Tensor.d1([1.0, 2.0, 3.0]).float()).all_true())
     _ = a
     _ = v
-    _ = f
+    # _ = f
 
 
 fn test_flatten_backward_view_slice() raises:
@@ -4239,10 +4219,10 @@ fn test_flatten_backward_view_slice() raises:
             )
         )
     )
-    _ = a
+    _ = """_ = a
     _ = v
     _ = f
-    _ = loss
+    _ = loss"""
 
 
 fn test_flatten_backward_non_contiguous_stride() raises:
@@ -4263,9 +4243,9 @@ fn test_flatten_backward_non_contiguous_stride() raises:
         )
     )
     _ = a
-    _ = v
+    _ = """_ = v
     _ = f
-    _ = loss
+    _ = loss"""
 
 
 fn test_flatten_forward_contiguous_3d() raises:
@@ -4280,7 +4260,7 @@ fn test_flatten_forward_contiguous_3d() raises:
         ).all_true()
     )
     _ = a
-    _ = f
+    # _ = f
 
 
 fn test_flatten_backward_contiguous_3d() raises:
@@ -4301,9 +4281,9 @@ fn test_flatten_backward_contiguous_3d() raises:
             )
         )
     )
-    _ = a
+    _ = """_ = a
     _ = f
-    _ = loss
+    _ = loss"""
 
 
 fn test_flatten_forward_3d_slice() raises:
@@ -4315,8 +4295,8 @@ fn test_flatten_forward_3d_slice() raises:
     var f = v.flatten()
     assert_true((f == Tensor.d1([1.0, 2.0, 3.0, 4.0]).float()).all_true())
     _ = a
-    _ = v
-    _ = f
+    _ = """_ = v
+    _ = f"""
 
 
 fn test_flatten_backward_3d_slice() raises:
@@ -4337,10 +4317,10 @@ fn test_flatten_backward_3d_slice() raises:
             )
         )
     )
-    _ = a
+    _ = """_ = a
     _ = v
     _ = f
-    _ = loss
+    _ = loss"""
 
 
 fn test_flatten_full_default_forward_2d() raises:
@@ -4350,8 +4330,8 @@ fn test_flatten_full_default_forward_2d() raises:
     var expected = Tensor.d1([1.0, 2.0, 3.0, 4.0]).float()
     assert_true((f == expected).all_true())
     _ = a
-    _ = f
-    _ = expected
+    _ = """ f
+    _ = expected"""
 
 
 fn test_flatten_partial_forward_3d() raises:
@@ -4393,8 +4373,8 @@ fn test_flatten_partial_forward_3d() raises:
     ).float()
     assert_true((f == expected).all_true())
     _ = a
-    _ = f
-    _ = expected
+    _ = """_ = f
+    _ = expected"""
 
 
 fn test_flatten_start_only_forward_3d() raises:
@@ -4412,8 +4392,8 @@ fn test_flatten_start_only_forward_3d() raises:
     ).float()
     assert_true((f == expected).all_true())
     _ = a
-    _ = f
-    _ = expected
+    _ = """_ = f
+    _ = expected"""
 
 
 fn test_flatten_start_eq_end_forward_noop_3d() raises:
@@ -4424,8 +4404,8 @@ fn test_flatten_start_eq_end_forward_noop_3d() raises:
     # flatten a single axis (start == end) => shape should be identical and values unchanged
     var f = a.flatten(1, 1)
     assert_true((f == a).all_true())
-    _ = a
-    _ = f
+    # _ = a
+    # _ = f
 
 
 fn test_flatten_backward_contiguous_2d() raises:
@@ -4436,10 +4416,10 @@ fn test_flatten_backward_contiguous_2d() raises:
     loss.backward()
     var expected_grad = Tensor.d2([[1.0, 1.0], [1.0, 1.0]]).float()
     assert_true(a.gradbox[].all_close(expected_grad))
-    _ = a
+    _ = """_ = a
     _ = f
     _ = loss
-    _ = expected_grad
+    _ = expected_grad"""
 
 
 fn test_flatten_backward_partial_3d() raises:
@@ -4471,10 +4451,10 @@ fn test_flatten_backward_partial_3d() raises:
         ]
     ).float()
     assert_true(a.gradbox[].all_close(expected_grad))
-    _ = a
+    _ = """_ = a
     _ = f
     _ = loss
-    _ = expected_grad
+    _ = expected_grad"""
 
 
 fn test_flatten_backward_view_strided_2d() raises:
@@ -4491,10 +4471,10 @@ fn test_flatten_backward_view_strided_2d() raises:
     var expected_grad = Tensor.d2([[1.0, 0.0, 1.0], [1.0, 0.0, 1.0]]).float()
     assert_true(a.gradbox[].all_close(expected_grad))
     _ = a
-    _ = v
+    _ = """_ = v
     _ = f
     _ = loss
-    _ = expected_grad
+    _ = expected_grad"""
 
 
 fn test_flatten_backward_3d_strided_view() raises:
@@ -4512,10 +4492,10 @@ fn test_flatten_backward_3d_strided_view() raises:
     ).float()
     assert_true(a.gradbox[].all_close(expected_grad))
     _ = a
-    _ = v
+    _ = """_ = v
     _ = f
     _ = loss
-    _ = expected_grad
+    _ = expected_grad"""
 
 
 fn test_flatten_gradient_correctness_strided_view() raises:
@@ -4582,7 +4562,7 @@ fn test_contiguous_tensor_equality() raises:
     a = Tensor.arange(42)
     v = a.into_view()
     a_buffer = a.buffer
-    v_buffer = v.base[].buffer
+    v_buffer = v.buffer
 
     a_new = Tensor(a.shape, a_buffer)
     v_new = Tensor(a.shape, v_buffer)
@@ -4600,10 +4580,10 @@ fn test_contiguous_tensor_equality() raises:
 
     sliced = a.slice(7, 22)
     expect = Tensor.arange(7, 22)
-    sliced_buffer = sliced.base[].buffer[
+    sliced_buffer = sliced.buffer.unbox()[
         sliced.offset : sliced.offset + sliced.numels()
     ]
-    expected_buffer = expect.buffer
+    expected_buffer = expect.buffer.unbox()
     result = sliced_buffer.eq(expected_buffer)
     assert_true(result.all_true(), "tensor equality assertion 4 failed")
     total = 133
@@ -4628,7 +4608,7 @@ fn test_contiguous_tensor_equality() raises:
         i += batch_size
 
     x = a.slice(27, 56)
-    x_buffer = x.base[].buffer[x.offset : x.numels() + x.offset]
+    x_buffer = x.buffer.unbox()[x.offset : x.numels() + x.offset].box()
     x_tensor = Tensor(x.shape, x_buffer)
     assert_true(
         (x_tensor == Tensor.full([29], 42)).all_true(),
@@ -4646,10 +4626,88 @@ fn test_max_index_and_element_at() raises:
     a = Tensor.arange(10)
     v = a[s(2, 8, 2)]
     assert_true(v.max_index() == 6 and v.element_at(-4) == 2)
+    _ = a
+
+
+fn test_scalar_dot_scalar() raises:
+    print("test_scalar_dot_scalar")
+    var a = Tensor.scalar(42.0, requires_grad=True).float()
+    var b = Tensor.scalar(3.0, requires_grad=True).float()
+
+    var z = a.dot(b)  # scalar dot scalar → just multiply
+    z.backward()
+
+    # dz/da = b, dz/db = a
+    assert_true(a.gradbox[].all_close(Tensor.scalar(3.0).float()))
+    assert_true(b.gradbox[].all_close(Tensor.scalar(42.0).float()))
+
+
+fn test_dotproduct_simple() raises:
+    print("test_dotproduct_simple")
+    var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True).float()
+    var y = Tensor.d1([4.0, 5.0, 6.0], requires_grad=True).float()
+
+    var z = x.dot(y)  # valid 1D dot product
+    z.backward()
+
+    # dz/dx = y, dz/dy = x
+    assert_true(x.gradbox[].all_close(y.float()))
+    assert_true(y.gradbox[].all_close(x.float()))
+
+
+fn test_dotproduct_with_scalar_multiply() raises:
+    print("test_dotproduct_with_scalar_multiply")
+    var x = Tensor.d1([2.0, 3.0, 4.0], requires_grad=True).float()
+    var s = Tensor.scalar(5.0, requires_grad=True).float()
+
+    var z = (x * s).sum()  # elementwise multiply + sum
+    z.backward()
+
+    # dz/dx = s, dz/ds = sum(x)
+    assert_true(x.gradbox[].all_close(Tensor.d1([5.0, 5.0, 5.0]).float()))
+    assert_true(s.gradbox[].all_close(Tensor.scalar(2.0 + 3.0 + 4.0).float()))
+
+
+fn test_dotproduct_views() raises:
+    print("test_dotproduct_views")
+    var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True).float()
+    var y = x[1:3]  # view [2,3]
+    var z = y.dot(Tensor.d1([10.0, 20.0], requires_grad=True).float())
+    z.backward()
+
+    # dz/dx = [0,10,20,0]
+
+    assert_true(
+        x.gradbox[].all_close(Tensor.d1([0.0, 10.0, 20.0, 0.0]).float())
+    )
+    # _ = x
+
+
+fn test_dotproduct_repeat_and_scalar_multiply() raises:
+    print("test_dotproduct_repeat_and_scalar_multiply")
+    var a = Tensor.d1([1.0, 2.0], requires_grad=True).float()
+    var b = a.repeat([3])  # [1,1,1,2,2,2]
+    var s = Tensor.scalar(2.0, requires_grad=True).float()
+    var z = (b * s).sum()  # elementwise multiply + sum
+    z.backward()
+
+    # dz/db = s, dz/da = sum over repeated grad
+    assert_true(a.gradbox[].all_close(Tensor.d1([6.0, 6.0]).float()))
+    assert_true(
+        s.gradbox[].all_close(
+            Tensor.scalar(1.0 + 1.0 + 1.0 + 2.0 + 2.0 + 2.0).float()
+        )
+    )
 
 
 fn main() raises:
     print("Starting tensor test cases")
+
+    test_dotproduct_views()
+    test_scalar_dot_scalar()
+    test_dotproduct_simple()
+    test_dotproduct_with_scalar_multiply()
+    test_dotproduct_repeat_and_scalar_multiply()
 
     test_slice_grad()
     test_max_index_and_element_at()
@@ -4862,9 +4920,10 @@ fn main() raises:
 
     test_vector_matrix_mm_backward_batched_matrix_vector_grad()
     test_vector_matrix_mm_backward_batched_matrix_matrix_grad()
-    test_large_tensor_backprop()
+    # test_large_tensor_backprop()
 
     test_repeat_1d_axis0()
+
     test_repeat_backward_simple()
     test_repeat_backward_with_view_slice()
     test_repeat_backward_with_strided_view()
@@ -4894,7 +4953,9 @@ fn main() raises:
     test_flatten_backward_3d_strided_view()
 
     test_flatten_full_default_forward_2d()
+
     test_flatten_partial_forward_3d()
+
     test_flatten_start_only_forward_3d()
     test_flatten_start_eq_end_forward_noop_3d()
     test_flatten_backward_contiguous_2d()

@@ -28,7 +28,7 @@ struct FlattenBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         ancestor = output.ancestry().get(0)[]
         tensor = ancestor.tensor()
         grad_in = Tensor[dtype].zeros(tensor.shape)
@@ -37,7 +37,7 @@ struct FlattenBackward[dtype: DType](Copyable):
         if tensor.is_contiguous():
             n = gradients.shape.num_elements()
             for i in range(n):
-                grad_in.buffer[i] = gradients.buffer[i]
+                grad_in.buffer.unbox()[i] = gradients.buffer.unbox()[i]
         else:
             out_numels = gradients.shape.num_elements()
             for flat_idx in range(out_numels):
@@ -79,13 +79,11 @@ struct Flatten[dtype: DType]:
         var out = Tensor[dtype](Shape(new_shape), requires_grad=False)
 
         # fast path: contiguous
-        if self.is_contiguous():
+        if self.is_dense():
             n = self.shape.num_elements()
             for i in range(n):
-                if self.owns_data:
-                    out.buffer[i] = self.buffer[i]
-                else:
-                    out.buffer[i] = self.base[].buffer[self.offset + i]
+                # out.buffer.unbox()[i] = self.buffer.unbox()[self.offset + i]
+                out.buffer.unbox()[i] = self.buffer.unbox()[i]
         else:
             var flat_idx = 0
             for _, value in self:

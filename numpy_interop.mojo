@@ -44,9 +44,9 @@ fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
     np = Python.import_module("numpy")
     shape_tuple = list_to_tuple(tensor.shape.tolist())
     ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(tensor.dtype))
-    if tensor.owns_data:
+    if tensor.is_dense():
         dst_ptr = ndarray_ptr[dtype](ndarray)
-        buffer_ptr = tensor.buffer.data
+        buffer_ptr = tensor.buffer.unbox().data
         memcpy(dst_ptr, buffer_ptr, tensor.numels())
     else:
         flat = ndarray.flat
@@ -75,7 +75,7 @@ fn from_ndarray[
         src_ptr = ndarray_ptr[dtype](ndarray)
         buffer = Buffer[dtype](numels)
         memcpy(buffer.data, src_ptr, numels)
-        result = Tensor[dtype](shape, buffer, requires_grad=requires_grad)
+        result = Tensor[dtype](shape, buffer.box(), requires_grad=requires_grad)
         return result
     else:
         # Wrap external NumPy buffer (⚠️ lifetime must be managed externally)
@@ -85,10 +85,10 @@ fn from_ndarray[
 
 from testing import assert_true
 
+
 fn main() raises:
-    
     mnist = Python.import_module("mnist_datasets")
-    loader = mnist.MNISTLoader(folder='/tmp')
+    loader = mnist.MNISTLoader(folder="/tmp")
 
     # Load train dataset
     var train_data: PythonObject = loader.load()
@@ -101,4 +101,3 @@ fn main() raises:
     var test_images = test_data[0]
     var test_labels = test_data[1]
     assert_true(len(test_images) == 10000 and len(test_labels) == 10000)
-

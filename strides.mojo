@@ -10,16 +10,16 @@ fn main():
 struct Strides(
     Sized & Copyable & Movable & Stringable & Representable & Writable
 ):
-    var strides: IntList
+    var strides: List[Int]
 
     fn __init__(out self):
-        self.strides = IntList()
+        self.strides = List[Int](capacity=0)
 
     fn __init__(out self, values: List[Int]):
-        self.strides = IntList.new(values)
+        self.strides = values
 
     fn __init__(out self, values: IntList):
-        self.strides = values
+        self.strides = values.tolist()[::]
 
     fn __copyinit__(out self, existing: Self):
         self.strides = existing.strides[::]
@@ -28,27 +28,20 @@ struct Strides(
         self.strides = existing.strides^
 
     fn __str__(self) -> String:
-        var s = String("(")
-        for i in range(len(self)):
-            s += String(self.strides[i])
-            if i < len(self) - 1:
-                s += ", "
-        s += ")"
-        return s
+        return self.strides.__str__()
 
     fn __repr__(self) -> String:
         return self.__str__()
 
-    fn write_to[W: Writer](self, mut writer: W):
-        writer.write(self.__str__())
+    fn write_to(self, mut writer: Some[Writer]):
+        self.strides.write_to(writer)
 
     fn __getitem__(self, i: Int) -> Int:
         return self.strides[i]
 
     fn __getitem__(self, slice: Slice) -> Self:
         strides = self.strides[slice]
-        result = Strides(strides)
-        return result
+        return Strides(strides)
 
     fn __len__(self) -> Int:
         return len(self.strides)
@@ -58,7 +51,7 @@ struct Strides(
 
     @always_inline
     fn to_list(self) -> IntList:
-        return self.strides
+        return IntList(self.strides)
 
     # Reorder dimensions (for transpose/permute)
     fn permute(self, axes: IntList) -> Self:
@@ -68,29 +61,34 @@ struct Strides(
             + ", axes: "
             + axes.__str__()
         )
-        ll = self.strides.permute(axes)
-        result = Strides(ll)
-        return result
+        il = IntList(self.strides)
+        perm = il.permute(axes)
+        return Strides(perm)
 
     @staticmethod
     fn of(*values: Int) -> Self:
-        ll = IntList(values)
-        result = Self(ll)
-        return result
+        ll = List[Int](capacity=len(values))
+        for v in values:
+            ll.append(v)
+        return Self(ll)
 
     @staticmethod
     fn default(shape: Shape) -> Self:
         var rank = shape.rank()
-        var strides = IntList.filled(rank, 0)
+        var strides = List[Int](length=rank, fill=0)
         var acc = 1
         for i in reversed(range(rank)):
             strides[i] = acc
             acc *= shape[i]
-        result = Strides(strides)
-        return result
+        return Strides(strides)
 
-    fn __del__(deinit self):
-        self.strides.free()
+    fn is_contiguous(self, shape: Shape) -> Bool:
+        if shape.rank() == 0:
+            return True  # scalar is trivially contiguous
+        var expected_stride = 1
+        for i in reversed(range(shape.rank())):
+            if shape[i] > 1 and self[i] != expected_stride:
+                return False
+            expected_stride *= shape[i]
 
-    fn free(deinit self):
-        self.strides.free()
+        return True
