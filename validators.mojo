@@ -166,22 +166,6 @@ struct Validator:
             Shape: Validated concrete shape (e.g., `Shape(2, 6, 10)`).
 
         """
-        if current_shape == Shape(1) and (
-            newdims == IntList() or newdims == IntList(-1)
-        ):
-            return Shape(True)
-
-        if current_shape == Shape() and newdims == IntList():
-            return Shape(True)
-
-        if current_shape == Shape() and (
-            newdims == IntList(1) or newdims == IntList(-1)
-        ):
-            return Shape(1)
-
-        if current_shape.num_elements() == newdims.product():
-            return Shape(newdims)
-
         var estimated_size = 1
         var concrete_dims = IntList.with_capacity(len(newdims))
         var infer_index = -1
@@ -288,6 +272,7 @@ struct Validator:
             else:
                 new_shape.append(dim)
                 new_strides.append(stride)
+
         return Shape(new_shape), Strides(new_strides), new_offset
 
     @always_inline
@@ -459,6 +444,18 @@ struct Validator:
         # Validate rank vs non-newaxis indices count
         # Count required rank: Int contributes 1; IntList contributes len(list); Slice contributes 1; NewAxis contributes 0
         var required_rank = 0
+        _ = """for idx in indices:
+            if not idx.isa[NewAxis]():  # Only count non-newaxis indices
+                required_rank += 1
+        if required_rank != original_shape.rank():
+            panic(
+                "Tensor indexing: axes count(",
+                String(original_shape.rank()),
+                ") and ",
+                "non-newaxis indices count(",
+                String(required_rank),
+                ") mismatch",
+            )"""
 
         for idx in indices:
             if idx.isa[NewAxis]():
@@ -577,8 +574,7 @@ struct Validator:
         shape: Shape,
         strides: Strides,
         offset: Int,
-        # ) -> Tuple[Int, Int, Int]:
-    ) -> Int:
+    ) -> Tuple[Int, Int, Int]:
         """
         Validate view parameters and compute absolute bounds.
 
@@ -589,8 +585,7 @@ struct Validator:
             offset: The offset for the view.
 
         Returns:
-            #Tuple of (abs_min, abs_max, abs_offset) absolute coordinates.
-            Absolute offest with respect to base tensor.
+            Tuple of (abs_min, abs_max, abs_offset) absolute coordinates.
 
         """
         # Calculate logical bounds of new view (relative to parent)
@@ -617,7 +612,7 @@ struct Validator:
         hi = max(abs_min, abs_max)
 
         # Bounds checking - PyTorch style
-        if this.is_dense():
+        if this.owns_data:
             # For root tensor, check against storage size
             if lo < 0 or hi >= this.numels():
                 panic("Tensor → view: exceeds tensor's memory bounds")
@@ -628,9 +623,11 @@ struct Validator:
             if lo < parent_lo or hi > parent_hi:
                 panic("Tensor → view: exceeds parent tensor's memory bounds")
 
-        # return abs_min, abs_max, abs_offset
-        return abs_offset
+        return abs_min, abs_max, abs_offset
 
 
 fn main() raises:
     pass
+
+
+from testing import assert_true

@@ -6,18 +6,10 @@ from operators import AddTensor
 from shapes import Shape
 from validators import Validator
 
-
-struct RepeatBackward[dtype: DType](Copyable & Movable):
+@fieldwise_init
+@register_passable
+struct RepeatBackward[dtype: DType](Copyable):
     var repeat: IntList
-
-    fn __init__(out self, repeat: IntList):
-        self.repeat = repeat
-
-    fn __copyinit__(out self, existing: Self):
-        self.repeat = existing.repeat.copy()
-
-    fn __moveinit__(out self, deinit existing: Self):
-        self.repeat = existing.repeat
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -30,7 +22,7 @@ struct RepeatBackward[dtype: DType](Copyable & Movable):
         var gradients = output.gradients()[]
         var ancestor = output.ancestry().get(0)[]
         var ancestor_shape = ancestor.shape()
-
+        
         # zero-initialized ancestor grad
         var grad_in = Tensor[dtype].zeros(ancestor_shape)
 
@@ -51,13 +43,9 @@ struct RepeatBackward[dtype: DType](Copyable & Movable):
         return [(ancestor, grad_in, AddTensor)]
 
 
+@fieldwise_init
 @register_passable
-struct Repeat[dtype: DType](Copyable):
-
-
-    fn __copyinit__(out self, existing: Self):
-        pass
-
+struct Repeat[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -94,9 +82,7 @@ struct Repeat[dtype: DType](Copyable):
             )
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = RepeatBackward[dtype](
-                    repeat
-                ).into_backward_fn()
+                var backward_fn = RepeatBackward[dtype](repeat).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite.of(self))
 

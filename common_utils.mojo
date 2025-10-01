@@ -188,7 +188,7 @@ fn print_tensor_recursive[
     num_last: Int = 10,
 ):
     if tensor_ptr[].rank() == 0:  # Tensor with Shape ()
-        print(tensor_ptr[][IntList()])
+        print(tensor_ptr[][IntList.Empty])
         return
     current_dim = len(indices)
     indent = " " * (level * 2)

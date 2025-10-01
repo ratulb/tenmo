@@ -159,7 +159,7 @@ fn test_indices_of() raises:
     indices = il.indices_of(2)
     assert_true(indices == IntList(3), "indices_of assertion 3 failed")
     indices = il.indices_of(5)
-    assert_true(indices == IntList(), "indices_of assertion 4 failed")
+    assert_true(indices == IntList.Empty, "indices_of assertion 4 failed")
 
 
 fn test_count() raises:
@@ -462,7 +462,6 @@ fn test_negative_indices() raises:
         "IntList negative indices assertion failed",
     )
 
-
 fn test_permute() raises:
     print("test_permute")
     a = IntList(1, 2, 3)
@@ -470,9 +469,8 @@ fn test_permute() raises:
     permuted = a.permute(perm)
     assert_true(permuted == IntList(2, 3, 1), "permute assertion failed")
 
-
 fn main() raises:
-    # print("Running IntList test cases")
+    print("Running IntList test cases")
     test_large_list()
     test_contains_unsorted()
     test_negative_and_duplicates()

@@ -7,23 +7,24 @@ from backpropagation import Delegate, BackwardFn
 from validators import Validator
 
 
-struct MeanBackward[dtype: DType](Copyable & Movable):
+@register_passable
+struct MeanBackward[dtype: DType](Copyable):
     var axes: IntList
     var keepdims: Bool
 
     fn __init__(
-        out self, axes: IntList = IntList(), keepdims: Bool = False
+        out self, axes: IntList = IntList.Empty, keepdims: Bool = False
     ):
         self.axes = axes
         self.keepdims = keepdims
 
     fn __copyinit__(out self, other: Self):
-        self.axes = other.axes
+        self.axes = other.axes.copy()
         self.keepdims = other.keepdims
 
-    fn __moveinit__(out self, deinit other: Self):
+        _ = """fn __moveinit__(out self, deinit other: Self):
         self.axes = other.axes
-        self.keepdims = other.keepdims
+        self.keepdims = other.keepdims"""
 
     fn backward[
         dtype: DType
@@ -32,7 +33,7 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
     ]:
         gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
-        if gradients.shape == Shape():
+        if gradients.shape == Shape.Void:
             scalar_grad = gradients.item() / ancestor.shape().num_elements()
             grad_contrib = Tensor[dtype].full(
                 ancestor.shape(),
@@ -78,12 +79,7 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
 
 
 @register_passable
-struct Mean[dtype: DType](Copyable):
-
-
-    fn __copyinit__(out self, other: Self):
-        pass
-
+struct Mean[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -109,7 +105,7 @@ struct Mean[dtype: DType](Copyable):
             if grad_required:
                 out.requires_grad_(True)
                 backward_fn = MeanBackward[dtype](
-                    normalized_axes, keepdims
+                    normalized_axes.copy(), keepdims
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite.of(tensor))

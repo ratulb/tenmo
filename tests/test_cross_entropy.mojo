@@ -260,7 +260,7 @@ fn test_ce_reduction_mean_1() raises:
     var loss = loss_fn(logits, target)
 
     # Should be average of 3 sample losses
-    assert_true(loss.shape == Shape())
+    assert_true(loss.shape == Shape.Void)
     assert_true(loss.item() > 0)
 
 
@@ -313,7 +313,7 @@ fn test_ce_label_smoothing_mean() raises:
     )
     var loss = loss_fn(logits, target)
 
-    assert_true(loss.shape == Shape())
+    assert_true(loss.shape == Shape.Void)
     assert_true(loss.item() > 0)
 
 
@@ -388,7 +388,7 @@ fn test_ce_2d_spatial() raises:
     var loss = loss_fn(logits, target)
 
     # Should compute mean over 4 spatial positions
-    assert_true(loss.shape == Shape())
+    assert_true(loss.shape == Shape.Void)
     assert_true(loss.item() > 0)
 
 

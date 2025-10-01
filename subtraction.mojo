@@ -6,20 +6,20 @@ from backpropagation import Delegate, BackwardFn
 from buffers import Buffer
 from broadcastbackward import BroadcastBackward
 from common_utils import panic
-from memory import ArcPointer
 
 
-struct SubBackward[dtype: DType](Copyable & Movable):
+@register_passable
+struct SubBackward[dtype: DType](Copyable):
     var signs: IntList
 
     fn __init__(out self):
-        self.signs = IntList()
+        self.signs = IntList.Empty
 
     fn __copyinit__(out self, existing: Self):
         self.signs = existing.signs.copy()
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self.signs = existing.signs
+        _ = """fn __moveinit__(out self, deinit existing: Self):
+        self.signs = existing.signs"""
 
     fn negate(mut self, neg: Bool):
         if neg:
@@ -35,7 +35,7 @@ struct SubBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.grad()
+        gradients = output.gradients()[]
         count = len(output.ancestry())
         grad_outputs = List[Tuple[TensorLite[dtype], Tensor[dtype], Int]](
             capacity=count
@@ -52,15 +52,10 @@ struct SubBackward[dtype: DType](Copyable & Movable):
         return grad_outputs
 
 
+@fieldwise_init
 @register_passable
 struct SubLeftRightBackwardScalar[dtype: DType](Copyable):
     var negate: Bool
-
-    fn __init__(out self, negate: Bool):
-        self.negate = negate
-
-    fn __copyinit__(out self, existing: Self):
-        self.negate = existing.negate
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -78,10 +73,7 @@ struct SubLeftRightBackwardScalar[dtype: DType](Copyable):
 
 
 @register_passable
-struct SubtractScalar[dtype: DType](Copyable):
-    fn __copyinit__(out self, existing: Self):
-        pass
-
+struct SubtractScalar[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -89,11 +81,11 @@ struct SubtractScalar[dtype: DType](Copyable):
         var out: Tensor[dtype]
         shape = self.shape.copy()
 
-        if self.is_dense():
-            buffer = self.buffer.unbox() - scalar
-            out = Tensor[dtype](shape, buffer.box(), requires_grad=False)
+        if self.owns_data:
+            out = Tensor[dtype](shape, self.buffer - scalar, False)
         else:
-            out = Tensor[dtype](shape, requires_grad=False)
+            buffer = Buffer[dtype](self.numels())
+            out = Tensor[dtype](shape, buffer, False)
             for idx, value in self:
                 out[idx] = value - scalar
 
@@ -111,21 +103,18 @@ struct SubtractScalar[dtype: DType](Copyable):
 
 
 @register_passable
-struct SubtractFromScalar[dtype: DType](Copyable):
-    fn __copyinit__(out self, existing: Self):
-        pass
-
+struct SubtractFromScalar[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out: Tensor[dtype]
         shape = self.shape.copy()
-        if self.is_dense():
-            buffer = scalar - self.buffer.unbox()
-            out = Tensor[dtype](shape, buffer.box(), requires_grad=False)
+        if self.owns_data:
+            out = Tensor[dtype](shape, scalar - self.buffer, False)
         else:
-            out = Tensor[dtype](shape, requires_grad=False)
+            buffer = Buffer[dtype](self.numels())
+            out = Tensor[dtype](shape, buffer, False)
             for idx, value in self:
                 out[idx] = scalar - value
 
@@ -143,10 +132,7 @@ struct SubtractFromScalar[dtype: DType](Copyable):
 
 
 @register_passable
-struct Subtractor[dtype: DType](Copyable):
-    fn __copyinit__(out self, existing: Self):
-        pass
-
+struct Subtractor[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -165,13 +151,11 @@ struct Subtractor[dtype: DType](Copyable):
         if self.shape != other.shape:
             out = self.broadcast_op(other, scalar_ops[dtype, Subtract])
         else:
-            if self.is_dense() and other.is_dense():
-                buffer = self.buffer.unbox() - other.buffer.unbox()
-                out = Tensor[dtype](
-                    this_shape, buffer.box(), requires_grad=False
-                )
+            if self.owns_data and other.owns_data:
+                buffer = self.buffer - other.buffer
+                out = Tensor[dtype](this_shape, buffer, False)
             else:
-                out = Tensor[dtype](this_shape, False)
+                out = Tensor[dtype].zeros(this_shape, False)
                 for coord in this_shape:
                     out[coord] = self[coord] - other[coord]
 

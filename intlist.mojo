@@ -1,51 +1,83 @@
-from memory import Pointer
-from common_utils import panic
+from memory import memcpy, memset, Pointer
+from os import abort
+from common_utils import log_debug, panic
 
 
-struct IntList(
-    Sized & Copyable & Movable & Stringable & Representable & Writable
-):
-    var elems: List[Int]
+@register_passable
+struct IntList(Sized & Copyable & Stringable & Representable & Writable):
+    """A memory-efficient, register-passable, dynamic array of Ints. Would abort on any erroneous condition.
+    """
+
+    alias Empty = IntList()
+    var data: UnsafePointer[Int]
+    var size: Int
+    var capacity: Int
 
     fn __init__(out self):
-        self.elems = List[Int](capacity=0)
+        """Constructs an empty IntList."""
+        self.data = UnsafePointer[Int]()
+        self.capacity = 0
+        self.size = 0
 
     @always_inline("nodebug")
     fn __init__(out self, src: List[Int]):
-        self.elems = List[Int](capacity=len(src))
-        for elem in src:
-            self.append(elem)
+        """Initialize a new `IntList` from elements of a list.
+        Args:
+            src: Original list containig the ints.
+        """
+
+        self.data = UnsafePointer[Int].alloc(len(src))
+        memcpy(self.data, src._data, len(src))
+        self.size = len(src)
+        self.capacity = len(src)
 
     @always_inline("nodebug")
     fn __init__(out self, *elems: Int):
-        self.elems = List[Int](capacity=len(elems))
-        for elem in elems:
-            self.append(elem)
+        """Initialize a new `IntList` with variadic number of elements.
+        Args:
+            elems: Number of Ints to allocate space for.
+        """
+        self.data = UnsafePointer[Int].alloc(len(elems))
+        self.size = len(elems)
+        self.capacity = len(elems)
+        for idx in range(len(elems)):
+            (self.data + idx)[] = elems[idx]
 
     @always_inline("nodebug")
     fn __init__(out self, elems: VariadicList[Int]):
-        self.elems = List[Int](capacity=len(elems))
-        for elem in elems:
-            self.append(elem)
+        """Initialize a new `IntList` with the with VariadicList[Int] - used primarily in Shape.
+        Args:
+            elems: Number of Ints to allocate space for.
+        """
+        self.data = UnsafePointer[Int].alloc(len(elems))
+        self.size = len(elems)
+        self.capacity = len(elems)
+        for idx in range(len(elems)):
+            (self.data + idx)[] = elems[idx]
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
-        self.elems = existing.elems[::]
-        # self.elems = existing.elems.copy()
-
-    fn __moveinit__(out self, deinit existing: Self):
-        self.elems = existing.elems^
+        """Initialize by copying an existing `IntList`.
+        Args:
+            existing: The source array to copy from.
+        """
+        self.size = existing.size
+        self.capacity = existing.capacity
+        self.data = UnsafePointer[Int].alloc(existing.capacity)
+        memcpy(self.data, existing.data, existing.size)
 
     @staticmethod
     fn new(src: List[Int]) -> IntList:
-        out = IntList(src)
-        return out
+        result = IntList.with_capacity(len(src))
+        memcpy(result.data, src._data, len(src))
+        result.size = len(src)
+        return result
 
     fn tolist(self) -> List[Int]:
-        out = List[Int](capacity=len(self))
-        for elem in self.elems:
-            out.append(elem)
-        return out
+        l = List[Int](capacity=len(self))
+        for i in range(len(self)):
+            l.append(self[i])
+        return l
 
     @staticmethod
     fn range_list(n: Int) -> IntList:
@@ -60,23 +92,27 @@ struct IntList(
 
     @staticmethod
     fn with_capacity(capacity: Int, fill: Optional[Int] = None) -> IntList:
-        elems = List[Int](length=capacity, fill=fill.value()) if fill else List[
-            Int
-        ](capacity=capacity)
-        out = Self(elems^)
-        return out^
+        array = Self()
+        array.data = UnsafePointer[Int].alloc(capacity)
+        array.capacity = capacity
+        array.size = 0
+        if fill:
+            for idx in range(capacity):
+                (array.data + idx)[] = fill.value()
+            array.size = capacity
+        return array
 
     fn product(self) -> Int:
-        prod = 1
-        for elem in self:
-            prod *= elem
-        return prod
+        result = 1
+        for each in self:
+            result *= each
+        return result
 
     fn sum(self) -> Int:
-        summ = 0
-        for elem in self:
-            summ += elem
-        return summ
+        result = 0
+        for each in self:
+            result += each
+        return result
 
     fn has_duplicates(self) -> Bool:
         if len(self) <= 1:
@@ -107,7 +143,7 @@ struct IntList(
                 panic("IntList -> permute: duplicate axis", ax.__str__())
             seen.append(axis)
             permuted.append(self[axis])
-
+        seen.free()
         return permuted
 
     fn swap(mut self, this_index: Int, that_index: Int):
@@ -121,10 +157,10 @@ struct IntList(
             )
 
         if index1 != index2:
-            self.elems.swap_elements(index1, index2)
+            swap((self.data + index1)[], (self.data + index2)[])
 
     fn sort_and_deduplicate(mut self):
-        if len(self) <= 1:
+        if len(self) == 0:
             return
         self.sort()
         write_index = 1
@@ -132,21 +168,21 @@ struct IntList(
             if self[read_index] != self[write_index - 1]:
                 self[write_index] = self[read_index]
                 write_index += 1
-        self.elems.shrink(len(self) - write_index + 1)
+        self.size = write_index
 
     fn sorted(self, asc: Bool = True) -> IntList:
         copied = self.copy()
         copied.sort(asc)
         return copied
 
-    fn sort(mut self, asc: Bool = True):
+    fn sort(self, asc: Bool = True):
         for i in range(1, len(self)):
             elem = self[i]
             j = i
             while j > 0 and (elem < self[j - 1] if asc else elem > self[j - 1]):
-                self[j] = self[j - 1]
+                (self.data + j)[] = self[j - 1]
                 j -= 1
-            self[j] = elem
+            (self.data + j)[] = elem
 
     fn select(self, indices: IntList) -> IntList:
         n = len(self)
@@ -154,7 +190,7 @@ struct IntList(
 
         for i in indices:
             if i < 0 or i >= n:
-                panic(
+                abort(
                     "Index out of bounds in IntList - select: "
                     + String(i)
                     + ", not in [0, "
@@ -166,15 +202,19 @@ struct IntList(
 
     fn indices_of(self, val: Int) -> IntList:
         """Returns a new IntList containing all indices where self[i] == val."""
-        out = IntList.with_capacity(len(self))
+        result = IntList.with_capacity(self.size)
 
-        for i in range(len(self)):
-            if self[i] == val:
-                out.append(i)
-        return out
+        for i in range(self.size):
+            if (self.data + i)[] == val:
+                result.append(i)
+        return result
 
     fn count(self, elem: Int) -> Int:
-        return self.elems.count(elem)
+        times = 0
+        for each in self:
+            if each == elem:
+                times += 1
+        return times
 
     fn any(self, cond: fn (Int) -> Bool) -> Bool:
         for elem in self:
@@ -199,7 +239,7 @@ struct IntList(
 
     fn insert(self, indices: IntList, values: IntList) -> IntList:
         if len(indices) != len(values):
-            panic("IntList -> insert: indices and values must be same length")
+            abort("IntList -> insert: indices and values must be same length")
 
         n = len(self)
         m = len(indices)
@@ -208,7 +248,7 @@ struct IntList(
                 return IntList()
             # Ensure indices = [0, 1, ..., m-1]
             if not indices.is_strictly_increasing_from_zero():
-                panic(
+                abort(
                     "IntList -> insert: invalid idices for empty list insertion"
                 )
             return values
@@ -224,7 +264,7 @@ struct IntList(
                 red_cursor += 1
             else:
                 if orig_cursor >= n:
-                    panic(
+                    abort(
                         "IntList -> insert: ran out of source values too early"
                     )
                 result.append(self[orig_cursor])
@@ -235,10 +275,10 @@ struct IntList(
         # Insert `value` at position `at` in `self`, return a new IntList
         # `at` could be start, middle or end
         if at < 0 or at > len(self):
-            panic("IntList -> insert - index out of bounds: " + String(at))
+            abort("IntList -> insert - index out of bounds: " + String(at))
 
         result = IntList.with_capacity(len(self) + 1)
-        for i in range(len(self) + 1):
+        for i in range(result.capacity):
             if i == at:
                 result.append(value)
             if i < len(self):
@@ -246,19 +286,26 @@ struct IntList(
 
         return result
 
+    @always_inline("nodebug")
+    # fn __del__(owned self):
+    fn free(deinit self):
+        """Destroy the `IntList` and free its memory."""
+        if self.data:
+            log_debug("Calling IntList __del__")
+            self.data.free()
+
     fn clear(mut self):
-        self.elems.clear()
+        self.size = 0
 
     fn __rmul__(self: IntList, factor: Int) -> IntList:
         return self.__mul__(factor)
 
     fn __mul__(self: IntList, factor: Int) -> IntList:
-        if factor < 1 or not self.elems:
+        if factor < 1 or self.data.__as_bool__() == False:
             return IntList()
         result = IntList.with_capacity(len(self) * factor)
-        elems = self.elems * factor
-        for i in range(len(elems)):
-            result[i] = elems[i]
+        for i in range(factor):
+            result.copy_from(i * len(self), self, 0, len(self))
         return result
 
     fn __mul__(self: IntList, other: Self) -> IntList:
@@ -275,20 +322,33 @@ struct IntList(
         return result
 
     fn __getitem__(self, slice: Slice) -> Self:
-        elems = self.elems[slice]
-        out = IntList(elems)
-        return out
+        var start, end, step = slice.indices(len(self))
+        var spread = range(start, end, step)
+
+        if not len(spread):
+            return Self()
+
+        var result = Self.with_capacity(capacity=len(spread))
+        for i in spread:
+            result.append(self[i])
+
+        return result^
 
     fn pop(mut self, index: Int = -1) -> Int:
         if len(self) < 1:
-            panic("cannot pop from empty IntList")
+            abort("cannot pop from empty IntList")
+
         var i = index
         if i < 0:
-            i += len(self)
+            i += self.size
         if i < 0 or i >= len(self):
-            panic("pop index out of bounds")
+            abort("pop index out of bounds")
 
-        val = self.elems.pop(i)
+        val = (self.data + i).take_pointee()
+        for j in range(i + 1, self.size):
+            (self.data + j).move_pointee_into(self.data + j - 1)
+
+        self.size -= 1
         return val
 
     fn __radd__(self: IntList, other: List[Int]) -> IntList:
@@ -298,41 +358,62 @@ struct IntList(
         return self.__add__(IntList(other))
 
     fn __add__(self: IntList, other: IntList) -> IntList:
-        if not self.elems and not other.elems:
+        if (
+            self.data.__as_bool__() == False
+            and other.data.__as_bool__() == False
+        ):
             return IntList()
-        if not self.elems:
-            return other.copy()
-        if not other.elems:
-            return self.copy()
+        if self.data.__as_bool__() == False:
+            return other
+        if other.data.__as_bool__() == False:
+            return self
 
-        elems = self.elems + other.elems
-        return IntList(elems)
+        result = IntList.with_capacity(len(self) + len(other))
+        result.copy_from(0, self, 0, len(self))
+        result.copy_from(len(self), other, 0, len(other))
+        return result
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
+        """Access an element at the specified index.
+        Args:
+            idx: Zero-based index of the element to access.
+
+        Returns:
+            The integer value at the specified index.
+
+        """
         index = idx if idx >= 0 else idx + self.__len__()
         if index < 0 or index >= len(self):
-            panic("IntList __getitem__  → Out-of-bounds read: " + String(idx))
+            abort("IntList __getitem__  → Out-of-bounds read: " + String(idx))
 
-        return self.elems[index]
+        return (self.data + index)[]
 
     @always_inline("nodebug")
     fn __setitem__(mut self, idx: Int, value: Int):
+        """Set the value at the specified index.
+
+        Args:
+            idx: Zero-based index of the element to modify.
+            value: The integer value to store at the specified index.
+
+        """
+
         if idx < 0 or idx > len(self):
-            panic("IntList __setitem__ -> Cannot skip indices")
-        if idx == len(self):
+            abort("IntList __setitem__ -> Cannot skip indices")
+        if idx == self.size:
             self.append(value)
         else:
-            self.elems[idx] = value
+            (self.data + idx)[] = value
 
     fn replace(self, idx: Int, value: Int) -> Self:
-        result = self.copy()
+        result = self
         result[idx] = value
         return result
 
     @staticmethod
     fn invert_permutation(perm: IntList) -> Self:
-        n = len(perm)
+        n = perm.size
         inverted = IntList.filled(n, 0)
         for i in range(n):
             inverted[perm[i]] = i
@@ -344,15 +425,15 @@ struct IntList(
         m = len(indices)
 
         if m != len(values):
-            panic("IntList -> replace: indices and values must be same length")
+            abort("IntList -> replace: indices and values must be same length")
 
         # Validate indices: no out-of-bounds, no duplicates
         for i in range(m):
             idx = indices[i]
             if idx < 0 or idx >= n:
-                panic("IntList -> replace: index out of bounds: " + String(idx))
+                abort("IntList -> replace: index out of bounds: " + String(idx))
 
-        result = self[::]
+        result = self.copy()
 
         # Apply replacements
         for i in range(m):
@@ -362,36 +443,159 @@ struct IntList(
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        return len(self.elems)
+        """Get the number of elements in the array.
+
+        Returns:
+            The number of elements in the array.
+        """
+        return self.size
 
     @always_inline("nodebug")
     fn len(self) -> Int:
-        return len(self.elems)
+        """Get the number of elements in the array.
+
+        Returns:
+            The number of elements in the array.
+        """
+        return self.size
 
     fn is_empty(self) -> Bool:
         return len(self) == 0
 
     fn __eq__(self: IntList, other: IntList) -> Bool:
-        return self.elems.__eq__(other.elems)
+        if len(self) != len(other):
+            return False
+        var index = 0
+        for element in self:
+            if element != other[index]:
+                return False
+            index += 1
+        return True
 
     fn __str__(self) -> String:
-        return self.elems.__str__()
+        var s = String("[")
+        for i in range(len(self)):
+            s += String(self[i])
+            if i < len(self) - 1:
+                s += ", "
+        s += "]"
+        return s
 
     fn __repr__(self) -> String:
         return self.__str__()
 
-    fn write_to(self, mut writer: Some[Writer]):
-        self.elems.write_to(writer)
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
+
+    @always_inline("nodebug")
+    fn copy_from(
+        mut self: IntList,
+        dst_offset: Int,
+        source: IntList,
+        src_offset: Int,
+        size: Int,
+    ):
+        """Copy elements from another IntList with source offset.
+
+        Args:
+            dst_offset: Destination offset in this array.
+            source: Source array to copy from.
+            src_offset: Source offset in the source array.
+            size: Number of elements to copy.
+        """
+
+        # --- Safety checks ---
+        if dst_offset < 0 or src_offset < 0 or size < 0:
+            abort("Negative offset/size not allowed")
+
+        if src_offset + size > source.size:
+            abort("Source range out of bounds")
+
+        required_dst_size = dst_offset + size
+
+        # Resize capacity if needed
+        if required_dst_size > self.capacity:
+            new_capacity = max(
+                required_dst_size,
+                self.capacity * 2 if self.capacity > 0 else required_dst_size,
+            )
+            self.resize(new_capacity)
+
+        # Fill any gap between current size and dst_offset with zeros
+        if dst_offset > self.size:
+            for i in range(self.size, dst_offset):
+                self.data[i] = 0
+
+        # Perform the actual copy
+        memcpy(
+            self.data.offset(dst_offset), source.data.offset(src_offset), size
+        )
+
+        # Update size
+        if required_dst_size > self.size:
+            self.size = required_dst_size
+
+    @always_inline("nodebug")
+    fn copy_from(mut self, offset: Int, source: IntList, size: Int):
+        """Copy elements from another `IntList`.
+
+        Args:
+            offset: Destination offset in this array.
+            source: Source array to copy from.
+            size: Number of elements to copy.
+        """
+        self.copy_from(offset, source, 0, size)
 
     fn prepend(mut self, value: Int):
-        self.elems.insert(0, value)
+        if self.size == self.capacity:
+            new_capacity = max(1, self.capacity * 2)
+            self.resize(new_capacity)
+        # Shift all elements to the right by 1
+        for i in range(self.size, 0, -1):
+            self.data[i] = self.data[i - 1]
+        # Insert the new value at the beginning
+        self.data[0] = value
+        self.size += 1
 
     fn append(mut self, value: Int):
-        self.elems.append(value)
+        if self.size == self.capacity:
+            new_capacity = max(1, self.capacity * 2)
+            self.resize(new_capacity)
+        self.data[self.size] = value
+        self.size += 1
+
+    fn resize(mut self, new_capacity: Int):
+        self.reserve(new_capacity)
+
+    fn reserve(mut self, new_capacity: Int):
+        if new_capacity <= self.capacity:
+            return
+
+        new_data = UnsafePointer[Int].alloc(new_capacity)
+        if self.size > 0:
+            memcpy(new_data, self.data, self.size)
+        if self.data:
+            self.data.free()
+        self.data = new_data
+        self.capacity = new_capacity
 
     @always_inline
     fn __contains__(self, value: Int) -> Bool:
-        return self.elems.__contains__(value)
+        for i in range(len(self)):
+            if self[i] == value:
+                return True
+        return False
+
+    fn copy(self) -> Self:
+        """Creates a deep copy of the given IntList.
+
+        Returns:
+            A copy of the value.
+        """
+        var copy = Self.with_capacity(capacity=len(self))
+        for e in self:
+            copy.append(e)
+        return copy^
 
     fn reversed(self) -> Self:
         copied = self.copy()
@@ -399,7 +603,24 @@ struct IntList(
         return copied
 
     fn reverse(mut self):
-        self.elems.reverse()
+        """Reverses the elements of the list."""
+
+        var left = 0
+        var right = len(self) - 1
+
+        var length = len(self)
+        var half_len = length // 2
+
+        for _ in range(half_len):
+            var left_ptr = self.data + left
+            var right_ptr = self.data + right
+
+            var tmp = left_ptr.take_pointee()
+            right_ptr.move_pointee_into(left_ptr)
+            right_ptr.init_pointee_move(tmp)
+
+            left += 1
+            right -= 1
 
     fn print(self, limit: Int = 20) -> None:
         total = len(self)
@@ -457,7 +678,6 @@ struct IntList(
         )
 
 
-@register_passable
 struct Iterator[
     origin: Origin[False],
     forward: Bool = True,
@@ -468,11 +688,6 @@ struct Iterator[
     fn __init__(out self, idx: Int, src: Pointer[IntList, origin]):
         self.src = src
         self.index = idx
-
-    @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
-        self.index = existing.index
-        self.src = existing.src
 
     fn __iter__(self) -> Self:
         return self
@@ -519,13 +734,6 @@ struct ZipIterator[
         self.index = idx
         self.offset = abs(len(src_this[]) - len(src_that[]))
 
-    @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
-        self.index = existing.index
-        self.offset = existing.offset
-        self.src_this = existing.src_this
-        self.src_that = existing.src_that
-
     fn __iter__(self) -> Self:
         return self
 
@@ -563,60 +771,7 @@ struct ZipIterator[
 
 
 fn main() raises:
-    _ = """test_slice()
-    test_deduplicate()
-    test_new()"""
-    print(IntList.with_capacity(10, 42).__str__())
+    pass
 
 
 from testing import assert_true
-
-
-fn test_with_capacity_fill() raises:
-    print("test_with_capacity_fill")
-    il = IntList.with_capacity(3, -10)
-    assert_true(
-        il == IntList(-10, -10, -10) and len(il) == 3,
-        "with_capacity with fill assertion failed",
-    )
-
-
-fn test_new() raises:
-    print("test_new")
-    l = List(1, 2, 3)
-    il = IntList.new(l)
-    print("il: ", il)
-    assert_true(il == IntList(1, 2, 3), "new assertion 1 failed")
-    l = List[Int]()
-    il = IntList.new(l)
-    print("il2: ", il)
-    assert_true(il == IntList(), "new assertion 2 failed")
-
-
-fn test_deduplicate() raises:
-    print("test_deduplicate")
-    il = IntList(9, 2, 9, 1, 4, 3, 1, 5, 7, 2, 1, 4, 7)
-    il.sort_and_deduplicate()
-    print("il: ", il)
-    assert_true(
-        il
-        == IntList(
-            1,
-            2,
-            3,
-            4,
-            5,
-            7,
-            9,
-        ),
-        "deduplicate assertion failed",
-    )
-
-
-fn test_slice() raises:
-    print("test_slice")
-    il = IntList.range_list(15)
-    print("il: ", il)
-    sliced = il[2::3]
-    print(sliced)
-    assert_true(sliced == IntList(2, 5, 8, 11, 14), "slice assertion failed")

@@ -7,24 +7,17 @@ from backpropagation import Delegate, BackwardFn
 from validators import Validator
 
 
-struct SumBackward[dtype: DType](Copyable & Movable):
+@register_passable
+struct SumBackward[dtype: DType](Copyable):
     var axes: IntList
     var keepdims: Bool
 
     fn __init__(
-        out self, axes: IntList = IntList(), keepdims: Bool = False
+        out self, axes: IntList = IntList.Empty, keepdims: Bool = False
     ):
         self.axes = axes
         self.keepdims = keepdims
 
-    fn __copyinit__(out self, existing: Self):
-        self.axes = existing.axes
-        self.keepdims = existing.keepdims
-
-    fn __moveinit__(out self, deinit existing: Self):
-        self.axes = existing.axes
-        self.keepdims = existing.keepdims
-    
     fn backward[
         dtype: DType
     ](self, output: TensorLite[dtype]) -> List[
@@ -40,7 +33,7 @@ struct SumBackward[dtype: DType](Copyable & Movable):
         var grad_contrib: Tensor[dtype]
 
         # Handle scalar gradient case (sum reduced to scalar)
-        if gradients.shape == Shape():
+        if gradients.shape == Shape.Void:
             grad_contrib = Tensor[dtype].full(
                 shape,
                 gradients.item(),
@@ -77,10 +70,7 @@ struct SumBackward[dtype: DType](Copyable & Movable):
 
 
 @register_passable
-struct Summer[dtype: DType](Copyable):
-    fn __copyinit__(out self, existing: Self):
-        pass
-
+struct Summer[dtype: DType](Copyable & Movable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -90,17 +80,17 @@ struct Summer[dtype: DType](Copyable):
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        shape = tensor.shape
+        shape = tensor.shape.copy()
         rank = shape.rank()
         normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
         out_shape = shape.compute_output_shape(normalized_axes, keepdims)
         out = Tensor[dtype].zeros(out_shape)
 
-        if out_shape == Shape():
+        if out_shape == Shape.Void:
             if rank == 0:  # Scalar case
-                out[IntList()] = tensor[IntList()]
+                out[IntList.Empty] = tensor[IntList.Empty]
             elif rank == len(normalized_axes) and not keepdims:  # Reducing all
-                out[IntList()] = tensor.sum_all()
+                out[IntList.Empty] = tensor.sum_all()
         else:
             reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
             for out_idx in out_shape:

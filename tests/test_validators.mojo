@@ -9,11 +9,11 @@ from testing import assert_true
 fn test_validate_and_normalize_axes() raises:
     print("test_validate_and_normalize_axes")
     shape = Shape([2, 3, 4])
-    axes = Validator.validate_and_normalize_axes(shape, IntList())
+    axes = Validator.validate_and_normalize_axes(shape, IntList.Empty)
     assert_true(
         axes == IntList(0, 1, 2), "Assertion failed for empty axes list"
     )
-    axes = Validator.validate_and_normalize_axes(Shape(), IntList())
+    axes = Validator.validate_and_normalize_axes(Shape.Void, IntList.Empty)
     assert_true(
         axes == IntList(), "Assertion failed for empty shape and empy axes list"
     )

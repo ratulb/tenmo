@@ -23,7 +23,7 @@ struct ShuffleBackward[dtype: DType](Copyable & Movable):
         var gradients = output.gradients()[]
         var parent = output.ancestry().get(0)[]
 
-        var shape = gradients.shape.copy()
+        var shape = gradients.shape
 
         # Allocate gradient w.r.t. ancestor
         var parent_grad = Tensor[dtype].zeros(
@@ -40,11 +40,8 @@ struct ShuffleBackward[dtype: DType](Copyable & Movable):
         return [(parent, parent_grad, AddTensor)]
 
 
-@register_passable
-struct Shuffle[dtype: DType](Copyable):
-    fn __copyinit__(out self, existing: Self):
-        pass
-
+@fieldwise_init
+struct Shuffle[dtype: DType](Copyable & Movable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -54,7 +51,7 @@ struct Shuffle[dtype: DType](Copyable):
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        shape = self.shape.copy()
+        shape = self.shape
         axis_length = shape[axis]
 
         var permutation: List[Int]
@@ -71,11 +68,11 @@ struct Shuffle[dtype: DType](Copyable):
         # Allocate output
         var out = Tensor[dtype].zeros(shape)
 
-        for coord in shape:
-            shifted_src_coord = coord[::]
+        for coord in self.shape:
+            shifted_src_coord = coord
             shifted_src_coord[axis] = permutation[coord[axis]]
             out[coord] = self[shifted_src_coord]
-        
+
         # Attach autograd info
         @parameter
         if track_grad:
@@ -84,43 +81,14 @@ struct Shuffle[dtype: DType](Copyable):
             )
             if grad_required:
                 out.requires_grad_(True)
-
                 backward_fn = ShuffleBackward[dtype](
                     axis, permutation
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite.of(self))
-        
+
         return out
 
 
-fn main() raises:
-    test_shuffle()
+fn main():
     print("passes")
-
-
-from testing import assert_true
-
-
-fn test_shuffle() raises:
-    print("test_shuffle\n")
-    perm = List(2, 3, 0, 4, 1)
-    a = Tensor.arange(5, requires_grad=True)
-    shuffled = a.shuffle(perm=perm)
-    print("\nshuffled: \n")
-    shuffled.print()
-    print()
-    print()
-    sliced = shuffled[1:4]
-    print()
-    sliced.print()
-    c = sliced * 42
-    c.backward()
-    expected = Tensor.d1([42.0, 0.0, 0.0, 42.0, 42.0]).float()
-    print()
-    a.gradbox[].print()
-    assert_true(a.gradbox[].all_close(expected))
-    _ = a
-    _ = shuffled
-    _ = sliced
-    _ = c

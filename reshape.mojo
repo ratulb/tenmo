@@ -14,7 +14,7 @@ struct ReshapeBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.grad()
+        gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
         reshaped = gradients.reshape(ancestor.shape())
 
@@ -37,13 +37,14 @@ struct Reshape[dtype: DType](Copyable):
         tensor: Tensor[dtype],
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,
-        validated: Bool = False,
+        validated: Bool = False
     ) -> Tensor[dtype]:
         shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             tensor.shape, new_shape.intlist()
         )
-        buffer = tensor.buffer.unbox().box()
-        out = Tensor[dtype](shape, buffer^, requires_grad=False)
+
+        buffer = tensor.buffer if tensor.owns_data else tensor.base[].buffer
+        out = Tensor[dtype](shape, buffer)
 
         @parameter
         if track_grad:
@@ -60,5 +61,5 @@ struct Reshape[dtype: DType](Copyable):
         return out
 
 
-fn main() raises:
+fn main():
     print("passes")

@@ -44,7 +44,7 @@ fn test_slice_from() raises:
         "slice_from assertion from from index 2 failed",
     )
     assert_true(
-        shape[3:] == Shape(),
+        shape[3:] == Shape.Void,
         "slice_from assertion from from index 3 failed",
     )
 
@@ -64,17 +64,19 @@ fn test_equivalence() raises:
 
 fn test_empty_shape() raises:
     print("test_empty_shape")
-    shape = Shape(IntList())
+    shape = Shape(IntList.Empty)
     assert_true(shape[0] == -1, "Empty shape __getitem__ assertion failed")
     for each in shape:
-        assert_true(each == IntList(), "Empty shape iteration assertion failed")
+        assert_true(
+            each == IntList.Empty, "Empty shape iteration assertion failed"
+        )
     tensor = Tensor[DType.bool](shape)
     assert_true(
-        tensor[IntList()] == False, "Scalar tensor get assertion 1 failed"
+        tensor[IntList.Empty] == False, "Scalar tensor get assertion 1 failed"
     )
-    tensor[IntList()] = True
+    tensor[IntList.Empty] = True
     assert_true(
-        tensor[IntList()] == True, "Scalar tensor get assertion 2 failed"
+        tensor[IntList.Empty] == True, "Scalar tensor get assertion 2 failed"
     )
     assert_true(tensor.item() == True, "Scalar tensor item() assertion failed")
     assert_true(
@@ -85,6 +87,7 @@ fn test_empty_shape() raises:
         Shape.of(1).broadcastable(shape),
         "broadcastable assertion 1 failed for empty shape",
     )
+
     broadcast_shape = Shape.broadcast_shape(shape, Shape.of(1))
     assert_true(
         broadcast_shape == Shape.of(1),

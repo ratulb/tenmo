@@ -235,7 +235,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
             out = losses.reshape(target.shape)
         elif self.reduction == 1:  # sum
             var total_loss = losses.sum()
-            out = Tensor.full(Shape(1), total_loss.item())
+            out = Tensor.full(Shape.Unit, total_loss.item())
         else:  # mean (default case - reduction == 0 or any other value)
             if valid_count > 0:
                 var total_loss = losses.sum()

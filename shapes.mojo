@@ -3,23 +3,21 @@ from intlist import IntList
 from memory import Pointer
 
 
+fn main():
+    pass
+
+
+@fieldwise_init
+@register_passable
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
     var shape: Pointer[Shape, origin]
     var current: IntList
     var index: Int
 
-    fn __init__(
-        out self, shape: Pointer[Shape, origin], curr_index: IntList, pos: Int
-    ):
+    fn __init__(out self, shape: Pointer[Shape, origin]):
         self.shape = shape
-        self.current = curr_index
-        self.index = pos
-
-    fn __copyinit__(out self, other: Self):
-        self.shape = other.shape
-        # self.current = other.current[::]
-        self.current = other.current
-        self.index = other.index
+        self.current = IntList.filled(shape[].ndim, 0)
+        self.index = 0
 
     fn __iter__(self) -> Self:
         return self
@@ -41,17 +39,16 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
         return self.shape[].num_elements() - self.index > 0
 
 
-struct Shape(
-    Sized & Stringable & Writable & Representable & Copyable & Movable
-):
+@register_passable
+struct Shape(Sized & Stringable & Writable & Representable & Copyable):
+    alias Unit = Shape.of(1)
+    alias Void = Shape(IntList.Empty)
     var axes_spans: IntList
     var ndim: Int
     var numels: Int
 
-    fn __init__(out self, scalar: Bool = False):
-        self.axes_spans = IntList()
-        self.ndim = 0
-        self.numels = 1 if scalar else 0
+    fn __init__(out self):
+        self = Self.Void
 
     fn __init__(out self, dims: VariadicList[Int]):
         spans = IntList.with_capacity(len(dims))
@@ -59,22 +56,8 @@ struct Shape(
             spans.append(each)
         self = Self(spans)
 
-    fn __init__(out self, *values: Int):
-        spans = IntList(values)
-        self = Self(spans)
-
     fn __init__(out self, dims: List[Int]):
         self = Self(IntList.new(dims))
-
-    fn __copyinit__(out self, other: Self):
-        self.axes_spans = other.axes_spans[::]
-        self.ndim = other.ndim
-        self.numels = other.numels
-
-    fn __moveinit__(out self, deinit other: Self):
-        self.axes_spans = other.axes_spans^
-        self.ndim = other.ndim
-        self.numels = other.numels
 
     fn __init__(out self, dims: IntList):
         if len(dims) < 0:
@@ -82,10 +65,9 @@ struct Shape(
         ndim = len(dims)
         # Allow scalar tensors (rank 0, i.e., Shape())
         if ndim == 0:
-            # self.axes_spans = IntList()
-            # self.ndim = 0
-            # self.numels = 1
-            self = Self(True)
+            self.axes_spans = IntList.Empty
+            self.ndim = 0
+            self.numels = 1
             return
         numels = 1
         for i in range(ndim):
@@ -99,14 +81,12 @@ struct Shape(
                     + String(i)
                 )
             numels *= dims[i]
-        self.axes_spans = dims[::]
+        self.axes_spans = dims
         self.ndim = ndim
         self.numels = numels
 
     fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
-        return ShapeIndexIter(
-            Pointer(to=self), IntList.filled(self.rank(), 0), 0
-        )
+        return ShapeIndexIter(Pointer(to=self))
 
     @always_inline
     fn broadcastable(self, to: Shape) -> Bool:
@@ -220,8 +200,7 @@ struct Shape(
 
         # Full reduction case (return scalar shape if not keeping dims)
         if rank == 0 or (len(normalized_axes) == rank and not keepdims):
-            # return Shape.Void
-            return Shape(True)
+            return Shape.Void
 
         var spans = IntList.with_capacity(rank)
         for dim in range(rank):
@@ -301,7 +280,7 @@ struct Shape(
         return Shape(dims)
 
     fn replace(self, axis: Int, extent: Int) -> Shape:
-        if axis < 0 or axis >= self.num_elements():
+        if axis < 0 or axis >= self.ndim:
             panic(
                 "Shape → replace: Invalid axis: "
                 + String(axis)
@@ -314,23 +293,35 @@ struct Shape(
         axes[axis] = extent
         return Shape(axes)
 
+    fn drop_axis(self, axis: Int) -> Shape:
+        if axis < 0 or axis >= self.ndim:
+            panic(
+                "Shape → drop_axis: Invalid axis: "
+                + String(axis)
+                + " for shape: "
+                + self.__str__()
+            )
+        if self.ndim == 1:
+            shape = self
+            return shape
+        axes = self.intlist()[:axis] + self.intlist()[axis + 1 :]
+        return Shape(axes)
+
     @always_inline
     @staticmethod
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
         if shape1 == shape2:
             return shape1, shape2
-        # if shape1 == Shape.Void:
-        if shape1 == Shape():
-            # return Shape.Unit * len(shape2), shape2
-            return Shape(1) * len(shape2), shape2
-        if shape2 == Shape():
-            return shape1, Shape(1) * len(shape1)
+        if shape1 == Shape.Void:
+            return Shape.Unit * len(shape2), shape2
+        if shape2 == Shape.Void:
+            return shape1, Shape.Unit * len(shape1)
 
         max_len = max(len(shape1), len(shape2))
 
         # Pad with 1s
-        padded1 = Shape(1) * (max_len - len(shape1)) + shape1
-        padded2 = Shape(1) * (max_len - len(shape2)) + shape2
+        padded1 = Shape.Unit * (max_len - len(shape1)) + shape1
+        padded2 = Shape.Unit * (max_len - len(shape2)) + shape2
 
         return padded1, padded2
 
@@ -345,9 +336,9 @@ struct Shape(
                 + that.__str__()
             )
         # Explicitly handle true scalars (Shape.Void)
-        if this == Shape():
+        if this == Shape.Void:
             return that  # Scalar + Tensor -> Tensor's shape
-        if that == Shape():
+        if that == Shape.Void:
             return this  # Tensor + Scalar -> Tensor's shape
         shape1, shape2 = Self.pad_shapes(this, that)
         result_shape = IntList.with_capacity(len(shape1))
@@ -436,9 +427,9 @@ struct Shape(
         """
         if not self.ndim <= broadcast_shape.ndim:
             panic("Shape → translate_index: original dims > broadcast dims")
-        if not len(mask) == broadcast_shape.ndim:
+        if not mask.size == broadcast_shape.ndim:
             panic("Shape → translate_index: mask/broadcast shape mismatch")
-        if not len(indices) == broadcast_shape.ndim:
+        if not indices.size == broadcast_shape.ndim:
             panic("Shape → translate_index: indices/broadcast shape mismatch")
 
         translated = IntList.with_capacity(self.ndim)
@@ -446,7 +437,7 @@ struct Shape(
 
         for i in range(self.ndim):
             broadcast_axis = i + offset
-            if not broadcast_axis < len(mask):
+            if not broadcast_axis < mask.size:
                 panic("Shape → translate_index: invalid axis")
 
             if mask[broadcast_axis] == 1:
@@ -471,6 +462,21 @@ struct Shape(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
+        _ = """fn __moveinit__(out self, deinit other: Self):
+        self.axes_spans = other.axes_spans
+        self.ndim = other.ndim
+        self.numels = other.numels"""
+
+    fn __copyinit__(out self, other: Self):
+        self.axes_spans = other.axes_spans
+        self.ndim = other.ndim
+        self.numels = other.numels
+
+    fn free(deinit self):
+        log_debug("Freeing Shape")
+        self.axes_spans.free()
+        _ = self^
+
     @always_inline
     @staticmethod
     fn validate(shape: Shape):
@@ -483,11 +489,7 @@ struct Shape(
 
     @always_inline
     fn intlist(self) -> IntList:
-        return self.axes_spans[::]
-
-    @always_inline
-    fn tolist(self) -> List[Int]:
-        return self.axes_spans.tolist()
+        return self.axes_spans
 
     @always_inline
     fn product(shape: Shape) -> Int:
@@ -496,7 +498,3 @@ struct Shape(
     @staticmethod
     fn of(*dims: Int) -> Shape:
         return Shape(dims)
-
-
-fn main() raises:
-    pass

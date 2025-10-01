@@ -7,18 +7,11 @@ from intlist import IntList
 from common_utils import panic
 
 
+@fieldwise_init
 @register_passable
 struct FlattenBackward[dtype: DType](Copyable):
     var start_dim: Int
     var end_dim: Int
-
-    fn __init__(out self, start_dim: Int, end_dim: Int):
-        self.start_dim = start_dim
-        self.end_dim = end_dim
-
-    fn __copyinit__(out self, existing: Self):
-        self.start_dim = existing.start_dim
-        self.end_dim = existing.end_dim
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -28,7 +21,7 @@ struct FlattenBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.grad()
+        gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)[]
         tensor = ancestor.tensor()
         grad_in = Tensor[dtype].zeros(tensor.shape)
@@ -37,7 +30,7 @@ struct FlattenBackward[dtype: DType](Copyable):
         if tensor.is_contiguous():
             n = gradients.shape.num_elements()
             for i in range(n):
-                grad_in.buffer.unbox()[i] = gradients.buffer.unbox()[i]
+                grad_in.buffer[i] = gradients.buffer[i]
         else:
             out_numels = gradients.shape.num_elements()
             for flat_idx in range(out_numels):
@@ -79,11 +72,13 @@ struct Flatten[dtype: DType]:
         var out = Tensor[dtype](Shape(new_shape), requires_grad=False)
 
         # fast path: contiguous
-        if self.is_dense():
+        if self.is_contiguous():
             n = self.shape.num_elements()
             for i in range(n):
-                # out.buffer.unbox()[i] = self.buffer.unbox()[self.offset + i]
-                out.buffer.unbox()[i] = self.buffer.unbox()[i]
+                if self.owns_data:
+                    out.buffer[i] = self.buffer[i]
+                else:
+                    out.buffer[i] = self.base[].buffer[self.offset + i]
         else:
             var flat_idx = 0
             for _, value in self:

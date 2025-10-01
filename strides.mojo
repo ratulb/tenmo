@@ -1,40 +1,51 @@
-from intlist import IntList
 from shapes import Shape
+from intlist import IntList
+from os import abort
 from common_utils import log_debug
 
 
 fn main():
-    pass
+    strides = Strides([])
+    for i in strides.to_list().__reversed__():
+        print(i)
+    print(Strides.Zero)
 
 
-struct Strides(
-    Sized & Copyable & Movable & Stringable & Representable & Writable
-):
-    var strides: List[Int]
-
-    fn __init__(out self):
-        self.strides = List[Int](capacity=0)
+@register_passable
+struct Strides(Sized & Copyable & Stringable & Representable & Writable):
+    var strides: IntList
+    alias Zero = Self(IntList.Empty)
 
     fn __init__(out self, values: List[Int]):
-        self.strides = values
+        self.strides = IntList.new(values)
 
     fn __init__(out self, values: IntList):
-        self.strides = values.tolist()[::]
+        self.strides = values
+
+    fn __eq__(self, other: Self) -> Bool:
+        return self.strides == other.strides
 
     fn __copyinit__(out self, existing: Self):
-        self.strides = existing.strides[::]
+        self.strides = existing.strides
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self.strides = existing.strides^
+    @staticmethod
+    fn of(*values: Int) -> Self:
+        return Self(IntList(values))
 
     fn __str__(self) -> String:
-        return self.strides.__str__()
+        var s = String("(")
+        for i in range(len(self)):
+            s += String(self.strides[i])
+            if i < len(self) - 1:
+                s += ", "
+        s += ")"
+        return s
 
     fn __repr__(self) -> String:
         return self.__str__()
 
-    fn write_to(self, mut writer: Some[Writer]):
-        self.strides.write_to(writer)
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
 
     fn __getitem__(self, i: Int) -> Int:
         return self.strides[i]
@@ -46,12 +57,9 @@ struct Strides(
     fn __len__(self) -> Int:
         return len(self.strides)
 
-    fn __eq__(self, other: Self) -> Bool:
-        return self.strides == other.strides
-
     @always_inline
     fn to_list(self) -> IntList:
-        return IntList(self.strides)
+        return self.strides
 
     # Reorder dimensions (for transpose/permute)
     fn permute(self, axes: IntList) -> Self:
@@ -61,34 +69,24 @@ struct Strides(
             + ", axes: "
             + axes.__str__()
         )
-        il = IntList(self.strides)
-        perm = il.permute(axes)
-        return Strides(perm)
 
-    @staticmethod
-    fn of(*values: Int) -> Self:
-        ll = List[Int](capacity=len(values))
-        for v in values:
-            ll.append(v)
-        return Self(ll)
+        return Strides(self.strides.permute(axes))
 
+    # Compute strides from shape in row-major order
     @staticmethod
     fn default(shape: Shape) -> Self:
-        var rank = shape.rank()
-        var strides = List[Int](length=rank, fill=0)
+        _ = """var strides_list = IntList.filled(shape.rank(), 1)
+        for i in reversed(range(shape.rank() - 1)):
+            strides_list[i] = strides_list[i + 1] * shape[i + 1]
+        return Strides(strides_list)"""
+
+        var strides = IntList.with_capacity(shape.rank())
         var acc = 1
-        for i in reversed(range(rank)):
-            strides[i] = acc
+        for i in reversed(range(shape.rank())):
+            strides.prepend(acc)
             acc *= shape[i]
         return Strides(strides)
 
-    fn is_contiguous(self, shape: Shape) -> Bool:
-        if shape.rank() == 0:
-            return True  # scalar is trivially contiguous
-        var expected_stride = 1
-        for i in reversed(range(shape.rank())):
-            if shape[i] > 1 and self[i] != expected_stride:
-                return False
-            expected_stride *= shape[i]
-
-        return True
+    fn free(deinit self):
+        """Free strides IntList."""
+        self.strides.free()

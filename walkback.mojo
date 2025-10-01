@@ -28,9 +28,9 @@ from division import (
     Divider,
 )
 from transpose import TransposeBackward, Transpose
-from views import ViewBackward, View
+from viewbackward import ViewBackward
 from permutebackward import PermuteBackward
-from dotproduct import DotBackward, Dot
+from dotbackward import DotBackward
 from vectormatrixmmbackward import VectorMatrixMMBackward
 from matrixvectormmbackward import MatrixVectorMMBackward
 from unsqueeze import UnsqueezeBackward, Unsqueeze
@@ -44,4 +44,3 @@ from crossentropy import CrossEntropyBackward, CrossEntropyLoss
 from repeat import RepeatBackward, Repeat
 from tiles import TileBackward, Tile
 from flatten import FlattenBackward, Flatten
-from contiguous import Contiguous

@@ -1,32 +1,13 @@
 from algorithm import vectorize
 from sys import simdwidthof
-from memory import memset_zero, memcpy, ArcPointer
+from memory import memset_zero, memcpy
 from math import exp, log
 
-from common_utils import log_debug, panic, is_null
-from utils import Variant
+# from runtime.asyncrt import num_physical_cores
+from sys import num_logical_cores, num_physical_cores
+from common_utils import log_debug, panic
 
 alias Boolean = Scalar[DType.bool]
-
-alias InnerBuffer[dtype: DType] = Variant[
-    Buffer[dtype], ArcPointer[Buffer[dtype]]
-]
-
-
-@fieldwise_init
-struct AdaptiveBuffer[dtype: DType](Copyable & Movable):
-    var buffer: InnerBuffer[dtype]
-
-    fn shared(mut self):
-        if self.buffer.isa[Buffer[dtype]]():
-            inner = self.buffer.take[Buffer[dtype]]()
-            self = AdaptiveBuffer[dtype](ArcPointer(inner))
-
-    fn unbox(ref self) -> ref [self.buffer] Buffer[dtype]:
-        if self.buffer.isa[Buffer[dtype]]():
-            return self.buffer[Buffer[dtype]]
-        else:
-            return self.buffer[ArcPointer[Buffer[dtype]]][]
 
 
 struct Buffer[dtype: DType = DType.float32](
@@ -34,62 +15,41 @@ struct Buffer[dtype: DType = DType.float32](
 ):
     var size: Int
     var data: UnsafePointer[Scalar[dtype]]
-    var external: Bool
+    alias Empty = Buffer[dtype]()
 
     fn __init__(out self):
         self.size = 0
         self.data = UnsafePointer[Scalar[dtype]]()
-        self.external = False
 
-    fn __init__(out self, size: Int, external: Bool = False):
-        if size < 0:
-            panic("Buffer size must be >= 0")
+    fn __init__(out self, size: Int):
+        self.data = UnsafePointer[Scalar[dtype]].alloc(size)
         self.size = size
-        self.external = external
-        if size == 0:
-            self.data = UnsafePointer[Scalar[dtype]]()
-        else:
-            if external:
-                # Expect data pointer to be set later
-                self.data = UnsafePointer[Scalar[dtype]]()
-            else:
-                self.data = UnsafePointer[Scalar[dtype]].alloc(size)
 
     fn __init__(out self, elems: List[Scalar[dtype]]):
         length = len(elems)
         self.data = UnsafePointer[Scalar[dtype]].alloc(length)
         self.size = length
         memcpy(self.data, elems._data, length)
-        self.external = False
 
-    fn __init__(
-        out self,
-        size: Int,
-        data: UnsafePointer[Scalar[dtype]],
-        copy: Bool = False,
-    ):
+    fn __init__(out self, size: Int, data: UnsafePointer[Scalar[dtype]]):
         self.size = size
-        if copy:
-            self.data = UnsafePointer[Scalar[dtype]].alloc(size)
-            memcpy(self.data, data, size)
-            self.external = False
-        else:
-            self.data = data
-            self.external = True
+        self.data = data
 
     fn __moveinit__(out self, deinit other: Self):
         self.size = other.size
-        self.data = other.data
-        self.external = other.external
+        self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
+        memcpy(self.data, other.data, other.size)
 
     fn __copyinit__(out self, other: Self):
         self.size = other.size
         self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
         memcpy(self.data, other.data, other.size)
-        self.external = other.external
 
-    fn box(self) -> AdaptiveBuffer[dtype]:
-        return AdaptiveBuffer[dtype](self)
+    fn copy(self) -> Buffer[dtype]:
+        data = UnsafePointer[Scalar[dtype]].alloc(self.size)
+        memcpy(data, self.data, self.size)
+        clone = Buffer[dtype](self.size, data)
+        return clone
 
     fn __len__(self) -> Int:
         return self.size
@@ -102,7 +62,7 @@ struct Buffer[dtype: DType = DType.float32](
         var spread = range(start, end, step)
 
         if not len(spread):
-            return Buffer[dtype]()
+            return Buffer[dtype].Empty
 
         # Calculate the correct size based on the actual number of elements
         var result_size = len(spread)
@@ -116,7 +76,7 @@ struct Buffer[dtype: DType = DType.float32](
             ]  # Copy the element from source to result
             result_index += 1
 
-        return result
+        return result^
 
     fn __getitem__(self, index: Int) -> Scalar[dtype]:
         return self.data.load[width=1, volatile=True](index)
@@ -1306,14 +1266,12 @@ struct Buffer[dtype: DType = DType.float32](
     fn __repr__(self) -> String:
         return self.__str__()
 
-    fn __del__(deinit self):
-        if not self.external and self.size > 0:
-            for i in range(len(self)):
-                (self.data + i).destroy_pointee()
-            self.data.free()
+    fn free(deinit this):
+        for i in range(len(this)):
+            (this.data + i).destroy_pointee()
+        this.data.free()
         log_debug("Buffer__del__ → freed data pointees")
-        # print("Buffer__del__ → freed data pointees")
-        _ = self^
+        _ = this^
 
 
 struct Iterator[
@@ -1343,18 +1301,8 @@ struct Iterator[
 
 
 fn main() raises:
-    l = List[Scalar[DType.int32]](capacity=10)
-    for i in range(10):
-        l.append(Scalar[DType.int32](i))
-    b = Buffer[DType.int32](l)
-
-    boxed = b.box()
-    boxed.unbox()[0] = 99
-    print("inner: ", boxed.unbox())
-
-    boxed.shared()
-
-    print("shared: ", boxed.unbox())
-
-
+    pass
 from testing import assert_true, assert_false
+
+
+

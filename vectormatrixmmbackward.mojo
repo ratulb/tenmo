@@ -69,7 +69,7 @@ struct VectorMatrixMMBackward[dtype: DType](Copyable):
 
             var A_expanded_shape = batch_shape + [1, A_tensor.shape[0]]
             var A_padded = A_lifted.reshape(
-                Shape(1) * len(batch_shape) + [1, A_tensor.shape[0]],
+                Shape.Unit * len(batch_shape) + [1, A_tensor.shape[0]],
                 requires_grad=False,
             )
             A_expanded = A_padded.expand(A_expanded_shape, requires_grad=False)
