@@ -241,17 +241,4 @@ struct MinMax[dtype: DType=DType.float32]:
 
 
 fn main() raises:
-    a = Tensor.arange(10, requires_grad=True)
-    _="""mx = MinMax.forward[True](a, IntList.Empty) 
-    mx.print()
-    mx.backward()
-    a.gradbox[].print()"""
-    min_ = MinMax.forward[False, False](a, IntList.Empty)
-    print("min_ has backward fn? ", min_.has_backward_fn())
-    min_.backward()
-    print()
-    a.gradbox[].print()
-    print()
-
-
-from testing import assert_true
+    pass

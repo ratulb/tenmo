@@ -1,9 +1,8 @@
 from shapes import Shape
-from tensors import Tensor
 from intlist import IntList
 from strides import Strides
 from common_utils import Slicer, panic, Idx, NewAxis, i, s, il, newaxis
-
+from tensors import Tensor
 
 struct Validator:
     @staticmethod
@@ -166,6 +165,22 @@ struct Validator:
             Shape: Validated concrete shape (e.g., `Shape(2, 6, 10)`).
 
         """
+        if current_shape == Shape(1) and (
+            newdims == IntList() or newdims == IntList(-1)
+        ):
+            return Shape(True)
+
+        if current_shape == Shape() and newdims == IntList():
+            return Shape(True)
+
+        if current_shape == Shape() and (
+            newdims == IntList(1) or newdims == IntList(-1)
+        ):
+            return Shape(1)
+
+        if current_shape.num_elements() == newdims.product():
+            return Shape(newdims)
+
         var estimated_size = 1
         var concrete_dims = IntList.with_capacity(len(newdims))
         var infer_index = -1
@@ -272,7 +287,6 @@ struct Validator:
             else:
                 new_shape.append(dim)
                 new_strides.append(stride)
-
         return Shape(new_shape), Strides(new_strides), new_offset
 
     @always_inline
@@ -444,18 +458,6 @@ struct Validator:
         # Validate rank vs non-newaxis indices count
         # Count required rank: Int contributes 1; IntList contributes len(list); Slice contributes 1; NewAxis contributes 0
         var required_rank = 0
-        _ = """for idx in indices:
-            if not idx.isa[NewAxis]():  # Only count non-newaxis indices
-                required_rank += 1
-        if required_rank != original_shape.rank():
-            panic(
-                "Tensor indexing: axes count(",
-                String(original_shape.rank()),
-                ") and ",
-                "non-newaxis indices count(",
-                String(required_rank),
-                ") mismatch",
-            )"""
 
         for idx in indices:
             if idx.isa[NewAxis]():
@@ -555,18 +557,6 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_matrix_shapes[
-        dtype: DType, //
-    ](lhs: Tensor[dtype], rhs: Tensor[dtype]):
-        if not lhs.rank() == 2:
-            panic("Tensor → matmul(Tensor): Only supports 2D matmul")
-        if not rhs.rank() == 2:
-            panic("Tensor → matmul(Tensor): Other must be 2D")
-        if not lhs.shape[1] == rhs.shape[0]:
-            panic("Tensor → matmul(Tensor): Incompatible shapes")
-
-    @always_inline
-    @staticmethod
     fn validate_view_params[
         dtype: DType, //
     ](
@@ -574,7 +564,8 @@ struct Validator:
         shape: Shape,
         strides: Strides,
         offset: Int,
-    ) -> Tuple[Int, Int, Int]:
+        # ) -> Tuple[Int, Int, Int]:
+    ) -> Int:
         """
         Validate view parameters and compute absolute bounds.
 
@@ -585,7 +576,8 @@ struct Validator:
             offset: The offset for the view.
 
         Returns:
-            Tuple of (abs_min, abs_max, abs_offset) absolute coordinates.
+            #Tuple of (abs_min, abs_max, abs_offset) absolute coordinates.
+            Absolute offest with respect to base tensor.
 
         """
         # Calculate logical bounds of new view (relative to parent)
@@ -623,11 +615,9 @@ struct Validator:
             if lo < parent_lo or hi > parent_hi:
                 panic("Tensor → view: exceeds parent tensor's memory bounds")
 
-        return abs_min, abs_max, abs_offset
+        # return abs_min, abs_max, abs_offset
+        return abs_offset
 
 
 fn main() raises:
     pass
-
-
-from testing import assert_true

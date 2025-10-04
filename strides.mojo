@@ -1,51 +1,41 @@
-from shapes import Shape
 from intlist import IntList
-from os import abort
+from shapes import Shape
 from common_utils import log_debug
 
 
 fn main():
-    strides = Strides([])
-    for i in strides.to_list().__reversed__():
-        print(i)
-    print(Strides.Zero)
+    pass
 
 
-@register_passable
-struct Strides(Sized & Copyable & Stringable & Representable & Writable):
-    var strides: IntList
+struct Strides(
+    Sized & Copyable & Movable & Stringable & Representable & Writable
+):
     alias Zero = Self(IntList.Empty)
+    var strides: List[Int]
+
+    fn __init__(out self):
+        self.strides = List[Int](capacity=0)
 
     fn __init__(out self, values: List[Int]):
-        self.strides = IntList.new(values)
-
-    fn __init__(out self, values: IntList):
         self.strides = values
 
-    fn __eq__(self, other: Self) -> Bool:
-        return self.strides == other.strides
+    fn __init__(out self, values: IntList):
+        self.strides = values.tolist()[::]
 
     fn __copyinit__(out self, existing: Self):
-        self.strides = existing.strides
+        self.strides = existing.strides[::]
 
-    @staticmethod
-    fn of(*values: Int) -> Self:
-        return Self(IntList(values))
+    fn __moveinit__(out self, deinit existing: Self):
+        self.strides = existing.strides^
 
     fn __str__(self) -> String:
-        var s = String("(")
-        for i in range(len(self)):
-            s += String(self.strides[i])
-            if i < len(self) - 1:
-                s += ", "
-        s += ")"
-        return s
+        return self.strides.__str__()
 
     fn __repr__(self) -> String:
         return self.__str__()
 
-    fn write_to[W: Writer](self, mut writer: W):
-        writer.write(self.__str__())
+    fn write_to(self, mut writer: Some[Writer]):
+        self.strides.write_to(writer)
 
     fn __getitem__(self, i: Int) -> Int:
         return self.strides[i]
@@ -57,9 +47,12 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
     fn __len__(self) -> Int:
         return len(self.strides)
 
+    fn __eq__(self, other: Self) -> Bool:
+        return self.strides == other.strides
+
     @always_inline
     fn to_list(self) -> IntList:
-        return self.strides
+        return IntList(self.strides)
 
     # Reorder dimensions (for transpose/permute)
     fn permute(self, axes: IntList) -> Self:
@@ -69,24 +62,36 @@ struct Strides(Sized & Copyable & Stringable & Representable & Writable):
             + ", axes: "
             + axes.__str__()
         )
+        il = IntList(self.strides)
+        perm = il.permute(axes)
+        return Strides(perm)
 
-        return Strides(self.strides.permute(axes))
-
-    # Compute strides from shape in row-major order
     @staticmethod
-    fn default(shape: Shape) -> Self:
-        _ = """var strides_list = IntList.filled(shape.rank(), 1)
-        for i in reversed(range(shape.rank() - 1)):
-            strides_list[i] = strides_list[i + 1] * shape[i + 1]
-        return Strides(strides_list)"""
+    fn of(*values: Int) -> Self:
+        ll = List[Int](capacity=len(values))
+        for v in values:
+            ll.append(v)
+        return Self(ll)
 
-        var strides = IntList.with_capacity(shape.rank())
+    @staticmethod
+    @always_inline
+    fn default(shape: Shape) -> Self:
+        var rank = shape.rank()
+        var strides = List[Int](length=rank, fill=0)
         var acc = 1
-        for i in reversed(range(shape.rank())):
-            strides.prepend(acc)
+        for i in reversed(range(rank)):
+            strides[i] = acc
             acc *= shape[i]
         return Strides(strides)
 
-    fn free(deinit self):
-        """Free strides IntList."""
-        self.strides.free()
+    @always_inline
+    fn is_contiguous(self, shape: Shape) -> Bool:
+        if shape.rank() == 0:
+            return True  # scalar is trivially contiguous
+        var expected_stride = 1
+        for i in reversed(range(shape.rank())):
+            if shape[i] > 1 and self[i] != expected_stride:
+                return False
+            expected_stride *= shape[i]
+
+        return True

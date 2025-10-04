@@ -7,8 +7,7 @@ from backpropagation import Delegate, BackwardFn
 from validators import Validator
 
 
-@register_passable
-struct MeanBackward[dtype: DType](Copyable):
+struct MeanBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     var keepdims: Bool
 
@@ -22,16 +21,16 @@ struct MeanBackward[dtype: DType](Copyable):
         self.axes = other.axes.copy()
         self.keepdims = other.keepdims
 
-        _ = """fn __moveinit__(out self, deinit other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         self.axes = other.axes
-        self.keepdims = other.keepdims"""
+        self.keepdims = other.keepdims
 
     fn backward[
         dtype: DType
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         ancestor = output.ancestry().get(0)[]
         if gradients.shape == Shape.Void:
             scalar_grad = gradients.item() / ancestor.shape().num_elements()
@@ -77,9 +76,9 @@ struct MeanBackward[dtype: DType](Copyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-
+@fieldwise_init
 @register_passable
-struct Mean[dtype: DType]:
+struct Mean[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True

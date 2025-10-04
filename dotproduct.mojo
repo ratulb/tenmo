@@ -1,6 +1,7 @@
 from tensors import Tensor
 from shared import TensorLite
 from common_utils import panic
+from contiguous import Contiguous
 from backpropagation import Delegate, BackwardFn
 from operators import (
     AddTensor,
@@ -28,14 +29,12 @@ struct DotBackward[dtype: DType](Copyable & Movable):
         if ancestor_1.requires_grad():
             tensor = ancestor_2.tensor()
 
-            buffer = tensor.buffer.unbox() if tensor.is_dense() else tensor.contiguous[
+            buffer = tensor.buffer if tensor.owns_data else Contiguous.forward[
                 False
-            ](
-                requires_grad=False
-            ).buffer.unbox()
+            ](tensor, requires_grad=False).buffer
             buffer = gradients * buffer
             outgoing = Tensor[dtype](
-                ancestor_1.shape(), buffer.box(), requires_grad=False
+                ancestor_1.shape(), buffer^, requires_grad=False
             )
             grad_outputs.append(
                 (
@@ -47,14 +46,12 @@ struct DotBackward[dtype: DType](Copyable & Movable):
 
         if ancestor_2.requires_grad():
             tensor = ancestor_1.tensor()
-            buffer = tensor.buffer.unbox() if tensor.is_dense() else tensor.contiguous[
+            buffer = tensor.buffer if tensor.owns_data else Contiguous.forward[
                 False
-            ](
-                requires_grad=False
-            ).buffer.unbox()
+            ](tensor, requires_grad=False).buffer
             buffer = gradients * buffer
             outgoing = Tensor[dtype](
-                ancestor_2.shape(), buffer.box(), requires_grad=False
+                ancestor_2.shape(), buffer^, requires_grad=False
             )
 
             grad_outputs.append(
@@ -94,8 +91,8 @@ struct Dot[dtype: DType](Copyable):
                 numels2.__str__(),
             )
         var out: Tensor[dtype]
-        if self.is_dense() and other.is_dense():
-            scalar = self.buffer.unbox().dot(other.buffer.unbox())
+        if self.owns_data and other.owns_data:
+            scalar = self.buffer.dot(other.buffer)
             out = Tensor[dtype].scalar(scalar, requires_grad=False)
         else:
             scalar = Scalar[dtype](0)

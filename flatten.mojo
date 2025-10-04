@@ -5,7 +5,7 @@ from operators import AddTensor
 from shapes import Shape
 from intlist import IntList
 from common_utils import panic
-
+from buffers import Buffer
 
 @fieldwise_init
 @register_passable
@@ -21,7 +21,7 @@ struct FlattenBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         ancestor = output.ancestry().get(0)[]
         tensor = ancestor.tensor()
         grad_in = Tensor[dtype].zeros(tensor.shape)
@@ -69,21 +69,26 @@ struct Flatten[dtype: DType]:
         for i in range(endd + 1, rank):
             new_shape.append(self.shape[i])
 
-        var out = Tensor[dtype](Shape(new_shape), requires_grad=False)
+        var buffer: Buffer[dtype]
+        shape = Shape(new_shape)
+        numels = shape.num_elements()
+        offset = self.offset
+        this_buffer = self.data()
 
         # fast path: contiguous
         if self.is_contiguous():
-            n = self.shape.num_elements()
-            for i in range(n):
-                if self.owns_data:
-                    out.buffer[i] = self.buffer[i]
-                else:
-                    out.buffer[i] = self.base[].buffer[self.offset + i]
+            if self.owns_data:
+                buffer = this_buffer
+            else:
+                buffer = this_buffer[offset : offset + numels]
         else:
             var flat_idx = 0
+            buffer = Buffer[dtype](numels)
             for _, value in self:
-                out[flat_idx] = value
+                buffer[flat_idx] = value
                 flat_idx += 1
+
+        out = Tensor[dtype](shape, buffer^, requires_grad=False)
 
         # autograd hookup
         @parameter

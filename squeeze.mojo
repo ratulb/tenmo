@@ -32,8 +32,8 @@ struct SqueezeBackward[dtype: DType](Copyable):
 struct Squeeze[dtype: DType]:
     # Squeeze specified axes or all dims of size 1 if no axes provided
     @staticmethod
-    fn squeeze(
-        tensor: Tensor[dtype],
+    fn forward[track_grad: Bool=True](
+        mut tensor: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -97,21 +97,22 @@ struct Squeeze[dtype: DType]:
 
         shape = Shape(new_shape)
         strides = Strides(new_strides)
-        grad_required = (
-            requires_grad.value() if requires_grad else tensor.requires_grad
-        )
+        offset = tensor.offset
 
-        base_addr = tensor.address() if tensor.owns_data else tensor.base.copy()
+        out = tensor.build_view(shape, strides, offset, False)
 
-        var out = Tensor[dtype](
-            shape, base_addr, strides, tensor.offset, grad_required
-        )
+        @parameter
+        if track_grad:
+            grad_required = (
+                requires_grad.value() if requires_grad else tensor.requires_grad
+            )
 
-        if grad_required:
-            out.requires_grad_()
-            bfn = SqueezeBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(bfn)
-            out.add_ancestry(TensorLite.of(tensor))
+
+            if grad_required:
+                out.requires_grad_(True)
+                bfn = SqueezeBackward[dtype]().into_backward_fn()
+                out.backwardFn = Optional(bfn)
+                out.add_ancestry(TensorLite.of(tensor))
 
         return out
 

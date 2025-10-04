@@ -6,8 +6,7 @@ from intlist import IntList
 from validators import Validator
 
 
-@register_passable
-struct TransposeBackward[dtype: DType](Copyable):
+struct TransposeBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     
     fn __init__(out self, axes: IntList):
@@ -16,8 +15,8 @@ struct TransposeBackward[dtype: DType](Copyable):
     fn __copyinit__(out self, existing: Self):
         self.axes = existing.axes.copy()
 
-        _="""fn __moveinit__(out self, deinit existing: Self):
-        self.axes = existing.axes"""
+    fn __moveinit__(out self, deinit existing: Self):
+        self.axes = existing.axes
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -27,7 +26,7 @@ struct TransposeBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         ancestor = output.ancestry().get(0)[]
         inverted_axes = IntList.invert_permutation(self.axes)
         grad_transposed = gradients.transpose(inverted_axes)
@@ -39,7 +38,7 @@ struct TransposeBackward[dtype: DType](Copyable):
             )
         ]
 
-
+@fieldwise_init
 @register_passable
 struct Transpose[dtype: DType](Copyable):
 
@@ -50,7 +49,7 @@ struct Transpose[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype], axes: IntList, requires_grad: Optional[Bool] = None
+        mut self: Tensor[dtype], axes: IntList, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         shape = self.shape.copy()
         normalized_axes = (
@@ -64,11 +63,7 @@ struct Transpose[dtype: DType](Copyable):
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides.permute(normalized_axes)
 
-        base_addr = self.address() if self.owns_data else self.base.copy()
-        out = Tensor[dtype](
-            new_shape, base_addr, new_strides, self.offset, False
-        )
-
+        out = self.build_view(new_shape, new_strides, self.offset, False)
 
         @parameter
         if track_grad:

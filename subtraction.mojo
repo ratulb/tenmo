@@ -8,8 +8,7 @@ from broadcastbackward import BroadcastBackward
 from common_utils import panic
 
 
-@register_passable
-struct SubBackward[dtype: DType](Copyable):
+struct SubBackward[dtype: DType](Copyable & Movable):
     var signs: IntList
 
     fn __init__(out self):
@@ -18,8 +17,8 @@ struct SubBackward[dtype: DType](Copyable):
     fn __copyinit__(out self, existing: Self):
         self.signs = existing.signs.copy()
 
-        _ = """fn __moveinit__(out self, deinit existing: Self):
-        self.signs = existing.signs"""
+    fn __moveinit__(out self, deinit existing: Self):
+        self.signs = existing.signs
 
     fn negate(mut self, neg: Bool):
         if neg:
@@ -35,7 +34,7 @@ struct SubBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         count = len(output.ancestry())
         grad_outputs = List[Tuple[TensorLite[dtype], Tensor[dtype], Int]](
             capacity=count
@@ -65,7 +64,7 @@ struct SubLeftRightBackwardScalar[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         ancestor = output.ancestry().get(0)[]
         return [
             (ancestor, gradients, SubtractTensor if self.negate else AddTensor)
@@ -84,8 +83,7 @@ struct SubtractScalar[dtype: DType]:
         if self.owns_data:
             out = Tensor[dtype](shape, self.buffer - scalar, False)
         else:
-            buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](shape, buffer, False)
+            out = Tensor[dtype](shape, requires_grad=False)
             for idx, value in self:
                 out[idx] = value - scalar
 
@@ -113,8 +111,7 @@ struct SubtractFromScalar[dtype: DType]:
         if self.owns_data:
             out = Tensor[dtype](shape, scalar - self.buffer, False)
         else:
-            buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](shape, buffer, False)
+            out = Tensor[dtype](shape, requires_grad=False)
             for idx, value in self:
                 out[idx] = scalar - value
 

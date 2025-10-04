@@ -31,12 +31,11 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
 
     @always_inline
     fn __del__(deinit self):
-        # fn free(deinit self):
         if self.ancestors:
             log_debug("Ancestors __del__ called")
             for idx in range(len(self)):
                 self.ancestors[idx].destroy_pointee()
-                # self.ancestors[idx].free()
+                #self.ancestors[idx].free()
 
     fn get(self, idx: Int) -> UnsafePointer[TensorLite[dtype]]:
         if idx < 0 or idx >= len(self.ancestors):

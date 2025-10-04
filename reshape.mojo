@@ -43,8 +43,8 @@ struct Reshape[dtype: DType](Copyable):
             tensor.shape, new_shape.intlist()
         )
 
-        buffer = tensor.buffer if tensor.owns_data else tensor.base[].buffer
-        out = Tensor[dtype](shape, buffer)
+        buffer = tensor.data()
+        out = Tensor[dtype](shape, buffer^)
 
         @parameter
         if track_grad:

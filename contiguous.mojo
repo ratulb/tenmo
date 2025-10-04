@@ -6,8 +6,6 @@ from memory import memcpy
 
 @register_passable
 struct Contiguous[dtype: DType](Copyable):
-    fn __copyinit__(out self, existing: Self):
-        pass
 
     @staticmethod
     fn forward[
@@ -18,12 +16,16 @@ struct Contiguous[dtype: DType](Copyable):
     ) -> Tensor[
         dtype
     ]:
-        var shape_copy = self.shape.copy()  # guarantee deep copy
+        var shape_copy = self.shape.copy()
         offset = self.offset
         numels = self.numels()
         out = Tensor[dtype](shape_copy, requires_grad=False)
-        if self.is_dense():
-            memcpy(out.buffer.unbox().data, self.buffer.unbox().data, numels)
+        if self.is_contiguous():
+            if self.owns_data:
+                memcpy(out.buffer.data, self.buffer.data, numels)
+            else:
+                buffer = self.shared_buffer.value()[]
+                memcpy(out.buffer.data, buffer.data + offset, numels)
         else:
             for idx, value in self:
                 out[idx] = value

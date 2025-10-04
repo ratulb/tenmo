@@ -7,7 +7,6 @@ from operators import AddTensor, ZeroGrad
 from shared import TensorLite
 from validators import Validator
 
-
 struct ViewBackward[dtype: DType](Copyable & Movable):
     var shape: Shape
     var strides: Strides
@@ -37,13 +36,12 @@ struct ViewBackward[dtype: DType](Copyable & Movable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         parent = output.ancestry().get(0)[]
-        # gradients = output.gradients()[]
         gradients = output.grad()
         offset_delta = self.offset - parent.tensor().offset
         parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
         parent_shape = parent.shape()
 
-        if parent_shape == Shape():
+        if parent_shape == Shape.Void:
             parent_grad[0] = gradients.item()
         else:
             for coord in self.shape:
@@ -74,16 +72,13 @@ struct View[dtype: DType](Copyable):
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
-    ) -> Tensor[dtype]:
+    ) ->  Tensor[dtype]:
         # Validate parameters and compute absolute bounds
         var abs_offset = Validator.validate_view_params(
             self, shape, strides, offset
         ) if not validated else offset
 
-        self.buffer.shared()
-        buffer = self.buffer.copy()
-
-        out = Tensor[dtype](shape, buffer^, strides, abs_offset, False)
+        out = self.build_view(shape, strides, abs_offset, requires_grad=False)
 
         @parameter
         if track_grad:

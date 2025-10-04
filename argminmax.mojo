@@ -11,7 +11,7 @@ struct Argmin[dtype: DType]:
         tensor: Tensor[dtype],
         axis: Int = 0,
     ) -> Tensor[DType.int32]:
-        shape = tensor.shape
+        shape = tensor.shape.copy()
         rank = shape.rank()
         ax = axis if axis >= 0 else axis + rank
         if ax < 0 or ax >= rank:
@@ -54,7 +54,7 @@ struct Argmax[dtype: DType]:
         tensor: Tensor[dtype],
         axis: Int = 0,
     ) -> Tensor[DType.int32]:
-        shape = tensor.shape
+        shape = tensor.shape.copy()
         rank = shape.rank()
         ax = axis if axis >= 0 else axis + rank
         if ax < 0 or ax >= rank:

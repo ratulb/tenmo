@@ -7,8 +7,7 @@ from shapes import Shape
 from validators import Validator
 
 @fieldwise_init
-@register_passable
-struct RepeatBackward[dtype: DType](Copyable):
+struct RepeatBackward[dtype: DType](Copyable & Movable):
     var repeat: IntList
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:

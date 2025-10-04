@@ -8,8 +8,7 @@ from validators import Validator
 
 
 @fieldwise_init
-@register_passable
-struct TileBackward[dtype: DType](Copyable):
+struct TileBackward[dtype: DType](Copyable & Movable):
     var repeat: IntList
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:

@@ -6,17 +6,10 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn
 from validators import Validator
 
-
-@register_passable
-struct SumBackward[dtype: DType](Copyable):
+@fieldwise_init
+struct SumBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     var keepdims: Bool
-
-    fn __init__(
-        out self, axes: IntList = IntList.Empty, keepdims: Bool = False
-    ):
-        self.axes = axes
-        self.keepdims = keepdims
 
     fn backward[
         dtype: DType
@@ -68,9 +61,9 @@ struct SumBackward[dtype: DType](Copyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-
+@fieldwise_init
 @register_passable
-struct Summer[dtype: DType](Copyable & Movable):
+struct Summer[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True

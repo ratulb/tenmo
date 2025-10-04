@@ -19,7 +19,7 @@ struct AddBackwardScalar[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         ancestor = output.ancestry().get(0)[]
         if ancestor.shape() != gradients.shape:
             gradients = gradients.reshape(ancestor.shape())
@@ -57,18 +57,31 @@ struct AddScalar[dtype: DType]:
         track_grad: Bool = True
     ](self: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
         var out: Tensor[dtype]
-        if self.owns_data:
-            buffer = self.buffer + scalar
-            out = Tensor[dtype](self.shape, buffer, self.requires_grad)
+        if self.is_contiguous():
+            if self.owns_data:
+                buffer = self.buffer + scalar
+                out = Tensor[dtype](
+                    self.shape, buffer^, requires_grad=False
+                )
+            else:
+                offset = self.offset
+                numels = self.numels()
+                buffer = self.shared_buffer.value()[][offset: offset+numels] + scalar
+                out = Tensor[dtype](
+                    self.shape, buffer^, requires_grad=False
+                )
+
         else:
-            buffer = Buffer[dtype](self.numels())
-            out = Tensor[dtype](self.shape, buffer, self.requires_grad)
-            for indices in self.shape:
-                out[indices] = self[indices] + scalar
+            out = Tensor[dtype](
+                self.shape, requires_grad=False
+            )
+            for coord in self.shape:
+                out[coord] = self[coord] + scalar
 
         @parameter
         if track_grad:
             if self.requires_grad:
+                out.requires_grad_(True)
                 backward_fn = AddBackwardScalar[dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite[dtype].of(self))
@@ -101,11 +114,13 @@ struct Adder[dtype: DType]:
         else:
             if self.owns_data and other.owns_data:
                 buffer = self.buffer + other.buffer
-                out = Tensor[dtype](self.shape, buffer, False)
+                out = Tensor[dtype](
+                    self.shape, buffer^, requires_grad=False
+                )
             else:
-                out = Tensor[dtype].zeros(self.shape, False)
-                for indices in self.shape:
-                    out[indices] = self[indices] + other[indices]
+                out = Tensor[dtype].zeros(self.shape, requires_grad=False)
+                for coord in self.shape:
+                    out[coord] = self[coord] + other[coord]
 
         @parameter
         if track_grad:

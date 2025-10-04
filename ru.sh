@@ -9,7 +9,7 @@ fi
 filename="$1"
 name="${filename%.mojo}"
 
-MOJO_ENABLE_STACK_TRACE_ON_ERROR=False mojo build -debug-level=line-tables ${filename}
+MOJO_ENABLE_STACK_TRACE_ON_ERROR=False mojo build -debug-level=line-tables -I . ${filename}
 
 MOJO_ENABLE_STACK_TRACE_ON_ERROR=True ./${name}
 

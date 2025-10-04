@@ -21,7 +21,7 @@ struct TrueDivBackwardScalar[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         var divisor: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
         ancestor = output.ancestry().get(0)[]
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
@@ -48,7 +48,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         var scalar: Scalar[dtype] = rebind[Scalar[dtype]](self.scalar)
         ancestor = output.ancestry().get(0)[]
         squared = ancestor.tensor().__pow__(2)
@@ -75,7 +75,7 @@ struct DivideBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         ancestor_1 = output.ancestry().get(0)[]
         ancestor_2 = output.ancestry().get(1)[]
 
@@ -129,11 +129,11 @@ struct DivideScalar[dtype: DType]:
         else:
             idx = 0
             buffer = Buffer[dtype](self.numels())
-            for indices in self.shape:
-                buffer[idx] = self[indices]
+            for coord in self.shape:
+                buffer[idx] = self[coord]
                 idx += 1
         buffer = scalar / buffer
-        out = Tensor[dtype](self.shape, buffer, False)
+        out = Tensor[dtype](self.shape, buffer^, requires_grad=False)
 
         @parameter
         if track_grad:
@@ -169,11 +169,11 @@ struct DivideByScalar[dtype: DType]:
         else:
             idx = 0
             buffer = Buffer[dtype](self.numels())
-            for indices in self.shape:
-                buffer[idx] = self[indices]
+            for coord in self.shape:
+                buffer[idx] = self[coord]
                 idx += 1
         buffer = buffer / scalar
-        out = Tensor[dtype](self.shape, buffer, False)
+        out = Tensor[dtype](self.shape, buffer^, requires_grad=False)
 
         @parameter
         if track_grad:
@@ -216,11 +216,11 @@ struct Divider[dtype: DType]:
             else:
                 buffer = Buffer[dtype](self.numels())
                 idx = 0
-                for indices in self.shape:
-                    buffer[idx] = self[indices] / other[indices]
+                for coord in self.shape:
+                    buffer[idx] = self[coord] / other[coord]
                     idx += 1
 
-            out = Tensor[dtype](self.shape, buffer)
+            out = Tensor[dtype](self.shape, buffer^, requires_grad=False)
 
         @parameter
         if track_grad:
