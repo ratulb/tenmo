@@ -1,0 +1,1 @@
+from contiguous import Contiguous
