@@ -1088,7 +1088,9 @@ struct Tensor[dtype: DType = DType.float32](
                 summ += value
             return summ
 
-    fn broadcast_to(self, target_shape: Shape) -> Tensor[dtype]:
+    fn broadcast_to(
+        self, target_shape: Shape, requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
         if not self.shape.broadcastable(target_shape):
             panic(
                 "Tensor → broadcast_to: shape "
@@ -1098,7 +1100,10 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         mask = self.shape.broadcast_mask(target_shape)
-        out = Tensor[dtype](target_shape, requires_grad=self.requires_grad)
+        grad_required = (
+            requires_grad.value() if requires_grad else self.requires_grad
+        )
+        out = Tensor[dtype](target_shape, requires_grad=grad_required)
 
         for idx in target_shape:
             src_idx = self.shape.translate_index(idx, mask, target_shape)
@@ -1180,25 +1185,18 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.shared_buffer.value()[].store[simdwidth](addr, value)
 
-    fn into_view(
-        mut self, requires_grad: Optional[Bool] = None
-    ) -> Tensor[dtype]:
+    fn into_view[
+        track_grad: Bool = True
+    ](mut self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         if not self.owns_data:
             panic("Tensor → into_view: not allowed on non-owning tensor")
         shape, strides = self.shape, self.strides
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
-        out = self.build_view(shape, strides, 0, grad_required)
-
-        if grad_required:
-            backward_fn = ViewBackward[dtype](
-                shape, strides, 0
-            ).into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite[dtype].of(self))
-
-        return out
+        return View[dtype].forward[track_grad](
+            self, shape, strides, 0, grad_required, True
+        )
 
     fn view[
         track_grad: Bool = True
@@ -1264,14 +1262,6 @@ struct Tensor[dtype: DType = DType.float32](
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        _ = """return self.view[track_grad](
-            shape=shape,
-            strides=Strides.default(shape),
-            offset=offset,
-            requires_grad=requires_grad,
-            validated=False,
-        )"""
-
         return View[dtype].forward[track_grad](
             self, shape, Strides.default(shape), offset, requires_grad, False
         )

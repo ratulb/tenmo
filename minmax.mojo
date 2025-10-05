@@ -55,10 +55,10 @@ struct MinMaxBackward[dtype: DType=DType.float32](Copyable & Movable):
             if not self.keepdims:
                 grad_like_input = gradients.unsqueeze(
                     self.axes, False
-                ).broadcast_to(shape)
+                ).broadcast_to(shape, requires_grad=False)
             else:
                 # keepdims=True: just broadcast to input shape
-                grad_like_input = gradients.broadcast_to(shape)
+                grad_like_input = gradients.broadcast_to(shape, requires_grad=False)
 
             # Apply mask
             var grad_contrib = mask * grad_like_input

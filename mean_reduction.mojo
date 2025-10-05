@@ -60,7 +60,7 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
             )
 
         # Broadcast and divide
-        broadcasted = expanded.broadcast_to(ancestor.shape())
+        broadcasted = expanded.broadcast_to(ancestor.shape(), requires_grad=False)
         # Compute total count of elements being reduced
         count = ancestor.shape().axes_spans.select(self.axes).product()
 

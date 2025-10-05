@@ -43,10 +43,10 @@ struct SumBackward[dtype: DType](Copyable & Movable):
                 unsqueezed_shape = Shape(axes)
 
                 unsqueezed_grad = gradients.reshape(unsqueezed_shape)
-                grad_contrib = unsqueezed_grad.broadcast_to(shape)
+                grad_contrib = unsqueezed_grad.broadcast_to(shape, requires_grad=False)
             else:
                 # keepdims=True: shapes match except for broadcasting
-                grad_contrib = gradients.broadcast_to(shape)
+                grad_contrib = gradients.broadcast_to(shape, requires_grad=False)
 
         grad_contrib.requires_grad = False
 
