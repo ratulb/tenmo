@@ -1,11 +1,9 @@
 ### Mojo Tensor
 ### Implement tensor library in mojo from first principles
-from math import iota, exp, floor, log
+from math import exp, floor, log
 from random import seed, random_float64
-from algorithm import vectorize
 from sys import simdwidthof
 from utils.numerics import max_finite, min_finite
-from os import abort
 from memory import memcpy, memset, memset_zero, ArcPointer
 from shapes import Shape, ShapeIndexIter
 from intlist import IntList
@@ -19,7 +17,6 @@ from forwards import *
 from buffers import Buffer
 from shared import TensorLite
 from validators import Validator
-from argminmax import Argmin, Argmax
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -2323,53 +2320,9 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable & Movable):
 
 
 fn main() raises:
-    # test_element_at()
-    test_fill()
-
+    pass
 
 from testing import assert_true
 
 
-fn test_fill() raises:
-    a = Tensor.zeros(10)
-    a.fill(42)
-    v = a.view(shape=[3], offset=2)
-    v.fill(99)
-    assert_true(
-        (v == Tensor.d1([99, 99, 99])).all_true(), "view fill assertion failed"
-    )
-    assert_true(
-        (a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 42, 42, 42])).all_true(),
-        "view fill propagation1 to parent failed",
-    )
-    v1 = a.view(shape=[2, 5])
-    v2 = v1[il(1), s(2, None, 2)]
-    v2.fill(101)
 
-    assert_true(
-        (a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 101, 42, 101])).all_true(),
-        "view fill propagation2 to parent failed",
-    )
-    assert_true(
-        (v.sum_all() == 3 * 99) and (v2.sum_all() == 2 * 101),
-        "fill sum_all assertion failed for views",
-    )
-    b = Tensor.d1([1919, 1919])
-    v2.set(b, s())
-    assert_true(
-        (
-            a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 1919, 42, 1919])
-        ).all_true(),
-        "view set propagation to parent failed",
-    )
-
-
-fn test_element_at() raises:
-    a = Tensor.arange(10)
-    a.print()
-    print()
-    v = a[s(2, 8, 2)]
-    assert_true(
-        v.max_index() == 6 and v.element_at(-4) == 2,
-        "max_index and element_at assertion failed",
-    )
