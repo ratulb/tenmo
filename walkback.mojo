@@ -1,5 +1,5 @@
 from backpropagation import BackwardFn
-from matmulbackward import MatmulBackward, BatchedMatmulBackward
+from matmul import MatmulBackward, BatchedMatmulBackward
 from summation import SumBackward, Summer
 from mean_reduction import MeanBackward, Mean
 from addition import AddBackward, AddBackwardScalar, AddScalar, Adder
@@ -18,7 +18,7 @@ from multiplication import (
     MultiplyScalar,
     Multiplicator,
 )
-from exponientionbackward import ExponientionBackward
+from exponiention import ExponientionBackward
 from division import (
     TrueDivBackwardScalar,
     RightTrueDivBackwardScalar,
@@ -29,10 +29,10 @@ from division import (
 )
 from transpose import TransposeBackward, Transpose
 from views import ViewBackward, View
-from permutebackward import PermuteBackward
+from permute import PermuteBackward
 from dotproduct import DotBackward, Dot
-from vectormatrixmmbackward import VectorMatrixMMBackward
-from matrixvectormmbackward import MatrixVectorMMBackward
+from vectormatrixmm import VectorMatrixMMBackward
+from matrixvectormm import MatrixVectorMMBackward
 from unsqueeze import UnsqueezeBackward, Unsqueeze
 from squeeze import SqueezeBackward, Squeeze
 from expand import ExpandBackward, Expand

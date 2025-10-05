@@ -59,8 +59,6 @@ struct ViewBackward[dtype: DType](Copyable & Movable):
 
 @register_passable
 struct View[dtype: DType](Copyable):
-    fn __copyinit__(out self, existing: Self):
-        pass
 
     @staticmethod
     fn forward[

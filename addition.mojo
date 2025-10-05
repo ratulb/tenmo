@@ -51,7 +51,7 @@ struct AddBackward[dtype: DType](Copyable):
 
 @fieldwise_init
 @register_passable
-struct AddScalar[dtype: DType]:
+struct AddScalar[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -92,7 +92,7 @@ struct AddScalar[dtype: DType]:
 # Element wise addition of two tensors
 @fieldwise_init
 @register_passable
-struct Adder[dtype: DType]:
+struct Adder[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
