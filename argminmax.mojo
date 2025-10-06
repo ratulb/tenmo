@@ -23,7 +23,7 @@ struct Argmin[dtype: DType]:
             )
 
         # Output shape is same as input but without the reduced axis
-        var out_axes = IntList.filled(rank - 1, 0)
+        var out_axes = IntList.Empty
         for i in range(rank):
             if i != ax:
                 out_axes.append(shape[i])
@@ -64,14 +64,14 @@ struct Argmax[dtype: DType]:
                 "out of range for tensor with rank",
                 rank.__str__(),
             )
-
         # Output shape is same as input but without the reduced axis
-        var out_axes = IntList.filled(rank - 1, 0)
+        var out_axes = IntList.Empty
         for i in range(rank):
             if i != ax:
                 out_axes.append(shape[i])
         out_shape = Shape(out_axes)
 
+        # Output shape is same as input but without the reduced axis
         out = Tensor[DType.int32].zeros(out_shape)
 
         # Iterate over all indices of output shape
@@ -91,12 +91,5 @@ struct Argmax[dtype: DType]:
         return out
 
 
-fn main():
-    a = Tensor.d1([1, 4, -9, 2, 10, 8])
-    v = a.view(shape=[4], offset=2)
-    a.argmax(0).print()
-    a.argmin().print()
-    v.argmax().print()
-    v.argmin(0).print()
-
+fn main() raises:
     print("passes")

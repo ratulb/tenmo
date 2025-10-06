@@ -1,10 +1,17 @@
 from intlist import IntList
 from shapes import Shape
 from common_utils import log_debug
+from tensors import Tensor
 
 
 fn main():
-    pass
+    s = Tensor.arange(10)
+    takes_f32(s[0][0])
+
+
+fn takes_f32(x: Float32):
+    print(x)
+    var y: Bool = x
 
 
 struct Strides(
@@ -39,6 +46,10 @@ struct Strides(
 
     fn __getitem__(self, i: Int) -> Int:
         return self.strides[i]
+
+    @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[Int]:
+        return self.strides.unsafe_ptr()
 
     fn __getitem__(self, slice: Slice) -> Self:
         strides = self.strides[slice]

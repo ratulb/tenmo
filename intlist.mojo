@@ -44,6 +44,10 @@ struct IntList(
         return out
 
     @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[Int]:
+        return self.elems.unsafe_ptr()
+
+    @always_inline
     fn tolist(self) -> List[Int]:
         out = List[Int](capacity=len(self))
         for elem in self.elems:
@@ -57,7 +61,6 @@ struct IntList(
         for i in range(n):
             out.append(i)
         return out
-
 
     @staticmethod
     @always_inline
@@ -570,4 +573,7 @@ struct ZipIterator[
 
 
 fn main() raises:
-    pass
+    ll = IntList(42, 2, 3)
+    print(ll.__str__())
+    first = (ll.unsafe_ptr() + 3)[]
+    print(first)

@@ -2,6 +2,7 @@
 from tensors import Tensor
 from common_utils import panic, log_debug, RED, CYAN, MAGENTA, addr
 from utils import Variant
+from math import sqrt
 
 # --------------------
 # Module / Layer / Sequential definitions (safe pointers)
@@ -76,17 +77,26 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
         out_features: Int,
         init_seed: Optional[Int] = None,
     ):
-        self.weights = Tensor[dtype].rand(
+        _ = """self.weights = Tensor[dtype].rand(
             [in_features, out_features], init_seed=init_seed, requires_grad=True
+        )
+        self.bias = Tensor[dtype].zeros([out_features], requires_grad=True)"""
+        limit = Scalar[dtype](sqrt(6.0 / (in_features + out_features)))
+        self.weights = Tensor[dtype].rand(
+            shape=[in_features, out_features],
+            min=-limit,
+            max=limit,
+            init_seed=init_seed,
+            requires_grad=True,
         )
         self.bias = Tensor[dtype].zeros([out_features], requires_grad=True)
 
     fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
         if x.shape[-1] != self.weights.shape[0]:
             panic("Linear forward: input dim mismatch")
-        tx = x
+        xs = x  # This assignment is needed to make x mut
         weights = self.weights
-        return tx.matmul(weights) + self.bias
+        return xs.matmul(weights) + self.bias
 
     fn parameters(self) -> List[Tensor[dtype]]:
         var p = List[Tensor[dtype]]()

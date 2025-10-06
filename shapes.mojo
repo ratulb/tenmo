@@ -45,7 +45,7 @@ struct Shape(
     Sized & Stringable & Writable & Representable & Copyable & Movable
 ):
     alias Unit = Shape.of(1)
-    alias Void = Shape(IntList.Empty)
+    alias Void = Shape(True)
 
     var axes_spans: IntList
     var ndim: Int
@@ -80,7 +80,7 @@ struct Shape(
         self.numels = other.numels
 
     fn __init__(out self, dims: IntList):
-        _="""if len(dims) < 0:
+        _ = """if len(dims) < 0:
             panic("Shape -> __init__: Shape dimension count should be >= 0")"""
         ndim = len(dims)
         # Allow scalar tensors (rank 0, i.e., Shape())
@@ -105,6 +105,10 @@ struct Shape(
         self.axes_spans = dims[::]
         self.ndim = ndim
         self.numels = numels
+
+    @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[Int]:
+        return self.axes_spans.unsafe_ptr()
 
     fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
         return ShapeIndexIter(
@@ -323,10 +327,10 @@ struct Shape(
         if shape1 == shape2:
             return shape1, shape2
         # if shape1 == Shape.Void:
-        if shape1 == Shape():
+        if shape1 == Shape.Void:
             # return Shape.Unit * len(shape2), shape2
             return Shape(1) * len(shape2), shape2
-        if shape2 == Shape():
+        if shape2 == Shape.Void:
             return shape1, Shape(1) * len(shape1)
 
         max_len = max(len(shape1), len(shape2))
@@ -348,9 +352,9 @@ struct Shape(
                 + that.__str__()
             )
         # Explicitly handle true scalars (Shape.Void)
-        if this == Shape():
+        if this == Shape.Void:
             return that  # Scalar + Tensor -> Tensor's shape
-        if that == Shape():
+        if that == Shape.Void:
             return this  # Tensor + Scalar -> Tensor's shape
         shape1, shape2 = Self.pad_shapes(this, that)
         result_shape = IntList.with_capacity(len(shape1))
@@ -503,8 +507,10 @@ struct Shape(
 
 from strides import Strides
 
+
 fn main() raises:
-    shape = Shape(True)
+    _ = """shape = Shape(True)
     strides = Strides()
     print(strides.is_contiguous(shape))
-    print(shape.num_elements())
+    print(shape.num_elements())"""
+    _shape = Shape(IntList(0))

@@ -26,7 +26,8 @@ fn test_count() raises:
 
     assert_true(v.count(42) == 12, "Tensor view count assertion 4 failed")
     assert_true(v2.count(42) == 12, "Tensor view count assertion 5 failed")
-
+    scalar.free()
+    full.free()
 
 fn test_reshape_slice_sum_backward() raises:
     print("test_reshape_slice_sum_backward")
@@ -51,7 +52,13 @@ fn test_reshape_slice_sum_backward() raises:
     var col_step = r[s(), s(0, 3, 2)]
     expect = Tensor.d2([[0, 2], [3, 5]])
     assert_true((col_step == expect).all_true())
-
+    a.free()
+    r.free()
+    y.free()
+    ss.free()
+    full_slice.free()
+    row.free()
+    col_step.free()
 
 fn test_shared_tensor_twice() raises:
     print("test_shared_tensor_twice")
@@ -224,7 +231,10 @@ fn test_matmul_view_view() raises:
     var view_b = b.view(shape=[2, 1], strides=[1, 1], offset=0)
     var out = view_a.matmul(view_b)
     assert_true((out == Tensor.d2([[17.0], [39.0]])).all_true())
-
+    a.free()
+    view_b.free()
+    b.free()
+    view_a.free()
 
 fn test_matmul_transposed_tensor_tensor() raises:
     print("test_matmul_transposed_tensor_tensor")
@@ -2983,8 +2993,6 @@ fn test_exponentiation() raises:
     a = Tensor.full(Shape.of(3, 3), 2)
     expected = Tensor.full(Shape.of(3, 3), 7.389056).float()
     b = a.exp()
-    b.print()
-    expected.print()
     assert_true(b.all_close(expected), "exponentiation assertion failed")
 
 
@@ -4435,9 +4443,34 @@ fn test_element_at() raises:
         "max_index and element_at assertion failed",
     )
 
+fn test_argmin_max() raises:
+    a = Tensor.d1([1, 4, -9, 2, 10, 8])
+    v = a.view(shape=[4], offset=2)
+    assert_true(
+        (a.argmax(0) == Tensor[DType.int32].scalar(4)).all_true(),
+        "argmax assertion 1failed",
+    )
+    assert_true(
+        (a.argmax() == Tensor[DType.int32].scalar(4)).all_true(),
+        "argmax assertion 2 failed",
+    )
+
+    assert_true(
+        (a.argmin() == Tensor[DType.int32].scalar(2)).all_true(),
+        "tensor argmin assertion 1 failed",
+    )
+    assert_true(
+        (v.argmax() == Tensor[DType.int32].scalar(2)).all_true(),
+        "view argmax assertion 1 failed",
+    )
+
+    assert_true(
+        (v.argmin() == Tensor[DType.int32].scalar(0)).all_true(),
+        "view argmax assertion 1 failed",)
 
 fn main() raises:
     print("Starting tensor test cases")
+    test_argmin_max()
     test_fill()
     test_element_at()
     test_shuffle()

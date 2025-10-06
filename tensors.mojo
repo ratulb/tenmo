@@ -17,6 +17,7 @@ from forwards import *
 from buffers import Buffer
 from shared import TensorLite
 from validators import Validator
+from collections import Set
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -182,10 +183,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn init_gradbox(mut self):
         if self.requires_grad and not self.gradbox.__as_bool__():
-            gradbox = Tensor[dtype](self.shape)
+            gradbox = Tensor[dtype].zeros(self.shape)
             self.gradbox = UnsafePointer[Tensor[dtype]].alloc(1)
             self.gradbox.init_pointee_move(gradbox^)
-            self.zero_grad()
 
     @always_inline
     fn is_contiguous(self) -> Bool:
@@ -391,10 +391,11 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn grad_is_zero(self) -> Bool:
         if not self.requires_grad:
-            panic(
+            log_debug(
                 "Tensor → grad_is_zero: checking grad on a",
                 "that does have grad",
             )
+            return False
 
         fn all_zero(val: Scalar[dtype]) -> Bool:
             return val == Scalar[dtype](0)
@@ -824,11 +825,9 @@ struct Tensor[dtype: DType = DType.float32](
     fn zeros_like(
         tensor: Tensor[dtype], requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        buffer = Buffer[dtype].full(
-            Scalar[dtype](0), tensor.shape.num_elements()
-        )
+        buffer = Buffer[dtype].zeros(tensor.shape.num_elements())
         out = Tensor[dtype](
-            shape=tensor.shape, buffer=buffer, requires_grad=requires_grad
+            shape=tensor.shape, buffer=buffer^, requires_grad=requires_grad
         )
         return out
 
@@ -841,9 +840,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn zeros(shape: Shape, requires_grad: Bool = False) -> Tensor[dtype]:
-        buffer = Buffer[dtype].full(Scalar[dtype](0), shape.num_elements())
+        buffer = Buffer[dtype].zeros(shape.num_elements())
         out = Tensor[dtype](
-            shape=shape, buffer=buffer, requires_grad=requires_grad
+            shape=shape, buffer=buffer^, requires_grad=requires_grad
         )
         return out
 
@@ -2195,16 +2194,30 @@ struct Tensor[dtype: DType = DType.float32](
             self.gradients()[].print(num_first, num_last)
 
     fn free(deinit self):
-        print("Tensor__del__ → deleting tensor with id: " + self.id().__str__())
+        # print("Tensor__del__ → deleting tensor with id: " + self.id().__str__())
         if self.owns_data:
             if self.has_grad():
                 self.gradbox.destroy_pointee()
                 self.gradbox.free()
                 log_debug("Tensor__del__ → freed grad")
-                print("Tensor__del__ → freed grad")
+                # print("Tensor__del__ → freed grad")
+        else:
+            _ = self.buffer^
+            _ = self.shared_buffer^
+        self.ancestors.free()
+        _ = self^
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
+
+    fn unique(self) -> Tensor[dtype]:
+        uniques = Set[Scalar[dtype]]()
+        for _, value in self:
+            uniques.add(value)
+        distincts = self.Row(capacity=len(uniques))
+        for elem in uniques:
+            distincts.append(elem)
+        return Tensor[dtype].d1(distincts)
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         TensorLite.of(self).backward(start_grad)
@@ -2294,6 +2307,97 @@ struct Tensor[dtype: DType = DType.float32](
             )
         return self.data()[idx]
 
+    @always_inline
+    fn unsafe_flatten_index(self, indices: IntList) -> Int:
+        # Fast path for common case: rank matches indices length
+        rank = self.rank()
+        if len(indices) != rank:
+            panic(
+                "Tensor → flatten_index: number of indices does not match",
+                " tensor rank",
+                ": indices →",
+                indices.__str__(),
+                "rank →",
+                rank.__str__(),
+            )
+
+        var flat = self.offset  # absolute base offset
+        shape_ptr = self.shape.unsafe_ptr()
+        strides_ptr = self.strides.unsafe_ptr()
+        indices_ptr = indices.unsafe_ptr()
+
+        # Unrolled loop for small ranks (common case)
+        if rank == 1:
+            idx = indices_ptr[]
+            dim_size = shape_ptr[]
+            normalized_idx = idx + dim_size if idx < 0 else idx
+            if normalized_idx < 0 or normalized_idx >= dim_size:
+                panic(
+                    "Tensor → flatten_index: index out of bounds: axis 0, got",
+                    indices_ptr[0].__str__(),
+                    ", size",
+                    dim_size.__str__(),
+                )
+            return flat + normalized_idx * strides_ptr[]
+
+        elif rank == 2:
+            var normalized_idx: Int
+            # Dim 0
+            normalized_idx = indices_ptr[]
+            dim_size0 = shape_ptr[]
+            normalized_idx = (
+                normalized_idx + dim_size0 if normalized_idx
+                < 0 else normalized_idx
+            )
+            if normalized_idx < 0 or normalized_idx >= dim_size0:
+                panic(
+                    "Tensor → flatten_index: index out of bounds: axis 0, got",
+                    indices_ptr[].__str__(),
+                    ", size",
+                    dim_size0.__str__(),
+                )
+            flat += normalized_idx * strides_ptr[]
+
+            # Dim 1
+            normalized_idx = (indices_ptr + 1)[]
+            dim_size1 = (shape_ptr + 1)[]
+            normalized_idx = (
+                normalized_idx + dim_size1 if normalized_idx
+                < 0 else normalized_idx
+            )
+            if normalized_idx < 0 or normalized_idx >= dim_size1:
+                panic(
+                    "Tensor → flatten_index: index out of bounds: axis 1, got",
+                    (indices_ptr + 1)[].__str__(),
+                    ", size",
+                    dim_size1.__str__(),
+                )
+            return flat + normalized_idx * (strides_ptr + 1)[]
+
+        # General case with precomputed bounds and direct memory access
+        for dim_idx in range(rank):
+            var idx = (indices_ptr + dim_idx)[]
+            dim_size = (shape_ptr + dim_idx)[]
+
+            # Optimized negative index normalization
+            if idx < 0:
+                idx += dim_size
+
+            # Bounds check
+            if idx < 0 or idx >= dim_size:
+                panic(
+                    "Tensor → flatten_index: index out of bounds: axis",
+                    dim_idx.__str__(),
+                    ", got",
+                    indices_ptr[dim_idx].__str__(),
+                    ", size",
+                    dim_size.__str__(),
+                )
+
+            flat += idx * (strides_ptr + dim_idx)[]
+
+        return flat
+
 
 struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable & Movable):
     var src: Pointer[Tensor[dtype], origin]
@@ -2320,9 +2424,9 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable & Movable):
 
 
 fn main() raises:
-    pass
+    a = Tensor[DType.bool].full([4], True)
+    b = a.float().sum()
+    b.print()
+
 
 from testing import assert_true
-
-
-

@@ -24,7 +24,7 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        var gradients = output.gradients()[]
+        var gradients = output.grad()
         var ancestor_1 = output.ancestry().get(0)[]
         var ancestor_2 = output.ancestry().get(1)[]
         var logits = ancestor_1.tensor()
@@ -42,8 +42,8 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
         var M = N * total_elements  # Total predictions
 
         # Reshape logits to (M, C) and target to (M,) (same as forward pass)
-        var logits_2d = logits.reshape(Shape([M, C]))
-        var target_1d = target.reshape(Shape([M]))
+        var logits_2d = logits.reshape[track_grad=False](Shape([M, C]))
+        var target_1d = target.reshape[track_grad=False](Shape([M]))
 
         # 2. Compute softmax probabilities on the 2D tensor
         var softmax_probs = logits_2d.softmax[False](
@@ -111,7 +111,9 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
         # reduction="none" requires no additional scaling
 
         # 7. Reshape grad_input back to original logits shape
-        var final_grad_input = grad_input_2d.reshape(input_shape)
+        var final_grad_input = grad_input_2d.reshape[track_grad=False](
+            input_shape
+        )
 
         # 8. Multiply by upstream gradient (chain rule)
         # The upstream gradient is a scalar for mean/sum reduction, or matches target shape for "none"
@@ -120,7 +122,7 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
         if self.reduction == 2:  # none
             # For "none" reduction, upstream gradient has shape (N, d1, d2, ...)
             # We need to reshape it to (M,) to match our 2D gradient computation
-            var gradients_1d = gradients.reshape(Shape([M]))
+            var gradients_1d = gradients.reshape[track_grad=False](Shape([M]))
             var expanded_gradients = Tensor[dtype](
                 Shape([M, C]), requires_grad=False
             )
@@ -164,7 +166,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         self.label_smoothing = existing.label_smoothing
 
     fn __call__(
-        self, logits: Tensor[dtype], target: Tensor[dtype]
+        self, logits: Tensor[dtype], target: Tensor[DType.int32]
     ) -> Tensor[dtype]:
         """
         Unified implementation that handles all shapes the same way.
@@ -183,8 +185,8 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         var M = N * total_elements  # Total predictions
 
         # Reshape logits to (M, C) and target to (M,)
-        var logits_2d = logits.reshape(Shape([M, C]))
-        var target_1d = target.reshape(Shape([M]))
+        var logits_2d = logits.reshape[track_grad=False](Shape([M, C]))
+        var target_1d = target.reshape[track_grad=False](Shape([M]))
 
         # 3. Compute log_softmax on the 2D tensor
         var log_probs = self.log_softmax(logits_2d)
@@ -232,7 +234,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
 
         if self.reduction == 2:  # none
             # Reshape back to original target shape
-            out = losses.reshape(target.shape)
+            out = losses.reshape[track_grad=False](target.shape)
         elif self.reduction == 1:  # sum
             var total_loss = losses.sum()
             out = Tensor.full(Shape.Unit, total_loss.item())
@@ -255,7 +257,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite[dtype].of(logits))
-                out.add_ancestry(TensorLite[dtype].of(target))
+                out.add_ancestry(TensorLite[dtype].of(target.to_dtype[dtype]()))
 
         return out
 
@@ -277,8 +279,8 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
             for c in range(C):
                 sum_exp += exp(logits[m, c] - max_val)
 
-            var log_sum_exp = log(sum_exp + Scalar[dtype](1e-12))
-
+            # var log_sum_exp = log(sum_exp + Scalar[dtype](1e-12))
+            var log_sum_exp = log(sum_exp + Scalar[dtype](1e-9))
             # Compute log_softmax
             for c in range(C):
                 result[m, c] = (logits[m, c] - max_val) - log_sum_exp
@@ -288,7 +290,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
     @staticmethod
     fn validate_cross_entropy_inputs[
         dtype: DType
-    ](logits: Tensor[dtype], target: Tensor[dtype], ignore_index: Int):
+    ](logits: Tensor[dtype], target: Tensor[DType.int32], ignore_index: Int):
         """
         Validate CrossEntropyLoss inputs and return processed tensors.
         """
@@ -331,13 +333,13 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                         )
 
     @staticmethod
-    fn validate_class_indices[
-        dtype: DType
-    ](target: Tensor[dtype], num_classes: Int, ignore_index: Int):
+    fn validate_class_indices(
+        target: Tensor[DType.int32], num_classes: Int, ignore_index: Int
+    ):
         """Validate that target indices are within valid range."""
         # Use your built-in shape iterator - this is the clean way!
         for idx in target.shape:
-            var class_idx = target[idx].__int__()
+            var class_idx = target[idx][0]
             if class_idx != ignore_index and (
                 class_idx < 0 or class_idx >= num_classes
             ):

@@ -44,9 +44,9 @@ fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
     np = Python.import_module("numpy")
     shape_tuple = list_to_tuple(tensor.shape.tolist())
     ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(tensor.dtype))
-    if tensor.is_dense():
+    if tensor.owns_data:
         dst_ptr = ndarray_ptr[dtype](ndarray)
-        buffer_ptr = tensor.buffer.data().data
+        buffer_ptr = tensor.buffer.data
         memcpy(dst_ptr, buffer_ptr, tensor.numels())
     else:
         flat = ndarray.flat
@@ -75,7 +75,9 @@ fn from_ndarray[
         src_ptr = ndarray_ptr[dtype](ndarray)
         buffer = Buffer[dtype](numels)
         memcpy(buffer.data, src_ptr, numels)
-        result = Tensor[dtype](shape, buffer^, requires_grad=requires_grad)
+        result = Tensor[dtype](
+            shape.copy(), buffer^, requires_grad=requires_grad
+        )
         return result
     else:
         # Wrap external NumPy buffer (⚠️ lifetime must be managed externally)

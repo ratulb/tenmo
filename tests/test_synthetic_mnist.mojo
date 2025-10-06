@@ -12,19 +12,19 @@ from common_utils import log_debug, s, i as Row
 # Synthetic dataset generator
 fn make_synthetic_mnist_dataset(
     n_samples: Int,
-) -> (Tensor[DType.float32], Tensor[DType.float32]):
+) -> (Tensor[DType.float32], Tensor[DType.int32]):
     height = 28
     width = 28
     num_classes = 10
 
     # Allocate tensors
     var X = Tensor[DType.float32](Shape([n_samples, height * width]))
-    var y = Tensor[DType.float32](Shape(n_samples))
+    var y = Tensor[DType.int32](Shape(n_samples))
 
     for i in range(n_samples):
         # Pick class
         label = Tensor.randint([1], 0, num_classes).item()
-        y[i] = Float32(label)
+        y[i] = label.__int__()
 
         # Create blank canvas
         var img = Tensor[DType.float32](Shape([height, width]))
@@ -72,25 +72,28 @@ fn make_synthetic_mnist_dataset(
                     img[r, c] = 1.0
 
         # Flatten into X
-        X.set(img.flatten[track_grad=False](), Row(i), s())
+        img_flattened = img.flatten[track_grad=False]()
+        X.set(img_flattened, Row(i), s())
 
     return (X, y)
 
 
 # Batching utility
 fn get_batches(
-    x: Tensor[DType.float32], y: Tensor[DType.float32], batch_size: Int
-) -> List[(Tensor[DType.float32], Tensor[DType.float32])]:
+    x: Tensor[DType.float32], y: Tensor[DType.int32], batch_size: Int
+) -> List[(Tensor[DType.float32], Tensor[DType.int32])]:
     n = x.shape[0]
     num_batch = (n + batch_size - 1) // batch_size
-    batches = List[(Tensor[DType.float32], Tensor[DType.float32])](
+    batches = List[(Tensor[DType.float32], Tensor[DType.int32])](
         capacity=num_batch
     )
+    xs = x
+    ys = y
     i = 0
     while i < n:
         end = min(i + batch_size, n)
-        x_batch = x.slice(i, end).contiguous()
-        y_batch = y.slice(i, end).contiguous()
+        x_batch = xs.slice(i, end).contiguous()
+        y_batch = ys.slice(i, end).contiguous()
         batches.append((x_batch^, y_batch^))
         i += batch_size
     return batches
@@ -106,7 +109,7 @@ fn fit(
     epochs: Int,
     batch_size: Int,
 ):
-    for epoch in range(epochs):
+    _ = """for epoch in range(epochs):
         var epoch_loss: Float32 = 0.0
         var correct: Int = 0
         var total: Int = 0
@@ -136,7 +139,8 @@ fn fit(
             epoch_loss / total,
             "Accuracy:",
             Float32(correct) / Float32(total),
-        )
+        )"""
+    pass
 
 
 fn main():
@@ -151,10 +155,10 @@ fn main():
 
     # Loss + Optimizer
     var criterion = CrossEntropyLoss[DType.float32]()
-    var optimizer = SGD[DType.float32](model.parameters_ptrs(), lr=0.01)
+    var optimizer = SGD[DType.float32](model.parameters_ptrs(), lr=0.1)
     # Train
     # fit(model, optimizer, criterion, train_x, train_y, epochs=40, batch_size=8)
-    epochs = 2
+    epochs = 20
     batch_size = 32
     for epoch in range(epochs):
         var epoch_loss: Float32 = 0.0
@@ -174,10 +178,10 @@ fn main():
 
             # Track loss
             epoch_loss += loss.item()
-            preds = logits.argmax(axis=1).float()
+            preds = logits.argmax(axis=1)
             result = preds == yb
 
-            correct += Int((result).float().sum().item())
+            correct += result.to_dtype[DType.int32]().sum_all().__int__()
             total += yb.shape[0]
 
         print(
