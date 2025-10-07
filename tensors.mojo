@@ -138,7 +138,7 @@ struct Tensor[dtype: DType = DType.float32](
             requires_grad,
             strides=strides,
             offset=offset,
-            shared_buffer=self.shared_buffer.copy(),
+            shared_buffer=self.shared_buffer,
             owns_data=False,
         )
 
@@ -178,9 +178,11 @@ struct Tensor[dtype: DType = DType.float32](
             return self.buffer
         return self.shared_buffer.value()[]
 
+    @always_inline
     fn id(self) -> Int:
         return identity(self)
 
+    @always_inline
     fn init_gradbox(mut self):
         if self.requires_grad and not self.gradbox.__as_bool__():
             gradbox = Tensor[dtype].zeros(self.shape)
@@ -191,7 +193,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_contiguous(self) -> Bool:
         return self.strides.is_contiguous(self.shape)
 
-    @always_inline
     fn is_leaf(self) -> Bool:
         return self.requires_grad and not self.has_backward_fn()
 
@@ -269,9 +270,11 @@ struct Tensor[dtype: DType = DType.float32](
 
         return flat
 
+    @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
         return self.__getitem__(IntList.new(indices))
 
+    @always_inline
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
         if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
             panic("Tensor → __getitem__: Scalar tensor expects no indices")
@@ -280,6 +283,7 @@ struct Tensor[dtype: DType = DType.float32](
             index
         ] if self.owns_data else self.shared_buffer.value()[][index]
 
+    @always_inline
     fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
         if self.rank() == 0:  # Tensor with Shape ()
             panic(
@@ -292,6 +296,7 @@ struct Tensor[dtype: DType = DType.float32](
             index
         ] if self.owns_data else self.shared_buffer.value()[][index]
 
+    @always_inline
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
         if self.rank() == 0:  # Tensor with Shape ()
             panic(
@@ -309,6 +314,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __setitem__(self, indices: List[Int], value: Scalar[dtype]):
         self.__setitem__(IntList.new(indices), value)
 
+    @always_inline
     fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
         if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
             panic("Tensor → __setitem__: Scalar tensor expects no indices")
@@ -360,25 +366,31 @@ struct Tensor[dtype: DType = DType.float32](
         writer.write(self.__str__())
 
     # Check if it has a backward fn before calling this API
+    @always_inline
     fn backward_fn(self) -> BackwardFn[dtype]:
         return self.backwardFn.value()
 
+    @always_inline
     fn has_backward_fn(self) -> Bool:
         return self.backwardFn is not None
 
+    @always_inline
     fn has_grad(self) -> Bool:
         return self.gradbox.__as_bool__()
 
+    @always_inline
     fn zero_grad(self):
         if self.requires_grad and self.has_grad():
             self.gradbox[].buffer.zero()
 
+    @always_inline
     fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
         if self.requires_grad and self.has_grad():
             return self.gradbox
         else:
             return UnsafePointer[Tensor[dtype]]()
 
+    @always_inline
     fn grad(self) -> Tensor[dtype]:
         if not self.requires_grad:
             panic(
@@ -2193,19 +2205,33 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.gradients()[].print(num_first, num_last)
 
+    @always_inline
+    fn free_buffer(mut self):
+        _ = self.buffer^
+
+    @always_inline
+    fn free_shared_buffer(mut self):
+        _ = self.shared_buffer^
+        self.shared_buffer = None
+
+    @always_inline
+    fn free_gradbox(mut self):
+        if self.gradbox.__as_bool__():
+            self.gradbox.destroy_pointee()
+            self.gradbox.free()
+            self.gradbox = UnsafePointer[Tensor[dtype]]()
+            log_debug("Freed gradbox")
+            print("Freed gradbox")
+
     fn free(deinit self):
-        # print("Tensor__del__ → deleting tensor with id: " + self.id().__str__())
-        if self.owns_data:
-            if self.has_grad():
-                self.gradbox.destroy_pointee()
-                self.gradbox.free()
-                log_debug("Tensor__del__ → freed grad")
-                # print("Tensor__del__ → freed grad")
-        else:
-            _ = self.buffer^
-            _ = self.shared_buffer^
+        self.free_buffer()
+        self.free_shared_buffer()
+        ref_count = self.ref_count()
+        if ref_count <= 1 and self.requires_grad and self.gradbox.__as_bool__():
+            log_debug("Ref count on entry to __del__: " + ref_count.__str__())
+            # Discard gradbox
+            self.free_gradbox()
         self.ancestors.free()
-        _ = self^
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
@@ -2398,6 +2424,13 @@ struct Tensor[dtype: DType = DType.float32](
 
         return flat
 
+    @always_inline
+    fn ref_count(self) -> Int:
+        if self.shared_buffer is None:
+            return 0
+        else:
+            return self.shared_buffer.value().count().__int__()
+
 
 struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable & Movable):
     var src: Pointer[Tensor[dtype], origin]
@@ -2424,9 +2457,14 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable & Movable):
 
 
 fn main() raises:
-    a = Tensor[DType.bool].full([4], True)
-    b = a.float().sum()
-    b.print()
+    a = Tensor.full([4], 42, requires_grad=True)
+    print("ref count: ", a.ref_count())
+    b = a.into_view()
+    print("a ref count: ", a.ref_count())
+    print("a ref count: ", a.ref_count())
+    print("b ref count: ", b.ref_count())
+    # _ = a
+    a.gradbox[].print()
 
 
 from testing import assert_true

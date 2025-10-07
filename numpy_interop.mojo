@@ -89,7 +89,7 @@ from testing import assert_true
 
 
 fn main() raises:
-    mnist = Python.import_module("mnist_datasets")
+    _ = """mnist = Python.import_module("mnist_datasets")
     loader = mnist.MNISTLoader(folder="/tmp")
 
     # Load train dataset
@@ -102,4 +102,13 @@ fn main() raises:
     var test_data: PythonObject = loader.load(train=False)
     var test_images = test_data[0]
     var test_labels = test_data[1]
-    assert_true(len(test_images) == 10000 and len(test_labels) == 10000)
+    assert_true(len(test_images) == 10000 and len(test_labels) == 10000)"""
+    test_to_ndarray()
+
+
+fn test_to_ndarray() raises:
+    a = Tensor.arange(10).reshape(2, 5)
+    py_obj = to_ndarray(a)
+    py = Python.import_module("builtins")
+    print(py_obj, py_obj.dtype, py.type(py_obj))
+    print("Done")

@@ -33,7 +33,11 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         if self.ancestors:
             log_debug("Ancestors __del__ called")
             for idx in range(len(self)):
+                if self.ancestors[idx].__as_bool__() == False:
+                    continue
                 tensor_ptr = self.ancestors[idx][].inner_address()
+                if tensor_ptr.__as_bool__() == False:
+                    continue
                 tensor_ptr.destroy_pointee()
                 tensor_ptr.free()
                 self.ancestors[idx].destroy_pointee()
