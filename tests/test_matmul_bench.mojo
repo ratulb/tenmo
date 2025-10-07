@@ -9,21 +9,39 @@ from sys import simdwidthof
 fn main() raises:
     A_rows, A_cols = 128, 64
     B_rows, B_cols = 64, 128
+    runs = 10
+    forward_only_time = 0
+    forward_backward_time = 0
 
     A = Tensor.rand(A_rows, A_cols)
     B = Tensor.rand(B_rows, B_cols)
     expected, t1 = mm_naive(A, B)
-    result, t2 = bench_tensor_tensor(A, B)
-    assert_true(expected.all_close(result))
-    print("Naive vs tensor matmul without backward pass: ", t1 / t2)
+
+    naive_time = t1 * runs
+    for _ in range(runs):
+        result, t2 = bench_tensor_tensor(A, B)
+        forward_only_time += t2
+        assert_true(expected.all_close(result))
+    print(
+        "Naive vs tensor matmul time without backward pass for ",
+        runs,
+        "runs: ",
+        naive_time / forward_only_time,
+    )
 
     # backward
     A.requires_grad_()
     B.requires_grad_()
-    result, _, _, t3 = bench_tensor_tensor_backward(A, B)
-
-    assert_true(expected.all_close(result))
-    print("Tensor matmul with/without backward pass: ", t3 / t2)
+    for _ in range(runs):
+        result, _, _, t3 = bench_tensor_tensor_backward(A, B)
+        forward_backward_time += t3
+        assert_true(expected.all_close(result))
+    print(
+        "Tensor matmul time with/without backward pass for ",
+        runs,
+        "runs: ",
+        forward_backward_time / forward_only_time,
+    )
 
 
 fn bench_tensor_tensor[
@@ -34,7 +52,6 @@ fn bench_tensor_tensor[
     start = perf_counter_ns()
     C = A.matmul(B)
     end = perf_counter_ns()
-    print("bench_tensor_tensor -> Total:            ", end - start)
 
     return C, (end - start)
 
@@ -51,12 +68,8 @@ fn bench_tensor_tensor_backward[
     B = B_t
     start = perf_counter_ns()
     C = A.matmul(B)
-    end = perf_counter_ns()
-    print("Tensor.matmul(Tensor) -> Total:                  ", end - start)
-    start = perf_counter_ns()
     C.backward()
     end = perf_counter_ns()
-    print("Tensor.matmul(Tensor) backward -> Total:         ", end - start)
 
     return C, A.gradbox[], B.gradbox[], (end - start)
 
