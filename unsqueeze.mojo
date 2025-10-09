@@ -117,7 +117,7 @@ struct Unsqueeze[dtype: DType]:
                     axes=normalized_axes
                 ).into_backward_fn()
                 out.backwardFn = Optional(bfn)
-                out.add_ancestry(TensorLite.of(tensor))
+                out.add_ancestry(tensor)
 
         return out
 

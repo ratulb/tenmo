@@ -22,7 +22,7 @@ struct TensorLite[dtype: DType](
         self.tensor_address = tensor_ptr
 
     fn __copyinit__(out self, other: Self):
-        self.tensor_address = other.tensor_address
+        self.tensor_address = other.tensor_address.copy()
 
     fn __moveinit__(out self, deinit other: Self):
         self.tensor_address = other.tensor_address

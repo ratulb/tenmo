@@ -54,7 +54,7 @@ struct Reshape[dtype: DType](Copyable):
                 out.requires_grad_(True)
                 backward_fn = ReshapeBackward[dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite[dtype].of(tensor))
+                out.add_ancestry(tensor)
 
         return out
 

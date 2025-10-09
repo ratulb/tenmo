@@ -83,7 +83,7 @@ struct Shuffle[dtype: DType](Copyable & Movable):
                     axis, permutation
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self))
+                out.add_ancestry(self)
 
         return out
 

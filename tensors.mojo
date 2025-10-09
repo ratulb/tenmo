@@ -547,12 +547,19 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
-    fn add_ancestry(mut self, *parents: TensorLite[dtype]):
+    fn add_ancestry(mut self, *parents: Tensor[dtype]):
         for parent in parents:
             parent_ptr = UnsafePointer[Tensor[dtype]].alloc(1)
-            parent_ptr.init_pointee_move(parent.tensor())
+            parent_ptr.init_pointee_copy(parent)
             tli = TensorLite[dtype](parent_ptr)
             self.ancestors.append(tli^)
+
+    fn add_ancestry(mut self, *tlis: TensorLite[dtype]):
+        for tli in tlis:
+            parent_ptr = UnsafePointer[Tensor[dtype]].alloc(1)
+            parent_ptr.init_pointee_move(tli.tensor())
+            shield = TensorLite[dtype](parent_ptr)
+            self.ancestors.append(shield^)
 
     fn ancestry(self) -> Ancestors[dtype]:
         return self.ancestors
@@ -2218,6 +2225,7 @@ struct Tensor[dtype: DType = DType.float32](
                 log_debug("Freed gradbox")
 
         self.ancestors.free()
+        # print("Tensor freed")
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()

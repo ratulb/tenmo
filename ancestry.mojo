@@ -35,7 +35,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
             self.ancestors.clear()
 
     @always_inline
-    fn get(ref self, idx: Int) -> ref [self.ancestors] TensorLite[dtype]:
+    fn get(self, idx: Int) -> TensorLite[dtype]:
         return self.ancestors[idx]
 
     fn __len__(self) -> Int:
@@ -80,6 +80,9 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         return AncestorsIter[self.dtype, forward=False](
             len(self), Pointer(to=self)
         )
+
+    fn store[datatype: DType](mut self, *data: Scalar[datatype]):
+        pass
 
 
 struct AncestorsIter[dtype: DType, origin: Origin[False], forward: Bool = True](

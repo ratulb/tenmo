@@ -185,6 +185,7 @@ struct VectorMatrixMM[dtype: DType](Copyable):
                 out.backwardFn = Optional(
                     VectorMatrixMMBackward[dtype]().into_backward_fn()
                 )
+            out.add_ancestry(A, B)
         return out
 
 

@@ -235,7 +235,7 @@ struct MinMax[dtype: DType = DType.float32]:
                     normalized_axes, keepdims, gradbox
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self))
+                out.add_ancestry(self)
 
         return out
 

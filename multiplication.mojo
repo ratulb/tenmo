@@ -121,7 +121,7 @@ struct MultiplyScalar[dtype: DType]:
                     factor
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self))
+                out.add_ancestry(self)
 
         return out
 
@@ -168,17 +168,15 @@ struct Multiplicator[dtype: DType]:
                     backward_fn = MultiplyBackward[dtype]().into_backward_fn()
                     out.backwardFn = Optional(backward_fn)
                     if id(self) == id(other):  # B = A * A, self == other == A
-                        out.add_ancestry(TensorLite.of(self))
+                        out.add_ancestry(self)
                     else:
-                        out.add_ancestry(
-                            TensorLite.of(self), TensorLite.of(other)
-                        )
+                        out.add_ancestry(self, other)
                 else:
                     backward_fn = BroadcastBackward[
                         dtype, AddTensor, AddTensor, True
                     ]().into_backward_fn()
                     out.backwardFn = Optional(backward_fn)
-                    out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
+                    out.add_ancestry(self, other)
 
         return out
 

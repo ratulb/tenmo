@@ -89,7 +89,7 @@ struct View[dtype: DType](Copyable):
                     shape, strides, abs_offset
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite[dtype].of(self))
+                out.add_ancestry(self)
 
         return out
 

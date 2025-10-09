@@ -79,7 +79,7 @@ struct AddScalar[dtype: DType](Copyable):
                 out.requires_grad_(True)
                 backward_fn = AddBackwardScalar[dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite[dtype].of(self))
+                out.add_ancestry(self)
 
         return out
 
@@ -125,16 +125,16 @@ struct Adder[dtype: DType](Copyable):
                     backward_fn = AddBackward[dtype]().into_backward_fn()
                     out.backwardFn = Optional(backward_fn)
                     if self.requires_grad:
-                        out.add_ancestry(TensorLite[dtype].of(self))
+                        out.add_ancestry(self)
                     if other.requires_grad:
-                        out.add_ancestry(TensorLite[dtype].of(other))
+                        out.add_ancestry(other)
                 else:
                     backward_fn = BroadcastBackward[
                         dtype, AddTensor, AddTensor, False
                     ]().into_backward_fn()
 
                     out.backwardFn = Optional(backward_fn)
-                    out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
+                    out.add_ancestry(self, other)
 
         return out
 

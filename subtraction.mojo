@@ -91,7 +91,7 @@ struct SubtractScalar[dtype: DType]:
                     False
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self))
+                out.add_ancestry(self)
 
         return out
 
@@ -119,7 +119,7 @@ struct SubtractFromScalar[dtype: DType]:
                     True
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self))
+                out.add_ancestry(self)
 
         return out
 
@@ -162,10 +162,10 @@ struct Subtractor[dtype: DType]:
                 if self.shape == other.shape:
                     sub_backward = SubBackward[dtype]()
                     if self.requires_grad:
-                        out.add_ancestry(TensorLite.of(self))
+                        out.add_ancestry(self)
                         sub_backward.negate(False)
                     if other.requires_grad:
-                        out.add_ancestry(TensorLite.of(other))
+                        out.add_ancestry(other)
                         sub_backward.negate(True)
                     backward_fn = sub_backward.into_backward_fn()
                     out.backwardFn = Optional(backward_fn)
@@ -176,7 +176,7 @@ struct Subtractor[dtype: DType]:
                     ]().into_backward_fn()
 
                     out.backwardFn = Optional(backward_fn)
-                    out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
+                    out.add_ancestry(self, other)
 
         return out
 

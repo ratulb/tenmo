@@ -66,7 +66,7 @@ struct Expand[dtype: DType]:
                 out.requires_grad_()
                 var bfn = ExpandBackward[dtype]().into_backward_fn()
                 out.backwardFn = Optional(bfn)
-                out.add_ancestry(TensorLite.of(tensor))
+                out.add_ancestry(tensor)
 
         return out
 

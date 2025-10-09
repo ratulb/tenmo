@@ -217,9 +217,7 @@ struct MatrixVectorMM[dtype: DType](Copyable):
 
                 backward_fn = MatrixVectorMMBackward[dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(
-                    TensorLite[dtype].of(A), TensorLite[dtype].of(B)
-                )
+                out.add_ancestry(A, B)
 
         return out
 

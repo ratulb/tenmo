@@ -110,7 +110,7 @@ struct Summer[dtype: DType](Copyable):
                     normalized_axes, keepdims
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(tensor))
+                out.add_ancestry(tensor)
 
         return out
 

@@ -38,7 +38,7 @@ struct MatmulBackward[dtype: DType](Copyable):
             outgoing_grads.append(
                 (
                     ancestor_1,
-                    dA.value(),
+                    dA.take(),
                     AddTensor,
                 )
             )
@@ -46,7 +46,7 @@ struct MatmulBackward[dtype: DType](Copyable):
             outgoing_grads.append(
                 (
                     ancestor_2,
-                    dB.value(),
+                    dB.take(),
                     AddTensor,
                 )
             )
@@ -76,12 +76,13 @@ struct MatmulBackward[dtype: DType](Copyable):
                 )
 
                 dA = Optional(gradients.matmul(B_transposed))
-
+                B_transposed.free()
             if B.requires_grad:
                 A_transposed = A.transpose[track_grad=False](
                     requires_grad=False
                 )
                 dB = Optional(A_transposed.matmul(gradients))
+                A_transposed.free()
 
         elif trans_a and not trans_b:
             # Forward: C = A^T @ B
@@ -91,6 +92,7 @@ struct MatmulBackward[dtype: DType](Copyable):
                 )
 
                 dA = Optional(B.matmul(grad_transposed))
+                grad_transposed.free()
 
             if B.requires_grad:
                 dB = Optional(A.matmul(gradients))
@@ -106,6 +108,7 @@ struct MatmulBackward[dtype: DType](Copyable):
                 )
 
                 dB = Optional(grad_transposed.matmul(A))
+                grad_transposed.free()
 
         else:
             # trans_a and trans_b
@@ -120,7 +123,8 @@ struct MatmulBackward[dtype: DType](Copyable):
                 )
 
                 dA = Optional(B_transposed.matmul(grad_transposed))
-
+                grad_transposed.free()
+                B_transposed.free()
             if B.requires_grad:
                 grad_transposed = gradients.transpose[track_grad=False](
                     requires_grad=False
@@ -131,7 +135,9 @@ struct MatmulBackward[dtype: DType](Copyable):
                 )
 
                 dB = Optional(grad_transposed.matmul(A_transposed))
-
+                A_transposed.free()
+                grad_transposed.free()
+            gradients.free()
         return dA, dB
 
 
@@ -162,7 +168,7 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
             outgoing_grads.append(
                 (
                     ancestor_1,
-                    dA.value(),
+                    dA.take(),
                     AddTensor,
                 )
             )
@@ -170,7 +176,7 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
             outgoing_grads.append(
                 (
                     ancestor_2,
-                    dB.value(),
+                    dB.take(),
                     AddTensor,
                 )
             )
@@ -203,6 +209,8 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                         A_batch_grad, A.shape
                     )
                 )
+                B_transposed.free()
+                A_batch_grad.free()
             if B.requires_grad:
                 A_transposed = A.transpose[track_grad=False](
                     axes=[-1, -2], requires_grad=False
@@ -213,6 +221,9 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                         B_batch_grad, B.shape
                     )
                 )
+
+                A_transposed.free()
+                B_batch_grad.free()
 
         elif trans_a and not trans_b:
             # Forward: C = A^T @ B
@@ -229,6 +240,9 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                     )
                 )
 
+                grad_transposed.free()
+                A_batch_grad.free()
+
             if B.requires_grad:
                 B_batch_grad = A.matmul_nd(gradients)
                 dB = Optional(
@@ -236,6 +250,7 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                         B_batch_grad, B.shape
                     )
                 )
+                B_batch_grad.free()
 
         elif not trans_a and trans_b:
             # Forward: C = A @ B^T
@@ -246,6 +261,7 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                     requires_grad=False
                 )
                 dB = Optional(grad_transposed.matmul(A))
+                grad_transposed.free()
 
         else:
             # trans_a and trans_b
@@ -259,6 +275,8 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                 )
 
                 dA = Optional(B_transposed.matmul(grad_transposed))
+                B_transposed.free()
+                grad_transposed.free()
 
             if B.requires_grad:
                 grad_transposed = gradients.transpose[track_grad=False](
@@ -269,6 +287,9 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
                 )
 
                 dB = Optional(grad_transposed.matmul(A_transposed))
+                grad_transposed.free()
+                A_transposed.free()
+            gradients.free()
 
         return dA, dB
 
@@ -293,9 +314,7 @@ struct Matmul[dtype: DType](Copyable):
                     C.requires_grad_()
                     backward_fn = DotBackward[dtype]().into_backward_fn()
                     C.backwardFn = Optional(backward_fn)
-                    C.add_ancestry(
-                        TensorLite[dtype].of(A), TensorLite[dtype].of(B)
-                    )
+                    C.add_ancestry(A, B)
             return C
 
         elif rank_a == 1 and rank_b >= 2:
@@ -309,9 +328,7 @@ struct Matmul[dtype: DType](Copyable):
                         dtype
                     ]().into_backward_fn()
                     C.backwardFn = Optional(backward_fn)
-                    C.add_ancestry(
-                        TensorLite[dtype].of(A), TensorLite[dtype].of(B)
-                    )
+                    C.add_ancestry(A, B)
             return C
 
         elif rank_a >= 2 and rank_b == 1:
@@ -325,9 +342,7 @@ struct Matmul[dtype: DType](Copyable):
                         dtype
                     ]().into_backward_fn()
                     C.backwardFn = Optional(backward_fn)
-                    C.add_ancestry(
-                        TensorLite[dtype].of(A), TensorLite[dtype].of(B)
-                    )
+                    C.add_ancestry(A, B)
             return C
 
         else:
@@ -346,9 +361,7 @@ struct Matmul[dtype: DType](Copyable):
                         ]().into_backward_fn()
                         C.backwardFn = Optional(bmbfn)
 
-                    C.add_ancestry(
-                        TensorLite[dtype].of(A), TensorLite[dtype].of(B)
-                    )
+                    C.add_ancestry(A, B)
 
             return C
 
@@ -410,7 +423,7 @@ struct Matmul_2d[dtype: DType](Copyable):
                 C.requires_grad_(True)
                 backward_fn = MatmulBackward[dtype]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn)
-                C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
+                C.add_ancestry(A, B)
 
         return C
 
@@ -451,12 +464,16 @@ struct Matmul_nd[dtype: DType](Copyable):
             B_slice = B[il(B_indices), s(), s()]
             C_slice = C[il(indices), s(), s()]
 
-            _ = Matmul_2d.forward[track_grad=False](
+            _result = Matmul_2d.forward[track_grad=False](
                 UnsafePointer(to=A_slice),
                 UnsafePointer(to=B_slice),
                 UnsafePointer(to=C_slice),
                 requires_grad=False,
             )
+            A_slice.free()
+            B_slice.free()
+            C_slice.free()
+            _result.free()
 
         @parameter
         if track_grad:
@@ -476,7 +493,7 @@ struct Matmul_nd[dtype: DType](Copyable):
                     bmbfn = BatchedMatmulBackward[dtype]().into_backward_fn()
                     C.backwardFn = Optional(bmbfn)
 
-                C.add_ancestry(TensorLite.of(A), TensorLite.of(B))
+                C.add_ancestry(A, B)
 
         return C
 

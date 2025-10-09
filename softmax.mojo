@@ -82,7 +82,7 @@ struct Softmax[dtype: DType]:
                     normalized_axes, softmax_out
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(this))
+                out.add_ancestry(this)
 
         return out
 

@@ -137,7 +137,7 @@ struct DivideScalar[dtype: DType]:
                     scalar
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self))
+                out.add_ancestry(self)
 
         return out
 
@@ -178,7 +178,7 @@ struct DivideByScalar[dtype: DType]:
                     scalar
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self))
+                out.add_ancestry(self)
 
         return out
 
@@ -223,7 +223,7 @@ struct Divider[dtype: DType]:
                 out.requires_grad_(True)
                 backward_fn = DivideBackward[dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self), TensorLite.of(other))
+                out.add_ancestry(self, other)
 
         return out
 

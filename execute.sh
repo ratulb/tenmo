@@ -19,7 +19,7 @@ case $1 in
         mojo -I . $DEBUG_MODE tests/test_tensors.mojo
         ;;
     ce)
-        echo "Running crossentropy loss tests"
+        echo "Running mojo -I . tests/test_cross_entropy.mojo"
         mojo -I . $DEBUG_MODE tests/test_cross_entropy.mojo
         ;;
     synth_smoke)
@@ -58,7 +58,7 @@ case $1 in
         ;;
 
     ancestry)
-        echo "Running ancestry test cases"
+        echo "Running mojo -I . tests/test_ancestry.mojo"
         mojo -I . $DEBUG_MODE tests/test_ancestry.mojo
         ;;
 

@@ -46,7 +46,7 @@ struct ReLU[dtype: DType]:
             out.requires_grad_(True)
             backward_fn = ReLUBackward[dtype]().into_backward_fn()
             out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(TensorLite.of(self))
+            out.add_ancestry(self)
 
         return out
 

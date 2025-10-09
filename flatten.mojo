@@ -101,7 +101,7 @@ struct Flatten[dtype: DType]:
                     start_dim, endd
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self))
+                out.add_ancestry(self)
 
         return out
 

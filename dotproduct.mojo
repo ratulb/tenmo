@@ -108,9 +108,7 @@ struct Dot[dtype: DType](Copyable):
                 out.requires_grad_(True)
                 backward_fn = DotBackward[dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(
-                    TensorLite[dtype].of(self), TensorLite[dtype].of(other)
-                )
+                out.add_ancestry(self, other)
 
         return out
 

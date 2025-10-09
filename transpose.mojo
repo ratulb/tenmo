@@ -77,7 +77,7 @@ struct Transpose[dtype: DType](Copyable):
                     normalized_axes
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite.of(self))
+                out.add_ancestry(self)
 
         return out
 

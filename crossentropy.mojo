@@ -11,10 +11,41 @@ from operators import AddTensor
 
 @fieldwise_init
 @register_passable
+struct Reduction(Copyable, EqualityComparable):
+    var reduction: Int
+
+    alias Mean = Reduction(0)
+    alias Sum = Reduction(1)
+    alias `None` = Reduction(2)  # None is a keyword in mojo!
+
+    fn __eq__(self, other: Self) -> Bool:
+        return self.reduction == other.reduction
+
+    fn __ne__(self, other: Self) -> Bool:
+        return not (self == other)
+
+
+@fieldwise_init
+@register_passable
 struct CrossEntropyBackward[dtype: DType](Copyable):
-    var reduction: Int  # '0-> mean', '1-> sum', '2 -> none'
-    var ignore_index: Int  # index to ignore (-1 for none)
+    var reduction: Reduction
+    var ignore_index: Int  # index to ignore (-100 for none)
     var label_smoothing: Scalar[dtype]  # usually 0.0
+
+    fn __init__(
+        out self,
+        reduction: Int = 0,  # '0-> mean', '1-> sum', '2 -> none'
+        ignore_index: Int = -100,
+        label_smoothing: Scalar[dtype] = Scalar[dtype](0),
+    ):
+        self.reduction = Reduction(reduction)
+        self.ignore_index = ignore_index
+        self.label_smoothing = label_smoothing
+
+    fn __copyinit__(out self, existing: Self):
+        self.reduction = existing.reduction
+        self.ignore_index = existing.ignore_index
+        self.label_smoothing = existing.label_smoothing
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -92,14 +123,14 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
                         grad_input_2d[m, j] = softmax_probs[m, j]
 
         # 6. Apply reduction scaling (must match forward pass logic)
-        if self.reduction == 0:  # "mean"
+        if self.reduction == Reduction.Mean:
             # For mean reduction, scale by 1/valid_count
             if valid_count > 0:
                 var scale_factor = Scalar[dtype](1) / Scalar[dtype](valid_count)
                 grad_input_2d = grad_input_2d * scale_factor
             # If valid_count == 0, gradients remain zero
 
-        elif self.reduction == 1:  # "sum"
+        elif self.reduction == Reduction.Sum:
             # No scaling needed for sum reduction
             pass
         # reduction="none" requires no additional scaling
@@ -111,9 +142,8 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
 
         # 8. Multiply by upstream gradient (chain rule)
         # The upstream gradient is a scalar for mean/sum reduction, or matches target shape for "none"
-        # var scaled_gradients: Tensor[dtype]
 
-        if self.reduction == 2:  # none
+        if self.reduction == Reduction.`None`:
             # For "none" reduction, upstream gradient has shape (N, d1, d2, ...)
             # We need to reshape it to (M,) to match our 2D gradient computation
             var gradients_1d = gradients.reshape[track_grad=False](Shape([M]))
@@ -135,13 +165,13 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
 struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
     Copyable
 ):
-    var reduction: Int  # '0-> mean', '1-> sum', '2 -> none'
-    var ignore_index: Int  # index to ignore (-1 for none)
+    var reduction: Reduction
+    var ignore_index: Int  # index to ignore (-100 for none)
     var label_smoothing: Scalar[dtype]  # usually 0.0
 
     fn __init__(
         out self,
-        reduction: Int = 0,  # Default to mean reduction
+        reduction: Int = 0,  # '0-> mean', '1-> sum', '2 -> none'
         ignore_index: Int = -100,
         label_smoothing: Scalar[dtype] = Scalar[dtype](0),
     ):
@@ -150,7 +180,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
             panic(
                 "Invalid reduction type. Must be 0 (mean), 1 (sum), or 2 (none)"
             )
-        self.reduction = reduction
+        self.reduction = Reduction(reduction)
         self.ignore_index = ignore_index
         self.label_smoothing = label_smoothing
 
@@ -158,6 +188,11 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         self.reduction = existing.reduction
         self.ignore_index = existing.ignore_index
         self.label_smoothing = existing.label_smoothing
+
+    fn __call__(
+        self, logits: Tensor[dtype], target: Tensor[dtype]
+    ) -> Tensor[dtype]:
+        return Tensor[dtype].scalar(42)
 
     fn __call__(
         self, logits: Tensor[dtype], target: Tensor[DType.int32]
@@ -226,13 +261,13 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         # 6. Apply reduction - FIXED: Ensure 'out' is always initialized
         var out: Tensor[dtype]
 
-        if self.reduction == 2:  # none
+        if self.reduction == Reduction.`None`:
             # Reshape back to original target shape
             out = losses.reshape[track_grad=False](target.shape)
-        elif self.reduction == 1:  # sum
+        elif self.reduction == Reduction.Sum:
             var total_loss = losses.sum()
             out = Tensor.full(Shape(1), total_loss.item())
-        else:  # mean (default case - reduction == 0 or any other value)
+        else:  # mean (default case - reduction == Reduction.Mean)
             if valid_count > 0:
                 var total_loss = losses.sum()
                 out = Tensor.scalar(
@@ -250,8 +285,12 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                     self.reduction, self.ignore_index, self.label_smoothing
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite[dtype].of(logits))
-                out.add_ancestry(TensorLite[dtype].of(target.to_dtype[dtype]()))
+                out.add_ancestry(logits)
+                # Target is not really a parent - but we need it in the backward pass!
+                # we are type casting DType.int32 to dtype(default DType.float32)
+                # because because our current ancestry expects homogeneous dtype!
+                target_casted = target.to_dtype[dtype]()
+                out.add_ancestry(target_casted)
 
         return out
 
@@ -273,8 +312,8 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
             for c in range(C):
                 sum_exp += exp(logits[m, c] - max_val)
 
-            # var log_sum_exp = log(sum_exp + Scalar[dtype](1e-12))
-            var log_sum_exp = log(sum_exp + Scalar[dtype](1e-9))
+            var log_sum_exp = log(sum_exp + Scalar[dtype](1e-12))
+            # var log_sum_exp = log(sum_exp + Scalar[dtype](1e-9))
             # Compute log_softmax
             for c in range(C):
                 result[m, c] = (logits[m, c] - max_val) - log_sum_exp
