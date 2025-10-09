@@ -6,6 +6,7 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn
 from validators import Validator
 
+
 @fieldwise_init
 struct SumBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
@@ -16,8 +17,8 @@ struct SumBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
-        ancestor = output.ancestry().get(0)[]
+        gradients = output.grad()
+        ancestor = output.ancestry().get(0)
         rank = ancestor.shape().rank()
         if rank == 0:
             return [(ancestor, gradients, AddTensor)]
@@ -26,7 +27,7 @@ struct SumBackward[dtype: DType](Copyable & Movable):
         var grad_contrib: Tensor[dtype]
 
         # Handle scalar gradient case (sum reduced to scalar)
-        if gradients.shape == Shape.Void:
+        if gradients.shape == Shape():
             grad_contrib = Tensor[dtype].full(
                 shape,
                 gradients.item(),
@@ -43,10 +44,14 @@ struct SumBackward[dtype: DType](Copyable & Movable):
                 unsqueezed_shape = Shape(axes)
 
                 unsqueezed_grad = gradients.reshape(unsqueezed_shape)
-                grad_contrib = unsqueezed_grad.broadcast_to(shape, requires_grad=False)
+                grad_contrib = unsqueezed_grad.broadcast_to(
+                    shape, requires_grad=False
+                )
             else:
                 # keepdims=True: shapes match except for broadcasting
-                grad_contrib = gradients.broadcast_to(shape, requires_grad=False)
+                grad_contrib = gradients.broadcast_to(
+                    shape, requires_grad=False
+                )
 
         grad_contrib.requires_grad = False
 
@@ -60,6 +65,7 @@ struct SumBackward[dtype: DType](Copyable & Movable):
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
+
 
 @fieldwise_init
 @register_passable
@@ -79,11 +85,11 @@ struct Summer[dtype: DType](Copyable):
         out_shape = shape.compute_output_shape(normalized_axes, keepdims)
         out = Tensor[dtype].zeros(out_shape)
 
-        if out_shape == Shape.Void:
+        if out_shape == Shape():
             if rank == 0:  # Scalar case
-                out[IntList.Empty] = tensor[IntList.Empty]
+                out[IntList()] = tensor[IntList()]
             elif rank == len(normalized_axes) and not keepdims:  # Reducing all
-                out[IntList.Empty] = tensor.sum_all()
+                out[IntList()] = tensor.sum_all()
         else:
             reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
             for out_idx in out_shape:

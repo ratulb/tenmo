@@ -23,7 +23,7 @@ struct TrueDivBackwardScalar[dtype: DType](Copyable):
     ]:
         gradients = output.grad()
         var divisor: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
         var divided = gradients / divisor
         return [
@@ -50,7 +50,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](Copyable):
     ]:
         gradients = output.grad()
         var scalar: Scalar[dtype] = rebind[Scalar[dtype]](self.scalar)
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
         squared = ancestor.tensor().__pow__(2)
         squared_reciprocal = 1.0 / squared
         grad = (gradients * scalar) * squared_reciprocal
@@ -76,8 +76,8 @@ struct DivideBackward[dtype: DType](Copyable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.grad()
-        ancestor_1 = output.ancestry().get(0)[]
-        ancestor_2 = output.ancestry().get(1)[]
+        ancestor_1 = output.ancestry().get(0)
+        ancestor_2 = output.ancestry().get(1)
 
         outgoing_grads = List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]()
 

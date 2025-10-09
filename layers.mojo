@@ -9,9 +9,12 @@ from math import sqrt
 # --------------------
 
 
-@fieldwise_init
+@explicit_destroy
 struct Module[dtype: DType = DType.float32](Copyable & Movable):
     var layer: Layer[dtype]
+
+    fn __init__(out self, layer: Layer[dtype]):
+        self.layer = layer
 
     fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
         if self.layer.isa[Linear[dtype]]():
@@ -66,7 +69,7 @@ struct Module[dtype: DType = DType.float32](Copyable & Movable):
         return ptrs
 
 
-@fieldwise_init
+@explicit_destroy
 struct Linear[dtype: DType = DType.float32](Copyable & Movable):
     var weights: Tensor[dtype]
     var bias: Tensor[dtype]
@@ -117,8 +120,10 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
         return ptrs
 
 
-@fieldwise_init
 struct ReLU[dtype: DType = DType.float32](Copyable & Movable):
+    fn __init__(out self):
+        pass
+
     fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
         return x.relu()
 
@@ -138,7 +143,7 @@ struct ReLU[dtype: DType = DType.float32](Copyable & Movable):
 alias Layer[dtype: DType] = Variant[Linear[dtype], ReLU[dtype]]
 
 
-@fieldwise_init
+@explicit_destroy
 struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
     var modules: List[Module[dtype]]
 

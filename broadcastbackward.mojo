@@ -16,13 +16,13 @@ struct BroadcastBackward[
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         var grad_outputs: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
         ancestors = output.ancestry()
-        ancestor_1 = ancestors.get(0)[]
-        ancestor_2 = ancestors.get(1)[]
+        ancestor_1 = ancestors.get(0)
+        ancestor_2 = ancestors.get(1)
 
         if ancestor_1.requires_grad():
             ancestor_1_share = ancestor_1.tensor().backward_contribution(

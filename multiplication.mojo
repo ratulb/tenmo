@@ -23,7 +23,7 @@ struct MulBackwardScalar[dtype: DType](Copyable & Movable):
     ]:
         gradients = output.grad()
         var value: Scalar[dtype] = rebind[Scalar[dtype]](self.factor)
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
 
         scaled_gradients = gradients * value
         return [
@@ -52,7 +52,7 @@ struct MultiplyBackward[dtype: DType](Copyable & Movable):
         ] = []
 
         count = len(output.ancestry())
-        ancestor_1 = output.ancestry().get(0)[]
+        ancestor_1 = output.ancestry().get(0)
 
         if count == 1:  # B = A * A, A is the only ancestor of B
             tensor_1 = ancestor_1.tensor()
@@ -62,7 +62,7 @@ struct MultiplyBackward[dtype: DType](Copyable & Movable):
             )
             return [(ancestor_1, product, AddTensor)]
 
-        ancestor_2 = output.ancestry().get(1)[]
+        ancestor_2 = output.ancestry().get(1)
 
         if ancestor_1.requires_grad():
             product = gradients * ancestor_2.tensor()
@@ -104,7 +104,10 @@ struct MultiplyScalar[dtype: DType]:
             else:
                 offset = self.offset
                 numels = self.numels()
-                buffer = self.shared_buffer.value()[][offset: offset+numels] * factor
+                buffer = (
+                    self.shared_buffer.value()[][offset : offset + numels]
+                    * factor
+                )
         else:
             idx = 0
             buffer = Buffer[dtype](self.numels())

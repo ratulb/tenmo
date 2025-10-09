@@ -21,19 +21,21 @@ struct UnsqueezeBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         # Remove the axis we had inserted
         gradients_squeezed = Squeeze[dtype].forward[track_grad=False](
             gradients, self.axes, requires_grad=False
         )
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
         return [(ancestor, gradients_squeezed, AddTensor)]
 
 
 @register_passable
 struct Unsqueeze[dtype: DType]:
     @staticmethod
-    fn forward[track_grad: Bool=True](
+    fn forward[
+        track_grad: Bool = True
+    ](
         mut tensor: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
@@ -107,7 +109,6 @@ struct Unsqueeze[dtype: DType]:
 
         @parameter
         if track_grad:
-        
             grad_required = (
                 requires_grad.value() if requires_grad else tensor.requires_grad
             )

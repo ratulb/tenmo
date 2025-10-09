@@ -6,7 +6,11 @@ struct IntList(
     Sized & Copyable & Movable & Stringable & Representable & Writable
 ):
     var elems: List[Int]
-    alias Empty = IntList()
+
+    @always_inline
+    @staticmethod
+    fn Empty() -> IntList:
+        return IntList()
 
     fn __init__(out self):
         self.elems = List[Int](capacity=0)
@@ -31,8 +35,7 @@ struct IntList(
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
-        self.elems = existing.elems[::]
-        # self.elems = existing.elems.copy()
+        self.elems = existing.elems.copy()
 
     fn __moveinit__(out self, deinit existing: Self):
         self.elems = existing.elems^
@@ -362,7 +365,7 @@ struct IntList(
             if idx < 0 or idx >= n:
                 panic("IntList -> replace: index out of bounds: " + String(idx))
 
-        result = self[::]
+        result = self.copy()
 
         # Apply replacements
         for i in range(m):
@@ -573,7 +576,4 @@ struct ZipIterator[
 
 
 fn main() raises:
-    ll = IntList(42, 2, 3)
-    print(ll.__str__())
-    first = (ll.unsafe_ptr() + 3)[]
-    print(first)
+    pass

@@ -11,8 +11,8 @@ fn gradcheck_param[
 ](
     model: Sequential[dtype],
     x: Tensor[dtype],
-    y: Tensor[dtype],
-    loss_fn: fn (Tensor[dtype], Tensor[dtype]) -> Tensor[dtype],
+    y: Tensor[DType.int32],
+    loss_fn: fn (Tensor[dtype], Tensor[DType.int32]) -> Tensor[dtype],
     eps: Scalar[dtype] = Scalar[dtype](1e-3),
     tol: Scalar[dtype] = Scalar[dtype](1e-2),
 ) raises -> Bool:
@@ -90,11 +90,11 @@ fn test_gradcheck1() raises:
     model.append(Linear(5, 3).into())
 
     var x = Tensor.rand([2, 4], requires_grad=True)
-    var y = Tensor.d1([1, 2])
+    var y = Tensor[DType.int32].d1([1, 2])
 
     fn criterion[
         dtype: DType
-    ](logits: Tensor[dtype], target: Tensor[dtype]) -> Tensor[dtype]:
+    ](logits: Tensor[dtype], target: Tensor[DType.int32]) -> Tensor[dtype]:
         var criterion = CrossEntropyLoss[dtype]()
         # print("ce logits/target shapes: ", logits.shape, target.shape)
         return criterion(logits, target)
@@ -126,13 +126,13 @@ fn test_gradcheck2() raises:
 
     var x = Tensor.rand([2, 4], requires_grad=True)
     # Target must match output shape [2, 3]
-    var y = Tensor.rand([2, 3])
+    var y = Tensor.randint32([2, 3])
 
     fn mse_loss[
         dtype: DType
-    ](preds: Tensor[dtype], target: Tensor[dtype]) -> Tensor[dtype]:
+    ](preds: Tensor[dtype], target: Tensor[DType.int32]) -> Tensor[dtype]:
         var mse = MSELoss[dtype]()
-        return mse(preds, target)
+        return mse(preds, target.to_dtype[dtype]())
 
     var passed = gradcheck_param(
         model,

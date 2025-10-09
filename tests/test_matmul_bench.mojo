@@ -9,7 +9,7 @@ from sys import simdwidthof
 fn main() raises:
     A_rows, A_cols = 128, 64
     B_rows, B_cols = 64, 128
-    runs = 10
+    runs = 15
     forward_only_time = 0
     forward_backward_time = 0
 
@@ -22,6 +22,7 @@ fn main() raises:
         result, t2 = bench_tensor_tensor(A, B)
         forward_only_time += t2
         assert_true(expected.all_close(result))
+        result.free()
     print(
         "Naive vs tensor matmul time without backward pass for ",
         runs,
@@ -36,6 +37,7 @@ fn main() raises:
         result, _, _, t3 = bench_tensor_tensor_backward(A, B)
         forward_backward_time += t3
         assert_true(expected.all_close(result))
+        result.free()
     print(
         "Tensor matmul time with/without backward pass for ",
         runs,

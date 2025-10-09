@@ -11,9 +11,7 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     var keepdims: Bool
 
-    fn __init__(
-        out self, axes: IntList = IntList.Empty, keepdims: Bool = False
-    ):
+    fn __init__(out self, axes: IntList = IntList(), keepdims: Bool = False):
         self.axes = axes
         self.keepdims = keepdims
 
@@ -31,8 +29,8 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.grad()
-        ancestor = output.ancestry().get(0)[]
-        if gradients.shape == Shape.Void:
+        ancestor = output.ancestry().get(0)
+        if gradients.shape == Shape():
             scalar_grad = gradients.item() / ancestor.shape().num_elements()
             grad_contrib = Tensor[dtype].full(
                 ancestor.shape(),
@@ -60,7 +58,9 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
             )
 
         # Broadcast and divide
-        broadcasted = expanded.broadcast_to(ancestor.shape(), requires_grad=False)
+        broadcasted = expanded.broadcast_to(
+            ancestor.shape(), requires_grad=False
+        )
         # Compute total count of elements being reduced
         count = ancestor.shape().axes_spans.select(self.axes).product()
 
@@ -75,6 +75,7 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
+
 
 @fieldwise_init
 @register_passable

@@ -23,7 +23,7 @@ struct Argmin[dtype: DType]:
             )
 
         # Output shape is same as input but without the reduced axis
-        var out_axes = IntList.Empty
+        var out_axes = IntList()
         for i in range(rank):
             if i != ax:
                 out_axes.append(shape[i])
@@ -65,7 +65,7 @@ struct Argmax[dtype: DType]:
                 rank.__str__(),
             )
         # Output shape is same as input but without the reduced axis
-        var out_axes = IntList.Empty
+        var out_axes = IntList()
         for i in range(rank):
             if i != ax:
                 out_axes.append(shape[i])

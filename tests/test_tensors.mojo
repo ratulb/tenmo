@@ -10,8 +10,6 @@ from operators import AddTensor
 from shared import TensorLite
 from strides import Strides
 
-alias Boolean = Scalar[DType.bool]
-
 
 fn test_count() raises:
     scalar = Tensor.scalar(10)
@@ -26,8 +24,7 @@ fn test_count() raises:
 
     assert_true(v.count(42) == 12, "Tensor view count assertion 4 failed")
     assert_true(v2.count(42) == 12, "Tensor view count assertion 5 failed")
-    scalar.free()
-    full.free()
+
 
 fn test_reshape_slice_sum_backward() raises:
     print("test_reshape_slice_sum_backward")
@@ -52,13 +49,7 @@ fn test_reshape_slice_sum_backward() raises:
     var col_step = r[s(), s(0, 3, 2)]
     expect = Tensor.d2([[0, 2], [3, 5]])
     assert_true((col_step == expect).all_true())
-    a.free()
-    r.free()
-    y.free()
-    ss.free()
-    full_slice.free()
-    row.free()
-    col_step.free()
+
 
 fn test_shared_tensor_twice() raises:
     print("test_shared_tensor_twice")
@@ -231,10 +222,7 @@ fn test_matmul_view_view() raises:
     var view_b = b.view(shape=[2, 1], strides=[1, 1], offset=0)
     var out = view_a.matmul(view_b)
     assert_true((out == Tensor.d2([[17.0], [39.0]])).all_true())
-    a.free()
-    view_b.free()
-    b.free()
-    view_a.free()
+
 
 fn test_matmul_transposed_tensor_tensor() raises:
     print("test_matmul_transposed_tensor_tensor")
@@ -1411,7 +1399,7 @@ fn test_reshape_tensor_to_scalar() raises:
     print("test_reshape_tensor_to_scalar")
     # (1,) → reshape to scalar
     a = Tensor.of(42.0, requires_grad=True)
-    b = a.reshape(Shape(True))
+    b = a.reshape(Shape())
 
     assert_true(b.is_scalar())
     assert_true(b[IntList()] == Scalar(42.0))
@@ -1803,7 +1791,7 @@ fn test_item() raises:
 fn test_view() raises:
     print("test_view")
     tensor = Tensor.rand(1).reshape()
-    view = tensor.view(Shape(True))
+    view = tensor.view(Shape())
     assert_true(
         tensor.shape == view.shape,
         "Tensor and view shape equality asserttion failed",
@@ -1848,7 +1836,7 @@ fn test_scalar_tensor() raises:
     assert_true(
         (
             tensor.item() == 42.0
-            and tensor.shape == Shape(True)
+            and tensor.shape == Shape()
             and tensor.numels() == 1
         ),
         "Scalar tensor item and shape assertion failed",
@@ -1897,7 +1885,7 @@ fn test_reshape() raises:
     tensor = Tensor.rand(1, 1)
     reshaped = tensor.reshape()
     assert_true(
-        reshaped.shape == Shape(True) and reshaped.item() == tensor[0, 0],
+        reshaped.shape == Shape() and reshaped.item() == tensor[0, 0],
         "post reshape random tensor - shape and get assertion failed",
     )
     tensor = Tensor.scalar(42, requires_grad=True)
@@ -2755,7 +2743,7 @@ fn test_empty_tensor() raises:
     var s = a.sum()
     s.backward()
     assert_true(s.item() == min_finite[DType.float32]())
-    assert_true(a.gradbox[].shape == Shape(True))
+    assert_true(a.gradbox[].shape == Shape())
 
 
 fn test_tensorlite_inner_tensor_requires_grad() raises:
@@ -2963,9 +2951,11 @@ fn test_powering() raises:
 
 fn test_invert() raises:
     print("test_invert")
-    a = Tensor[DType.bool].full(Shape.of(3, 3), Boolean(True))
+    a = Tensor[DType.bool].full(Shape.of(3, 3), Scalar[DType.bool](True))
     b = ~a
-    expected = Tensor[DType.bool].full(Shape.of(3, 3), Boolean(False))
+    expected = Tensor[DType.bool].full(
+        Shape.of(3, 3), Scalar[DType.bool](False)
+    )
     assert_true((b == expected).all_true(), "invertion assertion failed")
     assert_true((~b == a).all_true(), "invertion assertion 2 failed")
 
@@ -3041,9 +3031,9 @@ fn test_view_of_view() raises:
     print("test_view_of_view")
     a = Tensor.scalar(10)
     v1 = a.into_view()
-    v2 = v1.view(shape=Shape(True), strides=Strides(), offset=0)
-    v3 = v2.view(shape=Shape(True), strides=Strides(), offset=0)
-    v4 = v3.view(shape=Shape(True), strides=Strides(), offset=0)
+    v2 = v1.view(shape=Shape(), strides=Strides(), offset=0)
+    v3 = v2.view(shape=Shape(), strides=Strides(), offset=0)
+    v4 = v3.view(shape=Shape(), strides=Strides(), offset=0)
     assert_true(v2.item() == 10, "view's view(v2) - item() assertion failed")
     assert_true(v3.item() == 10, "view's view(v3) - item() assertion failed")
     assert_true(v4.item() == 10, "view's view(v4) - item() assertion failed")
@@ -4443,6 +4433,7 @@ fn test_element_at() raises:
         "max_index and element_at assertion failed",
     )
 
+
 fn test_argmin_max() raises:
     a = Tensor.d1([1, 4, -9, 2, 10, 8])
     v = a.view(shape=[4], offset=2)
@@ -4466,7 +4457,9 @@ fn test_argmin_max() raises:
 
     assert_true(
         (v.argmin() == Tensor[DType.int32].scalar(0)).all_true(),
-        "view argmax assertion 1 failed",)
+        "view argmax assertion 1 failed",
+    )
+
 
 fn main() raises:
     print("Starting tensor test cases")

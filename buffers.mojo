@@ -4,8 +4,6 @@ from memory import memset_zero, memcpy, ArcPointer
 from math import exp, log
 from common_utils import log_debug, panic
 
-alias Boolean = Scalar[DType.bool]
-
 
 struct Buffer[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Writable & Representable & Absable
@@ -13,7 +11,6 @@ struct Buffer[dtype: DType = DType.float32](
     var size: Int
     var data: UnsafePointer[Scalar[dtype]]
     var external: Bool
-    alias Empty = Buffer[dtype]()
 
     fn __init__(out self):
         self.size = 0
@@ -575,7 +572,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(this.load(k).eq(scalar)))
+            out.store(k, Scalar[DType.bool](this.load(k).eq(scalar)))
         return out
 
     fn __ne__[
@@ -610,7 +607,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(this.load(k).ne(scalar)))
+            out.store(k, Scalar[DType.bool](this.load(k).ne(scalar)))
         return out
 
     fn lt[
@@ -640,7 +637,7 @@ struct Buffer[dtype: DType = DType.float32](
         for block in range(simd_blocks):
             idx = block * simd_width
             cmp = this.load[simd_width](idx).lt(scalar)
-            if cmp == Boolean(False):
+            if cmp == Scalar[DType.bool](False):
                 return False
         i = simd_blocks * simd_width
 
@@ -658,7 +655,7 @@ struct Buffer[dtype: DType = DType.float32](
         for block in range(simd_blocks):
             idx = block * simd_width
             cmp = this.load[simd_width](idx).le(scalar)
-            if cmp == Boolean(False):
+            if cmp == Scalar[DType.bool](False):
                 return False
         i = simd_blocks * simd_width
 
@@ -682,7 +679,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(this.load(k).le(scalar)))
+            out.store(k, Scalar[DType.bool](this.load(k).le(scalar)))
         return out
 
     fn __gt__[
@@ -694,7 +691,7 @@ struct Buffer[dtype: DType = DType.float32](
         for block in range(simd_blocks):
             idx = block * simd_width
             cmp = this.load[simd_width](idx).gt(scalar)
-            if cmp == Boolean(False):
+            if cmp == Scalar[DType.bool](False):
                 return False
         i = simd_blocks * simd_width
 
@@ -718,7 +715,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(this.load(k).gt(scalar)))
+            out.store(k, Scalar[DType.bool](this.load(k).gt(scalar)))
         return out
 
     fn __ge__[
@@ -730,7 +727,7 @@ struct Buffer[dtype: DType = DType.float32](
         for block in range(simd_blocks):
             idx = block * simd_width
             cmp = this.load[simd_width](idx).ge(scalar)
-            if cmp == Boolean(False):
+            if cmp == Scalar[DType.bool](False):
                 return False
         i = simd_blocks * simd_width
 
@@ -754,7 +751,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(this.load(k).ge(scalar)))
+            out.store(k, Scalar[DType.bool](this.load(k).ge(scalar)))
         return out
 
     fn eq[
@@ -780,7 +777,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(lhs.load(k).eq(rhs.load(k))))
+            out.store(k, Scalar[DType.bool](lhs.load(k).eq(rhs.load(k))))
         return out
 
     @always_inline
@@ -830,7 +827,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(lhs.load(k).ne(rhs.load(k))))
+            out.store(k, Scalar[DType.bool](lhs.load(k).ne(rhs.load(k))))
         return out
 
     fn __ne__[
@@ -849,7 +846,7 @@ struct Buffer[dtype: DType = DType.float32](
         for block in range(simd_blocks):
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).ne(rhs.load[simd_width](idx))
-            if cmp == Boolean(False):
+            if cmp == Scalar[DType.bool](False):
                 return False
         i = simd_blocks * simd_width
 
@@ -880,7 +877,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(lhs.load(k).lt(rhs.load(k))))
+            out.store(k, Scalar[DType.bool](lhs.load(k).lt(rhs.load(k))))
         return out
 
     fn __lt__[
@@ -899,7 +896,7 @@ struct Buffer[dtype: DType = DType.float32](
         for block in range(simd_blocks):
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).lt(rhs.load[simd_width](idx))
-            if cmp == Boolean(False):
+            if cmp == Scalar[DType.bool](False):
                 return False
         i = simd_blocks * simd_width
 
@@ -930,7 +927,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(lhs.load(k).le(rhs.load(k))))
+            out.store(k, Scalar[DType.bool](lhs.load(k).le(rhs.load(k))))
         return out
 
     fn __le__[
@@ -973,7 +970,7 @@ struct Buffer[dtype: DType = DType.float32](
         for block in range(simd_blocks):
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).gt(rhs.load[simd_width](idx))
-            if cmp == Boolean(False):
+            if cmp == Scalar[DType.bool](False):
                 return False
         i = simd_blocks * simd_width
 
@@ -1004,7 +1001,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(lhs.load(k).gt(rhs.load(k))))
+            out.store(k, Scalar[DType.bool](lhs.load(k).gt(rhs.load(k))))
         return out
 
     fn __ge__[
@@ -1023,7 +1020,7 @@ struct Buffer[dtype: DType = DType.float32](
         for block in range(simd_blocks):
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).ge(rhs.load[simd_width](idx))
-            if cmp == Boolean(False):
+            if cmp == Scalar[DType.bool](False):
                 return False
         i = simd_blocks * simd_width
 
@@ -1054,7 +1051,7 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            out.store(k, Boolean(lhs.load(k).ge(rhs.load(k))))
+            out.store(k, Scalar[DType.bool](lhs.load(k).ge(rhs.load(k))))
         return out
 
     fn float(self) -> Buffer[DType.float32]:

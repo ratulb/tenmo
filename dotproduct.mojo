@@ -23,8 +23,8 @@ struct DotBackward[dtype: DType](Copyable & Movable):
         var grad_outputs: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
-        ancestor_1 = output.ancestry().get(0)[]
-        ancestor_2 = output.ancestry().get(1)[]
+        ancestor_1 = output.ancestry().get(0)
+        ancestor_2 = output.ancestry().get(1)
 
         if ancestor_1.requires_grad():
             tensor = ancestor_2.tensor()

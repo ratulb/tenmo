@@ -17,8 +17,8 @@ struct MatrixVectorMMBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        ancestor_1 = output.ancestry().get(0)[]
-        ancestor_2 = output.ancestry().get(1)[]
+        ancestor_1 = output.ancestry().get(0)
+        ancestor_2 = output.ancestry().get(1)
 
         var outgoing_grads: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
@@ -33,8 +33,7 @@ struct MatrixVectorMMBackward[dtype: DType](Copyable):
         # rows (n) and cols (m) of A: A is (..., n, m)
         var n = a_shape[-2]
         var m = a_shape[-1]
-        # var batch_shape = a_shape[0:-2] if len(a_shape) > 2 else Shape(True)
-        var batch_shape = a_shape[0:-2] if len(a_shape) > 2 else Shape.Void
+        var batch_shape = a_shape[0:-2] if len(a_shape) > 2 else Shape()
 
         # -----------------------
         # Normalize upstream gradient to shape: batch_shape + [n, 1]

@@ -1,6 +1,7 @@
 from tensors import Tensor
 
 
+@explicit_destroy
 struct SGD[dtype: DType = DType.float32](Copyable & Movable):
     """
     Stochastic Gradient Descent (SGD) Optimizer.
@@ -74,6 +75,7 @@ struct SGD[dtype: DType = DType.float32](Copyable & Movable):
         for param_ptr in self.params:
             var ref param = param_ptr[]  # Mutably borrow the pointee
             param.zero_grad()
+
 
 from common_utils import addr, addrs
 

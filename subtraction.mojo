@@ -12,7 +12,7 @@ struct SubBackward[dtype: DType](Copyable & Movable):
     var signs: IntList
 
     fn __init__(out self):
-        self.signs = IntList.Empty
+        self.signs = IntList()
 
     fn __copyinit__(out self, existing: Self):
         self.signs = existing.signs.copy()
@@ -40,7 +40,7 @@ struct SubBackward[dtype: DType](Copyable & Movable):
             capacity=count
         )
         for i in range(count):
-            ancestor = output.ancestry().get(i)[]
+            ancestor = output.ancestry().get(i)
             grad_outputs.append(
                 (
                     ancestor,
@@ -65,7 +65,7 @@ struct SubLeftRightBackwardScalar[dtype: DType](Copyable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.grad()
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
         return [
             (ancestor, gradients, SubtractTensor if self.negate else AddTensor)
         ]

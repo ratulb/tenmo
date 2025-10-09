@@ -15,7 +15,7 @@ fi
 # Determine which test to run based on the argument
 case $1 in
     tensors)
-        echo "Running tensor tests"
+        echo "Running mojo -I . tests/test_tensors.mojo"
         mojo -I . $DEBUG_MODE tests/test_tensors.mojo
         ;;
     ce)
@@ -44,7 +44,7 @@ case $1 in
         mojo -I . $DEBUG_MODE tests/test_views.mojo
         ;;
     shapes)
-        echo "Running shape test cases"
+        echo "Running mojo -I . tests/test_shapes.mojo"
         mojo -I . $DEBUG_MODE tests/test_shapes.mojo
         ;;
     shared)

@@ -102,11 +102,17 @@ struct TensorLite[dtype: DType](
     fn init_grad(self):
         self.tensor_address[].init_gradbox()
 
+    fn free(deinit self):
+        if self.tensor_address.__as_bool__():
+            id = self.inner_id()
+            self.tensor_address.destroy_pointee()
+            self.tensor_address.free()
+            log_debug("TensorLite deleted for inner_id: " + id.__str__())
+
     fn backward(root: Self, start_grad: Scalar[dtype] = 1.0):
         if not root.requires_grad():
             return
-        root_shape = root.shape()
-        shape = root_shape[::]
+        shape = root.shape()
         seed_tensor = Tensor[dtype].full(shape, start_grad)
         root.backward(seed_tensor)
 
@@ -118,7 +124,7 @@ struct TensorLite[dtype: DType](
             # seed the output grad
             root.seed_grad(seed_tensor)
 
-            traced = IntList.Empty
+            traced = IntList()
             streams = List[GradStream[dtype]]()
             use_count = Dict[
                 Int, Int
@@ -135,8 +141,7 @@ struct TensorLite[dtype: DType](
                 traced.append(sid)
 
                 # For each parent, increment use_count
-                for origin in node.ancestry():
-                    parent = origin[]
+                for parent in node.ancestry():
                     pid = parent.inner_id()
                     use_count[pid] = use_count.get(pid, 0) + 1
                     stack.append(parent)

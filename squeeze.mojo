@@ -19,8 +19,8 @@ struct SqueezeBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        ancestor = output.ancestry().get(0)[]
-        gradients = output.gradients()[]
+        ancestor = output.ancestry().get(0)
+        gradients = output.grad()
 
         var original_shape = ancestor.shape()
 
@@ -32,7 +32,9 @@ struct SqueezeBackward[dtype: DType](Copyable):
 struct Squeeze[dtype: DType]:
     # Squeeze specified axes or all dims of size 1 if no axes provided
     @staticmethod
-    fn forward[track_grad: Bool=True](
+    fn forward[
+        track_grad: Bool = True
+    ](
         mut tensor: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
@@ -54,7 +56,7 @@ struct Squeeze[dtype: DType]:
 
         # Determine which axes to squeeze
         var axes_to_squeeze: IntList
-        if not axes == IntList.Empty:
+        if not axes == IntList():
             # Use the specified axes after validation
             axes_to_squeeze = IntList.with_capacity(rank)
             seen = IntList.with_capacity(len(axes))
@@ -106,7 +108,6 @@ struct Squeeze[dtype: DType]:
             grad_required = (
                 requires_grad.value() if requires_grad else tensor.requires_grad
             )
-
 
             if grad_required:
                 out.requires_grad_(True)

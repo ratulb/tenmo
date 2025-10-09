@@ -6,6 +6,7 @@ from operators import AddTensor
 from shapes import Shape
 from validators import Validator
 
+
 @fieldwise_init
 struct RepeatBackward[dtype: DType](Copyable & Movable):
     var repeat: IntList
@@ -18,10 +19,10 @@ struct RepeatBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        var gradients = output.gradients()[]
-        var ancestor = output.ancestry().get(0)[]
+        var gradients = output.grad()
+        var ancestor = output.ancestry().get(0)
         var ancestor_shape = ancestor.shape()
-        
+
         # zero-initialized ancestor grad
         var grad_in = Tensor[dtype].zeros(ancestor_shape)
 
@@ -81,7 +82,9 @@ struct Repeat[dtype: DType]:
             )
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = RepeatBackward[dtype](repeat).into_backward_fn()
+                var backward_fn = RepeatBackward[dtype](
+                    repeat
+                ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
                 out.add_ancestry(TensorLite.of(self))
 

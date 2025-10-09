@@ -1,24 +1,22 @@
 from intlist import IntList
 from shapes import Shape
 from common_utils import log_debug
-from tensors import Tensor
 
 
 fn main():
-    s = Tensor.arange(10)
-    takes_f32(s[0][0])
-
-
-fn takes_f32(x: Float32):
-    print(x)
-    var y: Bool = x
+    s = Strides(IntList())
+    print(s)
 
 
 struct Strides(
     Sized & Copyable & Movable & Stringable & Representable & Writable
 ):
-    alias Zero = Self(IntList.Empty)
     var strides: List[Int]
+
+    @always_inline
+    @staticmethod
+    fn Zero() -> Strides:
+        return Strides()
 
     fn __init__(out self):
         self.strides = List[Int](capacity=0)
@@ -27,10 +25,10 @@ struct Strides(
         self.strides = values
 
     fn __init__(out self, values: IntList):
-        self.strides = values.tolist()[::]
+        self.strides = values.tolist()
 
     fn __copyinit__(out self, existing: Self):
-        self.strides = existing.strides[::]
+        self.strides = existing.strides.copy()
 
     fn __moveinit__(out self, deinit existing: Self):
         self.strides = existing.strides^

@@ -7,6 +7,7 @@ from intlist import IntList
 from common_utils import panic
 from buffers import Buffer
 
+
 @fieldwise_init
 @register_passable
 struct FlattenBackward[dtype: DType](Copyable):
@@ -22,7 +23,7 @@ struct FlattenBackward[dtype: DType](Copyable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.grad()
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
         tensor = ancestor.tensor()
         grad_in = Tensor[dtype].zeros(tensor.shape)
 

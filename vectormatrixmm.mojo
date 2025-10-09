@@ -18,8 +18,8 @@ struct VectorMatrixMMBackward[dtype: DType](Copyable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         # Ancestors (original inputs)
-        var ancestor_1 = output.ancestry().get(0)[]  # vector A
-        var ancestor_2 = output.ancestry().get(1)[]  # tensor B
+        var ancestor_1 = output.ancestry().get(0)  # vector A
+        var ancestor_2 = output.ancestry().get(1)  # tensor B
 
         var outgoing_grads: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
@@ -72,7 +72,7 @@ struct VectorMatrixMMBackward[dtype: DType](Copyable):
 
             var A_expanded_shape = batch_shape + [1, A_tensor.shape[0]]
             var A_padded = A_lifted.reshape[track_grad=False](
-                Shape.Unit * len(batch_shape) + [1, A_tensor.shape[0]],
+                Shape(1) * len(batch_shape) + [1, A_tensor.shape[0]],
                 requires_grad=False,
             )
             A_expanded = A_padded.expand[track_grad=False](

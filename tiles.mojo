@@ -19,8 +19,9 @@ struct TileBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        var gradients = output.gradients()[]
-        var ancestor = output.ancestry().get(0)[]
+        var gradients = output.grad()
+        # var ancestor = output.ancestry().get(0)[]
+        var ancestor = output.ancestry().get(0)
         var ancestor_shape = ancestor.shape()
 
         var grad_in = Tensor[dtype].zeros(ancestor_shape)

@@ -12,7 +12,7 @@ alias Gradbag[dtype: DType] = List[(IntList, Scalar[dtype])]
 
 
 @fieldwise_init
-struct MinMaxBackward[dtype: DType=DType.float32](Copyable & Movable):
+struct MinMaxBackward[dtype: DType = DType.float32](Copyable & Movable):
     var axes: IntList
     var keepdims: Bool
     var gradbox: Gradbag[dtype]
@@ -26,8 +26,8 @@ struct MinMaxBackward[dtype: DType=DType.float32](Copyable & Movable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         # Retrieve upstream grad and saved tensors
-        var gradients = output.gradients()[]
-        var ancestor = output.ancestry().get(0)[]  # original input
+        var gradients = output.grad()
+        var ancestor = output.ancestry().get(0)  # original input
         var mask = Tensor[dtype].zeros(ancestor.shape())
         for grad in self.gradbox:
             mask[grad[0]] = rebind[Scalar[dtype]](grad[1])
@@ -38,7 +38,7 @@ struct MinMaxBackward[dtype: DType=DType.float32](Copyable & Movable):
         if rank == 0:
             return [(ancestor, gradients, AddTensor)]
 
-        if gradients.shape == Shape.Void:
+        if gradients.shape == Shape():
             # Scalar upstream grad → same scalar everywhere that was max
             # Build a tensor of that scalar, then mask it
             var filled = Tensor[dtype].full(
@@ -58,7 +58,9 @@ struct MinMaxBackward[dtype: DType=DType.float32](Copyable & Movable):
                 ).broadcast_to(shape, requires_grad=False)
             else:
                 # keepdims=True: just broadcast to input shape
-                grad_like_input = gradients.broadcast_to(shape, requires_grad=False)
+                grad_like_input = gradients.broadcast_to(
+                    shape, requires_grad=False
+                )
 
             # Apply mask
             var grad_contrib = mask * grad_like_input
@@ -68,7 +70,7 @@ struct MinMaxBackward[dtype: DType=DType.float32](Copyable & Movable):
 
 @fieldwise_init
 @register_passable
-struct MinMax[dtype: DType=DType.float32]:
+struct MinMax[dtype: DType = DType.float32]:
     @staticmethod
     fn forward[
         max: Bool, track_grad: Bool = True
@@ -87,11 +89,11 @@ struct MinMax[dtype: DType=DType.float32]:
         # Keep grad shares in gradbox which contains index, grad value(IntList, Scalar)
         var gradbox: Gradbag[dtype] = Gradbag[dtype]()
 
-        if out_shape == Shape.Void:
+        if out_shape == Shape():
             if rank == 0:
                 # scalar input -> min/max is the value itself; mask = 1
-                var v = self[IntList.Empty]
-                out[IntList.Empty] = v
+                var v = self[IntList()]
+                out[IntList()] = v
             elif rank == len(normalized_axes) and not keepdims:
                 # reduce all dims -> scalar: find all positions equal to global max
                 var first_iter = True
@@ -141,7 +143,7 @@ struct MinMax[dtype: DType=DType.float32]:
                                     best_positions.append(idx)
                                 pass
 
-                out[IntList.Empty] = best_value
+                out[IntList()] = best_value
 
                 @parameter
                 if track_grad:

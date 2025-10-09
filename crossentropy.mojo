@@ -25,8 +25,8 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         var gradients = output.grad()
-        var ancestor_1 = output.ancestry().get(0)[]
-        var ancestor_2 = output.ancestry().get(1)[]
+        var ancestor_1 = output.ancestry().get(0)
+        var ancestor_2 = output.ancestry().get(1)
         var logits = ancestor_1.tensor()
         var target = ancestor_2.tensor()
 
@@ -117,7 +117,7 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
 
         # 8. Multiply by upstream gradient (chain rule)
         # The upstream gradient is a scalar for mean/sum reduction, or matches target shape for "none"
-        var scaled_gradients: Tensor[dtype]
+        # var scaled_gradients: Tensor[dtype]
 
         if self.reduction == 2:  # none
             # For "none" reduction, upstream gradient has shape (N, d1, d2, ...)
@@ -237,7 +237,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
             out = losses.reshape[track_grad=False](target.shape)
         elif self.reduction == 1:  # sum
             var total_loss = losses.sum()
-            out = Tensor.full(Shape.Unit, total_loss.item())
+            out = Tensor.full(Shape(1), total_loss.item())
         else:  # mean (default case - reduction == 0 or any other value)
             if valid_count > 0:
                 var total_loss = losses.sum()

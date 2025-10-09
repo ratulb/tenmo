@@ -61,7 +61,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.backwardFn = None
         self.gradbox = UnsafePointer[Tensor[dtype]]()
         self.ancestors = Ancestors[dtype].untracked()
-        # Take care of Tensor with Shape.Void
+        # Take care of Tensor with Shape()
         self.buffer = Buffer[dtype](1) if shape.rank() == 0 else Buffer[dtype](
             shape.num_elements()
         )
@@ -129,12 +129,12 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         if self.owns_data:
             self.shared_buffer = Optional(self.buffer.shared())
-            self.buffer = Buffer[dtype].Empty
+            self.buffer = Buffer[dtype]()
             self.owns_data = False
 
         return Tensor[dtype](
             shape,
-            Buffer[dtype].Empty,
+            Buffer[dtype](),
             requires_grad,
             strides=strides,
             offset=offset,
@@ -298,7 +298,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     @always_inline
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
-        if self.rank() == 0:  # Tensor with Shape ()
+        if self.rank() == 0:  # Tensor with Shape()
             panic(
                 "Tensor → __setitem__(*indices: Int): api not supported for"
                 " scalar tensor. Use __setitem__(IntList())"
@@ -327,13 +327,13 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn item(self) -> Scalar[dtype]:
         # if self.shape != Shape(1) and self.rank() != 0:  # Tensor with Shape ()
-        if self.shape != Shape.Unit and self.shape != Shape.Void:
+        if self.shape != Shape(1) and self.shape != Shape():
             panic(
                 "Tensor.item(): Only valid for scalar or singleton tensors, got"
                 " shape: "
                 + self.shape.__str__()
             )
-        return self[0] if self.shape == Shape(1) else self[IntList.Empty]
+        return self[0] if self.shape == Shape(1) else self[IntList()]
 
     fn __str__(self) -> String:
         rank = self.rank()
@@ -425,7 +425,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.shape[1]
 
     fn is_scalar(self) -> Bool:
-        return self.numels() == 1 and self.shape == Shape.Void  # Shape()
+        return self.numels() == 1 and self.shape == Shape()
 
     fn __eq__(self, scalar: Scalar[dtype]) -> Tensor[DType.bool]:
         return self.compare_scalar[Equal](scalar)
@@ -551,10 +551,8 @@ struct Tensor[dtype: DType = DType.float32](
         for parent in parents:
             parent_ptr = UnsafePointer[Tensor[dtype]].alloc(1)
             parent_ptr.init_pointee_move(parent.tensor())
-            ptr_shield = TensorLite[dtype](parent_ptr)
-            shield_ptr = UnsafePointer[TensorLite[dtype]].alloc(1)
-            shield_ptr.init_pointee_move(ptr_shield)
-            self.ancestors.append(shield_ptr)
+            tli = TensorLite[dtype](parent_ptr)
+            self.ancestors.append(tli^)
 
     fn ancestry(self) -> Ancestors[dtype]:
         return self.ancestors
@@ -1059,7 +1057,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn scalar(val: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
-        result = Tensor[dtype](Shape(True), requires_grad=requires_grad)
+        result = Tensor[dtype](Shape(), requires_grad=requires_grad)
         result[IntList()] = val
         return result
 
@@ -1417,11 +1415,11 @@ struct Tensor[dtype: DType = DType.float32](
             else:
                 elem = (
                     tensor.item() if tensor.shape
-                    == Shape.Void else (
+                    == Shape() else (
                         tensor.squeeze[track_grad=False](
                             [], requires_grad=False
                         )
-                    )[IntList.Empty]
+                    )[IntList()]
                 )
                 if self.owns_data:
                     self.buffer[offset] = elem
@@ -1473,8 +1471,8 @@ struct Tensor[dtype: DType = DType.float32](
 
         # Handle scalar (rank-0) case
         is_scalar = len(view_shape) == 0
-        shape = Shape.Void if is_scalar else view_shape
-        strides = Strides.Zero if is_scalar else view_strides
+        shape = Shape() if is_scalar else view_shape
+        strides = Strides() if is_scalar else view_strides
         return View[dtype].forward[track_grad=True](
             self,
             shape,
@@ -1498,7 +1496,7 @@ struct Tensor[dtype: DType = DType.float32](
                 " reshaped to scalar tensor"
             )
         return self.reshape[track_grad](
-            Shape(True), requires_grad=requires_grad, validated=True
+            Shape(), requires_grad=requires_grad, validated=True
         )
 
     fn reshape[
@@ -1611,7 +1609,7 @@ struct Tensor[dtype: DType = DType.float32](
         do_multiply: Bool,
     ) -> Tensor[dtype]:
         var grad_contrib: Tensor[dtype]
-        if upstream_grad.shape == Shape.Void:
+        if upstream_grad.shape == Shape():
             grad_contrib = Tensor[dtype].full(
                 self.shape, upstream_grad.item(), requires_grad=False
             )
@@ -2205,32 +2203,20 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.gradients()[].print(num_first, num_last)
 
-    @always_inline
-    fn free_buffer(mut self):
-        _ = self.buffer^
-
-    @always_inline
-    fn free_shared_buffer(mut self):
-        _ = self.shared_buffer^
-        self.shared_buffer = None
-
-    @always_inline
-    fn free_gradbox(mut self):
-        if self.gradbox.__as_bool__():
-            self.gradbox.destroy_pointee()
-            self.gradbox.free()
-            self.gradbox = UnsafePointer[Tensor[dtype]]()
-            log_debug("Freed gradbox")
-            print("Freed gradbox")
-
     fn free(deinit self):
-        self.free_buffer()
-        self.free_shared_buffer()
+        _ = self.buffer^
+        _ = self.shared_buffer^
+
         ref_count = self.ref_count()
-        if ref_count <= 1 and self.requires_grad and self.gradbox.__as_bool__():
+        if ref_count <= 1 and self.requires_grad:
             log_debug("Ref count on entry to __del__: " + ref_count.__str__())
-            # Discard gradbox
-            self.free_gradbox()
+
+            if self.gradbox.__as_bool__():
+                self.gradbox.destroy_pointee()
+                self.gradbox.free()
+                _ = self.gradbox
+                log_debug("Freed gradbox")
+
         self.ancestors.free()
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
@@ -2457,14 +2443,4 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable & Movable):
 
 
 fn main() raises:
-    a = Tensor.full([4], 42, requires_grad=True)
-    print("ref count: ", a.ref_count())
-    b = a.into_view()
-    print("a ref count: ", a.ref_count())
-    print("a ref count: ", a.ref_count())
-    print("b ref count: ", b.ref_count())
-    # _ = a
-    a.gradbox[].print()
-
-
-from testing import assert_true
+    pass

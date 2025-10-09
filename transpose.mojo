@@ -8,7 +8,7 @@ from validators import Validator
 
 struct TransposeBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
-    
+
     fn __init__(out self, axes: IntList):
         self.axes = axes
 
@@ -27,7 +27,7 @@ struct TransposeBackward[dtype: DType](Copyable & Movable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.grad()
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
         inverted_axes = IntList.invert_permutation(self.axes)
         grad_transposed = gradients.transpose(inverted_axes)
         return [
@@ -38,10 +38,10 @@ struct TransposeBackward[dtype: DType](Copyable & Movable):
             )
         ]
 
+
 @fieldwise_init
 @register_passable
 struct Transpose[dtype: DType](Copyable):
-
     fn __copyinit__(out self, existing: Self):
         pass
 
@@ -49,7 +49,9 @@ struct Transpose[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        mut self: Tensor[dtype], axes: IntList, requires_grad: Optional[Bool] = None
+        mut self: Tensor[dtype],
+        axes: IntList,
+        requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         shape = self.shape.copy()
         normalized_axes = (
@@ -84,5 +86,3 @@ struct Transpose[dtype: DType](Copyable):
 
 fn main():
     pass
-
-

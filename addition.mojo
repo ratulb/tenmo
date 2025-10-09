@@ -20,7 +20,7 @@ struct AddBackwardScalar[dtype: DType](Copyable):
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
         gradients = output.grad()
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
         if ancestor.shape() != gradients.shape:
             gradients = gradients.reshape(ancestor.shape())
         # Gradient of addition is 1 → just pass through incoming grad
@@ -44,7 +44,7 @@ struct AddBackward[dtype: DType](Copyable):
             capacity=count
         )
         for i in range(count):
-            ancestor = output.ancestry().get(i)[]
+            ancestor = output.ancestry().get(i)
             grad_outputs.append((ancestor, gradients, AddTensor))
         return grad_outputs
 
@@ -60,21 +60,18 @@ struct AddScalar[dtype: DType](Copyable):
         if self.is_contiguous():
             if self.owns_data:
                 buffer = self.buffer + scalar
-                out = Tensor[dtype](
-                    self.shape, buffer^, requires_grad=False
-                )
+                out = Tensor[dtype](self.shape, buffer^, requires_grad=False)
             else:
                 offset = self.offset
                 numels = self.numels()
-                buffer = self.shared_buffer.value()[][offset: offset+numels] + scalar
-                out = Tensor[dtype](
-                    self.shape, buffer^, requires_grad=False
+                buffer = (
+                    self.shared_buffer.value()[][offset : offset + numels]
+                    + scalar
                 )
+                out = Tensor[dtype](self.shape, buffer^, requires_grad=False)
 
         else:
-            out = Tensor[dtype](
-                self.shape, requires_grad=False
-            )
+            out = Tensor[dtype](self.shape, requires_grad=False)
             for coord in self.shape:
                 out[coord] = self[coord] + scalar
 
@@ -114,9 +111,7 @@ struct Adder[dtype: DType](Copyable):
         else:
             if self.owns_data and other.owns_data:
                 buffer = self.buffer + other.buffer
-                out = Tensor[dtype](
-                    self.shape, buffer^, requires_grad=False
-                )
+                out = Tensor[dtype](self.shape, buffer^, requires_grad=False)
             else:
                 out = Tensor[dtype].zeros(self.shape, requires_grad=False)
                 for coord in self.shape:

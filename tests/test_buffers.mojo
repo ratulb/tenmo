@@ -1,4 +1,4 @@
-from buffers import Buffer, Boolean
+from buffers import Buffer
 
 
 fn main() raises:
@@ -123,19 +123,19 @@ fn test_buffer_slice() raises:
 fn test_buffer_buffer_mul() raises:
     print("test_buffer_buffer_mul")
     x = Buffer[DType.bool](129)
-    x.fill(Boolean(True))
+    x.fill(Scalar[DType.bool](True))
     y = Buffer[DType.bool](129)
-    y.fill(Boolean(True))
+    y.fill(Scalar[DType.bool](True))
     expect = Buffer[DType.bool](129)
-    expect.fill(Boolean(True))
+    expect.fill(Scalar[DType.bool](True))
     mul_result = x * y
     cmp_result = mul_result == expect
     assert_true(
         cmp_result,
         "Buffer buffer mul for boolean - assertion failed",
     )
-    y.fill(Boolean(False))
-    expect.fill(Boolean(True))
+    y.fill(Scalar[DType.bool](False))
+    expect.fill(Scalar[DType.bool](True))
     mul_result = x * y
     cmp_result = mul_result == expect
     assert_false(

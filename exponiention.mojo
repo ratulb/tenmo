@@ -17,9 +17,9 @@ struct ExponientionBackward[dtype: DType](Copyable & Movable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
+        gradients = output.grad()
         var exponent: Scalar[dtype] = rebind[Scalar[dtype]](self.exponent)
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
 
         # ∂(x**n)/∂x = n * x**(n-1)
         # Need to see if base_pow gets a grad_fn or not - we don't want it to have one!

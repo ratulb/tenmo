@@ -30,19 +30,14 @@ struct SoftmaxBackward[dtype: DType](Copyable & Movable):
         softmax_out = Tensor[dtype].zeros(incoming.shape)
         for indices, value in self.softmax_out:
             softmax_out[indices] = rebind[Scalar[dtype]](value)
-       
-        product = Multiplicator[dtype].forward[False](incoming, softmax_out)
-        sum_grad = Summer[dtype].forward[False](product, self.axes, True) 
-        _="""sum_grad = (incoming * softmax_out).sum(
-            self.axes, keepdims=True, track_grad=False
-        )"""
 
-        #grad_share = softmax_out * (incoming - sum_grad)
+        product = Multiplicator[dtype].forward[False](incoming, softmax_out)
+        sum_grad = Summer[dtype].forward[False](product, self.axes, True)
 
         diff = Subtractor[dtype].forward[False](incoming, sum_grad)
         grad_share = Multiplicator[dtype].forward[False](softmax_out, diff)
 
-        ancestor = output.ancestry().get(0)[]
+        ancestor = output.ancestry().get(0)
         return [(ancestor, grad_share, AddTensor)]
 
 
@@ -50,7 +45,9 @@ struct SoftmaxBackward[dtype: DType](Copyable & Movable):
 @register_passable
 struct Softmax[dtype: DType]:
     @staticmethod
-    fn forward[track_grad: Bool=True](
+    fn forward[
+        track_grad: Bool = True
+    ](
         this: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
@@ -58,29 +55,26 @@ struct Softmax[dtype: DType]:
         shape = this.shape
         # Normalize axes
         normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
-        #max_vals = this.max(normalized_axes, keepdims=True, requires_grad=False)
-        max_vals = MinMax[dtype].forward[True](this, normalized_axes, True, False)
+        # max_vals = this.max(normalized_axes, keepdims=True, requires_grad=False)
+        max_vals = MinMax[dtype].forward[True](
+            this, normalized_axes, True, False
+        )
         # Numerical stability: subtract max along axes
-        #stable = this - max_vals
+        # stable = this - max_vals
         stable = Subtractor[dtype].forward[False](this, max_vals)
         # Compute exponentials
-        stable_exp = stable.exp()#Revisit
-        exp_sum = Summer[dtype].forward[False](stable_exp, normalized_axes, True)
-        _="""exp_sum = stable_exp.sum(
-            normalized_axes, keepdims=True, track_grad=False
-        )"""
-        # Softmax = exp(x) / sum(exp(x))
-        #out = stable_exp / exp_sum
+        stable_exp = stable.exp()  # Revisit
+        exp_sum = Summer[dtype].forward[False](
+            stable_exp, normalized_axes, True
+        )
         out = Divider[dtype].forward[False](stable_exp, exp_sum)
 
-       
         @parameter
         if track_grad:
-
             grad_required = (
                 requires_grad.value() if requires_grad else this.requires_grad
             )
-     
+
             if grad_required:
                 out.requires_grad_(True)
                 softmax_out = SoftmaxOutput[dtype](capacity=out.numels())

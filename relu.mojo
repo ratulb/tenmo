@@ -15,8 +15,8 @@ struct ReLUBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        gradients = output.gradients()[]
-        ancestor = output.ancestry().get(0)[]
+        gradients = output.grad()
+        ancestor = output.ancestry().get(0)
         this = output.tensor()
         shape = this.shape
         grad_share = Tensor[dtype].ones(shape)

@@ -1,4 +1,4 @@
-from common_utils import variadiclist_as_intlist, log_debug, panic
+from common_utils import log_debug, panic
 from intlist import IntList
 from memory import Pointer
 
@@ -17,8 +17,7 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
-        # self.current = other.current[::]
-        self.current = other.current
+        self.current = other.current.copy()
         self.index = other.index
 
     fn __iter__(self) -> Self:
@@ -44,17 +43,22 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
 struct Shape(
     Sized & Stringable & Writable & Representable & Copyable & Movable
 ):
-    alias Unit = Shape.of(1)
-    alias Void = Shape(True)
-
     var axes_spans: IntList
     var ndim: Int
     var numels: Int
 
-    fn __init__(out self, scalar: Bool = False):
-        self.axes_spans = IntList()
-        self.ndim = 0
-        self.numels = 1 if scalar else 0
+    @always_inline
+    @staticmethod
+    fn Void() -> Shape:
+        return Shape()
+
+    @always_inline
+    @staticmethod
+    fn Unit() -> Shape:
+        return Shape(1)
+
+    fn __init__(out self):
+        self = Self(IntList())
 
     fn __init__(out self, dims: VariadicList[Int]):
         spans = IntList.with_capacity(len(dims))
@@ -67,10 +71,11 @@ struct Shape(
         self = Self(spans)
 
     fn __init__(out self, dims: List[Int]):
-        self = Self(IntList.new(dims))
+        spans = IntList.new(dims)
+        self = Self(spans^)
 
     fn __copyinit__(out self, other: Self):
-        self.axes_spans = other.axes_spans[::]
+        self.axes_spans = other.axes_spans.copy()
         self.ndim = other.ndim
         self.numels = other.numels
 
@@ -80,15 +85,12 @@ struct Shape(
         self.numels = other.numels
 
     fn __init__(out self, dims: IntList):
-        _ = """if len(dims) < 0:
-            panic("Shape -> __init__: Shape dimension count should be >= 0")"""
         ndim = len(dims)
         # Allow scalar tensors (rank 0, i.e., Shape())
         if ndim == 0:
-            # self.axes_spans = IntList()
-            # self.ndim = 0
-            # self.numels = 1
-            self = Self(True)
+            self.axes_spans = IntList()
+            self.ndim = 0
+            self.numels = 1
             return
         numels = 1
         for i in range(ndim):
@@ -102,7 +104,8 @@ struct Shape(
                     + String(i)
                 )
             numels *= dims[i]
-        self.axes_spans = dims[::]
+        # self.axes_spans = dims[::]
+        self.axes_spans = dims
         self.ndim = ndim
         self.numels = numels
 
@@ -218,7 +221,7 @@ struct Shape(
             Shape after reduction
 
         Behavior:
-            - If reducing all axes and keepdims=False → returns Shape.Void (scalar)
+            - If reducing all axes and keepdims=False → returns Shape() (scalar)
             - Otherwise:
                 - For reduced axes: keep as 1 if keepdims=True, else remove
                 - For non-reduced axes: keep original size.
@@ -227,8 +230,7 @@ struct Shape(
 
         # Full reduction case (return scalar shape if not keeping dims)
         if rank == 0 or (len(normalized_axes) == rank and not keepdims):
-            # return Shape.Void
-            return Shape(True)
+            return Shape()
 
         var spans = IntList.with_capacity(rank)
         for dim in range(rank):
@@ -326,11 +328,9 @@ struct Shape(
     fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
         if shape1 == shape2:
             return shape1, shape2
-        # if shape1 == Shape.Void:
-        if shape1 == Shape.Void:
-            # return Shape.Unit * len(shape2), shape2
+        if shape1 == Shape():
             return Shape(1) * len(shape2), shape2
-        if shape2 == Shape.Void:
+        if shape2 == Shape():
             return shape1, Shape(1) * len(shape1)
 
         max_len = max(len(shape1), len(shape2))
@@ -351,10 +351,10 @@ struct Shape(
                 + " <=> "
                 + that.__str__()
             )
-        # Explicitly handle true scalars (Shape.Void)
-        if this == Shape.Void:
+        # Explicitly handle true scalars (Shape())
+        if this == Shape():
             return that  # Scalar + Tensor -> Tensor's shape
-        if that == Shape.Void:
+        if that == Shape():
             return this  # Tensor + Scalar -> Tensor's shape
         shape1, shape2 = Self.pad_shapes(this, that)
         result_shape = IntList.with_capacity(len(shape1))
@@ -490,7 +490,7 @@ struct Shape(
 
     @always_inline
     fn intlist(self) -> IntList:
-        return self.axes_spans[::]
+        return self.axes_spans
 
     @always_inline
     fn tolist(self) -> List[Int]:
@@ -505,12 +505,5 @@ struct Shape(
         return Shape(dims)
 
 
-from strides import Strides
-
-
 fn main() raises:
-    _ = """shape = Shape(True)
-    strides = Strides()
-    print(strides.is_contiguous(shape))
-    print(shape.num_elements())"""
-    _shape = Shape(IntList(0))
+    pass

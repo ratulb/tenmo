@@ -4,6 +4,7 @@ from strides import Strides
 from common_utils import Slicer, panic, Idx, NewAxis, i, s, il, newaxis
 from tensors import Tensor
 
+
 struct Validator:
     @staticmethod
     fn validate_repeat_args(
@@ -168,10 +169,10 @@ struct Validator:
         if current_shape == Shape(1) and (
             newdims == IntList() or newdims == IntList(-1)
         ):
-            return Shape(True)
+            return Shape()
 
         if current_shape == Shape() and newdims == IntList():
-            return Shape(True)
+            return Shape()
 
         if current_shape == Shape() and (
             newdims == IntList(1) or newdims == IntList(-1)

@@ -1,6 +1,6 @@
-from memory import memcpy, Pointer
+from memory import Pointer
 from shared import TensorLite
-from common_utils import log_debug, panic
+from common_utils import log_debug
 
 
 fn main() raises:
@@ -8,15 +8,13 @@ fn main() raises:
 
 
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
-    var ancestors: List[UnsafePointer[TensorLite[dtype]]]
+    var ancestors: List[TensorLite[dtype]]
 
     fn __init__(out self):
-        self.ancestors = List[UnsafePointer[TensorLite[dtype]]]()
+        self.ancestors = List[TensorLite[dtype]]()
 
     fn __init__(out self, capacity: Int):
-        self.ancestors = List[UnsafePointer[TensorLite[dtype]]](
-            capacity=capacity
-        )
+        self.ancestors = List[TensorLite[dtype]](capacity=capacity)
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
@@ -32,25 +30,13 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     fn free(deinit self):
         if self.ancestors:
             log_debug("Ancestors __del__ called")
-            for idx in range(len(self)):
-                if self.ancestors[idx].__as_bool__() == False:
-                    continue
-                tensor_ptr = self.ancestors[idx][].inner_address()
-                if tensor_ptr.__as_bool__() == False:
-                    continue
-                tensor_ptr.destroy_pointee()
-                tensor_ptr.free()
-                self.ancestors[idx].destroy_pointee()
-                self.ancestors[idx].free()
+            for tli in self:
+                tli.free()
             self.ancestors.clear()
 
-    fn get(self, idx: Int) -> UnsafePointer[TensorLite[dtype]]:
-        if idx < 0 or idx >= len(self.ancestors):
-            panic("Ancestors get → Out-of-bounds read")
-        address = self.ancestors[idx]
-        if address.__as_bool__() == False:
-            panic("Ancestors get → Uninitialized ancestor address")
-        return address
+    @always_inline
+    fn get(ref self, idx: Int) -> ref [self.ancestors] TensorLite[dtype]:
+        return self.ancestors[idx]
 
     fn __len__(self) -> Int:
         return len(self.ancestors)
@@ -63,45 +49,42 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         """
         return len(self) > 0
 
-    fn append(mut self, addr: UnsafePointer[TensorLite[dtype]]):
-        self.ancestors.append(addr)
+    @always_inline
+    fn append(mut self, tli: TensorLite[dtype]):
+        self.ancestors.append(tli)
 
     @no_inline
     fn print(self, id: Bool = True) -> None:
-        total = len(self)
+        var total = len(self)
         print("Ancestors[", total, "] = ", end="")
-        for i in range(total):
-            each = self.get(i)
-            instance = each[]
-            inner_id = instance.inner_id()
+
+        for tli in self.ancestors:
             if id:
-                print(inner_id, end=" ")
+                print(tli.inner_id(), end=" ")
             else:
-                print(each.__str__(), end=" ")
+                print(tli.inner_address().__str__(), end=" ")
         print()
 
     fn __contains__(self, tensor_like: TensorLite[dtype]) -> Bool:
-        for each in self.ancestors:
-            entry = each[]
-            inner_id = entry.inner_id()
-            if inner_id == tensor_like.inner_id():
+        for tli in self.ancestors:
+            if tli.inner_id() == tensor_like.inner_id():
                 return True
         return False
 
-    fn __iter__(ref self) -> _AncestorsIter[self.dtype, __origin_of(self)]:
-        return _AncestorsIter[self.dtype](0, Pointer(to=self))
+    fn __iter__(ref self) -> AncestorsIter[self.dtype, __origin_of(self)]:
+        return AncestorsIter[self.dtype](0, Pointer(to=self))
 
     fn __reversed__(
         ref self,
-    ) -> _AncestorsIter[self.dtype, __origin_of(self), False]:
-        return _AncestorsIter[self.dtype, forward=False](
+    ) -> AncestorsIter[self.dtype, __origin_of(self), False]:
+        return AncestorsIter[self.dtype, forward=False](
             len(self), Pointer(to=self)
         )
 
 
-struct _AncestorsIter[
-    dtype: DType, origin: Origin[False], forward: Bool = True
-](Sized & Copyable):
+struct AncestorsIter[dtype: DType, origin: Origin[False], forward: Bool = True](
+    Sized & Copyable
+):
     var index: Int
     var src: Pointer[Ancestors[dtype], origin]
 
@@ -112,7 +95,7 @@ struct _AncestorsIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(mut self) -> UnsafePointer[TensorLite[dtype]]:
+    fn __next__(mut self) -> TensorLite[dtype]:
         @parameter
         if forward:
             self.index += 1

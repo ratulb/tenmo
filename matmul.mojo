@@ -21,8 +21,8 @@ struct MatmulBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        ancestor_1 = output.ancestry().get(0)[]
-        ancestor_2 = output.ancestry().get(1)[]
+        ancestor_1 = output.ancestry().get(0)
+        ancestor_2 = output.ancestry().get(1)
 
         var outgoing_grads: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
@@ -150,8 +150,8 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
     ](self, output: TensorLite[dtype]) -> List[
         Tuple[TensorLite[dtype], Tensor[dtype], Int]
     ]:
-        ancestor_1 = output.ancestry().get(0)[]
-        ancestor_2 = output.ancestry().get(1)[]
+        ancestor_1 = output.ancestry().get(0)
+        ancestor_2 = output.ancestry().get(1)
         var outgoing_grads: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
