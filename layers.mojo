@@ -150,6 +150,9 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
     fn __init__(out self):
         self.modules = List[Module[dtype]]()
 
+    fn __init__(out self, modules: List[Module[dtype]]):
+        self.modules = modules
+
     fn append(mut self, m: Module[dtype]):
         self.modules.append(m)
 
