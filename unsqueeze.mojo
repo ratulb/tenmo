@@ -16,11 +16,9 @@ struct UnsqueezeBackward[dtype: DType](Copyable & Movable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward[
-        dtype: DType
-    ](self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
+    fn backward(
+        self, output: TensorLite[dtype]
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         gradients = output.grad()
         # Remove the axis we had inserted
         gradients_squeezed = Squeeze[dtype].forward[track_grad=False](

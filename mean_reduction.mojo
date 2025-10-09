@@ -23,11 +23,9 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
         self.axes = other.axes
         self.keepdims = other.keepdims
 
-    fn backward[
-        dtype: DType
-    ](self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
+    fn backward(
+        self, output: TensorLite[dtype]
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         gradients = output.grad()
         ancestor = output.ancestry().get(0)
         if gradients.shape == Shape():

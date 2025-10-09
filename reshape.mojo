@@ -9,11 +9,9 @@ from validators import Validator
 @fieldwise_init
 @register_passable
 struct ReshapeBackward[dtype: DType](Copyable):
-    fn backward[
-        dtype: DType
-    ](self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
+    fn backward(
+        self, output: TensorLite[dtype]
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         gradients = output.grad()
         ancestor = output.ancestry().get(0)
         reshaped = gradients.reshape(ancestor.shape())

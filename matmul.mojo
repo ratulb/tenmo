@@ -16,11 +16,9 @@ struct MatmulBackward[dtype: DType](Copyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward[
-        dtype: DType
-    ](self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
+    fn backward(
+        self, output: TensorLite[dtype]
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         ancestor_1 = output.ancestry().get(0)
         ancestor_2 = output.ancestry().get(1)
 
@@ -28,7 +26,7 @@ struct MatmulBackward[dtype: DType](Copyable):
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
 
-        dA, dB = Self.matmul_backward[dtype](
+        dA, dB = Self.matmul_backward(
             output.gradients(),
             ancestor_1.inner_address(),
             ancestor_2.inner_address(),
@@ -56,9 +54,7 @@ struct MatmulBackward[dtype: DType](Copyable):
         return outgoing_grads
 
     @staticmethod
-    fn matmul_backward[
-        dtype: DType
-    ](
+    fn matmul_backward(
         gradients_ptr: UnsafePointer[Tensor[dtype]],
         A_ptr: UnsafePointer[Tensor[dtype]],
         B_ptr: UnsafePointer[Tensor[dtype]],
@@ -145,18 +141,16 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward[
-        dtype: DType
-    ](self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
+    fn backward(
+        self, output: TensorLite[dtype]
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         ancestor_1 = output.ancestry().get(0)
         ancestor_2 = output.ancestry().get(1)
         var outgoing_grads: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
 
-        dA, dB = Self.batched_matmul_backward[dtype](
+        dA, dB = Self.batched_matmul_backward(
             output.gradients(),
             ancestor_1.inner_address(),
             ancestor_2.inner_address(),
@@ -184,9 +178,7 @@ struct BatchedMatmulBackward[dtype: DType](Copyable):
         return outgoing_grads
 
     @staticmethod
-    fn batched_matmul_backward[
-        dtype: DType
-    ](
+    fn batched_matmul_backward(
         gradients_ptr: UnsafePointer[Tensor[dtype]],
         A_ptr: UnsafePointer[Tensor[dtype]],
         B_ptr: UnsafePointer[Tensor[dtype]],

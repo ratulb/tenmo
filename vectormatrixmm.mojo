@@ -12,11 +12,9 @@ struct VectorMatrixMMBackward[dtype: DType](Copyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward[
-        dtype: DType
-    ](self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
+    fn backward(
+        self, output: TensorLite[dtype]
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         # Ancestors (original inputs)
         var ancestor_1 = output.ancestry().get(0)  # vector A
         var ancestor_2 = output.ancestry().get(1)  # tensor B

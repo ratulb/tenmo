@@ -16,16 +16,14 @@ struct TransposeBackward[dtype: DType](Copyable & Movable):
         self.axes = existing.axes.copy()
 
     fn __moveinit__(out self, deinit existing: Self):
-        self.axes = existing.axes
+        self.axes = existing.axes^
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward[
-        dtype: DType
-    ](self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
+    fn backward(
+        self, output: TensorLite[dtype]
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         gradients = output.grad()
         ancestor = output.ancestry().get(0)
         inverted_axes = IntList.invert_permutation(self.axes)

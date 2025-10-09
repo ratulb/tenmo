@@ -12,11 +12,9 @@ struct SumBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
     var keepdims: Bool
 
-    fn backward[
-        dtype: DType
-    ](self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
+    fn backward(
+        self, output: TensorLite[dtype]
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         gradients = output.grad()
         ancestor = output.ancestry().get(0)
         rank = ancestor.shape().rank()

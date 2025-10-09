@@ -60,144 +60,124 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         if self.grad_fn.isa[MatmulBackward[dtype]]():
-            return self.grad_fn[MatmulBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[MatmulBackward[dtype]].backward(output)
 
         if self.grad_fn.isa[BatchedMatmulBackward[dtype]]():
-            return self.grad_fn[BatchedMatmulBackward[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[BatchedMatmulBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[ReshapeBackward[dtype]]():
-            return self.grad_fn[ReshapeBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[ReshapeBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[ViewBackward[dtype]]():
-            return self.grad_fn[ViewBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[ViewBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[CrossEntropyBackward[dtype]]():
-            return self.grad_fn[CrossEntropyBackward[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[CrossEntropyBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[RepeatBackward[dtype]]():
-            return self.grad_fn[RepeatBackward[dtype]].backward[dtype](output)
-        
+            return self.grad_fn[RepeatBackward[dtype]].backward(output)
+
         elif self.grad_fn.isa[TileBackward[dtype]]():
-            return self.grad_fn[TileBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[TileBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[FlattenBackward[dtype]]():
-            return self.grad_fn[FlattenBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[FlattenBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[TransposeBackward[dtype]]():
-            return self.grad_fn[TransposeBackward[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[TransposeBackward[dtype]].backward(output)
         elif self.grad_fn.isa[ReLUBackward[dtype]]():
-            return self.grad_fn[ReLUBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[ReLUBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[SoftmaxBackward[dtype]]():
-            return self.grad_fn[SoftmaxBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[SoftmaxBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[DivideBackward[dtype]]():
-            return self.grad_fn[DivideBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[DivideBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[PermuteBackward[dtype]]():
-            return self.grad_fn[PermuteBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[PermuteBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[SumBackward[dtype]]():
-            return self.grad_fn[SumBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[SumBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[MeanBackward[dtype]]():
-            return self.grad_fn[MeanBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[MeanBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[AddBackward[dtype]]():
-            return self.grad_fn[AddBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[AddBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[AddBackwardScalar[dtype]]():
-            return self.grad_fn[AddBackwardScalar[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
 
         elif self.grad_fn.isa[SubBackward[dtype]]():
-            return self.grad_fn[SubBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[SubBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[SubLeftRightBackwardScalar[dtype]]():
-            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward[
-                dtype
-            ](output)
+            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward(
+                output
+            )
 
         elif self.grad_fn.isa[MultiplyBackward[dtype]]():
-            return self.grad_fn[MultiplyBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[MultiplyBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[MulBackwardScalar[dtype]]():
-            return self.grad_fn[MulBackwardScalar[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[MulBackwardScalar[dtype]].backward(output)
 
         elif self.grad_fn.isa[DotBackward[dtype]]():
-            return self.grad_fn[DotBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[DotBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[VectorMatrixMMBackward[dtype]]():
-            return self.grad_fn[VectorMatrixMMBackward[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[VectorMatrixMMBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[MatrixVectorMMBackward[dtype]]():
-            return self.grad_fn[MatrixVectorMMBackward[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[MatrixVectorMMBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[UnsqueezeBackward[dtype]]():
-            return self.grad_fn[UnsqueezeBackward[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[UnsqueezeBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[SqueezeBackward[dtype]]():
-            return self.grad_fn[SqueezeBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[SqueezeBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[ExpandBackward[dtype]]():
-            return self.grad_fn[ExpandBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[ExpandBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[MinMaxBackward[dtype]]():
-            return self.grad_fn[MinMaxBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[MinMaxBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[ShuffleBackward[dtype]]():
-            return self.grad_fn[ShuffleBackward[dtype]].backward[dtype](output)
+            return self.grad_fn[ShuffleBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[TrueDivBackwardScalar[dtype]]():
-            return self.grad_fn[TrueDivBackwardScalar[dtype]].backward[dtype](
-                output
-            )
+            return self.grad_fn[TrueDivBackwardScalar[dtype]].backward(output)
 
         elif self.grad_fn.isa[RightTrueDivBackwardScalar[dtype]]():
-            return self.grad_fn[RightTrueDivBackwardScalar[dtype]].backward[
-                dtype
-            ](output)
-
-        elif self.grad_fn.isa[ExponientionBackward[dtype]]():
-            return self.grad_fn[ExponientionBackward[dtype]].backward[dtype](
+            return self.grad_fn[RightTrueDivBackwardScalar[dtype]].backward(
                 output
             )
+
+        elif self.grad_fn.isa[ExponientionBackward[dtype]]():
+            return self.grad_fn[ExponientionBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[
             BroadcastBackward[dtype, AddTensor, AddTensor, False]
         ]():
             return self.grad_fn[
                 BroadcastBackward[dtype, AddTensor, AddTensor, False]
-            ].backward[dtype](output)
+            ].backward(output)
 
         elif self.grad_fn.isa[
             BroadcastBackward[dtype, AddTensor, AddTensor, True]
         ]():
             return self.grad_fn[
                 BroadcastBackward[dtype, AddTensor, AddTensor, True]
-            ].backward[dtype](output)
+            ].backward(output)
 
         elif self.grad_fn.isa[
             BroadcastBackward[dtype, AddTensor, SubtractTensor, False]
         ]():
             return self.grad_fn[
                 BroadcastBackward[dtype, AddTensor, SubtractTensor, False]
-            ].backward[dtype](output)
+            ].backward(output)
 
         else:
             abort("I am not here to receive you")

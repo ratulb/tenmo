@@ -19,11 +19,9 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward[
-        dtype: DType
-    ](self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
+    fn backward(
+        self, output: TensorLite[dtype]
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         var gradients = output.grad()
         var ancestor_1 = output.ancestry().get(0)
         var ancestor_2 = output.ancestry().get(1)
@@ -54,17 +52,13 @@ struct CrossEntropyBackward[dtype: DType](Copyable):
         var grad_input_2d = Tensor[dtype].zeros_like(softmax_probs)
 
         # 4. Precompute fixed values for label smoothing (same as forward pass)
-        var smoothing_active = rebind[Scalar[dtype]](
-            self.label_smoothing
-        ) > Scalar[dtype](0)
+        var smoothing_active = self.label_smoothing > Scalar[dtype](0)
         var smooth_prob = Scalar[dtype](0)
         var one_minus_smoothing = Scalar[dtype](0)
 
         if smoothing_active:
-            smooth_prob = rebind[Scalar[dtype]](self.label_smoothing) / C
-            one_minus_smoothing = 1 - rebind[Scalar[dtype]](
-                self.label_smoothing
-            )
+            smooth_prob = self.label_smoothing / C
+            one_minus_smoothing = 1 - self.label_smoothing
         # 5. Compute gradients for each element
         var valid_count = 0
 
