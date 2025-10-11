@@ -512,13 +512,9 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     fn float(self) -> Tensor[DType.float32]:
-        if self.dtype == DType.float32:
-            return rebind[Tensor[DType.float32]](self)
         return self.to_dtype[DType.float32]()
 
     fn float64(self) -> Tensor[DType.float64]:
-        if self.dtype == DType.float64:
-            return rebind[Tensor[DType.float64]](self)
         return self.to_dtype[DType.float64]()
 
     fn to_dtype[NewType: DType](self) -> Tensor[NewType]:
@@ -2224,7 +2220,12 @@ struct Tensor[dtype: DType = DType.float32](
                 _ = self.gradbox
                 log_debug("Freed gradbox")
 
+        _ = self.shape^
+        _ = self.strides^
         self.ancestors.free()
+        _ = self.ancestors^
+        _ = self.backwardFn^
+
         # print("Tensor freed")
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:

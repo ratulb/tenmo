@@ -21,6 +21,11 @@ struct TensorLite[dtype: DType](
     fn __init__(out self, tensor_ptr: Self.TensorAddress):
         self.tensor_address = tensor_ptr
 
+    fn __init__(out self, tensor: Tensor[dtype]):
+        tensor_addr = Self.TensorAddress.alloc(1)
+        tensor_addr.init_pointee_copy(tensor)
+        self.tensor_address = tensor_addr
+
     fn __copyinit__(out self, other: Self):
         self.tensor_address = other.tensor_address.copy()
 

@@ -9,7 +9,7 @@ from intlist import IntList
 
 
 fn main() raises:
-    # test_ce_gradients_computation_heavy() # Need to be re-enabled
+    test_ce_gradients_computation_heavy()  # Need to be re-enabled
     test_ce_reduction_none_1()
     # Basic functionality tests
     test_ce_basic_no_reduction()
@@ -33,9 +33,9 @@ fn main() raises:
     test_ce_spatial_with_ignore()
     test_ce_5d_spatial()
     # Gradient validation tests
-    # test_ce_gradients_basic() # Need to be re-enabled
+    test_ce_gradients_basic()
     test_ce_gradients_label_smoothing()
-    # test_ce_gradients_ignore_index() # Need to be re-enabled
+    test_ce_gradients_ignore_index()
     test_ce_gradients_spatial()
 
     # Edge case tests
@@ -64,6 +64,91 @@ fn main() raises:
     test_ce_reduction_sum()
     test_ce_reduction_none()
     test_ce_reduction_mean_1()
+    test_ce_reduction_types_with_ignore_index_and_label_smoothing()
+
+
+fn test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
+    print("test_ce_reduction_types_with_ignore_index_and_label_smoothing")
+    logits = Tensor.d2(
+        [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
+    )
+
+    targets = Tensor[DType.int32].d1([0, 1, 2])  # Class indices
+
+    # 1. MEAN reduction (default)
+    criterion_mean = CrossEntropyLoss(
+        reduction="mean", ignore_index=1, label_smoothing=Float32(0.2)
+    )
+    loss_mean = criterion_mean(logits, targets)
+    assert_true(
+        loss_mean.all_close(Tensor.scalar(0.5492352).float()),
+        "ce mean reduction value assertion failed",
+    )
+    loss_mean.backward()
+
+    assert_true(
+        logits.gradbox[].all_close(
+            Tensor.d2(
+                [
+                    [-0.10383275, 0.08788316, 0.015949614],
+                    [0.0, 0.0, 0.0],
+                    [0.008757681, 0.0047521815, -0.013509899],
+                ]
+            ).float()
+        ),
+        "ce mean reduction grad assertion failed",
+    )
+
+    logits.zero_grad()
+    # 2. SUM reduction
+    criterion_sum = CrossEntropyLoss(
+        reduction="sum", ignore_index=1, label_smoothing=Float32(0.2)
+    )
+    loss_sum = criterion_sum(logits, targets)
+    assert_true(
+        loss_sum.all_close(Tensor.scalar(1.0984705).float()),
+        "ce sum reduction value assertion failed",
+    )
+    loss_sum.backward()
+
+    assert_true(
+        logits.gradbox[].all_close(
+            Tensor.d2(
+                [
+                    [-0.2076655, 0.17576632, 0.03189923],
+                    [0.0, 0.0, 0.0],
+                    [0.017515361, 0.009504363, -0.027019799],
+                ]
+            ).float()
+        ),
+        "ce sum reduction grad assertion failed",
+    )
+
+    logits.zero_grad()
+    # 3. NONE reduction
+    criterion_none = CrossEntropyLoss(
+        reduction="none", ignore_index=1, label_smoothing=Float32(0.2)
+    )
+    loss_none = criterion_none(logits, targets)
+    assert_true(
+        loss_none.all_close(Tensor.d1([0.6103632, 0.0, 0.4881073]).float()),
+        "ce none reduction value assertion failed",
+    )
+
+    loss_none.backward()
+
+    assert_true(
+        logits.gradbox[].all_close(
+            Tensor.d2(
+                [
+                    [-0.2076655, 0.17576632, 0.03189923],
+                    [0.0, 0.0, 0.0],
+                    [0.017515361, 0.009504363, -0.027019799],
+                ]
+            ).float()
+        ),
+        "ce none reduction grad assertion failed",
+    )
 
 
 fn assert_approx_equal(
@@ -272,7 +357,7 @@ fn test_ce_reduction_sum_1() raises:
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=1)
     var loss = loss_fn(logits, target)
     # Should be sum of 2 sample losses
-    assert_true(loss.shape == Shape([1]))
+    assert_true(loss.shape == Shape())
     assert_true(loss.item() > 0)
 
 
@@ -430,7 +515,7 @@ fn test_ce_5d_spatial() raises:
     var loss_fn = CrossEntropyLoss[DType.float32](reduction=1)  # sum
     var loss = loss_fn(logits, target)
 
-    assert_true(loss.shape == Shape([1]))
+    assert_true(loss.shape == Shape())
     assert_true(loss.item() > 0)
     print("5D spatial test passed")
 
@@ -866,7 +951,7 @@ fn test_ce_reduction_sum() raises:
     end = perf_counter_ns()
     print("test_ce_reduction_sum -> Total:            ", end - start)
 
-    assert_true(loss.shape.rank() == 1)  # scalar
+    assert_true(loss.shape.rank() == 0)  # scalar
 
 
 fn test_ce_reduction_none() raises:

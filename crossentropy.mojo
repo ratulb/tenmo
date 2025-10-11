@@ -508,7 +508,7 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable):
 
         # Precompute smoothing values (same as forward pass)
         var smoothing_active = self.label_smoothing > Scalar[dtype](0)
-        #var uniform_val = Scalar[dtype](0)
+        # var uniform_val = Scalar[dtype](0)
         var true_smoothed = Scalar[dtype](0)
         var non_true_smoothed = Scalar[dtype](0)
 
@@ -561,6 +561,7 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable):
         target_1d.free()
         softmax_probs.free()
         grad_input_2d.free()
+        upstream_grad.free()
 
         return [(logits_ancestor, final_grad_input, AddTensor)]
 
@@ -618,7 +619,7 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable):
         grad_input_2d.free()
         if needs_smoothing_cleanup:
             smoothed_target.free()
-
+        upstream_grad.free()
         return [(logits_ancestor, final_grad_input, AddTensor)]
 
     fn _apply_reduction_scaling(
@@ -714,46 +715,5 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable):
         return smoothed
 
 
-fn main():
-    logits = Tensor.d2(
-        [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3], [0.2, 0.1, 2.5]], requires_grad=True
-    )
-
-    targets = Tensor[DType.int32].d1([0, 1, 2])  # Class indices
-
-    print()
-
-    # 1. MEAN reduction (default)
-    criterion_mean = CrossEntropyLoss(
-        reduction="mean", ignore_index=1, label_smoothing=Float32(0.2)
-    )
-    loss_mean = criterion_mean(logits, targets)
-    print("1. MEAN reduction:")
-    print("Loss:", loss_mean.item())
-    loss_mean.backward()
-    print()
-    logits.gradbox[].print()
-
-    logits.zero_grad()
-    # 2. SUM reduction
-    criterion_sum = CrossEntropyLoss(
-        reduction="sum", ignore_index=1, label_smoothing=Float32(0.2)
-    )
-    loss_sum = criterion_sum(logits, targets)
-    print("\n2. SUM reduction:")
-    print("Loss:", loss_sum.item())
-    loss_sum.backward()
-    print()
-    logits.gradbox[].print()
-
-    logits.zero_grad()
-    # 3. NONE reduction
-    criterion_none = CrossEntropyLoss(
-        reduction="none", ignore_index=1, label_smoothing=Float32(0.2)
-    )
-    loss_none = criterion_none(logits, targets)
-    print("\n3. NONE reduction:")
-    print("Loss per sample: \n")
-    loss_none.print()
-    loss_none.backward()
-    logits.gradbox[].print()
+fn main() raises:
+    pass

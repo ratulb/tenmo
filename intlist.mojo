@@ -381,6 +381,11 @@ struct IntList(
     fn len(self) -> Int:
         return len(self.elems)
 
+    @always_inline("nodebug")
+    fn size(self) -> Int:
+        return len(self.elems)
+
+
     fn is_empty(self) -> Bool:
         return len(self) == 0
 
