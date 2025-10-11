@@ -62,7 +62,7 @@ struct View[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        mut self: Tensor[dtype],
+        self: Tensor[dtype],
         shape: Shape,
         strides: Strides,
         offset: Int = 0,
@@ -74,7 +74,10 @@ struct View[dtype: DType](Copyable):
             self, shape, strides, offset
         ) if not validated else offset
 
-        out = self.build_view(shape, strides, abs_offset, requires_grad=False)
+        # out = self.build_view(shape, strides, abs_offset, requires_grad=False)
+        out = Tensor[dtype].build_view(
+            self.address(), shape, strides, abs_offset, requires_grad=False
+        )
 
         @parameter
         if track_grad:

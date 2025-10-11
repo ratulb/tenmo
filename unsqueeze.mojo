@@ -34,7 +34,7 @@ struct Unsqueeze[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        mut tensor: Tensor[dtype],
+        tensor: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -103,7 +103,9 @@ struct Unsqueeze[dtype: DType]:
         # Create the unsqueezed tensor
         shape = Shape(new_shape)
         strides = Strides(new_strides)
-        out = tensor.build_view(shape, strides, tensor.offset, False)
+        out = Tensor[dtype].build_view(
+            tensor.address(), shape, strides, tensor.offset, False
+        )
 
         @parameter
         if track_grad:

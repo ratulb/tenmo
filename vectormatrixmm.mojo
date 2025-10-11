@@ -104,7 +104,7 @@ struct VectorMatrixMM[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        A: Tensor[dtype], mut B: Tensor[dtype], requires_grad: Bool = True
+        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
     ) -> Tensor[dtype]:
         # A: (n,)(or batched: batch_A..., n)
         # B: (..., n, m)  (rank >= 2)

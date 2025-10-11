@@ -84,8 +84,8 @@ fn get_batches(
     return batches
 
 
-fn main() raises:
-    num_train = 8000
+fn main1() raises:
+    num_train = 7000
     num_test = 1
     batch_size = 32
     epochs = 40
@@ -113,7 +113,8 @@ fn main() raises:
         batches = get_batches(train_x, train_y, batch_size)
 
         for xb, yb in batches:
-            var logits = model(xb)
+            xs = xb
+            var logits = model(xs)
             var loss = criterion(logits, yb)
             loss.backward()
             optimizer.step()  # optimizer zero grads post step
@@ -139,3 +140,82 @@ fn main() raises:
             "Accuracy:",
             Float32(correct) / Float32(total),
         )
+        for batch in batches:
+            batch[0].free()
+            batch[1].free()
+            
+        batches.clear()
+
+
+fn main() raises:
+    num_train = 7000
+    num_test = 1
+    batch_size = 32
+    epochs = 40
+    lr = Scalar[DType.float32](0.001)
+
+    var (train_x, train_y, test_x, test_y) = load_mnist_subset(
+        num_train, num_test
+    )
+
+    # Define model
+    model = Sequential[DType.float32]()
+    model.append(Linear(784, 128).into())
+    model.append(ReLU().into())
+    model.append(Linear(128, 10).into())
+
+    # Loss + optimizer
+    var criterion = CrossEntropyLoss[DType.float32]()
+    var optimizer = SGD[DType.float32](model.parameters_ptrs(), lr=lr)
+
+    # Training
+    for epoch in range(epochs):
+        var epoch_loss: Float32 = 0.0
+        var correct: Int = 0
+        var total: Int = 0
+        
+        # Create batches for this epoch
+        var batches = get_batches(train_x, train_y, batch_size)
+
+        for xb, yb in batches:
+            xs = xb
+            var logits = model(xs)
+            var loss = criterion(logits, yb)
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item() * yb.shape[0]
+            var preds = logits.argmax(axis=1)
+            correct += (
+                (preds == yb).to_dtype[DType.int32]().sum().item().__int__()
+            )
+            total += yb.shape[0]
+            
+            # Free up temporaries
+            preds.free()
+            loss.free()
+            xb.free()
+            yb.free()
+            logits.free()
+        
+        # CRITICAL: Free the batches list and its contents
+        for i in range(batches.__len__()):
+            var batch = batches[i]
+            batch[0].free()  # Free x_batch
+            batch[1].free()  # Free y_batch
+        batches.clear()  # Free the list itself
+        
+        print(
+            "Epoch",
+            epoch,
+            "Loss:",
+            epoch_loss / total,
+            "Accuracy:",
+            Float32(correct) / Float32(total),
+        )
+    
+    # Free main datasets
+    train_x.free()
+    train_y.free() 
+    test_x.free()
+    test_y.free()

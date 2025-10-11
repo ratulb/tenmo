@@ -155,7 +155,7 @@ struct MatrixVectorMM[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        mut A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
+        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
     ) -> Tensor[dtype]:
         # --------------------------
         # Shapes

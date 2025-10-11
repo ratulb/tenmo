@@ -120,7 +120,7 @@ struct Tensor[dtype: DType = DType.float32](
         self._contiguous = self.is_contiguous()
         self.init_gradbox()
 
-    fn build_view(
+        _="""fn build_view(
         mut self,
         shape: Shape,
         strides: Optional[Strides] = None,
@@ -140,6 +140,32 @@ struct Tensor[dtype: DType = DType.float32](
             offset=offset,
             shared_buffer=self.shared_buffer,
             owns_data=False,
+        )"""
+    
+    @staticmethod
+    fn build_view(
+        source: UnsafePointer[Self],
+        shape: Shape,
+        strides: Optional[Strides] = None,
+        offset: Int = 0,
+        requires_grad: Bool = False,
+    ) -> Tensor[dtype]:
+        ref shared_buffer = source[].shared_buffer
+        ref owns_data = source[].owns_data
+        ref buffer = source[].buffer
+        
+        if owns_data:
+            shared_buffer = Optional(buffer.shared())
+            owns_data = False
+            buffer = Buffer[dtype]()
+        return Tensor[dtype](
+            shape,
+            Buffer[dtype](),
+            requires_grad,
+            strides=strides,
+            offset=offset,
+            shared_buffer=shared_buffer,
+            owns_data=owns_data,
         )
 
     fn __moveinit__(out self, deinit other: Self):
@@ -1196,7 +1222,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn into_view[
         track_grad: Bool = True
-    ](mut self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         if not self.owns_data:
             panic("Tensor → into_view: not allowed on non-owning tensor")
         shape, strides = self.shape, self.strides
@@ -1210,7 +1236,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn view[
         track_grad: Bool = True
     ](
-        mut self,
+        self,
         shape: Shape,
         strides: Strides,
         offset: Int = 0,
@@ -1224,7 +1250,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn view[
         track_grad: Bool = True
     ](
-        mut self,
+        self,
         shape: List[Int],
         strides: List[Int],
         offset: Int = 0,
@@ -1238,7 +1264,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn view[
         track_grad: Bool = True
     ](
-        mut self,
+        self,
         *shape_dims: Int,
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
@@ -1252,7 +1278,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn view[
         track_grad: Bool = True
     ](
-        mut self,
+        self,
         shape: List[Int],
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
@@ -1266,7 +1292,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn view[
         track_grad: Bool = True
     ](
-        mut self,
+        self,
         shape: Shape,
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
@@ -1317,7 +1343,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn slice[
         track_grad: Bool = True
-    ](mut self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
+    ](self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
         dtype
     ]:
         """
@@ -1352,7 +1378,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn slice[
         track_grad: Bool = True
     ](
-        mut self,
+        self,
         axes: List[Int],
         starts: List[Int],
         ends: List[Int],
@@ -1387,7 +1413,7 @@ struct Tensor[dtype: DType = DType.float32](
             True,
         )
 
-    fn __getitem__(mut self, *slices: Slice) -> Tensor[dtype]:
+    fn __getitem__(self, *slices: Slice) -> Tensor[dtype]:
         # Delegate shape/strides/offset computation
         shape, strides, offset = Validator.validate_and_compute_view_metadata(
             self.shape,
@@ -1398,7 +1424,7 @@ struct Tensor[dtype: DType = DType.float32](
             self, shape, strides, offset, self.requires_grad, True
         )
 
-    fn set(mut self, mut tensor: Tensor[dtype], *indices: Idx):
+    fn set(self, tensor: Tensor[dtype], *indices: Idx):
         shape, strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
                 self.shape, self.strides, indices
@@ -1447,7 +1473,7 @@ struct Tensor[dtype: DType = DType.float32](
                         )
                         sliced[idx] = tensor[tensor_idx]
 
-    fn set(mut self, value: Scalar[dtype], *indices: Idx):
+    fn set(self, value: Scalar[dtype], *indices: Idx):
         # Compute view metadata
         shape, strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
@@ -1464,7 +1490,7 @@ struct Tensor[dtype: DType = DType.float32](
             for idx in shape:
                 sliced[idx] = value
 
-    fn __getitem__(mut self, *indices: Idx) -> Tensor[dtype]:
+    fn __getitem__(self, *indices: Idx) -> Tensor[dtype]:
         # Compute view metadata
         view_shape, view_strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
@@ -1542,7 +1568,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn transpose[
         track_grad: Bool = True
-    ](mut self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
         return self.transpose[track_grad](IntList(axes), requires_grad)
@@ -1550,13 +1576,13 @@ struct Tensor[dtype: DType = DType.float32](
     fn transpose[
         track_grad: Bool = True
     ](
-        mut self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
+        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         return self.transpose[track_grad](IntList.new(axes), requires_grad)
 
     fn transpose[
         track_grad: Bool = True
-    ](mut self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
         return Transpose.forward[track_grad](self, axes, requires_grad)
@@ -1977,14 +2003,14 @@ struct Tensor[dtype: DType = DType.float32](
     fn vector_matrix_mm[
         track_grad: Bool = True
     ](
-        A: Tensor[dtype], mut B: Tensor[dtype], requires_grad: Bool = True
+        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
     ) -> Tensor[dtype]:
         return VectorMatrixMM[dtype].forward[track_grad](A, B, requires_grad)
 
     fn matrix_vector_mm[
         track_grad: Bool = True
     ](
-        mut A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
+        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
     ) -> Tensor[dtype]:
         return MatrixVectorMM[dtype].forward[track_grad](A, B, requires_grad)
 
@@ -2004,7 +2030,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn permute[
         track_grad: Bool = True
     ](
-        mut self, axes: List[Int], requires_grad: Optional[Bool] = None
+        self, axes: List[Int], requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         return Permute[dtype].forward[track_grad](
             self, IntList.new(axes), requires_grad
@@ -2012,14 +2038,14 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn permute[
         track_grad: Bool = True
-    ](mut self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
         return Permute[dtype].forward[track_grad](self, axes, requires_grad)
 
     fn unsqueeze[
         track_grad: Bool = True
-    ](mut self, axis: Int, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, axis: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
         return Unsqueeze[dtype].forward[track_grad](
@@ -2029,7 +2055,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn unsqueeze[
         track_grad: Bool = True
     ](
-        mut self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
+        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
         return Unsqueeze[dtype].forward[track_grad](
@@ -2038,7 +2064,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn unsqueeze[
         track_grad: Bool = True
-    ](mut self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
@@ -2129,7 +2155,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn expand[
         track_grad: Bool = True
     ](
-        mut self: Tensor[dtype],
+        self: Tensor[dtype],
         target: Shape,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -2138,7 +2164,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn expand[
         track_grad: Bool = True
     ](
-        mut self: Tensor[dtype],
+        self: Tensor[dtype],
         *target_dims: Int,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -2150,7 +2176,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn squeeze[
         track_grad: Bool = True
     ](
-        mut self,
+        self,
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -2172,7 +2198,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn squeeze[
         track_grad: Bool = True
     ](
-        mut self,
+        self,
         axis: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -2252,7 +2278,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn matmul[
         track_grad: Bool = True, simd_width: Int = simdwidthof[dtype]()
-    ](mut A: Tensor[dtype], mut B: Tensor[dtype]) -> Tensor[dtype]:
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         return Matmul[dtype].forward[track_grad](A, B)
 
     @staticmethod
@@ -2271,7 +2297,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn matmul_nd[
         track_grad: Bool = True
     ](
-        mut A: Tensor[dtype], mut B: Tensor[dtype], requires_grad: Bool = True
+        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
     ) -> Tensor[dtype]:
         return Matmul_nd[dtype].forward[track_grad](A, B, requires_grad)
 
@@ -2452,4 +2478,19 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable & Movable):
 
 
 fn main() raises:
-    pass
+    a = Tensor.arange(10, requires_grad=True)
+   # b = a.into_view()
+    a.print()
+    print()
+    c = a * 2
+    print("check 1")
+    c.backward()
+    print("check 2")
+    a.gradbox[].print()
+
+    _="""print(a.owns_data, b.owns_data, a.buffer, b.buffer) 
+    print()
+    print(a.shared_buffer.value() is b.shared_buffer.value())
+    print(a.shared_buffer.value().count(), b.shared_buffer.value().count())
+    print(b.shared_buffer.value().count(), a.shared_buffer.value().count())"""
+ 

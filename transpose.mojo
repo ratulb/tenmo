@@ -47,7 +47,7 @@ struct Transpose[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        mut self: Tensor[dtype],
+        self: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -63,7 +63,9 @@ struct Transpose[dtype: DType](Copyable):
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides.permute(normalized_axes)
 
-        out = self.build_view(new_shape, new_strides, self.offset, False)
+        out = Tensor[dtype].build_view(
+            self.address(), new_shape, new_strides, self.offset, False
+        )
 
         @parameter
         if track_grad:

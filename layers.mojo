@@ -94,12 +94,15 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
         )
         self.bias = Tensor[dtype].zeros([out_features], requires_grad=True)
 
-    fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
-        if x.shape[-1] != self.weights.shape[0]:
-            panic("Linear forward: input dim mismatch")
-        xs = x  # This assignment is needed to make x mut
-        weights = self.weights
-        return xs.matmul(weights) + self.bias
+    fn __call__(self, xs: Tensor[dtype]) -> Tensor[dtype]:
+        if xs.shape[-1] != self.weights.shape[0]:
+            panic(
+                "Linear forward: input dim mismatch: input shape -> ",
+                xs.shape.__str__(),
+                "and  weights shape -> ",
+                self.weights.shape.__str__(),
+            )
+        return xs.matmul(self.weights) + self.bias
 
     fn parameters(self) -> List[Tensor[dtype]]:
         var p = List[Tensor[dtype]]()

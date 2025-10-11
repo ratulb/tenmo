@@ -33,7 +33,7 @@ struct Squeeze[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        mut tensor: Tensor[dtype],
+        tensor: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -99,7 +99,7 @@ struct Squeeze[dtype: DType]:
         strides = Strides(new_strides)
         offset = tensor.offset
 
-        out = tensor.build_view(shape, strides, offset, False)
+        out = Tensor[dtype].build_view(tensor.address(), shape, strides, offset, False)
 
         @parameter
         if track_grad:

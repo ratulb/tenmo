@@ -300,7 +300,7 @@ struct Matmul[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True, simd_width: Int = simdwidthof[dtype]()
-    ](mut A: Tensor[dtype], mut B: Tensor[dtype]) -> Tensor[dtype]:
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         rank_a = A.rank()
         rank_b = B.rank()
         requires_grad = A.requires_grad or B.requires_grad
@@ -435,7 +435,7 @@ struct Matmul_nd[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        mut A: Tensor[dtype], mut B: Tensor[dtype], requires_grad: Bool = True
+        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
     ) -> Tensor[dtype]:
         Shape.validate_matrix_shapes_nd(A.shape, B.shape)
         # shapes: batch + [m, k], batch + [k, n]

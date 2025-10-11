@@ -39,7 +39,7 @@ struct Permute[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        mut self: Tensor[dtype],
+        self: Tensor[dtype],
         axes: IntList,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:

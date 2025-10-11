@@ -32,7 +32,7 @@ struct Expand[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        mut tensor: Tensor[dtype],
+        tensor: Tensor[dtype],
         target: Shape,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -54,7 +54,7 @@ struct Expand[dtype: DType]:
 
         offset = tensor.offset  # keep same as current tensor
 
-        out = tensor.build_view(exp_shape, strides, offset, False)
+        out = Tensor[dtype].build_view(tensor.address(), exp_shape, strides, offset, False)
 
         @parameter
         if track_grad:
