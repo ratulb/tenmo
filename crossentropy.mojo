@@ -508,7 +508,6 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable):
 
         # Precompute smoothing values (same as forward pass)
         var smoothing_active = self.label_smoothing > Scalar[dtype](0)
-        # var uniform_val = Scalar[dtype](0)
         var true_smoothed = Scalar[dtype](0)
         var non_true_smoothed = Scalar[dtype](0)
 
