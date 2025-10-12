@@ -120,28 +120,7 @@ struct Tensor[dtype: DType = DType.float32](
         self._contiguous = self.is_contiguous()
         self.init_gradbox()
 
-        _="""fn build_view(
-        mut self,
-        shape: Shape,
-        strides: Optional[Strides] = None,
-        offset: Int = 0,
-        requires_grad: Bool = False,
-    ) -> Tensor[dtype]:
-        if self.owns_data:
-            self.shared_buffer = Optional(self.buffer.shared())
-            self.buffer = Buffer[dtype]()
-            self.owns_data = False
 
-        return Tensor[dtype](
-            shape,
-            Buffer[dtype](),
-            requires_grad,
-            strides=strides,
-            offset=offset,
-            shared_buffer=self.shared_buffer,
-            owns_data=False,
-        )"""
-    
     @staticmethod
     fn build_view(
         source: UnsafePointer[Self],
@@ -153,7 +132,7 @@ struct Tensor[dtype: DType = DType.float32](
         ref shared_buffer = source[].shared_buffer
         ref owns_data = source[].owns_data
         ref buffer = source[].buffer
-        
+
         if owns_data:
             shared_buffer = Optional(buffer.shared())
             owns_data = False
@@ -2233,26 +2212,30 @@ struct Tensor[dtype: DType = DType.float32](
             self.gradients()[].print(num_first, num_last)
 
     fn free(deinit self):
+        pass
+
+    fn __del__(deinit self):
         _ = self.buffer^
         _ = self.shared_buffer^
 
-        ref_count = self.ref_count()
-        if ref_count <= 1 and self.requires_grad:
-            log_debug("Ref count on entry to __del__: " + ref_count.__str__())
+        #ref_count = self.ref_count()
+        #if ref_count <= 1 and self.requires_grad:
+        #log_debug("Ref count on entry to __del__: " + ref_count.__str__())
 
-            if self.gradbox.__as_bool__():
-                self.gradbox.destroy_pointee()
-                self.gradbox.free()
-                _ = self.gradbox
-                log_debug("Freed gradbox")
+        if self.gradbox.__as_bool__():
+            #self.gradbox.destroy_pointee()
+            #self.gradbox.free()
+            #_ = self.gradbox
+            #print("Freed gradbox")
+            pass
 
         _ = self.shape^
         _ = self.strides^
-        self.ancestors.free()
-        _ = self.ancestors^
+        #self.ancestors.free()
+        #_ = self.ancestors^
         _ = self.backwardFn^
 
-        # print("Tensor freed")
+        #print("Tensor freed")
 
     fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()
@@ -2479,7 +2462,7 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable & Movable):
 
 fn main() raises:
     a = Tensor.arange(10, requires_grad=True)
-   # b = a.into_view()
+    b = a.into_view()
     a.print()
     print()
     c = a * 2
@@ -2488,9 +2471,9 @@ fn main() raises:
     print("check 2")
     a.gradbox[].print()
 
-    _="""print(a.owns_data, b.owns_data, a.buffer, b.buffer) 
+    _="""print(a.owns_data, b.owns_data, a.buffer, b.buffer)
     print()
     print(a.shared_buffer.value() is b.shared_buffer.value())
     print(a.shared_buffer.value().count(), b.shared_buffer.value().count())
     print(b.shared_buffer.value().count(), a.shared_buffer.value().count())"""
- 
+

@@ -464,7 +464,7 @@ struct Matmul_nd[dtype: DType](Copyable):
             B_slice = B[il(B_indices), s(), s()]
             C_slice = C[il(indices), s(), s()]
 
-            _result = Matmul_2d.forward[track_grad=False](
+            _ = Matmul_2d.forward[track_grad=False](
                 UnsafePointer(to=A_slice),
                 UnsafePointer(to=B_slice),
                 UnsafePointer(to=C_slice),
@@ -473,7 +473,6 @@ struct Matmul_nd[dtype: DType](Copyable):
             A_slice.free()
             B_slice.free()
             C_slice.free()
-            _result.free()
 
         @parameter
         if track_grad:

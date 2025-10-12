@@ -97,9 +97,9 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
     fn __call__(self, xs: Tensor[dtype]) -> Tensor[dtype]:
         if xs.shape[-1] != self.weights.shape[0]:
             panic(
-                "Linear forward: input dim mismatch: input shape -> ",
+                "Linear forward: input dim mismatch: input shape → ",
                 xs.shape.__str__(),
-                "and  weights shape -> ",
+                "and  weights shape → ",
                 self.weights.shape.__str__(),
             )
         return xs.matmul(self.weights) + self.bias
@@ -245,7 +245,7 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
                 name,
                 " | I/P: ",
                 in_shape,
-                " -> O/P: ",
+                " → O/P: ",
                 out_shape,
                 " | Params: ",
                 nparams,

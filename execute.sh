@@ -36,7 +36,7 @@ case $1 in
         ;;
 
     bench)
-        echo "Running tensor multiplication benchmark"
+	    echo "Running tensor multiplication benchmark(tests/test_matmul_bench.mojo)"
         mojo -I . $DEBUG_MODE tests/test_matmul_bench.mojo
         ;;
     views)

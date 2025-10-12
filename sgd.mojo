@@ -90,25 +90,29 @@ fn main():
 
     # Construct optimizer
     sgd = SGD(params)
-
+    print("\na and b\n")
     a.print()
+    print()
+    b.print()
     a.seed_grad(42)
     b.seed_grad(24)
 
-    print("\npost seeding\n")
-    a.print()
+    print("\npost seeding a and b grads\n")
+    a.gprint()
+    print()
+    b.gprint()
 
     sgd.step()
 
-    print("\npost stepping\n")
+    print("\npost stepping a and b\n")
     a.print()  # Reflects updates
     print()
     b.print()
 
-    print("\na's grad now\n")
-    a.gradbox[].print()
+    print("\na's and b's grad now\n")
+    a.gprint()
     print()
-    b.gradbox[].print()
+    b.gprint()
 
     # Sanity check: directly viewing params inside optimizer
     sgd.params[0][].print()

@@ -107,9 +107,10 @@ struct TensorLite[dtype: DType](
     fn init_grad(self):
         self.tensor_address[].init_gradbox()
 
-    fn free(deinit self):
+    fn __del__1(deinit self):
         if self.tensor_address.__as_bool__():
             id = self.inner_id()
+
             self.tensor_address.destroy_pointee()
             self.tensor_address.free()
             log_debug("TensorLite deleted for inner_id: " + id.__str__())
@@ -192,6 +193,8 @@ struct TensorLite[dtype: DType](
                 else:
                     # leaf → grads already accumulated via sink
                     pass
+            _s = root.shape()
+            #print("Numels: ", s)
         except e:
             panic(e.__str__())
 

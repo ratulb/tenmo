@@ -48,9 +48,7 @@ fn main() raises:
 
 fn bench_tensor_tensor[
     dtype: DType, //
-](A_t: Tensor[dtype], B_t: Tensor[dtype]) -> (Tensor[dtype], UInt):
-    A = A_t
-    B = B_t
+](A: Tensor[dtype], B: Tensor[dtype]) -> (Tensor[dtype], UInt):
     start = perf_counter_ns()
     C = A.matmul(B)
     end = perf_counter_ns()
@@ -60,14 +58,12 @@ fn bench_tensor_tensor[
 
 fn bench_tensor_tensor_backward[
     dtype: DType, //
-](A_t: Tensor[dtype], B_t: Tensor[dtype]) -> (
+](A: Tensor[dtype], B: Tensor[dtype]) -> (
     Tensor[dtype],
     Tensor[dtype],
     Tensor[dtype],
     UInt,
 ):
-    A = A_t
-    B = B_t
     start = perf_counter_ns()
     C = A.matmul(B)
     C.backward()
