@@ -17,7 +17,9 @@ struct DotBackward[dtype: DType](Copyable & Movable):
     fn backward(
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.grad().item()  # Scalar
+        grads = output.grad()
+        gradients = grads.item()  # Scalar
+        grads.free()
         var grad_outputs: List[
             Tuple[TensorLite[dtype], Tensor[dtype], Int]
         ] = []
@@ -41,6 +43,7 @@ struct DotBackward[dtype: DType](Copyable & Movable):
                     AddTensor,
                 )
             )
+            tensor.free()
 
         if ancestor_2.requires_grad():
             tensor = ancestor_1.tensor()
@@ -59,7 +62,7 @@ struct DotBackward[dtype: DType](Copyable & Movable):
                     AddTensor,
                 )
             )
-
+            tensor.free()
         return grad_outputs
 
 

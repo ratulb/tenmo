@@ -27,7 +27,7 @@ struct SoftmaxBackward[dtype: DType](Copyable & Movable):
         incoming = output.gradients()[]
         softmax_out = Tensor[dtype].zeros(incoming.shape)
         for indices, value in self.softmax_out:
-            softmax_out[indices] = rebind[Scalar[dtype]](value)
+            softmax_out[indices] = value
 
         product = Multiplicator[dtype].forward[False](incoming, softmax_out)
         sum_grad = Summer[dtype].forward[False](product, self.axes, True)

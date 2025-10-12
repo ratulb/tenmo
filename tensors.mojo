@@ -41,7 +41,7 @@ struct Tensor[dtype: DType = DType.float32](
     var shared_buffer: Optional[ArcPointer[Buffer[dtype]]]
     var requires_grad: Bool
     var gradbox: UnsafePointer[Tensor[dtype]]
-    var ancestors: Ancestors[dtype]
+    var ancestors: Optional[Ancestors[dtype]]
     var backwardFn: Optional[BackwardFn[dtype]]
     var owns_data: Bool
 
@@ -60,7 +60,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.backwardFn = None
         self.gradbox = UnsafePointer[Tensor[dtype]]()
-        self.ancestors = Ancestors[dtype].untracked()
+        self.ancestors = None
         # Take care of Tensor with Shape()
         self.buffer = Buffer[dtype](1) if shape.rank() == 0 else Buffer[dtype](
             shape.num_elements()
@@ -86,7 +86,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.backwardFn = None
         self.gradbox = UnsafePointer[Tensor[dtype]]()
-        self.ancestors = Ancestors[dtype].untracked()
+        self.ancestors = None
         self.buffer = Buffer[dtype](shape.num_elements(), ptr, copy=copy)
         self.shared_buffer = None
         self.owns_data = True
@@ -112,7 +112,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.backwardFn = None
         self.gradbox = UnsafePointer[Tensor[dtype]]()
-        self.ancestors = Ancestors[dtype].untracked()
+        self.ancestors = None
         self.buffer = buffer^
         self.shared_buffer = shared_buffer^
         self.owns_data = owns_data
@@ -548,22 +548,29 @@ struct Tensor[dtype: DType = DType.float32](
 
         return out
 
+    @always_inline
     fn add_ancestry(mut self, *parents: Tensor[dtype]):
+        # Initialize ancestors if needed
+        if not self.ancestors:
+            self.ancestors = Optional(Ancestors[dtype].untracked())
+
+        ref ancestors = self.ancestors.value()
         for parent in parents:
             parent_ptr = UnsafePointer[Tensor[dtype]].alloc(1)
             parent_ptr.init_pointee_copy(parent)
-            tli = TensorLite[dtype](parent_ptr)
-            self.ancestors.append(tli^)
+            tli = TensorLite(parent_ptr)
+            ancestors.append(tli^)
 
-    fn add_ancestry(mut self, *tlis: TensorLite[dtype]):
-        for tli in tlis:
-            parent_ptr = UnsafePointer[Tensor[dtype]].alloc(1)
-            parent_ptr.init_pointee_move(tli.tensor())
-            shield = TensorLite[dtype](parent_ptr)
-            self.ancestors.append(shield^)
+    fn has_ancestry(self) -> Bool:
+        return self.ancestors != None
 
-    fn ancestry(self) -> Ancestors[dtype]:
-        return self.ancestors
+
+
+    @always_inline
+    fn ancestry(ref self) -> ref[self.ancestors.value()] Ancestors[dtype]:
+        if self.ancestors == None:
+            panic("Tensor → ancestry: ancestry not initialized")
+        return self.ancestors.value()
 
     @always_inline
     fn broadcastable(self, to: Tensor[dtype]) -> Bool:
@@ -675,7 +682,7 @@ struct Tensor[dtype: DType = DType.float32](
         if not self.has_grad():
             self.requires_grad_()
         if with_tensor.owns_data:
-            self.gradbox[].data() += with_tensor.data()
+            self.gradbox[].buffer += with_tensor.buffer
         else:
             for coord in self.shape:
                 self.gradbox[][coord] = with_tensor[coord]
@@ -2211,10 +2218,10 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.gradients()[].print(num_first, num_last)
 
-    fn free(deinit self):
+    fn free1(deinit self):
         pass
 
-    fn __del__(deinit self):
+    fn free(deinit self):
         _ = self.buffer^
         _ = self.shared_buffer^
 
@@ -2231,8 +2238,11 @@ struct Tensor[dtype: DType = DType.float32](
 
         _ = self.shape^
         _ = self.strides^
-        #self.ancestors.free()
-        #_ = self.ancestors^
+        if self.ancestors:
+            #ancestors = self.ancestors.take()
+            #ancestors.free()
+            pass
+        _ = self.ancestors^
         _ = self.backwardFn^
 
         #print("Tensor freed")
@@ -2462,14 +2472,14 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](Copyable & Movable):
 
 fn main() raises:
     a = Tensor.arange(10, requires_grad=True)
-    b = a.into_view()
     a.print()
-    print()
+    _="""b = a.into_view()
+    a.print()
     c = a * 2
     print("check 1")
     c.backward()
     print("check 2")
-    a.gradbox[].print()
+    a.gradbox[].print()"""
 
     _="""print(a.owns_data, b.owns_data, a.buffer, b.buffer)
     print()

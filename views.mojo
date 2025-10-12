@@ -36,7 +36,9 @@ struct ViewBackward[dtype: DType](Copyable & Movable):
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         parent = output.ancestry().get(0)
         gradients = output.grad()
-        offset_delta = self.offset - parent.tensor().offset
+        parent_tensor = parent.tensor()
+        offset_delta = self.offset - parent_tensor.offset
+        parent_tensor.free()
         parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
         parent_shape = parent.shape()
 

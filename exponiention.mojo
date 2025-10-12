@@ -16,20 +16,21 @@ struct ExponientionBackward[dtype: DType](Copyable & Movable):
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         gradients = output.grad()
-        var exponent: Scalar[dtype] = rebind[Scalar[dtype]](self.exponent)
         ancestor = output.ancestry().get(0)
 
         # ∂(x**n)/∂x = n * x**(n-1)
         # Need to see if base_pow gets a grad_fn or not - we don't want it to have one!
         # var base_pow = self ** (scalar - 1.0)
-        base_pow = ancestor.tensor() ** (exponent - 1.0)
+        base_pow = ancestor.tensor() ** (self.exponent - 1.0)
         base_pow.requires_grad = False
-        var local_grad = base_pow * exponent
+        var local_grad = base_pow * self.exponent
         product = gradients * local_grad
+        local_grad.free()
+        base_pow.free()
         return [
             (
                 ancestor,
-                product,
+                product^,
                 AddTensor,
             )
         ]

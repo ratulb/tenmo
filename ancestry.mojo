@@ -13,9 +13,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     fn __init__(out self):
         self.ancestors = List[TensorLite[dtype]]()
 
-    fn __init__(out self, capacity: Int):
-        self.ancestors = List[TensorLite[dtype]](capacity=capacity)
-
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
         self.ancestors = existing.ancestors.copy()
@@ -40,14 +37,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
 
     fn __len__(self) -> Int:
         return len(self.ancestors)
-
-    fn __bool__(self) -> Bool:
-        """Checks whether this contains any entry or not.
-
-        Returns:
-            `False` if there is no entry, `True` otherwise.
-        """
-        return len(self) > 0
 
     @always_inline
     fn append(mut self, tli: TensorLite[dtype]):
@@ -80,10 +69,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         return AncestorsIter[self.dtype, forward=False](
             len(self), Pointer(to=self)
         )
-
-    fn store[datatype: DType](mut self, *data: Scalar[datatype]):
-        pass
-
 
 struct AncestorsIter[dtype: DType, origin: Origin[False], forward: Bool = True](
     Sized & Copyable

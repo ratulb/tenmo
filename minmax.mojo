@@ -28,7 +28,7 @@ struct MinMaxBackward[dtype: DType = DType.float32](Copyable & Movable):
         var ancestor = output.ancestry().get(0)  # original input
         var mask = Tensor[dtype].zeros(ancestor.shape())
         for grad in self.gradbox:
-            mask[grad[0]] = rebind[Scalar[dtype]](grad[1])
+            mask[grad[0]] = grad[1]
         var shape = ancestor.shape()
         var rank = shape.rank()
 

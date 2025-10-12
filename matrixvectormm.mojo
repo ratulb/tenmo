@@ -145,6 +145,9 @@ struct MatrixVectorMMBackward[dtype: DType](Copyable):
             dB = Tensor[dtype].sum_over_broadcasted_axes(dB, tensor_b.shape)
             outgoing_grads.append((ancestor_2, dB, AddTensor))
 
+        tensor_a.free()
+        tensor_b.free()
+        gradients.free()
         return outgoing_grads
 
 

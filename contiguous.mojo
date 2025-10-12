@@ -43,7 +43,7 @@ struct Contiguous[dtype: DType](Copyable):
                     shape_copy, strides, offset * 2
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(TensorLite[dtype].of(self))
+                out.add_ancestry(self)
 
         return out
 

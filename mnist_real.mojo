@@ -84,11 +84,11 @@ fn get_batches(
     return batches
 
 fn main() raises:
-    num_train = 1000
+    num_train = 8000
     num_test = 1
     batch_size = 32
-    epochs = 15
-    lr = Scalar[DType.float32](0.001)
+    epochs = 25
+    lr = Scalar[DType.float32](0.006)
 
     var (train_x, train_y, test_x, test_y) = load_mnist_subset(
         num_train, num_test

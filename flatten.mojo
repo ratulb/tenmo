@@ -36,7 +36,9 @@ struct FlattenBackward[dtype: DType](Copyable):
                 idx = tensor.shape.unravel_index(flat_idx)
                 grad_in[idx] = gradients[flat_idx]
 
-        return [(ancestor, grad_in, AddTensor)]
+        gradients.free()
+        tensor.free()
+        return [(ancestor, grad_in^, AddTensor)]
 
 
 @register_passable

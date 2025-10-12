@@ -472,7 +472,7 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable):
             var ancestor_2 = output.ancestry().get(1)
             var target = ancestor_2.tensor()
             return self._backward_probabilities(
-                logits, target, gradients, ancestor_1
+                logits, target^, gradients, ancestor_1
             )
 
     fn _backward_class_indices(
@@ -612,6 +612,7 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable):
         )
 
         # Cleanup
+        target.free()
         logits_2d.free()
         target_2d.free()
         softmax_probs.free()

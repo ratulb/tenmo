@@ -23,6 +23,8 @@ struct ReLUBackward[dtype: DType](Copyable):
             grad_share[indices] = (
                 gradients[indices] if this[indices] > zero else zero
             )
+        this.free()
+        gradients.free()
         return [(ancestor, grad_share, AddTensor)]
 
 

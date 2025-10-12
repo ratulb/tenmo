@@ -6,25 +6,20 @@ from ancestry import Ancestors
 from operators import AddTensor, SubtractTensor, Noop
 from common_utils import log_debug, panic
 from collections import Deque
-
+from common_utils import addr
 
 fn main() raises:
     pass
 
 
 struct TensorLite[dtype: DType](
-    Sized & Stringable & Representable & Writable & Copyable & Movable
+    Stringable & Representable & Writable & Copyable & Movable
 ):
     alias TensorAddress = UnsafePointer[Tensor[dtype]]
     var tensor_address: Self.TensorAddress
 
     fn __init__(out self, tensor_ptr: Self.TensorAddress):
         self.tensor_address = tensor_ptr
-
-    fn __init__(out self, tensor: Tensor[dtype]):
-        tensor_addr = Self.TensorAddress.alloc(1)
-        tensor_addr.init_pointee_copy(tensor)
-        self.tensor_address = tensor_addr
 
     fn __copyinit__(out self, other: Self):
         self.tensor_address = other.tensor_address.copy()
@@ -37,19 +32,28 @@ struct TensorLite[dtype: DType](
 
     @always_inline
     fn shape(self) -> Shape:
-        return self.tensor_address[].shape
+        temp = self.tensor_address[]
+        shape = temp.shape.copy()
+        temp.free()
+        return shape
 
     @always_inline
     fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
-        return self.tensor_address[].gradients()
+        temp = self.tensor_address[]
+        gradients = temp.gradients().copy()
+        temp.free()
+        return gradients
 
     @always_inline
     fn grad(self) -> Tensor[dtype]:
-        return self.tensor_address[].grad()
+        temp = self.tensor_address[]
+        grad = temp.grad()
+        temp.free()
+        return grad
 
     @staticmethod
     fn of(tensor: Tensor[dtype]) -> Self:
-        return Self(UnsafePointer(to=tensor))
+        return Self(addr(tensor))
 
     @always_inline
     fn inner_id(self) -> Int:
@@ -61,27 +65,45 @@ struct TensorLite[dtype: DType](
 
     @always_inline
     fn tensor(self) -> Tensor[dtype]:
-        return self.tensor_address[]
+        return self.tensor_address[] #Caller needs to clean this up
+
+    fn has_ancestry(self) -> Bool:
+        temp = self.tensor_address[]
+        has = temp.has_ancestry()
+        temp.free()
+        return has
 
     @always_inline
     fn ancestry(self) -> Ancestors[dtype]:
-        return self.tensor_address[].ancestors
+        temp = self.tensor_address[]
+        ancestry = temp.ancestry()
+        temp.free()
+        return ancestry
 
     @always_inline
     fn requires_grad(self) -> Bool:
-        return self.tensor_address[].requires_grad
+        temp = self.tensor_address[]
+        requires_grad = temp.requires_grad
+        temp.free()
+        return requires_grad
 
     @always_inline
-    fn has_grad(self) -> Bool:
+    fn has_grad1(self) -> Bool:
         return self.tensor_address[].has_grad()
 
     @always_inline
     fn has_backward_fn(self) -> Bool:
-        return self.tensor_address[].has_backward_fn()
+        temp = self.tensor_address[]
+        has = temp.has_backward_fn()
+        temp.free()
+        return has
 
     @always_inline
     fn backward_fn(self) -> BackwardFn[dtype]:
-        return self.tensor_address[].backward_fn()
+        temp = self.tensor_address[]
+        func = temp.backward_fn()
+        temp.free()
+        return func
 
     fn __str__(self) -> String:
         return self.inner_id().__str__()
@@ -92,20 +114,34 @@ struct TensorLite[dtype: DType](
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn __len__(self) -> Int:
-        return len(self.tensor_address[])
-
     fn seed_grad(self, value: Scalar[dtype]):
-        self.tensor_address[].seed_grad(value)
+        temp = self.tensor_address[]
+        temp.seed_grad(value)
+        temp.free()
 
     fn update_grad[opcode: Int](self, incoming: Tensor[dtype]):
-        self.tensor_address[].update_grad[opcode](incoming)
+        temp = self.tensor_address[]
+        temp.update_grad[opcode](incoming)
+        temp.free()
 
     fn seed_grad(self, with_tensor: Tensor[dtype]):
-        self.tensor_address[].seed_grad(with_tensor)
+        temp = self.tensor_address[]
+        temp.seed_grad(with_tensor)
+        temp.free()
 
     fn init_grad(self):
-        self.tensor_address[].init_gradbox()
+        temp = self.tensor_address[]
+        temp.init_gradbox()
+        temp.free()
+
+    fn free(deinit self):
+        if self.tensor_address.__as_bool__():
+            id = self.inner_id()
+
+            self.tensor_address.destroy_pointee()
+            self.tensor_address.free()
+            log_debug("TensorLite deleted for inner_id: " + id.__str__())
+
 
     fn __del__1(deinit self):
         if self.tensor_address.__as_bool__():
@@ -129,7 +165,7 @@ struct TensorLite[dtype: DType](
 
             # seed the output grad
             root.seed_grad(seed_tensor)
-
+            seed_tensor.free()
             traced = IntList()
             streams = List[GradStream[dtype]]()
             use_count = Dict[
@@ -147,10 +183,11 @@ struct TensorLite[dtype: DType](
                 traced.append(sid)
 
                 # For each parent, increment use_count
-                for parent in node.ancestry():
-                    pid = parent.inner_id()
-                    use_count[pid] = use_count.get(pid, 0) + 1
-                    stack.append(parent)
+                if node.has_ancestry():
+                    for parent in node.ancestry():
+                        pid = parent.inner_id()
+                        use_count[pid] = use_count.get(pid, 0) + 1
+                        stack.append(parent)
 
             log_debug("Traced ancestry: " + traced.__str__())
 
@@ -180,6 +217,7 @@ struct TensorLite[dtype: DType](
                             recipient, Optional(grad_share), opcode
                         )
                         gs.sink()
+                        #gs.free()
 
                         # 2) decrement parent's fan-in
                         pid = recipient.inner_id()
@@ -193,8 +231,6 @@ struct TensorLite[dtype: DType](
                 else:
                     # leaf → grads already accumulated via sink
                     pass
-            _s = root.shape()
-            #print("Numels: ", s)
         except e:
             panic(e.__str__())
 
@@ -215,6 +251,12 @@ struct GradStream[dtype: DType](Copyable & Movable):
         self.recipient = recipient
         self.grad = grad
         self.opcode = opcode
+
+    fn free(deinit self):
+        self.recipient.free()
+        if self.grad:
+            t = self.grad.take()
+            t.free()
 
     fn __copyinit__(out self, other: Self):
         self.recipient = other.recipient

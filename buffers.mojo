@@ -1055,13 +1055,10 @@ struct Buffer[dtype: DType = DType.float32](
         return out
 
     fn float(self) -> Buffer[DType.float32]:
-        if dtype == DType.float32:
-            return rebind[Buffer[DType.float32]](self)
         return self.to_dtype[DType.float32]()
 
     fn float64(self) -> Buffer[DType.float64]:
         if dtype == DType.float64:
-            return rebind[Buffer[DType.float64]](self)
         return self.to_dtype[DType.float64]()
 
     fn to_dtype[
