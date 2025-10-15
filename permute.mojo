@@ -19,7 +19,7 @@ struct PermuteBackward[dtype: DType](Copyable & Movable):
     fn backward(
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.grad()
+        gradients = output.gradients()[]
         parent = output.ancestry().get(0)
         # Compute inverse permutation
         inverse = IntList.filled(len(self.permutation), 0)

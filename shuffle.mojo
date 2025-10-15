@@ -18,7 +18,7 @@ struct ShuffleBackward[dtype: DType](Copyable & Movable):
     fn backward(
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        var gradients = output.grad()
+        var gradients = output.gradients()[]
         var parent = output.ancestry().get(0)
 
         var shape = gradients.shape

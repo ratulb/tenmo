@@ -1,32 +1,17 @@
 from tensors import Tensor
 from shapes import Shape
 from strides import Strides
-from intlist import IntList
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor, ZeroGrad
 from shared import TensorLite
 from validators import Validator
 
 
+@fieldwise_init
 struct ViewBackward[dtype: DType](Copyable & Movable):
     var shape: Shape
     var strides: Strides
     var offset: Int
-
-    fn __init__(out self, shape: Shape, strides: Strides, offset: Int):
-        self.shape = shape
-        self.strides = strides
-        self.offset = offset
-
-    fn __copyinit__(out self, existing: Self):
-        self.shape = existing.shape
-        self.strides = existing.strides
-        self.offset = existing.offset
-
-    fn __moveinit__(out self, deinit existing: Self):
-        self.shape = existing.shape^
-        self.strides = existing.strides^
-        self.offset = existing.offset
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -76,7 +61,6 @@ struct View[dtype: DType](Copyable):
             self, shape, strides, offset
         ) if not validated else offset
 
-        # out = self.build_view(shape, strides, abs_offset, requires_grad=False)
         out = Tensor[dtype].build_view(
             self.address(), shape, strides, abs_offset, requires_grad=False
         )

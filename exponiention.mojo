@@ -15,7 +15,7 @@ struct ExponientionBackward[dtype: DType](Copyable & Movable):
     fn backward(
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.grad()
+        gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)
 
         # ∂(x**n)/∂x = n * x**(n-1)

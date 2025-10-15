@@ -16,7 +16,7 @@ struct ExpandBackward[dtype: DType](Copyable):
     fn backward(
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.grad()
+        gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)
         recipient_shape = ancestor.shape()
         reduced_grad = Tensor[dtype].sum_over_broadcasted_axes(

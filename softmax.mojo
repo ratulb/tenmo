@@ -61,7 +61,7 @@ struct Softmax[dtype: DType]:
         # stable = this - max_vals
         stable = Subtractor[dtype].forward[False](this, max_vals)
         # Compute exponentials
-        stable_exp = stable.exp()  # Revisit
+        stable_exp = stable.exp()
         exp_sum = Summer[dtype].forward[False](
             stable_exp, normalized_axes, True
         )

@@ -24,7 +24,7 @@ struct MinMaxBackward[dtype: DType = DType.float32](Copyable & Movable):
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         # Retrieve upstream grad and saved tensors
-        var gradients = output.grad()
+        var gradients = output.gradients()[]
         var ancestor = output.ancestry().get(0)  # original input
         var mask = Tensor[dtype].zeros(ancestor.shape())
         for grad in self.gradbox:

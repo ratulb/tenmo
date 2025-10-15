@@ -19,7 +19,7 @@ struct MulBackwardScalar[dtype: DType](Copyable & Movable):
     fn backward(
         self, output: TensorLite[dtype]
     ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.grad()
+        gradients = output.gradients()[]
         ancestor = output.ancestry().get(0)
         scaled_gradients = gradients * self.factor
         return [
