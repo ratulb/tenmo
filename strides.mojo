@@ -45,10 +45,6 @@ struct Strides(
     fn __getitem__(self, i: Int) -> Int:
         return self.strides[i]
 
-    @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[Int]:
-        return self.strides.unsafe_ptr()
-
     fn __getitem__(self, slice: Slice) -> Self:
         strides = self.strides[slice]
         return Strides(strides)

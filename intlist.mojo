@@ -47,10 +47,6 @@ struct IntList(
         return out
 
     @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[Int]:
-        return self.elems.unsafe_ptr()
-
-    @always_inline
     fn tolist(self) -> List[Int]:
         out = List[Int](capacity=len(self))
         for elem in self.elems:
@@ -384,7 +380,6 @@ struct IntList(
     @always_inline("nodebug")
     fn size(self) -> Int:
         return len(self.elems)
-
 
     fn is_empty(self) -> Bool:
         return len(self) == 0

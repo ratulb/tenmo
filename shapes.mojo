@@ -109,10 +109,6 @@ struct Shape(
         self.ndim = ndim
         self.numels = numels
 
-    @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[Int]:
-        return self.axes_spans.unsafe_ptr()
-
     fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
         return ShapeIndexIter(
             Pointer(to=self), IntList.filled(self.rank(), 0), 0
