@@ -1,6 +1,7 @@
 from common_utils import log_debug, panic
 from intlist import IntList
 from memory import Pointer
+from strides import Strides
 
 
 struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
@@ -151,6 +152,47 @@ struct Shape(
 
         return mask
 
+    @always_inline
+    fn flatten_index(
+        self, indices: List[Int], strides: Strides, offset: Int = 0
+    ) -> Int:
+        # 1. Rank check
+        if len(indices) != self.rank():
+            panic(
+                "Shape → flatten_index: number of indices does not match",
+                " shape rank",
+                ": indices →",
+                indices.__str__(),
+                "rank →",
+                self.rank().__str__(),
+            )
+
+        var flat = offset  # absolute base offset
+
+        # 2. Normalize negative indices, bounds-check, and accumulate
+        for dim_idx in range(len(indices)):
+            var idx = indices[dim_idx]
+            dim_size = self[dim_idx]
+
+            # allow negative indexing like Python/NumPy: -1 => last element
+            idx = idx + dim_size if idx < 0 else idx
+
+            # now validate
+            if idx < 0 or idx >= dim_size:
+                panic(
+                    "Shape → flatten_index: index out of bounds: axis",
+                    dim_idx.__str__(),
+                    ", got",
+                    indices[dim_idx].__str__(),
+                    ", size",
+                    dim_size.__str__(),
+                )
+
+            flat = flat + idx * strides[dim_idx]
+
+        return flat
+
+    @always_inline
     fn unravel_index(self, flat_index: Int) -> IntList:
         if flat_index < 0 or flat_index >= self.num_elements():
             panic(
