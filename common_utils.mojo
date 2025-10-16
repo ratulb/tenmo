@@ -1,5 +1,6 @@
 from shapes import Shape
 from tensors import Tensor
+from gradbox import Gradbox
 from sys.param_env import env_get_string
 from logger import Level, Logger
 from intlist import IntList
@@ -177,18 +178,104 @@ struct Slicer:
         )
         return _start, _end, _step
 
-
-fn print_tensor_recursive[
-    dtype: DType, //
+fn print_gradbox_recursive[
+    dtype: DType
 ](
-    tensor_ptr: UnsafePointer[Tensor[dtype]],
-    mut indices: IntList,
+    tensor_ptr: UnsafePointer[Gradbox[dtype]],
+    mut indices: List[Int],
     level: Int,
     num_first: Int = 10,
     num_last: Int = 10,
 ):
     if tensor_ptr[].rank() == 0:  # Tensor with Shape ()
-        print(tensor_ptr[][IntList()])
+        print(tensor_ptr[][[]])
+        return
+    current_dim = len(indices)
+    indent = " " * (level * 2)
+
+    if current_dim >= tensor_ptr[].rank():
+        print(
+            "ERROR: current_dim (",
+            current_dim,
+            ") >= ndim (",
+            tensor_ptr[].rank(),
+            ")",
+        )
+        return
+
+    size = tensor_ptr[].shape[current_dim]
+
+    if size < 0 or size > 1_000_000:
+        print(
+            "ERROR: suspicious size: ",
+            size,
+            "at dim ",
+            current_dim,
+            tensor_ptr[].shape.__str__(),
+        )
+        return
+
+    # Base case: last dimension (print actual elements)
+    if current_dim == tensor_ptr[].rank() - 1:
+        print(indent + "[", end="")
+
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                print(tensor_ptr[][indices], end="")
+                _ = indices.pop()
+                if i != size - 1:
+                    print(", ", end="")
+            elif i == num_first and size > num_first + num_last:
+                print("..., ", end="")
+            elif i >= size - num_last:
+                indices.append(i)
+                print(tensor_ptr[][indices], end="")
+                _ = indices.pop()
+                if i != size - 1:
+                    print(", ", end="")
+
+        print("]", end="")
+
+    else:
+        print(indent + "[")
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                print_gradbox_recursive(
+                    tensor_ptr, indices, level + 1, num_first, num_last
+                )
+                _ = indices.pop()
+            elif i == num_first and size > num_first + num_last:
+                print(indent + "  ...,")
+            elif i >= size - num_last:
+                indices.append(i)
+                print_gradbox_recursive(
+                    tensor_ptr, indices, level + 1, num_first, num_last
+                )
+                _ = indices.pop()
+
+            # Print comma and newline for all but last element
+            if i != size - 1 and (i < num_first or i >= size - num_last):
+                print(",")
+            # Special case: last element needs newline before closing bracket
+            elif i == size - 1:
+                print()  # Newline before closing bracket
+
+        print(indent + "]", end="")
+
+
+fn print_tensor_recursive[
+    dtype: DType
+](
+    tensor_ptr: UnsafePointer[Tensor[dtype]],
+    mut indices: List[Int],
+    level: Int,
+    num_first: Int = 10,
+    num_last: Int = 10,
+):
+    if tensor_ptr[].rank() == 0:  # Tensor with Shape ()
+        print(tensor_ptr[][[]])
         return
     current_dim = len(indices)
     indent = " " * (level * 2)

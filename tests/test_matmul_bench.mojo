@@ -44,7 +44,9 @@ fn main() raises:
         "runs: ",
         forward_backward_time / forward_only_time,
     )
-
+    expected.free()
+    A.free()
+    B.free()
 
 fn bench_tensor_tensor[
     dtype: DType, //

@@ -5,18 +5,9 @@ from operators import AddTensor
 from intlist import IntList
 from validators import Validator
 
-
+@fieldwise_init
 struct TransposeBackward[dtype: DType](Copyable & Movable):
     var axes: IntList
-
-    fn __init__(out self, axes: IntList):
-        self.axes = axes
-
-    fn __copyinit__(out self, existing: Self):
-        self.axes = existing.axes.copy()
-
-    fn __moveinit__(out self, deinit existing: Self):
-        self.axes = existing.axes^
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -40,8 +31,6 @@ struct TransposeBackward[dtype: DType](Copyable & Movable):
 @fieldwise_init
 @register_passable
 struct Transpose[dtype: DType](Copyable):
-    fn __copyinit__(out self, existing: Self):
-        pass
 
     @staticmethod
     fn forward[

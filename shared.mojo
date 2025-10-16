@@ -6,10 +6,38 @@ from ancestry import Ancestors
 from operators import AddTensor, SubtractTensor, Noop
 from common_utils import log_debug, panic
 from collections import Deque
-from common_utils import addr
+from common_utils import addr, id
+
+
+from testing import assert_true
+
 
 fn main() raises:
-    pass
+    test_tensorlite_basics()
+
+
+fn test_tensorlite_basics() raises:
+    a = Tensor.arange(5, requires_grad=True)
+    print("a.id(): ", a.id())
+    ptr = UnsafePointer[Tensor[DType.float32]].alloc(1)
+    print("ptr to int: ", Int(ptr))
+    ptr.init_pointee_copy(a)
+    tli = TensorLite[DType.float32](ptr)
+    tli.seed_grad(91)
+    assert_true(
+        a.gradbox[].all_close(
+            Tensor.d1([91.0, 91.0, 91.0, 91.0, 91.0]).float()
+        ),
+        "TensorLite grad setting assertion failed",
+    )
+    tli.tensor_address[][3] = 8989
+    t = tli.tensor()
+    print("t.id(): ", t.id())
+    t.print()
+    a.gradbox[].print()
+    print()
+    a.print()
+    tli.gradients()[].print()
 
 
 struct TensorLite[dtype: DType](
@@ -17,42 +45,38 @@ struct TensorLite[dtype: DType](
 ):
     alias TensorAddress = UnsafePointer[Tensor[dtype]]
     var tensor_address: Self.TensorAddress
+    var delegate: Tensor[dtype]
 
-    fn __init__(out self, tensor_ptr: Self.TensorAddress):
-        self.tensor_address = tensor_ptr
+    fn __init__(out self, tensor_address: Self.TensorAddress):
+        self.tensor_address = tensor_address
+        self.delegate = tensor_address[]
+        print("Inside TensorLite: ", self.delegate)
 
     fn __copyinit__(out self, other: Self):
         self.tensor_address = other.tensor_address.copy()
+        self.delegate = other.delegate.copy()
 
     fn __moveinit__(out self, deinit other: Self):
         self.tensor_address = other.tensor_address
+        self.delegate = other.delegate^
 
     fn __eq__(self, other: Self) -> Bool:
         return self.tensor_address == other.tensor_address
 
     @always_inline
     fn shape(self) -> Shape:
-        temp = self.tensor_address[]
-        shape = temp.shape.copy()
-        temp.free()
-        return shape
+        return self.delegate.shape
 
     @always_inline
     fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
-        temp = self.tensor_address[]
-        gradients = temp.gradients().copy()
-        temp.free()
-        return gradients
+        return self.delegate.gradients()
 
     @always_inline
     fn grad(self) -> Tensor[dtype]:
-        temp = self.tensor_address[]
-        grad = temp.grad()
-        temp.free()
-        return grad
+        return self.delegate.grad()
 
     @staticmethod
-    fn of(tensor: Tensor[dtype]) -> Self:
+    fn of(tensor: Tensor[dtype]) -> TensorLite[dtype]:
         return Self(addr(tensor))
 
     @always_inline
@@ -65,45 +89,26 @@ struct TensorLite[dtype: DType](
 
     @always_inline
     fn tensor(self) -> Tensor[dtype]:
-        return self.tensor_address[] #Caller needs to clean this up
+        return self.delegate  # Caller needs to clean this up
 
     fn has_ancestry(self) -> Bool:
-        temp = self.tensor_address[]
-        has = temp.has_ancestry()
-        temp.free()
-        return has
+        return self.delegate.has_ancestry()
 
     @always_inline
     fn ancestry(self) -> Ancestors[dtype]:
-        temp = self.tensor_address[]
-        ancestry = temp.ancestry()
-        temp.free()
-        return ancestry
+        return self.delegate.ancestry()
 
     @always_inline
     fn requires_grad(self) -> Bool:
-        temp = self.tensor_address[]
-        requires_grad = temp.requires_grad
-        temp.free()
-        return requires_grad
-
-    @always_inline
-    fn has_grad1(self) -> Bool:
-        return self.tensor_address[].has_grad()
+        return self.delegate.requires_grad
 
     @always_inline
     fn has_backward_fn(self) -> Bool:
-        temp = self.tensor_address[]
-        has = temp.has_backward_fn()
-        temp.free()
-        return has
+        return self.delegate.has_backward_fn()
 
     @always_inline
     fn backward_fn(self) -> BackwardFn[dtype]:
-        temp = self.tensor_address[]
-        func = temp.backward_fn()
-        temp.free()
-        return func
+        return self.delegate.backward_fn()
 
     fn __str__(self) -> String:
         return self.inner_id().__str__()
@@ -115,43 +120,35 @@ struct TensorLite[dtype: DType](
         writer.write(self.__str__())
 
     fn seed_grad(self, value: Scalar[dtype]):
-        temp = self.tensor_address[]
-        temp.seed_grad(value)
-        temp.free()
+        copy = self.delegate
+        copy.seed_grad(value)
 
     fn update_grad[opcode: Int](self, incoming: Tensor[dtype]):
-        temp = self.tensor_address[]
-        temp.update_grad[opcode](incoming)
-        temp.free()
+        copy = self.delegate
+        copy.update_grad[opcode](incoming)
 
     fn seed_grad(self, with_tensor: Tensor[dtype]):
-        temp = self.tensor_address[]
-        temp.seed_grad(with_tensor)
-        temp.free()
+        copy = self.delegate
+        copy.seed_grad(with_tensor)
 
     fn init_grad(self):
-        temp = self.tensor_address[]
-        temp.init_gradbox()
-        temp.free()
+        copy = self.delegate
+        copy.init_gradbox()
 
-    fn free(deinit self):
-        if self.tensor_address.__as_bool__():
-            id = self.inner_id()
-
-            self.tensor_address.destroy_pointee()
-            self.tensor_address.free()
-            log_debug("TensorLite deleted for inner_id: " + id.__str__())
-
+        _ = """fn nullify_ptr(mut self):
+        self.tensor_address = UnsafePointer[Tensor[dtype]]()"""
 
     fn __del__1(deinit self):
         if self.tensor_address.__as_bool__():
-            id = self.inner_id()
+            print(
+                "TensorLite __del__: cleaning up managed tensor",
+                self.delegate.id(),
+                self.delegate.has_grad(),
+            )
+            self.delegate.gradbox = UnsafePointer[Tensor[dtype]]()
+            _ = self.delegate^
 
-            self.tensor_address.destroy_pointee()
-            self.tensor_address.free()
-            log_debug("TensorLite deleted for inner_id: " + id.__str__())
-
-    fn backward(root: Self, start_grad: Scalar[dtype] = 1.0):
+    fn backward(root: TensorLite[dtype], start_grad: Scalar[dtype] = 1.0):
         if not root.requires_grad():
             return
         shape = root.shape()
@@ -214,10 +211,13 @@ struct TensorLite[dtype: DType](
                     for recipient, grad_share, opcode in edges:
                         # 1) sink grad into recipient (accumulate only!)
                         gs = GradStream[dtype](
-                            recipient, Optional(grad_share), opcode
+                            # recipient, Optional(grad_share), opcode
+                            recipient,
+                            grad_share,
+                            opcode,
                         )
                         gs.sink()
-                        #gs.free()
+                        # gs.free()
 
                         # 2) decrement parent's fan-in
                         pid = recipient.inner_id()
@@ -252,12 +252,6 @@ struct GradStream[dtype: DType](Copyable & Movable):
         self.grad = grad
         self.opcode = opcode
 
-    fn free(deinit self):
-        self.recipient.free()
-        if self.grad:
-            t = self.grad.take()
-            t.free()
-
     fn __copyinit__(out self, other: Self):
         self.recipient = other.recipient
         self.grad = other.grad
@@ -274,14 +268,6 @@ struct GradStream[dtype: DType](Copyable & Movable):
     fn inner_id(self) -> Int:
         return self.recipient.inner_id()
 
-    fn flow(self):
-        if self.recipient.has_backward_fn():
-            for recipient, grad_share, opcode in self.recipient.backward_fn()(
-                self.recipient
-            ):
-                gradstream = Self(recipient, Optional(grad_share), opcode)
-                gradstream.sink()
-
     fn sink(self):
         grad_share = self.grad.value()
         log_debug("sink(): to id=" + self.recipient.inner_id().__str__())
@@ -294,7 +280,9 @@ struct GradStream[dtype: DType](Copyable & Movable):
             grad_share
         )
 
-    fn edges(self) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
+    fn edges(
+        self,
+    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
         if not self.recipient.has_backward_fn():
             return []
         log_debug(
