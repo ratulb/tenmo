@@ -26,6 +26,10 @@ struct Gradbox[dtype: DType = DType.float32](
     var shape: Shape
     var buffer: Buffer[dtype]
 
+    fn __init__(out self):
+        self.shape = Shape.Void()
+        self.buffer = Buffer[dtype]()
+
     fn __init__(out self, shape: Shape):
         self.shape = shape.copy()
         # Take care of gradbox with Shape()
@@ -287,8 +291,8 @@ struct Gradbox[dtype: DType = DType.float32](
     @always_inline
     fn __iadd__[
         simd_width: Int = simd_width_of[dtype]()
-    ](self, incoming: Tensor[dtype]):
-        """Update existing gradients with adding incoming tensor values."""
+    ](self, incoming: Gradbox[dtype]):
+        """Update existing gradients with adding incoming grad values."""
         if self.shape != incoming.shape:
             panic(
                 "Gradbox → __iadd__: Shapes not equal -> ",
@@ -308,8 +312,8 @@ struct Gradbox[dtype: DType = DType.float32](
     @always_inline
     fn __isub__[
         simd_width: Int = simd_width_of[dtype]()
-    ](self, incoming: Tensor[dtype]):
-        """Update existing gradients with subtracting incoming tensor values."""
+    ](self, incoming: Gradbox[dtype]):
+        """Update existing gradients with subtracting incoming grad values."""
         if self.shape != incoming.shape:
             panic(
                 "Gradbox → __isub__: Shapes not equal -> ",
@@ -329,8 +333,8 @@ struct Gradbox[dtype: DType = DType.float32](
     @always_inline
     fn __imul__[
         simd_width: Int = simd_width_of[dtype]()
-    ](self, incoming: Tensor[dtype]):
-        """Update existing gradients with multiplying incoming tensor values."""
+    ](self, incoming: Gradbox[dtype]):
+        """Update existing gradients with multiplying incoming grad values."""
         if self.shape != incoming.shape:
             panic(
                 "Gradbox → __imul__(self, other): dimension mismatch: "
@@ -356,6 +360,13 @@ struct Gradbox[dtype: DType = DType.float32](
                 + other.shape.__str__(),
             )
         buffer = self.buffer - other.buffer
+        return Gradbox[dtype](self.shape.copy(), buffer^)
+
+    fn __rmul__(self, factor: Scalar[dtype]) -> Gradbox[dtype]:
+        return self.__mul__(factor)
+
+    fn __mul__(self, factor: Scalar[dtype]) -> Gradbox[dtype]:
+        buffer = self.buffer * factor
         return Gradbox[dtype](self.shape.copy(), buffer^)
 
     @always_inline
@@ -458,12 +469,3 @@ fn main() raises:
 
     a = gb.as_tensor()
     a.print()
-
-    gb += a
-
-    print("Post in place add")
-    gb.print()
-    tensor = Tensor.full(Shape(5, 3), 3891)
-    print(gb == tensor)
-
-    gb.diff(tensor).print()
