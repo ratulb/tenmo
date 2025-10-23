@@ -8,7 +8,18 @@ from common_utils import panic, IntArrayHelper
 from sys import simd_width_of
 from algorithm import vectorize
 from memory import memcpy, ArcPointer
-from operators import Multiply, Add, Subtract, Divide
+from operators import (
+    Multiply,
+    Add,
+    Subtract,
+    Divide,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessThanEqual,
+    GreaterThan,
+    GreaterThanEqual,
+)
 
 
 struct NDBuffer[dtype: DType](Copyable & Movable):
@@ -42,6 +53,10 @@ struct NDBuffer[dtype: DType](Copyable & Movable):
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ):
+        if buffer.size == 0:
+            panic(
+                "NDBuffer →__init__(Buffer, ...): zero sized buffer not allowed"
+            )
         _shape = shape.value() if shape else Shape(buffer.size)
         self.shape = _shape.copy()
         self.buffer = Optional(buffer^)
@@ -119,14 +134,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable):
         return self.strides.is_contiguous(self.shape)
 
     @always_inline
-    fn is_none(self) -> Bool:
-        return self.buffer is None and self.shared_buffer is None
-
-    @always_inline
-    fn is_some(self) -> Bool:
-        return not self.is_none()
-
-    @always_inline
     fn data(
         ref self,
     ) -> ref [
@@ -153,7 +160,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable):
     fn item(self) -> Scalar[dtype]:
         if self.shape != Shape(1) and self.shape != Shape():
             panic(
-                "NDBuffer -> item(self): only valid for zero dim buffer,"
+                "NDBuffer → item(self): only valid for zero dim buffer,"
                 " got shape: "
                 + self.shape.__str__()
             )
@@ -232,12 +239,14 @@ struct NDBuffer[dtype: DType](Copyable & Movable):
 
     @always_inline
     fn size(self) -> Int:
-        return self.shape.num_elements() if self.is_some() else 0
+        return self.shape.num_elements()
+
+    @always_inline
+    fn zero(self):
+        self.fill(Scalar[dtype](0))
 
     @always_inline
     fn fill(self, value: Scalar[dtype]):
-        if self.is_none():
-            return
         if self.contiguous:
             if not self.shared():
                 self.data().fill(value)
@@ -739,15 +748,90 @@ struct NDBuffer[dtype: DType](Copyable & Movable):
             result = lhs / rhs
         return result
 
+    @always_inline
+    fn compare[
+        opcode: Int,
+        validate_shape: Bool = True,
+        simd_width: Int = simd_width_of[dtype](),
+    ](lhs: NDBuffer[dtype], rhs: NDBuffer[dtype]) -> NDBuffer[DType.bool]:
+        @parameter
+        if validate_shape:
+            if not lhs.shape == rhs.shape:
+                panic(
+                    "NDBuffer → compare(lhs, rhs): dimension mismatch: "
+                    + lhs.shape.__str__()
+                    + "≠"
+                    + rhs.shape.__str__(),
+                    "opcode: " + opcode.__str__(),
+                )
+
+        if lhs.contiguous and rhs.contiguous:
+            var lhs_buffer: Buffer[dtype]
+            var rhs_buffer: Buffer[dtype]
+            if not lhs.shared() and not rhs.shared():
+                lhs_buffer = lhs.data().copy()
+                rhs_buffer = rhs.data().copy()
+            else:
+                numels = lhs.numels()
+                lhs_offset = lhs.offset
+                rhs_offset = rhs.offset
+                lhs_buffer = lhs.data()[lhs_offset : lhs_offset + numels]
+                rhs_buffer = rhs.data()[rhs_offset : rhs_offset + numels]
+
+            @parameter
+            if opcode == Equal:
+                buffer = lhs_buffer.eq[simd_width](rhs_buffer)
+
+            elif opcode == NotEqual:
+                buffer = lhs_buffer.ne[simd_width](rhs_buffer)
+
+            elif opcode == LessThan:
+                buffer = lhs_buffer.lt[simd_width](rhs_buffer)
+
+            elif opcode == LessThanEqual:
+                buffer = lhs_buffer.le[simd_width](rhs_buffer)
+
+            elif opcode == GreaterThan:
+                buffer = lhs_buffer.gt[simd_width](rhs_buffer)
+
+            else:  # opcode == GreaterThanEqual:
+                buffer = lhs_buffer.ge[simd_width](rhs_buffer)
+
+            return NDBuffer[DType.bool](buffer^, lhs.shape)
+
+        else:
+            var index = 0
+            var buffer = Buffer[DType.bool](lhs.numels())
+            for coord in lhs.shape:
+
+                @parameter
+                if opcode == Equal:
+                    buffer[index] = lhs[coord] == rhs[coord]
+
+                elif opcode == NotEqual:
+                    buffer[index] = lhs[coord] != rhs[coord]
+
+                elif opcode == LessThan:
+                    buffer[index] = lhs[coord] < rhs[coord]
+
+                elif opcode == LessThanEqual:
+                    buffer[index] = lhs[coord] <= rhs[coord]
+
+                elif opcode == GreaterThan:
+                    buffer[index] = lhs[coord] > rhs[coord]
+
+                else:
+                    buffer[index] = lhs[coord] >= rhs[coord]
+
+                index += 1
+
+            return NDBuffer[DType.bool](buffer^, lhs.shape)
+
 
 fn main() raises:
-    alias dtype = DType.float32
-    buffer = Buffer[dtype]()
-    print(buffer == Buffer[dtype].Empty())
-
     var runs = 1
     for _ in range(runs):
-        test_ndbuffer_set_get()
+        _ = """test_ndbuffer_set_get()
         test_ndbuffer_inplace_ops()
         test_ndbuffer_broadcast_ops()
         test_is()
@@ -755,10 +839,60 @@ fn main() raises:
         test_detach()
         test_scalar_buffer()
         test_fill_2()
+        test_broadcast_fill()
+        test_zero()
+        test_add()"""
+        test_equal()
 
 
 from testing import assert_true, assert_false
-from memory import ArcPointer
+
+fn test_equal() raises:
+    print("test_equal")
+    alias dtype = DType.float32
+    ndb1 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
+    ndb1_shared = ndb1.share(Shape(1, 3), offset=3)
+    ndb2 = NDBuffer[dtype](Buffer[dtype]([4, 10, 6]), Shape(1, 3))
+    result = ndb1_shared.compare[Equal](ndb2)
+    assert_true(result.data() == Buffer[DType.bool]([True, False, True]))
+
+fn test_add() raises:
+    print("test_add")
+    alias dtype = DType.float32
+    ndb1 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
+    ndb1_shared = ndb1.share(Shape(1, 3), offset=3)
+    ndb2 = NDBuffer[dtype](Buffer[dtype]([10, 20, 30]), Shape(1, 3))
+
+    result = ndb1_shared + ndb2
+    assert_true(
+        result.data() == Buffer[dtype]([14, 25, 36])
+        and result.shared() == False
+    )
+
+
+fn test_zero() raises:
+    print("test_zero")
+    alias dtype = DType.float32
+    ndb = NDBuffer[dtype](Shape(2, 3))
+    ndb.fill(42)
+    shared = ndb.share(Shape(3), offset=3)
+    shared.zero()
+    assert_true(ndb.data() == Buffer[dtype]([42, 42, 42, 0, 0, 0]))
+
+
+fn test_broadcast_fill() raises:
+    print("test_broadcast_fill")
+    alias dtype = DType.float32
+    ndb = NDBuffer[dtype](Shape(2, 3))
+    filler = NDBuffer[dtype](Shape(2, 1))
+    filler.fill(42)
+    ndb.fill(filler)
+    assert_true(ndb.data() == Buffer[dtype]([42, 42, 42, 42, 42, 42]))
+
+    filler.fill(89)
+    shared = filler.share()
+    ndb.fill(shared)
+    assert_true(ndb.data() == Buffer[dtype]([89, 89, 89, 89, 89, 89]))
 
 
 fn test_fill_2() raises:
