@@ -29,17 +29,24 @@ struct NDBuffer[dtype: DType](Copyable & Movable):
         self.offset = 0
         self.contiguous = True
 
+    fn __init__(out self, *values: Scalar[dtype]):
+        buffer = Buffer[dtype](len(values))
+        for i in range(len(values)):
+            buffer[i] = values[i]
+        self = NDBuffer[dtype](buffer^)
+
     fn __init__(
         out self,
         var buffer: Buffer[dtype],
-        shape: Shape,
+        shape: Optional[Shape] = None,
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ):
+        _shape = shape.value() if shape else Shape(buffer.size)
+        self.shape = _shape.copy()
         self.buffer = Optional(buffer^)
         self.shared_buffer = None
-        self.shape = shape.copy()
-        self.strides = strides.value() if strides else Strides.default(shape)
+        self.strides = strides.value() if strides else Strides.default(_shape)
         self.offset = offset
         self.contiguous = False
         self.contiguous = self.is_contiguous()
@@ -141,7 +148,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-
         self.data()[index] = value
 
     fn item(self) -> Scalar[dtype]:
@@ -252,60 +258,64 @@ struct NDBuffer[dtype: DType](Copyable & Movable):
         return False
 
     @always_inline
-    fn fill(lhs, rhs: NDBuffer[dtype]):
-        if not ShapeBroadcaster.broadcastable(lhs.shape, rhs.shape):
-            panic("NDBuffer → fill(lhs, rhs): dimension mismatch: lhs shape", lhs.shape.__str__(), "≠", "rhs shape", rhs.shape.__str__())
-        if rhs.is_scalar() or rhs.shape == Shape.Unit():
+    fn fill(lhs, other: NDBuffer[dtype]):
+        var src_shape = other.shape
+        var target_shape = lhs.shape
+        if not ShapeBroadcaster.broadcastable(src_shape, target_shape):
+            panic(
+                "NDBuffer → fill(lhs, other): dimension mismatch: lhs shape",
+                target_shape.__str__(),
+                "≠",
+                "other shape",
+                src_shape.__str__(),
+            )
+        if other.is_scalar() or src_shape == Shape.Unit():
             lhs.fill(
-                rhs.item()
+                other.item()
             )  # Scalar/Singleton NDBuffer - shared or otherwise
             return
-
+        # Detach if same storage
+        rhs = other.detach() if other is lhs else other.copy()
         if lhs.numels() == rhs.numels():
-            if not lhs is rhs:  # Same storage check
-                if lhs.contiguous and rhs.contiguous:
-                    count = lhs.size()
-                    ref dest = lhs.data()
-                    ref src = rhs.data()
-                    offset_dest = lhs.offset
-                    offset_src = rhs.offset
+            if lhs.contiguous and rhs.contiguous:
+                count = lhs.size()
+                ref dest = lhs.data()
+                ref src = rhs.data()
+                offset_dest = lhs.offset
+                offset_src = rhs.offset
 
-                    memcpy(
-                        dest=dest.data + offset_dest,
-                        src=src.data + offset_src,
-                        count=count,
-                    )
-                elif lhs.contiguous and not rhs.contiguous:
-                    index = 0
-                    offset = lhs.offset
-                    ref dest = lhs.data()
-                    for coord in rhs.shape:
-                        dest[index + offset] = rhs[coord]
-                        index += 1
+                memcpy(
+                    dest=dest.data + offset_dest,
+                    src=src.data + offset_src,
+                    count=count,
+                )
+            elif lhs.contiguous and not rhs.contiguous:
+                index = 0
+                offset = lhs.offset
+                ref dest = lhs.data()
+                for coord in src_shape:
+                    dest[index + offset] = rhs[coord]
+                    index += 1
 
-                elif not lhs.contiguous and rhs.contiguous:
-                    index = 0
-                    offset = rhs.offset
-                    ref src = rhs.data()
-                    for coord in lhs.shape:
-                        lhs[coord] = src[index + offset]
-                        index += 1
+            elif not lhs.contiguous and rhs.contiguous:
+                index = 0
+                offset = rhs.offset
+                ref src = rhs.data()
+                for coord in target_shape:
+                    lhs[coord] = src[index + offset]
+                    index += 1
+
+            else:
+                for coord in target_shape:
+                    lhs[coord] = rhs[coord]
 
         else:  # Handle broadcast
-            pass
-
-        _ = """if self.contiguous:
-            if not self.shared():
-                self.data().fill(value)
-            else:
-                var start = self.offset
-                var end = start + self.numels()
-                ref buffer = self.shared_buffer.value()[]
-                for i in range(start, end):
-                    buffer[i] = value
-        else:
-            for coord in self.shape:
-                self[coord] = value"""
+            mask = ShapeBroadcaster.broadcast_mask(src_shape, target_shape)
+            for coord in target_shape:
+                src_coord = ShapeBroadcaster.translate_index(
+                    src_shape, coord, mask, target_shape
+                )
+                lhs[coord] = rhs[src_coord]
 
     @always_inline
     fn buffer_scalar_arithmetic_ops[
@@ -731,6 +741,10 @@ struct NDBuffer[dtype: DType](Copyable & Movable):
 
 
 fn main() raises:
+    alias dtype = DType.float32
+    buffer = Buffer[dtype]()
+    print(buffer == Buffer[dtype].Empty())
+
     var runs = 1
     for _ in range(runs):
         test_ndbuffer_set_get()
@@ -765,6 +779,7 @@ fn test_fill_2() raises:
     assert_true(shared1.data() == Buffer[dtype]([91, 91, 91, 92, 92, 92]))
     assert_true(ndb.data() == Buffer[dtype]([91, 91, 91, 92, 92, 92]))
 
+    # Left contiguous, right non-contiguous
     ndb = NDBuffer[dtype](Shape(2, 2))
     filler = NDBuffer[dtype](Shape(2, 1, 4))
     filler.fill(102)
@@ -772,7 +787,7 @@ fn test_fill_2() raises:
     ndb.fill(filler_shared)
 
     assert_true(ndb.data() == Buffer[dtype]([102, 102, 102, 102]))
-
+    # Both shared
     ndb = NDBuffer[dtype](Shape(2, 2))
     filler_shared.fill(31)
     ndb_shared = ndb.share()
@@ -788,7 +803,7 @@ fn test_fill_2() raises:
         ndb.data() == Buffer[dtype]([1919, 1919, 1919, 1919])
         and not filler_shared.contiguous,
     )
-
+    # Left non-contiguous and right contiguous
     filler1 = NDBuffer[dtype](Shape(2, 2))
     filler1.fill(47)
 
@@ -796,6 +811,77 @@ fn test_fill_2() raises:
     ndb1.fill(1)
     ndb_shared1 = ndb1.share(Shape(2, 2), strides=Strides.of(1, 2), offset=1)
     ndb_shared1.fill(filler1)
+
+    assert_true(ndb1.data() == Buffer[dtype]([1, 47, 47, 47, 47, 1, 1, 1]))
+
+    # left and right No contiguous
+
+    ndb1 = NDBuffer[dtype](
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+    )
+    ndb1_shared = ndb1.share(Shape(2, 3), strides=Strides.of(1, 2), offset=12)
+
+    ndb2 = NDBuffer[dtype](
+        10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160
+    )
+    ndb2_shared = ndb2.share(Shape(2, 3), strides=Strides.of(1, 3), offset=0)
+
+    ndb1_shared.fill(ndb2_shared)
+
+    assert_true(
+        ndb1.data()
+        == Buffer[dtype](
+            [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                10,
+                20,
+                40,
+                50,
+                70,
+                80,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+            ]
+        )
+    )
 
 
 fn test_scalar_buffer() raises:
