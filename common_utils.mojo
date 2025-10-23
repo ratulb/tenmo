@@ -1,5 +1,5 @@
 from shapes import Shape
-from tensors import Tensor
+from tenmo import Tensor
 from gradbox import Gradbox
 from sys.param_env import env_get_string
 from logger import Level, Logger
@@ -9,8 +9,8 @@ from layers import Sequential, Linear, ReLU
 # from strides import Strides
 from os import abort
 from utils import Variant
-from builtin._location import __call_location, _SourceLocation
 from testing import assert_true
+from layout.int_tuple import IntArray
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -19,11 +19,34 @@ alias log = Logger[Level._from_str(LOG_LEVEL)]()
 alias RED: String = "\033[31m"
 alias CYAN: String = "\033[36m"
 alias MAGENTA: String = "\033[35m"
+alias BLUE: String = "\033[34m"  # Standard blue
+alias YELLOW: String = "\033[33m"  # Standard yellow
+alias RESET: String = "\033[0m"
+
+# Bright variants (more vibrant)
+alias BRIGHT_BLUE: String = "\033[94m"
 
 
-@always_inline
-fn is_power_of_two(x: Int) -> Bool:
-    return x > 0 and (x & (x - 1)) == 0
+fn log_debug(msg: String, color: String = RED):
+    log.debug(color + msg + RESET.__str__())
+
+
+fn log_info(msg: String, color: String = BRIGHT_BLUE):
+    log.info(color + msg + RESET.__str__())
+
+
+fn log_warning(msg: String, color: String = YELLOW):
+    log.warning(color + msg + RESET.__str__())
+
+
+@always_inline("nodebug")
+fn panic(*s: String):
+    var message = String(capacity=len(s))
+    if len(s) > 0:
+        message += s[0].strip()
+        for i in range(1, len(s)):
+            message += " " + s[i].strip()
+    abort(RED + message + RESET.__str__())
 
 
 fn id[type: AnyType, //](t: type) -> Int:
@@ -43,39 +66,6 @@ fn addrs[type: AnyType, //](*ts: type) -> List[UnsafePointer[type]]:
 
 fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
     return ptr.__as_bool__() == False
-
-
-@always_inline("nodebug")
-fn panic[depth: Int = 1](*s: String):
-    var message = String(capacity=len(s))
-    if len(s) > 0:
-        message += s[0].strip()
-        for i in range(1, len(s)):
-            message += " " + s[i].strip()
-
-    loc = __call_location[inline_count=depth]()
-    message += (
-        " at "
-        + loc.file_name
-        + ":"
-        + loc.line.__str__()
-        + ":"
-        + loc.col.__str__()
-    )
-    abort(message)
-
-
-fn log_debug(msg: String, color: String = ""):
-    var reset = "\033[0m"
-    log.debug(color + msg + reset)
-
-
-fn log_info(msg: String):
-    log.info(msg)
-
-
-fn log_warning(msg: String):
-    log.warning(msg)
 
 
 # Helper
@@ -100,7 +90,7 @@ def assert_grad[
     )
 
 
-fn variadiclist_as_str(list: VariadicList[Int]) -> String:
+fn variadiclist_as_str1(list: VariadicList[Int]) -> String:
     s = String("[")
     for idx in range(len(list)):
         s += list[idx].__str__()
@@ -178,32 +168,33 @@ struct Slicer:
         )
         return _start, _end, _step
 
+
 fn print_gradbox_recursive[
     dtype: DType
 ](
-    tensor_ptr: UnsafePointer[Gradbox[dtype]],
+    grad_ptr: UnsafePointer[Gradbox[dtype]],
     mut indices: List[Int],
     level: Int,
     num_first: Int = 10,
     num_last: Int = 10,
 ):
-    if tensor_ptr[].rank() == 0:  # Tensor with Shape ()
-        print(tensor_ptr[][[]])
+    if grad_ptr[].rank() == 0:  # Tensor with Shape ()
+        print(grad_ptr[][[]])
         return
     current_dim = len(indices)
     indent = " " * (level * 2)
 
-    if current_dim >= tensor_ptr[].rank():
+    if current_dim >= grad_ptr[].rank():
         print(
             "ERROR: current_dim (",
             current_dim,
             ") >= ndim (",
-            tensor_ptr[].rank(),
+            grad_ptr[].rank(),
             ")",
         )
         return
 
-    size = tensor_ptr[].shape[current_dim]
+    size = grad_ptr[].shape[current_dim]
 
     if size < 0 or size > 1_000_000:
         print(
@@ -211,18 +202,18 @@ fn print_gradbox_recursive[
             size,
             "at dim ",
             current_dim,
-            tensor_ptr[].shape.__str__(),
+            grad_ptr[].shape.__str__(),
         )
         return
 
     # Base case: last dimension (print actual elements)
-    if current_dim == tensor_ptr[].rank() - 1:
+    if current_dim == grad_ptr[].rank() - 1:
         print(indent + "[", end="")
 
         for i in range(size):
             if i < num_first:
                 indices.append(i)
-                print(tensor_ptr[][indices], end="")
+                print(grad_ptr[][indices], end="")
                 _ = indices.pop()
                 if i != size - 1:
                     print(", ", end="")
@@ -230,7 +221,7 @@ fn print_gradbox_recursive[
                 print("..., ", end="")
             elif i >= size - num_last:
                 indices.append(i)
-                print(tensor_ptr[][indices], end="")
+                print(grad_ptr[][indices], end="")
                 _ = indices.pop()
                 if i != size - 1:
                     print(", ", end="")
@@ -243,7 +234,7 @@ fn print_gradbox_recursive[
             if i < num_first:
                 indices.append(i)
                 print_gradbox_recursive(
-                    tensor_ptr, indices, level + 1, num_first, num_last
+                    grad_ptr, indices, level + 1, num_first, num_last
                 )
                 _ = indices.pop()
             elif i == num_first and size > num_first + num_last:
@@ -251,7 +242,7 @@ fn print_gradbox_recursive[
             elif i >= size - num_last:
                 indices.append(i)
                 print_gradbox_recursive(
-                    tensor_ptr, indices, level + 1, num_first, num_last
+                    grad_ptr, indices, level + 1, num_first, num_last
                 )
                 _ = indices.pop()
 
@@ -268,29 +259,29 @@ fn print_gradbox_recursive[
 fn print_tensor_recursive[
     dtype: DType
 ](
-    tensor_ptr: UnsafePointer[Tensor[dtype]],
+    read tensor_ptr: Tensor[dtype],
     mut indices: List[Int],
     level: Int,
     num_first: Int = 10,
     num_last: Int = 10,
 ):
-    if tensor_ptr[].rank() == 0:  # Tensor with Shape ()
-        print(tensor_ptr[][[]])
+    if tensor_ptr.rank() == 0:  # Tensor with Shape ()
+        print(tensor_ptr[[]])
         return
     current_dim = len(indices)
     indent = " " * (level * 2)
 
-    if current_dim >= tensor_ptr[].rank():
+    if current_dim >= tensor_ptr.rank():
         print(
             "ERROR: current_dim (",
             current_dim,
             ") >= ndim (",
-            tensor_ptr[].rank(),
+            tensor_ptr.rank(),
             ")",
         )
         return
 
-    size = tensor_ptr[].shape[current_dim]
+    size = tensor_ptr.shape[current_dim]
 
     if size < 0 or size > 1_000_000:
         print(
@@ -298,18 +289,18 @@ fn print_tensor_recursive[
             size,
             "at dim ",
             current_dim,
-            tensor_ptr[].shape.__str__(),
+            tensor_ptr.shape.__str__(),
         )
         return
 
     # Base case: last dimension (print actual elements)
-    if current_dim == tensor_ptr[].rank() - 1:
+    if current_dim == tensor_ptr.rank() - 1:
         print(indent + "[", end="")
 
         for i in range(size):
             if i < num_first:
                 indices.append(i)
-                print(tensor_ptr[][indices], end="")
+                print(tensor_ptr[indices], end="")
                 _ = indices.pop()
                 if i != size - 1:
                     print(", ", end="")
@@ -317,7 +308,7 @@ fn print_tensor_recursive[
                 print("..., ", end="")
             elif i >= size - num_last:
                 indices.append(i)
-                print(tensor_ptr[][indices], end="")
+                print(tensor_ptr[indices], end="")
                 _ = indices.pop()
                 if i != size - 1:
                     print(", ", end="")
@@ -350,6 +341,32 @@ fn print_tensor_recursive[
                 print()  # Newline before closing bracket
 
         print(indent + "]", end="")
+
+
+@register_passable
+struct IntArrayHelper(Copyable):
+    @staticmethod
+    fn print(arr: IntArray):
+        for i in range(arr.size()):
+            end = ", " if i < arr.size() - 1 else "\n"
+            print(arr[i], end=end)
+
+    @staticmethod
+    fn extend(arr: IntArray, *elems: Int) -> IntArray:
+        out = IntArray(arr.size() + len(elems))
+        out.copy_from(0, arr, arr.size())
+        idx = 0
+        for i in range(arr.size(), arr.size() + len(elems)):
+            out[i] = elems[idx]
+            idx += 1
+        return out
+
+    @staticmethod
+    fn from_list(l: List[Int]) -> IntArray:
+        out = IntArray(size=len(l))
+        for i in range(len(l)):
+            out[i] = l[i]
+        return out
 
 
 # Utility repeat function
@@ -473,8 +490,10 @@ fn print_summary[
 
 
 fn main() raises:
-    a = Tensor.arange(24, requires_grad=True).reshape(2, 3, 4)
+    _ = """a = Tensor.arange(24, requires_grad=True).reshape(2, 3, 4)
     b = Tensor.scalar(10)
     l = addrs(a, b)
     for e in l:
-        e[].print()
+        e[].print()"""
+    l = List(8, 9, 0)
+    IntArrayHelper.print(IntArrayHelper.from_list(l))
