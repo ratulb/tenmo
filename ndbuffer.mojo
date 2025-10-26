@@ -312,7 +312,8 @@ struct NDBuffer[dtype: DType](
         ] = Self.buffer_pass_thru,
         scalar_thru: fn (Scalar[dtype]) -> Scalar[
             dtype
-            ] = Self.scalar_pass_thru, apply: Bool = False
+        ] = Self.scalar_pass_thru,
+        apply: Bool = False,
     ](self) -> Buffer[dtype]:
         """Returns a contiguous copy of the buffer with the same data."""
         # - same shape
@@ -321,6 +322,7 @@ struct NDBuffer[dtype: DType](
         # - copies data from original
         if self._contiguous:
             if not self.shared():
+
                 @parameter
                 if apply:
                     return buffer_thru(self.buffer.value())
@@ -329,6 +331,7 @@ struct NDBuffer[dtype: DType](
             else:
                 var start = self.offset
                 var end = start + self.numels()
+
                 @parameter
                 if apply:
                     return buffer_thru(self.shared_buffer.value()[][start:end])
@@ -338,6 +341,7 @@ struct NDBuffer[dtype: DType](
             var buffer = Buffer[dtype](self.numels())
             var index = 0
             for coord in self.shape:
+
                 @parameter
                 if apply:
                     buffer[index] = scalar_thru(self[coord])
@@ -919,6 +923,14 @@ struct NDBuffer[dtype: DType](
         opcode: Int,
         simd_width: Int = simd_width_of[dtype](),
     ](self: NDBuffer[dtype], scalar: Scalar[dtype]) -> NDBuffer[dtype]:
+        @parameter
+        if opcode == Divide:
+            if scalar == Scalar[dtype](0):
+                panic(
+                    "NDBuffer -> buffer_scalar_ops(self, scalar): can not"
+                        " divide by zero"
+                )
+
         if self._contiguous:
             var buffer: Buffer[dtype]
             if not self.shared():
@@ -938,12 +950,7 @@ struct NDBuffer[dtype: DType](
             elif opcode == Subtract:
                 buffer = buffer - scalar
 
-            else:
-                if scalar == Scalar[dtype](0):
-                    panic(
-                        "NDBuffer -> buffer_scalar_ops(self, scalar): can not"
-                        " divide by zero"
-                    )
+            else: # Divide
                 buffer = buffer / scalar
 
             return NDBuffer[dtype](buffer^, self.shape)
@@ -1156,9 +1163,11 @@ struct NDBuffer[dtype: DType](
     fn __abs__(self) -> NDBuffer[dtype]:
         fn buff_abs(b: Buffer[dtype]) -> Buffer[dtype]:
             return b.__abs__()
+
         fn scalar_abs(s: Scalar[dtype]) -> Scalar[dtype]:
             return s.__abs__()
-        #buffer = self.contiguous_buffer().__abs__()
+
+        # buffer = self.contiguous_buffer().__abs__()
         buffer = self.contiguous_buffer[buff_abs, scalar_abs, True]()
         return NDBuffer[dtype](buffer^, self.shape)
 
