@@ -3,12 +3,31 @@ from common_utils import panic
 from layout.int_tuple import IntArray
 from intlist import IntList
 
-fn main():
-    pass
+from testing import assert_true
+
+
+fn main() raises:
+    test_validate_broadcast_mask()
+
+
+fn test_validate_broadcast_mask() raises:
+    print("test_validate_broadcast_mask")
+    s1 = Shape(4, 2)
+    s2 = Shape(1, 2)
+    mask = ShapeBroadcaster.broadcast_mask(s2, s1)
+
+    assert_true(mask == IntList(1, 0), "broadcast mask assertion 1 failed")
+
+    s1 = Shape(5, 4, 3)
+    s2 = Shape(4, 3)
+    mask = ShapeBroadcaster.broadcast_mask(s2, s1)
+    assert_true(mask == IntList(1, 0, 0), "broadcast mask assertion 2 failed")
+
 
 @register_passable
 struct ShapeBroadcaster:
-    """Utility for broadcasting and manipulating shapes for tensor operations."""
+    """Utility for broadcasting and manipulating shapes for tensor operations.
+    """
 
     @always_inline
     @staticmethod
@@ -31,15 +50,20 @@ struct ShapeBroadcaster:
 
     @always_inline
     @staticmethod
-    fn broadcast_shape(this: Shape, that: Shape) -> Shape:
+    fn broadcast_shape[
+        validated: Bool = False
+    ](this: Shape, that: Shape) -> Shape:
         """Compute the broadcasted shape from two input shapes."""
-        if not ShapeBroadcaster.broadcastable(this, that):
-            panic(
-                "ShapeBroadcaster → broadcast_shape - not broadcastable: "
-                + this.__str__()
-                + " <=> "
-                + that.__str__()
-            )
+
+        @parameter
+        if not validated:
+            if not ShapeBroadcaster.broadcastable(this, that):
+                panic(
+                    "ShapeBroadcaster → broadcast_shape - not broadcastable: "
+                    + this.__str__()
+                    + " <=> "
+                    + that.__str__()
+                )
         # Explicitly handle true scalars (Shape())
         if this == Shape():
             return that.copy()  # Scalar + Tensor -> Tensor's shape
@@ -62,7 +86,8 @@ struct ShapeBroadcaster:
                 result_shape.append(dims[0])
             else:
                 panic(
-                    "ShapeBroadcaster → broadcast_shape - cannot broadcast shapes: "
+                    "ShapeBroadcaster → broadcast_shape - cannot broadcast"
+                    " shapes: "
                     + this.__str__()
                     + ", "
                     + that.__str__()
@@ -76,7 +101,7 @@ struct ShapeBroadcaster:
         original_shape: Shape,
         indices: IntArray,
         mask: IntArray,
-        broadcast_shape: Shape
+        broadcast_shape: Shape,
     ) -> IntArray:
         """Translate broadcasted indices to original tensor indices.
 
@@ -92,17 +117,18 @@ struct ShapeBroadcaster:
         # Input Validation
         if original_shape.ndim > broadcast_shape.ndim:
             panic(
-                "ShapeBroadcaster → translate_index: original dims greater than broadcast"
-                " dims"
+                "ShapeBroadcaster → translate_index: original dims greater than"
+                " broadcast dims"
             )
         if mask.size() != broadcast_shape.ndim:
             panic(
-                "ShapeBroadcaster → translate_index: mask size does not match broadcast ndim"
+                "ShapeBroadcaster → translate_index: mask size does not match"
+                " broadcast ndim"
             )
         if indices.size() != broadcast_shape.ndim:
             panic(
-                "ShapeBroadcaster → translate_index: indices size does not match broadcast"
-                " ndim"
+                "ShapeBroadcaster → translate_index: indices size does not"
+                " match broadcast ndim"
             )
 
         var translated = IntArray(size=original_shape.ndim)
@@ -119,8 +145,8 @@ struct ShapeBroadcaster:
                 # CRITICAL: Check if the index is valid for the original shape
                 if original_index >= original_shape[i]:
                     panic(
-                        "ShapeBroadcaster → translate_index: index out of bounds for"
-                        " original tensor"
+                        "ShapeBroadcaster → translate_index: index out of"
+                        " bounds for original tensor"
                     )
                 translated[i] = original_index
 
@@ -141,14 +167,44 @@ struct ShapeBroadcaster:
 
     @always_inline
     @staticmethod
-    fn broadcast_mask(original_shape: Shape, target_shape: Shape) -> IntArray:
-        """Create a broadcast mask indicating which dimensions are broadcasted."""
+    fn broadcast_mask1(original_shape: Shape, target_shape: Shape) -> IntArray:
+        """Create a broadcast mask indicating which dimensions are broadcasted.
+        """
         var mask = IntArray(size=target_shape.ndim)
         var offset = target_shape.ndim - original_shape.ndim
         if offset < 0:
             panic(
-                "ShapeBroadcaster → broadcast_mask → target_shape.ndim is smaller than"
-                " original_shape.ndim: "
+                "ShapeBroadcaster → broadcast_mask → target_shape.ndim is"
+                " smaller than original_shape.ndim: "
+                + String(target_shape.ndim)
+                + ", "
+                + String(original_shape.ndim)
+            )
+
+        for i in range(target_shape.ndim):
+            if i < offset:
+                mask[i] = 1  # original_shape has no dimension here
+            else:
+                var base_dim = original_shape[i - offset]
+                var target_dim = target_shape[i]
+                if base_dim == 1 and target_dim != 1:
+                    mask[i] = 1  # original_shape is being expanded
+                else:
+                    mask[i] = 0  # match or both 1 → not broadcasted
+
+        return mask^
+
+    @always_inline
+    @staticmethod
+    fn broadcast_mask(original_shape: Shape, target_shape: Shape) -> IntList:
+        """Create a broadcast mask indicating which dimensions are broadcasted.
+        """
+        var mask = IntList.with_capacity(capacity=target_shape.ndim)
+        var offset = target_shape.ndim - original_shape.ndim
+        if offset < 0:
+            panic(
+                "ShapeBroadcaster → broadcast_mask → target_shape.ndim is"
+                " smaller than original_shape.ndim: "
                 + String(target_shape.ndim)
                 + ", "
                 + String(original_shape.ndim)
