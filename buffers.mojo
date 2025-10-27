@@ -418,6 +418,34 @@ struct Buffer[dtype: DType = DType.float32](
 
         vectorize[inplace_add_scalar, simd_width](this.size)
 
+    fn __isub__[
+        simd_width: Int = simd_width_of[dtype]()
+    ](this: Buffer[dtype], scalar: Scalar[dtype]):
+        constrained[
+            dtype.is_numeric(),
+            "Buffer → __isub__(scalar) is for numeric data types only",
+        ]()
+
+        @parameter
+        fn inplace_sub_scalar[simdwidth: Int](idx: Int):
+            this.store[simdwidth](idx, this.load[simdwidth](idx) - scalar)
+
+        vectorize[inplace_sub_scalar, simd_width](this.size)
+
+    fn __imul__[
+        simd_width: Int = simd_width_of[dtype]()
+    ](this: Buffer[dtype], scalar: Scalar[dtype]):
+        constrained[
+            dtype.is_numeric(),
+            "Buffer → __imul__(scalar) is for numeric data types only",
+        ]()
+
+        @parameter
+        fn inplace_mul_scalar[simdwidth: Int](idx: Int):
+            this.store[simdwidth](idx, this.load[simdwidth](idx) * scalar)
+
+        vectorize[inplace_mul_scalar, simd_width](this.size)
+
     fn __itruediv__[
         simd_width: Int = simd_width_of[dtype]()
     ](this: Buffer[dtype], scalar: Scalar[dtype]):
@@ -535,6 +563,11 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     fn exp(self) -> Buffer[dtype]:
+        constrained[
+            dtype.is_floating_point(),
+            "Buffer → exp is for numeric data types only",
+        ]()
+
         total = self.size
         out = Buffer[dtype](total)
 
@@ -1189,6 +1222,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         return out^
 
+    @always_inline
     fn sum[
         simd_width: Int = simd_width_of[dtype]()
     ](
@@ -1436,7 +1470,7 @@ struct ElementIterator[
 
 
 fn main() raises:
-    alias dtype = DType.float32
+    alias dtype = DType.int32
     b = Buffer[dtype](
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
     )
