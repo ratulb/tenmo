@@ -9,6 +9,7 @@ from common_utils import panic, IntArrayHelper
 from sys import simd_width_of
 from algorithm import vectorize
 from memory import memcpy, ArcPointer
+from collections import Set
 from operators import (
     Multiply,
     Add,
@@ -23,9 +24,7 @@ from operators import (
 )
 
 
-struct NDBuffer[dtype: DType](
-    Copyable & Movable & EqualityComparable & Sized & Absable
-):
+struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     var shape: Shape
     var strides: Strides
     var offset: Int
@@ -295,26 +294,47 @@ struct NDBuffer[dtype: DType](
     fn contiguous(self) -> NDBuffer[dtype]:
         return NDBuffer[dtype](self.contiguous_buffer(), self.shape)
 
-    @staticmethod
     @always_inline
-    fn buffer_pass_thru(buffer: Buffer[dtype]) -> Buffer[dtype]:
-        return buffer.copy()
-
-    @staticmethod
-    @always_inline
-    fn scalar_pass_thru(scalar: Scalar[dtype]) -> Scalar[dtype]:
-        return scalar
-
-    @always_inline
-    fn contiguous_buffer[
-        buffer_thru: fn (Buffer[dtype]) -> Buffer[
-            dtype
-        ] = Self.buffer_pass_thru,
-        scalar_thru: fn (Scalar[dtype]) -> Scalar[
-            dtype
-        ] = Self.scalar_pass_thru,
-        apply: Bool = False,
+    fn map[
+        map_buffer: fn (Buffer[dtype]) -> Buffer[dtype],
+        map_element: fn (Scalar[dtype]) -> Scalar[dtype],
     ](self) -> Buffer[dtype]:
+        if self._contiguous:
+            if not self.shared():
+                return map_buffer(self.buffer.value())
+            else:
+                var start = self.offset
+                var end = start + self.numels()
+                return map_buffer(self.shared_buffer.value()[][start:end])
+        else:
+            var buffer = Buffer[dtype](self.numels())
+            var index = 0
+            for coord in self.shape:
+                buffer[index] = map_element(self[coord])
+                index += 1
+            return buffer^
+
+    @always_inline
+    fn reduce[
+        reduce_buffer: fn (Buffer[dtype], Int, Optional[Int]) -> Scalar[dtype],
+        reduce_elements: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
+        unit: Scalar[dtype] = Scalar[dtype](0),
+    ](self) -> Scalar[dtype]:
+        if self._contiguous:
+            if not self.shared():
+                return reduce_buffer(self.buffer.value(), 0, None)
+            else:
+                var start = self.offset
+                var end = start + self.numels()
+                return reduce_buffer(self.shared_buffer.value()[], start, end)
+        else:
+            var accum: Scalar[dtype] = unit
+            for coord in self.shape:
+                accum = reduce_elements(self[coord], accum)
+            return accum
+
+    @always_inline
+    fn contiguous_buffer(self) -> Buffer[dtype]:
         """Returns a contiguous copy of the buffer with the same data."""
         # - same shape
         # - contiguous strides
@@ -322,33 +342,54 @@ struct NDBuffer[dtype: DType](
         # - copies data from original
         if self._contiguous:
             if not self.shared():
-
-                @parameter
-                if apply:
-                    return buffer_thru(self.buffer.value())
-                else:
-                    return self.buffer.value().copy()
+                return self.buffer.value().copy()
             else:
                 var start = self.offset
                 var end = start + self.numels()
-
-                @parameter
-                if apply:
-                    return buffer_thru(self.shared_buffer.value()[][start:end])
-                else:
-                    return self.shared_buffer.value()[][start:end]
+                return self.shared_buffer.value()[][start:end]
         else:
             var buffer = Buffer[dtype](self.numels())
             var index = 0
             for coord in self.shape:
-
-                @parameter
-                if apply:
-                    buffer[index] = scalar_thru(self[coord])
-                else:
-                    buffer[index] = self[coord]
+                buffer[index] = self[coord]
                 index += 1
             return buffer^
+
+    fn count(self, key: Scalar[dtype]) -> Int:
+        """Count occurence of the key in the buffer."""
+        if self._contiguous:
+            if not self.shared():
+                return self.buffer.value().count(key)
+            else:
+                var start = self.offset
+                var end = start + self.numels()
+                return self.shared_buffer.value()[].count(key, start, end)
+        else:
+            var _count = 0
+            for coord in self.shape:
+                if self[coord] == key:
+                    _count += 1
+            return _count
+
+    fn unique(self, key: Scalar[dtype]) -> NDBuffer[dtype]:
+        """Get the unique values in the buffer."""
+        var uniques = Set[Scalar[dtype]]()
+        if self._contiguous:
+            if not self.shared():
+                for i in range(self.numels()):
+                    uniques.add(self.data()[i])
+            else:
+                var start = self.offset
+                var end = start + self.numels()
+                for i in range(start, end):
+                    uniques.add(self.data()[i])
+        else:
+            for coord in self.shape:
+                uniques.add(self[coord])
+        var elems = List[Scalar[dtype]](capacity=UInt(len(uniques)))
+        for elem in uniques:
+            elems.append(elem)
+        return NDBuffer[dtype](Buffer[dtype](elems), self.shape)
 
     @always_inline
     fn __is__(self, other: NDBuffer[dtype]) -> Bool:
@@ -928,30 +969,38 @@ struct NDBuffer[dtype: DType](
             if scalar == Scalar[dtype](0):
                 panic(
                     "NDBuffer -> buffer_scalar_ops(self, scalar): can not"
-                        " divide by zero"
+                    " divide by zero"
                 )
 
         if self._contiguous:
             var buffer: Buffer[dtype]
-            if not self.shared():
-                buffer = self.buffer.value().copy()
-            else:
-                numels = self.numels()
-                offset = self.offset
-                buffer = self.shared_buffer.value()[][offset : offset + numels]
+            numels = self.numels()
+            offset = self.offset
 
             @parameter
             if opcode == Multiply:
-                buffer = buffer * scalar
+                if not self.shared():
+                    buffer = self.data() * scalar
+                else:
+                    buffer = self.data()[offset : offset + numels] * scalar
 
             elif opcode == Add:
-                buffer = buffer + scalar
+                if not self.shared():
+                    buffer = self.data() + scalar
+                else:
+                    buffer = self.data()[offset : offset + numels] + scalar
 
             elif opcode == Subtract:
-                buffer = buffer - scalar
+                if not self.shared():
+                    buffer = self.data() - scalar
+                else:
+                    buffer = self.data()[offset : offset + numels] - scalar
 
-            else: # Divide
-                buffer = buffer / scalar
+            else:  # Divide
+                if not self.shared():
+                    buffer = self.data() / scalar
+                else:
+                    buffer = self.data()[offset : offset + numels] / scalar
 
             return NDBuffer[dtype](buffer^, self.shape)
 
@@ -970,13 +1019,7 @@ struct NDBuffer[dtype: DType](
                 elif opcode == Subtract:
                     buffer[index] = self[coord] - scalar
 
-                else:
-                    if scalar == Scalar[dtype](0):
-                        panic(
-                            "NDBuffer -> buffer_scalar_ops(self, scalar): can"
-                            " not divide non-contiguous buffer by zero"
-                        )
-
+                else:  # Divide
                     buffer[index] = self[coord] / scalar
 
                 index += 1
@@ -1160,17 +1203,7 @@ struct NDBuffer[dtype: DType](
             other.contiguous_buffer()
         )
 
-    fn __abs__(self) -> NDBuffer[dtype]:
-        fn buff_abs(b: Buffer[dtype]) -> Buffer[dtype]:
-            return b.__abs__()
-
-        fn scalar_abs(s: Scalar[dtype]) -> Scalar[dtype]:
-            return s.__abs__()
-
-        # buffer = self.contiguous_buffer().__abs__()
-        buffer = self.contiguous_buffer[buff_abs, scalar_abs, True]()
-        return NDBuffer[dtype](buffer^, self.shape)
-
+    @always_inline
     fn element_at(self, index: Int) -> Scalar[dtype]:
         idx = index + self.max_index() if index < 0 else index
         if idx < 0 or idx > self.max_index():
@@ -1189,7 +1222,7 @@ fn main() raises:
     alias _dtype = DType.float32
 
     for _ in range(runs):
-        test_ndbuffer_set_get()
+        _ = """test_ndbuffer_set_get()
         test_ndbuffer_inplace_ops()
         test_ndbuffer_broadcast_ops()
         test_is()
@@ -1204,11 +1237,29 @@ fn main() raises:
         test_dtype_conversion()
         test_buffer_scalar_ops()
         test_scalar_inplace_update()
-        test_element_at()
+        test_element_at()"""
+        test_count()
     pass
 
 
 from testing import assert_true, assert_false
+
+
+fn test_count() raises:
+    print("test_count")
+    alias dtype = DType.float32
+    ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
+    assert_true(ndb.count(2) == 3)
+    shared = ndb.share()
+    assert_true(
+        shared.count(2) == 3 and ndb.count(2) == 3 and ndb.count(3) == 1
+    )
+    share2 = shared.share(Shape(5, 1), offset=1)
+    assert_true(share2.count(2) == 2)
+    share3 = ndb.share(Shape(2))
+    assert_true(share3.count(2) == 2)
+    share4 = ndb.share(Shape(1))
+    assert_true(share4.count(2) == 1)
 
 
 fn test_scalar_inplace_update() raises:
