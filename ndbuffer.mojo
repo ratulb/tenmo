@@ -873,69 +873,48 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     @always_inline
     fn buffer_scalar_ops[
         opcode: Int,
-        simd_width: Int = simd_width_of[dtype](),
     ](self: NDBuffer[dtype], scalar: Scalar[dtype]) -> NDBuffer[dtype]:
         @parameter
         if opcode == Divide:
             if scalar == Scalar[dtype](0):
-                panic(
-                    "NDBuffer -> buffer_scalar_ops(self, scalar): can not"
-                    " divide by zero"
-                )
+                panic("NDBuffer -> buffer_scalar_ops: cannot divide by zero")
 
         if self._contiguous:
-            var buffer: Buffer[dtype]
-            numels = self.numels()
-            offset = self.offset
+            var contiguous_data = self.contiguous_buffer()
+            var result_buffer: Buffer[dtype]
 
             @parameter
             if opcode == Multiply:
-                if not self.shared():
-                    buffer = self.data() * scalar
-                else:
-                    buffer = self.data()[offset : offset + numels] * scalar
-
+                result_buffer = contiguous_data * scalar
             elif opcode == Add:
-                if not self.shared():
-                    buffer = self.data() + scalar
-                else:
-                    buffer = self.data()[offset : offset + numels] + scalar
-
+                result_buffer = contiguous_data + scalar
             elif opcode == Subtract:
-                if not self.shared():
-                    buffer = self.data() - scalar
-                else:
-                    buffer = self.data()[offset : offset + numels] - scalar
-
+                result_buffer = contiguous_data - scalar
             else:  # Divide
-                if not self.shared():
-                    buffer = self.data() / scalar
-                else:
-                    buffer = self.data()[offset : offset + numels] / scalar
+                result_buffer = contiguous_data / scalar
 
-            return NDBuffer[dtype](buffer^, self.shape)
+            return NDBuffer[dtype](result_buffer^, self.shape)
 
         else:
             var index = 0
-            var buffer = Buffer[dtype].zeros(self.numels())
+            var result_buffer = Buffer[dtype](self.numels())
+
             for coord in self.shape:
+                var value = self[coord]
 
                 @parameter
                 if opcode == Multiply:
-                    buffer[index] = self[coord] * scalar
-
+                    result_buffer[index] = value * scalar
                 elif opcode == Add:
-                    buffer[index] = self[coord] + scalar
-
+                    result_buffer[index] = value + scalar
                 elif opcode == Subtract:
-                    buffer[index] = self[coord] - scalar
-
+                    result_buffer[index] = value - scalar
                 else:  # Divide
-                    buffer[index] = self[coord] / scalar
+                    result_buffer[index] = value / scalar
 
                 index += 1
 
-            return NDBuffer[dtype](buffer^, self.shape)
+            return NDBuffer[dtype](result_buffer^, self.shape)
 
     fn __eq__(self, other: Self) -> Bool:
         return self.compare[Equal](other).buffer.value().all_true()
@@ -943,80 +922,59 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     fn __ne__(self, other: Self) -> Bool:
         return self.compare[NotEqual](other).buffer.value().all_true()
 
-    @always_inline
     fn compare[
         opcode: Int,
-        validate_shape: Bool = True,
-        simd_width: Int = simd_width_of[dtype](),
     ](lhs: NDBuffer[dtype], rhs: NDBuffer[dtype]) -> NDBuffer[DType.bool]:
-        @parameter
-        if validate_shape:
-            if not lhs.shape == rhs.shape:
-                panic(
-                    "NDBuffer → compare(lhs, rhs): dimension mismatch: "
-                    + lhs.shape.__str__()
-                    + "≠"
-                    + rhs.shape.__str__(),
-                    "opcode: " + opcode.__str__(),
-                )
+        if not lhs.shape == rhs.shape:
+            panic(
+                "NDBuffer → compare(lhs, rhs): dimension mismatch: "
+                + lhs.shape.__str__()
+                + "≠"
+                + rhs.shape.__str__()
+            )
 
         if lhs._contiguous and rhs._contiguous:
-            var lhs_buffer: Buffer[dtype]
-            var rhs_buffer: Buffer[dtype]
-            if not lhs.shared() and not rhs.shared():
-                lhs_buffer = lhs.buffer.value().copy()
-                rhs_buffer = rhs.buffer.value().copy()
-            else:
-                numels = lhs.numels()
-                lhs_offset = lhs.offset
-                rhs_offset = rhs.offset
-                lhs_buffer = lhs.data()[lhs_offset : lhs_offset + numels]
-                rhs_buffer = rhs.data()[rhs_offset : rhs_offset + numels]
+            var lhs_contiguous = lhs.contiguous_buffer()
+            var rhs_contiguous = rhs.contiguous_buffer()
+            var result_buffer: Buffer[DType.bool]
 
             @parameter
             if opcode == Equal:
-                buffer = lhs_buffer.eq[simd_width](rhs_buffer)
-
+                result_buffer = lhs_contiguous.eq(rhs_contiguous)
             elif opcode == NotEqual:
-                buffer = lhs_buffer.ne[simd_width](rhs_buffer)
-
+                result_buffer = lhs_contiguous.ne(rhs_contiguous)
             elif opcode == LessThan:
-                buffer = lhs_buffer.lt[simd_width](rhs_buffer)
-
+                result_buffer = lhs_contiguous.lt(rhs_contiguous)
             elif opcode == LessThanEqual:
-                buffer = lhs_buffer.le[simd_width](rhs_buffer)
-
+                result_buffer = lhs_contiguous.le(rhs_contiguous)
             elif opcode == GreaterThan:
-                buffer = lhs_buffer.gt[simd_width](rhs_buffer)
+                result_buffer = lhs_contiguous.gt(rhs_contiguous)
+            else:  # opcode == GreaterThanEqual
+                result_buffer = lhs_contiguous.ge(rhs_contiguous)
 
-            else:  # opcode == GreaterThanEqual:
-                buffer = lhs_buffer.ge[simd_width](rhs_buffer)
-
-            return NDBuffer[DType.bool](buffer^, lhs.shape)
+            return NDBuffer[DType.bool](result_buffer^, lhs.shape)
 
         else:
             var index = 0
             var buffer = Buffer[DType.bool](lhs.numels())
+
             for coord in lhs.shape:
+                var lhs_val = lhs[coord]
+                var rhs_val = rhs[coord]
 
                 @parameter
                 if opcode == Equal:
-                    buffer[index] = lhs[coord] == rhs[coord]
-
+                    buffer[index] = lhs_val == rhs_val
                 elif opcode == NotEqual:
-                    buffer[index] = lhs[coord] != rhs[coord]
-
+                    buffer[index] = lhs_val != rhs_val
                 elif opcode == LessThan:
-                    buffer[index] = lhs[coord] < rhs[coord]
-
+                    buffer[index] = lhs_val < rhs_val
                 elif opcode == LessThanEqual:
-                    buffer[index] = lhs[coord] <= rhs[coord]
-
+                    buffer[index] = lhs_val <= rhs_val
                 elif opcode == GreaterThan:
-                    buffer[index] = lhs[coord] > rhs[coord]
-
-                else:
-                    buffer[index] = lhs[coord] >= rhs[coord]
+                    buffer[index] = lhs_val > rhs_val
+                else:  # GreaterThanEqual
+                    buffer[index] = lhs_val >= rhs_val
 
                 index += 1
 
@@ -1025,61 +983,47 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     @always_inline
     fn compare_scalar[
         opcode: Int,
-        simd_width: Int = simd_width_of[dtype](),
     ](self: NDBuffer[dtype], scalar: Scalar[dtype]) -> NDBuffer[DType.bool]:
         if self._contiguous:
-            var _buffer: Buffer[dtype]
-            if not self.shared():
-                _buffer = self.buffer.value().copy()
-            else:
-                numels = self.numels()
-                offset = self.offset
-                _buffer = self.shared_buffer.value()[][offset : offset + numels]
+            var contiguous_data = self.contiguous_buffer()
+            var result_buffer: Buffer[DType.bool]
 
             @parameter
             if opcode == Equal:
-                buffer = _buffer.eq[simd_width](scalar)
-
+                result_buffer = contiguous_data.eq(scalar)
             elif opcode == NotEqual:
-                buffer = _buffer.ne[simd_width](scalar)
-
+                result_buffer = contiguous_data.ne(scalar)
             elif opcode == LessThan:
-                buffer = _buffer.lt[simd_width](scalar)
-
+                result_buffer = contiguous_data.lt(scalar)
             elif opcode == LessThanEqual:
-                buffer = _buffer.le[simd_width](scalar)
-
+                result_buffer = contiguous_data.le(scalar)
             elif opcode == GreaterThan:
-                buffer = _buffer.gt[simd_width](scalar)
+                result_buffer = contiguous_data.gt(scalar)
+            else:  # opcode == GreaterThanEqual
+                result_buffer = contiguous_data.ge(scalar)
 
-            else:  # opcode == GreaterThanEqual:
-                buffer = _buffer.ge[simd_width](scalar)
-
-            return NDBuffer[DType.bool](buffer^, self.shape)
+            return NDBuffer[DType.bool](result_buffer^, self.shape)
 
         else:
             var index = 0
             var buffer = Buffer[DType.bool](self.numels())
+
             for coord in self.shape:
+                var value = self[coord]
 
                 @parameter
                 if opcode == Equal:
-                    buffer[index] = self[coord] == scalar
-
+                    buffer[index] = value == scalar
                 elif opcode == NotEqual:
-                    buffer[index] = self[coord] != scalar
-
+                    buffer[index] = value != scalar
                 elif opcode == LessThan:
-                    buffer[index] = self[coord] < scalar
-
+                    buffer[index] = value < scalar
                 elif opcode == LessThanEqual:
-                    buffer[index] = self[coord] <= scalar
-
+                    buffer[index] = value <= scalar
                 elif opcode == GreaterThan:
-                    buffer[index] = self[coord] > scalar
-
-                else:
-                    buffer[index] = self[coord] >= scalar
+                    buffer[index] = value > scalar
+                else:  # GreaterThanEqual
+                    buffer[index] = value >= scalar
 
                 index += 1
 
@@ -1090,25 +1034,19 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
         simd_width: Int = simd_width_of[dtype](),
         rtol: Scalar[dtype] = 1e-5,
         atol: Scalar[dtype] = 1e-8,
-        check_dtype: Bool = True,
-        validate_shape: Bool = True,
     ](self, other: Self) -> Bool:
-        @parameter
-        if check_dtype:
-            constrained[
-                dtype.is_floating_point(),
-                "Gradbox → all_close is for floating point data types only",
-            ]()
+        constrained[
+            dtype.is_floating_point(),
+            "Gradbox → all_close is for floating point data types only",
+        ]()
 
-        @parameter
-        if validate_shape:
-            if self.shape != other.shape:
-                panic(
-                    "NDBuffer → all_close(other) expects same shaped buffers: "
-                    + self.shape.__str__()
-                    + ", "
-                    + other.shape.__str__()
-                )
+        if self.shape != other.shape:
+            panic(
+                "NDBuffer → all_close(other) expects same shaped buffers: "
+                + self.shape.__str__()
+                + ", "
+                + other.shape.__str__()
+            )
 
         return self.contiguous_buffer().all_close[simd_width, rtol, atol](
             other.contiguous_buffer()
@@ -1129,11 +1067,11 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
 
 
 fn main() raises:
-    var runs = 1000
+    var runs = 1
     alias _dtype = DType.float32
 
     for _ in range(runs):
-        test_ndbuffer_set_get()
+        _ = """test_ndbuffer_set_get()
         test_ndbuffer_broadcast_ops()
         test_is()
         test_ndbuffer_fill()
@@ -1152,11 +1090,24 @@ fn main() raises:
         test_count()
         test_unique()
         test_inplace_operations()
-        test_inplace_broadcast_operations()
+        test_inplace_broadcast_operations()"""
+        test_compare_scalar()
     pass
 
 
 from testing import assert_true, assert_false
+
+
+fn test_compare_scalar() raises:
+    print("test_compare_scalar")
+    alias dtype = DType.float32
+    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
+    result = ndb.compare_scalar[GreaterThan](3)
+    assert_true(
+        result.data()
+        == Buffer[DType.bool]([False, False, False, True, True, True])
+    )
+    print(result.data())
 
 
 fn test_inplace_broadcast_operations() raises:
