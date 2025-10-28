@@ -612,84 +612,38 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
                     if opcode == Divide:
                         lhs[coord] = lhs[coord] / rhs[coord]
 
+
+    fn take_buffer(self) -> Buffer[dtype]:
+        """Take the underlying buffer out, panicking if None"""
+        if not self.buffer:
+            panic("NDBuffer: expected buffer to be present")
+        return self.buffer.unsafe_take()
+
     @always_inline
     fn inplace_scalar_ops[
         opcode: Int,
-        simd_width: Int = simd_width_of[dtype](),
     ](self: NDBuffer[dtype], scalar: Scalar[dtype]):
         @parameter
-        fn update_inplace():
-            @parameter
-            if opcode == Multiply:
-                self.data().__imul__(scalar)
-
-            @parameter
-            if opcode == Add:
-                self.data().__iadd__(scalar)
-
-            @parameter
-            if opcode == Subtract:
-                self.data().__isub__(scalar)
-
-            @parameter
-            if opcode == Divide:
-                self.data().__itruediv__(scalar)
+        if opcode == Divide:
+            if scalar == Scalar[dtype](0):
+                panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
 
         if self._contiguous:
-            if not self.shared():
-                update_inplace()
-            else:
-                numels = self.numels()
-                offset = self.offset
-
-                @parameter
-                fn update_segment[width: Int](idx: Int):
-                    segment = self.data().load[width](offset + idx)
-
-                    @parameter
-                    if opcode == Multiply:
-                        segment *= scalar
-                        self.data().store[width](offset + idx, segment)
-
-                    @parameter
-                    if opcode == Add:
-                        segment += scalar
-                        self.data().store[width](offset + idx, segment)
-
-                    @parameter
-                    if opcode == Subtract:
-                        segment -= scalar
-                        self.data().store[width](offset + idx, segment)
-
-                    @parameter
-                    if opcode == Divide:
-                        segment /= scalar
-                        self.data().store[width](offset + idx, segment)
-
-                vectorize[update_segment, simd_width](numels)
+            start = self.offset
+            end = start + self.numels()
+            var result = self.buffer_scalar_ops[opcode](scalar)
+            self.data().overwrite(result.take_buffer(), start, end)
 
         else:
             for coord in self.shape:
-
                 @parameter
                 if opcode == Multiply:
                     self[coord] *= scalar
-
-                @parameter
-                if opcode == Add:
+                elif opcode == Add:
                     self[coord] += scalar
-
-                @parameter
-                if opcode == Subtract:
+                elif opcode == Subtract:
                     self[coord] -= scalar
-
-                @parameter
-                if opcode == Divide:
-                    if scalar == Scalar[dtype](0):
-                        panic(
-                            "NDBuffer → inplace_scalar_ops(scalar): can not"
-                            " divide by zero"
-                        )
+                else:  # Divide
                     self[coord] /= scalar
 
     @always_inline
@@ -713,78 +667,52 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     @always_inline
     fn buffer_arithmetic_ops[
         opcode: Int,
-        simd_width: Int = simd_width_of[dtype](),
     ](lhs: NDBuffer[dtype], rhs: NDBuffer[dtype]) -> NDBuffer[dtype]:
+        # Broadcast validation
         if not ShapeBroadcaster.broadcastable(lhs.shape, rhs.shape):
             panic(
-                "NDBuffer → buffer_arithmetic_ops(lhs, rhs): dimension"
-                " mismatch: "
-                + lhs.shape.__str__()
-                + ", "
-                + rhs.shape.__str__()
-                + ", opcode = "
-                + opcode.__str__()
+                "NDBuffer → buffer_arithmetic_ops(lhs, rhs): dimension mismatch: "
+                + lhs.shape.__str__() + ", " + rhs.shape.__str__()
             )
 
+        # Handle broadcasting case
         if lhs.shape != rhs.shape:
             return lhs.broadcast_buffer[opcode](rhs)
 
+        # Same shape case - use hybrid approach
         if lhs._contiguous and rhs._contiguous:
-            var buffer: Buffer[dtype]
-            if not lhs.shared() and not rhs.shared():
+            var lhs_contiguous = lhs.contiguous_buffer()
+            var rhs_contiguous = rhs.contiguous_buffer()
+            var result_buffer: Buffer[dtype]
+            @parameter
+            if opcode == Multiply:
+                result_buffer = lhs_contiguous * rhs_contiguous
+            elif opcode == Add:
+                result_buffer = lhs_contiguous + rhs_contiguous
+            elif opcode == Subtract:
+                result_buffer = lhs_contiguous - rhs_contiguous
+            else:  # Divide
+                result_buffer = lhs_contiguous / rhs_contiguous
 
-                @parameter
-                if opcode == Multiply:
-                    buffer = lhs.data() * rhs.data()
-
-                elif opcode == Add:
-                    buffer = lhs.data() + rhs.data()
-
-                elif opcode == Subtract:
-                    buffer = lhs.data() - rhs.data()
-
-                else:
-                    buffer = lhs.data() / rhs.data()
-
-            else:
-                numels = lhs.numels()
-                lhs_offset = lhs.offset
-                rhs_offset = rhs.offset
-                var lhs_buffer = lhs.data()[lhs_offset : lhs_offset + numels]
-                var rhs_buffer = rhs.data()[rhs_offset : rhs_offset + numels]
-
-                @parameter
-                if opcode == Multiply:
-                    buffer = lhs_buffer * rhs_buffer
-
-                elif opcode == Add:
-                    buffer = lhs_buffer + rhs_buffer
-
-                elif opcode == Subtract:
-                    buffer = lhs_buffer - rhs_buffer
-
-                else:
-                    buffer = lhs_buffer / rhs_buffer
-
-            return NDBuffer[dtype](buffer^, lhs.shape)
+            return NDBuffer[dtype](result_buffer^, lhs.shape)
 
         else:
             var buffer = Buffer[dtype](lhs.numels())
             var index = 0
+
             for coord in lhs.shape:
+                var lhs_val = lhs[coord]
+                var rhs_val = rhs[coord]
 
                 @parameter
                 if opcode == Multiply:
-                    buffer[index] = lhs[coord] * rhs[coord]
-
+                    buffer[index] = lhs_val * rhs_val
                 elif opcode == Add:
-                    buffer[index] = lhs[coord] + rhs[coord]
-
+                    buffer[index] = lhs_val + rhs_val
                 elif opcode == Subtract:
-                    buffer[index] = lhs[coord] - rhs[coord]
-
+                    buffer[index] = lhs_val - rhs_val
                 else:  # Divide
-                    buffer[index] = lhs[coord] / rhs[coord]
+                    buffer[index] = lhs_val / rhs_val
 
                 index += 1
 
@@ -877,7 +805,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
         @parameter
         if opcode == Divide:
             if scalar == Scalar[dtype](0):
-                panic("NDBuffer -> buffer_scalar_ops: cannot divide by zero")
+                panic("NDBuffer → buffer_scalar_ops: cannot divide by zero")
 
         if self._contiguous:
             var contiguous_data = self.contiguous_buffer()
@@ -1072,7 +1000,6 @@ fn main() raises:
 
     for _ in range(runs):
         _ = """test_ndbuffer_set_get()
-        test_ndbuffer_broadcast_ops()
         test_is()
         test_ndbuffer_fill()
         test_contiguous()
@@ -1083,19 +1010,49 @@ fn main() raises:
         test_add()
         test_equal()
         test_dtype_conversion()
-        test_buffer_scalar_ops()
-        test_scalar_inplace_update()
         test_element_at()
         test_ndbuffer_inplace_ops()
         test_count()
         test_unique()
         test_inplace_operations()
-        test_inplace_broadcast_operations()"""
+        test_inplace_broadcast_operations()
+        test_ndbuffer_broadcast_ops()
+        test_buffer_scalar_ops()
         test_compare_scalar()
+        test_compare_buffer()"""
+        #test_buffer_overwrite()
+        test_scalar_inplace_update()
     pass
 
 
 from testing import assert_true, assert_false
+
+fn test_buffer_overwrite() raises:
+
+    alias dtype = DType.int32
+    size = 21
+    l = List[Scalar[dtype]](capacity=UInt(size))
+    for i in range(size):
+        l.append(i)
+
+    buffer = Buffer[dtype](l)
+    ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
+    result = Buffer[dtype]([42, 42, 42])
+    ndb.data().overwrite(result, 3, 6)
+
+    print(ndb.data())
+
+fn test_compare_buffer() raises:
+    print("test_compare_buffer")
+    alias dtype = DType.float32
+    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
+    ndb2 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 3, 4, 6]), Shape(2, 3))
+    result = ndb.compare[GreaterThan](ndb2)
+    assert_true(
+        result.data()
+        == Buffer[DType.bool]([False, False, False, True, True, False])
+    )
+
 
 
 fn test_compare_scalar() raises:
@@ -1107,7 +1064,13 @@ fn test_compare_scalar() raises:
         result.data()
         == Buffer[DType.bool]([False, False, False, True, True, True])
     )
-    print(result.data())
+
+    shared = ndb.share(Shape(1, 3), strides=Strides(1, 2), offset=1)
+    result = shared.compare_scalar[Equal](4)
+    assert_true(
+        result.data()
+        == Buffer[DType.bool]([False, True, False])
+    )
 
 
 fn test_inplace_broadcast_operations() raises:
@@ -1527,24 +1490,19 @@ fn test_ndbuffer_broadcast_ops() raises:
     print("test_ndbuffer_broadcast_ops")
 
     alias dtype = DType.float32
-    buffer1 = Buffer[dtype](6)
-    buffer1.fill(42)
+    buffer1 = Buffer[dtype]([42, 42, 42, 42, 42, 42])
     shape1 = Shape(2, 3)
-    ndbuffer1 = NDBuffer[dtype](buffer1^, shape1, None)
+    ndbuffer1 = NDBuffer[dtype](buffer1^, shape1)
 
-    buffer2 = Buffer[dtype](3)
-    buffer2.fill(3)
+    buffer2 = Buffer[dtype]([3, 3, 3])
     shape2 = Shape(3)
-    ndbuffer2 = NDBuffer[dtype](buffer2^, shape2, None)
+    ndbuffer2 = NDBuffer[dtype](buffer2^, shape2)
 
-    _result = ndbuffer1.buffer_arithmetic_ops[Add](ndbuffer2)
+    result = ndbuffer1.buffer_arithmetic_ops[Add](ndbuffer2)
+    assert_true(result.data() == (Buffer[dtype]([42, 42, 42, 42, 42, 42]) + 3))
 
-    buffer3 = Buffer[dtype](1)
-    buffer3.fill(-3)
-    shape3 = Shape()
-    ndbuffer3 = NDBuffer[dtype](buffer3^, shape3, None)
-
-    _result2 = ndbuffer1.buffer_arithmetic_ops[Add](ndbuffer3)
+    result = result.buffer_arithmetic_ops[Subtract](ndbuffer2)
+    assert_true(result.data() == Buffer[dtype]([42, 42, 42, 42, 42, 42]))
 
 
 fn test_ndbuffer_inplace_ops() raises:

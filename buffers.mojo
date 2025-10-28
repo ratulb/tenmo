@@ -143,8 +143,9 @@ struct Buffer[dtype: DType = DType.float32](
         # Safety checks
         if self.size != rhs.size:
             panic("Buffer __iadd__: buffer sizes must match")
+
         if self.size == 0:
-            return  # Nothing to do
+            return
 
         # Use parameterized function for vectorization
         @parameter
@@ -169,6 +170,7 @@ struct Buffer[dtype: DType = DType.float32](
                 "and right hand size: ",
                 rhs.size.__str__(),
             )
+
         if self.size == 0:
             return
 
@@ -563,11 +565,6 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     fn exp(self) -> Buffer[dtype]:
-        constrained[
-            dtype.is_floating_point(),
-            "Buffer → exp is for numeric data types only",
-        ]()
-
         total = self.size
         out = Buffer[dtype](total)
 
@@ -1258,15 +1255,19 @@ struct Buffer[dtype: DType = DType.float32](
         return (lhs * rhs).sum()
 
     fn product[
-        simd_width: Int = simd_width_of[dtype]()
-    ](this: Buffer[dtype]) -> Scalar[dtype]:
+        simd_width: Int = simd_width_of[dtype](),
+    ](
+        this: Buffer[dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ) -> Scalar[dtype]:
         constrained[
             dtype.is_numeric(),
             "Buffer → product is for numeric data types only",
         ]()
 
         var product = Scalar[dtype](1)
-        total = this.size
+        total = (end_index.value() if end_index else this.size) - start_index
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
@@ -1277,14 +1278,71 @@ struct Buffer[dtype: DType = DType.float32](
             product *= this.load(k)
         return product
 
+    @always_inline
+    fn overwrite[
+        simd_width: Int = simd_width_of[dtype]()
+    ](
+        self: Buffer[dtype],
+        result: Buffer[dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ):
+        """Overwrite a segment of this buffer with result data."""
+
+        actual_end = end_index.value() if end_index else self.size
+        segment_size = actual_end - start_index
+
+        # Safety checks
+        if segment_size != result.size:
+            panic(
+                (
+                    "Buffer → overwrite: segment size must match result buffer"
+                    " size."
+                ),
+                "start_index:",
+                start_index.__str__(),
+                "end_index:",
+                actual_end.__str__(),
+                "segment_size:",
+                segment_size.__str__(),
+                "buffer size:",
+                self.size.__str__(),
+                "result size:",
+                result.size.__str__(),
+            )
+
+        if segment_size == 0:
+            return
+
+        # Special handling for bool due to bit packing
+        if dtype == DType.bool:
+            for i in range(segment_size):
+                self[start_index + i] = result[i]
+            return
+
+        @parameter
+        fn overwrite_elems[simdwidth: Int](idx: Int):
+            result_vec = result.load[simdwidth](idx)
+            self.store[simdwidth](start_index + idx, result_vec)
+
+        vectorize[overwrite_elems, simd_width](segment_size)
+
     fn count[
         simd_width: Int = simd_width_of[dtype]()
-    ](this: Buffer[dtype], key: Scalar[dtype]) -> Int:
+    ](
+        this: Buffer[dtype],
+        key: Scalar[dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ) -> Int:
+        actual_end = end_index.value() if end_index else this.size
+        total_elements = actual_end - start_index
+
         total = 0
 
         @parameter
         fn matches[simdwidth: Int](idx: Int):
-            block = this.load[simdwidth](idx)
+            block = this.load[simdwidth](idx + start_index)
             result = block == key
             if result:
                 total += simdwidth
@@ -1295,9 +1353,9 @@ struct Buffer[dtype: DType = DType.float32](
 
         @parameter
         if dtype == DType.bool:
-            vectorize[matches, 1](this.size)
+            vectorize[matches, 1](total_elements)
         else:
-            vectorize[matches, simd_width](this.size)
+            vectorize[matches, simd_width](total_elements)
 
         return total
 
@@ -1471,11 +1529,29 @@ struct ElementIterator[
 
 fn main() raises:
     alias dtype = DType.int32
-    b = Buffer[dtype](
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-    )
-    b /= b
-    print(b)
+    _ = """size = 100
+    l = List[Scalar[dtype]](capacity=UInt(size))
+    for i in range(size):
+        l.append(i)
+    buffer = Buffer[dtype](l)
+    buffer[41] = 42
+    print(buffer.count(42, 41, 101))
+    print(buffer[41], buffer[42])"""
+    test_overwrite()
 
 
 from testing import assert_true, assert_false
+
+
+fn test_overwrite() raises:
+    alias dtype = DType.int32
+    size = 21
+    l = List[Scalar[dtype]](capacity=UInt(size))
+    for i in range(size):
+        l.append(i)
+
+    buffer = Buffer[dtype](l)
+    result = Buffer[dtype]([42, 42, 42])
+
+    buffer.overwrite(result, 3, 6)
+    print(buffer)
