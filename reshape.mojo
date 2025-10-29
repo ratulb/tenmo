@@ -1,24 +1,26 @@
-from tensors import Tensor
-from shared import TensorLite
+from tenmo import Tensor
 from operators import AddTensor, ZeroGrad
 from backpropagation import BackwardFn, Delegate
 from shapes import Shape
 from validators import Validator
+from ancestry import Ancestor
+from gradbox import Gradbox
+from ndbuffer import NDBuffer
 
 
 @fieldwise_init
 @register_passable
-struct ReshapeBackward[dtype: DType](Copyable):
+struct ReshapeBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.gradients()[]
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
         ancestor = output.ancestry().get(0)
-        reshaped = gradients.reshape(ancestor.shape())
+        reshaped = gradbox.reshape(ancestor.shape())
 
         return [
-            (ancestor, reshaped, AddTensor),
-            (output, gradients, ZeroGrad),
+            (ancestor^, reshaped^, AddTensor),
+            (Ancestor(output), gradbox^, ZeroGrad),
         ]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
@@ -38,11 +40,12 @@ struct Reshape[dtype: DType](Copyable):
         validated: Bool = False,
     ) -> Tensor[dtype]:
         shape = new_shape if validated else Validator.validate_and_construct_new_shape(
-            tensor.shape, new_shape.intlist()
+            tensor.shape(), new_shape.intlist()
         )
 
-        buffer = tensor.data()
-        out = Tensor[dtype](shape, buffer^)
+        buffer = tensor.buffer.contiguous_buffer()
+        nd_buffer = NDBuffer[dtype](buffer^, shape^)
+        out = Tensor[dtype](nd_buffer^, requires_grad=False)
 
         @parameter
         if track_grad:
@@ -53,10 +56,10 @@ struct Reshape[dtype: DType](Copyable):
             if grad_required:
                 out.requires_grad_(True)
                 backward_fn = ReshapeBackward[dtype]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
+                out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(tensor)
 
-        return out
+        return out^
 
 
 fn main():

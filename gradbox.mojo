@@ -20,12 +20,12 @@ struct Gradbox[dtype: DType](
 ):
     var buffer: NDBuffer[dtype]
 
-    fn __init__(out self, shape: Shape):
+    fn __init__(out self, shape: Shape, share: Bool=True):
         buffer = NDBuffer[dtype](shape)
-        self.buffer = buffer.share()
+        self.buffer = buffer.share() if share else buffer^
 
-    fn __init__(out self, var buffer: NDBuffer[dtype]):
-        self.buffer = buffer.share()
+    fn __init__(out self, var buffer: NDBuffer[dtype], share: Bool = True):
+        self.buffer = buffer.share() if share else buffer^
 
     fn __moveinit__(out self, deinit other: Self):
         self.buffer = other.buffer^
@@ -38,6 +38,10 @@ struct Gradbox[dtype: DType](
         return Tensor[dtype](
             self.buffer.contiguous(), requires_grad=requires_grad
         )
+
+    @always_inline
+    fn unshared(self) -> Gradbox[dtype]:
+        return Gradbox[dtype](self.buffer.contiguous(), share=False)
 
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:

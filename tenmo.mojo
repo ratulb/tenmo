@@ -15,7 +15,7 @@ from operators_imports import *
 
 # from walkback import *
 from backpropagation import BackwardFn
-from forwards import AddScalar, Adder
+from forwards import AddScalar, Adder, Reshape
 from buffers import Buffer
 from shared import TensorLite
 from validators import Validator
@@ -109,6 +109,9 @@ struct Tensor[dtype: DType = DType.float32](
         buffer = src_buffer.share(shape, strides, offset)
         return Tensor[dtype](buffer=buffer^, requires_grad=requires_grad)
 
+    fn as_gradbox(self, share: Bool=False) -> Gradbox[dtype]:
+        return Gradbox[dtype](self.buffer.contiguous(), share=share)
+
     fn __moveinit__(out self, deinit other: Self):
         self.buffer = other.buffer^
         self.requires_grad = other.requires_grad
@@ -131,6 +134,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn init_gradbox(mut self):
         if self.requires_grad and self.gradbox == None:
             gradbox = Gradbox[dtype](self.shape())
+            gradbox.zero_grad()
             self.gradbox = Optional(gradbox^)
 
     @always_inline
@@ -275,7 +279,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.gradbox != None
 
     @always_inline
-    fn zero_grad(mut self):
+    fn zero_grad(self):
         if self.requires_grad and self.has_grad():
             self.gradbox.value().zero_grad()
 
@@ -287,6 +291,15 @@ struct Tensor[dtype: DType = DType.float32](
                 " grad or grad not initialized"
             )
         return self.gradbox.value()
+
+    @always_inline
+    fn unshared_grad(self) -> Gradbox[dtype]:
+        if not self.requires_grad or not self.has_grad():
+            panic(
+                "Tensor → grad(self): called on a tensor that does not require"
+                " grad or grad not initialized"
+            )
+        return self.gradbox.value().unshared()
 
     fn rows(self) -> Int:
         if not self.rank() == 2:
@@ -964,7 +977,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn contiguous[
         track_grad: Bool = True
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        return Contiguous[dtype].forward[track_grad](self, requires_grad)
+        return Contiguous[dtype].forward[track_grad](self, requires_grad)"""
 
     fn reshape[
         track_grad: Bool = True
@@ -986,7 +999,7 @@ struct Tensor[dtype: DType = DType.float32](
         if len(newdims) == 1 and newdims[0] == 0:
             return self.reshape[track_grad](requires_grad=requires_grad)
         shape = Validator.validate_and_construct_new_shape(
-            self.shape, IntList(newdims)
+            self.shape(), IntList(newdims)
         )
         return self.reshape[track_grad](
             shape, requires_grad=requires_grad, validated=True
@@ -998,7 +1011,7 @@ struct Tensor[dtype: DType = DType.float32](
         dtype
     ]:
         new_shape = Validator.validate_and_construct_new_shape(
-            self.shape, IntList.new(shape)
+            self.shape(), IntList.new(shape)
         )
         return self.reshape[track_grad](
             new_shape, requires_grad=requires_grad, validated=True
@@ -1016,7 +1029,7 @@ struct Tensor[dtype: DType = DType.float32](
             self, new_shape, requires_grad, validated
         )
 
-    fn upstream_grad_share[augment: Bool](
+        _="""fn upstream_grad_share[augment: Bool](
         self,
         other: Tensor[dtype],
         upstream_grad: Tensor[dtype],
@@ -1183,13 +1196,13 @@ struct Tensor[dtype: DType = DType.float32](
     fn __mul__(self, other: Self) -> Tensor[dtype]:
         return Multiplicator[dtype].forward[True](self, other)"""
 
-    fn update_grad[opcode: Int](mut self, incoming: Gradbox[dtype]):
+    fn update_grad[opcode: Int](self, incoming: Gradbox[dtype]):
         if opcode == MulTensor:
-            self.grad() *= incoming
+            self.grad().__imul__(incoming)
         if opcode == AddTensor:
-            self.grad() += incoming
+            self.grad().__iadd__(incoming)
         if opcode == SubtractTensor:
-            self.grad() -= incoming
+            self.grad().__isub__(incoming)
         if opcode == ZeroGrad:
             self.zero_grad()
 
@@ -2012,7 +2025,11 @@ fn main() raises:
     share4_t.print()"""
 
     alias dtype = DType.float32
-    a = Tensor.arange(5)
-    b = Tensor.arange(5)
-    a /= b
-    a.print()
+    a = Tensor[dtype].arange(6, requires_grad=True)
+    b = a + 2
+    c = b.reshape(Shape(2,3))
+    c.print()
+
+    c.backward(49)
+    print()
+    a.grad().print()
