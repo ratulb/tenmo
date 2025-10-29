@@ -190,15 +190,13 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
         self.data()[index] = value
 
     @always_inline
-    fn item[validate: Bool = True](self) -> Scalar[dtype]:
-        @parameter
-        if validate:
-            if self.shape != Shape(1) and self.shape != Shape():
-                panic(
-                    "NDBuffer → item(self): only valid for zero dim buffer,"
-                    " got shape: "
-                    + self.shape.__str__()
-                )
+    fn item(self) -> Scalar[dtype]:
+        if self.shape != Shape(1) and self.shape != Shape():
+            panic(
+                "NDBuffer → item(self): only valid for zero dim buffer,"
+                " got shape: "
+                + self.shape.__str__()
+            )
         if self.shape == Shape(1):
             index = IntArray(size=1)
             index[0] = 0
@@ -276,14 +274,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     @always_inline
     fn fill(self, value: Scalar[dtype]):
         if self._contiguous:
-            if not self.shared():
-                self.data().fill(value)
-            else:
-                var start = self.offset
-                var end = start + self.numels()
-                ref buffer = self.shared_buffer.value()[]
-                for i in range(start, end):
-                    buffer[i] = value
+            self.data().fill(value, self.offset, self.offset + self.numels())
         else:
             for coord in self.shape:
                 self[coord] = value
@@ -339,12 +330,9 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
         # - offset = 0
         # - copies data from original
         if self._contiguous:
-            if not self.shared():
-                return self.buffer.value().copy()
-            else:
-                var start = self.offset
-                var end = start + self.numels()
-                return self.shared_buffer.value()[][start:end]
+            var start = self.offset
+            var end = start + self.numels()
+            return self.data()[start:end]
         else:
             var buffer = Buffer[dtype](self.numels())
             var index = 0
@@ -356,12 +344,9 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     fn count(self, key: Scalar[dtype]) -> Int:
         """Count occurence of the key in the buffer."""
         if self._contiguous:
-            if not self.shared():
-                return self.buffer.value().count(key)
-            else:
-                var start = self.offset
-                var end = start + self.numels()
-                return self.shared_buffer.value()[].count(key, start, end)
+            var start = self.offset
+            var end = start + self.numels()
+            return self.data().count(key, start, end)
         else:
             var _count = 0
             for coord in self.shape:
@@ -390,231 +375,119 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
         return NDBuffer[dtype](Buffer[dtype](distincts), self.shape)
 
     @always_inline
-    fn __is__(self, other: NDBuffer[dtype]) -> Bool:
-        if self.shared() and other.shared():
-            return self.shared_buffer.value() is other.shared_buffer.value()
-        return False
-
-    @always_inline
     fn fill(lhs, other: NDBuffer[dtype]):
-        var src_shape = other.shape
-        var target_shape = lhs.shape
-        if not ShapeBroadcaster.broadcastable(src_shape, target_shape):
+        if not ShapeBroadcaster.broadcastable(lhs.shape, other.shape):
             panic(
                 "NDBuffer → fill(lhs, other): dimension mismatch: lhs shape",
-                target_shape.__str__(),
+                lhs.shape.__str__(),
                 "≠",
                 "other shape",
-                src_shape.__str__(),
+                other.shape.__str__(),
             )
-        if other.is_scalar() or src_shape == Shape.Unit():
+        if other.is_scalar() or other.shape == Shape.Unit():
             lhs.fill(
                 other.item()
             )  # Scalar/Singleton NDBuffer - shared or otherwise
             return
-        # Make contiguous if same storage
-        rhs = other.contiguous() if other is lhs else other.copy()
-        if lhs.numels() == rhs.numels():
-            if lhs._contiguous and rhs._contiguous:
-                count = lhs.size()
-                ref dest = lhs.data()
-                ref src = rhs.data()
-                offset_dest = lhs.offset
-                offset_src = rhs.offset
+        var broadcast_shape = ShapeBroadcaster.broadcast_shape(
+            lhs.shape, other.shape
+        )
+        if broadcast_shape != lhs.shape:
+            panic(
+                "NDBuffer → fill: broadcasted shape must match receiver shape"
+            )
 
-                memcpy(
-                    dest=dest.data + offset_dest,
-                    src=src.data + offset_src,
-                    count=count,
+        # Make other contiguous because it could be same storage and makes processing simpler/faster
+        var rhs = other.contiguous()
+
+        if lhs.shape == rhs.shape:
+            if lhs._contiguous:
+                lhs.data().overwrite(
+                    rhs.data(), lhs.offset, lhs.offset + lhs.numels()
                 )
-            elif lhs._contiguous and not rhs._contiguous:
-                index = 0
-                offset = lhs.offset
-                ref dest = lhs.data()
-                for coord in src_shape:
-                    dest[index + offset] = rhs[coord]
-                    index += 1
-
-            elif not lhs._contiguous and rhs._contiguous:
-                index = 0
-                offset = rhs.offset
-                ref src = rhs.data()
-                for coord in target_shape:
-                    lhs[coord] = src[index + offset]
-                    index += 1
-
             else:
-                for coord in target_shape:
-                    lhs[coord] = rhs[coord]
-
+                var index = 0
+                for coord in lhs.shape:
+                    lhs[coord] = rhs.data()[index]
+                    index += 1
         else:  # Handle broadcast
-            mask = ShapeBroadcaster.broadcast_mask(src_shape, target_shape)
-            for coord in target_shape:
+            # lhs.shape -> Target shape
+            # rhs.shape -> Source shape
+            mask = ShapeBroadcaster.broadcast_mask(rhs.shape, lhs.shape)
+            for coord in lhs.shape:
                 src_coord = ShapeBroadcaster.translate_index(
-                    src_shape, coord, mask, target_shape
+                    rhs.shape, coord, mask, lhs.shape
                 )
                 lhs[coord] = rhs[src_coord]
 
     @always_inline
-    fn buffer_scalar_arithmetic_ops[
-        opcode: Int
-    ](lhs: NDBuffer[dtype], scalar: Scalar[dtype]) -> NDBuffer[dtype]:
-        var buffer: Buffer[dtype]
-
-        if lhs._contiguous:
-            var lhs_buffer: Buffer[dtype]
-            if not lhs.shared():
-                lhs_buffer = lhs.data().copy()
-            else:
-                offset = lhs.offset
-                numels = lhs.numels()
-                lhs_buffer = lhs.data()[offset : offset + numels]
-
-            @parameter
-            if opcode == Multiply:
-                buffer = lhs_buffer * scalar
-
-            elif opcode == Add:
-                buffer = lhs_buffer + scalar
-
-            elif opcode == Subtract:
-                buffer = lhs_buffer - scalar
-
-            elif opcode == Divide:
-                buffer = lhs_buffer / scalar
-
-            else:
-                buffer = scalar / lhs_buffer
-        else:
-            buffer = Buffer[dtype](lhs.numels())
-            var index = 0
-            for coord in lhs.shape:
-
-                @parameter
-                if opcode == Multiply:
-                    buffer[index] = lhs[coord] * scalar
-
-                elif opcode == Add:
-                    buffer[index] = lhs[coord] + scalar
-
-                elif opcode == Subtract:
-                    buffer[index] = lhs[coord] - scalar
-
-                elif opcode == Divide:
-                    buffer[index] = lhs[coord] / scalar
-
-                else:
-                    buffer[index] = scalar / lhs[coord]
-
-                index += 1
-
-        return NDBuffer[dtype](buffer^, lhs.shape)
-
-    @always_inline
     fn inplace_ops[
         opcode: Int,
-        simd_width: Int = simd_width_of[dtype](),
     ](lhs: NDBuffer[dtype], rhs: NDBuffer[dtype]):
+        # Broadcast validation
         if not ShapeBroadcaster.broadcastable(lhs.shape, rhs.shape):
             panic(
                 "NDBuffer → inplace_ops: dimension mismatch: "
                 + lhs.shape.__str__()
                 + ", "
                 + rhs.shape.__str__()
-                + ", opcode = "
-                + opcode.__str__()
             )
+
+        # Handle broadcasting case
         if lhs.shape != rhs.shape:
-            # Handle broadcasting
             broadcast_shape = ShapeBroadcaster.broadcast_shape(
                 lhs.shape, rhs.shape
             )
+
+            # PyTorch's rule: broadcasted shape must match receiver shape
             if broadcast_shape != lhs.shape:
                 panic(
-                    (
-                        "NDBuffer → inplace_ops: broadcasted shape does not"
-                        " match receiver's shape →"
-                    ),
-                    broadcast_shape.__str__(),
-                    "≠",
-                    lhs.shape.__str__(),
+                    "NDBuffer → inplace_ops: broadcasted shape "
+                    + broadcast_shape.__str__()
+                    + " must match receiver shape "
+                    + lhs.shape.__str__()
                 )
-            broadcast_result = lhs.broadcast_buffer[opcode](rhs)
-            for coord in lhs.shape:
-                lhs[coord] = broadcast_result[coord]
+
+            # Use existing broadcast operation
+            var broadcast_result = lhs.broadcast_buffer[opcode](rhs)
+
+            if lhs._contiguous:
+                result_buffer = broadcast_result.take_buffer()
+                lhs.data().overwrite(
+                    result_buffer, lhs.offset, lhs.offset + lhs.numels()
+                )
+            else:
+                for coord in lhs.shape:
+                    lhs[coord] = broadcast_result[coord]
 
         else:
+            # Same shape case - use hybrid approach
             if lhs._contiguous and rhs._contiguous:
-                if not lhs.shared() and not rhs.shared():
-
-                    @parameter
-                    if opcode == Multiply:
-                        lhs.data().__imul__(rhs.data())
-
-                    @parameter
-                    if opcode == Add:
-                        lhs.data().__iadd__(rhs.data())
-
-                    @parameter
-                    if opcode == Subtract:
-                        lhs.data().__isub__(rhs.data())
-
-                    @parameter
-                    if opcode == Divide:
-                        lhs.data().__itruediv__(rhs.data())
-
-                else:
-                    numels = lhs.numels()
-                    lhs_offset = lhs.offset
-                    rhs_offset = rhs.offset
-
-                    @parameter
-                    fn update_segment[width: Int](idx: Int):
-                        lhs_segment = lhs.data().load[width](lhs_offset + idx)
-                        rhs_segment = rhs.data().load[width](rhs_offset + idx)
-
-                        @parameter
-                        if opcode == Multiply:
-                            lhs_segment *= rhs_segment
-
-                        @parameter
-                        if opcode == Add:
-                            lhs_segment += rhs_segment
-
-                        @parameter
-                        if opcode == Subtract:
-                            lhs_segment -= rhs_segment
-
-                        @parameter
-                        if opcode == Divide:
-                            lhs_segment /= rhs_segment
-
-                        lhs.data().store[width](lhs_offset + idx, lhs_segment)
-
-                    vectorize[update_segment, simd_width](numels)
+                # Fast path: Use out-of-place operation + overwrite
+                var result = lhs.buffer_arithmetic_ops[opcode](rhs)
+                result_buffer = result.take_buffer()
+                lhs.data().overwrite(
+                    result_buffer, lhs.offset, lhs.offset + lhs.numels()
+                )
 
             else:
                 for coord in lhs.shape:
+                    var lhs_val = lhs[coord]
+                    var rhs_val = rhs[coord]
 
                     @parameter
                     if opcode == Multiply:
-                        lhs[coord] = lhs[coord] * rhs[coord]
+                        lhs[coord] = lhs_val * rhs_val
+                    elif opcode == Add:
+                        lhs[coord] = lhs_val + rhs_val
+                    elif opcode == Subtract:
+                        lhs[coord] = lhs_val - rhs_val
+                    else:  # Divide
+                        lhs[coord] = lhs_val / rhs_val
 
-                    @parameter
-                    if opcode == Add:
-                        lhs[coord] = lhs[coord] + rhs[coord]
-
-                    @parameter
-                    if opcode == Subtract:
-                        lhs[coord] = lhs[coord] - rhs[coord]
-
-                    @parameter
-                    if opcode == Divide:
-                        lhs[coord] = lhs[coord] / rhs[coord]
-
-
-    fn take_buffer(self) -> Buffer[dtype]:
-        """Take the underlying buffer out, panicking if None"""
+    @always_inline
+    fn take_buffer(mut self) -> Buffer[dtype]:
+        """Take the underlying buffer out, panicking if None."""
         if not self.buffer:
             panic("NDBuffer: expected buffer to be present")
         return self.buffer.unsafe_take()
@@ -636,6 +509,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
 
         else:
             for coord in self.shape:
+
                 @parameter
                 if opcode == Multiply:
                     self[coord] *= scalar
@@ -671,8 +545,11 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(lhs.shape, rhs.shape):
             panic(
-                "NDBuffer → buffer_arithmetic_ops(lhs, rhs): dimension mismatch: "
-                + lhs.shape.__str__() + ", " + rhs.shape.__str__()
+                "NDBuffer → buffer_arithmetic_ops(lhs, rhs): dimension"
+                " mismatch: "
+                + lhs.shape.__str__()
+                + ", "
+                + rhs.shape.__str__()
             )
 
         # Handle broadcasting case
@@ -684,6 +561,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
             var lhs_contiguous = lhs.contiguous_buffer()
             var rhs_contiguous = rhs.contiguous_buffer()
             var result_buffer: Buffer[dtype]
+
             @parameter
             if opcode == Multiply:
                 result_buffer = lhs_contiguous * rhs_contiguous
@@ -965,7 +843,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     ](self, other: Self) -> Bool:
         constrained[
             dtype.is_floating_point(),
-            "Gradbox → all_close is for floating point data types only",
+            "NDBuffer → all_close is for floating point data types only",
         ]()
 
         if self.shape != other.shape:
@@ -999,10 +877,7 @@ fn main() raises:
     alias _dtype = DType.float32
 
     for _ in range(runs):
-        _ = """test_ndbuffer_set_get()
-        test_is()
-        test_ndbuffer_fill()
-        test_contiguous()
+        test_ndbuffer_set_get()
         test_scalar_buffer()
         test_fill_2()
         test_broadcast_fill()
@@ -1019,16 +894,17 @@ fn main() raises:
         test_ndbuffer_broadcast_ops()
         test_buffer_scalar_ops()
         test_compare_scalar()
-        test_compare_buffer()"""
-        #test_buffer_overwrite()
+        test_compare_buffer()
+        test_buffer_overwrite()
         test_scalar_inplace_update()
+        test_ndbuffer_fill()
     pass
 
 
 from testing import assert_true, assert_false
 
-fn test_buffer_overwrite() raises:
 
+fn test_buffer_overwrite() raises:
     alias dtype = DType.int32
     size = 21
     l = List[Scalar[dtype]](capacity=UInt(size))
@@ -1040,7 +916,6 @@ fn test_buffer_overwrite() raises:
     result = Buffer[dtype]([42, 42, 42])
     ndb.data().overwrite(result, 3, 6)
 
-    print(ndb.data())
 
 fn test_compare_buffer() raises:
     print("test_compare_buffer")
@@ -1052,7 +927,6 @@ fn test_compare_buffer() raises:
         result.data()
         == Buffer[DType.bool]([False, False, False, True, True, False])
     )
-
 
 
 fn test_compare_scalar() raises:
@@ -1067,10 +941,7 @@ fn test_compare_scalar() raises:
 
     shared = ndb.share(Shape(1, 3), strides=Strides(1, 2), offset=1)
     result = shared.compare_scalar[Equal](4)
-    assert_true(
-        result.data()
-        == Buffer[DType.bool]([False, True, False])
-    )
+    assert_true(result.data() == Buffer[DType.bool]([False, True, False]))
 
 
 fn test_inplace_broadcast_operations() raises:
@@ -1387,6 +1258,12 @@ fn test_fill_2() raises:
         )
     )
 
+    ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8]))
+    ndb_shared = ndb.share(Shape(3), offset=2)
+    ndb_shared.fill(42)
+    print(ndb.data())
+    assert_true(ndb_shared.data() == Buffer[dtype]([1, 2, 42, 42, 42, 6, 7, 8]))
+
 
 fn test_scalar_buffer() raises:
     print("test_scalar_buffer")
@@ -1395,53 +1272,6 @@ fn test_scalar_buffer() raises:
     ndb.fill(True)
     assert_true(ndb.item() == True)
     assert_true(ndb[IntArray()] == True)
-
-
-fn test_contiguous() raises:
-    print("test_contiguous")
-    alias dtype = DType.float32
-    ndb = NDBuffer[dtype]()
-    ndb.fill(42)
-    contiguous = ndb.contiguous()
-    assert_false(
-        ndb is contiguous,
-        (
-            "Unshared NDBuffer is check False assertion 1 failed for contiguous"
-            " buffer"
-        ),
-    )
-    shared = ndb.share()
-    shared_contiguous = shared.contiguous()
-    assert_false(
-        shared is shared_contiguous,
-        "Shared buffer contiguous __is__ entirely different assertion failed",
-    )
-
-
-fn test_is() raises:
-    print("test_is")
-    alias dtype = DType.float32
-    ndb = NDBuffer[dtype]()
-    ndb.fill(42)
-    assert_true(
-        ndb.size() == 1 and ndb.is_scalar(), "Unit size buffer assertion failed"
-    )
-    copied = ndb.copy()
-    assert_false(
-        ndb is copied, "Unshared NDBuffer is check False assertion 1 failed"
-    )
-    assert_false(
-        copied is ndb, "Unshared NDBuffer is check False assertion 2 failed"
-    )
-    copied = ndb.share()
-    assert_true(copied is ndb, "Shared NDBuffer is check True assertion failed")
-
-    new_ndb = NDBuffer[dtype]()
-    new_ndb_shared = new_ndb.share()
-    assert_true(
-        new_ndb is new_ndb_shared,
-        "Empty NDBuffer sharing and __is__ True assertion failed",
-    )
 
 
 fn test_ndbuffer_fill() raises:
@@ -1484,6 +1314,32 @@ fn test_ndbuffer_fill() raises:
     shared.fill(filler)
 
     assert_true(ndb.item() == 101)
+
+    alias _Bool = Scalar[DType.bool]
+
+    _list = List[Scalar[DType.bool]](
+        [
+            _Bool(True),
+            _Bool(True),
+            _Bool(True),
+            _Bool(True),
+            _Bool(True),
+            _Bool(True),
+            _Bool(True),
+            _Bool(True),
+            _Bool(True),
+        ]
+    )
+    buff = Buffer[DType.bool](_list.copy())
+    ndb_bool = NDBuffer[DType.bool](buff.copy())
+    ndb_bool_shared = ndb_bool.share(Shape(5), offset=1)
+    ndb_bool_shared.fill(False)
+    assert_true(
+        ndb_bool.data()
+        == Buffer[DType.bool](
+            [True, False, False, False, False, False, True, True, True]
+        )
+    )
 
 
 fn test_ndbuffer_broadcast_ops() raises:
