@@ -235,7 +235,6 @@ struct Gradbox[dtype: DType](
     fn __itruediv__(self, incoming: Gradbox[dtype]):
         self.buffer.inplace_ops[Divide](incoming.buffer)
 
-    @always_inline
     fn all_close[
         rtol: Scalar[dtype] = 1e-5,
         atol: Scalar[dtype] = 1e-8,
@@ -254,6 +253,7 @@ struct Gradbox[dtype: DType](
 
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
+    @always_inline
     fn reshape(self) -> Gradbox[dtype]:
         if self.numels() != 1:
             panic(
@@ -262,6 +262,7 @@ struct Gradbox[dtype: DType](
             )
         return self.reshape(Shape(), validated=True)
 
+    @always_inline
     fn reshape(
         self,
         new_shape: Shape,
