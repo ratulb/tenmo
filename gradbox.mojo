@@ -2,12 +2,11 @@
 ### Implement tensor library in mojo from first principles
 from shapes import Shape
 from common_utils_imports import *
-from operators_imports import *
+from operators import *
 from validators import Validator
 from tenmo import Tensor
 from layout.int_tuple import IntArray
 from ndbuffer import NDBuffer
-from utilities import Utils
 
 
 struct Gradbox[dtype: DType](
@@ -182,11 +181,7 @@ struct Gradbox[dtype: DType](
         return Gradbox[dtype](self.buffer.scalar_ops[Subtract](scalar))
 
     fn __rsub__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        negated = self.buffer.map[
-            Utils[dtype].negate_buffer, Utils[dtype].negate_scalar
-        ]()
-        nd_buffer = NDBuffer[dtype](negated^, self.buffer.shape)
-        return Gradbox[dtype](nd_buffer^.scalar_ops[Add](scalar))
+        return Gradbox[dtype](self.buffer.scalar_ops[ReverseSubtract](scalar))
 
     fn __truediv__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
         if scalar == Scalar[dtype](0):
@@ -194,9 +189,7 @@ struct Gradbox[dtype: DType](
         return Gradbox[dtype](self.buffer.scalar_ops[Divide](scalar))
 
     fn __rtruediv__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        reciprocal = Buffer[dtype].full(1, self.numels()) / self.buffer.data()
-        nd_buffer = NDBuffer[dtype]((reciprocal^) * scalar, self.buffer.shape)
-        return Gradbox[dtype](nd_buffer^)
+        return Gradbox[dtype](self.buffer.scalar_ops[ReverseDivide](scalar))
 
     fn __mul__(self, other: Self) -> Gradbox[dtype]:
         return Gradbox[dtype](
@@ -282,19 +275,19 @@ struct Gradbox[dtype: DType](
 
         return Gradbox[dtype](nd_buffer^)
 
-        _ = """fn __eq__(self, tensor: Tensor[dtype]) -> Bool:
-        if self.shape != tensor.shape:
+    fn __eq__(self, tensor: Tensor[dtype]) -> Bool:
+        if self.shape() != tensor.shape():
             panic(
                 "Gradbox __eq__(tensor) → dimension mismatch:",
-                self.shape.__str__(),
+                self.shape().__str__(),
                 ",",
-                tensor.shape.__str__(),
+                tensor.shape().__str__(),
             )
-        tensor_as_gradbox = Self.from_tensor(tensor)
-        return self == tensor_as_gradbox
+        return (
+            self.buffer.compare[Equal](tensor.buffer).buffer.value().all_true()
+        )
 
     fn all_close[
-        simd_width: Int = simd_width_of[dtype](),
         rtol: Scalar[dtype] = 1e-5,
         atol: Scalar[dtype] = 1e-8,
     ](self, other: Tensor[dtype]) -> Bool:
@@ -302,15 +295,15 @@ struct Gradbox[dtype: DType](
             dtype.is_floating_point(),
             "Gradbox → all_close is for floating point data types only",
         ]()
-        if self.shape != other.shape:
+        if self.shape() != other.shape():
             panic(
                 "Gradbox → all_close expects same shaped Tensor: "
-                + self.shape.__str__()
+                + self.shape().__str__()
                 + ", "
-                + other.shape.__str__()
+                + other.shape().__str__()
             )
 
-        return self.buffer.all_close[simd_width, rtol, atol](other.data())"""
+        return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(
@@ -335,21 +328,40 @@ from buffers import Buffer
 
 
 fn main() raises:
-    alias dtype = DType.float32
-    gb = Gradbox[dtype](Shape(3, 3))
-    # a = gb^.as_tensor()
-    b = 2 - gb
-    c = 2 / b
-    c.print()
     run = 1
     for _ in range(run):
         test_gradbox_is_shared()
         test_seed_gradbox()
         test_gradbox_inplace_add()
         test_gradbox_reshape()
+        test_gradbox_reverse_subtract()
+        test_gradbox_reverse_division()
 
 
 from testing import assert_true
+
+
+fn test_gradbox_reverse_division() raises:
+    print("test_gradbox_reverse_division")
+    alias dtype = DType.float32
+    buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
+    ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    gradbox = Gradbox[dtype](ndb^)
+    result = 2 / gradbox
+    assert_true(
+        result.buffer.data()
+        == Buffer[dtype]([2.0, 1.0, 0.6666667, 0.5, 0.4, 0.33333334])
+    )
+
+
+fn test_gradbox_reverse_subtract() raises:
+    print("test_gradbox_reverse_subtract")
+    alias dtype = DType.float32
+    buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
+    ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
+    gradbox = Gradbox[dtype](ndb^)
+    result = 2 - gradbox
+    assert_true(result.buffer.data() == Buffer[dtype]([1, 0, -1, -2, -3, -4]))
 
 
 fn test_gradbox_reshape() raises:
