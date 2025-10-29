@@ -35,9 +35,7 @@ struct Tensor[dtype: DType = DType.float32](
     & Representable
     & Writable
     & Absable
-    & Utils
 ):
-    alias datatype = Self.dtype
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
@@ -148,7 +146,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     @always_inline
     fn __len__(self) -> Int:
-        return len(self.buffer)
+        return self.shape()[0] if self.shape() != Shape() else 0
 
     @always_inline
     fn shape(self) -> Shape:
@@ -231,13 +229,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.buffer[indices] = value
 
     fn item(self) -> Scalar[dtype]:
-        shape = self.shape()
-        if shape != Shape(1) and shape != Shape():
-            panic(
-                "Tensor → item(self): only valid for scalar or singleton"
-                " tensors, got shape: "
-                + shape.__str__()
-            )
         return self.buffer.item()
 
     fn __str__(self) -> String:
@@ -420,28 +411,15 @@ struct Tensor[dtype: DType = DType.float32](
             requires_grad.value() if requires_grad else self.requires_grad
         )
 
-        buffer = self.buffer.map[Self.log_buffer, Self.log_scalar]()
+        buffer = self.buffer.map[Utils[dtype].log_buffer, Utils[dtype].log_scalar]()
         nd_buffer = NDBuffer[dtype](buffer^, self.shape())
         return Tensor[dtype](nd_buffer^, requires_grad=grad_required)
 
     fn all_close[
-        simd_width: Int = simd_width_of[dtype](),
         rtol: Scalar[dtype] = 1e-5,
         atol: Scalar[dtype] = 1e-8,
     ](self, other: Self,) -> Bool:
-        constrained[
-            dtype.is_floating_point(),
-            "Tensor → all_close is for floating point data types only",
-        ]()
-        if self.shape() != other.shape():
-            panic(
-                "Tensor → all_close expects same shaped tensors: "
-                + self.shape().__str__()
-                + ", "
-                + other.shape().__str__()
-            )
-
-        return self.buffer.all_close[simd_width, rtol, atol](other.buffer)
+        return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
     fn address(self) -> UnsafePointer[Self,]:
         return UnsafePointer(to=self)
@@ -449,13 +427,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn seed_grad(mut self, with_tensor: Tensor[dtype]):
         if not self.requires_grad:
             return
-        if self.shape() != with_tensor.shape():
-            panic(
-                "Tensor → seed_grad: Shapes not equal -> ",
-                self.shape().__str__(),
-                " ≠ ",
-                with_tensor.shape().__str__(),
-            )
         if not self.has_grad():
             self.requires_grad_()
         self.gradbox.value().seed_grad(with_tensor)
@@ -1228,7 +1199,6 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __iadd__(self, other): can not perform in-place"
                 " operation on a leaf tensor requiring grad."
             )
-
         self.buffer.inplace_ops[Add](other.buffer)
 
     fn __isub__(self, other: Self):
@@ -1249,6 +1219,15 @@ struct Tensor[dtype: DType = DType.float32](
 
         self.buffer.inplace_ops[Multiply](other.buffer)
 
+    fn __itruediv__(self, other: Self):
+        if self.is_leaf():
+            panic(
+                "Tensor → __itruediv__(self, other): can not perform in-place"
+                " operation on a leaf tensor requiring grad."
+            )
+
+        self.buffer.inplace_ops[Divide](other.buffer)
+
     fn unique(self) -> Tensor[dtype]:
         return Tensor[dtype](self.buffer.unique(), requires_grad=False)
 
@@ -1262,7 +1241,7 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         return self.buffer.reduce[
-            Self.sum_buffer, Self.sum_scalars, unit = Scalar[dtype](0)
+            Utils[dtype].sum_buffer, Utils[dtype].sum_scalars, unit = Scalar[dtype](0)
         ]()
 
     fn product_all(self) -> Scalar[dtype]:
@@ -1272,7 +1251,7 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         return self.buffer.reduce[
-            Self.product_buffer, Self.product_scalars, unit = Scalar[dtype](1)
+            Utils[dtype].product_buffer, Utils[dtype].product_scalars, unit = Scalar[dtype](1)
         ]()
 
     fn exp(self) -> Tensor[dtype]:
@@ -1281,7 +1260,7 @@ struct Tensor[dtype: DType = DType.float32](
             "Tensor → exp is for floating point data types only",
         ]()
 
-        var buffer = self.buffer.map[Self.exp_buffer, Self.exp_scalar]()
+        var buffer = self.buffer.map[Utils[dtype].exp_buffer, Utils[dtype].exp_scalar]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
@@ -1290,18 +1269,18 @@ struct Tensor[dtype: DType = DType.float32](
             dtype.is_numeric(),
             "Tensor → __neg__ is for numeric data types only",
         ]()
-        var buffer = self.buffer.map[Self.negate_buffer, Self.negate_scalar]()
+        var buffer = self.buffer.map[Utils[dtype].negate_buffer, Utils[dtype].negate_scalar]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     fn __invert__(self: Tensor[DType.bool]) -> Tensor[DType.bool]:
-        var buffer = self.buffer.map[Self.invert_buffer, Self.invert_scalar]()
+        var buffer = self.buffer.map[Utils[dtype].invert_buffer, Utils[dtype].invert_scalar]()
         var nd_buffer = NDBuffer[DType.bool](buffer^, self.buffer.shape)
         # What is the meaning of requires_grad for boolean Tensor?
         return Tensor[DType.bool](nd_buffer^, requires_grad=False)
 
     fn __abs__(self) -> Tensor[dtype]:
-        var buffer = self.buffer.map[Self.abs_buffer, Self.abs_scalar]()
+        var buffer = self.buffer.map[Utils[dtype].abs_buffer, Utils[dtype].abs_scalar]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
@@ -1338,18 +1317,37 @@ struct Tensor[dtype: DType = DType.float32](
     ](self, other: Self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         return Dot[dtype].forward[track_grad](self, other, requires_grad)"""
 
-    fn __iadd__(mut self, scalar: Scalar[dtype]):
+    fn __iadd__(self, scalar: Scalar[dtype]):
         if self.is_leaf():
             panic(
-                "Tensor → Cannot perform in-place operation on a leaf tensor"
-                " requiring grad."
+                "Tensor → __iadd__: can not perform in-place operation on a"
+                " leaf tensor requiring grad."
             )
+        self.buffer.inplace_scalar_ops[Add](scalar)
 
-        _ = """if self.owns_data:
-            self.buffer += scalar
-        else:
-            for coord in self.shape:
-                self[coord] += scalar"""
+    fn __isub__(self, scalar: Scalar[dtype]):
+        if self.is_leaf():
+            panic(
+                "Tensor → __isub__: can not perform in-place operation on a"
+                " leaf tensor requiring grad."
+            )
+        self.buffer.inplace_scalar_ops[Subtract](scalar)
+
+    fn __imul__(self, scalar: Scalar[dtype]):
+        if self.is_leaf():
+            panic(
+                "Tensor → __imul__: can not perform in-place operation on a"
+                " leaf tensor requiring grad."
+            )
+        self.buffer.inplace_scalar_ops[Multiply](scalar)
+
+    fn __itruediv__(self, scalar: Scalar[dtype]):
+        if self.is_leaf():
+            panic(
+                "Tensor → __itruediv__: can not perform in-place operation on a"
+                " leaf tensor requiring grad."
+            )
+        self.buffer.inplace_scalar_ops[Divide](scalar)
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(
@@ -2016,5 +2014,5 @@ fn main() raises:
     alias dtype = DType.float32
     a = Tensor.arange(5)
     b = Tensor.arange(5)
-    a += b
+    a /= b
     a.print()

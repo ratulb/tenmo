@@ -3,14 +3,11 @@
 from shapes import Shape
 from common_utils_imports import *
 from operators_imports import *
-from buffers import Buffer
 from validators import Validator
-from common_utils import IntArrayHelper
-
-# from tensors import Tensor
 from tenmo import Tensor
 from layout.int_tuple import IntArray
 from ndbuffer import NDBuffer
+from utilities import Utils
 
 
 struct Gradbox[dtype: DType](
@@ -31,15 +28,6 @@ struct Gradbox[dtype: DType](
     fn __init__(out self, var buffer: NDBuffer[dtype]):
         self.buffer = buffer.share()
 
-        _ = """fn __init__(out self, var shape: Shape, var buffer: Buffer[dtype]):
-        if shape.num_elements() != buffer.size:
-            panic(
-                "Gradbox __init__: shape numels do not match buffer size: ",
-                shape.num_elements().__str__(),
-                buffer.size.__str__(),
-            )
-        self.buffer = NDBuffer[dtype](buffer^, shape^)"""
-
     fn __moveinit__(out self, deinit other: Self):
         self.buffer = other.buffer^
 
@@ -48,17 +36,28 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn as_tensor(self, requires_grad: Bool = False) -> Tensor[dtype]:
-        _ = """return Tensor[dtype](
-            self.shape.copy(), self.buffer.copy(), requires_grad=requires_grad
-        )"""
-        return Tensor[dtype].scalar(42)
+        return Tensor[dtype](
+            self.buffer.contiguous(), requires_grad=requires_grad
+        )
 
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
+        if self.rank() == 0 and len(indices) != 0:
+            panic(
+                "Gradbox → __getitem__(List): Scalar gradbox expects empty"
+                " indices"
+            )
+
         return self.buffer[indices]
 
     @always_inline
     fn __getitem__(self, indices: IntArray) -> Scalar[dtype]:
+        if self.rank() == 0 and indices.size() != 0:
+            panic(
+                "Gradbox → __getitem__(IntArray): Scalar gradbox expects empty"
+                " indices"
+            )
+
         return self.buffer[indices]
 
     @always_inline
@@ -81,12 +80,6 @@ struct Gradbox[dtype: DType](
         self.buffer[indices] = value
 
     fn item(self) -> Scalar[dtype]:
-        if self.shape() != Shape(1) and self.shape() != Shape():
-            panic(
-                "Gradbox → item(self): only valid for scalar or singleton"
-                " gradbox, got shape: "
-                + self.shape().__str__()
-            )
         return self.buffer.item()
 
     @always_inline
@@ -173,52 +166,81 @@ struct Gradbox[dtype: DType](
     fn zero_grad(self):
         self.buffer.zero()
 
+    fn __mul__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+        return Gradbox[dtype](self.buffer.scalar_ops[Multiply](scalar))
+
+    fn __rmul__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+        return self.__mul__(scalar)
+
+    fn __add__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+        return Gradbox[dtype](self.buffer.scalar_ops[Add](scalar))
+
+    fn __radd__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+        return self.__add__(scalar)
+
+    fn __sub__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+        return Gradbox[dtype](self.buffer.scalar_ops[Subtract](scalar))
+
+    fn __rsub__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+        negated = self.buffer.map[
+            Utils[dtype].negate_buffer, Utils[dtype].negate_scalar
+        ]()
+        nd_buffer = NDBuffer[dtype](negated^, self.buffer.shape)
+        return Gradbox[dtype](nd_buffer^.scalar_ops[Add](scalar))
+
+    fn __truediv__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+        if scalar == Scalar[dtype](0):
+            panic("Gradbox → __truediv__(scalar): can not divide by zero")
+        return Gradbox[dtype](self.buffer.scalar_ops[Divide](scalar))
+
+    fn __rtruediv__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+        reciprocal = Buffer[dtype].full(1, self.numels()) / self.buffer.data()
+        nd_buffer = NDBuffer[dtype]((reciprocal^) * scalar, self.buffer.shape)
+        return Gradbox[dtype](nd_buffer^)
+
+    fn __mul__(self, other: Self) -> Gradbox[dtype]:
+        return Gradbox[dtype](
+            self.buffer.arithmetic_ops[Multiply](other.buffer)
+        )
+
+    fn __add__(self, other: Self) -> Gradbox[dtype]:
+        return Gradbox[dtype](self.buffer.arithmetic_ops[Add](other.buffer))
+
     fn __sub__(self, other: Self) -> Gradbox[dtype]:
-        if self.shape() != other.shape():
-            panic(
-                "Gradbox → __sub__(other) → dimension mismatch: "
-                + self.shape().__str__()
-                + "≠"
-                + other.shape().__str__(),
-            )
-        buffer = self.buffer.__sub__(other.buffer)
-        return Gradbox[dtype](buffer^)
+        return Gradbox[dtype](
+            self.buffer.arithmetic_ops[Subtract](other.buffer)
+        )
 
-    @always_inline
-    fn __iadd__(self, incoming: Gradbox[dtype]):
-        if self.shape() != incoming.shape():
-            panic(
-                "Gradbox → __iadd__: Shapes not equal -> ",
-                self.shape().__str__(),
-                " ≠ ",
-                incoming.shape().__str__(),
-            )
+    fn __truediv__(self, other: Self) -> Gradbox[dtype]:
+        return Gradbox[dtype](self.buffer.arithmetic_ops[Divide](other.buffer))
 
-        self.buffer.__iadd__(incoming.buffer)
+    fn __imul__(self, scalar: Scalar[dtype]):
+        self.buffer.inplace_scalar_ops[Multiply](scalar)
+
+    fn __iadd__(self, scalar: Scalar[dtype]):
+        self.buffer.inplace_scalar_ops[Add](scalar)
+
+    fn __isub__(self, scalar: Scalar[dtype]):
+        self.buffer.inplace_scalar_ops[Subtract](scalar)
+
+    fn __itruediv__(self, scalar: Scalar[dtype]):
+        self.buffer.inplace_scalar_ops[Divide](scalar)
 
     @always_inline
     fn __imul__(self, incoming: Gradbox[dtype]):
-        if self.shape() != incoming.shape():
-            panic(
-                "Gradbox → __imul__: Shapes not equal -> ",
-                self.shape().__str__(),
-                " ≠ ",
-                incoming.shape().__str__(),
-            )
+        self.buffer.inplace_ops[Multiply](incoming.buffer)
 
-        self.buffer.__imul__(incoming.buffer)
+    @always_inline
+    fn __iadd__(self, incoming: Gradbox[dtype]):
+        self.buffer.inplace_ops[Add](incoming.buffer)
 
     @always_inline
     fn __isub__(self, incoming: Gradbox[dtype]):
-        if self.shape() != incoming.shape():
-            panic(
-                "Gradbox → __isub__: Shapes not equal -> ",
-                self.shape().__str__(),
-                " ≠ ",
-                incoming.shape().__str__(),
-            )
+        self.buffer.inplace_ops[Subtract](incoming.buffer)
 
-        self.buffer.__isub__(incoming.buffer)
+    @always_inline
+    fn __itruediv__(self, incoming: Gradbox[dtype]):
+        self.buffer.inplace_ops[Divide](incoming.buffer)
 
     @always_inline
     fn all_close[
@@ -309,12 +331,21 @@ struct Gradbox[dtype: DType](
         _ = self.buffer^
 
 
+from buffers import Buffer
+
+
 fn main() raises:
+    alias dtype = DType.float32
+    gb = Gradbox[dtype](Shape(3, 3))
+    # a = gb^.as_tensor()
+    b = 2 - gb
+    c = 2 / b
+    c.print()
     run = 1
     for _ in range(run):
         test_gradbox_is_shared()
         test_seed_gradbox()
-        test_gradbox_in_place_add()
+        test_gradbox_inplace_add()
         test_gradbox_reshape()
 
 
@@ -322,6 +353,7 @@ from testing import assert_true
 
 
 fn test_gradbox_reshape() raises:
+    print("test_gradbox_reshape")
     alias dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
@@ -333,7 +365,8 @@ fn test_gradbox_reshape() raises:
     assert_true(gradbox[[1, 2]] == 6 and gradbox[[0, 1]] == 2)
 
 
-fn test_gradbox_in_place_add() raises:
+fn test_gradbox_inplace_add() raises:
+    print("test_gradbox_inplace_add")
     alias dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
@@ -355,6 +388,7 @@ fn test_gradbox_in_place_add() raises:
 
 
 fn test_gradbox_is_shared() raises:
+    print("test_gradbox_is_shared")
     alias dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
@@ -365,6 +399,7 @@ fn test_gradbox_is_shared() raises:
 
 
 fn test_seed_gradbox() raises:
+    print("test_seed_gradbox")
     alias dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))

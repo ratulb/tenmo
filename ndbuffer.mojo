@@ -6,8 +6,6 @@ from layout.int_tuple import IntArray
 from indexhelper import IndexCalculator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic
-from sys import simd_width_of
-from algorithm import vectorize
 from memory import memcpy, ArcPointer
 from collections import Set
 from operators import (
@@ -74,7 +72,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ):
-        self.buffer = Optional(Buffer[dtype].zeros(shape.num_elements()))
+        self.buffer = Optional(Buffer[dtype](shape.num_elements()))
         self.shared_buffer = None
         self.shape = shape
         self.strides = strides.value() if strides else Strides.default(shape)
@@ -450,7 +448,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
             # Same shape case - use hybrid approach
             if lhs._contiguous and rhs._contiguous:
                 # Fast path: Use out-of-place operation + overwrite
-                var result = lhs.buffer_arithmetic_ops[opcode](rhs)
+                var result = lhs.arithmetic_ops[opcode](rhs)
                 result_buffer = result.take_buffer()
                 lhs.data().overwrite(
                     result_buffer, lhs.offset, lhs.offset + lhs.numels()
@@ -490,7 +488,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         if self._contiguous:
             start = self.offset
             end = start + self.numels()
-            var result = self.buffer_scalar_ops[opcode](scalar)
+            var result = self.scalar_ops[opcode](scalar)
             self.data().overwrite(result.take_buffer(), start, end)
 
         else:
@@ -508,30 +506,28 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
 
     @always_inline
     fn __add__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
-        return self.buffer_arithmetic_ops[Add](other)
+        return self.arithmetic_ops[Add](other)
 
     @always_inline
     fn __mul__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
-        return self.buffer_arithmetic_ops[Multiply](other)
+        return self.arithmetic_ops[Multiply](other)
 
     @always_inline
     fn __sub__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
-        return self.buffer_arithmetic_ops[Subtract](other)
+        return self.arithmetic_ops[Subtract](other)
 
     @always_inline
-    fn __truediv__[
-        broadcast: Bool = True,
-    ](self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
-        return self.buffer_arithmetic_ops[Divide](other)
+    fn __truediv__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
+        return self.arithmetic_ops[Divide](other)
 
     @always_inline
-    fn buffer_arithmetic_ops[
+    fn arithmetic_ops[
         opcode: Int,
     ](lhs: NDBuffer[dtype], rhs: NDBuffer[dtype]) -> NDBuffer[dtype]:
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(lhs.shape, rhs.shape):
             panic(
-                "NDBuffer → buffer_arithmetic_ops(lhs, rhs): dimension"
+                "NDBuffer → arithmetic_ops(lhs, rhs): dimension"
                 " mismatch: "
                 + lhs.shape.__str__()
                 + ", "
@@ -663,13 +659,13 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         return result
 
     @always_inline
-    fn buffer_scalar_ops[
+    fn scalar_ops[
         opcode: Int,
     ](self: NDBuffer[dtype], scalar: Scalar[dtype]) -> NDBuffer[dtype]:
         @parameter
         if opcode == Divide:
             if scalar == Scalar[dtype](0):
-                panic("NDBuffer → buffer_scalar_ops: cannot divide by zero")
+                panic("NDBuffer → scalar_ops: cannot divide by zero")
 
         if self._contiguous:
             var contiguous_data = self.contiguous_buffer()
@@ -823,7 +819,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
 
     @always_inline
     fn all_close[
-        simd_width: Int = simd_width_of[dtype](),
         rtol: Scalar[dtype] = 1e-5,
         atol: Scalar[dtype] = 1e-8,
     ](self, other: Self) -> Bool:
@@ -840,7 +835,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
                 + other.shape.__str__()
             )
 
-        return self.contiguous_buffer().all_close[simd_width, rtol, atol](
+        return self.contiguous_buffer().all_close[rtol=rtol, atol=atol](
             other.contiguous_buffer()
         )
 
@@ -878,7 +873,7 @@ fn main() raises:
         test_inplace_operations()
         test_inplace_broadcast_operations()
         test_ndbuffer_broadcast_ops()
-        test_buffer_scalar_ops()
+        test_scalar_ops()
         test_compare_scalar()
         test_compare_buffer()
         test_buffer_overwrite()
@@ -1049,12 +1044,12 @@ fn test_element_at() raises:
     )
 
 
-fn test_buffer_scalar_ops() raises:
-    print("test_buffer_scalar_ops")
+fn test_scalar_ops() raises:
+    print("test_scalar_ops")
     alias dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     ndb_shared = ndb.share(Shape(1, 3), offset=3)
-    result = ndb_shared.buffer_scalar_ops[Add](42)
+    result = ndb_shared.scalar_ops[Add](42)
     assert_true(result.data() == Buffer[dtype]([46, 47, 48]))
 
 
@@ -1339,10 +1334,10 @@ fn test_ndbuffer_broadcast_ops() raises:
     shape2 = Shape(3)
     ndbuffer2 = NDBuffer[dtype](buffer2^, shape2)
 
-    result = ndbuffer1.buffer_arithmetic_ops[Add](ndbuffer2)
+    result = ndbuffer1.arithmetic_ops[Add](ndbuffer2)
     assert_true(result.data() == (Buffer[dtype]([42, 42, 42, 42, 42, 42]) + 3))
 
-    result = result.buffer_arithmetic_ops[Subtract](ndbuffer2)
+    result = result.arithmetic_ops[Subtract](ndbuffer2)
     assert_true(result.data() == Buffer[dtype]([42, 42, 42, 42, 42, 42]))
 
 
