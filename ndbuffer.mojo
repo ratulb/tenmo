@@ -12,7 +12,9 @@ from operators import (
     Multiply,
     Add,
     Subtract,
+    ReverseSubtract,
     Divide,
+    ReverseDivide,
     Equal,
     NotEqual,
     LessThan,
@@ -191,8 +193,8 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
     fn item(self) -> Scalar[dtype]:
         if self.shape != Shape(1) and self.shape != Shape():
             panic(
-                "NDBuffer → item(self): only valid for zero dim buffer/singleton,"
-                " got shape: "
+                "NDBuffer → item(self): only valid for zero dim"
+                " buffer/singleton, got shape: "
                 + self.shape.__str__()
             )
         if self.shape == Shape(1):
@@ -527,8 +529,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(lhs.shape, rhs.shape):
             panic(
-                "NDBuffer → arithmetic_ops(lhs, rhs): dimension"
-                " mismatch: "
+                "NDBuffer → arithmetic_ops(lhs, rhs): dimension mismatch: "
                 + lhs.shape.__str__()
                 + ", "
                 + rhs.shape.__str__()
@@ -678,6 +679,10 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
                 result_buffer = contiguous_data + scalar
             elif opcode == Subtract:
                 result_buffer = contiguous_data - scalar
+            elif opcode == ReverseSubtract:
+                result_buffer = scalar - contiguous_data
+            elif opcode == ReverseDivide:
+                result_buffer = scalar / contiguous_data
             else:  # Divide
                 result_buffer = contiguous_data / scalar
 
@@ -697,6 +702,8 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
                     result_buffer[index] = value + scalar
                 elif opcode == Subtract:
                     result_buffer[index] = value - scalar
+                elif opcode == ReverseDivide:
+                    result_buffer[index] = scalar / value
                 else:  # Divide
                     result_buffer[index] = value / scalar
 
