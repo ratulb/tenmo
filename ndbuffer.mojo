@@ -24,7 +24,7 @@ from operators import (
 )
 
 
-struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
+struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
     var shape: Shape
     var strides: Strides
     var offset: Int
@@ -193,7 +193,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     fn item(self) -> Scalar[dtype]:
         if self.shape != Shape(1) and self.shape != Shape():
             panic(
-                "NDBuffer → item(self): only valid for zero dim buffer,"
+                "NDBuffer → item(self): only valid for zero dim buffer/singleton,"
                 " got shape: "
                 + self.shape.__str__()
             )
@@ -215,10 +215,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
     @always_inline
     fn rank(self) -> Int:
         return self.shape.rank()
-
-    @always_inline
-    fn __len__(self) -> Int:
-        return self.shape[0] if self.shape != Shape() else 0
 
     @always_inline
     fn max_index(self) -> Int:
@@ -264,10 +260,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
         return NDBuffer[dtype](self.shared_buffer, new_shape, strides, offset)
 
     @always_inline
-    fn size(self) -> Int:
-        return self.shape.num_elements()
-
-    @always_inline
     fn zero(self):
         self.fill(Scalar[dtype](0))
 
@@ -289,12 +281,9 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
         map_element: fn (Scalar[dtype]) -> Scalar[dtype],
     ](self) -> Buffer[dtype]:
         if self._contiguous:
-            if not self.shared():
-                return map_buffer(self.buffer.value())
-            else:
-                var start = self.offset
-                var end = start + self.numels()
-                return map_buffer(self.shared_buffer.value()[][start:end])
+            var start = self.offset
+            var end = start + self.numels()
+            return map_buffer(self.data()[start:end])
         else:
             var buffer = Buffer[dtype](self.numels())
             var index = 0
@@ -310,12 +299,9 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Sized):
         unit: Scalar[dtype] = Scalar[dtype](0),
     ](self) -> Scalar[dtype]:
         if self._contiguous:
-            if not self.shared():
-                return reduce_buffer(self.buffer.value(), 0, None)
-            else:
-                var start = self.offset
-                var end = start + self.numels()
-                return reduce_buffer(self.shared_buffer.value()[], start, end)
+            var start = self.offset
+            var end = start + self.numels()
+            return reduce_buffer(self.data(), start, end)
         else:
             var accum: Scalar[dtype] = unit
             for coord in self.shape:
@@ -1261,7 +1247,6 @@ fn test_fill_2() raises:
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8]))
     ndb_shared = ndb.share(Shape(3), offset=2)
     ndb_shared.fill(42)
-    print(ndb.data())
     assert_true(ndb_shared.data() == Buffer[dtype]([1, 2, 42, 42, 42, 6, 7, 8]))
 
 
