@@ -238,7 +238,7 @@ struct Tensor[dtype: DType = DType.float32](
                 " tensors, got shape: "
                 + shape.__str__()
             )
-        return self.buffer.item[validate=False]()
+        return self.buffer.item()
 
     fn __str__(self) -> String:
         rank = self.rank()
@@ -335,79 +335,27 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        if self.shape() != other.shape():
-            panic(
-                "Tensor → __eq__(other): shape mismatch."
-                + self.shape().__str__()
-                + "≠"
-                + other.shape().__str__()
-            )
-        return Tensor[DType.bool](
-            self.buffer.compare[Equal, validate_shape=False](other.buffer)
-        )
+        return Tensor[DType.bool](self.buffer.compare[Equal](other.buffer))
 
     fn __ne__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        if self.shape() != other.shape():
-            panic(
-                "Tensor → __ne__(other): shape mismatch."
-                + self.shape().__str__()
-                + "≠"
-                + other.shape().__str__()
-            )
-        return Tensor[DType.bool](
-            self.buffer.compare[NotEqual, validate_shape=False](other.buffer)
-        )
+        return Tensor[DType.bool](self.buffer.compare[NotEqual](other.buffer))
 
     fn __lt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        if self.shape() != other.shape():
-            panic(
-                "Tensor → __lt__(other): shape mismatch."
-                + self.shape().__str__()
-                + "≠"
-                + other.shape().__str__()
-            )
-        return Tensor[DType.bool](
-            self.buffer.compare[LessThan, validate_shape=False](other.buffer)
-        )
+        return Tensor[DType.bool](self.buffer.compare[LessThan](other.buffer))
 
     fn __le__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        if self.shape() != other.shape():
-            panic(
-                "Tensor → __le__(other): shape mismatch."
-                + self.shape().__str__()
-                + "≠"
-                + other.shape().__str__()
-            )
         return Tensor[DType.bool](
-            self.buffer.compare[LessThanEqual, validate_shape=False](
-                other.buffer
-            )
+            self.buffer.compare[LessThanEqual](other.buffer)
         )
 
     fn __gt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        if self.shape() != other.shape():
-            panic(
-                "Tensor → __gt__(other): shape mismatch."
-                + self.shape().__str__()
-                + "≠"
-                + other.shape().__str__()
-            )
         return Tensor[DType.bool](
-            self.buffer.compare[GreaterThan, validate_shape=False](other.buffer)
+            self.buffer.compare[GreaterThan](other.buffer)
         )
 
     fn __ge__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
-        if self.shape() != other.shape():
-            panic(
-                "Tensor → __ge__(other): shape mismatch."
-                + self.shape().__str__()
-                + "≠"
-                + other.shape().__str__()
-            )
         return Tensor[DType.bool](
-            self.buffer.compare[GreaterThanEqual, validate_shape=False](
-                other.buffer
-            )
+            self.buffer.compare[GreaterThanEqual](other.buffer)
         )
 
     fn float(self) -> Tensor[DType.float32]:
@@ -493,9 +441,7 @@ struct Tensor[dtype: DType = DType.float32](
                 + other.shape().__str__()
             )
 
-        return self.buffer.all_close[
-            simd_width, rtol, atol, check_dtype=False, validate_shape=False
-        ](other.buffer)
+        return self.buffer.all_close[simd_width, rtol, atol](other.buffer)
 
     fn address(self) -> UnsafePointer[Self,]:
         return UnsafePointer(to=self)
@@ -1276,7 +1222,7 @@ struct Tensor[dtype: DType = DType.float32](
         if opcode == ZeroGrad:
             self.zero_grad()
 
-    fn __iadd__(mut self, other: Self):
+    fn __iadd__(self, other: Self):
         if self.is_leaf():
             panic(
                 "Tensor → __iadd__(self, other): can not perform in-place"
@@ -1285,7 +1231,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         self.buffer.inplace_ops[Add](other.buffer)
 
-    fn __isub__(mut self, other: Self):
+    fn __isub__(self, other: Self):
         if self.is_leaf():
             panic(
                 "Tensor → __isub__(self, other): can not perform in-place"
@@ -1294,7 +1240,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         self.buffer.inplace_ops[Subtract](other.buffer)
 
-    fn __imul__(mut self, other: Self):
+    fn __imul__(self, other: Self):
         if self.is_leaf():
             panic(
                 "Tensor → __imul__(self, other): can not perform in-place"
@@ -1302,6 +1248,9 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         self.buffer.inplace_ops[Multiply](other.buffer)
+
+    fn unique(self) -> Tensor[dtype]:
+        return Tensor[dtype](self.buffer.unique(), requires_grad=False)
 
     fn count(self, key: Scalar[dtype]) -> Int:
         return self.buffer.count(key)
@@ -1334,7 +1283,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         var buffer = self.buffer.map[Self.exp_buffer, Self.exp_scalar]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
-        return Tensor[dtype](nd_buffer^, requires_grad=self.requires_grad)
+        return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     fn __neg__(self) -> Tensor[dtype]:
         constrained[
@@ -1343,18 +1292,18 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
         var buffer = self.buffer.map[Self.negate_buffer, Self.negate_scalar]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
-        return Tensor[dtype](nd_buffer^, requires_grad=self.requires_grad)
+        return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     fn __invert__(self: Tensor[DType.bool]) -> Tensor[DType.bool]:
         var buffer = self.buffer.map[Self.invert_buffer, Self.invert_scalar]()
         var nd_buffer = NDBuffer[DType.bool](buffer^, self.buffer.shape)
         # What is the meaning of requires_grad for boolean Tensor?
-        return Tensor[DType.bool](nd_buffer^, requires_grad=self.requires_grad)
+        return Tensor[DType.bool](nd_buffer^, requires_grad=False)
 
     fn __abs__(self) -> Tensor[dtype]:
         var buffer = self.buffer.map[Self.abs_buffer, Self.abs_scalar]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
-        return Tensor[dtype](nd_buffer^, requires_grad=self.requires_grad)
+        return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     fn __radd__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__add__(scalar)
@@ -1437,15 +1386,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         _ = """fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()"""
-
-    fn unique(self) -> Tensor[dtype]:
-        uniques = Set[Scalar[dtype]]()
-        for _, value in self:
-            uniques.add(value)
-        distincts = self.Row(capacity=len(uniques))
-        for elem in uniques:
-            distincts.append(elem)
-        return Tensor[dtype].d1(distincts)
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         output = Ancestor(self)
@@ -2045,7 +1985,7 @@ fn main() raises:
     d.exp().print()
     print(d.sum_all())
     print(d.product_all())"""
-    alias dtype = DType.float32
+    _ = """alias dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
     ndb_t = Tensor(ndb.copy())
     ndb_t.print()
@@ -2071,4 +2011,10 @@ fn main() raises:
     share4_t = Tensor(share4.copy())
     assert_true(share4_t.count(2) == 1)
     print()
-    share4_t.print()
+    share4_t.print()"""
+
+    alias dtype = DType.float32
+    a = Tensor.arange(5)
+    b = Tensor.arange(5)
+    a += b
+    a.print()
