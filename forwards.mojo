@@ -6,6 +6,10 @@ from permute import Permute
 from exponiention import Exponentiator
 from argminmax import Argmin, Argmax
 from views import View
+from addition import AddScalar, Adder
+from reshape import Reshape
+from multiplication import MultiplyScalar, Multiplicator
+
 
 fn main():
     pass

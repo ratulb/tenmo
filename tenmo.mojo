@@ -15,7 +15,7 @@ from operators_imports import *
 
 # from walkback import *
 from backpropagation import BackwardFn
-from forwards import AddScalar, Adder, Reshape
+from forwards import AddScalar, Adder, Reshape, MultiplyScalar, Multiplicator
 from buffers import Buffer
 from validators import Validator
 from collections import Set
@@ -464,9 +464,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn full(
         shape: Shape, value: Scalar[dtype], requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        tensor = Tensor[dtype](shape, requires_grad=requires_grad)
-        tensor.fill(value)
-        return tensor^
+        return Tensor[dtype](NDBuffer[dtype].full(shape, value), requires_grad=requires_grad)
 
     @staticmethod
     fn randn(
@@ -1167,17 +1165,8 @@ struct Tensor[dtype: DType = DType.float32](
 
     # Element wise division of two tensors
     fn __truediv__(self, other: Self) -> Tensor[dtype]:
-        return Divider[dtype].forward[True](self, other)
+        return Divider[dtype].forward[True](self, other)"""
 
-    fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return self.__mul__(scalar)
-
-    fn __mul__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
-        return MultiplyScalar[dtype].forward[True](self, factor)
-
-    # Element wise multiplication of two tensors
-    fn __mul__(self, other: Self) -> Tensor[dtype]:
-        return Multiplicator[dtype].forward[True](self, other)"""
 
     fn update_grad[opcode: Int](self, incoming: Gradbox[dtype]):
         if opcode == MulTensor:
@@ -1296,6 +1285,16 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __add__(self, other: Self) -> Tensor[dtype]:
         return Adder[dtype].forward[True](self, other)
+
+    fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return self.__mul__(scalar)
+
+    fn __mul__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
+        return MultiplyScalar[dtype].forward[True](self, factor)
+
+    # Element wise multiplication of two tensors
+    fn __mul__(self, other: Self) -> Tensor[dtype]:
+        return Multiplicator[dtype].forward[True](self, other)
 
         _ = """fn __pow__[
         track_grad: Bool = True
@@ -2018,10 +2017,10 @@ fn main() raises:
     alias dtype = DType.float32
     a = Tensor[dtype].arange(6, requires_grad=True)
     b = Tensor[dtype].arange(1, requires_grad=True)
-    c = a + b
+    c = a * a
     c.print()
 
-    c.backward(53)
+    c.backward(42)
     print()
     a.grad().print()
     b.grad().print()
