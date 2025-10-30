@@ -1,14 +1,14 @@
-from tensors import Tensor
+from tenmo import Tensor
 from intlist import IntList
-from operators import AddTensor, SubtractTensor, Subtract, scalar_ops
-from shared import TensorLite
+from operators import AddTensor, SubtractTensor, Subtract, ReverseSubtract
 from backpropagation import Delegate, BackwardFn
-from buffers import Buffer
-from broadcastbackward import BroadcastBackward
 from common_utils import panic
+from gradbox import Gradbox
+from ancestry import Ancestor
 
 
-struct SubBackward[dtype: DType](Copyable & Movable):
+@register_passable
+struct SubBackward[dtype: DType](ImplicitlyCopyable):
     var signs: IntList
 
     fn __init__(out self):
@@ -16,9 +16,6 @@ struct SubBackward[dtype: DType](Copyable & Movable):
 
     fn __copyinit__(out self, existing: Self):
         self.signs = existing.signs.copy()
-
-    fn __moveinit__(out self, deinit existing: Self):
-        self.signs = existing.signs
 
     fn negate(mut self, neg: Bool):
         if neg:
@@ -29,42 +26,89 @@ struct SubBackward[dtype: DType](Copyable & Movable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward(self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
-        gradients = output.grad()
+    fn backward(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
         count = len(output.ancestry())
-        grad_outputs = List[Tuple[TensorLite[dtype], Tensor[dtype], Int]](
-            capacity=count
+        grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
+            capacity=UInt(count)
         )
         for i in range(count):
             ancestor = output.ancestry().get(i)
-            grad_outputs.append(
+            grad_shares.append(
                 (
-                    ancestor,
-                    gradients,
+                    ancestor^,
+                    gradbox.copy(),
                     AddTensor if self.signs[i] == 0 else SubtractTensor,
                 )
             )
-        return grad_outputs
+        return grad_shares^
 
 
 @fieldwise_init
 @register_passable
-struct SubLeftRightBackwardScalar[dtype: DType](Copyable):
+struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
     var negate: Bool
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward(self, output: TensorLite[dtype]) -> List[
-        Tuple[TensorLite[dtype], Tensor[dtype], Int]
-    ]:
-        gradients = output.grad()
+    fn backward(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
         ancestor = output.ancestry().get(0)
         return [
-            (ancestor, gradients, SubtractTensor if self.negate else AddTensor)
+            (ancestor^, gradbox^, SubtractTensor if self.negate else AddTensor)
         ]
+
+
+@fieldwise_init
+@register_passable
+struct SubtractBroadcastBackward[dtype: DType](ImplicitlyCopyable):
+    fn into_backward_fn(self) -> BackwardFn[dtype]:
+        return BackwardFn[dtype](Delegate[dtype](self))
+
+    fn backward(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
+        var grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
+            capacity=2
+        )
+
+        ancestor_lhs = output.ancestry().get(0)
+        ancestor_rhs = output.ancestry().get(1)
+
+        tensor_lhs = ancestor_lhs.tensor()
+        tensor_rhs = ancestor_rhs.tensor()
+
+        if ancestor_lhs.requires_grad():
+            lhs_share = tensor_lhs.upstream_grad_share[augment=False](
+                tensor_rhs, gradbox
+            )
+            grad_shares.append(
+                (
+                    ancestor_lhs^,
+                    lhs_share^,
+                    AddTensor,
+                )
+            )
+
+        if ancestor_rhs.requires_grad():
+            rhs_share = tensor_rhs.upstream_grad_share[augment=False](
+                tensor_lhs, gradbox
+            )
+            grad_shares.append(
+                (
+                    ancestor_rhs^,
+                    rhs_share^,
+                    SubtractTensor,
+                )
+            )
+
+        return grad_shares^
 
 
 @register_passable
@@ -73,15 +117,9 @@ struct SubtractScalar[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
-        var out: Tensor[dtype]
-        shape = self.shape.copy()
-
-        if self.owns_data:
-            out = Tensor[dtype](shape, self.buffer - scalar, False)
-        else:
-            out = Tensor[dtype](shape, requires_grad=False)
-            for idx, value in self:
-                out[idx] = value - scalar
+        var out = Tensor[dtype](
+            self.buffer.scalar_ops[Subtract](scalar), requires_grad=False
+        )
 
         @parameter
         if track_grad:
@@ -90,10 +128,10 @@ struct SubtractScalar[dtype: DType]:
                 backward_fn = SubLeftRightBackwardScalar[dtype](
                     False
                 ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
+                out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
-        return out
+        return out^
 
 
 @register_passable
@@ -102,14 +140,9 @@ struct SubtractFromScalar[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
-        var out: Tensor[dtype]
-        shape = self.shape.copy()
-        if self.owns_data:
-            out = Tensor[dtype](shape, scalar - self.buffer, False)
-        else:
-            out = Tensor[dtype](shape, requires_grad=False)
-            for idx, value in self:
-                out[idx] = scalar - value
+        var out = Tensor[dtype](
+            self.buffer.scalar_ops[ReverseSubtract](scalar), requires_grad=False
+        )
 
         @parameter
         if track_grad:
@@ -118,10 +151,10 @@ struct SubtractFromScalar[dtype: DType]:
                 backward_fn = SubLeftRightBackwardScalar[dtype](
                     True
                 ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
+                out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
-        return out
+        return out^
 
 
 @register_passable
@@ -133,24 +166,16 @@ struct Subtractor[dtype: DType]:
         if not self.broadcastable(other):
             panic(
                 "Tensor →__sub__(self, other): dimension mismatch: "
-                + self.shape.__str__()
+                + self.shape().__str__()
                 + " <=> "
-                + other.shape.__str__(),
+                + other.shape().__str__(),
                 "→ at Subtractor → forward",
             )
 
-        var out: Tensor[dtype]
-        this_shape = self.shape.copy()
-        if self.shape != other.shape:
-            out = self.broadcast_op(other, scalar_ops[dtype, Subtract])
-        else:
-            if self.owns_data and other.owns_data:
-                buffer = self.buffer - other.buffer
-                out = Tensor[dtype](this_shape, buffer, False)
-            else:
-                out = Tensor[dtype].zeros(this_shape, False)
-                for coord in this_shape:
-                    out[coord] = self[coord] - other[coord]
+        var out: Tensor[dtype] = Tensor[dtype](
+            self.buffer.arithmetic_ops[Subtract](other.buffer),
+            requires_grad=False,
+        )
 
         @parameter
         if track_grad:
@@ -159,7 +184,7 @@ struct Subtractor[dtype: DType]:
             if requires_grad:
                 out.requires_grad_(True)
 
-                if self.shape == other.shape:
+                if self.shape() == other.shape():
                     sub_backward = SubBackward[dtype]()
                     if self.requires_grad:
                         out.add_ancestry(self)
@@ -168,17 +193,17 @@ struct Subtractor[dtype: DType]:
                         out.add_ancestry(other)
                         sub_backward.negate(True)
                     backward_fn = sub_backward.into_backward_fn()
-                    out.backwardFn = Optional(backward_fn)
+                    out.backwardFn = Optional(backward_fn^)
 
                 else:
-                    backward_fn = BroadcastBackward[
-                        dtype, AddTensor, SubtractTensor, False
+                    backward_fn = SubtractBroadcastBackward[
+                        dtype
                     ]().into_backward_fn()
 
-                    out.backwardFn = Optional(backward_fn)
+                    out.backwardFn = Optional(backward_fn^)
                     out.add_ancestry(self, other)
 
-        return out
+        return out^
 
 
 fn main():

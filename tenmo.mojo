@@ -15,7 +15,16 @@ from operators_imports import *
 
 # from walkback import *
 from backpropagation import BackwardFn
-from forwards import AddScalar, Adder, Reshape, MultiplyScalar, Multiplicator
+from forwards import (
+    AddScalar,
+    Adder,
+    Reshape,
+    MultiplyScalar,
+    Multiplicator,
+    SubtractFromScalar,
+    SubtractScalar,
+    Subtractor,
+)
 from buffers import Buffer
 from validators import Validator
 from collections import Set
@@ -464,7 +473,9 @@ struct Tensor[dtype: DType = DType.float32](
     fn full(
         shape: Shape, value: Scalar[dtype], requires_grad: Bool = False
     ) -> Tensor[dtype]:
-        return Tensor[dtype](NDBuffer[dtype].full(shape, value), requires_grad=requires_grad)
+        return Tensor[dtype](
+            NDBuffer[dtype].full(shape, value), requires_grad=requires_grad
+        )
 
     @staticmethod
     fn randn(
@@ -1167,7 +1178,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn __truediv__(self, other: Self) -> Tensor[dtype]:
         return Divider[dtype].forward[True](self, other)"""
 
-
     fn update_grad[opcode: Int](self, incoming: Gradbox[dtype]):
         if opcode == MulTensor:
             self.grad().__imul__(incoming)
@@ -1286,6 +1296,15 @@ struct Tensor[dtype: DType = DType.float32](
     fn __add__(self, other: Self) -> Tensor[dtype]:
         return Adder[dtype].forward[True](self, other)
 
+    fn __rsub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return SubtractFromScalar[dtype].forward[True](self, scalar)
+
+    fn __sub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return SubtractScalar[dtype].forward[True](self, scalar)
+
+    fn __sub__(self, other: Self) -> Tensor[dtype]:
+        return Subtractor[dtype].forward[True](self, other)
+
     fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return self.__mul__(scalar)
 
@@ -1306,14 +1325,6 @@ struct Tensor[dtype: DType = DType.float32](
 
         return Exponentiator[dtype].forward[track_grad](self, exponent)
 
-    fn __rsub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return SubtractFromScalar[dtype].forward[True](self, scalar)
-
-    fn __sub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return SubtractScalar[dtype].forward[True](self, scalar)
-
-    fn __sub__(self, other: Self) -> Tensor[dtype]:
-        return Subtractor[dtype].forward[True](self, other)
 
     fn dot[
         track_grad: Bool = True
@@ -2017,7 +2028,7 @@ fn main() raises:
     alias dtype = DType.float32
     a = Tensor[dtype].arange(6, requires_grad=True)
     b = Tensor[dtype].arange(1, requires_grad=True)
-    c = a * a
+    c = a - 2 * b
     c.print()
 
     c.backward(42)

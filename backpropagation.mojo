@@ -9,6 +9,9 @@ from ancestry import Ancestor
 alias Delegate[dtype: DType] = Variant[
     AddBackwardScalar[dtype],
     AddBackward[dtype],
+    SubBackward[dtype],
+    SubLeftRightBackwardScalar[dtype],
+    SubtractBroadcastBackward[dtype],
     ReshapeBackward[dtype],
     SumBackward[dtype],
     AddBroadcastBackward[dtype],
@@ -47,6 +50,15 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[AddBroadcastBackward[dtype]]():
             return self.grad_fn[AddBroadcastBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[SubBackward[dtype]]():
+            return self.grad_fn[SubBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[SubLeftRightBackwardScalar[dtype]]():
+            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward(output)
+
+        elif self.grad_fn.isa[SubtractBroadcastBackward[dtype]]():
+            return self.grad_fn[SubtractBroadcastBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[MultiplyBackward[dtype]]():
             return self.grad_fn[MultiplyBackward[dtype]].backward(output)

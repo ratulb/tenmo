@@ -2,22 +2,19 @@ from backpropagation import BackwardFn
 from matmul import MatmulBackward, BatchedMatmulBackward
 from summation import SumBackward, Summer
 from mean_reduction import MeanBackward, Mean
-from addition import AddBackward, AddBackwardScalar, AddScalar, Adder
+from addition import AddBackward, AddBackwardScalar, AddBroadcastBackward
 from subtraction import (
     SubBackward,
     SubLeftRightBackwardScalar,
-    SubtractScalar,
-    SubtractFromScalar,
-    Subtractor,
+    SubtractBroadcastBackward,
 )
-from broadcastbackward import BroadcastBackward
-from reshape import ReshapeBackward, Reshape
+from reshape import ReshapeBackward
 from multiplication import (
     MultiplyBackward,
-    MulBackwardScalar,
-    MultiplyScalar,
-    Multiplicator,
+    MultiplyBackwardScalar,
+    MultiplyBroadcastBackward,
 )
+
 from exponiention import ExponientionBackward
 from division import (
     TrueDivBackwardScalar,

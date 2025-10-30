@@ -7,6 +7,7 @@ from exponiention import Exponentiator
 from argminmax import Argmin, Argmax
 from views import View
 from addition import AddScalar, Adder
+from subtraction import SubtractScalar, SubtractFromScalar, Subtractor
 from reshape import Reshape
 from multiplication import MultiplyScalar, Multiplicator
 
