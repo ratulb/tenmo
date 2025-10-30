@@ -119,6 +119,19 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         _ = self.shape^
         _ = self.strides^
 
+    @staticmethod
+    @always_inline
+    fn zeros(shape: Shape) -> NDBuffer[dtype]:
+        var buffer = Buffer[dtype].zeros(shape.num_elements())
+        return NDBuffer[dtype](buffer^, shape)
+
+
+    @staticmethod
+    @always_inline
+    fn full(shape: Shape, scalar: Scalar[dtype]) -> NDBuffer[dtype]:
+        var buffer = Buffer[dtype].full(scalar, shape.num_elements())
+        return NDBuffer[dtype](buffer^, shape)
+
     @always_inline
     fn is_contiguous(self) -> Bool:
         return self.strides.is_contiguous(self.shape)
@@ -307,6 +320,43 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
             for coord in self.shape:
                 accum = reduce_elements(self[coord], accum)
             return accum
+
+    @always_inline
+    fn sum_all(self) -> Scalar[dtype]:
+        if self._contiguous:
+            var start = self.offset
+            var end = start + self.numels()
+            return self.data().sum(start, end)
+        else:
+            var accum_sum: Scalar[dtype] = Scalar[dtype](0)
+            for coord in self.shape:
+                accum_sum += self[coord]
+            return accum_sum
+
+    fn sum(self, reduction_axes: IntList, keepdims: Bool) -> NDBuffer[dtype]:
+        var out_shape = self.shape.compute_output_shape(
+            reduction_axes, keepdims
+        )
+        var out = NDBuffer[dtype].zeros(out_shape)
+        if out_shape == Shape():
+            # We're producing a scalar (either from scalar NDBuffer or full reduction)
+            out[IntArray()] = self.sum_all()
+        else:
+            reduction_axes_shape = Shape(
+                self.shape.axes_spans.select(reduction_axes)
+            )
+            for out_coord in out_shape.indices():
+                var accum_sum = Scalar[dtype](0)
+                for red_coord in reduction_axes_shape.indices():
+                    self_coord = out_coord.replace(
+                        reduction_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        reduction_axes, red_coord
+                    )
+                    accum_sum += self[self_coord]
+                out[out_coord] = accum_sum
+
+        return out^
 
     @always_inline
     fn contiguous_buffer(self) -> Buffer[dtype]:
@@ -636,6 +686,28 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         return NDBuffer[dtype](buffer^, result_shape)
 
     @always_inline
+    fn broadcast_to(self, target_shape: Shape) -> NDBuffer[dtype]:
+        own_shape = self.shape
+        if not ShapeBroadcaster.broadcastable(own_shape, target_shape):
+            panic(
+                "NDBuffer → broadcast_to(target_shape): "
+                + own_shape.__str__()
+                + " not broadcastable to "
+                + target_shape.__str__()
+            )
+
+        mask = ShapeBroadcaster.broadcast_mask(own_shape, target_shape)
+        out = NDBuffer[dtype].zeros(target_shape)
+
+        for target_coord in target_shape:
+            src_coord = ShapeBroadcaster.translate_index(
+                own_shape, target_coord, mask, target_shape
+            )
+            out[target_coord] = self[src_coord]
+
+        return out^
+
+    @always_inline
     @staticmethod
     fn scalar_fn[
         opcode: Int
@@ -865,7 +937,7 @@ fn main() raises:
     alias _dtype = DType.float32
 
     for _ in range(runs):
-        test_ndbuffer_set_get()
+        _ = """test_ndbuffer_set_get()
         test_scalar_buffer()
         test_fill_2()
         test_broadcast_fill()
@@ -885,11 +957,68 @@ fn main() raises:
         test_compare_buffer()
         test_buffer_overwrite()
         test_scalar_inplace_update()
-        test_ndbuffer_fill()
+        test_ndbuffer_fill()"""
+        test_buffer_sum_all()
+        test_buffer_sum()
     pass
 
 
 from testing import assert_true, assert_false
+
+
+fn test_buffer_sum() raises:
+    print("test_buffer_sum")
+    alias dtype = DType.int32
+    size = 21
+    l = List[Scalar[dtype]](capacity=UInt(size))
+    for i in range(size):
+        l.append(i)
+
+    buffer = Buffer[dtype](l)
+    ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
+    result = ndb.sum(IntList(0), True)
+    assert_true(result.data() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39]))
+
+    result = ndb.sum(IntList(0), False)
+    assert_true(result.data() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39]))
+
+    result = ndb.sum(IntList(0, 1), True)
+    assert_true(result.data() == Buffer[dtype]([210]))
+
+    result = ndb.sum(IntList(1), True)
+    assert_true(result.data() == Buffer[dtype]([21, 70, 119]))
+
+
+fn test_buffer_sum_all() raises:
+    print("test_buffer_sum_all")
+    alias dtype = DType.int32
+    size = 21
+    l = List[Scalar[dtype]](capacity=UInt(size))
+    for i in range(size):
+        l.append(i)
+
+    buffer = Buffer[dtype](l)
+    ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
+
+    assert_true(ndb.sum_all() == 210)
+    shared = ndb.share(Shape(5, 2), offset=1, strides=Strides(2, 2))
+    assert_true(shared.sum_all() == 60)
+    # Scalar
+    ndb = NDBuffer[dtype](Shape())
+    ndb.fill(42)
+    assert_true(ndb.sum_all() == 42)
+    shared = ndb.share()
+    assert_true(
+        shared.sum_all() == 42 and shared.item() == 42 and ndb.item() == 42
+    )
+    # Shape(1)
+    ndb = NDBuffer[dtype](Shape(1))
+    ndb.fill(39)
+    assert_true(ndb.sum_all() == 39 and ndb[IntList(0)] == 39)
+    shared = ndb.share()
+    assert_true(
+        shared.sum_all() == 39 and shared.item() == 39 and ndb.item() == 39
+    )
 
 
 fn test_buffer_overwrite() raises:

@@ -7,6 +7,7 @@ from validators import Validator
 from tenmo import Tensor
 from layout.int_tuple import IntArray
 from ndbuffer import NDBuffer
+from broadcasthelper import ShapeBroadcaster
 
 
 struct Gradbox[dtype: DType](
@@ -20,7 +21,7 @@ struct Gradbox[dtype: DType](
 ):
     var buffer: NDBuffer[dtype]
 
-    fn __init__(out self, shape: Shape, share: Bool=True):
+    fn __init__(out self, shape: Shape, share: Bool = True):
         buffer = NDBuffer[dtype](shape)
         self.buffer = buffer.share() if share else buffer^
 
@@ -39,9 +40,31 @@ struct Gradbox[dtype: DType](
             self.buffer.contiguous(), requires_grad=requires_grad
         )
 
+    @staticmethod
+    @always_inline
+    fn full(
+        shape: Shape, scalar: Scalar[dtype], share: Bool = False
+    ) -> Gradbox[dtype]:
+        return Gradbox[dtype](NDBuffer.full(shape, scalar), share=share)
+
     @always_inline
     fn unshared(self) -> Gradbox[dtype]:
         return Gradbox[dtype](self.buffer.contiguous(), share=False)
+
+    fn broadcast_to(
+        self, target_shape: Shape, share: Bool = False
+    ) -> Gradbox[dtype]:
+        if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
+            panic(
+                "Gradbox → broadcast_to: shape "
+                + self.shape().__str__()
+                + " not broadcastable to "
+                + target_shape.__str__()
+            )
+
+        broadcasted_buffer = self.buffer.broadcast_to(target_shape)
+        out = Gradbox[dtype](broadcasted_buffer^, share=share)
+        return out^
 
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
@@ -170,46 +193,65 @@ struct Gradbox[dtype: DType](
         self.buffer.zero()
 
     fn __mul__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.scalar_ops[Multiply](scalar))
+        return Gradbox[dtype](
+            self.buffer.scalar_ops[Multiply](scalar), share=False
+        )
 
     fn __rmul__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
         return self.__mul__(scalar)
 
     fn __add__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.scalar_ops[Add](scalar))
+        return Gradbox[dtype](self.buffer.scalar_ops[Add](scalar), share=False)
 
     fn __radd__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
         return self.__add__(scalar)
 
     fn __sub__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.scalar_ops[Subtract](scalar))
+        return Gradbox[dtype](
+            self.buffer.scalar_ops[Subtract](scalar), share=False
+        )
 
     fn __rsub__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.scalar_ops[ReverseSubtract](scalar))
+        return Gradbox[dtype](
+            self.buffer.scalar_ops[ReverseSubtract](scalar), share=False
+        )
 
     fn __truediv__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
         if scalar == Scalar[dtype](0):
             panic("Gradbox → __truediv__(scalar): can not divide by zero")
-        return Gradbox[dtype](self.buffer.scalar_ops[Divide](scalar))
+        return Gradbox[dtype](
+            self.buffer.scalar_ops[Divide](scalar), share=False
+        )
 
     fn __rtruediv__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.scalar_ops[ReverseDivide](scalar))
+        return Gradbox[dtype](
+            self.buffer.scalar_ops[ReverseDivide](scalar), share=False
+        )
 
     fn __mul__(self, other: Self) -> Gradbox[dtype]:
         return Gradbox[dtype](
-            self.buffer.arithmetic_ops[Multiply](other.buffer)
+            self.buffer.arithmetic_ops[Multiply](other.buffer), share=False
+        )
+
+    fn __mul__(self, other: Tensor[dtype]) -> Gradbox[dtype]:
+        return Gradbox[dtype](
+            self.buffer.arithmetic_ops[Multiply](other.buffer), share=False
         )
 
     fn __add__(self, other: Self) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.arithmetic_ops[Add](other.buffer))
+        return Gradbox[dtype](
+            self.buffer.arithmetic_ops[Add](other.buffer), share=False
+        )
 
     fn __sub__(self, other: Self) -> Gradbox[dtype]:
         return Gradbox[dtype](
-            self.buffer.arithmetic_ops[Subtract](other.buffer)
+            self.buffer.arithmetic_ops[Subtract](other.buffer), share=False
         )
 
     fn __truediv__(self, other: Self) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.arithmetic_ops[Divide](other.buffer))
+        return Gradbox[dtype](
+            self.buffer.arithmetic_ops[Divide](other.buffer), share=False
+        )
 
     fn __imul__(self, scalar: Scalar[dtype]):
         self.buffer.inplace_scalar_ops[Multiply](scalar)
