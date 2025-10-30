@@ -1,8 +1,6 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn
-from operators import AddTensor, Add, scalar_ops
-
-# from broadcastbackward import BroadcastBackward
+from operators import AddTensor, Add
 from common_utils import panic
 from gradbox import Gradbox
 from ancestry import Ancestor
@@ -41,37 +39,35 @@ struct AddBroadcastBackward[dtype: DType](ImplicitlyCopyable):
 
         ancestor_lhs = output.ancestry().get(0)
         ancestor_rhs = output.ancestry().get(1)
-        lhs_requires_grad = ancestor_lhs.requires_grad()
-        rhs_requires_grad = ancestor_rhs.requires_grad()
 
         tensor_lhs = ancestor_lhs.tensor()
         tensor_rhs = ancestor_rhs.tensor()
 
         if ancestor_lhs.requires_grad():
             lhs_share = tensor_lhs.upstream_grad_share[augment=False](
-                tensor_rhs, gradbox.as_tensor(requires_grad=False)
+                tensor_rhs, gradbox
             )
             grad_shares.append(
                 (
                     ancestor_lhs^,
-                    lhs_share^.as_gradbox(share=False),
+                    lhs_share^,
                     AddTensor,
                 )
             )
 
         if ancestor_rhs.requires_grad():
             rhs_share = tensor_rhs.upstream_grad_share[augment=False](
-                tensor_lhs, gradbox.as_tensor(requires_grad=False)
+                tensor_lhs, gradbox
             )
             grad_shares.append(
                 (
                     ancestor_rhs^,
-                    rhs_share^.as_gradbox(share=False),
+                    rhs_share^,
                     AddTensor,
                 )
             )
 
-        return grad_shares
+        return grad_shares^
 
 
 @fieldwise_init
@@ -86,13 +82,13 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
         gradbox = output.grad().copy()
         count = len(output.ancestry())
 
-        var grad_shares = List[Tuple[TensorLite[dtype], Tensor[dtype], Int]](
-            cacpacity=UInt(count)
+        var grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
+            capacity=UInt(count)
         )
 
         if count == 1:
             ancestor = output.ancestry().get(0)
-            grad.shares.append((ancestor^, gradbox^, AddTensor))
+            grad_shares.append((ancestor^, gradbox^, AddTensor))
         else:
             ancestor_lhs = output.ancestry().get(0)
             ancestor_rhs = output.ancestry().get(1)
@@ -103,16 +99,16 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
                 grad_shares.append((ancestor_lhs^, gradbox.copy(), AddTensor))
                 grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))
 
-            elif lhs_requires_grad and not rhs.requires_grad:
+            elif lhs_requires_grad and not rhs_requires_grad:
                 grad_shares.append((ancestor_lhs^, gradbox^, AddTensor))
 
-            elif not lhs_requires_grad and rhs.requires_grad:
+            elif not lhs_requires_grad and rhs_requires_grad:
                 grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))
 
             else:
                 pass
 
-        return grad_shares
+        return grad_shares^
 
 
 @fieldwise_init
@@ -148,29 +144,19 @@ struct Adder[dtype: DType](Copyable):
         if self.address() == other.address():
             # return self.__mul__(2)
             pass
-        _ = """if not self.broadcastable(other):
+        if not self.broadcastable(other):
             panic(
                 "Tensor__add__(self, other): dimension mismatch: "
-                + self.shape.__str__()
+                + self.shape().__str__()
                 + " <=> "
-                + other.shape.__str__(),
+                + other.shape().__str__(),
                 "at Addition → forward",
-            )"""
+            )
 
         var out: Tensor[dtype] = Tensor[dtype](
             self.buffer.arithmetic_ops[Add](other.buffer),
             requires_grad=False,
         )
-        # if self.shape != other.shape:
-        # out = self.broadcast_op(other, scalar_ops[dtype, Add])
-        # else:
-        _ = """if self.owns_data and other.owns_data:
-            buffer = self.buffer + other.buffer
-            out = Tensor[dtype](self.shape, buffer^, requires_grad=False)
-        else:
-            out = Tensor[dtype].zeros(self.shape, requires_grad=False)
-            for coord in self.shape:
-                out[coord] = self[coord] + other[coord]"""
 
         @parameter
         if track_grad:

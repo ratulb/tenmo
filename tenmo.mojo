@@ -17,7 +17,6 @@ from operators_imports import *
 from backpropagation import BackwardFn
 from forwards import AddScalar, Adder, Reshape
 from buffers import Buffer
-from shared import TensorLite
 from validators import Validator
 from collections import Set
 from gradbox import Gradbox
@@ -28,13 +27,7 @@ from utilities import Utils
 
 
 struct Tensor[dtype: DType = DType.float32](
-    Copyable
-    & Movable
-    & Sized
-    & Stringable
-    & Representable
-    & Writable
-    & Absable
+    Copyable & Movable & Sized & Stringable & Representable & Writable & Absable
 ):
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
@@ -109,7 +102,7 @@ struct Tensor[dtype: DType = DType.float32](
         buffer = src_buffer.share(shape, strides, offset)
         return Tensor[dtype](buffer=buffer^, requires_grad=requires_grad)
 
-    fn as_gradbox(self, share: Bool=False) -> Gradbox[dtype]:
+    fn as_gradbox(self, share: Bool = False) -> Gradbox[dtype]:
         return Gradbox[dtype](self.buffer.contiguous(), share=share)
 
     fn __moveinit__(out self, deinit other: Self):
@@ -424,7 +417,9 @@ struct Tensor[dtype: DType = DType.float32](
             requires_grad.value() if requires_grad else self.requires_grad
         )
 
-        buffer = self.buffer.map[Utils[dtype].log_buffer, Utils[dtype].log_scalar]()
+        buffer = self.buffer.map[
+            Utils[dtype].log_buffer, Utils[dtype].log_scalar
+        ]()
         nd_buffer = NDBuffer[dtype](buffer^, self.shape())
         return Tensor[dtype](nd_buffer^, requires_grad=grad_required)
 
@@ -847,27 +842,19 @@ struct Tensor[dtype: DType = DType.float32](
     fn broadcast_to(
         self, target_shape: Shape, requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
-        own_shape = self.shape()
-        if not ShapeBroadcaster.broadcastable(own_shape, target_shape):
+        if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
             panic(
                 "Tensor → broadcast_to: shape "
-                + own_shape.__str__()
+                + self.shape().__str__()
                 + " not broadcastable to "
                 + target_shape.__str__()
             )
 
-        mask = ShapeBroadcaster.broadcast_mask(own_shape, target_shape)
+        broadcasted_buffer = self.buffer.broadcast_to(target_shape)
         grad_required = (
             requires_grad.value() if requires_grad else self.requires_grad
         )
-        out = Tensor[dtype](target_shape, requires_grad=grad_required)
-
-        for target_coord in target_shape:
-            src_coord = ShapeBroadcaster.translate_index(
-                own_shape, target_coord, mask, target_shape
-            )
-            out[target_coord] = self[src_coord]
-
+        out = Tensor[dtype](broadcasted_buffer^, requires_grad=grad_required)
         return out^
 
     @always_inline
@@ -896,10 +883,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         addr = row * strides[0] + col * strides[1] + offset
-        if not self.shared():
-            return self.buffer.buffer.value().load[simdwidth](addr)
-        else:
-            return self.buffer.shared_buffer.value()[].load[simdwidth](addr)
+        return self.buffer.data().load[simdwidth](addr)
 
     @always_inline
     fn store[
@@ -927,11 +911,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         addr = row * strides[0] + col * strides[1] + offset
-
-        if not self.shared():
-            self.buffer.buffer.value().store[simdwidth](addr, value)
-        else:
-            self.buffer.shared_buffer.value()[].store[simdwidth](addr, value)
+        self.buffer.data().store[simdwidth](addr, value)
 
         _ = """fn flatten[
         track_grad: Bool = True
@@ -1029,38 +1009,41 @@ struct Tensor[dtype: DType = DType.float32](
             self, new_shape, requires_grad, validated
         )
 
-        _="""fn upstream_grad_share[augment: Bool](
+    fn upstream_grad_share[
+        augment: Bool
+    ](
         self,
         other: Tensor[dtype],
-        upstream_grad: Tensor[dtype],
-    ) -> Tensor[dtype]:
-        var grad_contrib: Tensor[dtype]
+        upstream_grad: Gradbox[dtype],
+    ) -> Gradbox[
+        dtype
+    ]:
+        var grad_contrib: Gradbox[dtype]
         if upstream_grad.shape() == Shape():
-            grad_contrib = Tensor[dtype].full(
-                self.shape(), upstream_grad.item(), requires_grad=False
+            grad_contrib = Gradbox[dtype].full(
+                self.shape(), upstream_grad.item(), share=False
             )
         else:
+
             @parameter
             if augment:
                 grad_contrib = upstream_grad * other
             else:
-                grad_contrib = upstream_grad
+                grad_contrib = upstream_grad.copy()
 
-            if grad_contrib.shape != self.shape():
-                axes = self.broadcast_mask(grad_contrib.shape).indices_of(1)
-                grad_contrib = grad_contrib.sum[track_grad=False](
-                    axes=axes, keepdims=True
-                )
-            if grad_contrib.shape != self.shape:
-                grad_contrib = grad_contrib.reshape[track_grad=False](
-                    self.shape
-                )
-            grad_contrib.requires_grad = False
+            if grad_contrib.shape() != self.shape():
+                axes = IntList(
+                    ShapeBroadcaster.broadcast_mask(
+                        self.shape(), grad_contrib.shape()
+                    )
+                ).indices_of(1)
+                grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
+            if grad_contrib.shape() != self.shape():
+                grad_contrib = grad_contrib.reshape(self.shape())
 
-        return grad_contrib
+        return grad_contrib^
 
-
-    fn broadcast_op(
+        _ = """fn broadcast_op(
         self,
         other: Self,
         op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
@@ -1253,9 +1236,7 @@ struct Tensor[dtype: DType = DType.float32](
             "Tensor → sum_all is for numeric data types only",
         ]()
 
-        return self.buffer.reduce[
-            Utils[dtype].sum_buffer, Utils[dtype].sum_scalars, unit = Scalar[dtype](0)
-        ]()
+        return self.buffer.sum_all()
 
     fn product_all(self) -> Scalar[dtype]:
         constrained[
@@ -1264,7 +1245,9 @@ struct Tensor[dtype: DType = DType.float32](
         ]()
 
         return self.buffer.reduce[
-            Utils[dtype].product_buffer, Utils[dtype].product_scalars, unit = Scalar[dtype](1)
+            Utils[dtype].product_buffer,
+            Utils[dtype].product_scalars,
+            unit = Scalar[dtype](1),
         ]()
 
     fn exp(self) -> Tensor[dtype]:
@@ -1273,7 +1256,9 @@ struct Tensor[dtype: DType = DType.float32](
             "Tensor → exp is for floating point data types only",
         ]()
 
-        var buffer = self.buffer.map[Utils[dtype].exp_buffer, Utils[dtype].exp_scalar]()
+        var buffer = self.buffer.map[
+            Utils[dtype].exp_buffer, Utils[dtype].exp_scalar
+        ]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
@@ -1282,18 +1267,24 @@ struct Tensor[dtype: DType = DType.float32](
             dtype.is_numeric(),
             "Tensor → __neg__ is for numeric data types only",
         ]()
-        var buffer = self.buffer.map[Utils[dtype].negate_buffer, Utils[dtype].negate_scalar]()
+        var buffer = self.buffer.map[
+            Utils[dtype].negate_buffer, Utils[dtype].negate_scalar
+        ]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     fn __invert__(self: Tensor[DType.bool]) -> Tensor[DType.bool]:
-        var buffer = self.buffer.map[Utils[dtype].invert_buffer, Utils[dtype].invert_scalar]()
+        var buffer = self.buffer.map[
+            Utils[dtype].invert_buffer, Utils[dtype].invert_scalar
+        ]()
         var nd_buffer = NDBuffer[DType.bool](buffer^, self.buffer.shape)
         # What is the meaning of requires_grad for boolean Tensor?
         return Tensor[DType.bool](nd_buffer^, requires_grad=False)
 
     fn __abs__(self) -> Tensor[dtype]:
-        var buffer = self.buffer.map[Utils[dtype].abs_buffer, Utils[dtype].abs_scalar]()
+        var buffer = self.buffer.map[
+            Utils[dtype].abs_buffer, Utils[dtype].abs_scalar
+        ]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
@@ -1393,7 +1384,7 @@ struct Tensor[dtype: DType = DType.float32](
         _ = self.ancestors^
         _ = self.backwardFn^
 
-        print("Tensor freed", self.id())
+        # print("Tensor freed", self.id())
 
         _ = """fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
         return ((self - target) ** 2).mean()"""
@@ -2026,10 +2017,11 @@ fn main() raises:
 
     alias dtype = DType.float32
     a = Tensor[dtype].arange(6, requires_grad=True)
-    b = a + 2
-    c = b.reshape(Shape(2,3))
+    b = Tensor[dtype].arange(1, requires_grad=True)
+    c = a + b
     c.print()
 
-    c.backward(49)
+    c.backward(53)
     print()
     a.grad().print()
+    b.grad().print()

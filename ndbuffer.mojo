@@ -125,7 +125,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         var buffer = Buffer[dtype].zeros(shape.num_elements())
         return NDBuffer[dtype](buffer^, shape)
 
-
     @staticmethod
     @always_inline
     fn full(shape: Shape, scalar: Scalar[dtype]) -> NDBuffer[dtype]:

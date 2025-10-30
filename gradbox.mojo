@@ -8,6 +8,7 @@ from tenmo import Tensor
 from layout.int_tuple import IntArray
 from ndbuffer import NDBuffer
 from broadcasthelper import ShapeBroadcaster
+from intlist import IntList
 
 
 struct Gradbox[dtype: DType](
@@ -50,6 +51,10 @@ struct Gradbox[dtype: DType](
     @always_inline
     fn unshared(self) -> Gradbox[dtype]:
         return Gradbox[dtype](self.buffer.contiguous(), share=False)
+
+    fn sum(self, axes: IntList, keepdims: Bool) -> Gradbox[dtype]:
+        var nd_buffer = self.buffer.sum(reduction_axes=axes, keepdims=keepdims)
+        return Gradbox[dtype](nd_buffer^, share=False)
 
     fn broadcast_to(
         self, target_shape: Shape, share: Bool = False
