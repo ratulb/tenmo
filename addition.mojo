@@ -142,8 +142,7 @@ struct Adder[dtype: DType](Copyable):
         track_grad: Bool = True
     ](self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
         if self.address() == other.address():
-            # return self.__mul__(2)
-            pass
+            return self.__mul__(Scalar[dtype](2))
         if not self.broadcastable(other):
             panic(
                 "Tensor__add__(self, other): dimension mismatch: "
