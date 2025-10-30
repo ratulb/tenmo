@@ -4,7 +4,6 @@ from operators import AddTensor, Multiply
 from common_utils import panic, id
 from ancestry import Ancestor
 from gradbox import Gradbox
-from broadcasthelper import ShapeBroadcaster
 
 
 @fieldwise_init
@@ -156,7 +155,7 @@ struct Multiplicator[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
-        if not ShapeBroadcaster.broadcastable(self.shape(), other.shape()):
+        if not self.broadcastable(other):
             panic(
                 "Tensor → __mul__(self * other) → dimension mismatch: "
                 + self.shape().__str__()
