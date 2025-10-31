@@ -22,6 +22,8 @@ alias Delegate[dtype: DType] = Variant[
     TrueDivBackwardScalar[dtype],
     RightTrueDivBackwardScalar[dtype],
     DivideBackward[dtype],
+    SumBackward[dtype],
+    ViewBackward[dtype],
 ]
 
 
@@ -42,6 +44,10 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         if self.grad_fn.isa[AddBackwardScalar[dtype]]():
             return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
+
+        elif self.grad_fn.isa[ViewBackward[dtype]]():
+            return self.grad_fn[ViewBackward[dtype]].backward(output)
+
 
         elif self.grad_fn.isa[ReshapeBackward[dtype]]():
             return self.grad_fn[ReshapeBackward[dtype]].backward(output)
@@ -92,6 +98,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[DivideBackward[dtype]]():
             return self.grad_fn[DivideBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[SumBackward[dtype]]():
+            return self.grad_fn[SumBackward[dtype]].backward(output)
 
         else:
             panic("I am not here to receive you")

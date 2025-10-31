@@ -28,6 +28,8 @@ from forwards import (
     DivideScalar,
     Divider,
     Exponentiator,
+    Summer,
+    View,
 )
 from buffers import Buffer
 from validators import Validator
@@ -1128,7 +1130,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return grad_contrib"""
 
-        _ = """fn sum[
+    fn sum[
         track_grad: Bool = True
     ](
         self,
@@ -1150,7 +1152,7 @@ struct Tensor[dtype: DType = DType.float32](
             self, axes, keepdims, requires_grad
         )
 
-    fn mean[
+        _ = """fn mean[
         track_grad: Bool = True
     ](
         self,
@@ -1329,8 +1331,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return Exponentiator[dtype].forward[track_grad](self, exponent)
 
-
-        _="""fn dot[
+        _ = """fn dot[
         track_grad: Bool = True
     ](self, other: Self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         return Dot[dtype].forward[track_grad](self, other, requires_grad)"""
@@ -1421,8 +1422,80 @@ struct Tensor[dtype: DType = DType.float32](
     fn element_at(self, index: Int) -> Scalar[dtype]:
         return self.buffer.element_at(index)
 
-    fn sum_over_broadcasted_axes(batch_tensor: Tensor[dtype], target_shape: Shape) -> Tensor[dtype]:
-        var nd_buffer = batch_tensor.buffer.sum_over_broadcasted_axes(target_shape)
+    fn view[
+        track_grad: Bool = True
+    ](
+        self,
+        shape: Shape,
+        strides: Strides,
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+        validated: Bool = False,
+    ) -> Tensor[dtype]:
+        return View[dtype].forward[track_grad](
+            self, shape, strides, offset, requires_grad, validated
+        )
+
+    fn view[
+        track_grad: Bool = True
+    ](
+        self,
+        shape: List[Int],
+        strides: List[Int],
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        view_shape, view_strides = Shape(shape), Strides(strides)
+        return View[dtype].forward[track_grad](
+            self, view_shape, view_strides, offset, requires_grad, False
+        )
+
+    fn view[
+        track_grad: Bool = True
+    ](
+        self,
+        *shape_dims: Int,
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        shape = Shape(shape_dims)
+        strides = Strides.default(shape)
+        return View[dtype].forward[track_grad](
+            self, shape, strides, offset, requires_grad, False
+        )
+
+    fn view[
+        track_grad: Bool = True
+    ](
+        self,
+        shape: List[Int],
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        view_shape = Shape(shape)
+        strides = Strides.default(view_shape)
+        return View[dtype].forward[track_grad](
+            self, view_shape, strides, offset, requires_grad, False
+        )
+
+    fn view[
+        track_grad: Bool = True
+    ](
+        self,
+        shape: Shape,
+        offset: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return View[dtype].forward[track_grad](
+            self, shape, Strides.default(shape), offset, requires_grad, False
+        )
+
+    fn sum_over_broadcasted_axes(
+        batch_tensor: Tensor[dtype], target_shape: Shape
+    ) -> Tensor[dtype]:
+        var nd_buffer = batch_tensor.buffer.sum_over_broadcasted_axes(
+            target_shape
+        )
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     @staticmethod
@@ -1726,80 +1799,9 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         )
         return View[dtype].forward[track_grad](
             self, shape, strides, 0, grad_required, True
-        )
+        )"""
 
-
-
-    fn view[
-        track_grad: Bool = True
-    ](
-        self,
-        shape: Shape,
-        strides: Strides,
-        offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-        validated: Bool = False,
-    ) -> Tensor[dtype]:
-        return View[dtype].forward[track_grad](
-            self, shape, strides, offset, requires_grad, validated
-        )
-
-    fn view[
-        track_grad: Bool = True
-    ](
-        self,
-        shape: List[Int],
-        strides: List[Int],
-        offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        view_shape, view_strides = Shape(shape), Strides(strides)
-        return View[dtype].forward[track_grad](
-            self, view_shape, view_strides, offset, requires_grad, False
-        )
-
-    fn view[
-        track_grad: Bool = True
-    ](
-        self,
-        *shape_dims: Int,
-        offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        shape = Shape(shape_dims)
-        strides = Strides.default(shape)
-        return View[dtype].forward[track_grad](
-            self, shape, strides, offset, requires_grad, False
-        )
-
-    fn view[
-        track_grad: Bool = True
-    ](
-        self,
-        shape: List[Int],
-        offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        view_shape = Shape(shape)
-        strides = Strides.default(view_shape)
-        return View[dtype].forward[track_grad](
-            self, view_shape, strides, offset, requires_grad, False
-        )
-
-    fn view[
-        track_grad: Bool = True
-    ](
-        self,
-        shape: Shape,
-        offset: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return View[dtype].forward[track_grad](
-            self, shape, Strides.default(shape), offset, requires_grad, False
-        )
-
-
-    fn slice[
+        _ = """fn slice[
         track_grad: Bool = True
     ](self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
         dtype
@@ -2035,11 +2037,7 @@ fn main() raises:
 
     alias dtype = DType.float32
     a = Tensor[dtype].arange(6, requires_grad=True)
-    b = Tensor[dtype].arange(1, requires_grad=True)
-    c = a - 2 * b
-    c.print()
+    v = a.view(shape=Shape(3), offset=1)
+    v.backward(42)
 
-    c.backward(42)
-    print()
     a.grad().print()
-    b.grad().print()

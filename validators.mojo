@@ -2,7 +2,7 @@ from shapes import Shape
 from intlist import IntList
 from strides import Strides
 from common_utils import Slicer, panic, Idx, NewAxis, i, s, il, newaxis
-from tensors import Tensor
+from tenmo import Tensor
 
 
 struct Validator:
@@ -596,23 +596,24 @@ struct Validator:
                 min_index += extent  # negative stride
 
         # Convert to absolute coordinates (relative to base tensor)
-        abs_min = this.offset + min_index
-        abs_max = this.offset + max_index
-        abs_offset = this.offset + offset
+        this_offset = this.offset()
+        abs_min = this_offset + min_index
+        abs_max = this_offset + max_index
+        abs_offset = this_offset + offset
 
         # Normalize bounds (account for negative strides)
         lo = min(abs_min, abs_max)
         hi = max(abs_min, abs_max)
 
         # Bounds checking - PyTorch style
-        if this.owns_data:
+        if not this.shared():
             # For root tensor, check against storage size
             if lo < 0 or hi >= this.numels():
                 panic("Tensor → view: exceeds tensor's memory bounds")
         else:
             # For views, check logical range is contained in parent's logical range
-            parent_lo = this.offset
-            parent_hi = this.offset + this.max_index()
+            parent_lo = this_offset
+            parent_hi = this_offset + this.max_index()
             if lo < parent_lo or hi > parent_hi:
                 panic("Tensor → view: exceeds parent tensor's memory bounds")
 

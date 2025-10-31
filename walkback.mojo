@@ -1,6 +1,6 @@
 from backpropagation import BackwardFn
 from matmul import MatmulBackward, BatchedMatmulBackward
-from summation import SumBackward, Summer
+from summation import SumBackward
 from mean_reduction import MeanBackward, Mean
 from addition import AddBackward, AddBackwardScalar, AddBroadcastBackward
 from subtraction import (
@@ -20,9 +20,6 @@ from division import (
     TrueDivBackwardScalar,
     RightTrueDivBackwardScalar,
     DivideBackward,
-    DivideScalar,
-    DivideByScalar,
-    Divider,
 )
 from transpose import TransposeBackward, Transpose
 from views import ViewBackward

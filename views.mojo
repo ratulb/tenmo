@@ -1,14 +1,17 @@
-from tensors import Tensor
+from tenmo import Tensor
 from shapes import Shape
 from strides import Strides
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor, ZeroGrad
-from shared import TensorLite
 from validators import Validator
+from ancestry import Ancestor
+from gradbox import Gradbox
+from layout.int_tuple import IntArray
 
 
 @fieldwise_init
-struct ViewBackward[dtype: DType](Copyable & Movable):
+@register_passable
+struct ViewBackward[dtype: DType](ImplicitlyCopyable):
     var shape: Shape
     var strides: Strides
     var offset: Int
@@ -17,29 +20,33 @@ struct ViewBackward[dtype: DType](Copyable & Movable):
         return BackwardFn[dtype](Delegate[dtype](self))
 
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         parent = output.ancestry().get(0)
-        gradients = output.grad()
+        gradbox = output.grad().copy()
         parent_tensor = parent.tensor()
-        offset_delta = self.offset - parent_tensor.offset
-        parent_tensor.free()
-        parent_grad = Tensor[dtype].zeros(parent.shape().num_elements())
+        offset_delta = self.offset - parent_tensor.offset()
         parent_shape = parent.shape()
+        # Flat gradbox space
+        parent_gradbox = Gradbox[dtype].zeros(
+            Shape(parent_shape.num_elements())
+        )
 
         if parent_shape == Shape():
-            parent_grad[0] = gradients.item()
+            parent_gradbox[IntArray()] = gradbox.item()
         else:
-            for coord in self.shape:
-                child_flat = (coord * self.strides.to_list()).sum()
-                parent_flat = child_flat + offset_delta
-                parent_grad[parent_flat] += gradients[coord]
+            for coord in self.shape.indices():
+                child_flat_unpinned = (coord * self.strides.intlist()).sum()
+                child_flat_pinned = child_flat_unpinned + offset_delta
+                child_position = IntArray(size=1)
+                child_position[0] = child_flat_pinned
+                parent_gradbox[child_position] += gradbox[coord.intarray()]
 
-        reshaped = parent_grad.reshape(parent_shape)
+        reshaped = parent_gradbox.reshape(parent_shape)
 
         return [
-            (parent, reshaped, AddTensor),
-            (output, gradients, ZeroGrad),
+            (parent^, reshaped^, AddTensor),
+            (Ancestor(output), gradbox^, ZeroGrad),
         ]
 
 
@@ -77,10 +84,10 @@ struct View[dtype: DType](Copyable):
                 backward_fn = ViewBackward[dtype](
                     shape, strides, abs_offset
                 ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
+                out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
-        return out
+        return out^
 
 
 fn main():
