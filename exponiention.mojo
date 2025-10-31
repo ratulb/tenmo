@@ -1,21 +1,22 @@
-from tensors import Tensor
-from shared import TensorLite
+from tenmo import Tensor
 from backpropagation import BackwardFn, Delegate
 from operators import AddTensor
-from buffers import Buffer
-
+from ancestry import Ancestor
+from gradbox import Gradbox
+from ndbuffer import NDBuffer
 
 @fieldwise_init
-struct ExponientionBackward[dtype: DType](Copyable & Movable):
+@register_passable
+struct ExponientionBackward[dtype: DType](ImplicitlyCopyable):
     var exponent: Scalar[dtype]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.gradients()[]
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
         ancestor = output.ancestry().get(0)
 
         # ∂(x**n)/∂x = n * x**(n-1)
@@ -24,13 +25,11 @@ struct ExponientionBackward[dtype: DType](Copyable & Movable):
         base_pow = ancestor.tensor() ** (self.exponent - 1.0)
         base_pow.requires_grad = False
         var local_grad = base_pow * self.exponent
-        product = gradients * local_grad
-        local_grad.free()
-        base_pow.free()
+        gradbox_prod = gradbox * local_grad
         return [
             (
-                ancestor,
-                product^,
+                ancestor^,
+                gradbox_prod^,
                 AddTensor,
             )
         ]
@@ -43,23 +42,8 @@ struct Exponentiator[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[dtype], exponent: Scalar[dtype]) -> Tensor[dtype]:
-        var out: Tensor[dtype]
-        if self.is_contiguous():
-            var buffer: Buffer[dtype]
-            if self.owns_data:
-                buffer = self.buffer
-            else:
-                offset = self.offset
-                numels = self.numels()
-                buffer = self.shared_buffer.value()[][offset : offset + numels]
-            out = Tensor[dtype](
-                self.shape, buffer**exponent, requires_grad=False
-            )
-
-        else:
-            out = Tensor[dtype](self.shape, requires_grad=False)
-            for idx, value in self:
-                out[idx] = value**exponent
+        nd_buffer = NDBuffer[dtype]((self.buffer.contiguous_buffer() ** exponent), self.shape())
+        var out = Tensor[dtype](nd_buffer^, requires_grad=False)
 
         @parameter
         if track_grad:
@@ -68,10 +52,10 @@ struct Exponentiator[dtype: DType](Copyable):
                 backward_fn = ExponientionBackward[dtype](
                     exponent
                 ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
+                out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
-        return out
+        return out^
 
 
 fn main():

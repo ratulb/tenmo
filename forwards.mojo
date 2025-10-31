@@ -10,6 +10,7 @@ from addition import AddScalar, Adder
 from subtraction import SubtractScalar, SubtractFromScalar, Subtractor
 from reshape import Reshape
 from multiplication import MultiplyScalar, Multiplicator
+from division import DivideByScalar, DivideScalar, Divider
 
 
 fn main():

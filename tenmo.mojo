@@ -24,6 +24,10 @@ from forwards import (
     SubtractFromScalar,
     SubtractScalar,
     Subtractor,
+    DivideByScalar,
+    DivideScalar,
+    Divider,
+    Exponentiator,
 )
 from buffers import Buffer
 from validators import Validator
@@ -1166,7 +1170,7 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         return Mean[dtype].forward[track_grad](
             self, axes, keepdims, requires_grad
-        )
+        )"""
 
     fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return DivideScalar[dtype].forward[True](self, scalar)
@@ -1176,7 +1180,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     # Element wise division of two tensors
     fn __truediv__(self, other: Self) -> Tensor[dtype]:
-        return Divider[dtype].forward[True](self, other)"""
+        return Divider[dtype].forward[True](self, other)
 
     fn update_grad[opcode: Int](self, incoming: Gradbox[dtype]):
         if opcode == MulTensor:
@@ -1315,7 +1319,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __mul__(self, other: Self) -> Tensor[dtype]:
         return Multiplicator[dtype].forward[True](self, other)
 
-        _ = """fn __pow__[
+    fn __pow__[
         track_grad: Bool = True
     ](self, exponent: Scalar[dtype]) -> Tensor[dtype]:
         constrained[
@@ -1326,7 +1330,7 @@ struct Tensor[dtype: DType = DType.float32](
         return Exponentiator[dtype].forward[track_grad](self, exponent)
 
 
-    fn dot[
+        _="""fn dot[
         track_grad: Bool = True
     ](self, other: Self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         return Dot[dtype].forward[track_grad](self, other, requires_grad)"""
@@ -1416,6 +1420,10 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn element_at(self, index: Int) -> Scalar[dtype]:
         return self.buffer.element_at(index)
+
+    fn sum_over_broadcasted_axes(batch_tensor: Tensor[dtype], target_shape: Shape) -> Tensor[dtype]:
+        var nd_buffer = batch_tensor.buffer.sum_over_broadcasted_axes(target_shape)
+        return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     @staticmethod
     fn broadcasted_indices(

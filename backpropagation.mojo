@@ -18,6 +18,10 @@ alias Delegate[dtype: DType] = Variant[
     MultiplyBackwardScalar[dtype],
     MultiplyBackward[dtype],
     MultiplyBroadcastBackward[dtype],
+    ExponientionBackward[dtype],
+    TrueDivBackwardScalar[dtype],
+    RightTrueDivBackwardScalar[dtype],
+    DivideBackward[dtype],
 ]
 
 
@@ -55,10 +59,14 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[SubBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[SubLeftRightBackwardScalar[dtype]]():
-            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward(output)
+            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward(
+                output
+            )
 
         elif self.grad_fn.isa[SubtractBroadcastBackward[dtype]]():
-            return self.grad_fn[SubtractBroadcastBackward[dtype]].backward(output)
+            return self.grad_fn[SubtractBroadcastBackward[dtype]].backward(
+                output
+            )
 
         elif self.grad_fn.isa[MultiplyBackward[dtype]]():
             return self.grad_fn[MultiplyBackward[dtype]].backward(output)
@@ -70,6 +78,20 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[MultiplyBroadcastBackward[dtype]].backward(
                 output
             )
+
+        elif self.grad_fn.isa[ExponientionBackward[dtype]]():
+            return self.grad_fn[ExponientionBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[TrueDivBackwardScalar[dtype]]():
+            return self.grad_fn[TrueDivBackwardScalar[dtype]].backward(output)
+
+        elif self.grad_fn.isa[RightTrueDivBackwardScalar[dtype]]():
+            return self.grad_fn[RightTrueDivBackwardScalar[dtype]].backward(
+                output
+            )
+
+        elif self.grad_fn.isa[DivideBackward[dtype]]():
+            return self.grad_fn[DivideBackward[dtype]].backward(output)
 
         else:
             panic("I am not here to receive you")
