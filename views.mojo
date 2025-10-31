@@ -8,7 +8,6 @@ from ancestry import Ancestor
 from gradbox import Gradbox
 from layout.int_tuple import IntArray
 
-
 @fieldwise_init
 @register_passable
 struct ViewBackward[dtype: DType](ImplicitlyCopyable):
@@ -31,16 +30,15 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
         parent_gradbox = Gradbox[dtype].zeros(
             Shape(parent_shape.num_elements())
         )
-
         if parent_shape == Shape():
             parent_gradbox[IntArray()] = gradbox.item()
         else:
-            for coord in self.shape.indices():
-                child_flat_unpinned = (coord * self.strides.intlist()).sum()
+            for coord in self.shape:
+                child_flat_unpinned = (self.strides * coord).sum()
                 child_flat_pinned = child_flat_unpinned + offset_delta
                 child_position = IntArray(size=1)
                 child_position[0] = child_flat_pinned
-                parent_gradbox[child_position] += gradbox[coord.intarray()]
+                parent_gradbox[child_position] += gradbox[coord]
 
         reshaped = parent_gradbox.reshape(parent_shape)
 
