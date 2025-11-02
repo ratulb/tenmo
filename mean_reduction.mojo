@@ -1,13 +1,15 @@
-from tensors import Tensor
+from tenmo import Tensor
 from intlist import IntList
 from operators import AddTensor
-from shared import TensorLite
 from shapes import Shape
 from backpropagation import Delegate, BackwardFn
 from validators import Validator
+from ancestry import Ancestor
+from gradbox import Gradbox
 
 
-struct MeanBackward[dtype: DType](Copyable & Movable):
+@register_passable
+struct MeanBackward[dtype: DType](ImplicitlyCopyable):
     var axes: IntList
     var keepdims: Bool
 
@@ -19,36 +21,33 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
         self.axes = other.axes.copy()
         self.keepdims = other.keepdims
 
-    fn __moveinit__(out self, deinit other: Self):
-        self.axes = other.axes
-        self.keepdims = other.keepdims
-
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.gradients()[]
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
+        gradbox_shape = gradbox.shape()
         ancestor = output.ancestry().get(0)
-        if gradients.shape == Shape():
-            scalar_grad = gradients.item() / ancestor.shape().num_elements()
-            grad_contrib = Tensor[dtype].full(
+        if gradbox_shape == Shape():
+            scalar_grad = gradbox.item() / ancestor.shape().num_elements()
+            grad_contrib = Gradbox[dtype].full(
                 ancestor.shape(),
                 scalar_grad,
-                requires_grad=False,
             )
+
             return [
                 (
-                    ancestor,
-                    grad_contrib,
+                    ancestor^,
+                    grad_contrib^,
                     AddTensor,
                 )
             ]
 
-        var expanded = gradients
+        var expanded = gradbox^
 
         if not self.keepdims:
-            expanded = gradients.reshape(
+            expanded = expanded.reshape(
                 Shape(
-                    gradients.shape.intlist().insert(
+                    gradbox_shape.intlist().insert(
                         self.axes,
                         IntList.with_capacity(len(self.axes), 1),
                     )
@@ -56,17 +55,15 @@ struct MeanBackward[dtype: DType](Copyable & Movable):
             )
 
         # Broadcast and divide
-        broadcasted = expanded.broadcast_to(
-            ancestor.shape(), requires_grad=False
-        )
+        broadcasted = expanded.broadcast_to(ancestor.shape())
         # Compute total count of elements being reduced
         count = ancestor.shape().axes_spans.select(self.axes).product()
-
         average = broadcasted / Scalar[dtype](count)
+
         return [
             (
-                ancestor,
-                average,
+                ancestor^,
+                average^,
                 AddTensor,
             )
         ]
@@ -88,9 +85,9 @@ struct Mean[dtype: DType](Copyable):
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         normalized_axes = Validator.validate_and_normalize_axes(
-            tensor.shape, axes
+            tensor.shape(), axes
         )
-        count = tensor.shape.axes_spans.select(normalized_axes).product()
+        count = tensor.shape().axes_spans.select(normalized_axes).product()
         out = tensor.sum[track_grad=False](
             axes=normalized_axes, keepdims=keepdims, requires_grad=False
         ) / Scalar[dtype](count)
@@ -105,10 +102,10 @@ struct Mean[dtype: DType](Copyable):
                 backward_fn = MeanBackward[dtype](
                     normalized_axes.copy(), keepdims
                 ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
+                out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(tensor)
 
-        return out
+        return out^
 
 
 fn main():
