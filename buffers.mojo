@@ -596,15 +596,28 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn fill[
         simd_width: Int = simd_width_of[dtype]()
-    ](this: Buffer[dtype], value: Scalar[dtype]):
+    ](
+        this: Buffer[dtype],
+        value: Scalar[dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ):
+        """Fill a segment or the whole buffer with a value."""
+        actual_end = end_index.value() if end_index else this.size
+        segment_size = actual_end - start_index
+
+        # Safety checks
+        if segment_size < 1:
+            panic("Buffer → fill: segment size must be greater than zero")
+
         @parameter
         fn set_scalar[simdwidth: Int](idx: Int):
-            this.store[simdwidth](idx, value)
+            this.store[simdwidth](idx + start_index, value)
 
         if dtype == DType.bool:
-            vectorize[set_scalar, 1](this.size)
+            vectorize[set_scalar, 1](segment_size)
         else:
-            vectorize[set_scalar, simd_width](this.size)
+            vectorize[set_scalar, simd_width](segment_size)
 
     @always_inline
     fn zero(this: Buffer[dtype]):
@@ -1460,6 +1473,36 @@ struct Buffer[dtype: DType = DType.float32](
 
         return buf.all_true[1](pred)
 
+    fn string(self) -> String:
+        var result = "Buffer["
+
+        # Use self.size instead of len(self) - self.size has actual count
+        if self.size <= 60:
+            for i in range(self.size):
+                result += self.load(i).__str__()
+                if i < self.size - 1:
+                    result += ", "
+        else:
+            for i in range(15):
+                result += self.load(i).__str__()
+                result += ", "
+
+            result += "..., "
+
+            for i in range(self.size - 15, self.size):
+                result += self.load(i).__str__()
+                if i < self.size - 1:
+                    result += ", "
+
+        result += (
+            "], dtype="
+            + self.dtype.__str__()
+            + ", size="
+            + self.size.__str__()
+            + "]"
+        )
+        return result
+
     @no_inline
     fn __str__(self) -> String:
         return String.write(self)
@@ -1528,30 +1571,7 @@ struct ElementIterator[
 
 
 fn main() raises:
-    alias dtype = DType.int32
-    _ = """size = 100
-    l = List[Scalar[dtype]](capacity=UInt(size))
-    for i in range(size):
-        l.append(i)
-    buffer = Buffer[dtype](l)
-    buffer[41] = 42
-    print(buffer.count(42, 41, 101))
-    print(buffer[41], buffer[42])"""
-    test_overwrite()
+    pass
 
 
 from testing import assert_true, assert_false
-
-
-fn test_overwrite() raises:
-    alias dtype = DType.int32
-    size = 21
-    l = List[Scalar[dtype]](capacity=UInt(size))
-    for i in range(size):
-        l.append(i)
-
-    buffer = Buffer[dtype](l)
-    result = Buffer[dtype]([42, 42, 42])
-
-    buffer.overwrite(result, 3, 6)
-    print(buffer)

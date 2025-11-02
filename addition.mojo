@@ -185,6 +185,3 @@ struct Adder[dtype: DType](Copyable):
 fn main():
     print("passes")
 
-
-fn main():
-    pass

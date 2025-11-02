@@ -3,6 +3,8 @@ from buffers import Buffer
 
 fn main() raises:
     print("Running buffer tests")
+    test_overwrite()
+    test_fill_segment()
     test_buffer_iter()
     test_buffer_slice()
     test_buffer_buffer_add()
@@ -344,3 +346,96 @@ fn test_buffer_float_inequality() raises:
     b.fill(420)
     result = a != b
     assert_true(result, "1024 float inequality assertion failed")
+
+
+fn test_fill_segment() raises:
+    print("test_fill_segment")
+    alias dtype = DType.int32
+    size = 21
+    l = List[Scalar[dtype]](capacity=UInt(size))
+    for i in range(size):
+        l.append(i)
+
+    buffer = Buffer[dtype](l)
+
+    buffer.fill(42, 3, 6)
+    assert_true(
+        buffer
+        == Buffer[dtype](
+            [
+                0,
+                1,
+                2,
+                42,
+                42,
+                42,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+            ]
+        )
+    )
+    bool_buff = Buffer[DType.bool](
+        [True, True, True, False, False, False, False, False, False]
+    )
+    bool_buff.fill(False, 0, 3)
+    assert_true(
+        bool_buff
+        == Buffer[DType.bool](
+            [False, False, False, False, False, False, False, False, False]
+        )
+    )
+
+
+fn test_overwrite() raises:
+    print("test_overwrite")
+    alias dtype = DType.int32
+    size = 21
+    l = List[Scalar[dtype]](capacity=UInt(size))
+    for i in range(size):
+        l.append(i)
+
+    buffer = Buffer[dtype](l)
+    result = Buffer[dtype]([42, 42, 42])
+
+    buffer.overwrite(result, 3, 6)
+    assert_true(
+        buffer
+        == Buffer[dtype](
+            [
+                0,
+                1,
+                2,
+                42,
+                42,
+                42,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+            ]
+        )
+    )

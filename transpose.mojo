@@ -1,28 +1,30 @@
-from tensors import Tensor
-from shared import TensorLite
+from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
 from intlist import IntList
 from validators import Validator
+from gradbox import Gradbox
+from ancestry import Ancestor
 
 @fieldwise_init
-struct TransposeBackward[dtype: DType](Copyable & Movable):
+@register_passable
+struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
     var axes: IntList
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.grad()
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
         ancestor = output.ancestry().get(0)
         inverted_axes = IntList.invert_permutation(self.axes)
-        grad_transposed = gradients.transpose(inverted_axes)
+        gradbox_transposed = gradbox.transpose(inverted_axes)
         return [
             (
-                ancestor,
-                grad_transposed,
+                ancestor^,
+                gradbox_transposed^,
                 AddTensor,
             )
         ]
@@ -40,7 +42,7 @@ struct Transpose[dtype: DType](Copyable):
         axes: IntList,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        shape = self.shape.copy()
+        shape = self.shape()
         normalized_axes = (
             Validator.validate_and_normalize_axes(
                 shape, axes, ordered=False, fill_missing=True
@@ -50,10 +52,10 @@ struct Transpose[dtype: DType](Copyable):
 
         # Permute shape and create default strides and permute
         var new_shape = shape.permute(normalized_axes)
-        var new_strides = self.strides.permute(normalized_axes)
+        var new_strides = self.strides().permute(normalized_axes)
 
         out = Tensor[dtype].build_view(
-            self.address(), new_shape, new_strides, self.offset, False
+            self.address(), new_shape, new_strides, self.offset(), requires_grad=False
         )
 
         @parameter
@@ -67,10 +69,10 @@ struct Transpose[dtype: DType](Copyable):
                 backward_fn = TransposeBackward[dtype](
                     normalized_axes
                 ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
+                out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
-        return out
+        return out^
 
 
 fn main():
