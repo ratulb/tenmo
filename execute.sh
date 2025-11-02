@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|buffers|views|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
+    echo "Usage: $0 [tensors|buffers|views|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
     exit 1
 fi
 
@@ -17,6 +17,14 @@ case $1 in
     tensors)
         echo "Running mojo -I . tests/test_tensors.mojo"
         mojo -I . $DEBUG_MODE tests/test_tensors.mojo
+        ;;
+    transpose)
+        echo "Running mojo -I . tests/test_transpose.mojo"
+        mojo -I . $DEBUG_MODE tests/test_transpose.mojo
+        ;;
+    ndb)
+        echo "Running mojo -I . tests/test_ndb.mojo"
+        mojo -I . $DEBUG_MODE tests/test_ndb.mojo
         ;;
     ce)
         echo "Running mojo -I . tests/test_cross_entropy.mojo"
@@ -74,6 +82,10 @@ case $1 in
     all)
         mojo -I . tests/test_tensors.mojo
         mojo -I . tests/test_buffers.mojo
+        echo "Running ndbuffer tests"
+        mojo -I . tests/test_ndb.mojo
+        echo "Running tranpose tests"
+        mojo -I . tests/test_transpose.mojo
         echo "Running synthetic mnist tests"
         mojo -I . tests/test_synthetic_mnist.mojo
         echo "Running synthetic smoke tests"
@@ -99,7 +111,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: tensors, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
+        echo "Available tests: tensors, transpose, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
         exit 1
         ;;
 esac
