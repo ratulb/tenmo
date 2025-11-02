@@ -7,7 +7,6 @@ from validators import Validator
 from ancestry import Ancestor
 from gradbox import Gradbox
 from layout.int_tuple import IntArray
-from common_utils import IntArrayHelper
 
 
 @fieldwise_init
@@ -33,23 +32,24 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
         parent_gradbox = Gradbox[dtype].zeros(
             Shape(parent_shape.num_elements())
         )
+
         if parent_shape == Shape():
             parent_gradbox[IntArray()] = gradbox.item()
         else:
-            var child_position = IntArray(size=1)
+            var position = IntArray(size=1)
             var total_strides = len(self.strides)
+
             for coord in self.shape:
-                var child_flat_pinned = offset_delta
+                var parent_flat_index = offset_delta
                 for i in range(total_strides):
-                    child_flat_pinned += self.strides[i] * coord[i]
-                child_position[0] = child_flat_pinned
-                parent_gradbox[child_position] += gradbox[coord]
+                    parent_flat_index += self.strides[i] * coord[i]
+                position[0] = parent_flat_index
+                parent_gradbox[position] += gradbox[coord]
 
         var reshaped: Gradbox[dtype] = (
             parent_gradbox.reshape(parent_shape) if parent_shape != Shape()
             and parent_shape != parent_gradbox.shape() else parent_gradbox^
         )
-
         return [
             (parent^, reshaped^, AddTensor),
             (
@@ -77,12 +77,11 @@ struct View[dtype: DType](Copyable):
         var abs_offset = Validator.validate_view_params(
             self, shape, strides, offset
         ) if not validated else offset
-
         out = Tensor[dtype].build_view(
             self.address(),
             shape,
             Optional(strides),
-            abs_offset,
+            offset,
             requires_grad=False,
         )
 
@@ -94,9 +93,9 @@ struct View[dtype: DType](Copyable):
 
             if grad_required:
                 out.requires_grad_(True)
-
+                # Store ABSOLUTE offset in ViewBackward for gradient scattering
                 backward_fn = ViewBackward[dtype](
-                    shape, strides, abs_offset
+                    shape, strides, abs_offset  # Store ABSOLUTE offset
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
