@@ -559,16 +559,10 @@ struct Validator:
     @always_inline
     @staticmethod
     fn validate_view_params[
-        dtype: DType, //
-    ](
-        this: Tensor[dtype],
-        shape: Shape,
-        strides: Strides,
-        offset: Int,
-        # ) -> Tuple[Int, Int, Int]:
-    ) -> Int:
+        dtype: DType,
+    ](this: Tensor[dtype], shape: Shape, strides: Strides, offset: Int,) -> Int:
         """
-        Validate view parameters and compute absolute bounds.
+        Validate view parameters and compute absolute offset.
 
         Args:
             this: Tensor - owning or non-owning.
@@ -577,47 +571,69 @@ struct Validator:
             offset: The offset for the view.
 
         Returns:
-            #Tuple of (abs_min, abs_max, abs_offset) absolute coordinates.
             Absolute offest with respect to base tensor.
-
         """
-        # Calculate logical bounds of new view (relative to parent)
-        var min_index = offset
-        var max_index = offset
+        # Calculate parent's accessible range using max_index() for both cases
+        parent_min = this.offset()
+        parent_max = this.max_index()
+
+        # 1. Check starting offset is within parent's accessible range
+        abs_offset_check = this.offset() + offset
+        if abs_offset_check < parent_min or abs_offset_check > parent_max:
+            panic(
+                "Tensor → view: starting offset "
+                + offset.__str__()
+                + " (absolute: "
+                + abs_offset_check.__str__()
+                + ") is outside parent's accessible range ["
+                + parent_min.__str__()
+                + ", "
+                + parent_max.__str__()
+                + "]"
+            )
+
+        # 2. Calculate the new view's accessed range (relative to parent)
+        var min_accessed_rel = offset
+        var max_accessed_rel = offset
 
         for i in range(shape.rank()):
             stride = strides[i]
             if stride == 0:
                 panic("Tensor → view: stride cannot be 0 in a view")
-            extent = (shape[i] - 1) * stride
-            if extent >= 0:
-                max_index += extent
+
+            if stride > 0:
+                max_accessed_rel += (shape[i] - 1) * stride
             else:
-                min_index += extent  # negative stride
+                min_accessed_rel += (shape[i] - 1) * stride
 
-        # Convert to absolute coordinates (relative to base tensor)
-        this_offset = this.offset()
-        abs_min = this_offset + min_index
-        abs_max = this_offset + max_index
-        abs_offset = this_offset + offset
+        # 3. Convert to absolute coordinates
+        abs_offset = this.offset() + offset
+        min_accessed_abs = this.offset() + min_accessed_rel
+        max_accessed_abs = this.offset() + max_accessed_rel
 
-        # Normalize bounds (account for negative strides)
-        lo = min(abs_min, abs_max)
-        hi = max(abs_min, abs_max)
+        # 4. Bounds checking - ensure entire view fits within parent
+        if min_accessed_abs < parent_min or max_accessed_abs > parent_max:
+            panic(
+                "Tensor → view: view with shape "
+                + shape.__str__()
+                + " and strides "
+                + strides.__str__()
+                + " accesses memory range ["
+                + min_accessed_abs.__str__()
+                + ", "
+                + max_accessed_abs.__str__()
+                + "] which exceeds parent's accessible range ["
+                + parent_min.__str__()
+                + ", "
+                + parent_max.__str__()
+                + "]"
+                + "\n  - Specifically: "
+                + (
+                    "min_accessed < parent_min" if min_accessed_abs
+                    < parent_min else "max_accessed > parent_max"
+                )
+            )
 
-        # Bounds checking - PyTorch style
-        if not this.shared():
-            # For root tensor, check against storage size
-            if lo < 0 or hi >= this.numels():
-                panic("Tensor → view: exceeds tensor's memory bounds")
-        else:
-            # For views, check logical range is contained in parent's logical range
-            parent_lo = this_offset
-            parent_hi = this_offset + this.max_index()
-            if lo < parent_lo or hi > parent_hi:
-                panic("Tensor → view: exceeds parent tensor's memory bounds")
-
-        # return abs_min, abs_max, abs_offset
         return abs_offset
 
 

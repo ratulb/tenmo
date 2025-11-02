@@ -7,6 +7,7 @@ from validators import Validator
 from ancestry import Ancestor
 from gradbox import Gradbox
 from layout.int_tuple import IntArray
+from common_utils import IntArrayHelper
 
 
 @fieldwise_init
@@ -24,6 +25,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         parent = output.ancestry().get(0)
         gradbox = output.grad().copy()
+
         parent_tensor = parent.tensor()
         offset_delta = self.offset - parent_tensor.offset()
         parent_shape = parent.shape()
@@ -44,8 +46,8 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
                 parent_gradbox[child_position] += gradbox[coord]
 
         var reshaped: Gradbox[dtype] = (
-            parent_gradbox.reshape(parent_shape) if parent_shape
-            != Shape() else parent_gradbox^
+            parent_gradbox.reshape(parent_shape) if parent_shape != Shape()
+            and parent_shape != parent_gradbox.shape() else parent_gradbox^
         )
 
         return [
@@ -54,7 +56,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
                 Ancestor(output),
                 gradbox^,
                 ZeroGrad,
-            ),  # Send a signal to zero out current 'output' tensor which is a view
+            ),  # Send a signal to zero out current 'output' tensor which is a view"""
         ]
 
 
@@ -77,7 +79,11 @@ struct View[dtype: DType](Copyable):
         ) if not validated else offset
 
         out = Tensor[dtype].build_view(
-            self.address(), shape, strides, abs_offset, requires_grad=False
+            self.address(),
+            shape,
+            Optional(strides),
+            abs_offset,
+            requires_grad=False,
         )
 
         @parameter
