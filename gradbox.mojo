@@ -9,6 +9,7 @@ from layout.int_tuple import IntArray
 from ndbuffer import NDBuffer
 from broadcasthelper import ShapeBroadcaster
 from intlist import IntList
+from strides import Strides
 
 
 struct Gradbox[dtype: DType](
@@ -41,6 +42,25 @@ struct Gradbox[dtype: DType](
             self.buffer.contiguous(), requires_grad=requires_grad
         )
 
+    fn transpose(self, axes: IntList) -> Gradbox[dtype]:
+        shape = self.shape()
+        normalized_axes = (
+            Validator.validate_and_normalize_axes(
+                shape, axes, ordered=False, fill_missing=True
+            ) if len(axes)
+            > 0 else IntList.range_list(shape.rank()).reversed()
+        )
+
+        # Permute shape and create default strides and permute
+        var new_shape = shape.permute(normalized_axes)
+        var new_strides = self.strides().permute(normalized_axes)
+
+        buffer = self.buffer.contiguous_buffer()
+        nd_buffer = NDBuffer[dtype](
+            buffer^, Optional(new_shape^), Optional(new_strides^), offset=0
+        )
+        return Gradbox[dtype](nd_buffer^, share=False)
+
     @staticmethod
     @always_inline
     fn full(
@@ -48,12 +68,32 @@ struct Gradbox[dtype: DType](
     ) -> Gradbox[dtype]:
         return Gradbox[dtype](NDBuffer.full(shape, scalar), share=share)
 
+    @staticmethod
+    @always_inline
+    fn zeros(shape: Shape, share: Bool = False) -> Gradbox[dtype]:
+        return Gradbox[dtype](
+            NDBuffer.full(shape, Scalar[dtype](0)), share=share
+        )
+
     @always_inline
     fn unshared(self) -> Gradbox[dtype]:
         return Gradbox[dtype](self.buffer.contiguous(), share=False)
 
+    fn shared(self) -> Bool:
+        return self.buffer.shared()
+
+    @always_inline
     fn sum(self, axes: IntList, keepdims: Bool) -> Gradbox[dtype]:
         var nd_buffer = self.buffer.sum(reduction_axes=axes, keepdims=keepdims)
+        return Gradbox[dtype](nd_buffer^, share=False)
+
+    @always_inline
+    fn sum_over_broadcasted_axes(
+        batch_grad: Gradbox[dtype], target_shape: Shape
+    ) -> Gradbox[dtype]:
+        var nd_buffer = batch_grad.buffer.sum_over_broadcasted_axes(
+            target_shape
+        )
         return Gradbox[dtype](nd_buffer^, share=False)
 
     fn broadcast_to(
@@ -132,6 +172,10 @@ struct Gradbox[dtype: DType](
     @always_inline
     fn shape(self) -> Shape:
         return self.buffer.shape
+
+    @always_inline
+    fn strides(self) -> Strides:
+        return Strides.default(self.buffer.shape)
 
     fn __eq__(self, other: Gradbox[dtype]) -> Bool:
         if self.shape() != other.shape():
