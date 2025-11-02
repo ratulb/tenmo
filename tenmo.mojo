@@ -29,7 +29,10 @@ from forwards import (
     Divider,
     Exponentiator,
     Summer,
+    Mean,
     View,
+    Contiguous,
+    Transpose,
 )
 from buffers import Buffer
 from validators import Validator
@@ -42,7 +45,14 @@ from utilities import Utils
 
 
 struct Tensor[dtype: DType = DType.float32](
-    Copyable & Movable & Sized & Stringable & Representable & Writable & Absable
+    Copyable
+    & Movable
+    & Sized
+    & Stringable
+    & Representable
+    & Writable
+    & Absable
+    & EqualityComparable
 ):
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
@@ -212,6 +222,43 @@ struct Tensor[dtype: DType = DType.float32](
 
         return self.buffer[indices]
 
+    fn __getitem__(self, *slices: Slice) -> Tensor[dtype]:
+        # Delegate shape/strides/offset computation
+        shape, strides, offset = Validator.validate_and_compute_view_metadata(
+            self.shape(),
+            self.strides(),
+            slices,
+        )
+        return View[dtype].forward[track_grad=True](
+            self,
+            shape=shape,
+            strides=strides,
+            offset=offset,
+            requires_grad=self.requires_grad,
+            validated=True,
+        )
+
+    fn __getitem__(self, *indices: Idx) -> Tensor[dtype]:
+        # Compute view metadata
+        view_shape, view_strides, offset = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                self.shape(), self.strides(), indices
+            )
+        )
+
+        # Handle scalar (rank-0) case
+        is_scalar = len(view_shape) == 0
+        shape = Shape() if is_scalar else view_shape
+        strides = Strides() if is_scalar else view_strides
+        return View[dtype].forward[track_grad=True](
+            self,
+            shape,
+            strides,
+            offset,
+            self.requires_grad,
+            True,
+        )
+
     @always_inline
     fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
         if self.rank() == 0:  # Tensor with Shape()
@@ -346,10 +393,16 @@ struct Tensor[dtype: DType = DType.float32](
             self.buffer.compare_scalar[GreaterThanEqual](scalar)
         )
 
-    fn __eq__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
+    fn __eq__(self, other: Tensor[dtype]) -> Bool:
+        return self.eq(other).all_true()
+
+    fn eq(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.buffer.compare[Equal](other.buffer))
 
-    fn __ne__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
+    fn __ne__(self, other: Tensor[dtype]) -> Bool:
+        return self.ne(other).all_true()
+
+    fn ne(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.buffer.compare[NotEqual](other.buffer))
 
     fn __lt__(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
@@ -966,13 +1019,12 @@ struct Tensor[dtype: DType = DType.float32](
     ](self, repeat: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
-        return Tile.forward[track_grad](self, repeat, requires_grad)
-
+        return Tile.forward[track_grad](self, repeat, requires_grad)"""
 
     fn contiguous[
         track_grad: Bool = True
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        return Contiguous[dtype].forward[track_grad](self, requires_grad)"""
+        return Contiguous[dtype].forward[track_grad](self, requires_grad)
 
     fn reshape[
         track_grad: Bool = True
@@ -1152,7 +1204,7 @@ struct Tensor[dtype: DType = DType.float32](
             self, axes, keepdims, requires_grad
         )
 
-        _ = """fn mean[
+    fn mean[
         track_grad: Bool = True
     ](
         self,
@@ -1172,7 +1224,7 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         return Mean[dtype].forward[track_grad](
             self, axes, keepdims, requires_grad
-        )"""
+        )
 
     fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
         return DivideScalar[dtype].forward[True](self, scalar)
@@ -1399,10 +1451,10 @@ struct Tensor[dtype: DType = DType.float32](
         _ = self.ancestors^
         _ = self.backwardFn^
 
-        # print("Tensor freed", self.id())
+        log_debug("Tensor freed: " + self.id().__str__())
 
-        _ = """fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
-        return ((self - target) ** 2).mean()"""
+    fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
+        return ((self - target) ** 2).mean()
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         output = Ancestor(self)
@@ -1490,6 +1542,25 @@ struct Tensor[dtype: DType = DType.float32](
             self, shape, Strides.default(shape), offset, requires_grad, False
         )
 
+    fn transpose[
+        track_grad: Bool = True
+    ](self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
+        return self.transpose[track_grad](IntList(axes), requires_grad)
+
+    fn transpose[
+        track_grad: Bool = True
+    ](
+        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
+        return self.transpose[track_grad](IntList.new(axes), requires_grad)
+
+    fn transpose[
+        track_grad: Bool = True
+    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
+        return Transpose.forward[track_grad](self, axes, requires_grad)
+
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
     ) -> Tensor[dtype]:
@@ -1502,7 +1573,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn broadcasted_indices(
         target_indices: IntList, target_shape: Shape, source_shape: Shape
     ) -> IntList:
-        """Get coordinates for source tensor given target coordinates."""
+        # Get coordinates for source tensor given target coordinates
         var source_indices = IntList.with_capacity(len(source_shape))
 
         for i in range(len(source_shape)):
@@ -1559,23 +1630,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
                 result = result.sum(axes=[i], keepdims=True)
                 current_shape = result.shape.copy()
         return result^
-
-    fn __iter__(ref self) -> ElemIterator[dtype, origin_of(self)]:
-        return ElemIterator[dtype, origin_of(self)](Pointer(to=self))
-
-    fn element_at(self, index: Int) -> Scalar[dtype]:
-        idx = index + self.max_index() if index < 0 else index
-        if idx < 0 or idx > self.max_index():
-            panic(
-                "Tensor → element_at: index out of bounds.",
-                "Tensor max index",
-                self.max_index().__str__(),
-                ", provided index",
-                index.__str__(),
-            )
-        return self.data()[idx]
-
-
 
     fn vector_matrix_mm[
         track_grad: Bool = True
@@ -1799,9 +1853,9 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         )
         return View[dtype].forward[track_grad](
             self, shape, strides, 0, grad_required, True
-        )"""
+        )
 
-        _ = """fn slice[
+        fn slice[
         track_grad: Bool = True
     ](self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
         dtype
@@ -1859,17 +1913,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
             offset,
             self.requires_grad,
             True,
-        )
-
-    fn __getitem__(self, *slices: Slice) -> Tensor[dtype]:
-        # Delegate shape/strides/offset computation
-        shape, strides, offset = Validator.validate_and_compute_view_metadata(
-            self.shape,
-            self.strides,
-            slices,
-        )
-        return View[dtype].forward[track_grad=True](
-            self, shape, strides, offset, self.requires_grad, True
         )
 
     fn set(self, tensor: Tensor[dtype], *indices: Idx):
@@ -1936,108 +1979,67 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         else:
             sliced = self.view(shape, strides, offset, False)
             for idx in shape:
-                sliced[idx] = value
-
-    fn __getitem__(self, *indices: Idx) -> Tensor[dtype]:
-        # Compute view metadata
-        view_shape, view_strides, offset = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                self.shape, self.strides, indices
-            )
-        )
-
-        # Handle scalar (rank-0) case
-        is_scalar = len(view_shape) == 0
-        shape = Shape() if is_scalar else view_shape
-        strides = Strides() if is_scalar else view_strides
-        return View[dtype].forward[track_grad=True](
-            self,
-            shape,
-            strides,
-            offset,
-            self.requires_grad,
-            True,
-        )
-
-
-
-    fn transpose[
-        track_grad: Bool = True
-    ](self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[
-        dtype
-    ]:
-        return self.transpose[track_grad](IntList(axes), requires_grad)
-
-    fn transpose[
-        track_grad: Bool = True
-    ](
-        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
-    ) -> Tensor[dtype]:
-        return self.transpose[track_grad](IntList.new(axes), requires_grad)
-
-    fn transpose[
-        track_grad: Bool = True
-    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
-        dtype
-    ]:
-        return Transpose.forward[track_grad](self, axes, requires_grad)"""
+                sliced[idx] = value"""
 
 
 from testing import assert_true
 
 
 fn main() raises:
-    _ = """alias dtype  = DType.float32
-    a = Tensor.d2([[10, 20, 30],[40, 50, 60]],requires_grad=True)
-    b =  a + 1000
-    b.print()
-    b.backward(42)
+    test_view_backward()
+    test_complex_mixed_ops_backward()
+    test_slice_backward()
 
-    a.grad().print()
 
-    c = Tensor.d1([-10, -20, -30])
-
-    d = Tensor[dtype](a.buffer.buffer_arithmetic_ops[Add](c.buffer))
-    print()
-    print()
-    d.print()
-
-    d.log().print()
-    abs(d).print()
-    d.exp().print()
-    print(d.sum_all())
-    print(d.product_all())"""
-    _ = """alias dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
-    ndb_t = Tensor(ndb.copy())
-    ndb_t.print()
-    print()
-    assert_true(ndb.count(2) == 3)
-    shared = ndb.share()
-    shared_t = Tensor(shared.copy())
-    shared_t.print()
-    assert_true(
-        shared_t.count(2) == 3 and ndb.count(2) == 3 and ndb.count(3) == 1
-    )
-    share2 = shared.share(Shape(5, 1), offset=1)
-    share2_t = Tensor(share2.copy())
-    print()
-    share2_t.print()
-    print()
-    assert_true(share2_t.count(2) == 2)
-    share3 = ndb.share(Shape(2))
-    share3_t = Tensor(share3.copy())
-    share3_t.print()
-    assert_true(share3_t.count(2) == 2)
-    share4 = ndb.share(Shape(1))
-    share4_t = Tensor(share4.copy())
-    assert_true(share4_t.count(2) == 1)
-    print()
-    share4_t.print()"""
-
+fn test_slice_backward() raises:
+    print("test_slice_backward")
     alias dtype = DType.float32
-    a = Tensor[dtype].arange(6, requires_grad=True)
-    v = a.view(shape=Shape(3), offset=1)
-    v.backward(42)
+    a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6], requires_grad=True)
+    r = a.reshape([2, 3])
+    s = r[Slice(1, None, None), Slice(0, 3, 1)]
+    s.sum().backward(42)
+    assert_true(
+        a.grad().as_tensor()[Slice(3, None, None)]
+        == Tensor[dtype]([42, 42, 42])
+    )
 
-    a.grad().print()
+
+fn test_view_backward() raises:
+    print("test_view_backward")
+    alias dtype = DType.float32
+    a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], requires_grad=True)
+    v = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
+    assert_true(v == Tensor[dtype].d2([[3, 4, 5, 6], [7, 8, 9, 10]]))
+
+    v2 = v.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
+    assert_true(v2 == Tensor[dtype].d2([[5, 6], [7, 8]]))
+    # Test gradients
+    loss = v2.mean()
+    loss.backward()
+    assert_true(
+        a.grad() == Tensor[dtype]([0, 0, 0, 0, 0.25, 0.25, 0.25, 0.25, 0, 0])
+    )
+    assert_true(
+        a.grad().as_tensor()[Slice(4, 8, 1)]
+        == Tensor[dtype]([0.25, 0.25, 0.25, 0.25])
+    )
+
+
+fn test_complex_mixed_ops_backward() raises:
+    print("test_complex_mixed_ops_backward")
+    alias dtype = DType.float32
+    a = Tensor[dtype].d2(
+        [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], requires_grad=True
+    )
+    v = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
+
+    v2 = v.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
+
+    v3 = v2.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=0)
+    c = v3.contiguous()
+    s = c.mean()
+    s.backward(42)
+    assert_true(
+        a.grad().as_tensor()[Slice(1, 2, None), Slice(None, None, None)]
+        == Tensor[dtype].d2([[10.5, 10.5, 10.5, 10.5]])
+    )
