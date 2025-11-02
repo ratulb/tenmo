@@ -1,69 +1,47 @@
-from tensors import Tensor
-from shared import TensorLite
+from tenmo import Tensor
 from common_utils import panic
-from contiguous import Contiguous
 from backpropagation import Delegate, BackwardFn
-from operators import (
-    AddTensor,
-)
+from operators import AddTensor
+from gradbox import Gradbox
+from ancestry import Ancestor
 
 
 @fieldwise_init
 @register_passable
-struct DotBackward[dtype: DType](Copyable & Movable):
+struct DotBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        grads = output.gradients()[]
-        gradients = grads.item()  # Scalar
-        grads.free()
-        var grad_outputs: List[
-            Tuple[TensorLite[dtype], Tensor[dtype], Int]
-        ] = []
-        ancestor_1 = output.ancestry().get(0)
-        ancestor_2 = output.ancestry().get(1)
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
+        scalar_grad_value = gradbox.item()  # Scalar
+        var grad_shares: List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]] = []
+        ancestor_lhs = output.ancestry().get(0)
+        ancestor_rhs = output.ancestry().get(1)
 
-        if ancestor_1.requires_grad():
-            tensor = ancestor_2.tensor()
+        if ancestor_lhs.requires_grad():
+            tensor_rhs = ancestor_rhs.tensor()
+            gradbox_lhs = Gradbox[dtype].zeros(
+                ancestor_lhs.shape(), share=False
+            )
+            for index, value in tensor_rhs:
+                gradbox_lhs[index] = value * scalar_grad_value
 
-            buffer = tensor.buffer if tensor.owns_data else Contiguous.forward[
-                False
-            ](tensor, requires_grad=False).buffer
-            buffer = gradients * buffer
-            outgoing = Tensor[dtype](
-                ancestor_1.shape(), buffer^, requires_grad=False
-            )
-            grad_outputs.append(
-                (
-                    ancestor_1,
-                    outgoing^,
-                    AddTensor,
-                )
-            )
-            tensor.free()
+            grad_shares.append((ancestor_lhs.copy(), gradbox_lhs^, AddTensor))
 
-        if ancestor_2.requires_grad():
-            tensor = ancestor_1.tensor()
-            buffer = tensor.buffer if tensor.owns_data else Contiguous.forward[
-                False
-            ](tensor, requires_grad=False).buffer
-            buffer = gradients * buffer
-            outgoing = Tensor[dtype](
-                ancestor_2.shape(), buffer^, requires_grad=False
+        if ancestor_rhs.requires_grad():
+            tensor_lhs = ancestor_lhs.tensor()
+            gradbox_rhs = Gradbox[dtype].zeros(
+                ancestor_rhs.shape(), share=False
             )
+            for index, value in tensor_lhs:
+                gradbox_rhs[index] = value * scalar_grad_value
 
-            grad_outputs.append(
-                (
-                    ancestor_2,
-                    outgoing^,
-                    AddTensor,
-                )
-            )
-            tensor.free()
-        return grad_outputs
+            grad_shares.append((ancestor_rhs^, gradbox_rhs^, AddTensor))
+
+        return grad_shares^
 
 
 @register_passable
@@ -75,45 +53,40 @@ struct Dot[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
-        other: Tensor[dtype],
+        lhs: Tensor[dtype],
+        rhs: Tensor[dtype],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        rank1 = self.rank()
-        rank2 = other.rank()
-        if not rank1 == rank2 and not rank1 <= 1:
+        rank_lhs = lhs.rank()
+        rank_rhs = rhs.rank()
+        if not rank_lhs == rank_rhs and not rank_lhs <= 1:
             panic("Tensor → dot: not supported for rank > 1")
-        numels1 = self.numels()
-        numels2 = other.numels()
-        if not numels1 == numels2:
+        numels_lhs = lhs.numels()
+        numels_rhs = rhs.numels()
+        if not numels_lhs == numels_rhs:
             panic(
                 "Tensor → dot: size does not match",
-                numels1.__str__(),
-                numels2.__str__(),
+                numels_lhs.__str__(),
+                numels_rhs.__str__(),
             )
-        var out: Tensor[dtype]
-        if self.owns_data and other.owns_data:
-            scalar = self.buffer.dot(other.buffer)
-            out = Tensor[dtype].scalar(scalar, requires_grad=False)
-        else:
-            scalar = Scalar[dtype](0)
-            for idx in self.shape:
-                scalar += self[idx] * other[idx]
-            out = Tensor[dtype].scalar(scalar, requires_grad=False)
+        scalar = lhs.buffer.contiguous_buffer().dot(
+            rhs.buffer.contiguous_buffer()
+        )
+        out = Tensor[dtype].scalar(scalar, requires_grad=False)
 
         @parameter
         if track_grad:
             grad_required = requires_grad.value() if requires_grad else (
-                self.requires_grad or other.requires_grad
+                lhs.requires_grad or rhs.requires_grad
             )
 
             if grad_required:
                 out.requires_grad_(True)
                 backward_fn = DotBackward[dtype]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
-                out.add_ancestry(self, other)
+                out.backwardFn = Optional(backward_fn^)
+                out.add_ancestry(lhs, rhs)
 
-        return out
+        return out^
 
 
 fn main():

@@ -33,6 +33,7 @@ from forwards import (
     View,
     Contiguous,
     Transpose,
+    Dot,
 )
 from buffers import Buffer
 from validators import Validator
@@ -1383,10 +1384,10 @@ struct Tensor[dtype: DType = DType.float32](
 
         return Exponentiator[dtype].forward[track_grad](self, exponent)
 
-        _ = """fn dot[
+    fn dot[
         track_grad: Bool = True
     ](self, other: Self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        return Dot[dtype].forward[track_grad](self, other, requires_grad)"""
+        return Dot[dtype].forward[track_grad](self, other, requires_grad)
 
     fn __iadd__(self, scalar: Scalar[dtype]):
         if self.is_leaf():

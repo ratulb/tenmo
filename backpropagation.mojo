@@ -23,7 +23,10 @@ alias Delegate[dtype: DType] = Variant[
     RightTrueDivBackwardScalar[dtype],
     DivideBackward[dtype],
     SumBackward[dtype],
+    MeanBackward[dtype],
     ViewBackward[dtype],
+    TransposeBackward[dtype],
+    DotBackward[dtype],
 ]
 
 
@@ -42,18 +45,24 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     fn __call__(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+
         if self.grad_fn.isa[AddBackwardScalar[dtype]]():
             return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
-
-        elif self.grad_fn.isa[ViewBackward[dtype]]():
-            return self.grad_fn[ViewBackward[dtype]].backward(output)
-
 
         elif self.grad_fn.isa[ReshapeBackward[dtype]]():
             return self.grad_fn[ReshapeBackward[dtype]].backward(output)
 
+        elif self.grad_fn.isa[TransposeBackward[dtype]]():
+            return self.grad_fn[TransposeBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[ViewBackward[dtype]]():
+            return self.grad_fn[ViewBackward[dtype]].backward(output)
+
         elif self.grad_fn.isa[SumBackward[dtype]]():
             return self.grad_fn[SumBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[MeanBackward[dtype]]():
+            return self.grad_fn[MeanBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[AddBackward[dtype]]():
             return self.grad_fn[AddBackward[dtype]].backward(output)
@@ -101,6 +110,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[SumBackward[dtype]]():
             return self.grad_fn[SumBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[DotBackward[dtype]]():
+            return self.grad_fn[DotBackward[dtype]].backward(output)
 
         else:
             panic("I am not here to receive you")

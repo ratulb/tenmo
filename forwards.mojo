@@ -11,7 +11,9 @@ from subtraction import SubtractScalar, SubtractFromScalar, Subtractor
 from reshape import Reshape
 from multiplication import MultiplyScalar, Multiplicator
 from division import DivideByScalar, DivideScalar, Divider
-
-
+from summation import Summer
+from mean_reduction import Mean
+from transpose import Transpose
+from dotproduct import Dot
 fn main():
     pass
