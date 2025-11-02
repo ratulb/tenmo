@@ -1,12 +1,9 @@
-from tensors import Tensor
-from shared import TensorLite
+from tenmo import Tensor
 from views import ViewBackward
-from memory import memcpy
 
 
 @register_passable
 struct Contiguous[dtype: DType](Copyable):
-
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -16,19 +13,8 @@ struct Contiguous[dtype: DType](Copyable):
     ) -> Tensor[
         dtype
     ]:
-        var shape_copy = self.shape.copy()
-        offset = self.offset
-        numels = self.numels()
-        out = Tensor[dtype](shape_copy, requires_grad=False)
-        if self.is_contiguous():
-            if self.owns_data:
-                memcpy(out.buffer.data, self.buffer.data, numels)
-            else:
-                buffer = self.shared_buffer.value()[]
-                memcpy(out.buffer.data, buffer.data + offset, numels)
-        else:
-            for idx, value in self:
-                out[idx] = value
+        var ndb = self.buffer.contiguous()
+        var out = Tensor[dtype](ndb^, requires_grad=False)
 
         @parameter
         if track_grad:
@@ -38,14 +24,16 @@ struct Contiguous[dtype: DType](Copyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                strides = self.strides
+                shape = self.shape()
+                strides = self.strides()
+                offset = self.offset()
                 backward_fn = ViewBackward[dtype](
-                    shape_copy, strides, offset * 2
+                    shape, strides, offset
                 ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
+                out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
-        return out
+        return out^
 
 
 fn main():
