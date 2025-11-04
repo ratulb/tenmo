@@ -127,6 +127,10 @@ struct Ancestor[dtype: DType](
         return self._tensor.shape()
 
     @always_inline
+    fn is_contiguous(self) -> Bool:
+        return self._tensor.is_contiguous()
+
+    @always_inline
     fn grad(self) -> Gradbox[dtype]:
         return self._tensor.grad().copy()
 
