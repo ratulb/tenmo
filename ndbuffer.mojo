@@ -290,8 +290,9 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
                 self[coord] = value
 
     @always_inline
-    fn contiguous(self) -> NDBuffer[dtype]:
-        return NDBuffer[dtype](self.contiguous_buffer(), self.shape)
+    fn contiguous(self, new_shape: Optional[Shape] = None) -> NDBuffer[dtype]:
+        shape = new_shape.value() if new_shape else self.shape
+        return NDBuffer[dtype](self.contiguous_buffer(), shape)
 
     @always_inline
     fn map[
@@ -938,10 +939,10 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
 
     @always_inline
     fn sum_over_broadcasted_axes(
-        batch_buffer: NDBuffer[dtype], target_shape: Shape
+        extended_buffer: NDBuffer[dtype], target_shape: Shape
     ) -> NDBuffer[dtype]:
-        result = batch_buffer.contiguous()
-        current_shape = batch_buffer.shape
+        result = extended_buffer.contiguous()
+        current_shape = extended_buffer.shape
 
         # Sum over extra leading dimensions
         while len(current_shape) > len(target_shape):
