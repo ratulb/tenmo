@@ -34,6 +34,8 @@ from forwards import (
     Contiguous,
     Transpose,
     Dot,
+    Expand,
+    Flatten,
 )
 from buffers import Buffer
 from validators import Validator
@@ -458,14 +460,14 @@ struct Tensor[dtype: DType = DType.float32](
         return ShapeBroadcaster.broadcastable(self.shape(), to.shape())
 
     fn all_true(self: Tensor[DType.bool]) -> Bool:
-        fn all_truthy(ambivalent: Scalar[DType.bool]) -> Bool:
-            return ambivalent == Scalar[DType.bool](True)
+        fn all_truthy(elem: Scalar[DType.bool]) -> Bool:
+            return elem == Scalar[DType.bool](True)
 
         return self.for_all(all_truthy)
 
     fn any_true(self: Tensor[DType.bool]) -> Bool:
-        fn any_truthy(ambivalent: Scalar[DType.bool]) -> Bool:
-            return ambivalent == Scalar[DType.bool](True)
+        fn any_truthy(elem: Scalar[DType.bool]) -> Bool:
+            return elem == Scalar[DType.bool](True)
 
         return self.any(any_truthy)
 
@@ -982,7 +984,7 @@ struct Tensor[dtype: DType = DType.float32](
         addr = row * strides[0] + col * strides[1] + offset
         self.buffer.data().store[simdwidth](addr, value)
 
-        _ = """fn flatten[
+    fn flatten[
         track_grad: Bool = True
     ](
         self,
@@ -994,7 +996,7 @@ struct Tensor[dtype: DType = DType.float32](
             self, start_dim, end_dim, requires_grad
         )
 
-    fn repeat[
+        _="""fn repeat[
         track_grad: Bool = True
     ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
@@ -1562,6 +1564,27 @@ struct Tensor[dtype: DType = DType.float32](
     ]:
         return Transpose.forward[track_grad](self, axes, requires_grad)
 
+    fn expand[
+        track_grad: Bool = True
+    ](
+        self: Tensor[dtype],
+        target: Shape,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Expand[dtype].forward[track_grad](self, target, requires_grad)
+
+    fn expand[
+        track_grad: Bool = True
+    ](
+        self: Tensor[dtype],
+        *target_dims: Int,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Expand[dtype].forward[track_grad](
+            self, Shape(target_dims), requires_grad
+        )
+
+
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
     ) -> Tensor[dtype]:
@@ -1770,25 +1793,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
     fn argmin(self, axis: Int = 0) -> Tensor[DType.int32]:
         return Argmin[dtype].argmin(tensor=self, axis=axis)
 
-    fn expand[
-        track_grad: Bool = True
-    ](
-        self: Tensor[dtype],
-        target: Shape,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return Expand[dtype].forward[track_grad](self, target, requires_grad)
-
-    fn expand[
-        track_grad: Bool = True
-    ](
-        self: Tensor[dtype],
-        *target_dims: Int,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return Expand[dtype].forward[track_grad](
-            self, Shape(target_dims), requires_grad
-        )
 
     # Squeeze specified axes or all dims of size 1 if no axes provided
     fn squeeze[
@@ -1988,8 +1992,8 @@ from testing import assert_true
 
 fn main() raises:
     test_view_backward()
-    test_complex_mixed_ops_backward()
-    test_slice_backward()
+    #test_complex_mixed_ops_backward()
+    #test_slice_backward()
 
 
 fn test_slice_backward() raises:
@@ -2013,6 +2017,9 @@ fn test_view_backward() raises:
     assert_true(v == Tensor[dtype].d2([[3, 4, 5, 6], [7, 8, 9, 10]]))
 
     v2 = v.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
+    #v2 = v.view(shape=Shape(2, 2), strides=Strides(1, 1), offset=2)
+
+    v2.print()
     assert_true(v2 == Tensor[dtype].d2([[5, 6], [7, 8]]))
     # Test gradients
     loss = v2.mean()

@@ -558,7 +558,7 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_view_params[
+    fn validate_view_params_orig[
         dtype: DType,
     ](this: Tensor[dtype], shape: Shape, strides: Strides, offset: Int,) -> Int:
         """
@@ -634,6 +634,123 @@ struct Validator:
                 )
             )
 
+        return abs_offset
+
+    @staticmethod
+    fn validate_view_params[dtype: DType](
+        this: Tensor[dtype],
+        shape: Shape,
+        strides: Strides,
+        offset: Int,
+    ) -> Int:
+        """
+        Validate view parameters and compute absolute offset.
+
+        Args:
+            this: Tensor - owning or non-owning.
+            shape: The new shape for the view.
+            strides: The new strides for the view.
+            offset: The offset for the view.
+
+        Returns:
+            Absolute offset with respect to base tensor.
+        """
+        # -------------------------------------------------------------------------
+        # 0. Resolve base parent access bounds
+        # -------------------------------------------------------------------------
+        parent_min = this.offset()
+        parent_max = this.max_index()
+
+        # -------------------------------------------------------------------------
+        # 1. Compute absolute offset
+        # -------------------------------------------------------------------------
+        abs_offset_check = this.offset() + offset
+        if abs_offset_check < parent_min or abs_offset_check > parent_max:
+            panic(
+                "Tensor → view: starting offset "
+                + offset.__str__() + " (absolute: " + abs_offset_check.__str__() + ") "
+                + "is outside parent's accessible range ["
+                + parent_min.__str__() + ", " + parent_max.__str__() + "]"
+            )
+
+        # -------------------------------------------------------------------------
+        # 2. Validate stride sanity and calculate accessed range
+        # -------------------------------------------------------------------------
+        var min_accessed_rel = offset
+        var max_accessed_rel = offset
+
+        for i in range(shape.rank()):
+            stride = strides[i]
+            if stride == 0:
+                panic("Tensor → view: stride cannot be 0 in a view")
+
+            if stride > 0:
+                max_accessed_rel += (shape[i] - 1) * stride
+            else:
+                min_accessed_rel += (shape[i] - 1) * stride
+
+        # -------------------------------------------------------------------------
+        # 3. Convert to absolute coordinates
+        # -------------------------------------------------------------------------
+        abs_offset = this.offset() + offset
+        min_accessed_abs = this.offset() + min_accessed_rel
+        max_accessed_abs = this.offset() + max_accessed_rel
+
+        # -------------------------------------------------------------------------
+        # 4. Bounds checking - ensure entire view fits within parent
+        # -------------------------------------------------------------------------
+        if min_accessed_abs < parent_min or max_accessed_abs > parent_max:
+            panic(
+                "Tensor → view: view with shape " + shape.__str__()
+                + " and strides " + strides.__str__()
+                + " accesses memory range ["
+                + min_accessed_abs.__str__() + ", "
+                + max_accessed_abs.__str__() + "] "
+                + "which exceeds parent's accessible range ["
+                + parent_min.__str__() + ", " + parent_max.__str__() + "]"
+                + "\n  - Specifically: "
+                + (
+                    "min_accessed < parent_min"
+                    if min_accessed_abs < parent_min
+                    else "max_accessed > parent_max"
+                )
+            )
+
+        # -------------------------------------------------------------------------
+        # 5. Extra diagnostic: detect logically invalid view-of-view chain
+        # -------------------------------------------------------------------------
+        if this.shared():
+            parent_strides = this.strides()
+            #abs_strides = [s * parent_strides[-1] for s in strides.intlist()]
+            var abs_strides = List[Int]()
+            for i in range(len(strides)):
+                var parent_stride = parent_strides[min(i, len(parent_strides) - 1)]
+                abs_strides.append(strides[i] * parent_stride)
+
+
+            _="""total_extent = abs_offset + sum([
+                (shape[i] - 1) * abs_strides[i] for i in range(shape.rank())
+            ])"""
+            total_extent = abs_offset
+            for i in range(shape.rank()):
+                total_extent += (shape[i] -1) * abs_strides[i]
+
+            # Use shared buffer’s true extent
+            base_max = this.buffer.size() - 1
+
+            if total_extent > base_max:
+                panic(
+                    "Tensor → view: invalid view-of-view chain (composed strides overflow base tensor bounds).\n"
+                    + "  Parent strides: " + parent_strides.__str__() + "\n"
+                    + "  Child strides:  " + strides.__str__() + "\n"
+                    + "  Composed abs strides: " + abs_strides.__str__() + "\n"
+                    + "  Access range exceeds base tensor bounds.\n"
+                    + "  → Check nested view offset or stride scaling logic."
+                )
+
+        # -------------------------------------------------------------------------
+        # 6. Return absolute offset (validated)
+        # -------------------------------------------------------------------------
         return abs_offset
 
 

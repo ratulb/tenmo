@@ -46,6 +46,16 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
                 position[0] = parent_flat_index
                 parent_gradbox[position] += gradbox[coord]
 
+            # Correct approach:
+            _="""for coord in self.shape:
+                # Calculate absolute index in parent's storage
+                absolute_index = self.offset + (self.strides * coord).sum()
+                # Map to parent's gradbox (accounting for parent's own offset if it's a view)
+                parent_storage_index = absolute_index - parent_tensor.offset()
+                if 0 <= parent_storage_index < len(parent_gradbox):
+                    position[0] = parent_storage_index
+                    parent_gradbox[position] += gradbox[coord]"""
+
         var reshaped: Gradbox[dtype] = (
             parent_gradbox.reshape(parent_shape) if parent_shape != Shape()
             and parent_shape != parent_gradbox.shape() else parent_gradbox^
