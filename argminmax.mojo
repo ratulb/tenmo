@@ -1,4 +1,4 @@
-from tensors import Tensor
+from tenmo import Tensor
 from intlist import IntList
 from common_utils import panic
 from shapes import Shape
@@ -11,7 +11,7 @@ struct Argmin[dtype: DType]:
         tensor: Tensor[dtype],
         axis: Int = 0,
     ) -> Tensor[DType.int32]:
-        shape = tensor.shape.copy()
+        shape = tensor.shape()
         rank = shape.rank()
         ax = axis if axis >= 0 else axis + rank
         if ax < 0 or ax >= rank:
@@ -32,7 +32,7 @@ struct Argmin[dtype: DType]:
         var out = Tensor[DType.int32].zeros(out_shape)
 
         # Iterate over all indices of output shape
-        for out_idx in out_shape:
+        for out_idx in out_shape.indices():
             var min_val = max_finite[dtype]()
             var min_pos = 0
 
@@ -45,7 +45,7 @@ struct Argmin[dtype: DType]:
                     min_pos = idx
             out[out_idx] = min_pos
 
-        return out
+        return out^
 
 
 struct Argmax[dtype: DType]:
@@ -54,7 +54,7 @@ struct Argmax[dtype: DType]:
         tensor: Tensor[dtype],
         axis: Int = 0,
     ) -> Tensor[DType.int32]:
-        shape = tensor.shape.copy()
+        shape = tensor.shape()
         rank = shape.rank()
         ax = axis if axis >= 0 else axis + rank
         if ax < 0 or ax >= rank:
@@ -75,20 +75,20 @@ struct Argmax[dtype: DType]:
         out = Tensor[DType.int32].zeros(out_shape)
 
         # Iterate over all indices of output shape
-        for out_idx in out_shape:
+        for out_idx in out_shape.indices():
             max_val = min_finite[dtype]()
             max_pos = 0
 
             # Loop over reduced axis
             for idx in range(shape[ax]):
                 full_idx = out_idx.insert(ax, idx)
-                val = tensor[full_idx]
+                var val = tensor[full_idx]
                 if val > max_val:
                     max_val = val
                     max_pos = idx
             out[out_idx] = max_pos
 
-        return out
+        return out^
 
 
 fn main() raises:
