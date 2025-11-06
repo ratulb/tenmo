@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|buffers|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
+    echo "Usage: $0 [tensors|buffers|flatten|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
     exit 1
 fi
 
@@ -17,6 +17,11 @@ case $1 in
     tensors)
         echo "Running mojo -I . tests/test_tensors.mojo"
         mojo -I . $DEBUG_MODE tests/test_tensors.mojo
+        ;;
+
+    flatten)
+        echo "Running mojo -I . tests/test_flatten.mojo"
+        mojo -I . $DEBUG_MODE tests/test_flatten.mojo
         ;;
     gradbox)
         echo "Running mojo -I . tests/test_gradbox.mojo"
@@ -87,6 +92,8 @@ case $1 in
     all)
         echo "Running tensor tests"
         mojo -I . tests/test_tensors.mojo
+        echo "Running flatten tests"
+        mojo -I . tests/test_flatten.mojo
         echo "Running buffer tests"
         mojo -I . tests/test_buffers.mojo
         echo "Running gradbox tests"
@@ -120,7 +127,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: tensors, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
+        echo "Available tests: tensors, flatten, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
         exit 1
         ;;
 esac

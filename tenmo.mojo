@@ -996,7 +996,7 @@ struct Tensor[dtype: DType = DType.float32](
             self, start_dim, end_dim, requires_grad
         )
 
-        _="""fn repeat[
+        _ = """fn repeat[
         track_grad: Bool = True
     ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
@@ -1584,7 +1584,6 @@ struct Tensor[dtype: DType = DType.float32](
             self, Shape(target_dims), requires_grad
         )
 
-
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
     ) -> Tensor[dtype]:
@@ -1992,8 +1991,8 @@ from testing import assert_true
 
 fn main() raises:
     test_view_backward()
-    #test_complex_mixed_ops_backward()
-    #test_slice_backward()
+    # test_complex_mixed_ops_backward()
+    # test_slice_backward()
 
 
 fn test_slice_backward() raises:
@@ -2017,7 +2016,7 @@ fn test_view_backward() raises:
     assert_true(v == Tensor[dtype].d2([[3, 4, 5, 6], [7, 8, 9, 10]]))
 
     v2 = v.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
-    #v2 = v.view(shape=Shape(2, 2), strides=Strides(1, 1), offset=2)
+    # v2 = v.view(shape=Shape(2, 2), strides=Strides(1, 1), offset=2)
 
     v2.print()
     assert_true(v2 == Tensor[dtype].d2([[5, 6], [7, 8]]))

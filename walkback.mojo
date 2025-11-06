@@ -29,7 +29,7 @@ from vectormatrixmm import VectorMatrixMMBackward
 from matrixvectormm import MatrixVectorMMBackward
 from unsqueeze import UnsqueezeBackward, Unsqueeze
 from squeeze import SqueezeBackward, Squeeze
-from expand import ExpandBackward, Expand
+from expand import ExpandBackward
 from minmax import MinMaxBackward, MinMax
 from shuffle import ShuffleBackward, Shuffle
 from relu import ReLUBackward, ReLU
@@ -37,4 +37,5 @@ from softmax import SoftmaxBackward, Softmax
 from crossentropy import CrossEntropyBackward, CrossEntropyLoss
 from repeat import RepeatBackward, Repeat
 from tiles import TileBackward, Tile
-from flatten import FlattenBackward, Flatten
+from flatten import FlattenBackward
+from contiguous import ContiguousBackward

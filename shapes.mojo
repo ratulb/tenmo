@@ -4,6 +4,7 @@ from memory import Pointer
 from strides import Strides
 from layout.int_tuple import IntArray
 
+
 @register_passable
 struct ShapeIndexIterator[origin: ImmutableOrigin](ImplicitlyCopyable):
     var shape: Pointer[Shape, origin]
@@ -42,26 +43,20 @@ struct ShapeIndexIterator[origin: ImmutableOrigin](ImplicitlyCopyable):
         return self.shape[].num_elements() - self.index > 0
 
 
-struct ShapeIndexIter1[origin: ImmutableOrigin](Copyable & Movable):
+@register_passable
+struct IndexIterator[origin: ImmutableOrigin](Copyable):
     var shape: Pointer[Shape, origin]
     var current: IntList
     var index: Int
 
-    fn __init__(
-        out self, shape: Pointer[Shape, origin], curr_index: IntList, pos: Int
-    ):
+    fn __init__(out self, shape: Pointer[Shape, origin]):
         self.shape = shape
-        self.current = curr_index.copy()
-        self.index = pos
+        self.current = IntList.filled(shape[].rank(), 0)
+        self.index = 0
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
         self.current = other.current.copy()
-        self.index = other.index
-
-    fn __moveinit__(out self, deinit other: Self):
-        self.shape = other.shape
-        self.current = other.current^
         self.index = other.index
 
     fn __iter__(self) -> Self:
@@ -83,6 +78,7 @@ struct ShapeIndexIter1[origin: ImmutableOrigin](Copyable & Movable):
     fn __has_next__(self) -> Bool:
         return self.shape[].num_elements() - self.index > 0
 
+
 @register_passable
 struct Shape(
     Sized & Stringable & Writable & Representable & ImplicitlyCopyable & Movable
@@ -90,6 +86,7 @@ struct Shape(
     var axes_spans: IntList
     var ndim: Int
     var numels: Int
+
     @always_inline
     @staticmethod
     fn Void() -> Shape:
@@ -122,11 +119,6 @@ struct Shape(
         self.ndim = other.ndim
         self.numels = other.numels
 
-        _="""fn __moveinit__(out self, deinit other: Self):
-        self.axes_spans = other.axes_spans^
-        self.ndim = other.ndim
-        self.numels = other.numels"""
-
     fn __init__(out self, dims: IntList):
         ndim = len(dims)
         # Allow scalar tensors (rank 0, i.e., Shape())
@@ -154,198 +146,8 @@ struct Shape(
     fn __iter__(ref self) -> ShapeIndexIterator[origin_of(self)]:
         return ShapeIndexIterator(Pointer(to=self))
 
-    @always_inline
-    fn broadcastable(self, to: Shape) -> Bool:
-        dims1 = self.intlist()
-        dims2 = to.intlist()
-        zip_reversed = dims1.zip_reversed(dims2)
-        for dims in zip_reversed:
-            if dims[0] != dims[1]:
-                if dims[0] != 1 and dims[1] != 1:
-                    return False
-        return True
-
-    @always_inline
-    fn broadcast_mask(self, target_shape: Shape) -> IntArray:
-        mask = IntArray(size=target_shape.ndim)
-        offset = target_shape.ndim - self.ndim
-        if offset < 0:
-            panic(
-                "Shape → broadcast_mask → target_shape.ndim is smaller than"
-                " self.ndim: "
-                + String(target_shape.ndim)
-                + ", "
-                + String(self.ndim)
-            )
-
-        for i in range(target_shape.ndim):
-            if i < offset:
-                mask[i] = 1  # self has no dimension here
-            else:
-                base_dim = self[i - offset]
-                target_dim = target_shape[i]
-                if base_dim == 1 and target_dim != 1:
-                    mask[i] = 1  # self is being expanded
-                else:
-                    mask[i] = 0  # match or both 1 → not broadcasted
-
-        return mask^
-
-    @always_inline
-    fn flatten_index(
-        self, indices: IntList, strides: Strides, offset: Int = 0
-    ) -> Int:
-        # 1. Rank check
-        if indices.size() != self.rank():
-            panic(
-                (
-                    "Shape → flatten_index(IntList): number of indices does not"
-                    " match"
-                ),
-                " shape rank",
-                ": len indices →",
-                indices.size().__str__(),
-                "rank →",
-                self.rank().__str__(),
-            )
-
-        var flat = offset  # absolute base offset
-
-        # 2. Normalize negative indices, bounds-check, and accumulate
-        for dim_idx in range(indices.size()):
-            var idx = indices[dim_idx]
-            dim_size = self[dim_idx]
-
-            # allow negative indexing like Python/NumPy: -1 => last element
-            idx = idx + dim_size if idx < 0 else idx
-
-            # now validate
-            if idx < 0 or idx >= dim_size:
-                panic(
-                    "Shape → flatten_index(IntList): index out of bounds: axis",
-                    dim_idx.__str__(),
-                    ", got",
-                    indices[dim_idx].__str__(),
-                    ", size",
-                    dim_size.__str__(),
-                )
-
-            flat = flat + idx * strides[dim_idx]
-
-        return flat
-
-    @always_inline
-    fn flatten_index(
-        self, indices: IntArray, strides: Strides, offset: Int = 0
-    ) -> Int:
-        # 1. Rank check
-        if indices.size() != self.rank():
-            panic(
-                (
-                    "Shape → flatten_index[IntArray]: number of indices does"
-                    " not match"
-                ),
-                " shape rank",
-                ": len indices →",
-                indices.size().__str__(),
-                "rank →",
-                self.rank().__str__(),
-            )
-
-        var flat = offset  # absolute base offset
-
-        # 2. Normalize negative indices, bounds-check, and accumulate
-        for dim_idx in range(indices.size()):
-            var idx = indices[dim_idx]
-            dim_size = self[dim_idx]
-
-            # allow negative indexing like Python/NumPy: -1 => last element
-            idx = idx + dim_size if idx < 0 else idx
-
-            # now validate
-            if idx < 0 or idx >= dim_size:
-                panic(
-                    (
-                        "Shape → flatten_index[IntArray]: index out of bounds:"
-                        " axis"
-                    ),
-                    dim_idx.__str__(),
-                    ", got",
-                    indices[dim_idx].__str__(),
-                    ", size",
-                    dim_size.__str__(),
-                )
-
-            flat = flat + idx * strides[dim_idx]
-
-        return flat
-
-    @always_inline
-    fn flatten_index(
-        self, indices: List[Int], strides: Strides, offset: Int = 0
-    ) -> Int:
-        # 1. Rank check
-        if len(indices) != self.rank():
-            panic(
-                (
-                    "Shape → flatten_index(List[Int]): number of indices does"
-                    " not match"
-                ),
-                " shape rank",
-                ": indices →",
-                indices.__str__(),
-                "rank →",
-                self.rank().__str__(),
-            )
-
-        var flat = offset  # absolute base offset
-
-        # 2. Normalize negative indices, bounds-check, and accumulate
-        for dim_idx in range(len(indices)):
-            var idx = indices[dim_idx]
-            dim_size = self[dim_idx]
-
-            # allow negative indexing like Python/NumPy: -1 => last element
-            idx = idx + dim_size if idx < 0 else idx
-
-            # now validate
-            if idx < 0 or idx >= dim_size:
-                panic(
-                    (
-                        "Shape → flatten_index(List[Int]): index out of bounds:"
-                        " axis"
-                    ),
-                    dim_idx.__str__(),
-                    ", got",
-                    indices[dim_idx].__str__(),
-                    ", size",
-                    dim_size.__str__(),
-                )
-
-            flat = flat + idx * strides[dim_idx]
-
-        return flat
-
-    @always_inline
-    fn index_to_coord(self, flat_index: Int) -> IntList:
-        # fn unravel_index(self, flat_index: Int) -> IntList:
-        if flat_index < 0 or flat_index >= self.num_elements():
-            panic(
-                "Shape → unravel_index: flat_index",
-                flat_index.__str__(),
-                "out of bounds.",
-                "Should be between 0 <= and <",
-                self.num_elements().__str__(),
-            )
-        rank = self.rank()
-        indices = IntList.filled(rank, 0)
-        remaining = flat_index
-        for i in range(rank - 1, -1, -1):  # from last axis backward
-            dim = self[i]
-            indices[i] = remaining % dim
-            remaining //= dim
-
-        return indices^
+    fn indices(ref self) -> IndexIterator[origin_of(self)]:
+        return IndexIterator(Pointer(to=self))
 
     @always_inline
     fn count_axes_of_size(self, axis_size: Int) -> Int:
@@ -415,68 +217,6 @@ struct Shape(
 
         return Shape(spans)
 
-    @always_inline
-    @staticmethod
-    fn validate_matrix_shapes_nd(A_shape: Shape, B_shape: Shape):
-        if len(A_shape) < 2 or len(B_shape) < 2:
-            panic(
-                "Tensor → validate_matrix_shapes_nd: matmul_nd expects rank >="
-                " 2. Got A = "
-                + A_shape.__str__()
-                + ", B = "
-                + B_shape.__str__()
-            )
-
-        if A_shape[-1] != B_shape[-2]:
-            panic(
-                "Tensor → validate_matrix_shapes_nd: inner dimensions"
-                " mismatch: "
-                + "A(...,"
-                + A_shape[-1].__str__()
-                + ") vs "
-                + "B("
-                + B_shape[-2].__str__()
-                + ",...). "
-                + "Full A = "
-                + A_shape.__str__()
-                + ", B = "
-                + B_shape.__str__()
-            )
-
-        A_batch = A_shape[0:-2]
-        B_batch = B_shape[0:-2]
-        _ = Shape.broadcast_shape(
-            A_batch, B_batch
-        )  # will panic internally if not compatible
-
-    @always_inline
-    @staticmethod
-    fn validate_matrix_shapes_2d(A_shape: Shape, B_shape: Shape):
-        if len(A_shape) != 2 or len(B_shape) != 2:
-            panic(
-                "Tensor → validate_matrix_shapes_2d: matmul_2d expects rank =="
-                " 2. Got A = "
-                + A_shape.__str__()
-                + ", B = "
-                + B_shape.__str__()
-            )
-
-        if A_shape[1] != B_shape[0]:
-            panic(
-                "Tensor → validate_matrix_shapes_2d: inner dimensions mismatch"
-                " in matmul_2d: "
-                + "A(m,"
-                + A_shape[1].__str__()
-                + ") vs "
-                + "B("
-                + B_shape[0].__str__()
-                + ",n). "
-                + "Full A = "
-                + A_shape.__str__()
-                + ", B = "
-                + B_shape.__str__()
-            )
-
     fn reverse(self) -> Self:
         dims = self.intlist()
         dims.reverse()
@@ -495,63 +235,6 @@ struct Shape(
         axes = self.intlist()
         axes[axis] = extent
         return Shape(axes)
-
-    @always_inline
-    @staticmethod
-    fn pad_shapes(shape1: Shape, shape2: Shape) -> Tuple[Shape, Shape]:
-        if shape1 == shape2:
-            return shape1.copy(), shape2.copy()
-        if shape1 == Shape():
-            return Shape(1) * len(shape2), shape2.copy()
-        if shape2 == Shape():
-            return shape1.copy(), Shape(1) * len(shape1)
-
-        max_len = max(len(shape1), len(shape2))
-
-        # Pad with 1s
-        padded1 = Shape(1) * (max_len - len(shape1)) + shape1
-        padded2 = Shape(1) * (max_len - len(shape2)) + shape2
-
-        return padded1^, padded2^
-
-    @always_inline
-    @staticmethod
-    fn broadcast_shape(this: Shape, that: Shape) -> Shape:
-        if not this.broadcastable(that):
-            panic(
-                "Shape → broadcast_shape - not broadcastable: "
-                + this.__str__()
-                + " <=> "
-                + that.__str__()
-            )
-        # Explicitly handle true scalars (Shape())
-        if this == Shape():
-            return that.copy()  # Scalar + Tensor -> Tensor's shape
-        if that == Shape():
-            return this.copy()  # Tensor + Scalar -> Tensor's shape
-        padded = Self.pad_shapes(this, that)
-        shape1 = padded[0].copy()
-        shape2 = padded[1].copy()
-        result_shape = IntList.with_capacity(len(shape1))
-        s1 = shape1.intlist()
-        s2 = shape2.intlist()
-
-        for dims in s1.zip(s2):
-            if dims[0] == dims[1]:
-                result_shape.append(dims[0])
-            elif dims[0] == 1:
-                result_shape.append(dims[1])
-            elif dims[1] == 1:
-                result_shape.append(dims[0])
-            else:
-                panic(
-                    "Shape → broadcast_shape - cannot broadcast shapes: "
-                    + this.__str__()
-                    + ", "
-                    + that.__str__()
-                )
-
-        return Shape(result_shape)
 
     @always_inline
     fn __len__(self) -> Int:
@@ -602,57 +285,6 @@ struct Shape(
     fn num_elements(self) -> Int:
         return self.numels
 
-    @always_inline
-    fn translate_index(
-        self, indices: IntArray, mask: IntArray, broadcast_shape: Shape
-    ) -> IntArray:
-        """Translate broadcasted indices to original tensor indices.
-
-        Args:
-            indices: Position in broadcasted tensor.
-            mask: 1 for broadcasted dims, 0 for original.
-            broadcast_shape: Shape after broadcasting.
-
-        Returns:
-            Indices in original tensor's space.
-        """
-        # Input Validation
-        if self.ndim > broadcast_shape.ndim:
-            panic(
-                "Shape translate_index: original dims greater than broadcast"
-                " dims"
-            )
-        if mask.size() != broadcast_shape.ndim:
-            panic(
-                "Shape translate_index: mask size does not match broadcast ndim"
-            )
-        if indices.size() != broadcast_shape.ndim:
-            panic(
-                "Shape translate_index: indices size does not match broadcast"
-                " ndim"
-            )
-
-        translated = IntArray(size=self.ndim)
-        offset = broadcast_shape.ndim - self.ndim
-
-        # Perform the translation
-        for i in range(self.ndim):
-            broadcast_axis = i + offset
-
-            if mask[broadcast_axis] == 1:
-                translated[i] = 0  # Broadcasted dim
-            else:
-                original_index = indices[broadcast_axis]
-                # CRITICAL: Check if the index is valid for the original shape
-                if original_index >= self[i]:
-                    panic(
-                        "Shape translate_index: index out of bounds for"
-                        " original tensor"
-                    )
-                translated[i] = original_index
-
-        return translated^
-
     fn __str__(self) -> String:
         var s = String("(")
         for i in range(self.ndim):
@@ -667,16 +299,6 @@ struct Shape(
 
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
-
-    @always_inline
-    @staticmethod
-    fn validate1(shape: Shape):
-        for idx in range(shape.ndim):
-            if shape.axes_spans[idx] < 1:
-                panic(
-                    "Shape → validate: shape dimension not valid: "
-                    + String(shape.axes_spans[idx])
-                )
 
     @always_inline
     fn intlist(self) -> IntList:
@@ -706,6 +328,8 @@ fn main() raises:
         extended = IntArrayHelper.extend(coord, 2, 3)
         print()
         IntArrayHelper.print(extended)"""
-    s = Shape(6)
-    print(len(s))
+    s = Shape(Shape(6, 2).num_elements())
+    print(len(Shape(2,3)))
+    for coord in s.indices():
+        print(coord)
     pass

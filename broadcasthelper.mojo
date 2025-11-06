@@ -14,13 +14,13 @@ fn test_validate_broadcast_mask() raises:
     print("test_validate_broadcast_mask")
     s1 = Shape(4, 2)
     s2 = Shape(1, 2)
-    mask = ShapeBroadcaster.broadcast_mask(s2, s1)
+    mask = ShapeBroadcaster.broadcast_mask_intlist(s2, s1)
 
     assert_true(mask == IntList(1, 0), "broadcast mask assertion 1 failed")
 
     s1 = Shape(5, 4, 3)
     s2 = Shape(4, 3)
-    mask = ShapeBroadcaster.broadcast_mask(s2, s1)
+    mask = ShapeBroadcaster.broadcast_mask_intlist(s2, s1)
     assert_true(mask == IntList(1, 0, 0), "broadcast mask assertion 2 failed")
 
 
@@ -165,9 +165,10 @@ struct ShapeBroadcaster:
                     return False
         return True
 
+
     @always_inline
     @staticmethod
-    fn broadcast_mask1(original_shape: Shape, target_shape: Shape) -> IntArray:
+    fn broadcast_mask(original_shape: Shape, target_shape: Shape) -> IntArray:
         """Create a broadcast mask indicating which dimensions are broadcasted.
         """
         var mask = IntArray(size=target_shape.ndim)
@@ -196,29 +197,5 @@ struct ShapeBroadcaster:
 
     @always_inline
     @staticmethod
-    fn broadcast_mask(original_shape: Shape, target_shape: Shape) -> IntList:
-        """Create a broadcast mask indicating which dimensions are broadcasted.
-        """
-        var mask = IntList.with_capacity(capacity=target_shape.ndim)
-        var offset = target_shape.ndim - original_shape.ndim
-        if offset < 0:
-            panic(
-                "ShapeBroadcaster → broadcast_mask → target_shape.ndim is"
-                " smaller than original_shape.ndim: "
-                + String(target_shape.ndim)
-                + ", "
-                + String(original_shape.ndim)
-            )
-
-        for i in range(target_shape.ndim):
-            if i < offset:
-                mask[i] = 1  # original_shape has no dimension here
-            else:
-                var base_dim = original_shape[i - offset]
-                var target_dim = target_shape[i]
-                if base_dim == 1 and target_dim != 1:
-                    mask[i] = 1  # original_shape is being expanded
-                else:
-                    mask[i] = 0  # match or both 1 → not broadcasted
-
-        return mask^
+    fn broadcast_mask_intlist(original_shape: Shape, target_shape: Shape) -> IntList:
+        return IntList(Self.broadcast_mask(original_shape, target_shape))

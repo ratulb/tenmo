@@ -1,5 +1,31 @@
 from tenmo import Tensor
-from views import ViewBackward
+from backpropagation import Delegate, BackwardFn
+from operators import AddTensor
+from ancestry import Ancestor
+from gradbox import Gradbox
+
+@fieldwise_init
+@register_passable
+struct ContiguousBackward[dtype: DType](ImplicitlyCopyable):
+
+    fn into_backward_fn(self) -> BackwardFn[dtype]:
+        return BackwardFn[dtype](Delegate[dtype](self))
+
+    fn backward(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        parent = output.ancestry().get(0)
+        parent_shape = parent.shape()
+
+        parent_gradbox = Gradbox[dtype].zeros(
+            parent_shape
+        )
+        for coord in parent_shape:
+            parent_gradbox[coord] = output.grad()[coord]
+
+        return [
+            (parent^, parent_gradbox^, AddTensor),
+        ]
 
 
 @register_passable
@@ -24,12 +50,7 @@ struct Contiguous[dtype: DType](Copyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                shape = self.shape()
-                strides = self.strides()
-                offset = self.offset()
-                backward_fn = ViewBackward[dtype](
-                    shape, strides, offset
-                ).into_backward_fn()
+                backward_fn = ContiguousBackward[dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
@@ -38,3 +59,4 @@ struct Contiguous[dtype: DType](Copyable):
 
 fn main():
     print("passes")
+

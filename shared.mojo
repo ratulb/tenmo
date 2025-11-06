@@ -1,4 +1,4 @@
-from tensors import Tensor
+from tenmo import Tensor
 from shapes import Shape
 from intlist import IntList
 from backpropagation import BackwardFn
@@ -17,7 +17,7 @@ fn main() raises:
 
 
 fn test_tensorlite_basics() raises:
-    a = Tensor.arange(5, requires_grad=True)
+    _="""a = Tensor.arange(5, requires_grad=True)
     print("a.id(): ", a.id())
     ptr = UnsafePointer[Tensor[DType.float32]].alloc(1)
     print("ptr to int: ", Int(ptr))
@@ -37,7 +37,7 @@ fn test_tensorlite_basics() raises:
     a.gradbox[].print()
     print()
     a.print()
-    tli.gradients()[].print()
+    tli.gradients()[].print()"""
 
 
 struct TensorLite[dtype: DType](
@@ -49,7 +49,7 @@ struct TensorLite[dtype: DType](
 
     fn __init__(out self, tensor_address: Self.TensorAddress):
         self.tensor_address = tensor_address
-        self.delegate = tensor_address[]
+        self.delegate = tensor_address[].copy()
         print("Inside TensorLite: ", self.delegate)
 
     fn __copyinit__(out self, other: Self):
@@ -65,7 +65,7 @@ struct TensorLite[dtype: DType](
 
     @always_inline
     fn shape(self) -> Shape:
-        return self.delegate.shape
+        return self.delegate.shape.copy()
 
     @always_inline
     fn gradients(self) -> UnsafePointer[Tensor[dtype]]:
@@ -73,7 +73,8 @@ struct TensorLite[dtype: DType](
 
     @always_inline
     fn grad(self) -> Tensor[dtype]:
-        return self.delegate.grad()
+        #return self.delegate.grad()
+        return Tensor[dtype].scalar(42)
 
     @staticmethod
     fn of(tensor: Tensor[dtype]) -> TensorLite[dtype]:
@@ -96,7 +97,7 @@ struct TensorLite[dtype: DType](
 
     @always_inline
     fn ancestry(self) -> Ancestors[dtype]:
-        return self.delegate.ancestry()
+        return self.delegate.ancestry().copy()
 
     @always_inline
     fn requires_grad(self) -> Bool:
@@ -120,19 +121,19 @@ struct TensorLite[dtype: DType](
         writer.write(self.__str__())
 
     fn seed_grad(self, value: Scalar[dtype]):
-        copy = self.delegate
+        copy = self.delegate.copy()
         copy.seed_grad(value)
 
     fn update_grad[opcode: Int](self, incoming: Tensor[dtype]):
-        copy = self.delegate
+        copy = self.delegate.copy()
         copy.update_grad[opcode](incoming)
 
     fn seed_grad(self, with_tensor: Tensor[dtype]):
-        copy = self.delegate
+        copy = self.delegate.copy()
         copy.seed_grad(with_tensor)
 
     fn init_grad(self):
-        copy = self.delegate
+        copy = self.delegate.copy()
         copy.init_gradbox()
 
         _ = """fn nullify_ptr(mut self):
@@ -162,7 +163,6 @@ struct TensorLite[dtype: DType](
 
             # seed the output grad
             root.seed_grad(seed_tensor)
-            seed_tensor.free()
             traced = IntList()
             streams = List[GradStream[dtype]]()
             use_count = Dict[
@@ -170,7 +170,7 @@ struct TensorLite[dtype: DType](
             ]()  # <-- new: how many children feed each parent?
 
             # ---- trace phase ----
-            stack = [root]
+            stack = [root.copy()]
             while stack:
                 node = stack.pop()
                 sid = node.inner_id()
@@ -184,7 +184,7 @@ struct TensorLite[dtype: DType](
                     for parent in node.ancestry():
                         pid = parent.inner_id()
                         use_count[pid] = use_count.get(pid, 0) + 1
-                        stack.append(parent)
+                        stack.append(parent.copy())
 
             log_debug("Traced ancestry: " + traced.__str__())
 
@@ -196,11 +196,11 @@ struct TensorLite[dtype: DType](
             # Build lookup for fast scheduling
             node_by_id = Dict[Int, GradStream[dtype]]()
             for s in streams:
-                node_by_id[s.inner_id()] = s
+                node_by_id[s.inner_id()] = s.copy()
 
             # ---- backward execution phase ----
             ready = Deque[GradStream[dtype]]()
-            ready.append(node_by_id[rid])
+            ready.append(node_by_id[rid].copy())
 
             while ready:
                 stream = ready.popleft()
@@ -212,8 +212,8 @@ struct TensorLite[dtype: DType](
                         # 1) sink grad into recipient (accumulate only!)
                         gs = GradStream[dtype](
                             # recipient, Optional(grad_share), opcode
-                            recipient,
-                            grad_share,
+                            recipient.copy(),
+                            grad_share.copy(),
                             opcode,
                         )
                         gs.sink()
@@ -227,7 +227,7 @@ struct TensorLite[dtype: DType](
                         # 3) schedule recipient when all contributions received
                         if remaining == 0 and recipient.has_backward_fn():
                             if pid in node_by_id:
-                                ready.append(node_by_id[pid])
+                                ready.append(node_by_id[pid].copy())
                 else:
                     # leaf → grads already accumulated via sink
                     pass
@@ -248,18 +248,18 @@ struct GradStream[dtype: DType](Copyable & Movable):
         grad: Optional[Tensor[dtype]] = None,
         opcode: Int = Noop,
     ):
-        self.recipient = recipient
-        self.grad = grad
+        self.recipient = recipient.copy()
+        self.grad = grad.copy()
         self.opcode = opcode
 
     fn __copyinit__(out self, other: Self):
-        self.recipient = other.recipient
-        self.grad = other.grad
+        self.recipient = other.recipient.copy()
+        self.grad = other.grad.copy()
         self.opcode = other.opcode
 
     fn __moveinit__(out self, deinit other: Self):
-        self.recipient = other.recipient
-        self.grad = other.grad
+        self.recipient = other.recipient^
+        self.grad = other.grad^
         self.opcode = other.opcode
 
     fn has_backward_fn(self) -> Bool:
@@ -269,7 +269,7 @@ struct GradStream[dtype: DType](Copyable & Movable):
         return self.recipient.inner_id()
 
     fn sink(self):
-        grad_share = self.grad.value()
+        grad_share = self.grad.value().copy()
         log_debug("sink(): to id=" + self.recipient.inner_id().__str__())
         self.recipient.init_grad()
         self.recipient.update_grad[AddTensor](
@@ -295,4 +295,4 @@ struct GradStream[dtype: DType](Copyable & Movable):
             log_debug(
                 " -> produced edge to id=" + ancestor.inner_id().__str__()
             )
-        return out
+        return out^

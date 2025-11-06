@@ -160,7 +160,7 @@ struct Slicer:
     @staticmethod
     fn slice(
         slice: Slice, end: Int, start: Int = 0, step: Int = 1
-    ) -> (Int, Int, Int):
+    ) -> Tuple[Int, Int, Int]:
         _start, _end, _step = (
             slice.start.or_else(start),
             slice.end.or_else(end),
@@ -194,7 +194,7 @@ fn print_gradbox_recursive[
         )
         return
 
-    size = grad_ptr[].shape[current_dim]
+    size = grad_ptr[].shape()[current_dim]
 
     if size < 0 or size > 1_000_000:
         print(
@@ -202,7 +202,7 @@ fn print_gradbox_recursive[
             size,
             "at dim ",
             current_dim,
-            grad_ptr[].shape.__str__(),
+            grad_ptr[].shape().__str__(),
         )
         return
 
@@ -281,7 +281,7 @@ fn print_tensor_recursive[
         )
         return
 
-    size = tensor_ptr.shape[current_dim]
+    size = tensor_ptr.shape()[current_dim]
 
     if size < 0 or size > 1_000_000:
         print(
@@ -289,7 +289,7 @@ fn print_tensor_recursive[
             size,
             "at dim ",
             current_dim,
-            tensor_ptr.shape.__str__(),
+            tensor_ptr.shape().__str__(),
         )
         return
 
@@ -487,7 +487,6 @@ fn print_summary[
     print("  Total params:        ", total_params)
     print("  Trainable params:    ", trainable_params)
     print("  Non-trainable params:", non_trainable_params)
-
 
 fn main() raises:
     _ = """a = Tensor.arange(24, requires_grad=True).reshape(2, 3, 4)

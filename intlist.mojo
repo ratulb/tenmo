@@ -7,6 +7,7 @@ struct IntList(
     Sized & ImplicitlyCopyable & Stringable & Representable & Writable
 ):
     var _storage: IntArray
+    var _size: Int  # Current number of elements (<= storage capacity)
 
     @always_inline
     @staticmethod
@@ -16,31 +17,40 @@ struct IntList(
     @always_inline("nodebug")
     fn __init__(out self, array: IntArray):
         self._storage = array
+        self._size = array.size()  # Use full capacity initially
 
     fn __init__(out self):
         self._storage = IntArray(size=0)
+        self._size = 0
 
     @always_inline("nodebug")
     fn __init__(out self, src: List[Int]):
-        self._storage = IntArray(size=len(src))
-        for i in range(len(src)):
+        src_len = len(src)
+        self._storage = IntArray(size=src_len)
+        self._size = src_len
+        for i in range(src_len):
             self._storage[i] = src[i]
 
     @always_inline("nodebug")
     fn __init__(out self, *elems: Int):
-        self._storage = IntArray(size=len(elems))
-        for i in range(len(elems)):
+        elems_len = len(elems)
+        self._storage = IntArray(size=elems_len)
+        self._size = elems_len
+        for i in range(elems_len):
             self._storage[i] = elems[i]
 
     @always_inline("nodebug")
     fn __init__(out self, elems: VariadicList[Int]):
-        self._storage = IntArray(size=len(elems))
-        for i in range(len(elems)):
+        elems_len = len(elems)
+        self._storage = IntArray(size=elems_len)
+        self._size = elems_len
+        for i in range(elems_len):
             self._storage[i] = elems[i]
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
         self._storage = existing._storage  # IntArray handles deep copy
+        self._size = existing._size
 
     @staticmethod
     @always_inline
@@ -50,8 +60,8 @@ struct IntList(
 
     @always_inline
     fn tolist(self) -> List[Int]:
-        out = List[Int](capacity=len(self))
-        for i in range(len(self)):
+        out = List[Int](capacity=self._size)
+        for i in range(self._size):
             out.append(self[i])
         return out^
 
@@ -79,39 +89,50 @@ struct IntList(
     @always_inline
     fn with_capacity(capacity: Int, fill: Optional[Int] = None) -> IntList:
         var out = IntList()
-        if fill:
-            # Create storage with exact size and fill it
+        if capacity > 0:
             out._storage = IntArray(capacity)
-            for i in range(capacity):
-                out._storage[i] = fill.value()
-        else:
-            # Create empty storage but with allocated capacity
-            out._storage = IntArray(size=0)  # Start with empty
+            if fill:
+                out._size = capacity
+                for i in range(capacity):
+                    out._storage[i] = fill.value()
+            else:
+                out._size = 0  # Start with zero elements but allocated capacity
+        # else: remains empty (size=0, storage=IntArray(0))
         return out^
 
-    @staticmethod
-    @always_inline
-    fn single_intarray(elem: Int) -> IntArray:
-        var out = IntArray(size=1)
-        out[0] = elem
-        return out^
+    fn _ensure_capacity(mut self, required_capacity: Int):
+        """Ensure we have enough capacity, reallocating if necessary."""
+        current_capacity = self._storage.size()
+        if required_capacity <= current_capacity:
+            return
+
+        # Grow by at least 1.5x, but at least required_capacity
+        new_capacity = max(required_capacity, current_capacity * 3 // 2 + 1)
+        var new_storage = IntArray(size=new_capacity)
+
+        # Copy existing elements
+        for i in range(self._size):
+            new_storage[i] = self._storage[i]
+
+        self._storage = new_storage
 
     fn product(self) -> Int:
-        if len(self) == 0:
+        if self._size == 0:
             return 0
         var prod = 1
-        for i in range(len(self)):
+        for i in range(self._size):
             prod *= self[i]
         return prod
 
+    @always_inline
     fn sum(self) -> Int:
-        var summ = 0
-        for i in range(len(self)):
-            summ += self[i]
-        return summ
+        var accum_sum = 0
+        for i in range(self._size):
+            accum_sum += self[i]
+        return accum_sum
 
     fn has_duplicates(self) -> Bool:
-        if len(self) <= 1:
+        if self._size <= 1:
             return False
         var sorted_list = self.sorted()
 
@@ -122,18 +143,18 @@ struct IntList(
         return False
 
     fn permute(self, axes: IntList) -> IntList:
-        if not len(self) == len(axes):
+        if not self._size == len(axes):
             panic(
                 "IntList -> permute: axes length",
                 len(axes).__str__(),
                 "does not match list's length",
-                len(self).__str__(),
+                self._size.__str__(),
             )
         var permuted = IntList.with_capacity(len(axes))
         var seen = IntList.with_capacity(len(axes))
         for ax in axes:
-            var axis = ax + len(self) if ax < 0 else ax
-            if axis < 0 or axis >= len(self):
+            var axis = ax + self._size if ax < 0 else ax
+            if axis < 0 or axis >= self._size:
                 panic("IntList -> permute: index out of bound", ax.__str__())
             if axis in seen:
                 panic("IntList -> permute: duplicate axis", ax.__str__())
@@ -144,10 +165,10 @@ struct IntList(
 
     fn swap(mut self, this_index: Int, that_index: Int):
         """Swaps elements at different indices."""
-        var index1 = this_index + len(self) if this_index < 0 else this_index
-        var index2 = that_index + len(self) if that_index < 0 else that_index
+        var index1 = this_index + self._size if this_index < 0 else this_index
+        var index2 = that_index + self._size if that_index < 0 else that_index
 
-        if not 0 <= index1 < len(self) and 0 <= index2 < len(self):
+        if not 0 <= index1 < self._size and 0 <= index2 < self._size:
             panic(
                 "IntList → swap: provided index(indices) is(are) out of bounds"
             )
@@ -158,21 +179,18 @@ struct IntList(
             self[index2] = temp
 
     fn sort_and_deduplicate(mut self):
-        if len(self) <= 1:
+        if self._size <= 1:
             return
         self.sort()
         var write_index = 1
-        for read_index in range(1, len(self)):
+        for read_index in range(1, self._size):
             if self[read_index] != self[write_index - 1]:
                 self[write_index] = self[read_index]
                 write_index += 1
 
-        # Shrink the storage
-        if write_index < len(self):
-            var new_storage = IntArray(size=write_index)
-            for i in range(write_index):
-                new_storage[i] = self[i]
-            self._storage = new_storage
+        # Update size to remove duplicates
+        self._size = write_index
+        # Note: We don't shrink storage here to avoid reallocation
 
     fn sorted(self, asc: Bool = True) -> IntList:
         var copied = self.copy()
@@ -181,7 +199,7 @@ struct IntList(
 
     fn sort(mut self, asc: Bool = True):
         # Simple insertion sort (you might want to optimize this later)
-        for i in range(1, len(self)):
+        for i in range(1, self._size):
             var elem = self[i]
             var j = i
             while j > 0 and (elem < self[j - 1] if asc else elem > self[j - 1]):
@@ -190,7 +208,7 @@ struct IntList(
             self[j] = elem
 
     fn select(self, indices: IntList) -> IntList:
-        var n = len(self)
+        var n = self._size
         var result = IntList.with_capacity(len(indices))
 
         for i in indices:
@@ -207,29 +225,29 @@ struct IntList(
 
     fn indices_of(self, val: Int) -> IntList:
         """Returns a new IntList containing all indices where self[i] == val."""
-        var out = IntList.with_capacity(len(self))
+        var out = IntList.with_capacity(self._size)
 
-        for i in range(len(self)):
+        for i in range(self._size):
             if self[i] == val:
                 out.append(i)
         return out^
 
     fn count(self, elem: Int) -> Int:
         var count = 0
-        for i in range(len(self)):
+        for i in range(self._size):
             if self[i] == elem:
                 count += 1
         return count
 
     fn any(self, cond: fn (Int) -> Bool) -> Bool:
-        for i in range(len(self)):
+        for i in range(self._size):
             if cond(self[i]):
                 return True
         return False
 
     @always_inline
     fn is_strictly_increasing_from_zero(self) -> Bool:
-        for i in range(len(self)):
+        for i in range(self._size):
             if self[i] != i:
                 print(
                     (
@@ -246,7 +264,7 @@ struct IntList(
         if len(indices) != len(values):
             panic("IntList -> insert: indices and values must be same length")
 
-        var n = len(self)
+        var n = self._size
         var m = len(indices)
         if n == 0:
             if m == 0:
@@ -279,70 +297,69 @@ struct IntList(
     fn insert(self, at: Int, value: Int) -> IntList:
         # Insert `value` at position `at` in `self`, return a new IntList
         # `at` could be start, middle or end
-        if at < 0 or at > len(self):
+        if at < 0 or at > self._size:
             panic("IntList -> insert - index out of bounds: " + String(at))
 
-        var result = IntList.with_capacity(len(self) + 1)
-        for i in range(len(self) + 1):
+        var result = IntList.with_capacity(self._size + 1)
+        for i in range(self._size + 1):
             if i == at:
                 result.append(value)
-            if i < len(self):
+            if i < self._size:
                 result.append(self[i])
 
         return result^
 
     fn clear(mut self):
-        # For IntArray, we create a new empty storage
-        self._storage = IntArray(size=0)
+        self._size = 0
+        # Note: We keep the storage to avoid reallocation
 
     fn __rmul__(self: IntList, factor: Int) -> IntList:
         return self.__mul__(factor)
 
     fn __mul__(self: IntList, factor: Int) -> IntList:
-        if factor < 1 or len(self) == 0:
+        if factor < 1 or self._size == 0:
             return IntList()
-        var result = IntList.with_capacity(len(self) * factor)
+        var result = IntList.with_capacity(self._size * factor)
         for _ in range(factor):
-            for i in range(len(self)):
+            for i in range(self._size):
                 result.append(self[i])
         return result^
 
     fn __mul__(self: IntList, other: Self) -> IntList:
-        if len(self) != len(other):
+        if self._size != len(other):
             panic(
                 "IntList → __mul__(IntList): lengths are not equal → ",
-                String(len(self)),
+                String(self._size),
                 "<=>",
                 String(len(other)),
             )
-        var result = IntList.with_capacity(len(self))
-        for i in range(len(self)):
+        var result = IntList.with_capacity(self._size)
+        for i in range(self._size):
             result.append(self[i] * other[i])
         return result^
 
     fn __mul__(self: IntList, other: IntArray) -> IntList:
-        if len(self) != other.size():
+        if self._size != other.size():
             panic(
                 "IntList → __mul__(IntArray): lengths are not equal → ",
-                String(len(self)),
+                String(self._size),
                 "<=>",
                 String(other.size()),
             )
-        var result = IntList.with_capacity(len(self))
-        for i in range(len(self)):
+        var result = IntList.with_capacity(self._size)
+        for i in range(self._size):
             result.append(self[i] * other[i])
         return result^
 
-
     fn __getitem__(self, slice: Slice) -> Self:
         var start = slice.start.value() if slice.start else  0
-        var stop = slice.end.value() if slice.end  else len(self)
+        var stop = slice.end.value() if slice.end  else self._size
         var step = slice.step.value() if slice.step else 1
 
         if start < 0:
-            start += len(self)
+            start += self._size
         if stop < 0:
-            stop += len(self)
+            stop += self._size
 
         var result = IntList.with_capacity((stop - start + step - 1) // step)
         for i in range(start, stop, step):
@@ -350,24 +367,21 @@ struct IntList(
         return result^
 
     fn pop(mut self, index: Int = -1) -> Int:
-        if len(self) < 1:
+        if self._size < 1:
             panic("cannot pop from empty IntList")
         var i = index
         if i < 0:
-            i += len(self)
-        if i < 0 or i >= len(self):
+            i += self._size
+        if i < 0 or i >= self._size:
             panic("pop index out of bounds")
 
         var val = self[i]
 
-        # Create new storage without the popped element
-        var new_storage = IntArray(size=(len(self) - 1))
-        for j in range(i):
-            new_storage[j] = self[j]
-        for j in range(i + 1, len(self)):
-            new_storage[j - 1] = self[j]
+        # Shift elements left
+        for j in range(i, self._size - 1):
+            self._storage[j] = self._storage[j + 1]
 
-        self._storage = new_storage
+        self._size -= 1
         return val
 
     fn __radd__(self: IntList, other: List[Int]) -> IntList:
@@ -377,15 +391,15 @@ struct IntList(
         return self.__add__(IntList(other))
 
     fn __add__(self: IntList, other: IntList) -> IntList:
-        if len(self) == 0 and len(other) == 0:
+        if self._size == 0 and len(other) == 0:
             return IntList()
-        if len(self) == 0:
+        if self._size == 0:
             return other.copy()
         if len(other) == 0:
             return self.copy()
 
-        var result = IntList.with_capacity(len(self) + len(other))
-        for i in range(len(self)):
+        var result = IntList.with_capacity(self._size + len(other))
+        for i in range(self._size):
             result.append(self[i])
         for i in range(len(other)):
             result.append(other[i])
@@ -393,18 +407,18 @@ struct IntList(
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
-        var index = idx if idx >= 0 else idx + len(self)
-        if index < 0 or index >= len(self):
+        var index = idx if idx >= 0 else idx + self._size
+        if index < 0 or index >= self._size:
             panic("IntList __getitem__  → Out-of-bounds read: " + String(idx))
 
         return self._storage[index]
 
     @always_inline("nodebug")
     fn __setitem__(mut self, idx: Int, value: Int):
-        var index = idx if idx >= 0 else idx + len(self)
-        if index < 0 or index > len(self):
+        var index = idx if idx >= 0 else idx + self._size
+        if index < 0 or index > self._size:
             panic("IntList __setitem__ -> Cannot skip indices")
-        if index == len(self):
+        if index == self._size:
             self.append(value)
         else:
             self._storage[index] = value
@@ -424,7 +438,7 @@ struct IntList(
         return inverted^
 
     fn replace(self: IntList, indices: IntList, values: IntList) -> Self:
-        var n = len(self)
+        var n = self._size
         var m = len(indices)
 
         if m != len(values):
@@ -446,41 +460,43 @@ struct IntList(
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        return self._storage.size()
+        return self._size
 
     @always_inline("nodebug")
     fn len(self) -> Int:
-        return self._storage.size()
+        return self._size
 
     @always_inline("nodebug")
     fn size(self) -> Int:
+        return self._size
+
+    fn capacity(self) -> Int:
         return self._storage.size()
 
     fn is_empty(self) -> Bool:
-        return len(self) == 0
+        return self._size == 0
 
     fn __eq__(self: IntList, other: IntList) -> Bool:
-        if len(self) != len(other):
+        if self._size != len(other):
             return False
-        for i in range(len(self)):
+        for i in range(self._size):
             if self[i] != other[i]:
                 return False
         return True
 
     fn __eq__(self: IntList, other: IntArray) -> Bool:
-        if len(self) != other.size():
+        if self._size != other.size():
             return False
-        for i in range(len(self)):
+        for i in range(self._size):
             if self[i] != other[i]:
                 return False
         return True
 
-
     fn __str__(self) -> String:
-        if len(self) == 0:
+        if self._size == 0:
             return "[]"
         var result = String("[")
-        for i in range(len(self)):
+        for i in range(self._size):
             if i > 0:
                 result += ", "
             result += String(self[i])
@@ -494,24 +510,23 @@ struct IntList(
         writer.write(self.__str__())
 
     fn prepend(mut self, value: Int):
-        # Create new storage with +1 capacity
-        var new_storage = IntArray(size=(len(self) + 1))
-        new_storage[0] = value
-        for i in range(len(self)):
-            new_storage[i + 1] = self[i]
-        self._storage = new_storage
+        self._ensure_capacity(self._size + 1)
+
+        # Shift elements right
+        for i in range(self._size, 0, -1):
+            self._storage[i] = self._storage[i - 1]
+
+        self._storage[0] = value
+        self._size += 1
 
     fn append(mut self, value: Int):
-        # Create new storage with +1 capacity
-        var new_storage = IntArray(size=(len(self) + 1))
-        for i in range(len(self)):
-            new_storage[i] = self[i]
-        new_storage[len(self)] = value
-        self._storage = new_storage
+        self._ensure_capacity(self._size + 1)
+        self._storage[self._size] = value
+        self._size += 1
 
     @always_inline
     fn __contains__(self, value: Int) -> Bool:
-        for i in range(len(self)):
+        for i in range(self._size):
             if self[i] == value:
                 return True
         return False
@@ -522,14 +537,14 @@ struct IntList(
         return copied^
 
     fn reverse(mut self):
-        var n = len(self)
+        var n = self._size
         for i in range(n // 2):
             var temp = self[i]
             self[i] = self[n - 1 - i]
             self[n - 1 - i] = temp
 
     fn print(self, limit: Int = 20) -> None:
-        var total = len(self)
+        var total = self._size
         print("IntList[", total, "] = ", end="")
 
         if total <= 2 * limit:
@@ -559,7 +574,7 @@ struct IntList(
     fn __reversed__(
         ref self,
     ) -> Iterator[origin_of(self), False]:
-        return Iterator[forward=False](len(self), Pointer(to=self))
+        return Iterator[forward=False](self._size, Pointer(to=self))
 
     fn zip(
         ref self, ref other: Self
@@ -580,7 +595,7 @@ struct IntList(
             An iterator of immutable references to the IntList elements in reverse order.
         """
         return ZipIterator[forward=False](
-            min(len(self), len(other)), Pointer(to=self), Pointer(to=other)
+            min(self._size, len(other)), Pointer(to=self), Pointer(to=other)
         )
 
 
@@ -687,7 +702,6 @@ struct ZipIterator[
         else:
             return self.index
 
-
 fn main() raises:
     test_simple_slice()
     _="""il = IntList()
@@ -709,7 +723,6 @@ fn test_simple_slice() raises:
     il = IntList(array^)
     print(il)
     print("Below")
-    print(IntList.single_intarray(il[2])[0])
 
     a = IntList(1, 2, 3)
     result = a * a

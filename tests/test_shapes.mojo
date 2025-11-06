@@ -1,9 +1,9 @@
 from intlist import IntList
-from tensors import Tensor
+from tenmo import Tensor
 from shapes import Shape
 
 from testing import assert_true, assert_raises
-
+from layout.int_tuple import IntArray
 
 fn test_slice_shape() raises:
     print("test_slice_shape")
@@ -67,11 +67,11 @@ fn test_empty_shape() raises:
     shape = Shape()
     assert_true(shape[0] == -1, "Empty shape __getitem__ assertion failed")
     for each in shape:
-        assert_true(each == IntList(), "Empty shape iteration assertion failed")
+        assert_true(IntList() == each, "Empty shape iteration assertion failed")
     tensor = Tensor[DType.bool](shape)
-    tensor[IntList()] = True
+    tensor[IntArray()] = True
     assert_true(
-        tensor[IntList()] == True, "Scalar tensor get assertion 2 failed"
+        tensor[IntArray()] == True, "Scalar tensor get assertion 2 failed"
     )
     assert_true(tensor.item() == True, "Scalar tensor item() assertion failed")
     assert_true(
@@ -95,7 +95,7 @@ fn test_empty_shape() raises:
     )
     broadcast_mask = shape.broadcast_mask(Shape.of(1))
     assert_true(
-        broadcast_mask == IntList(1),
+        IntList(1) == broadcast_mask,
         "Empty shape broadcast mask assertion failed",
     )
 
@@ -161,14 +161,14 @@ fn test_index_iter() raises:
     shape = Shape.of(1)
     for each in shape:
         assert_true(
-            each == IntList(0),
+            IntList(0) == each,
             "Unit shape(Shape.of(1)) index iteration assertion failed",
         )
     shape = Shape.of(2, 1)
     indices = shape.__iter__()
     assert_true(
-        indices.__next__() == IntList(0, 0)
-        and indices.__next__() == IntList(1, 0),
+        IntList(0, 0) == indices.__next__()
+        and IntList(1, 0) == indices.__next__(),
         "Shape(2,1) iteration assertion failed",
     )
 

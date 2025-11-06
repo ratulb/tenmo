@@ -3,6 +3,7 @@ from common_utils import log_debug, panic
 from tenmo import Tensor
 from shapes import Shape
 from intlist import IntList
+from strides import Strides
 from backpropagation import BackwardFn
 from operators import AddTensor, SubtractTensor
 from collections import Deque
@@ -125,6 +126,19 @@ struct Ancestor[dtype: DType](
     @always_inline
     fn shape(self) -> Shape:
         return self._tensor.shape()
+
+    @always_inline
+    fn offset(self) -> Int:
+        return self._tensor.offset()
+
+    @always_inline
+    fn max_index(self) -> Int:
+        return self._tensor.max_index()
+
+
+    @always_inline
+    fn strides(self) -> Strides:
+        return self._tensor.strides()
 
     @always_inline
     fn is_contiguous(self) -> Bool:
