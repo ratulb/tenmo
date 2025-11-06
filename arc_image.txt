@@ -1,0 +1,26 @@
+        ┌─────────────────────────────────────────────┐
+        │                 Tensor                      │
+        │─────────────────────────────────────────────│
+        │ ndbuffer: NDBuffer[Optional[Buffer]]        │
+        │ gradbox: Gradbox[dtype]                     │
+        │ backwardFn, ancestry, requires_grad, ...    │
+        └───────────────┬─────────────────────────────┘
+                        │
+                        ▼
+          ┌──────────────────────────┐
+          │        NDBuffer          │
+          │──────────────────────────│
+          │ shape: Shape             │
+          │ strides: Strides         │
+          │ offset: Int              │
+          │ buffer: Optional[Buffer] │
+          │ shared_buffer: Optional[ArcPointer[Buffer]] │
+          └───────────────┬──────────┘
+                          │
+         ┌────────────────┴────────────────┐
+         ▼                                 ▼
+   (before share)                    (after share)
+  Local stack buffer           Shared heap ArcPointer[Buffer]
+  owned solely by Tensor       reference-counted among views
+
+

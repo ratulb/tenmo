@@ -38,6 +38,7 @@ from forwards import (
     Flatten,
     Squeeze,
     Unsqueeze,
+    Permute,
 )
 from buffers import Buffer
 from validators import Validator
@@ -1637,6 +1638,23 @@ struct Tensor[dtype: DType = DType.float32](
     ]:
         return Unsqueeze[dtype].forward[track_grad](self, axes, requires_grad)
 
+    fn permute[
+        track_grad: Bool = True
+    ](
+        self, axes: List[Int], requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
+        return Permute[dtype].forward[track_grad](
+            self, IntList.new(axes), requires_grad
+        )
+
+    fn permute[
+        track_grad: Bool = True
+    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
+        return Permute[dtype].forward[track_grad](self, axes, requires_grad)
+
+
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
     ) -> Tensor[dtype]:
@@ -1722,21 +1740,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         return MatrixVectorMM[dtype].forward[track_grad](A, B, requires_grad)
 
 
-    fn permute[
-        track_grad: Bool = True
-    ](
-        self, axes: List[Int], requires_grad: Optional[Bool] = None
-    ) -> Tensor[dtype]:
-        return Permute[dtype].forward[track_grad](
-            self, IntList.new(axes), requires_grad
-        )
-
-    fn permute[
-        track_grad: Bool = True
-    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
-        dtype
-    ]:
-        return Permute[dtype].forward[track_grad](self, axes, requires_grad)
 
 
     fn softmax[

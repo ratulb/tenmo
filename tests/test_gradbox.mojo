@@ -23,6 +23,76 @@ fn main() raises:
         test_gradbox_squeeze_after_broadcast_and_sum_over_broadcasted_axes()
         test_gradbox_squeeze_integration_with_unsqueeze_backward()
         test_gradbox_squeeze_chain_of_ops()
+        test_gradbox_permute_basic()
+        test_gradbox_permute_3d()
+        test_gradbox_permute_inverse()
+        test_gradbox_permute_identity()
+        test_gradbox_permute_singleton_dims()
+        test_gradbox_permute_high_rank()
+
+
+fn test_gradbox_permute_basic() raises:
+    alias dtype = DType.float32
+    print("Running test_gradbox_permute_basic")
+    g1 = Gradbox[dtype](Shape(3, 4))
+    g1.buffer.fill(Scalar[dtype](1.0))
+    p = g1.permute(IntList([1, 0]))
+    assert_true(p.shape() == Shape(4, 3))
+    assert_true(g1.numels() == p.numels())
+    print("✓ Passed test_gradbox_permute_basic")
+
+fn test_gradbox_permute_3d() raises:
+    alias dtype = DType.float32
+    print("Running test_gradbox_permute_3d")
+    g1 = Gradbox[dtype](Shape(3, 4, 5))
+    g1.buffer.fill(Scalar[dtype](2.0))
+    p = g1.permute(IntList([2, 0, 1]))
+    assert_true(p.shape() == Shape(5, 3, 4))
+    assert_true(g1.numels() == p.numels())
+    print("✓ Passed test_gradbox_permute_3d")
+
+fn test_gradbox_permute_inverse() raises:
+    alias dtype = DType.float32
+    print("Running test_gradbox_permute_inverse")
+    g1 = Gradbox[dtype](Shape(2, 3, 4))
+    g1.buffer.fill(Scalar[dtype](3.0))
+    p = g1.permute(IntList([1, 2, 0]))
+    inv = p.permute(IntList([2, 0, 1]))
+    assert_true(inv.shape() == g1.shape())
+    assert_true(inv.all_close(g1))
+    print("✓ Passed test_gradbox_permute_inverse")
+
+fn test_gradbox_permute_identity() raises:
+    alias dtype = DType.float32
+    print("Running test_gradbox_permute_identity")
+    g1 = Gradbox[dtype](Shape(3, 4, 5))
+    g1.buffer.fill(Scalar[dtype](5.0))
+    p = g1.permute(IntList([0, 1, 2]))
+    assert_true(p.shape() == g1.shape())
+    assert_true(p.all_close(g1))
+    print("✓ Passed test_gradbox_permute_identity")
+
+fn test_gradbox_permute_singleton_dims() raises:
+    alias dtype = DType.float32
+    print("Running test_gradbox_permute_singleton_dims")
+    g1 = Gradbox[dtype](Shape(1, 4, 1))
+    g1.buffer.fill(Scalar[dtype](7.0))
+    p = g1.permute(IntList([2, 1, 0]))
+    assert_true(p.shape() == Shape(1, 4, 1))
+    assert_true(p.numels() == g1.numels())
+    assert_true(p.all_close(g1))
+    print("✓ Passed test_gradbox_permute_singleton_dims")
+
+fn test_gradbox_permute_high_rank() raises:
+    alias dtype = DType.float32
+    print("Running test_gradbox_permute_high_rank")
+    g1 = Gradbox[dtype](Shape(2, 3, 4, 5))
+    g1.buffer.fill(Scalar[dtype](9.0))
+    p = g1.permute(IntList([3, 2, 1, 0]))
+    assert_true(p.shape() == Shape(5, 4, 3, 2))
+    assert_true(g1.numels() == p.numels())
+    print("✓ Passed test_gradbox_permute_high_rank")
+
 
 fn test_gradbox_squeeze_noop() raises:
     print("test_gradbox_squeeze_noop")

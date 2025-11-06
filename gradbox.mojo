@@ -101,6 +101,55 @@ struct Gradbox[dtype: DType](
 
         return Gradbox[dtype](nd_buffer^, share=False)
 
+    @always_inline
+    fn permute(self, axes: IntList) -> Gradbox[dtype]:
+        # Validate rank / axis count
+        var rank = self.rank()
+        if len(axes) != rank:
+            panic(
+                "Gradbox → permute: number of axes (",
+                len(axes).__str__(),
+                ") must match rank (",
+                rank.__str__(),
+                ")",
+            )
+
+        # Validate permutation (no duplicates, indices in range)
+        var seen = IntList.with_capacity(rank)
+        for axis in axes:
+            if axis < 0 or axis >= rank:
+                panic(
+                    "Gradbox → permute: invalid axis index ",
+                    axis.__str__(),
+                    " for rank ",
+                    rank.__str__(),
+                )
+            if axis in seen:
+                panic(
+                    "Gradbox → permute: duplicate axis in permutation ",
+                    axis.__str__(),
+                )
+            seen.append(axis)
+
+        # Build permuted shape and strides
+        var new_shape = IntList.with_capacity(rank)
+        var new_strides = IntList.with_capacity(rank)
+        for axis in axes:
+            new_shape.append(self.shape()[axis])
+            new_strides.append(self.strides()[axis])
+
+        # Create a contiguous backing buffer (value semantics) and construct a new NDBuffer
+        var buffer = self.buffer.contiguous_buffer()
+        var nd_buffer = NDBuffer[dtype](
+            buffer=buffer^,
+            shape=Shape(new_shape^),
+            strides=Optional(Strides(new_strides^)),
+            offset=0,
+        )
+
+        # Return a value-style Gradbox (share=False) — no ArcPointer, no autograd, no view-sharing
+        return Gradbox[dtype](nd_buffer^, share=False)
+
     @staticmethod
     @always_inline
     fn full(
@@ -464,3 +513,6 @@ fn main() raises:
     run = 1
     for _ in range(run):
         pass
+
+
+from testing import assert_true
