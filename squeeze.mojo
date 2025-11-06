@@ -1,30 +1,33 @@
-from tensors import Tensor
-from operators import AddTensor
-from shared import TensorLite
+from tenmo import Tensor
+from operators import AddTensor, ZeroGrad
 from intlist import IntList
 from backpropagation import Delegate, BackwardFn
 from common_utils import panic
 from shapes import Shape
 from strides import Strides
+from gradbox import Gradbox
+from ancestry import Ancestor
 
 
 @fieldwise_init
 @register_passable
-struct SqueezeBackward[dtype: DType](Copyable):
+struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         ancestor = output.ancestry().get(0)
-        gradients = output.grad()
+        gradbox = output.grad().copy()
 
         var original_shape = ancestor.shape()
 
-        # Create gradient with the same shape as original tensor
-        var final_grad = gradients.reshape(original_shape, requires_grad=False)
-        return [(ancestor, final_grad, AddTensor)]
+        var gradbox_ancestor = gradbox.reshape(original_shape)
+        return [
+            (ancestor^, gradbox_ancestor^, AddTensor),
+            (Ancestor(output), gradbox^, ZeroGrad), #Send out a signal to this output of squeeze op to zero out its grad(No accumulation of grad for view)
+        ]
 
 
 struct Squeeze[dtype: DType]:
@@ -40,21 +43,25 @@ struct Squeeze[dtype: DType]:
         """
         Squeeze dimensions of size 1.
 
+        Note: This operation returns a view sharing storage with the input tensor.
+        Gradients are properly propagated through the squeeze operation.
+
         Args:
             tensor: The tensor being squeezed.
-            axes: Optional list of axes to squeeze. If None, squeeze all dims of size 1.
+            axes: Optional list of axes to squeeze. If empty, squeeze all dims of size 1.
             requires_grad: Optional override for gradient requirement.
 
         Returns:
-            Tensor with specified dimensions squeezed.
+            Tensor with specified dimensions squeezed (view of original data).
         """
-        if tensor.shape.count_axes_of_size(1) == 0:
-            return tensor
-        rank = tensor.shape.rank()
+        shape = tensor.shape()
+        if shape.count_axes_of_size(1) == 0:
+            return tensor.copy()
+        rank = tensor.rank()
 
         # Determine which axes to squeeze
         var axes_to_squeeze: IntList
-        if not axes == IntList():
+        if not axes == IntList.Empty():
             # Use the specified axes after validation
             axes_to_squeeze = IntList.with_capacity(rank)
             seen = IntList.with_capacity(len(axes))
@@ -66,25 +73,25 @@ struct Squeeze[dtype: DType]:
                         axis.__str__(),
                         " out of range",
                     )
-                if tensor.shape[normalized] != 1:
+                if shape[normalized] != 1:
                     panic(
                         "Tensor → squeeze: cannot squeeze axis ",
                         axis.__str__(),
                         " with size ",
-                        tensor.shape[normalized].__str__(),
+                        shape[normalized].__str__(),
                     )
                 if normalized in seen:
-                    panic("Tensor → squeeze dupliacte axis", axis.__str__())
+                    panic("Tensor → squeeze duplicate axis", axis.__str__())
                 seen.append(normalized)
                 axes_to_squeeze.append(normalized)
 
             axes_to_squeeze.sort()
 
         else:
-            axes_to_squeeze = tensor.shape.indices_of_axes_with_size(1)
+            axes_to_squeeze = shape.indices_of_axes_with_size(1)
 
         if len(axes_to_squeeze) == 0:
-            return tensor
+            return tensor.copy()
 
         new_size = rank - len(axes_to_squeeze)
         new_shape = IntList.with_capacity(new_size)
@@ -92,29 +99,32 @@ struct Squeeze[dtype: DType]:
 
         for i in range(rank):
             if i not in axes_to_squeeze:
-                new_shape.append(tensor.shape[i])
-                new_strides.append(tensor.strides[i])
+                new_shape.append(shape[i])
+                new_strides.append(tensor.strides()[i])
 
-        shape = Shape(new_shape)
+        squeezed_shape = Shape(new_shape)
         strides = Strides(new_strides)
-        offset = tensor.offset
+        offset = tensor.offset()
 
-        out = Tensor[dtype].build_view(tensor.address(), shape, strides, offset, False)
+        out = Tensor[dtype].build_view(
+            tensor.address(), squeezed_shape, strides, offset, requires_grad=False
+        )
 
         @parameter
-        if track_grad:
-            grad_required = (
-                requires_grad.value() if requires_grad else tensor.requires_grad
-            )
+        if (
+            track_grad
+        ):  # comptime parameter - disaable generation of autograd code if False
+            grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:
                 out.requires_grad_(True)
                 bfn = SqueezeBackward[dtype]().into_backward_fn()
-                out.backwardFn = Optional(bfn)
+                out.backwardFn = Optional(bfn^)
                 out.add_ancestry(tensor)
 
-        return out
+        return out^
 
 
-fn main():
+
+fn main() raises:
     print("passes")

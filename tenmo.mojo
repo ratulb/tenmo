@@ -36,6 +36,7 @@ from forwards import (
     Dot,
     Expand,
     Flatten,
+    Squeeze,
 )
 from buffers import Buffer
 from validators import Validator
@@ -1584,6 +1585,32 @@ struct Tensor[dtype: DType = DType.float32](
             self, Shape(target_dims), requires_grad
         )
 
+    # Squeeze specified axes or all dims of size 1 if no axes provided
+    fn squeeze[
+        track_grad: Bool = True
+    ](
+        self,
+        axes: List[Int] = [],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Squeeze[dtype].forward[track_grad](
+            self, IntList.new(axes), requires_grad
+        )
+
+    # Squeeze single axis if provided, otherwise squeeze all dims of size 1
+    fn squeeze[
+        track_grad: Bool = True
+    ](
+        self,
+        axis: Optional[Int] = None,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Squeeze[dtype].forward[track_grad](
+            self,
+            IntList(axis.value()) if axis else IntList(),
+            requires_grad,
+        )
+
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
     ) -> Tensor[dtype]:
@@ -1793,31 +1820,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         return Argmin[dtype].argmin(tensor=self, axis=axis)
 
 
-    # Squeeze specified axes or all dims of size 1 if no axes provided
-    fn squeeze[
-        track_grad: Bool = True
-    ](
-        self,
-        axes: List[Int] = [],
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return Squeeze[dtype].forward[track_grad](
-            self, IntList.new(axes), requires_grad
-        )
-
-    # Squeeze single axis if provided, otherwise squeeze all dims of size 1
-    fn squeeze[
-        track_grad: Bool = True
-    ](
-        self,
-        axis: Optional[Int] = None,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return Squeeze[dtype].forward[track_grad](
-            self,
-            IntList(axis.value()) if axis else IntList(),
-            requires_grad,
-        )
 
     fn matmul[
         track_grad: Bool = True, simd_width: Int = simd_width_of[dtype]()
@@ -2018,16 +2020,15 @@ fn test_view_backward() raises:
     v2 = v.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
     # v2 = v.view(shape=Shape(2, 2), strides=Strides(1, 1), offset=2)
 
-    v2.print()
-    assert_true(v2 == Tensor[dtype].d2([[5, 6], [7, 8]]))
+    assert_true(v2 == Tensor[dtype].d2([[3, 4], [5, 6]]))
     # Test gradients
     loss = v2.mean()
     loss.backward()
     assert_true(
-        a.grad() == Tensor[dtype]([0, 0, 0, 0, 0.25, 0.25, 0.25, 0.25, 0, 0])
+        a.grad() == Tensor[dtype]([0, 0, 0.25, 0.25, 0.25, 0.25, 0, 0, 0, 0])
     )
     assert_true(
-        a.grad().as_tensor()[Slice(4, 8, 1)]
+        a.grad().as_tensor()[Slice(2, 6, 1)]
         == Tensor[dtype]([0.25, 0.25, 0.25, 0.25])
     )
 

@@ -6,6 +6,12 @@ from strides import Strides
 
 fn main() raises:
     print("Running all flatten tests...")
+    test_flatten_scalar()
+    test_flatten_1d()
+    test_flatten_2d()
+    test_flatten_3d()
+    test_flatten_keep_grad_chain()
+    test_flatten_partial_axes()
     test_flatten_1d_to_1d()
     test_flatten_2d_to_1d()
     test_flatten_3d_to_1d()
@@ -35,6 +41,84 @@ fn main() raises:
     test_flatten_after_expand_contiguous_view_chain()
     print("All flatten tests passed!")
 
+fn test_flatten_scalar() raises:
+    print("test_flatten_scalar")
+    var a = Tensor.scalar(5.0, requires_grad=True)
+    var f = a.flatten()
+    assert_true(f.shape() == Shape())
+    assert_true(f.item() == 5.0)
+    f.backward()
+    assert_true(a.grad().item() == 1.0)
+
+
+fn test_flatten_1d() raises:
+    print("test_flatten_1d")
+    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var f = a.flatten()
+    assert_true(f.shape() == Shape.of(3))
+    assert_true((f == a))
+    f.sum().backward()
+    assert_true(a.grad().all_close(Tensor.d1([1.0, 1.0, 1.0])))
+
+
+fn test_flatten_2d() raises:
+    print("test_flatten_2d")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var f = a.flatten()
+    assert_true(f.shape() == Shape.of(4))
+    assert_true(f.all_close(Tensor.d1([1.0, 2.0, 3.0, 4.0])))
+    f.sum().backward()
+    assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+
+
+fn test_flatten_3d() raises:
+    print("test_flatten_3d")
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]],
+         [[5.0, 6.0], [7.0, 8.0]]],
+        requires_grad=True
+    )  # shape (2,2,2)
+    var f = a.flatten()
+    assert_true(f.shape() == Shape.of(8))
+    expected_flat = Tensor.d1([1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0])
+    assert_true(f.all_close(expected_flat))
+    f.sum().backward()
+    expected_grad = Tensor.d3(
+        [[[1.0, 1.0], [1.0, 1.0]],
+         [[1.0, 1.0], [1.0, 1.0]]]
+    )
+    assert_true(a.grad().all_close(expected_grad))
+
+
+fn test_flatten_keep_grad_chain() raises:
+    print("test_flatten_keep_grad_chain")
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var b = a.flatten()
+    var c = b * 2.0
+    var d = c.sum()
+    d.backward()
+    # d = sum(2 * a) → grad(a) = 2
+    expected_grad = Tensor.d2([[2.0, 2.0], [2.0, 2.0]])
+    assert_true(a.grad().all_close(expected_grad))
+
+
+fn test_flatten_partial_axes() raises:
+    print("test_flatten_partial_axes")
+    var a = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]],
+         [[5.0, 6.0], [7.0, 8.0]]],
+        requires_grad=True
+    )  # shape (2,2,2)
+    # Flatten from axis=1 → shape becomes (2,4)
+    var f = a.flatten(start_dim=1)
+    assert_true(f.shape() == Shape.of(2, 4))
+    f.sum().backward()
+    expected_grad = Tensor.d3(
+        [[[1.0, 1.0], [1.0, 1.0]],
+         [[1.0, 1.0], [1.0, 1.0]]]
+    )
+    assert_true(a.grad().all_close(expected_grad))
+#here
 
 fn test_flatten_1d_to_1d() raises:
     print("test_flatten_1d_to_1d")

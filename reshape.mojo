@@ -43,15 +43,12 @@ struct Reshape[dtype: DType](Copyable):
             tensor.shape(), new_shape.intlist()
         )
 
-        buffer = tensor.buffer.contiguous_buffer()
-        nd_buffer = NDBuffer[dtype](buffer^, shape^)
+        nd_buffer = tensor.buffer.contiguous(shape^)
         out = Tensor[dtype](nd_buffer^, requires_grad=False)
 
         @parameter
         if track_grad:
-            grad_required = (
-                requires_grad.value() if requires_grad else tensor.requires_grad
-            )
+            grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:
                 out.requires_grad_(True)

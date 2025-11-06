@@ -17,5 +17,9 @@ from transpose import Transpose
 from dotproduct import Dot
 from expand import Expand
 from flatten import Flatten
+from squeeze import Squeeze
+
+
+
 fn main():
     pass

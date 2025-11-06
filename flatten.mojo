@@ -36,7 +36,10 @@ struct Flatten[dtype: DType]:
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         rank = self.rank()
+        if rank == 0:
+            return self.copy()
         var endd = end_dim.value() if end_dim else rank - 1
+
         if endd < start_dim:
             panic("Flatten → end_dim must be >= start_dim")
 
