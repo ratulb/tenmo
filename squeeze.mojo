@@ -26,7 +26,11 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
         var gradbox_ancestor = gradbox.reshape(original_shape)
         return [
             (ancestor^, gradbox_ancestor^, AddTensor),
-            (Ancestor(output), gradbox^, ZeroGrad), #Send out a signal to this output of squeeze op to zero out its grad(No accumulation of grad for view)
+            (
+                Ancestor(output),
+                gradbox^,
+                ZeroGrad,
+            ),  # Send out a signal to this output of squeeze op to zero out its grad(No accumulation of grad for view)
         ]
 
 
@@ -58,10 +62,9 @@ struct Squeeze[dtype: DType]:
         if shape.count_axes_of_size(1) == 0:
             return tensor.copy()
         rank = tensor.rank()
-
         # Determine which axes to squeeze
         var axes_to_squeeze: IntList
-        if not axes == IntList.Empty():
+        if not axes == IntList():
             # Use the specified axes after validation
             axes_to_squeeze = IntList.with_capacity(rank)
             seen = IntList.with_capacity(len(axes))
@@ -107,7 +110,11 @@ struct Squeeze[dtype: DType]:
         offset = tensor.offset()
 
         out = Tensor[dtype].build_view(
-            tensor.address(), squeezed_shape, strides, offset, requires_grad=False
+            tensor.address(),
+            squeezed_shape,
+            strides,
+            offset,
+            requires_grad=False,
         )
 
         @parameter
@@ -124,6 +131,8 @@ struct Squeeze[dtype: DType]:
 
         return out^
 
+
+from testing import assert_true
 
 
 fn main() raises:
