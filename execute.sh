@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
+    echo "Usage: $0 [tensors|argminmax|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
     exit 1
 fi
 
@@ -17,6 +17,10 @@ case $1 in
     tensors)
         echo "Running mojo -I . tests/test_tensors.mojo"
         mojo -I . $DEBUG_MODE tests/test_tensors.mojo
+        ;;
+    argminmax)
+        echo "Running mojo -I . tests/test_argminmax.mojo"
+        mojo -I . $DEBUG_MODE tests/test_argminmax.mojo
         ;;
 
     permute)
@@ -104,6 +108,9 @@ case $1 in
         ;;
 
     all)
+        echo "Running tests/test_argminmax.mojo"
+        mojo -I . tests/test_argminmax.mojo
+
         echo "Running tests/test_permute.mojo"
         mojo -I . tests/test_permute.mojo
 
@@ -148,7 +155,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: permute, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
+        echo "Available tests: permute, argminmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
         exit 1
         ;;
 esac

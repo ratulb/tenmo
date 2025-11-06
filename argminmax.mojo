@@ -10,6 +10,7 @@ struct Argmin[dtype: DType]:
     fn argmin(
         tensor: Tensor[dtype],
         axis: Int = 0,
+        keepdims: Bool = False,
     ) -> Tensor[DType.int32]:
         shape = tensor.shape()
         rank = shape.rank()
@@ -22,28 +23,40 @@ struct Argmin[dtype: DType]:
                 rank.__str__(),
             )
 
-        # Output shape is same as input but without the reduced axis
+        # --- Build output shape ---
         var out_axes = IntList()
         for i in range(rank):
-            if i != ax:
+            if i == ax:
+                if keepdims:
+                    out_axes.append(1)
+            else:
                 out_axes.append(shape[i])
         out_shape = Shape(out_axes)
 
+        # --- Allocate output tensor ---
         var out = Tensor[DType.int32].zeros(out_shape)
 
-        # Iterate over all indices of output shape
+        # --- Iterate over output indices ---
         for out_idx in out_shape.indices():
             var min_val = max_finite[dtype]()
             var min_pos = 0
 
-            # Loop over reduced axis
-            for idx in range(shape[axis]):
-                var full_idx = out_idx.insert(ax, idx)
-                val = tensor[full_idx]
+            # Determine the reduced index position to insert
+            for idx in range(shape[ax]):
+                var full_idx = out_idx.insert(
+                    ax, idx
+                ) if not keepdims else out_idx.replace(ax, idx)
+                var val = tensor[full_idx]
                 if val < min_val:
                     min_val = val
                     min_pos = idx
-            out[out_idx] = min_pos
+
+            # For keepdims=True, write at [ax]=0
+            if keepdims:
+                var write_idx = out_idx.replace(ax, 0)
+                out[write_idx] = min_pos
+            else:
+                out[out_idx] = min_pos
 
         return out^
 
@@ -53,6 +66,7 @@ struct Argmax[dtype: DType]:
     fn argmax(
         tensor: Tensor[dtype],
         axis: Int = 0,
+        keepdims: Bool = False,
     ) -> Tensor[DType.int32]:
         shape = tensor.shape()
         rank = shape.rank()
@@ -64,32 +78,47 @@ struct Argmax[dtype: DType]:
                 "out of range for tensor with rank",
                 rank.__str__(),
             )
-        # Output shape is same as input but without the reduced axis
+
+        # --- Build output shape ---
         var out_axes = IntList()
         for i in range(rank):
-            if i != ax:
+            if i == ax:
+                if keepdims:
+                    out_axes.append(1)
+            else:
                 out_axes.append(shape[i])
         out_shape = Shape(out_axes)
 
-        # Output shape is same as input but without the reduced axis
-        out = Tensor[DType.int32].zeros(out_shape)
+        # --- Allocate output tensor ---
+        var out = Tensor[DType.int32].zeros(out_shape)
 
-        # Iterate over all indices of output shape
+        # --- Iterate over output indices ---
         for out_idx in out_shape.indices():
-            max_val = min_finite[dtype]()
-            max_pos = 0
+            var max_val = min_finite[dtype]()
+            var max_pos = 0
 
-            # Loop over reduced axis
+            # Determine the reduced index position to insert
             for idx in range(shape[ax]):
-                full_idx = out_idx.insert(ax, idx)
+                var full_idx = out_idx.insert(
+                    ax, idx
+                ) if not keepdims else out_idx.replace(ax, idx)
                 var val = tensor[full_idx]
                 if val > max_val:
                     max_val = val
                     max_pos = idx
-            out[out_idx] = max_pos
+
+            # For keepdims=True, write at [ax]=0
+            if keepdims:
+                var write_idx = out_idx.replace(ax, 0)
+                out[write_idx] = max_pos
+            else:
+                out[out_idx] = max_pos
 
         return out^
 
 
 fn main() raises:
     print("passes")
+
+
+from testing import assert_true

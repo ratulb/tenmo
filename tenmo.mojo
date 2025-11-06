@@ -39,6 +39,8 @@ from forwards import (
     Squeeze,
     Unsqueeze,
     Permute,
+    Argmax,
+    Argmin
 )
 from buffers import Buffer
 from validators import Validator
@@ -210,6 +212,16 @@ struct Tensor[dtype: DType = DType.float32](
         return self.buffer[indices]
 
     @always_inline
+    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
+        if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
+            panic(
+                "Tensor → __getitem__(IntList): Scalar tensor expects no"
+                " indices"
+            )
+        return self.buffer[indices]
+
+
+    @always_inline
     fn __getitem__(self, indices: IntArray) -> Scalar[dtype]:
         if self.rank() == 0 and indices.size() != 0:  # Tensor with Shape ()
             panic(
@@ -279,6 +291,15 @@ struct Tensor[dtype: DType = DType.float32](
         if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
             panic(
                 "Tensor → __setitem__(List[Int]): Scalar tensor expects no"
+                " indices"
+            )
+        self.buffer[indices] = value
+
+    @always_inline
+    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
+        if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
+            panic(
+                "Tensor → __setitem__(IntList): Scalar tensor expects no"
                 " indices"
             )
         self.buffer[indices] = value
@@ -1654,6 +1675,11 @@ struct Tensor[dtype: DType = DType.float32](
     ]:
         return Permute[dtype].forward[track_grad](self, axes, requires_grad)
 
+    fn argmax(self, axis: Int = 0, keepdims: Bool = False) -> Tensor[DType.int32]:
+        return Argmax[dtype].argmax(tensor=self, axis=axis, keepdims=keepdims)
+
+    fn argmin(self, axis: Int = 0, keepdims: Bool = False) -> Tensor[DType.int32]:
+        return Argmin[dtype].argmin(tensor=self, axis=axis, keepdims=keepdims)
 
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
@@ -1817,12 +1843,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         return Shuffle[dtype].forward[track_grad](
             self, perm, axis, requires_grad
         )
-
-    fn argmax(self, axis: Int = 0) -> Tensor[DType.int32]:
-        return Argmax[dtype].argmax(tensor=self, axis=axis)
-
-    fn argmin(self, axis: Int = 0) -> Tensor[DType.int32]:
-        return Argmin[dtype].argmin(tensor=self, axis=axis)
 
 
 
