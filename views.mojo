@@ -19,42 +19,29 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward(
+    fn backward2(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         parent = output.ancestry().get(0)
         gradbox = output.grad().copy()
-
-        parent_tensor = parent.tensor()
-        offset_delta = self.offset - parent_tensor.offset()
         parent_shape = parent.shape()
-        # Flat gradbox space
+
         parent_gradbox = Gradbox[dtype].zeros(
             Shape(parent_shape.num_elements())
         )
 
-        if parent_shape == Shape():
+        if parent_shape == Shape():  # Parent was a scalar Tensor
             parent_gradbox[IntArray()] = gradbox.item()
         else:
             var position = IntArray(size=1)
             var total_strides = len(self.strides)
 
             for coord in self.shape:
-                var parent_flat_index = offset_delta
+                var parent_flat_index = self.offset
                 for i in range(total_strides):
                     parent_flat_index += self.strides[i] * coord[i]
                 position[0] = parent_flat_index
                 parent_gradbox[position] += gradbox[coord]
-
-            # Correct approach:
-            _="""for coord in self.shape:
-                # Calculate absolute index in parent's storage
-                absolute_index = self.offset + (self.strides * coord).sum()
-                # Map to parent's gradbox (accounting for parent's own offset if it's a view)
-                parent_storage_index = absolute_index - parent_tensor.offset()
-                if 0 <= parent_storage_index < len(parent_gradbox):
-                    position[0] = parent_storage_index
-                    parent_gradbox[position] += gradbox[coord]"""
 
         var reshaped: Gradbox[dtype] = (
             parent_gradbox.reshape(parent_shape) if parent_shape != Shape()
@@ -62,16 +49,210 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
         )
         return [
             (parent^, reshaped^, AddTensor),
-            (
-                Ancestor(output),
-                gradbox^,
-                ZeroGrad,
-            ),  # Send a signal to zero out current 'output' tensor which is a view"""
+            (Ancestor(output), gradbox^, ZeroGrad),
+        ]
+
+    fn backward1(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        parent = output.ancestry().get(0)
+        gradbox = output.grad().copy()
+        parent_shape = parent.shape()
+        print("offsets: ", self.offset, parent.offset())
+
+        # parent_gradbox = Gradbox[dtype].zeros(Shape(parent_shape.num_elements()))
+        parent_gradbox = Gradbox[dtype].zeros(parent_shape)
+
+        if parent_shape == Shape():
+            parent_gradbox[IntArray()] = gradbox.item()
+        else:
+            var position = IntArray(size=parent_shape.rank())
+
+            for child_coord in self.shape:
+                # Compute absolute storage index
+                var abs_index = self.offset
+                for i in range(len(self.strides)):
+                    abs_index += self.strides[i] * child_coord[i]
+
+                # Convert absolute storage index to parent's LOGICAL coordinates
+                var remaining = (
+                    abs_index - parent.offset() if parent.offset()
+                    < self.offset else abs_index + parent.offset()
+                )
+                for i in range(parent_shape.rank()):
+                    parent_stride = parent.strides()[i]
+                    position[i] = remaining // parent_stride
+                    remaining = remaining % parent_stride
+
+                parent_gradbox[position] += gradbox[child_coord]
+
+        _ = """var reshaped: Gradbox[dtype] = (
+            parent_gradbox.reshape(parent_shape)
+            if parent_shape != Shape() and parent_shape != parent_gradbox.shape()
+            else parent_gradbox^
+        )"""
+        return [
+            (parent^, parent_gradbox^, AddTensor),
+            (Ancestor(output), gradbox^, ZeroGrad),
+        ]
+
+    fn backward3(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        parent = output.ancestry().get(0)
+        gradbox = output.grad().copy()
+        parent_shape = parent.shape()
+        parent_strides = parent.strides()
+
+        parent_gradbox = Gradbox[dtype].zeros(parent_shape)
+
+        if parent_shape == Shape():
+            parent_gradbox[IntArray()] = gradbox.item()
+        else:
+            var position = IntArray(size=parent_shape.rank())
+
+            for child_coord in self.shape:
+                # Compute absolute storage index from child coordinates
+                var abs_index = self.offset
+                for i in range(len(self.strides)):
+                    abs_index += self.strides[i] * child_coord[i]
+
+                # Skip if this absolute index is not within parent's storage region
+                if (
+                    abs_index < parent.offset()
+                    or abs_index > parent.max_index()
+                ):
+                    continue
+
+                # Convert absolute storage index to parent's LOGICAL coordinates
+                var remaining = abs_index - parent.offset()
+
+                # Simple coordinate conversion - assumes standard row-major parent
+                var valid = True
+                var temp_remaining = remaining
+
+                for i in range(parent_shape.rank()):
+                    stride = parent_strides[i]
+                    dim_size = parent_shape[i]
+
+                    # Calculate coordinate for this dimension
+                    var coord_val = temp_remaining // stride
+
+                    # Check if coordinate is valid
+                    if coord_val < 0 or coord_val >= dim_size:
+                        valid = False
+                        break
+
+                    position[i] = coord_val
+                    temp_remaining = temp_remaining % stride
+
+                # Final check - all remainder should be consumed
+                if valid and temp_remaining != 0:
+                    valid = False
+
+                if valid:
+                    parent_gradbox[position] += gradbox[child_coord]
+
+        return [
+            (parent^, parent_gradbox^, AddTensor),
+            (Ancestor(output), gradbox^, ZeroGrad),
+        ]
+
+    fn backward(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        parent = output.ancestry().get(0)
+        gradbox = output.grad().copy()
+        parent_shape = parent.shape()
+        parent_strides = parent.strides()
+        parent_offset = parent.offset()
+        parent_max_index = parent.max_index()
+
+        parent_gradbox = Gradbox[dtype].zeros(parent_shape)
+
+        if parent_shape == Shape():
+            parent_gradbox[IntArray()] = gradbox.item()
+        else:
+            var position = IntArray(size=parent_shape.rank())
+
+            for child_coord in self.shape:
+                # Compute absolute storage index
+                var abs_index = self.offset
+                for i in range(len(self.strides)):
+                    abs_index += self.strides[i] * child_coord[i]
+
+                # CRITICAL: PyTorch-style boundary check
+                if abs_index < parent_offset or abs_index > parent_max_index:
+                    continue  # Skip - not in parent's storage region
+
+                # Convert to parent's logical coordinates
+                var remaining = abs_index - parent_offset
+                var valid = True
+
+                for i in range(parent_shape.rank()):
+                    stride = parent_strides[i]
+                    dim_size = parent_shape[i]
+
+                    if stride == 0:
+                        position[i] = 0  # Broadcast dimension
+                    else:
+                        position[i] = remaining // stride
+                        # Check if coordinate is within parent's shape bounds
+                        if position[i] < 0 or position[i] >= dim_size:
+                            valid = False
+                            break
+                        remaining = remaining % stride
+
+                # Final check - no remainder and all coordinates valid
+                if valid and remaining == 0:
+                    parent_gradbox[position] += gradbox[child_coord]
+        return [
+            (parent^, parent_gradbox^, AddTensor),
+            (Ancestor(output), gradbox^, ZeroGrad),
+        ]
+
+    fn backward_conservative(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        parent = output.ancestry().get(0)
+        gradbox = output.grad().copy()
+        parent_shape = parent.shape()
+        parent_strides = parent.strides()
+
+        parent_gradbox = Gradbox[dtype].zeros(parent_shape)
+
+        if parent_shape == Shape():
+            parent_gradbox[IntArray()] = gradbox.item()
+        else:
+            var position = IntArray(size=parent_shape.rank())
+
+            for child_coord in self.shape:
+                # Compute absolute storage index
+                var abs_index = self.offset
+                for i in range(len(self.strides)):
+                    abs_index += self.strides[i] * child_coord[i]
+
+                # Convert to parent's logical coordinates
+                # Since we enforced boundaries, this MUST succeed
+                var remaining = abs_index - parent.offset()
+
+                for i in range(parent_shape.rank()):
+                    parent_stride = parent_strides[i]
+                    position[i] = remaining // parent_stride
+                    remaining = remaining % parent_stride
+
+                # With boundary enforcement, this should always be valid
+                parent_gradbox[position] += gradbox[child_coord]
+
+        return [
+            (parent^, parent_gradbox^, AddTensor),
+            (Ancestor(output), gradbox^, ZeroGrad),
         ]
 
 
 @register_passable
 struct View[dtype: DType](Copyable):
+    @always_inline
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -83,29 +264,34 @@ struct View[dtype: DType](Copyable):
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[dtype]:
-        # Validate parameters and compute absolute bounds
-        var abs_offset = Validator.validate_view_params(
-            self, shape, strides, offset
-        ) if not validated else offset
+        var abs_offset: Int
+        var abs_strides: Strides
+
+        if not validated:
+            (abs_offset, abs_strides) = Validator.validate_view_params(
+                self, shape, strides, offset
+            )
+
+        else:
+            abs_offset = offset
+            abs_strides = strides  # already absolute
+
         out = Tensor[dtype].build_view(
             self.address(),
             shape,
-            Optional(strides),
-            offset,
+            Optional(abs_strides),
+            abs_offset,
             requires_grad=False,
         )
 
         @parameter
         if track_grad:
-            grad_required = (
-                requires_grad.value() if requires_grad else self.requires_grad
-            )
+            grad_required = requires_grad.or_else(self.requires_grad)
 
             if grad_required:
                 out.requires_grad_(True)
-                # Store ABSOLUTE offset in ViewBackward for gradient scattering
                 backward_fn = ViewBackward[dtype](
-                    shape, strides, abs_offset  # Store ABSOLUTE offset
+                    shape, abs_strides, abs_offset
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)

@@ -27,6 +27,9 @@ alias Delegate[dtype: DType] = Variant[
     ViewBackward[dtype],
     TransposeBackward[dtype],
     DotBackward[dtype],
+    ExpandBackward[dtype],
+    ContiguousBackward[dtype],
+    FlattenBackward[dtype],
 ]
 
 
@@ -37,10 +40,10 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         self.grad_fn = grad_fn
 
     fn __moveinit__(out self, deinit other: Self):
-        self.grad_fn = other.grad_fn
+        self.grad_fn = other.grad_fn^
 
     fn __copyinit__(out self, other: Self):
-        self.grad_fn = other.grad_fn
+        self.grad_fn = other.grad_fn.copy()
 
     fn __call__(
         self, output: Tensor[dtype]
@@ -113,6 +116,15 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[DotBackward[dtype]]():
             return self.grad_fn[DotBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[ExpandBackward[dtype]]():
+            return self.grad_fn[ExpandBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[ContiguousBackward[dtype]]():
+            return self.grad_fn[ContiguousBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[FlattenBackward[dtype]]():
+            return self.grad_fn[FlattenBackward[dtype]].backward(output)
 
         else:
             panic("I am not here to receive you")

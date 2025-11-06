@@ -146,6 +146,13 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         return self.shared_buffer.value()[]
 
     @always_inline
+    fn size(self) -> Int:
+        if self.buffer:
+            return self.buffer.value().size
+        else:
+            return self.shared_buffer.value()[].size
+
+    @always_inline
     fn __getitem__(self, indices: IntArray) -> Scalar[dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
@@ -268,13 +275,13 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         if not self.shared():
             self.shared_buffer = Optional(self.buffer.unsafe_take().shared())
 
-        new_shape = shape.value() if shape else self.shape
-        absolute_offset = self.offset + offset
+        new_shape = shape.or_else(self.shape)
+        new_strides = strides.or_else(self.strides)
         return NDBuffer[dtype](
             shared_buffer=self.shared_buffer,
             shape=new_shape,
-            strides=strides,
-            offset=absolute_offset,
+            strides=new_strides,
+            offset=offset,
         )
 
     @always_inline
