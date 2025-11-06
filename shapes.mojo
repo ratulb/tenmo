@@ -156,8 +156,8 @@ struct Shape(
     @always_inline
     fn indices_of_axes_with_size(self, axis_size: Int) -> IntList:
         indices = IntList.with_capacity(len(self))
-        for i in self.axes_spans:
-            if self.axes_spans[i] == axis_size:
+        for i in range(len(self.axes_spans)):
+            if self[i] == axis_size:
                 indices.append(i)
         return indices^
 
@@ -329,7 +329,7 @@ fn main() raises:
         print()
         IntArrayHelper.print(extended)"""
     s = Shape(Shape(6, 2).num_elements())
-    print(len(Shape(2,3)))
+    print(len(Shape(2, 3)))
     for coord in s.indices():
         print(coord)
     pass
