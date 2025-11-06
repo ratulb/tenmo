@@ -558,6 +558,7 @@ struct Validator:
 
     @always_inline
     @staticmethod
+    #fn validate_view_params_absolute[
     fn validate_view_params[
         dtype: DType
     ](
@@ -624,7 +625,10 @@ struct Validator:
 
         return (offset, strides)
 
+    @always_inline
+    @staticmethod
     fn validate_view_params_conservative[
+    fn validate_view_params[
         dtype: DType
     ](
         this: Tensor[dtype],

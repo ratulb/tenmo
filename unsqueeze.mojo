@@ -1,31 +1,35 @@
-from tensors import Tensor
-from operators import AddTensor
-from shared import TensorLite
+from tenmo import Tensor
+from operators import AddTensor, ZeroGrad
 from intlist import IntList
 from shapes import Shape
 from strides import Strides
 from backpropagation import Delegate, BackwardFn
 from squeeze import Squeeze
 from common_utils import panic
+from gradbox import Gradbox
+from ancestry import Ancestor
 
 
 @fieldwise_init
-struct UnsqueezeBackward[dtype: DType](Copyable & Movable):
+@register_passable
+struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable):
     var axes: IntList  # where axes were inserted
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.grad()
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
         # Remove the axis we had inserted
-        gradients_squeezed = Squeeze[dtype].forward[track_grad=False](
-            gradients, self.axes, requires_grad=False
-        )
+        squeezed_gradbox = gradbox.squeeze(self.axes)
+
         ancestor = output.ancestry().get(0)
-        return [(ancestor, gradients_squeezed, AddTensor)]
+        return [
+            (ancestor^, squeezed_gradbox^, AddTensor),
+            (Ancestor(output), gradbox^, ZeroGrad),
+        ]
 
 
 @register_passable
@@ -39,11 +43,13 @@ struct Unsqueeze[dtype: DType]:
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
-        rank = tensor.shape.rank()
+        rank = tensor.rank()
+        original_shape = tensor.shape()
+        original_strides = tensor.strides()
         new_axes_count = len(axes)
 
         if new_axes_count == 0:
-            return tensor
+            return tensor.copy()
 
         new_rank = rank + new_axes_count
 
@@ -67,7 +73,6 @@ struct Unsqueeze[dtype: DType]:
         normalized_axes.sort()
 
         # Pre-allocate with exact capacity
-        new_rank = rank + new_axes_count
         var new_shape = IntList.with_capacity(new_rank)
         var new_strides = IntList.with_capacity(new_rank)
 
@@ -87,7 +92,7 @@ struct Unsqueeze[dtype: DType]:
                 # If inserting before existing dimensions, use stride of next dimension
                 # If inserting at the end, use stride 1
                 insert_stride = (
-                    tensor.strides[orig_axis_index] if orig_axis_index
+                    original_strides[orig_axis_index] if orig_axis_index
                     < rank else 1
                 )
 
@@ -96,33 +101,38 @@ struct Unsqueeze[dtype: DType]:
                 new_axis_index += 1
             else:
                 # Copy existing dimension
-                new_shape.append(tensor.shape[orig_axis_index])
-                new_strides.append(tensor.strides[orig_axis_index])
+                new_shape.append(original_shape[orig_axis_index])
+                new_strides.append(original_strides[orig_axis_index])
                 orig_axis_index += 1
 
         # Create the unsqueezed tensor
         shape = Shape(new_shape)
         strides = Strides(new_strides)
         out = Tensor[dtype].build_view(
-            tensor.address(), shape, strides, tensor.offset, False
+            tensor.address(),
+            shape,
+            strides,
+            tensor.offset(),
+            requires_grad=False,
         )
 
         @parameter
         if track_grad:
-            grad_required = (
-                requires_grad.value() if requires_grad else tensor.requires_grad
-            )
+            grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:
                 out.requires_grad_(True)
                 bfn = UnsqueezeBackward[dtype](
                     axes=normalized_axes
                 ).into_backward_fn()
-                out.backwardFn = Optional(bfn)
+                out.backwardFn = Optional(bfn^)
                 out.add_ancestry(tensor)
 
-        return out
+        return out^
 
 
-fn main():
-    print("passes")
+from testing import assert_true
+
+
+fn main() raises:
+    pass

@@ -31,6 +31,7 @@ alias Delegate[dtype: DType] = Variant[
     ContiguousBackward[dtype],
     FlattenBackward[dtype],
     SqueezeBackward[dtype],
+    UnsqueezeBackward[dtype],
 ]
 
 
@@ -129,6 +130,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[SqueezeBackward[dtype]]():
             return self.grad_fn[SqueezeBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[UnsqueezeBackward[dtype]]():
+            return self.grad_fn[UnsqueezeBackward[dtype]].backward(output)
 
         else:
             panic("I am not here to receive you")

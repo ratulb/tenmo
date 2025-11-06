@@ -37,6 +37,7 @@ from forwards import (
     Expand,
     Flatten,
     Squeeze,
+    Unsqueeze,
 )
 from buffers import Buffer
 from validators import Validator
@@ -1598,7 +1599,7 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     # Squeeze single axis if provided, otherwise squeeze all dims of size 1
-    fn squeeze[
+    fn squeeze1[
         track_grad: Bool = True
     ](
         self,
@@ -1610,6 +1611,31 @@ struct Tensor[dtype: DType = DType.float32](
             IntList(axis.value()) if axis else IntList(),
             requires_grad,
         )
+
+    fn unsqueeze[
+        track_grad: Bool = True
+    ](self, axis: Int, requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
+        return Unsqueeze[dtype].forward[track_grad](
+            self, IntList(axis), requires_grad
+        )
+
+    fn unsqueeze[
+        track_grad: Bool = True
+    ](
+        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
+    ) -> Tensor[dtype]:
+        return Unsqueeze[dtype].forward[track_grad](
+            self, IntList.new(axes), requires_grad
+        )
+
+    fn unsqueeze[
+        track_grad: Bool = True
+    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
+        return Unsqueeze[dtype].forward[track_grad](self, axes, requires_grad)
 
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
@@ -1712,30 +1738,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
     ]:
         return Permute[dtype].forward[track_grad](self, axes, requires_grad)
 
-    fn unsqueeze[
-        track_grad: Bool = True
-    ](self, axis: Int, requires_grad: Optional[Bool] = None) -> Tensor[
-        dtype
-    ]:
-        return Unsqueeze[dtype].forward[track_grad](
-            self, IntList(axis), requires_grad
-        )
-
-    fn unsqueeze[
-        track_grad: Bool = True
-    ](
-        self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
-    ) -> Tensor[dtype]:
-        return Unsqueeze[dtype].forward[track_grad](
-            self, IntList.new(axes), requires_grad
-        )
-
-    fn unsqueeze[
-        track_grad: Bool = True
-    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
-        dtype
-    ]:
-        return Unsqueeze[dtype].forward[track_grad](self, axes, requires_grad)
 
     fn softmax[
         track_grad: Bool = True
@@ -1992,9 +1994,10 @@ from testing import assert_true
 
 
 fn main() raises:
-    test_view_backward()
+    #test_view_backward()
     # test_complex_mixed_ops_backward()
     # test_slice_backward()
+    pass
 
 
 fn test_slice_backward() raises:

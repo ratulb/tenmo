@@ -27,8 +27,8 @@ from permute import PermuteBackward
 from dotproduct import DotBackward
 from vectormatrixmm import VectorMatrixMMBackward
 from matrixvectormm import MatrixVectorMMBackward
-from unsqueeze import UnsqueezeBackward, Unsqueeze
-from squeeze import SqueezeBackward, Squeeze
+from unsqueeze import UnsqueezeBackward
+from squeeze import SqueezeBackward
 from expand import ExpandBackward
 from minmax import MinMaxBackward, MinMax
 from shuffle import ShuffleBackward, Shuffle

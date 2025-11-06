@@ -3,6 +3,9 @@ from testing import assert_true
 from ndbuffer import NDBuffer
 from shapes import Shape
 from gradbox import Gradbox
+from unsqueeze import Unsqueeze
+from tenmo import Tensor
+from intlist import IntList
 
 fn main() raises:
     run = 1
@@ -13,6 +16,92 @@ fn main() raises:
         test_gradbox_reshape()
         test_gradbox_reverse_subtract()
         test_gradbox_reverse_division()
+        test_gradbox_squeeze_noop()
+        test_gradbox_squeeze_remove_all_singletons()
+        test_gradbox_squeeze_with_axes_list()
+        test_gradbox_squeeze_preserves_value_semantics()
+        test_gradbox_squeeze_after_broadcast_and_sum_over_broadcasted_axes()
+        test_gradbox_squeeze_integration_with_unsqueeze_backward()
+        test_gradbox_squeeze_chain_of_ops()
+
+fn test_gradbox_squeeze_noop() raises:
+    print("test_gradbox_squeeze_noop")
+    var g = Gradbox[DType.float32].zeros(Shape.of(2, 3), share=False)
+    var s = g.squeeze()  # no size-1 axes -> should be same shape
+    assert_true(s.shape() == Shape.of(2, 3))
+    # values unchanged
+    assert_true(s.all_close(g.as_tensor(requires_grad=False)))
+
+fn test_gradbox_squeeze_remove_all_singletons() raises:
+    print("test_gradbox_squeeze_remove_all_singletons")
+    var g = Gradbox[DType.float32](
+        NDBuffer[DType.float32].full(Shape.of(1, 3, 1), Scalar[DType.float32](1.0)), share=False
+    )
+    var s = g.squeeze()  # should remove axes 0 and 2 -> shape (3,)
+    assert_true(s.shape() == Shape.of(3))
+    # round-trip via tensor to validate ordering & values
+    assert_true(s.as_tensor(requires_grad=False).all_close(Tensor.d1([1, 1, 1])))
+
+fn test_gradbox_squeeze_with_axes_list() raises:
+    print("test_gradbox_squeeze_with_axes_list")
+    var g = Gradbox[DType.float32](
+        NDBuffer[DType.float32].full(Shape.of(2, 1, 3), Scalar[DType.float32](2.0)), share=False
+    )
+    # specify axis 1 to squeeze -> shape becomes (2,3)
+    var s = g.squeeze(IntList([1]))
+    assert_true(s.shape() == Shape.of(2, 3))
+    # values preserved
+    assert_true(s.as_tensor(requires_grad=False).all_close(Tensor.d2([[2, 2, 2], [2, 2, 2]])))
+
+fn test_gradbox_squeeze_preserves_value_semantics() raises:
+    print("test_gradbox_squeeze_preserves_value_semantics")
+    # create non-shared gradbox and squeeze; result must not be shared (share=False semantics)
+    var g = Gradbox[DType.float32].full(Shape.of(1, 2, 1), Scalar[DType.float32](3.0), share=False)
+    assert_true(g.shared() == False)
+    var s = g.squeeze()
+    assert_true(s.shared() == False)
+    assert_true(s.shape() == Shape.of(2))
+    assert_true(s.as_tensor(requires_grad=False).all_close(Tensor.d1([3, 3])))
+
+fn test_gradbox_squeeze_after_broadcast_and_sum_over_broadcasted_axes() raises:
+    print("test_gradbox_squeeze_after_broadcast_and_sum_over_broadcasted_axes")
+    var base = Gradbox[DType.float32](
+        NDBuffer[DType.float32].full(Shape.of(1, 3, 1), Scalar[DType.float32](1.0)), share=False
+    )
+    # broadcast to (2,3,4)
+    var broadcasted = base.broadcast_to(Shape.of(2, 3, 4), share=False)
+    # sum over broadcasted axes back to (1,3,1) -- uses NDBuffer.sum_over_broadcasted_axes
+    var collapsed = Gradbox[DType.float32].sum_over_broadcasted_axes(broadcasted, Shape.of(1, 3, 1))
+    # then squeeze to (3,)
+    var s = collapsed.squeeze()
+    assert_true(s.shape() == Shape.of(3))
+    # expected values: each element should equal number of elements contributed along collapsed axes
+    # broadcasted values were all 1.0; summed down to (1,3,1) from (2,3,4) -> multiplier = 2*4 = 8
+    assert_true(s.as_tensor(requires_grad=False).all_close(Tensor.d1([8.0, 8.0, 8.0]).float()))
+
+fn test_gradbox_squeeze_integration_with_unsqueeze_backward() raises:
+    print("test_gradbox_squeeze_integration_with_unsqueeze_backward")
+    # This verifies behaviour of Unsqueeze.backward: gradient of the unsqueezed tensor
+    # should be reduced (squeezed) back to original shape. Behaviourally this uses Gradbox.squeeze().
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)  # shape (2,2)
+    # Unsqueeze axes [0, 2] -> new rank = 4, shape (1, 2, 1, 2)
+    var u = Unsqueeze.forward[track_grad=True](a, IntList([0, 2]), requires_grad=None)
+    # do a simple op and backward
+    var out = u.sum()
+    out.backward()
+    # after backward, a.grad() should be ones of original shape because sum reduces to ones
+    assert_true(a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]])))
+
+fn test_gradbox_squeeze_chain_of_ops() raises:
+    print("test_gradbox_squeeze_chain_of_ops")
+    # chain: Tensor -> Unsqueeze -> some ops -> backward uses Gradbox.squeeze internally
+    var a = Tensor.d3([[[1.0, 2.0]]], requires_grad=True)  # shape (1,1,2)
+    var u = Unsqueeze.forward[track_grad=True](a, IntList([0, 2]), requires_grad=None)
+    var v = u * 3.0
+    var loss = v.sum()
+    loss.backward()
+    # grad should be 3.0 in the original shape (1,1,2)
+    assert_true(a.grad().all_close(Tensor.d3([[[3.0, 3.0]]])))
 
 
 fn test_gradbox_reverse_division() raises:

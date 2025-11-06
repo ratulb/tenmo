@@ -61,6 +61,46 @@ struct Gradbox[dtype: DType](
         )
         return Gradbox[dtype](nd_buffer^, share=False)
 
+    @always_inline
+    fn squeeze(self, axes: IntList = IntList()) -> Gradbox[dtype]:
+        shape = self.shape()
+        rank = shape.rank()
+
+        # Validate axes
+        var validated_axes = IntList()
+        if axes.len() == 0:
+            # Default: squeeze all dimensions with size 1
+            for i in range(rank):
+                if shape[i] == 1:
+                    validated_axes.append(i)
+        else:
+            validated_axes = Validator.validate_and_normalize_axes(
+                shape, axes, ordered=True
+            )
+
+            # ensure all are truly size-1 dimensions
+            for ax in validated_axes:
+                if shape[ax] != 1:
+                    panic(
+                        "Gradbox.squeeze(): cannot squeeze non-unit dimension "
+                        + ax.__str__()
+                        + " (size="
+                        + shape[ax].__str__()
+                        + ")"
+                    )
+
+        # construct new shape
+        var new_dims = IntList()
+        for i in range(rank):
+            if i not in validated_axes:
+                new_dims.append(shape[i])
+
+        var new_shape = Shape(new_dims)
+        var buffer = self.buffer.contiguous_buffer()
+        var nd_buffer = NDBuffer[dtype](buffer^, new_shape^)
+
+        return Gradbox[dtype](nd_buffer^, share=False)
+
     @staticmethod
     @always_inline
     fn full(
@@ -420,15 +460,7 @@ struct Gradbox[dtype: DType](
         _ = self.buffer^
 
 
-
-
 fn main() raises:
     run = 1
     for _ in range(run):
         pass
-    pass
-
-from testing import assert_true
-
-
-
