@@ -1,44 +1,27 @@
-from tensors import Tensor
-from shared import TensorLite
+from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
-from shapes import Shape
-from intlist import IntList
 from common_utils import panic
-from buffers import Buffer
+from ancestry import Ancestor
+from gradbox import Gradbox
 
 
 @fieldwise_init
 @register_passable
-struct FlattenBackward[dtype: DType](Copyable):
-    var start_dim: Int
-    var end_dim: Int
-
+struct FlattenBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.gradients()[]
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         ancestor = output.ancestry().get(0)
-        tensor = ancestor.tensor()
-        grad_in = Tensor[dtype].zeros(tensor.shape)
-
-        # fast contiguous path
-        if tensor.is_contiguous():
-            n = gradients.shape.num_elements()
-            for i in range(n):
-                grad_in.buffer[i] = gradients.buffer[i]
-        else:
-            out_numels = gradients.shape.num_elements()
-            for flat_idx in range(out_numels):
-                idx = tensor.shape.unravel_index(flat_idx)
-                grad_in[idx] = gradients[flat_idx]
-
-        gradients.free()
-        tensor.free()
-        return [(ancestor, grad_in^, AddTensor)]
+        ancestor_shape = ancestor.shape()
+        # Just reshape gradient back to original
+        var reshaped_grad = output.grad().reshape(ancestor_shape)
+        return [
+            (ancestor^, reshaped_grad^, AddTensor),
+        ]
 
 
 @register_passable
@@ -55,41 +38,18 @@ struct Flatten[dtype: DType]:
         rank = self.rank()
         var endd = end_dim.value() if end_dim else rank - 1
         if endd < start_dim:
-            panic("Flatten: end_dim must be >= start_dim")
+            panic("Flatten → end_dim must be >= start_dim")
 
+        var original_shape = self.shape()
         # compute new shape
-        var new_shape = IntList()
-        for i in range(start_dim):
-            new_shape.append(self.shape[i])
-
-        var flat_dim = 1
-        for i in range(start_dim, endd + 1):
-            flat_dim *= self.shape[i]
-        new_shape.append(flat_dim)
-
-        for i in range(endd + 1, rank):
-            new_shape.append(self.shape[i])
-
-        var buffer: Buffer[dtype]
-        shape = Shape(new_shape)
-        numels = shape.num_elements()
-        offset = self.offset
-        this_buffer = self.data()
-
-        # fast path: contiguous
-        if self.is_contiguous():
-            if self.owns_data:
-                buffer = this_buffer
-            else:
-                buffer = this_buffer[offset : offset + numels]
-        else:
-            var flat_idx = 0
-            buffer = Buffer[dtype](numels)
-            for _, value in self:
-                buffer[flat_idx] = value
-                flat_idx += 1
-
-        out = Tensor[dtype](shape, buffer^, requires_grad=False)
+        collapsed = original_shape[start_dim : endd + 1].product()
+        new_shape = (
+            original_shape[:start_dim]
+            + [collapsed]
+            + original_shape[endd + 1 :]
+        )
+        nd_buffer = self.buffer.contiguous(new_shape)
+        out = Tensor[dtype](nd_buffer^, requires_grad=False)
 
         # autograd hookup
         @parameter
@@ -99,14 +59,12 @@ struct Flatten[dtype: DType]:
             )
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = FlattenBackward[dtype](
-                    start_dim, endd
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn)
+                backward_fn = FlattenBackward[dtype]().into_backward_fn()
+                out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
-        return out
+        return out^
 
 
-fn main():
-    print("passes")
+fn main() raises:
+    pass
