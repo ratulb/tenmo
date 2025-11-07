@@ -30,6 +30,106 @@ fn main() raises:
         test_gradbox_permute_singleton_dims()
         test_gradbox_permute_high_rank()
 
+        test_gradbox_unsqueeze_basic()
+        test_gradbox_squeeze_basic()
+        test_gradbox_squeeze_unsqueeze_symmetry()
+        test_gradbox_unsqueeze_negative_axes()
+        test_gradbox_squeeze_unsqueeze_multiple_axes()
+
+
+
+fn test_gradbox_unsqueeze_basic() raises:
+    print("test_gradbox_unsqueeze_basic")
+    alias dtype = DType.float32
+    var g = Gradbox[dtype].arange(6).reshape(Shape(2, 3))
+
+    var g1 = g.unsqueeze([0])
+    var g2 = g.unsqueeze([-1])
+    var g3 = g.unsqueeze([0, 2])
+
+    assert_true(g1.shape() == Shape(1, 2, 3))
+    assert_true(g2.shape() == Shape(2, 3, 1))
+    assert_true(g3.shape() == Shape(1, 2, 1, 3))
+
+    assert_true(g.flatten() == g1.flatten())
+    assert_true(g.flatten() == g2.flatten())
+    assert_true(g.flatten() == g3.flatten())
+
+    print("✓ Passed unsqueeze basic test")
+
+
+fn test_gradbox_squeeze_basic() raises:
+    print("test_gradbox_squeeze_basic")
+    alias dtype = DType.float32
+    var g = Gradbox[dtype].arange(6).reshape(Shape(1, 2, 3, 1))
+
+    var g1 = g.squeeze()
+    var g2 = g.squeeze([0])
+    var g3 = g.squeeze([-1])
+    var g4 = g.squeeze([0, -1])
+
+    assert_true(g1.shape() == Shape(2, 3))
+    assert_true(g2.shape() == Shape(2, 3, 1))
+    assert_true(g3.shape() == Shape(1, 2, 3))
+    assert_true(g4.shape() == Shape(2, 3))
+
+    assert_true(g.flatten() == g1.flatten())
+    assert_true(g.flatten() == g2.flatten())
+    assert_true(g.flatten() == g3.flatten())
+    assert_true(g.flatten() == g4.flatten())
+
+    print("✓ Passed squeeze basic test")
+
+
+fn test_gradbox_squeeze_unsqueeze_symmetry() raises:
+    print("test_gradbox_squeeze_unsqueeze_symmetry")
+    alias dtype = DType.float32
+    var g = Gradbox[dtype].arange(12).reshape(Shape(2, 3, 2))
+
+    var u = g.unsqueeze([0, 3])
+    var s = u.squeeze()
+
+    assert_true(g.shape() == s.shape())
+    assert_true(g.flatten() == s.flatten())
+
+    print("✓ Passed squeeze-unsqueeze symmetry test")
+
+
+fn test_gradbox_unsqueeze_negative_axes() raises:
+    print("test_gradbox_unsqueeze_negative_axes")
+    alias dtype = DType.float32
+    var g = Gradbox[dtype].arange(4).reshape(Shape(2, 2))
+
+    var g1 = g.unsqueeze([-1])
+    var g2 = g.unsqueeze([-2])
+    var g3 = g.unsqueeze([-3])  # should prepend
+
+    assert_true(g1.shape() == Shape(2, 2, 1))
+    assert_true(g2.shape() == Shape(2, 1, 2))
+    assert_true(g3.shape() == Shape(1, 2, 2))
+
+    assert_true(g.flatten() == g1.flatten())
+    assert_true(g.flatten() == g2.flatten())
+    assert_true(g.flatten() == g3.flatten())
+
+    print("✓ Passed unsqueeze negative axes test")
+
+
+fn test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
+    print("test_gradbox_squeeze_unsqueeze_multiple_axes")
+    alias dtype = DType.float32
+    var g = Gradbox[dtype].arange(8).reshape(Shape(1, 2, 1, 4, 1))
+
+    var s = g.squeeze([0, 2, 4])
+    assert_true(s.shape() == Shape(2, 4))
+    var u = s.unsqueeze([0, 2, 4])
+    assert_true(u.shape() == g.shape())
+
+    assert_true(g.flatten() == s.flatten())
+    assert_true(s.flatten() == u.flatten())
+
+    print("✓ Passed squeeze-unsqueeze multiple axes test")
+
 
 fn test_gradbox_permute_basic() raises:
     alias dtype = DType.float32

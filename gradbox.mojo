@@ -68,8 +68,16 @@ struct Gradbox[dtype: DType](
         nd_buffer = NDBuffer[dtype].arange(args)
         return Gradbox[dtype](nd_buffer^, share=False)
 
+    fn flatten(self, start_dim: Int=0, end_dim: Optional[Int] = None) -> Gradbox[dtype]:
+        flattened_buffer = self.buffer.flatten(start_dim, end_dim)
+        return Gradbox[dtype](flattened_buffer^, share=False)
+
     @always_inline
-    fn squeeze(self, axes: IntList = IntList()) -> Gradbox[dtype]:
+    fn squeeze(self, axes: List[Int]=[]) -> Gradbox[dtype]:
+        return self.squeeze(IntList(axes))
+
+    @always_inline
+    fn squeeze(self, axes: IntList) -> Gradbox[dtype]:
         shape = self.shape()
         rank = shape.rank()
 
@@ -107,6 +115,9 @@ struct Gradbox[dtype: DType](
         var nd_buffer = NDBuffer[dtype](buffer^, new_shape^)
 
         return Gradbox[dtype](nd_buffer^, share=False)
+
+    fn unsqueeze(self, axes: List[Int]) -> Self:
+        return self.unsqueeze(IntList(axes))
 
     fn unsqueeze(self, axes: IntList) -> Self:
         var rank = self.rank()
@@ -217,7 +228,7 @@ struct Gradbox[dtype: DType](
         return self.buffer.shared()
 
     @always_inline
-    fn sum(self, axes: IntList, keepdims: Bool) -> Gradbox[dtype]:
+    fn sum(self, axes: IntList=IntList(), keepdims: Bool=False) -> Gradbox[dtype]:
         var nd_buffer = self.buffer.sum(reduction_axes=axes, keepdims=keepdims)
         return Gradbox[dtype](nd_buffer^, share=False)
 
@@ -470,11 +481,30 @@ struct Gradbox[dtype: DType](
     ](self, other: Self) -> Bool:
         constrained[
             dtype.is_floating_point(),
-            "Gradbox → all_close is for floating point data types only",
+            "Gradbox → all_close(Self): is for floating point data types only",
         ]()
         if self.shape() != other.shape():
             panic(
-                "Gradbox → all_close expects same shaped gradboxes: "
+                    "Gradbox → all_close(Self): expects same shaped gradboxes: "
+                + self.shape().__str__()
+                + ", "
+                + other.shape().__str__()
+            )
+
+        return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
+
+
+    fn all_close[
+        rtol: Scalar[dtype] = 1e-5,
+        atol: Scalar[dtype] = 1e-8,
+    ](self, other: Tensor[dtype]) -> Bool:
+        constrained[
+            dtype.is_floating_point(),
+            "Gradbox → all_close(Tensor): is for floating point data types only",
+        ]()
+        if self.shape() != other.shape():
+            panic(
+                    "Gradbox → all_close(Tensor): expects same shaped tensor: "
                 + self.shape().__str__()
                 + ", "
                 + other.shape().__str__()
@@ -516,24 +546,6 @@ struct Gradbox[dtype: DType](
         return (
             self.buffer.compare[Equal](tensor.buffer).buffer.value().all_true()
         )
-
-    fn all_close[
-        rtol: Scalar[dtype] = 1e-5,
-        atol: Scalar[dtype] = 1e-8,
-    ](self, other: Tensor[dtype]) -> Bool:
-        constrained[
-            dtype.is_floating_point(),
-            "Gradbox → all_close is for floating point data types only",
-        ]()
-        if self.shape() != other.shape():
-            panic(
-                "Gradbox → all_close expects same shaped Tensor: "
-                + self.shape().__str__()
-                + ", "
-                + other.shape().__str__()
-            )
-
-        return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(

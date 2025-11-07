@@ -131,6 +131,15 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         var buffer = Buffer[dtype].full(scalar, shape.num_elements())
         return NDBuffer[dtype](buffer^, shape)
 
+    @staticmethod
+    @always_inline
+    fn arange(
+        args: VariadicList[Scalar[dtype]],
+    ) -> NDBuffer[dtype]:
+        var buffer = Buffer[dtype].arange(args)
+        var shape = Shape(buffer.size)
+        return NDBuffer[dtype](buffer^, shape^)
+
     @always_inline
     fn is_contiguous(self) -> Bool:
         return self.strides.is_contiguous(self.shape)
@@ -298,7 +307,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
 
     @always_inline
     fn contiguous(self, new_shape: Optional[Shape] = None) -> NDBuffer[dtype]:
-        shape = new_shape.value() if new_shape else self.shape
+        shape = new_shape.or_else(self.shape)
         return NDBuffer[dtype](self.contiguous_buffer(), shape)
 
     @always_inline
@@ -370,6 +379,29 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
                 out[out_coord] = accum_sum
 
         return out^
+
+    fn flatten(
+        self,
+        start_dim: Int = 0,
+        end_dim: Optional[Int] = None,
+    ) -> NDBuffer[dtype]:
+        rank = self.rank()
+        if rank == 0:
+            return self.contiguous()
+        var endd = end_dim.or_else(rank - 1)
+
+        if endd < start_dim:
+            panic("NDBuffer → flatten: end_dim must be >= start_dim")
+
+        var original_shape = self.shape
+        # compute new shape
+        collapsed = original_shape[start_dim : endd + 1].product()
+        new_shape = (
+            original_shape[:start_dim]
+            + [collapsed]
+            + original_shape[endd + 1 :]
+        )
+        return self.contiguous(new_shape)
 
     @always_inline
     fn contiguous_buffer(self) -> Buffer[dtype]:
@@ -932,11 +964,12 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         )
 
     @always_inline
-    fn element_at(self, index: Int) -> Scalar[dtype]:
+    fn __getitem__(self, index: Int) -> Scalar[dtype]:
         idx = index + self.max_index() if index < 0 else index
         if idx < 0 or idx > self.max_index():
             panic(
-                "NDBuffer → element_at: index out of bounds.",
+                # "NDBuffer → element_at: index out of bounds.",
+                "NDBuffer → __getitem__(int): index out of bounds.",
                 "NDBuffer max index",
                 self.max_index().__str__(),
                 ", provided index",
@@ -965,4 +998,5 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
 
 
 fn main() raises:
+    #alias dtype = DType.float32
     pass

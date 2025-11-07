@@ -34,6 +34,9 @@ alias Delegate[dtype: DType] = Variant[
     UnsqueezeBackward[dtype],
     PermuteBackward[dtype],
     ShuffleBackward[dtype],
+    ReLUBackward[dtype],
+    MinMaxBackward[dtype],
+    SoftmaxBackward[dtype],
 ]
 
 
@@ -58,6 +61,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[ReshapeBackward[dtype]]():
             return self.grad_fn[ReshapeBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[SoftmaxBackward[dtype]]():
+            return self.grad_fn[SoftmaxBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[TransposeBackward[dtype]]():
             return self.grad_fn[TransposeBackward[dtype]].backward(output)
@@ -141,6 +147,12 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[ShuffleBackward[dtype]]():
             return self.grad_fn[ShuffleBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[ReLUBackward[dtype]]():
+            return self.grad_fn[ReLUBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[MinMaxBackward[dtype]]():
+            return self.grad_fn[MinMaxBackward[dtype]].backward(output)
 
         else:
             panic("I am not here to receive you")

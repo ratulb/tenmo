@@ -1,64 +1,64 @@
-from tensors import Tensor
-from shared import TensorLite
+from tenmo import Tensor
 from operators import AddTensor
 from backpropagation import Delegate, BackwardFn
+from ancestry import Ancestor
+from gradbox import Gradbox
 
 
 @fieldwise_init
 @register_passable
-struct ReLUBackward[dtype: DType](Copyable):
+struct ReLUBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
     fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        gradients = output.gradients()[]
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        gradbox = output.grad().copy()
         ancestor = output.ancestry().get(0)
-        this = output.tensor()
-        shape = this.shape
-        grad_share = Tensor[dtype].ones(shape)
-        zero = Scalar[dtype](0)
-        for indices in shape:
-            grad_share[indices] = (
-                gradients[indices] if this[indices] > zero else zero
-            )
-        this.free()
-        gradients.free()
-        return [(ancestor, grad_share, AddTensor)]
+        input_tensor = ancestor.tensor()
+        shape = ancestor.shape()
+        gradbox_ancestor = Gradbox[dtype].zeros(
+            shape, share=False
+        )
+        var zero = Scalar[dtype](0)
+        for coord in shape:
+            if input_tensor[coord] > zero:
+                gradbox_ancestor[coord] = gradbox[coord]
+
+        return [(ancestor^, gradbox_ancestor^, AddTensor)]
 
 
 @fieldwise_init
 @register_passable
 struct ReLU[dtype: DType]:
     @staticmethod
-    fn forward(
+    fn forward[
+        track_grad: Bool = True
+    ](
         self: Tensor[dtype],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        shape = self.shape
-        out = Tensor[dtype].zeros(shape)
+    ) -> Tensor[
+        dtype
+    ]:
+        shape = self.shape()
+        out = Tensor[dtype].zeros(shape, requires_grad=False)
         zero = Scalar[dtype](0)
-        for indices in shape:
-            out[indices] = self[indices] if self[indices] > zero else zero
-        grad_required = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
-        if grad_required:
-            out.requires_grad_(True)
-            backward_fn = ReLUBackward[dtype]().into_backward_fn()
-            out.backwardFn = Optional(backward_fn)
-            out.add_ancestry(self)
+        for coord in shape:
+            out[coord] = self[coord] if self[coord] > zero else zero
 
-        return out
+        @parameter
+        if track_grad:
+            grad_required = requires_grad.or_else(self.requires_grad)
+
+            if grad_required:
+                out.requires_grad_(True)
+                backward_fn = ReLUBackward[dtype]().into_backward_fn()
+                out.backwardFn = Optional(backward_fn^)
+                out.add_ancestry(self)
+
+        return out^
 
 
-fn main():
-    a = Tensor.arange(5, requires_grad=True)
-    out = a.relu()
-    out.print()
-    print()
-    out.backward()
-    a.gradbox[].print()
-    print()
+fn main() raises:
     print("passes")

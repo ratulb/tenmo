@@ -20,7 +20,8 @@ from flatten import Flatten
 from squeeze import Squeeze
 from unsqueeze import Unsqueeze
 from shuffle import Shuffle
-
-
+from relu import ReLU
+from minmax import MinMax
+from softmax import Softmax
 fn main():
     pass

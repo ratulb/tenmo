@@ -30,10 +30,10 @@ from matrixvectormm import MatrixVectorMMBackward
 from unsqueeze import UnsqueezeBackward
 from squeeze import SqueezeBackward
 from expand import ExpandBackward
-from minmax import MinMaxBackward, MinMax
+from minmax import MinMaxBackward
 from shuffle import ShuffleBackward
-from relu import ReLUBackward, ReLU
-from softmax import SoftmaxBackward, Softmax
+from relu import ReLUBackward
+from softmax import SoftmaxBackward
 from crossentropy import CrossEntropyBackward, CrossEntropyLoss
 from repeat import RepeatBackward, Repeat
 from tiles import TileBackward, Tile

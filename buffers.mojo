@@ -588,6 +588,11 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     @staticmethod
     fn arange(args: VariadicList[Scalar[dtype]]) -> Buffer[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Buffer → arange is for numeric data types only",
+        ]()
+
         start: Scalar[dtype] = 0
         end: Scalar[dtype] = max_finite[dtype]()
         step: Scalar[dtype] = 1

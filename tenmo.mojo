@@ -3,7 +3,7 @@
 from math import exp, floor
 from random import seed, random_float64
 from sys import simd_width_of
-from utils.numerics import max_finite, min_finite
+from utils.numerics import min_finite
 from memory import memcpy, memset, memset_zero, ArcPointer
 from shapes import Shape, ShapeIndexIterator
 from intlist import IntList
@@ -42,6 +42,9 @@ from forwards import (
     Argmax,
     Argmin,
     Shuffle,
+    ReLU,
+    MinMax,
+    Softmax,
 )
 from buffers import Buffer
 from validators import Validator
@@ -627,48 +630,7 @@ struct Tensor[dtype: DType = DType.float32](
         *args: Scalar[dtype],
         requires_grad: Bool = False,
     ) -> Tensor[dtype]:
-        start: Scalar[dtype] = 0
-        end: Scalar[dtype] = max_finite[dtype]()
-        step: Scalar[dtype] = 1
-
-        n = len(args)
-        if n == 1:
-            end = args[0]
-        elif n == 2:
-            start = args[0]
-            end = args[1]
-        elif n == 3:
-            start = args[0]
-            end = args[1]
-            step = args[2]
-        else:
-            panic(
-                "Tensor.arange expects 1 to 3 arguments:\n"
-                + "- arange(end)\n"
-                + "- arange(start, end)\n"
-                + "- arange(start, end, step)\n"
-                + "Got: "
-                + String(len(args))
-                + " argument(s)"
-            )
-
-        if step == 0:
-            panic("step can not be zero")
-        if (step > 0 and start >= end) or (step < 0 and start <= end):
-            panic("Invalid range for the given step")
-        delta = end - start
-        size = floor(delta / step)
-        if size <= 0:
-            panic("Error: computed arange size is zero")
-        count = size.__int__()
-        buffer = Buffer[dtype](count)
-
-        var value = start
-        for i in range(count):
-            buffer[i] = value
-            value += step
-
-        nd_buffer = NDBuffer[dtype](buffer^, Shape([count]))
+        nd_buffer = NDBuffer[dtype].arange(args)
         tensor = Tensor[dtype](nd_buffer^, requires_grad=requires_grad)
         return tensor^
 
@@ -1464,14 +1426,6 @@ struct Tensor[dtype: DType = DType.float32](
             num_last=num_last,
         )
 
-    # Always use this to print grad to avoid surprises of segmentation fault!
-    fn gprint(self, num_first: Int = 10, num_last: Int = 10):
-        if not self.requires_grad:
-            print("Tensor is non-differentiable")
-        elif self.requires_grad and not self.has_grad():
-            print("Requires grad but grad not initialized")
-        else:
-            self.grad().print(num_first, num_last)
 
     fn __del__(deinit self):
         _ = self.buffer^
@@ -1500,7 +1454,8 @@ struct Tensor[dtype: DType = DType.float32](
         return ElemIterator[dtype, origin_of(self)](Pointer(to=self))
 
     fn element_at(self, index: Int) -> Scalar[dtype]:
-        return self.buffer.element_at(index)
+    #fn __getitem__(self, index: Int) -> Scalar[dtype]:
+        return self.buffer[index]
 
     fn view[
         track_grad: Bool = True
@@ -1682,6 +1637,43 @@ struct Tensor[dtype: DType = DType.float32](
     fn argmin(self, axis: Int = 0, keepdims: Bool = False) -> Tensor[DType.int32]:
         return Argmin[dtype].argmin(tensor=self, axis=axis, keepdims=keepdims)
 
+    fn max(
+        self,
+        axes: List[Int] = [],
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return MinMax[dtype].forward[True](
+            self, IntList.new(axes), keepdims, requires_grad
+        )
+
+    fn max(
+        self,
+        axes: IntList,
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return MinMax[dtype].forward[True](self, axes, keepdims, requires_grad)
+
+    fn min(
+        self,
+        axes: List[Int] = [],
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return MinMax[dtype].forward[False](
+            self, IntList.new(axes), keepdims, requires_grad
+        )
+
+    fn min(
+        self,
+        axes: IntList,
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return MinMax[dtype].forward[False](self, axes, keepdims, requires_grad)
+
+
     fn shuffle[
         track_grad: Bool = True
     ](
@@ -1694,6 +1686,33 @@ struct Tensor[dtype: DType = DType.float32](
             self, perm, axis, requires_grad
         )
 
+    fn relu(
+        self,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return ReLU[dtype].forward(self, requires_grad)
+
+    fn softmax[
+        track_grad: Bool = True
+    ](
+        self,
+        axes: List[Int] = [],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Softmax[dtype].forward[track_grad](
+            self, IntList.new(axes), requires_grad
+        )
+
+    fn softmax[
+        track_grad: Bool = True
+    ](
+        self,
+        axes: IntList,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[
+        dtype
+    ]:
+        return Softmax[dtype].forward[track_grad](self, axes, requires_grad)
 
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
@@ -1781,73 +1800,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
 
 
 
-
-    fn softmax[
-        track_grad: Bool = True
-    ](
-        self,
-        axes: List[Int] = [],
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return Softmax[dtype].forward[track_grad](
-            self, IntList.new(axes), requires_grad
-        )
-
-    fn softmax[
-        track_grad: Bool = True
-    ](
-        self,
-        axes: IntList,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[
-        dtype
-    ]:
-        return Softmax[dtype].forward[track_grad](self, axes, requires_grad)
-
-    fn max(
-        self,
-        axes: List[Int] = [],
-        keepdims: Bool = False,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return MinMax[dtype].forward[True](
-            self, IntList.new(axes), keepdims, requires_grad
-        )
-
-    fn max(
-        self,
-        axes: IntList,
-        keepdims: Bool = False,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return MinMax[dtype].forward[True](self, axes, keepdims, requires_grad)
-
-    fn min(
-        self,
-        axes: List[Int] = [],
-        keepdims: Bool = False,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return MinMax[dtype].forward[False](
-            self, IntList.new(axes), keepdims, requires_grad
-        )
-
-    fn min(
-        self,
-        axes: IntList,
-        keepdims: Bool = False,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return MinMax[dtype].forward[False](self, axes, keepdims, requires_grad)
-
-    fn relu(
-        self,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return ReLU[dtype].forward(self, requires_grad)
-
-
-
     fn matmul[
         track_grad: Bool = True, simd_width: Int = simd_width_of[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
@@ -1872,7 +1824,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
     ) -> Tensor[dtype]:
         return Matmul_nd[dtype].forward[track_grad](A, B, requires_grad)
-
 
 
     fn into_view[
@@ -2022,6 +1973,8 @@ fn main() raises:
     #test_view_backward()
     # test_complex_mixed_ops_backward()
     # test_slice_backward()
+    a = Tensor.arange(2, 12, 3)
+    a.print()
     pass
 
 
