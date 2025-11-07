@@ -31,7 +31,7 @@ from unsqueeze import UnsqueezeBackward
 from squeeze import SqueezeBackward
 from expand import ExpandBackward
 from minmax import MinMaxBackward, MinMax
-from shuffle import ShuffleBackward, Shuffle
+from shuffle import ShuffleBackward
 from relu import ReLUBackward, ReLU
 from softmax import SoftmaxBackward, Softmax
 from crossentropy import CrossEntropyBackward, CrossEntropyLoss

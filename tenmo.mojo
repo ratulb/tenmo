@@ -40,7 +40,8 @@ from forwards import (
     Unsqueeze,
     Permute,
     Argmax,
-    Argmin
+    Argmin,
+    Shuffle,
 )
 from buffers import Buffer
 from validators import Validator
@@ -1681,6 +1682,19 @@ struct Tensor[dtype: DType = DType.float32](
     fn argmin(self, axis: Int = 0, keepdims: Bool = False) -> Tensor[DType.int32]:
         return Argmin[dtype].argmin(tensor=self, axis=axis, keepdims=keepdims)
 
+    fn shuffle[
+        track_grad: Bool = True
+    ](
+        self,
+        perm: List[Int] = [],
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Shuffle[dtype].forward[track_grad](
+            self, perm, axis, requires_grad
+        )
+
+
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
     ) -> Tensor[dtype]:
@@ -1831,18 +1845,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         return ReLU[dtype].forward(self, requires_grad)
-
-    fn shuffle[
-        track_grad: Bool = True
-    ](
-        self,
-        perm: List[Int] = [],
-        axis: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return Shuffle[dtype].forward[track_grad](
-            self, perm, axis, requires_grad
-        )
 
 
 
