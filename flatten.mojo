@@ -35,31 +35,14 @@ struct Flatten[dtype: DType]:
         end_dim: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        rank = self.rank()
-        if rank == 0:
-            return self.copy()
-        var endd = end_dim.value() if end_dim else rank - 1
-
-        if endd < start_dim:
-            panic("Flatten → end_dim must be >= start_dim")
-
-        var original_shape = self.shape()
-        # compute new shape
-        collapsed = original_shape[start_dim : endd + 1].product()
-        new_shape = (
-            original_shape[:start_dim]
-            + [collapsed]
-            + original_shape[endd + 1 :]
-        )
-        nd_buffer = self.buffer.contiguous(new_shape)
-        out = Tensor[dtype](nd_buffer^, requires_grad=False)
+        flattened_buffer = self.buffer.flatten(start_dim, end_dim)
+        out = Tensor[dtype](flattened_buffer^, requires_grad=False)
 
         # autograd hookup
         @parameter
         if track_grad:
-            grad_required = (
-                requires_grad.value() if requires_grad else self.requires_grad
-            )
+            grad_required = requires_grad.or_else(self.requires_grad)
+
             if grad_required:
                 out.requires_grad_(True)
                 backward_fn = FlattenBackward[dtype]().into_backward_fn()
