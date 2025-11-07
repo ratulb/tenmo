@@ -1,8 +1,9 @@
 from algorithm import vectorize
 from sys import simd_width_of
 from memory import memset_zero, memcpy, ArcPointer
-from math import exp, log
+from math import exp, log, ceil
 from common_utils import log_debug, panic
+from utils.numerics import max_finite
 
 
 struct Buffer[dtype: DType = DType.float32](
@@ -583,6 +584,64 @@ struct Buffer[dtype: DType = DType.float32](
         buffer = Buffer[dtype](size)
         buffer.fill[simd_width](value)
         return buffer^
+
+    @always_inline
+    @staticmethod
+    fn arange(args: VariadicList[Scalar[dtype]]) -> Buffer[dtype]:
+        start: Scalar[dtype] = 0
+        end: Scalar[dtype] = max_finite[dtype]()
+        step: Scalar[dtype] = 1
+
+        n = len(args)
+        if n == 1:
+            end = args[0]
+        elif n == 2:
+            start = args[0]
+            end = args[1]
+        elif n == 3:
+            start = args[0]
+            end = args[1]
+            step = args[2]
+        else:
+            panic("Buffer → arange: expected 1 to 3 arguments")
+
+        if step == 0:
+            panic("Buffer → arange: step can not be zero")
+
+        # Estimate size to avoid frequent reallocations
+        # Add 2 as safety margin for floating-point precision
+        delta = abs(end - start)
+        step_abs = abs(step)
+        est_size = ceil(delta / step_abs).__int__() + 2
+        var data = List[Scalar[dtype]](capacity=UInt(est_size))
+        var value = start
+
+        # Safety limit to prevent infinite loops with very small steps
+        alias MAX_ARANGE_ELEMENTS = 1000000
+
+        if step > 0:
+            while value < end:
+                data.append(value)
+                value += step
+                if len(data) > MAX_ARANGE_ELEMENTS:
+                    panic(
+                        "Buffer → arange: too many elements, possible infinite"
+                        " loop"
+                    )
+        else:
+            while value > end:
+                data.append(value)
+                value += step
+                if len(data) > MAX_ARANGE_ELEMENTS:
+                    panic(
+                        "Buffer → arange: too many elements, possible infinite"
+                        " loop"
+                    )
+
+        if len(data) == 0:
+            panic("Buffer → arange: computed arange size is zero")
+
+        return Buffer[dtype](data^)
 
     @staticmethod
     @always_inline

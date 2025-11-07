@@ -1,4 +1,4 @@
-from tensors import Tensor
+from tenmo import Tensor
 from intlist import IntList
 
 
@@ -16,7 +16,7 @@ struct MSELoss[dtype: DType = DType.float32]:
         diff = preds - target
         #loss = (diff * diff).mean(IntList(), False, True)
         loss = (diff * diff).mean()
-        return loss
+        return loss^
 
 
 fn main():
