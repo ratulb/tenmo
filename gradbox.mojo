@@ -61,6 +61,13 @@ struct Gradbox[dtype: DType](
         )
         return Gradbox[dtype](nd_buffer^, share=False)
 
+    @staticmethod
+    fn arange(
+        *args: Scalar[dtype],
+    ) -> Gradbox[dtype]:
+        nd_buffer = NDBuffer[dtype].arange(args)
+        return Gradbox[dtype](nd_buffer^, share=False)
+
     @always_inline
     fn squeeze(self, axes: IntList = IntList()) -> Gradbox[dtype]:
         shape = self.shape()
@@ -99,6 +106,44 @@ struct Gradbox[dtype: DType](
         var buffer = self.buffer.contiguous_buffer()
         var nd_buffer = NDBuffer[dtype](buffer^, new_shape^)
 
+        return Gradbox[dtype](nd_buffer^, share=False)
+
+    fn unsqueeze(self, axes: IntList) -> Self:
+        var rank = self.rank()
+        var sorted_axes = axes.sorted()
+        var new_rank = rank + sorted_axes.size()
+
+        # Normalize negative axes
+        for i in range(sorted_axes.size()):
+            var ax = sorted_axes[i]
+            if ax < 0:
+                ax += new_rank
+                # Validate
+                if ax < 0 or ax > new_rank:
+                    panic(
+                        "Gradbox → unsqueeze: invalid axis",
+                        sorted_axes[i].__str__(),
+                    )
+            sorted_axes[i] = ax
+
+        # Build new shape
+        shape = self.shape()
+        var new_shape_dims = IntList.with_capacity(new_rank)
+        var src_i = 0
+        for dst_i in range(new_rank):
+            if dst_i in sorted_axes:
+                new_shape_dims.append(1)
+            else:
+                new_shape_dims.append(shape[src_i])
+                src_i += 1
+
+        # Allocate new gradbox
+        new_shape = Shape(new_shape_dims)
+
+        # Copy elements preserving order
+        # Unsqueeze doesn't change total number of elements.
+        # So we can safely copy flattened contents.
+        nd_buffer = self.buffer.contiguous(new_shape)
         return Gradbox[dtype](nd_buffer^, share=False)
 
     @always_inline
@@ -510,6 +555,9 @@ struct Gradbox[dtype: DType](
 
 
 fn main() raises:
+    alias dtype = DType.float32
+    gb = Gradbox[dtype].arange(0.2, 1.8, 0.3)
+    gb.print()
     run = 1
     for _ in range(run):
         pass
