@@ -46,6 +46,7 @@ from forwards import (
     MinMax,
     Softmax,
     Repeat,
+    Tile,
 )
 from buffers import Buffer
 from validators import Validator
@@ -999,7 +1000,7 @@ struct Tensor[dtype: DType = DType.float32](
     ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
-        return Repeat.forward[track_grad](
+        return Repeat[dtype].forward[track_grad](
             self, IntList.new(repeat), requires_grad
         )
 
@@ -1008,21 +1009,27 @@ struct Tensor[dtype: DType = DType.float32](
     ](self, *repeat: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
-        return Repeat.forward[track_grad](self, IntList(repeat), requires_grad)
+        return Repeat[dtype].forward[track_grad](
+            self, IntList(repeat), requires_grad
+        )
 
-        _ = """fn tile[
+    fn tile[
         track_grad: Bool = True
     ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
-        return self.tile[track_grad](IntList.new(repeat), requires_grad)
+        return Tile[dtype].forward[track_grad](
+            self, IntList.new(repeat), requires_grad
+        )
 
     fn tile[
         track_grad: Bool = True
-    ](self, repeat: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, *repeat: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
-        return Tile.forward[track_grad](self, repeat, requires_grad)"""
+        return Tile[dtype].forward[track_grad](
+            self, IntList(repeat), requires_grad
+        )
 
     fn contiguous[
         track_grad: Bool = True

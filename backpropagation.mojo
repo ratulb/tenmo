@@ -37,7 +37,7 @@ alias Delegate[dtype: DType] = Variant[
     ReLUBackward[dtype],
     MinMaxBackward[dtype],
     SoftmaxBackward[dtype],
-    RepeatBackward[dtype],
+    TileBackward[dtype],
 ]
 
 
@@ -155,8 +155,8 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.grad_fn.isa[MinMaxBackward[dtype]]():
             return self.grad_fn[MinMaxBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[RepeatBackward[dtype]]():
-            return self.grad_fn[RepeatBackward[dtype]].backward(output)
+        elif self.grad_fn.isa[TileBackward[dtype]]():
+            return self.grad_fn[TileBackward[dtype]].backward(output)
 
         else:
             panic("I am not here to receive you")

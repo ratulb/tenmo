@@ -35,7 +35,6 @@ from shuffle import ShuffleBackward
 from relu import ReLUBackward
 from softmax import SoftmaxBackward
 from crossentropy import CrossEntropyBackward, CrossEntropyLoss
-from repeat import RepeatBackward
-from tiles import TileBackward, Tile
+from tiles import TileBackward
 from flatten import FlattenBackward
 from contiguous import ContiguousBackward

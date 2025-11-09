@@ -24,5 +24,10 @@ from relu import ReLU
 from minmax import MinMax
 from softmax import Softmax
 from repeat import Repeat
+from tiles import Tile
+
+
+
+
 fn main():
     pass

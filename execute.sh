@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|argminmax|repeat|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
+    echo "Usage: $0 [tensors|argminmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
     exit 1
 fi
 
@@ -22,13 +22,18 @@ case $1 in
         echo "Running mojo -I . tests/test_softmax.mojo"
         mojo -I . $DEBUG_MODE tests/test_softmax.mojo
         ;;
+    repeat)
+        echo "Running mojo -I . tests/test_repeat.mojo"
+        mojo -I . $DEBUG_MODE tests/test_repeat.mojo
+        ;;
+
     slice)
         echo "Running mojo -I . tests/test_slice.mojo"
         mojo -I . $DEBUG_MODE tests/test_slice.mojo
         ;;
-    repeat)
-        echo "Running mojo -I . tests/test_repeat.mojo"
-        mojo -I . $DEBUG_MODE tests/test_repeat.mojo
+    tiles)
+        echo "Running mojo -I . tests/test_tiles.mojo"
+        mojo -I . $DEBUG_MODE tests/test_tiles.mojo
         ;;
 
     linspace)
@@ -139,6 +144,9 @@ case $1 in
         echo "Running tests/test_repeat.mojo"
         mojo -I . tests/test_repeat.mojo
 
+        echo "Running tests/test_tiles.mojo"
+        mojo -I . tests/test_tiles.mojo
+
         echo "Running tests/test_linspace.mojo"
         mojo -I . tests/test_linspace.mojo
 
@@ -200,7 +208,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: repeat, linspace, slice, relu, softmax permute, shuffle, argminmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
+        echo "Available tests: repeat, tiles, linspace, slice, relu, softmax permute, shuffle, argminmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
         exit 1
         ;;
 esac
