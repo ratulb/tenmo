@@ -140,6 +140,17 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         var shape = Shape(buffer.size)
         return NDBuffer[dtype](buffer^, shape^)
 
+    @staticmethod
+    @always_inline
+    fn linspace(
+        start: Scalar[dtype],
+        end: Scalar[dtype],
+        steps: Int,
+    ) -> NDBuffer[dtype]:
+        var buffer = Buffer[dtype].linspace(start, end, steps)
+        var shape = Shape(buffer.size)
+        return NDBuffer[dtype](buffer^, shape^)
+
     @always_inline
     fn is_contiguous(self) -> Bool:
         return self.strides.is_contiguous(self.shape)
@@ -356,29 +367,74 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
             return accum_sum
 
     fn sum(self, reduction_axes: IntList, keepdims: Bool) -> NDBuffer[dtype]:
+        # Step 1: Normalize and validate reduction axes
+        var normalized_axes = self._normalize_reduction_axes(reduction_axes)
+
+        # Step 2: Compute output shape with pre-validated axes
         var out_shape = self.shape.compute_output_shape(
-            reduction_axes, keepdims
+            normalized_axes, keepdims, validated=True
         )
+
         var out = NDBuffer[dtype].zeros(out_shape)
+
+        # Step 3: Handle scalar output cases
         if out_shape == Shape():
-            # We're producing a scalar (either from scalar NDBuffer or full reduction)
+            # This covers both scalar input AND full reduction cases
             out[IntArray()] = self.sum_all()
         else:
+            # Step 4: Handle partial reduction with proper coordinate mapping
             reduction_axes_shape = Shape(
-                self.shape.axes_spans.select(reduction_axes)
+                self.shape.axes_spans.select(normalized_axes)
             )
+
             for out_coord in out_shape.indices():
                 var accum_sum = Scalar[dtype](0)
                 for red_coord in reduction_axes_shape.indices():
-                    self_coord = out_coord.replace(
-                        reduction_axes, red_coord
+                    # Use normalized_axes (sorted) for coordinate reconstruction
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
                     ) if keepdims else out_coord.insert(
-                        reduction_axes, red_coord
+                        normalized_axes, red_coord
                     )
                     accum_sum += self[self_coord]
                 out[out_coord] = accum_sum
 
         return out^
+
+    fn _normalize_reduction_axes(self, axes: IntList) -> IntList:
+        """Normalize reduction axes: handle empty list, negative indices, sort, and deduplicate.
+        """
+        var rank = self.rank()
+
+        # Empty axes list means reduce over all dimensions
+        if len(axes) == 0:
+            return IntList.range_list(rank)
+
+        # Normalize negative indices and validate bounds
+        var normalized = IntList.with_capacity(len(axes))
+        for axis in axes:
+            var norm_axis = axis
+            if norm_axis < 0:
+                norm_axis = rank + norm_axis
+            if norm_axis < 0 or norm_axis >= rank:
+                panic(
+                    "Reduction axis out of bounds: "
+                    + axis.__str__()
+                    + " for rank "
+                    + rank.__str__()
+                )
+            normalized.append(norm_axis)
+
+        # Sort and remove duplicates
+        normalized.sort(asc=True)
+        var result = IntList.with_capacity(len(normalized))
+        var prev = -1
+        for axis in normalized:
+            if axis != prev:
+                result.append(axis)
+                prev = axis
+
+        return result^
 
     fn flatten(
         self,
@@ -998,5 +1054,5 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
 
 
 fn main() raises:
-    #alias dtype = DType.float32
+    # alias dtype = DType.float32
     pass

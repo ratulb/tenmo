@@ -657,6 +657,33 @@ struct Buffer[dtype: DType = DType.float32](
         memset_zero(buffer.data, size)
         return buffer^
 
+    @staticmethod
+    fn linspace(
+        start: Scalar[dtype],
+        end: Scalar[dtype],
+        steps: Int,
+    ) -> Buffer[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Buffer → linspace is for numeric data types only",
+        ]()
+
+        if steps < 1:
+            panic("Buffer → linspace: steps must be at least 1")
+
+        if steps == 1:
+            var buffer = Buffer[dtype](1)
+            buffer[0] = start
+            return buffer^
+
+        var step_size = (end - start) / Scalar[dtype](steps - 1)
+        var buffer = Buffer[dtype](steps)
+
+        for i in range(steps):
+            buffer[i] = start + Scalar[dtype](i) * step_size
+
+        return buffer^
+
     @always_inline
     fn fill[
         simd_width: Int = simd_width_of[dtype]()

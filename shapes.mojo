@@ -184,36 +184,87 @@ struct Shape(
         return Shape(dims)
 
     fn compute_output_shape(
-        self, normalized_axes: IntList, keepdims: Bool
+        self, normalized_axes: IntList, keepdims: Bool, validated: Bool = False
     ) -> Shape:
         """Compute the output shape after reduction along specified axes.
 
         Args:
             normalized_axes: Sorted list of axes to reduce over.
+                - Empty list means reduce over ALL axes.
             keepdims: Whether to keep reduced dimensions as size 1.
+            validated: If True, skips axis validation (assumes axes are sorted, unique, and in bounds).
 
         Returns:
             Shape after reduction
 
         Behavior:
-            - If reducing all axes and keepdims=False → returns Shape() (scalar)
+            - If reducing all axes (empty list or all indices) and keepdims=False → returns Shape() (scalar)
             - Otherwise:
                 - For reduced axes: keep as 1 if keepdims=True, else remove
                 - For non-reduced axes: keep original size.
         """
-        rank = self.rank()
+        var rank = self.rank()
 
-        # Full reduction case (return scalar shape if not keeping dims)
-        if rank == 0 or (len(normalized_axes) == rank and not keepdims):
+        # Handle empty axes case: reduce over ALL axes
+        if len(normalized_axes) == 0:
+            if keepdims:
+                # Return shape of all 1's
+                var ones = IntList.filled(rank, 1)
+                return Shape(ones)
+            else:
+                return Shape()  # Scalar
+
+        # Validate axes only if not already validated
+        if not validated:
+            for i in range(len(normalized_axes)):
+                var axis = normalized_axes[i]
+                if axis < 0 or axis >= rank:
+                    panic(
+                        (
+                            "Shape → compute_output_shape: reduction axis out"
+                            " of bounds: normalized_axes: "
+                        ),
+                        normalized_axes.__str__(),
+                        "keepdims: ",
+                        keepdims.__str__(),
+                        "→ for shape: ",
+                        self.__str__(),
+                    )
+                if i > 0 and axis <= normalized_axes[i - 1]:
+                    panic(
+                        (
+                            "Shape → compute_output_shape: reduction axes must"
+                            " be sorted and unique. normalized_axes: "
+                        ),
+                        normalized_axes.__str__(),
+                        "keepdims: ",
+                        keepdims.__str__(),
+                        "→ for shape: ",
+                        self.__str__(),
+                    )
+
+        # Full reduction case (all specified axes reduced, not keeping dims)
+        if len(normalized_axes) == rank and not keepdims:
             return Shape()
 
-        var spans = IntList.with_capacity(rank)
+        # Build output shape efficiently using sorted axes property
+        var spans = IntList.with_capacity(
+            rank if keepdims else rank - len(normalized_axes)
+        )
+        var axes_index = 0
+
         for dim in range(rank):
-            if dim in normalized_axes:
+            if (
+                axes_index < len(normalized_axes)
+                and dim == normalized_axes[axes_index]
+            ):
+                # This dimension is being reduced
                 if keepdims:
-                    spans.append(1)  # Keep reduced dim as size 1
+                    spans.append(1)
+                axes_index += 1
             else:
-                spans.append(self[dim])  # Keep original size
+                # This dimension is kept as-is
+                spans.append(self[dim])
 
         return Shape(spans)
 
@@ -318,18 +369,31 @@ struct Shape(
 
 
 from common_utils import IntArrayHelper
+from testing import assert_true
 
 
 fn main() raises:
-    _ = """s = Shape(5, 2, 1)
-    for coord in s:
-        # print(coord, end="\n")
-        IntArrayHelper.print(coord)
-        extended = IntArrayHelper.extend(coord, 2, 3)
-        print()
-        IntArrayHelper.print(extended)"""
-    s = Shape(Shape(6, 2).num_elements())
-    print(len(Shape(2, 3)))
-    for coord in s.indices():
-        print(coord)
-    pass
+    test_compute_output_shape_with_validation_flag()
+
+
+fn test_compute_output_shape_with_validation_flag() raises:
+    print("test_compute_output_shape_with_validation_flag")
+    var shape = Shape(2, 3, 4)
+
+    # Test with default validation (should work)
+    assert_true(shape.compute_output_shape(IntList([1]), False) == Shape(2, 4))
+
+    # Test with validated=True (should work and be faster)
+    var pre_validated_axes = IntList([0, 2])
+    assert_true(
+        shape.compute_output_shape(pre_validated_axes, True, validated=True)
+        == Shape(1, 3, 1)
+    )
+
+    # Test with invalid axes but validated=True (dangerous but allowed)
+    # This would panic if validated=False, but with validated=True it assumes caller knows what they're doing
+    var risky_axes = IntList([5])  # Out of bounds
+    var output_shape = shape.compute_output_shape(
+        risky_axes, False, validated=False
+    )  # Could cause undefined behavior
+    print(output_shape)

@@ -84,9 +84,8 @@ struct Summer[dtype: DType](Copyable):
 
         @parameter
         if track_grad:
-            grad_required = (
-                requires_grad.value() if requires_grad else tensor.requires_grad
-            )
+            grad_required = requires_grad.or_else(tensor.requires_grad)
+
             if grad_required:
                 out.requires_grad_(True)
                 backward_fn = SumBackward[dtype](

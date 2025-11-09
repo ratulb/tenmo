@@ -68,12 +68,14 @@ struct Gradbox[dtype: DType](
         nd_buffer = NDBuffer[dtype].arange(args)
         return Gradbox[dtype](nd_buffer^, share=False)
 
-    fn flatten(self, start_dim: Int=0, end_dim: Optional[Int] = None) -> Gradbox[dtype]:
+    fn flatten(
+        self, start_dim: Int = 0, end_dim: Optional[Int] = None
+    ) -> Gradbox[dtype]:
         flattened_buffer = self.buffer.flatten(start_dim, end_dim)
         return Gradbox[dtype](flattened_buffer^, share=False)
 
     @always_inline
-    fn squeeze(self, axes: List[Int]=[]) -> Gradbox[dtype]:
+    fn squeeze(self, axes: List[Int] = []) -> Gradbox[dtype]:
         return self.squeeze(IntList(axes))
 
     @always_inline
@@ -228,7 +230,9 @@ struct Gradbox[dtype: DType](
         return self.buffer.shared()
 
     @always_inline
-    fn sum(self, axes: IntList=IntList(), keepdims: Bool=False) -> Gradbox[dtype]:
+    fn sum(
+        self, axes: IntList = IntList(), keepdims: Bool = False
+    ) -> Gradbox[dtype]:
         var nd_buffer = self.buffer.sum(reduction_axes=axes, keepdims=keepdims)
         return Gradbox[dtype](nd_buffer^, share=False)
 
@@ -277,6 +281,16 @@ struct Gradbox[dtype: DType](
         return self.buffer[indices]
 
     @always_inline
+    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
+        if self.rank() == 0 and len(indices) != 0:
+            panic(
+                "Gradbox → __getitem__(IntList): Scalar gradbox expects empty"
+                " indices"
+            )
+
+        return self.buffer[indices]
+
+    @always_inline
     fn __setitem__(self, indices: List[Int], value: Scalar[dtype]):
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -291,6 +305,15 @@ struct Gradbox[dtype: DType](
         if self.rank() == 0 and indices.size() != 0:
             panic(
                 "Gradbox → __setitem__(IntArray): Scalar gradbox expects empty"
+                " indices"
+            )
+        self.buffer[indices] = value
+
+    @always_inline
+    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
+        if self.rank() == 0 and len(indices) != 0:
+            panic(
+                "Gradbox → __setitem__(IntList): Scalar gradbox expects empty"
                 " indices"
             )
         self.buffer[indices] = value
@@ -485,7 +508,7 @@ struct Gradbox[dtype: DType](
         ]()
         if self.shape() != other.shape():
             panic(
-                    "Gradbox → all_close(Self): expects same shaped gradboxes: "
+                "Gradbox → all_close(Self): expects same shaped gradboxes: "
                 + self.shape().__str__()
                 + ", "
                 + other.shape().__str__()
@@ -493,18 +516,20 @@ struct Gradbox[dtype: DType](
 
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
-
     fn all_close[
         rtol: Scalar[dtype] = 1e-5,
         atol: Scalar[dtype] = 1e-8,
     ](self, other: Tensor[dtype]) -> Bool:
         constrained[
             dtype.is_floating_point(),
-            "Gradbox → all_close(Tensor): is for floating point data types only",
+            (
+                "Gradbox → all_close(Tensor): is for floating point data types"
+                " only"
+            ),
         ]()
         if self.shape() != other.shape():
             panic(
-                    "Gradbox → all_close(Tensor): expects same shaped tensor: "
+                "Gradbox → all_close(Tensor): expects same shaped tensor: "
                 + self.shape().__str__()
                 + ", "
                 + other.shape().__str__()

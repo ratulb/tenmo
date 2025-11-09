@@ -23,5 +23,6 @@ from shuffle import Shuffle
 from relu import ReLU
 from minmax import MinMax
 from softmax import Softmax
+from repeat import Repeat
 fn main():
     pass

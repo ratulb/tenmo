@@ -240,6 +240,11 @@ struct Validator:
         Returns:
             Tuple of (new_shape, new_strides, new_offset).
         """
+        if start == end:
+            panic("Slice start and end can not be same")
+        # Validate step
+        if step == 0:
+            panic("Slice step cannot be zero")
 
         # Normalize axis
         var actual_axis = axis
@@ -252,10 +257,6 @@ struct Validator:
                 " out of bounds for tensor of rank ",
                 String(original_shape.rank()),
             )
-
-        # Validate step
-        if step == 0:
-            panic("Slice step cannot be zero")
 
         # Prepare new shape, strides, offset
         var new_shape: IntList = IntList.with_capacity(original_shape.rank())
@@ -558,7 +559,6 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    #fn validate_view_params_absolute[
     fn validate_view_params[
         dtype: DType
     ](
@@ -628,7 +628,6 @@ struct Validator:
     @always_inline
     @staticmethod
     fn validate_view_params_conservative[
-    fn validate_view_params[
         dtype: DType
     ](
         this: Tensor[dtype],

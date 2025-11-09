@@ -10,7 +10,7 @@ from intlist import IntList
 from ancestry import Ancestors, Ancestor
 from strides import Strides
 from common_utils_imports import *
-from common_utils import id as identity, IntArrayHelper
+from common_utils import id as identity, IntArrayHelper, log_warning
 from operators_imports import *
 
 # from walkback import *
@@ -45,6 +45,7 @@ from forwards import (
     ReLU,
     MinMax,
     Softmax,
+    Repeat,
 )
 from buffers import Buffer
 from validators import Validator
@@ -223,7 +224,6 @@ struct Tensor[dtype: DType = DType.float32](
                 " indices"
             )
         return self.buffer[indices]
-
 
     @always_inline
     fn __getitem__(self, indices: IntArray) -> Scalar[dtype]:
@@ -635,6 +635,17 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor^
 
     @staticmethod
+    fn linspace(
+        start: Scalar[dtype],
+        end: Scalar[dtype],
+        steps: Int,
+        requires_grad: Bool = False,
+    ) -> Tensor[dtype]:
+        nd_buffer = NDBuffer[dtype].linspace(start, end, steps)
+        tensor = Tensor[dtype](nd_buffer^, requires_grad=requires_grad)
+        return tensor^
+
+    @staticmethod
     fn zeros(
         axes_spans: List[Int], requires_grad: Bool = False
     ) -> Tensor[dtype]:
@@ -983,21 +994,23 @@ struct Tensor[dtype: DType = DType.float32](
             self, start_dim, end_dim, requires_grad
         )
 
-        _ = """fn repeat[
+    fn repeat[
         track_grad: Bool = True
     ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
-        return self.repeat[track_grad](IntList.new(repeat), requires_grad)
+        return Repeat.forward[track_grad](
+            self, IntList.new(repeat), requires_grad
+        )
 
     fn repeat[
         track_grad: Bool = True
-    ](self, repeat: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, *repeat: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
-        return Repeat.forward[track_grad](self, repeat, requires_grad)
+        return Repeat.forward[track_grad](self, IntList(repeat), requires_grad)
 
-    fn tile[
+        _ = """fn tile[
         track_grad: Bool = True
     ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
@@ -1099,78 +1112,6 @@ struct Tensor[dtype: DType = DType.float32](
                 grad_contrib = grad_contrib.reshape(self.shape())
 
         return grad_contrib^
-
-        _ = """fn broadcast_op(
-        self,
-        other: Self,
-        op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
-    ) -> Tensor[dtype]:
-        if self.shape.rank() == 0 or other.shape.rank() == 0:
-            return self.broadcast_scalar_op(other, op)
-        else:
-            result = self.broadcast_tensor_op(other, op)
-            return result
-
-    fn broadcast_scalar_op(
-        self,
-        other: Self,
-        op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
-    ) -> Tensor[dtype]:
-        # Decide result shape
-        result_shape = other.shape if self.shape.rank() == 0 else self.shape
-        result = Tensor[dtype](result_shape, requires_grad=False)
-
-        for coord in result_shape:
-            self_val = self.item() if self.shape.rank() == 0 else self[coord]
-            other_val = (
-                other.item() if other.shape.rank() == 0 else other[coord]
-            )
-            result[coord] = op(self_val, other_val)
-
-        return result
-
-    fn broadcast_tensor_op(
-        self,
-        other: Self,
-        op: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
-    ) -> Tensor[dtype]:
-        result_shape = Shape.broadcast_shape(self.shape, other.shape)
-        mask1 = self.broadcast_mask(result_shape)
-        mask2 = other.broadcast_mask(result_shape)
-        result = Tensor[dtype](result_shape, requires_grad=False)
-        for indices in result_shape:
-            self_indices = self.translate_index(indices, mask1, result_shape)
-            other_indices = other.translate_index(indices, mask2, result_shape)
-            result[indices] = op(self[self_indices], other[other_indices])
-        return result
-
-    fn backward_contribution(
-        self,
-        other: Tensor[dtype],
-        upstream_grad: Tensor[dtype],
-        do_multiply: Bool,
-    ) -> Tensor[dtype]:
-        var grad_contrib: Tensor[dtype]
-        if upstream_grad.shape == Shape():
-            grad_contrib = Tensor[dtype].full(
-                self.shape, upstream_grad.item(), requires_grad=False
-            )
-        else:
-            grad_contrib = (
-                upstream_grad * other if do_multiply else upstream_grad
-            )
-            if grad_contrib.shape != self.shape:
-                axes = self.broadcast_mask(grad_contrib.shape).indices_of(1)
-                grad_contrib = grad_contrib.sum[track_grad=False](
-                    axes=axes, keepdims=True
-                )
-            if grad_contrib.shape != self.shape:
-                grad_contrib = grad_contrib.reshape[track_grad=False](
-                    self.shape
-                )
-            grad_contrib.requires_grad = False
-
-        return grad_contrib"""
 
     fn sum[
         track_grad: Bool = True
@@ -1314,11 +1255,11 @@ struct Tensor[dtype: DType = DType.float32](
             dtype.is_numeric(),
             "Tensor → __neg__ is for numeric data types only",
         ]()
-        var buffer = self.buffer.map[
-            Utils[dtype].negate_buffer, Utils[dtype].negate_scalar
-        ]()
-        var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
-        return Tensor[dtype](nd_buffer^, requires_grad=False)
+        # Create a zero tensor with same shape and properties
+        var zeros = Tensor[dtype].zeros_like(self)
+
+        # Use subtraction: 0 - self
+        return Subtractor[dtype].forward[True](zeros, self)
 
     fn __invert__(self: Tensor[DType.bool]) -> Tensor[DType.bool]:
         var buffer = self.buffer.map[
@@ -1426,7 +1367,6 @@ struct Tensor[dtype: DType = DType.float32](
             num_last=num_last,
         )
 
-
     fn __del__(deinit self):
         _ = self.buffer^
         _ = self.gradbox^
@@ -1454,7 +1394,7 @@ struct Tensor[dtype: DType = DType.float32](
         return ElemIterator[dtype, origin_of(self)](Pointer(to=self))
 
     fn element_at(self, index: Int) -> Scalar[dtype]:
-    #fn __getitem__(self, index: Int) -> Scalar[dtype]:
+        # fn __getitem__(self, index: Int) -> Scalar[dtype]:
         return self.buffer[index]
 
     fn view[
@@ -1525,6 +1465,18 @@ struct Tensor[dtype: DType = DType.float32](
             self, shape, Strides.default(shape), offset, requires_grad, False
         )
 
+    fn into_view[
+        track_grad: Bool = True
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
+        if self.shared():
+            log_warning("Tensor → into_view: already shared")
+            return self.copy()
+        shape, strides = self.shape(), self.strides()
+        grad_required = requires_grad.or_else(self.requires_grad)
+        return View[dtype].forward[track_grad](
+            self, shape, strides, 0, grad_required, validated=True
+        )
+
     fn transpose[
         track_grad: Bool = True
     ](self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
@@ -1543,6 +1495,66 @@ struct Tensor[dtype: DType = DType.float32](
         dtype
     ]:
         return Transpose.forward[track_grad](self, axes, requires_grad)
+
+    fn slice[
+        track_grad: Bool = True
+    ](self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
+        dtype
+    ]:
+        # Call Validator to compute everything
+        var shape, strides, offset = (
+            Validator.validate_and_compute_slice_metadata(
+                self.shape(), self.strides(), axis, start, end, step
+            )
+        )
+
+        # Return view
+        return View[dtype].forward[track_grad](
+            self,
+            shape,
+            strides,
+            offset,
+            self.requires_grad,
+            True,
+        )
+
+    fn slice[
+        track_grad: Bool = True
+    ](
+        self,
+        axes: List[Int],
+        starts: List[Int],
+        ends: List[Int],
+        steps: List[Int] = [],
+    ) -> Tensor[dtype]:
+        # Default step = 1 if not provided
+        jumps = IntList(steps)
+        if len(steps) == 0:
+            jumps = IntList.filled(len(axes), 1)
+        elif len(steps) != len(axes):
+            panic("Tensor → slice: length of steps must match axes length")
+
+        # Call Validator
+        var shape, strides, offset = (
+            Validator.validate_and_compute_slice_metadata_multi(
+                self.shape(),
+                self.strides(),
+                IntList(axes),
+                IntList(starts),
+                IntList(ends),
+                jumps,
+            )
+        )
+
+        # Return view
+        return View[dtype].forward[track_grad](
+            self,
+            shape,
+            strides,
+            offset,
+            self.requires_grad,
+            True,
+        )
 
     fn expand[
         track_grad: Bool = True
@@ -1592,9 +1604,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn unsqueeze[
         track_grad: Bool = True
-    ](self, axis: Int, requires_grad: Optional[Bool] = None) -> Tensor[
-        dtype
-    ]:
+    ](self, axis: Int, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         return Unsqueeze[dtype].forward[track_grad](
             self, IntList(axis), requires_grad
         )
@@ -1617,9 +1627,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn permute[
         track_grad: Bool = True
-    ](
-        self, axes: List[Int], requires_grad: Optional[Bool] = None
-    ) -> Tensor[dtype]:
+    ](self, axes: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
+        dtype
+    ]:
         return Permute[dtype].forward[track_grad](
             self, IntList.new(axes), requires_grad
         )
@@ -1631,10 +1641,14 @@ struct Tensor[dtype: DType = DType.float32](
     ]:
         return Permute[dtype].forward[track_grad](self, axes, requires_grad)
 
-    fn argmax(self, axis: Int = 0, keepdims: Bool = False) -> Tensor[DType.int32]:
+    fn argmax(
+        self, axis: Int = 0, keepdims: Bool = False
+    ) -> Tensor[DType.int32]:
         return Argmax[dtype].argmax(tensor=self, axis=axis, keepdims=keepdims)
 
-    fn argmin(self, axis: Int = 0, keepdims: Bool = False) -> Tensor[DType.int32]:
+    fn argmin(
+        self, axis: Int = 0, keepdims: Bool = False
+    ) -> Tensor[DType.int32]:
         return Argmin[dtype].argmin(tensor=self, axis=axis, keepdims=keepdims)
 
     fn max(
@@ -1672,7 +1686,6 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         return MinMax[dtype].forward[False](self, axes, keepdims, requires_grad)
-
 
     fn shuffle[
         track_grad: Bool = True
@@ -1826,78 +1839,7 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         return Matmul_nd[dtype].forward[track_grad](A, B, requires_grad)
 
 
-    fn into_view[
-        track_grad: Bool = True
-    ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        if not self.owns_data:
-            panic("Tensor → into_view: not allowed on non-owning tensor")
-        shape, strides = self.shape, self.strides
-        grad_required = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
-        return View[dtype].forward[track_grad](
-            self, shape, strides, 0, grad_required, True
-        )
 
-        fn slice[
-        track_grad: Bool = True
-    ](self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
-        dtype
-    ]:
-       # Call Validator to compute everything
-        var shape, strides, offset = (
-            Validator.validate_and_compute_slice_metadata(
-                self.shape, self.strides, axis, start, end, step
-            )
-        )
-
-        # Return view
-        return View[dtype].forward[track_grad](
-            self,
-            shape,
-            strides,
-            offset,
-            self.requires_grad,
-            True,
-        )
-
-    fn slice[
-        track_grad: Bool = True
-    ](
-        self,
-        axes: List[Int],
-        starts: List[Int],
-        ends: List[Int],
-        steps: List[Int] = [],
-    ) -> Tensor[dtype]:
-        # Default step = 1 if not provided
-        jumps = IntList(steps)
-        if len(steps) == 0:
-            jumps = IntList.filled(len(axes), 1)
-        elif len(steps) != len(axes):
-            panic("Tensor → slice: length of steps must match axes length")
-
-        # Call Validator
-        var shape, strides, offset = (
-            Validator.validate_and_compute_slice_metadata_multi(
-                self.shape,
-                self.strides,
-                IntList(axes),
-                IntList(starts),
-                IntList(ends),
-                jumps,
-            )
-        )
-
-        # Return view
-        return View[dtype].forward[track_grad](
-            self,
-            shape,
-            strides,
-            offset,
-            self.requires_grad,
-            True,
-        )
 
     fn set(self, tensor: Tensor[dtype], *indices: Idx):
         shape, strides, offset = (
@@ -1970,11 +1912,10 @@ from testing import assert_true
 
 
 fn main() raises:
-    #test_view_backward()
+    # test_view_backward()
     # test_complex_mixed_ops_backward()
     # test_slice_backward()
-    a = Tensor.arange(2, 12, 3)
-    a.print()
+
     pass
 
 
