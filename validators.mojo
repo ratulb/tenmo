@@ -182,6 +182,9 @@ struct Validator:
         if current_shape.num_elements() == newdims.product():
             return Shape(newdims)
 
+        if current_shape.num_elements() == 1 and newdims == IntList():
+            return Shape()
+
         var estimated_size = 1
         var concrete_dims = IntList.with_capacity(len(newdims))
         var infer_index = -1

@@ -1923,6 +1923,9 @@ fn main() raises:
     # test_complex_mixed_ops_backward()
     # test_slice_backward()
 
+    # test_view_chain_with_hidden_elements()
+
+    test_gradient_flow_through_views()
     pass
 
 
@@ -1969,14 +1972,92 @@ fn test_complex_mixed_ops_backward() raises:
         [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], requires_grad=True
     )
     v = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
+    v.print()
 
     v2 = v.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
-
+    v2.print()
     v3 = v2.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=0)
+    v3.print()
     c = v3.contiguous()
     s = c.mean()
+    print("\nmean\n", s.item())
     s.backward(42)
+
+    a.grad().print()
+
     assert_true(
         a.grad().as_tensor()[Slice(1, 2, None), Slice(None, None, None)]
         == Tensor[dtype].d2([[10.5, 10.5, 10.5, 10.5]])
     )
+
+
+fn test_view_chain_with_hidden_elements() raises:
+    print("=== Mojo: View chain with hidden elements ===")
+
+    var a = Tensor.d2(
+        [[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], [13, 14, 15, 16, 17, 18]],
+        requires_grad=True,
+    )
+
+    print("Original a:")
+    a.print()
+
+    # Parent view: offset=2, shape=(2,4), strides=(6,1)
+    # Should see: [3,4,5,6,9,10,11,12]
+    var v1 = a.view(shape=Shape(2, 4), strides=Strides(6, 1), offset=2)
+    print("\nView v1 (offset=2, should see elements from a[0,2] to a[1,3]):")
+    v1.print()
+
+    # Child view: offset=8 (from base!), shape=(2,2), strides=(6,1)
+    # This accesses elements that v1 CANNOT see: a[1,4], a[1,5], a[2,0], a[2,1]
+    var v2 = v1.view(shape=Shape(2, 2), strides=Strides(6, 1), offset=8)
+    print(
+        "\nView v2 (offset=8 from base, should access elements outside v1's"
+        " range):"
+    )
+    v2.print()
+
+    # Compute and backward
+    var result = v2.sum()
+    print("\nSum of v2:")
+    result.print()
+    result.backward()
+
+    print("\nGradient of a:")
+    a.grad().print()
+    print("Gradient should be 1.0 at positions corresponding to v2's elements")
+
+
+# Run the test
+
+
+fn test_gradient_flow_through_views() raises:
+    print("=== Testing Gradient Flow Through View Chain ===")
+
+    var a = Tensor.d2([[1, 2, 3, 4], [5, 6, 7, 8]], requires_grad=True)
+
+    print("Original a:")
+    a.print()
+
+    # Create view chain similar to PyTorch slicing
+    # v1 = a[:, 1:3] - elements [2,3,6,7]
+    var v1 = a.view(shape=Shape(2, 2), strides=Strides(4, 1), offset=1)
+    print("\nv1 = a[:, 1:3]:")
+    v1.print()
+
+    # v2 = v1[1:, :] - elements [6,7]
+    # var v2 = v1.view(shape=Shape(1, 2), strides=Strides(2, 1), offset=2)
+    var v2 = v1.view(shape=Shape(1, 2), strides=Strides(2, 1), offset=5)
+    # var v2 = v1[i(1), il(0, 1)]
+    print("v2 = v1[1:, :]:")
+    v2.print()
+
+    # Forward and backward
+    var result = v2.sum()
+    print("\nSum of v2:")
+    result.print()
+    result.backward()
+
+    print("\nGradient of a:")
+    a.grad().print()
+    print("Should show gradients only at positions that were in the view chain")

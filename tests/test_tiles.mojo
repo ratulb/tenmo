@@ -5,6 +5,14 @@ from shapes import Shape
 
 fn main() raises:
     print("Running comprehensive tiles functionality tests...")
+    test_tile_scalar()
+    test_tile_1d_repeats()
+    test_tile_2d_nonuniform_repeats()
+    test_tile_axis_selective_grad()
+    test_tile_nonrepeated_axis_stability()
+    test_tile_high_dimensional()
+    test_tile_in_computational_graph()
+
     test_tensor_tiles_1d()
     test_tensor_tiles_2d()
     test_tensor_tiles_1d_to_2d_with_gradients()
@@ -30,6 +38,87 @@ fn main() raises:
 
     print("✓ All tiles functionality tests passed!")
     print("passes")
+
+
+fn test_tile_axis_selective_grad() raises:
+    print("test_tile_axis_selective_grad")
+    var x = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
+    )  # shape (1,2,2)
+    var y = x.tile(3, 2, 1)  # depth×row×col = 3×2×1
+    var loss = y.sum()
+    loss.backward()
+    # 3×2×1=6 total repetitions per element
+    assert_true(x.grad().all_close(Tensor.d3([[[6.0, 6.0], [6.0, 6.0]]])))
+
+
+fn test_tile_nonrepeated_axis_stability() raises:
+    print("test_tile_nonrepeated_axis_stability")
+    var x = Tensor.d3(
+        [[[1.0, 2.0, 3.0]], [[4.0, 5.0, 6.0]]], requires_grad=True
+    )  # shape (2,1,3)
+    var y = x.tile(2, 1, 3)  # only last axis repeats strongly
+    var loss = y.sum()
+    loss.backward()
+    # gradient factor = 2×1×3 = 6
+    assert_true(
+        x.grad().all_close(Tensor.d3([[[6.0, 6.0, 6.0]], [[6.0, 6.0, 6.0]]]))
+    )
+
+
+fn test_tile_scalar() raises:
+    print("test_tile_scalar")
+    var x = Tensor.scalar(2.0, requires_grad=True)
+    var y = x.tile(3, 2)
+    var loss = y.sum()
+    loss.backward()
+    assert_true(y.shape() == Shape(3, 2))
+    assert_true(x.grad().all_close(Tensor.scalar(6.0)))
+
+
+fn test_tile_1d_repeats() raises:
+    print("test_tile_1d_repeats")
+    var x = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var y = x.tile(4)
+    var loss = y.sum()
+    loss.backward()
+    assert_true(y.shape() == Shape(12))
+    assert_true(x.grad().all_close(Tensor.d1([4.0, 4.0, 4.0])))
+
+
+fn test_tile_2d_nonuniform_repeats() raises:
+    print("test_tile_2d_nonuniform_repeats")
+    var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var y = x.tile(2, 3)
+    var loss = y.sum()
+    loss.backward()
+    assert_true(y.shape() == Shape(4, 6))
+    assert_true(x.grad().all_close(Tensor.d2([[6.0, 6.0], [6.0, 6.0]])))
+
+
+fn test_tile_high_dimensional() raises:
+    print("test_tile_high_dimensional")
+    var x = Tensor.d1([1.0, 2.0], requires_grad=True)
+    var y = x.tile(2, 1, 3, 1, 2)
+    var loss = y.sum()
+    loss.backward()
+    # 2×1×3×1×2 = 12 repetitions per element
+    assert_true(y.shape() == Shape(2, 1, 3, 1, 4))
+    assert_true(x.grad().all_close(Tensor.d1([12.0, 12.0])))
+
+
+fn test_tile_in_computational_graph() raises:
+    print("test_tile_in_computational_graph")
+    var a = Tensor.d1([1.0, 2.0], requires_grad=True)
+    var b = Tensor.d1([10.0, 20.0], requires_grad=True)
+    var c = a * b  # [10, 40]
+    var d = c.tile(3)
+    var loss = d.sum()
+    loss.backward()
+    a.grad().print()
+    b.grad().print()
+    assert_true(a.grad().all_close(Tensor.d1([30.0, 60.0])))
+    assert_true(b.grad().all_close(Tensor.d1([3.0, 6.0])))
 
 
 fn test_tensor_tiles_1d() raises:

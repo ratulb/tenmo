@@ -18,7 +18,7 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward(
+    fn backward_orig(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         var grad_out = output.grad().copy()
@@ -60,6 +60,59 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable):
 
         # --- CRITICAL: Sort reduce_axes in DESCENDING order ---
         # reduce_axes.sort(asc=False) - NEVER SORT!!!!
+
+        # --- 2. Reshape grad_out to that pattern ---
+        var reshaped = grad_out.reshape(reshaped_shape)
+
+        # --- 3. Sum over every "repeat" axis ---
+        var gradbox_parent = reshaped.sum(reduce_axes, keepdims=False)
+        if gradbox_parent.shape() != parent_shape:
+            gradbox_parent = gradbox_parent.reshape(parent_shape)
+
+        return [(parent^, gradbox_parent^, AddTensor)]
+
+    fn backward(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        var grad_out = output.grad().copy()
+        var parent = output.ancestry().get(0)
+        var parent_shape = self.orig_shape
+        var parent_rank = len(parent_shape)
+        var repeat_rank = len(self.repeat)
+
+        # Handle scalar case
+        if parent_rank == 0:
+            var total_grad = grad_out.sum().item()
+            var gradbox_parent = Gradbox[dtype].full(
+                Shape(), total_grad, share=False
+            )
+            return [(parent^, gradbox_parent^, AddTensor)]
+
+        # --- Handle dimension alignment ---
+        var effective_rank = max(parent_rank, repeat_rank)
+
+        # --- 1. Expand each dim into (orig_dim, repeat_factor) ---
+        var reshaped_dims = IntList.with_capacity(effective_rank * 2)
+        var reduce_axes = IntList.with_capacity(effective_rank)
+
+        for i in range(effective_rank):
+            var parent_index = parent_rank - effective_rank + i
+            var repeat_index = repeat_rank - effective_rank + i
+
+            var orig_dim = 1 if parent_index < 0 else parent_shape[parent_index]
+            var repeat_factor = (
+                1 if repeat_index < 0 else self.repeat[repeat_index]
+            )
+
+            # CRITICAL FIX: Put repeat_factor FIRST, then orig_dim
+            reshaped_dims.append(repeat_factor)  # Repeat dimension first
+            reshaped_dims.append(orig_dim)  # Original dimension second
+
+            reduce_axes.append(
+                i * 2
+            )  # Reduce along the REPEAT axis (first in pair)
+
+        var reshaped_shape = Shape(reshaped_dims)
 
         # --- 2. Reshape grad_out to that pattern ---
         var reshaped = grad_out.reshape(reshaped_shape)
@@ -144,8 +197,6 @@ struct Tile[dtype: DType]:
         var effective_rank = max(orig_rank, repeat_rank)
         var new_shape = IntList.with_capacity(effective_rank)
 
-
-
         for i in range(effective_rank):
             orig_index = orig_rank - effective_rank + i
             repeat_index = repeat_rank - effective_rank + i
@@ -153,7 +204,6 @@ struct Tile[dtype: DType]:
             orig_dim = 1 if orig_index < 0 else orig_shape[orig_index]
             repeat_factor = 1 if repeat_index < 0 else repeat[repeat_index]
             new_shape.append(orig_dim * repeat_factor)
-
 
         var out_shape = Shape(new_shape)
         var out = Tensor[dtype](out_shape, requires_grad=False)

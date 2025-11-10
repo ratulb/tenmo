@@ -373,7 +373,9 @@ from testing import assert_true
 
 
 fn main() raises:
-    test_compute_output_shape_with_validation_flag()
+    # test_compute_output_shape_with_validation_flag()
+    s = Shape(1)
+    print(s.num_elements(), Shape().num_elements(), Shape(1, 1).num_elements())
 
 
 fn test_compute_output_shape_with_validation_flag() raises:

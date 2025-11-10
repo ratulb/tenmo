@@ -6,6 +6,7 @@ from validators import Validator
 from ancestry import Ancestor
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
+from strides import Strides
 
 
 @fieldwise_init
@@ -42,9 +43,23 @@ struct Reshape[dtype: DType](Copyable):
         shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             tensor.shape(), new_shape.intlist()
         )
+        var out: Tensor[dtype]
+        if tensor.is_contiguous():
+            # Calculate the correct offset and strides
+            var new_offset = tensor.offset()
+            var new_strides = Strides.default(shape)
 
-        nd_buffer = tensor.buffer.contiguous(shape^)
-        out = Tensor[dtype](nd_buffer^, requires_grad=False)
+            out = Tensor[dtype].build_view(
+                tensor.address(),
+                shape^,
+                Optional(new_strides^),
+                new_offset,
+                requires_grad=False,
+            )
+
+        else:
+            nd_buffer = tensor.buffer.contiguous(shape^)
+            out = Tensor[dtype](nd_buffer^, requires_grad=False)
 
         @parameter
         if track_grad:
