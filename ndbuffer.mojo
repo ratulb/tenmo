@@ -305,6 +305,12 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         )
 
     @always_inline
+    fn __is__(self, other: NDBuffer[dtype]) -> Bool:
+        if self.shared() and other.shared():
+            return self.shared_buffer.value() is other.shared_buffer.value()
+        return False
+
+    @always_inline
     fn zero(self):
         self.fill(Scalar[dtype](0))
 

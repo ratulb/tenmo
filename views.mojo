@@ -7,6 +7,7 @@ from validators import Validator
 from ancestry import Ancestor
 from gradbox import Gradbox
 from layout.int_tuple import IntArray
+from common_utils import panic
 
 
 @fieldwise_init
@@ -19,7 +20,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    #fn backward_absolute(
+    # fn backward_absolute(
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
@@ -74,8 +75,9 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
         ]
 
     fn backward_conservative(
-    #fn backward(
-        self, output: Tensor[dtype]
+        # fn backward(
+        self,
+        output: Tensor[dtype],
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         parent = output.ancestry().get(0)
         gradbox = output.grad().copy()
@@ -127,6 +129,12 @@ struct View[dtype: DType](Copyable):
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[dtype]:
+        if not self.is_contiguous():
+            panic(
+                "Cannot create a view from a non-contiguous tensor. Use"
+                " reshape() or contiguous().view() instead"
+            )
+
         var abs_offset: Int
         var abs_strides: Strides
 

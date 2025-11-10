@@ -291,6 +291,16 @@ struct Gradbox[dtype: DType](
         return self.buffer[indices]
 
     @always_inline
+    fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
+        if self.rank() == 0 and len(indices) != 0:
+            panic(
+                "Gradbox → __getitem__(*Int): Scalar gradbox expects empty"
+                " indices - please use __getitem__([])"
+            )
+
+        return self.buffer[indices]
+
+    @always_inline
     fn __setitem__(self, indices: List[Int], value: Scalar[dtype]):
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -315,6 +325,15 @@ struct Gradbox[dtype: DType](
             panic(
                 "Gradbox → __setitem__(IntList): Scalar gradbox expects empty"
                 " indices"
+            )
+        self.buffer[indices] = value
+
+    @always_inline
+    fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
+        if self.rank() == 0 and len(indices) != 0:
+            panic(
+                "Gradbox → __setitem__(*Int): Scalar gradbox expects empty"
+                " indices - please use __setitem__([], value)"
             )
         self.buffer[indices] = value
 
