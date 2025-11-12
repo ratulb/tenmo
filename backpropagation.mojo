@@ -7,6 +7,7 @@ from gradbox import Gradbox
 from ancestry import Ancestor
 
 alias Delegate[dtype: DType] = Variant[
+    Matmul2dBackward[dtype],
     AddBackwardScalar[dtype],
     AddBackward[dtype],
     SubBackward[dtype],
@@ -57,7 +58,10 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
 
-        if self.grad_fn.isa[AddBackwardScalar[dtype]]():
+        if self.grad_fn.isa[Matmul2dBackward[dtype]]():
+            return self.grad_fn[Matmul2dBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[AddBackwardScalar[dtype]]():
             return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
 
         elif self.grad_fn.isa[ReshapeBackward[dtype]]():

@@ -4461,8 +4461,107 @@ fn test_argmin_max() raises:
     )
 
 
+
+fn test_slice_backward() raises:
+    print("test_slice_backward")
+    alias dtype = DType.float32
+    a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6], requires_grad=True)
+    r = a.reshape([2, 3])
+    s = r[Slice(1, None, None), Slice(0, 3, 1)]
+    s.sum().backward(42)
+    assert_true(
+        a.grad().as_tensor()[Slice(3, None, None)]
+        == Tensor[dtype]([42, 42, 42])
+    )
+
+
+fn test_view_backward() raises:
+    print("test_view_backward")
+    alias dtype = DType.float32
+    a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], requires_grad=True)
+    v = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
+    assert_true(v == Tensor[dtype].d2([[3, 4, 5, 6], [7, 8, 9, 10]]))
+
+    v2 = v.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
+
+    assert_true(v2 == Tensor[dtype].d2([[3, 4], [5, 6]]))
+    loss = v2.mean()
+    loss.backward()
+    assert_true(
+        a.grad() == Tensor[dtype]([0, 0, 0.25, 0.25, 0.25, 0.25, 0, 0, 0, 0])
+    )
+    assert_true(
+        a.grad().as_tensor()[Slice(2, 6, 1)]
+        == Tensor[dtype]([0.25, 0.25, 0.25, 0.25])
+    )
+
+
+fn test_complex_mixed_ops_backward() raises:
+    print("test_complex_mixed_ops_backward")
+    alias dtype = DType.float32
+
+    a = Tensor[dtype].d2(
+        [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], requires_grad=True
+    )
+
+    v1 = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
+
+    v2 = v1.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
+
+    v3 = v2.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=0)
+
+    c = v3.contiguous()
+
+    s = c.mean()
+
+    s.backward(42)
+
+    assert_true(
+        a.grad().as_tensor()[Slice(0, 1, None), Slice(2, None, None)]
+        == Tensor[dtype].d2([[10.5, 10.5]])
+    )
+
+
+fn test_view_chain_with_hidden_elements() raises:
+    print("=== Mojo: View chain with hidden elements ===")
+
+    var a = Tensor.d2(
+        [[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], [13, 14, 15, 16, 17, 18]],
+        requires_grad=True,
+    )
+
+    var v1 = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
+    var v2 = v1.view(shape=Shape(2, 2), strides=Strides(1, 3), offset=2)
+
+    var result = v2.sum()
+    result.backward()
+
+    expected = Tensor.d2(
+        [[0, 0, 1, 1, 0, 1], [1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]
+    )
+
+    assert_true(a.grad() == expected)
+
+
+fn test_gradient_flow_through_views() raises:
+    print("=== Testing Gradient Flow Through View Chain ===")
+    var a = Tensor.d2([[1, 2, 3, 4], [5, 6, 7, 8]], requires_grad=True)
+    var v1 = a.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=1)
+    var v2 = v1.view(shape=Shape(1, 2), strides=Strides(2, 1), offset=3)
+    var result = v2.sum()
+    result.backward()
+
+    var expected = Tensor.d2([[0, 0, 0, 1], [1, 0, 0, 0]])
+    assert_true(a.grad() == expected)
+
 fn main() raises:
     print("Starting tensor test cases")
+    test_complex_mixed_ops_backward()
+    test_view_backward()
+    test_slice_backward()
+    test_view_chain_with_hidden_elements()
+    test_gradient_flow_through_views()
+
     test_argmin_max()
     test_fill()
     test_element_at()

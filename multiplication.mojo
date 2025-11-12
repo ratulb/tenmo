@@ -191,6 +191,11 @@ struct Multiplicator[dtype: DType]:
 
         return out^
 
+    @staticmethod
+    fn forward(self: Tensor[dtype], other: Gradbox[dtype]) -> Gradbox[dtype]:
+        var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer)
+        return Gradbox[dtype](nd_buffer^, share=False)
+
 
 fn main():
     print("passes")

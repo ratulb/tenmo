@@ -8,6 +8,7 @@ from broadcasthelper import ShapeBroadcaster
 from common_utils import panic
 from memory import memcpy, ArcPointer
 from collections import Set
+from sys import simd_width_of
 from operators import (
     Multiply,
     Add,
@@ -242,6 +243,132 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
             return self[index]
         else:
             return self[IntArray()]
+
+    fn load[
+        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
+    ](self, row: Int, col: Int) -> SIMD[dtype, simdwidth]:
+        """SIMD load of a row segment from a 2D Tensor.
+
+        Preconditions:
+            - NDBuffer must be 2D.
+            - Columns must be contiguous (stride[1] == 1) for SIMD loads.
+            - `col + simdwidth` must not exceed the number of columns.
+        """
+
+        constrained[
+            simdwidth.is_power_of_two(),
+            "NDBuffer → load: SIMD width must be a power of 2",
+        ]()
+
+        @parameter
+        if not validated:
+            var rank = self.rank()
+            var shape = self.shape
+
+            if rank != 2:
+                panic("NDBuffer → load: Only 2D buffers are supported.")
+
+            # Bounds check
+            if (
+                row < 0
+                or row >= shape[0]
+                or col < 0
+                or col + simdwidth > shape[1]
+            ):
+                panic(
+                    "NDBuffer → load: Out-of-bounds access. "
+                    + "Attempted row "
+                    + row.__str__()
+                    + ", col range ["
+                    + col.__str__()
+                    + ", "
+                    + (col + simdwidth).__str__()
+                    + ") "
+                    + "for shape "
+                    + shape.__str__()
+                    + "."
+                )
+
+        var strides = self.strides
+        var offset = self.offset
+
+        @parameter
+        if not validated:
+            # Contiguity check for SIMD
+            if simdwidth > 1 and strides[1] != 1:
+                panic(
+                    "NDBuffer → SIMD load requires contiguous column access. "
+                    + "Expected stride[1] == 1 but got "
+                    + strides[1].__str__()
+                    + ". "
+                    + "Use .contiguous() or scalar loads."
+                )
+
+        var addr = row * strides[0] + col * strides[1] + offset
+        return self.data().load[simdwidth](addr)
+
+    @always_inline
+    fn store[
+        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
+    ](self, row: Int, col: Int, value: SIMD[dtype, simdwidth]):
+        """SIMD store of a row segment into a 2D NDBuffer.
+
+        Preconditions:
+            - NDBuffer must be 2D.
+            - Columns must be contiguous for SIMD stores (stride[1] == 1).
+            - Caller may set validated=True if these checks are already ensured.
+        """
+
+        constrained[
+            simdwidth.is_power_of_two(),
+            "NDBuffer → store: SIMD width must be a power of 2",
+        ]()
+
+        @parameter
+        if not validated:
+            var rank = self.rank()
+            var shape = self.shape
+
+            if rank != 2:
+                panic("NDBuffer → store: Only 2D buffers are supported.")
+
+            # Bounds check
+            if (
+                row < 0
+                or row >= shape[0]
+                or col < 0
+                or col + simdwidth > shape[1]
+            ):
+                panic(
+                    "NDBuffer → store: Out-of-bounds access. "
+                    + "Attempted row "
+                    + row.__str__()
+                    + ", col range ["
+                    + col.__str__()
+                    + ", "
+                    + (col + simdwidth).__str__()
+                    + ") "
+                    + "for shape "
+                    + shape.__str__()
+                    + "."
+                )
+
+        var strides = self.strides
+        var offset = self.offset
+
+        @parameter
+        if not validated:
+            if simdwidth > 1 and strides[1] != 1:
+                panic(
+                    "NDBuffer → SIMD store requires contiguous column access. "
+                    + "Expected stride[1] == 1 but got "
+                    + strides[1].__str__()
+                    + ". "
+                    + "Use .contiguous() or scalar stores."
+                )
+
+        var addr = row * strides[0] + col * strides[1] + offset
+        self.data().store[simdwidth](addr, value)
 
     @always_inline
     fn is_scalar(self) -> Bool:
@@ -1017,7 +1144,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
             panic(
                 "NDBuffer → all_close(other) expects same shaped buffers: "
                 + self.shape.__str__()
-                + ", "
+                + "≠"
                 + other.shape.__str__()
             )
 

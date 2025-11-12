@@ -10,7 +10,8 @@ from ndbuffer import NDBuffer
 from broadcasthelper import ShapeBroadcaster
 from intlist import IntList
 from strides import Strides
-
+from sys import simd_width_of
+from matmul2d import Matmul2d
 
 struct Gradbox[dtype: DType](
     Copyable
@@ -337,6 +338,35 @@ struct Gradbox[dtype: DType](
             )
         self.buffer[indices] = value
 
+    @always_inline
+    fn load[
+        simdwidth: Int = simd_width_of[dtype](),
+        validated: Bool = False
+    ](self, row: Int, col: Int) -> SIMD[dtype, simdwidth]:
+        """SIMD load of a row segment from a 2D Gradbox.
+
+        Preconditions:
+            - Gradbox must be 2D.
+            - Columns must be contiguous (stride[1] == 1) for SIMD loads.
+            - `col + simdwidth` must not exceed the number of columns.
+        """
+        return self.buffer.load[simdwidth, validated](row, col)
+
+
+    @always_inline
+    fn store[
+        simdwidth: Int = simd_width_of[dtype](),
+        validated: Bool = False
+    ](self, row: Int, col: Int, value: SIMD[dtype, simdwidth]):
+        """SIMD store of a row segment into a 2D Gradbox.
+
+        Preconditions:
+            - Gradbox must be 2D.
+            - Columns must be contiguous for SIMD stores (stride[1] == 1).
+            - Caller may set validated=True if these checks are already ensured.
+        """
+        self.buffer.store[simdwidth, validated](row, col, value)
+
     fn item(self) -> Scalar[dtype]:
         return self.buffer.item()
 
@@ -473,6 +503,10 @@ struct Gradbox[dtype: DType](
         return Gradbox[dtype](
             self.buffer.arithmetic_ops[Multiply](other.buffer), share=False
         )
+
+    fn matmul_2d(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
+        return Matmul2d[dtype].forward(A, B)
+
 
     fn __add__(self, other: Self) -> Gradbox[dtype]:
         return Gradbox[dtype](

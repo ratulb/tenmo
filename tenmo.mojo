@@ -13,6 +13,8 @@ from common_utils_imports import *
 from common_utils import id as identity, IntArrayHelper, log_warning
 from operators_imports import *
 
+from matmul2d import Matmul2d
+
 # from walkback import *
 from backpropagation import BackwardFn
 from forwards import (
@@ -463,7 +465,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn to_dtype[NewType: DType](self) -> Tensor[NewType]:
         var new_type_buffer = self.buffer.to_dtype[NewType]()
-        return Tensor[NewType](new_type_buffer^)
+        return Tensor[NewType](
+            new_type_buffer^, requires_grad=self.requires_grad
+        )
 
     @always_inline
     fn add_ancestry(mut self, *parents: Tensor[dtype]):
@@ -929,59 +933,29 @@ struct Tensor[dtype: DType = DType.float32](
 
     @always_inline
     fn load[
-        simdwidth: Int = 1
+        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
     ](self, row: Int, col: Int) -> SIMD[dtype, simdwidth]:
-        constrained[
-            simdwidth.is_power_of_two(),
-            "Tensor → load: SIMD width (simdwidth) must be a power of 2",
-        ]()
-        rank = self.rank()
-        shape = self.shape()
-        if rank != 2:
-            panic("Tensor → load: supported only for 2D tensors")
+        """SIMD load of a row segment from a 2D Tensor.
 
-        if row < 0 or row >= shape[0] or col < 0 or col + simdwidth > shape[1]:
-            panic("Tensor → load: Out-of-bounds access")
-
-        strides = self.strides()
-        offset = self.offset()
-
-        if not self.is_contiguous() and strides[1] != 1 and simdwidth > 1:
-            panic(
-                "Tensor → SIMD load attempted on non-contiguous Tensor - only"
-                " single-element loads are permitted for non-contiguous tensor"
-            )
-
-        addr = row * strides[0] + col * strides[1] + offset
-        return self.buffer.data().load[simdwidth](addr)
+        Preconditions:
+            - Tensor must be 2D.
+            - Columns must be contiguous (stride[1] == 1) for SIMD loads.
+            - `col + simdwidth` must not exceed the number of columns.
+        """
+        return self.buffer.load[simdwidth, validated](row, col)
 
     @always_inline
     fn store[
-        simdwidth: Int = 1
+        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
     ](self, row: Int, col: Int, value: SIMD[dtype, simdwidth]):
-        constrained[
-            simdwidth.is_power_of_two(),
-            "Tensor → store: SIMD width (simdwidth) must be a power of 2",
-        ]()
-        rank = self.rank()
-        shape = self.shape()
-        if rank != 2:
-            panic("Tensor → store is supported only for 2D tensors")
+        """SIMD store of a row segment into a 2D Tensor.
 
-        if row < 0 or row >= shape[0] or col < 0 or col + simdwidth > shape[1]:
-            panic("Tensor → store: out-of-bounds access")
-
-        strides = self.strides()
-        offset = self.offset()
-
-        if not self.is_contiguous() and strides[1] != 1 and simdwidth > 1:
-            panic(
-                "Tensor → SIMD store attempted on non-contiguous Tensor - only"
-                " single-element stores are permitted for non-contiguous tensor"
-            )
-
-        addr = row * strides[0] + col * strides[1] + offset
-        self.buffer.data().store[simdwidth](addr, value)
+        Preconditions:
+            - Tensor must be 2D.
+            - Columns must be contiguous for SIMD stores (stride[1] == 1).
+            - Caller may set validated=True if these checks are already ensured.
+        """
+        self.buffer.store[simdwidth, validated](row, col, value)
 
     fn flatten[
         track_grad: Bool = True
@@ -1310,6 +1284,9 @@ struct Tensor[dtype: DType = DType.float32](
     # Element wise multiplication of two tensors
     fn __mul__(self, other: Self) -> Tensor[dtype]:
         return Multiplicator[dtype].forward[True](self, other)
+
+    fn __mul__(self, other: Gradbox[dtype]) -> Gradbox[dtype]:
+        return Multiplicator[dtype].forward(self, other)
 
     fn __pow__[
         track_grad: Bool = True
@@ -1760,6 +1737,14 @@ struct Tensor[dtype: DType = DType.float32](
 
         return source_indices^
 
+    fn matmul_2d[
+        track_grad: Bool = True
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+        return Matmul2d[dtype].forward[track_grad=track_grad](A, B)
+
+    fn matmul_2d(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
+        return Matmul2d[dtype].forward(A, B)
+
 
 @register_passable
 struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
@@ -1845,9 +1830,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
     ) -> Tensor[dtype]:
         return Matmul_nd[dtype].forward[track_grad](A, B, requires_grad)
 
-
-
-
     fn set(self, tensor: Tensor[dtype], *indices: Idx):
         shape, strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
@@ -1915,149 +1897,9 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
                 sliced[idx] = value"""
 
 
-from testing import assert_true
-
-
 fn main() raises:
-    # test_view_backward()
-    # test_complex_mixed_ops_backward()
-    # test_slice_backward()
-
-    # test_view_chain_with_hidden_elements()
-
-    test_gradient_flow_through_views()
-    pass
-
-
-fn test_slice_backward() raises:
-    print("test_slice_backward")
-    alias dtype = DType.float32
-    a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6], requires_grad=True)
-    r = a.reshape([2, 3])
-    s = r[Slice(1, None, None), Slice(0, 3, 1)]
-    s.sum().backward(42)
-    assert_true(
-        a.grad().as_tensor()[Slice(3, None, None)]
-        == Tensor[dtype]([42, 42, 42])
-    )
-
-
-fn test_view_backward() raises:
-    print("test_view_backward")
-    alias dtype = DType.float32
-    a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], requires_grad=True)
-    v = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
-    assert_true(v == Tensor[dtype].d2([[3, 4, 5, 6], [7, 8, 9, 10]]))
-
-    v2 = v.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
-    # v2 = v.view(shape=Shape(2, 2), strides=Strides(1, 1), offset=2)
-
-    assert_true(v2 == Tensor[dtype].d2([[3, 4], [5, 6]]))
-    # Test gradients
-    loss = v2.mean()
-    loss.backward()
-    assert_true(
-        a.grad() == Tensor[dtype]([0, 0, 0.25, 0.25, 0.25, 0.25, 0, 0, 0, 0])
-    )
-    assert_true(
-        a.grad().as_tensor()[Slice(2, 6, 1)]
-        == Tensor[dtype]([0.25, 0.25, 0.25, 0.25])
-    )
-
-
-fn test_complex_mixed_ops_backward() raises:
-    print("test_complex_mixed_ops_backward")
-    alias dtype = DType.float32
-    a = Tensor[dtype].d2(
-        [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], requires_grad=True
-    )
-    v = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
-    v.print()
-
-    v2 = v.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
-    v2.print()
-    v3 = v2.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=0)
-    v3.print()
-    c = v3.contiguous()
-    s = c.mean()
-    print("\nmean\n", s.item())
-    s.backward(42)
-
-    a.grad().print()
-
-    assert_true(
-        a.grad().as_tensor()[Slice(1, 2, None), Slice(None, None, None)]
-        == Tensor[dtype].d2([[10.5, 10.5, 10.5, 10.5]])
-    )
-
-
-fn test_view_chain_with_hidden_elements() raises:
-    print("=== Mojo: View chain with hidden elements ===")
-
-    var a = Tensor.d2(
-        [[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], [13, 14, 15, 16, 17, 18]],
-        requires_grad=True,
-    )
-
-    print("Original a:")
-    a.print()
-
-    # Parent view: offset=2, shape=(2,4), strides=(6,1)
-    # Should see: [3,4,5,6,9,10,11,12]
-    var v1 = a.view(shape=Shape(2, 4), strides=Strides(6, 1), offset=2)
-    print("\nView v1 (offset=2, should see elements from a[0,2] to a[1,3]):")
-    v1.print()
-
-    # Child view: offset=8 (from base!), shape=(2,2), strides=(6,1)
-    # This accesses elements that v1 CANNOT see: a[1,4], a[1,5], a[2,0], a[2,1]
-    var v2 = v1.view(shape=Shape(2, 2), strides=Strides(6, 1), offset=8)
-    print(
-        "\nView v2 (offset=8 from base, should access elements outside v1's"
-        " range):"
-    )
-    v2.print()
-
-    # Compute and backward
-    var result = v2.sum()
-    print("\nSum of v2:")
-    result.print()
-    result.backward()
-
-    print("\nGradient of a:")
-    a.grad().print()
-    print("Gradient should be 1.0 at positions corresponding to v2's elements")
-
-
-# Run the test
-
-
-fn test_gradient_flow_through_views() raises:
-    print("=== Testing Gradient Flow Through View Chain ===")
-
-    var a = Tensor.d2([[1, 2, 3, 4], [5, 6, 7, 8]], requires_grad=True)
-
-    print("Original a:")
-    a.print()
-
-    # Create view chain similar to PyTorch slicing
-    # v1 = a[:, 1:3] - elements [2,3,6,7]
-    var v1 = a.view(shape=Shape(2, 2), strides=Strides(4, 1), offset=1)
-    print("\nv1 = a[:, 1:3]:")
-    v1.print()
-
-    # v2 = v1[1:, :] - elements [6,7]
-    # var v2 = v1.view(shape=Shape(1, 2), strides=Strides(2, 1), offset=2)
-    var v2 = v1.view(shape=Shape(1, 2), strides=Strides(2, 1), offset=5)
-    # var v2 = v1[i(1), il(0, 1)]
-    print("v2 = v1[1:, :]:")
-    v2.print()
-
-    # Forward and backward
-    var result = v2.sum()
-    print("\nSum of v2:")
-    result.print()
-    result.backward()
-
-    print("\nGradient of a:")
-    a.grad().print()
-    print("Should show gradients only at positions that were in the view chain")
+    A = Tensor.rand(2, 3, 4, init_seed=42)
+    A.print()
+    A_indices = IntList(1)
+    A_slice = A[il(A_indices), s(), s()]
+    A_slice.print()
