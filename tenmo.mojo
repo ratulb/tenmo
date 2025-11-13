@@ -130,6 +130,18 @@ struct Tensor[dtype: DType = DType.float32](
         self.backwardFn = None
         self.init_gradbox()
 
+    fn build_view1(
+        mut self,
+        shape: Shape,
+        strides: Optional[Strides] = None,
+        offset: Int = 0,
+        requires_grad: Bool = False,
+    ) -> Tensor[dtype]:
+
+        buffer = self.buffer.share(shape, strides, offset)
+        return Tensor[dtype](buffer=buffer^, requires_grad=requires_grad)
+
+
     @staticmethod
     fn build_view(
         source: UnsafePointer[Self],
@@ -536,6 +548,17 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn address(self) -> UnsafePointer[Self,]:
         return UnsafePointer(to=self)
+
+    fn unsafe_address(
+        ref self,
+    ) -> UnsafePointer[
+        Self,
+        mut = Origin(origin_of(self)).mut,
+        origin = origin_of(self),
+    ]:
+        return UnsafePointer(to=self).mut_cast[
+            Origin(origin_of(self)).mut
+        ]()
 
     fn seed_grad(mut self, with_tensor: Tensor[dtype]):
         if not self.requires_grad:
@@ -1885,7 +1908,8 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
 
 
 fn main() raises:
-    A = Tensor.rand(2, 3, 4, init_seed=42, requires_grad=True)
+    pass
+    _="""A = Tensor.rand(2, 3, 4, init_seed=42, requires_grad=True)
     A.print()
     A_indices = IntArray(1)
     A_indices[0] = 1
@@ -1900,4 +1924,4 @@ fn main() raises:
     C.print()
     C.backward()
     print("\nB.grad\n")
-    B.grad().print()
+    B.grad().print()"""

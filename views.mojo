@@ -149,7 +149,8 @@ struct View[dtype: DType](Copyable):
 
         out = Tensor[dtype].build_view(
             #self.address(),
-            UnsafePointer(to=self),
+            #UnsafePointer(to=self),
+            self.unsafe_address(),
             shape,
             Optional(abs_strides),
             abs_offset,

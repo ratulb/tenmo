@@ -11,7 +11,7 @@ from broadcasthelper import ShapeBroadcaster
 from intlist import IntList
 from strides import Strides
 from sys import simd_width_of
-from matmul2d import Matmul2d
+from matmul import Matmul2d
 
 struct Gradbox[dtype: DType](
     Copyable
@@ -261,6 +261,26 @@ struct Gradbox[dtype: DType](
         out = Gradbox[dtype](broadcasted_buffer^, share=share)
         return out^
 
+    fn __getitem__(self, *indices: Idx) -> Gradbox[dtype]:
+        if not self.shared():
+            panic("Gradbox -> __getitem__(self, *indices: Idx): can not call on an unshared gradbox")
+        # Compute view metadata
+        view_shape, view_strides, relative_offset = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                self.shape(), self.strides(), indices
+            )
+        )
+
+        # Handle scalar (rank-0) case
+        is_scalar = len(view_shape) == 0
+        shape = Shape() if is_scalar else view_shape
+        strides = Strides() if is_scalar else view_strides
+        abs_offset = self.offset() + relative_offset
+        shared_buffer = self.buffer.shared_buffer.copy()
+        ndb = NDBuffer[dtype](shared_buffer=shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset)
+
+        return Gradbox[dtype](ndb^, share=False)
+
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
         if self.rank() == 0 and len(indices) != 0:
@@ -387,6 +407,10 @@ struct Gradbox[dtype: DType](
         return self.buffer.rank()
 
     @always_inline
+    fn offset(self) -> Int:
+        return self.buffer.offset
+
+    @always_inline
     fn shape(self) -> Shape:
         return self.buffer.shape
 
@@ -437,6 +461,9 @@ struct Gradbox[dtype: DType](
             s += "Gradbox"
         s += self.shape().__str__()
         s += ", Type: " + dtype.__str__()
+        s += ", Shared : " + self.shared().__str__()
+        s += ", Strides : " + self.strides().__str__()
+        s += ", Offset : " + self.offset().__str__()
         s += "]"
         return s
 
@@ -643,14 +670,24 @@ struct Gradbox[dtype: DType](
     fn __del__(deinit self):
         _ = self.buffer^
 
+from common_utils import s, il
 
 fn main() raises:
     alias dtype = DType.float32
-    gb = Gradbox[dtype].arange(0.2, 1.8, 0.3)
+    gb = Gradbox[dtype].arange(12).reshape(Shape([3, 4]))
+    r = gb[il(2), s()]
     gb.print()
-    run = 1
-    for _ in range(run):
-        pass
 
+    print(gb.buffer)
+    print(r.buffer)
+
+    r.print()
+
+    print(gb.buffer is r.buffer)
+
+    a = Tensor.arange(12).reshape(3, 4)
+    a_slice = a[il(1), s()]
+
+    a_slice.print()
 
 from testing import assert_true

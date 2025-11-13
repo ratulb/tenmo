@@ -1662,7 +1662,11 @@ struct ElementIterator[
 
 
 fn main() raises:
-    pass
+    alias dtype = DType.float32
+    l = List[Scalar[dtype]](0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    b = Buffer[dtype](l)
+    r = b[3:8]
+    print(r)
 
 
 from testing import assert_true, assert_false

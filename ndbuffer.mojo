@@ -25,7 +25,7 @@ from operators import (
 )
 
 
-struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
+struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringable & Representable & Writable):
     var shape: Shape
     var strides: Strides
     var offset: Int
@@ -370,6 +370,25 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         var addr = row * strides[0] + col * strides[1] + offset
         self.data().store[simdwidth](addr, value)
 
+
+    fn __str__(self) -> String:
+        s = String("NDBuffer [")
+        s += "Shape: " + self.shape.__str__()
+        s += ", Type: " + dtype.__str__()
+        s += ", Shared : " + self.shared().__str__()
+        s += ", Strides : " + self.strides.__str__()
+        s += ", Offset : " + self.offset.__str__()
+        s += ", Contiguous : " + self.is_contiguous().__str__()
+        s += ", Buffer size : " + self.size().__str__()
+        s += "]"
+        return s
+
+    fn __repr__(self) -> String:
+        return self.__str__()
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
+
     @always_inline
     fn is_scalar(self) -> Bool:
         return self.numels() == 1 and self.shape == Shape()
@@ -657,7 +676,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         return NDBuffer[dtype](Buffer[dtype](distincts), self.shape)
 
     @always_inline
-    fn fill_equal_shape(lhs, rhs: NDBuffer[dtype]):
+    fn fill_equal_shape[overwrite: Bool=True](lhs, rhs: NDBuffer[dtype]):
         if not lhs.shape == rhs.shape:
             panic(
                 "NDBuffer → fill_equal_shape(lhs, other): dimension mismatch: lhs shape",
@@ -670,15 +689,30 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
             panic(
                 "NDBuffer → fill_equal_shape(lhs, rhs): rhs is not contiguous",
             )
-        if lhs._contiguous:
-            lhs.data().overwrite(
-                 rhs.data(), lhs.offset, lhs.offset + lhs.numels()
-            )
+        @parameter
+        if overwrite:
+            if lhs._contiguous:
+                lhs.data().overwrite(
+                     rhs.data(), lhs.offset, lhs.offset + lhs.numels()
+                )
+            else:
+                var index = 0
+                for coord in lhs.shape:
+                    lhs[coord] = rhs.data()[index]
+                    index += 1
         else:
-            var index = 0
-            for coord in lhs.shape:
-                lhs[coord] = rhs.data()[index]
-                index += 1
+            if lhs._contiguous:
+                var existing = lhs.data()[lhs.offset:lhs.offset + lhs.numels()]
+                accumulated = rhs.data() + existing
+                lhs.data().overwrite(
+                     accumulated, lhs.offset, lhs.offset + lhs.numels()
+                )
+            else:
+                var index = 0
+                for coord in lhs.shape:
+                    lhs[coord] += rhs.data()[index]
+                    index += 1
+
 
     @always_inline
     fn fill(lhs, other: NDBuffer[dtype]):
