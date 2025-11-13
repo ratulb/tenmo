@@ -7,22 +7,7 @@ from testing import assert_true
 
 
 fn main() raises:
-    test_validate_broadcast_mask()
-
-
-fn test_validate_broadcast_mask() raises:
-    print("test_validate_broadcast_mask")
-    s1 = Shape(4, 2)
-    s2 = Shape(1, 2)
-    mask = ShapeBroadcaster.broadcast_mask_intlist(s2, s1)
-
-    assert_true(mask == IntList(1, 0), "broadcast mask assertion 1 failed")
-
-    s1 = Shape(5, 4, 3)
-    s2 = Shape(4, 3)
-    mask = ShapeBroadcaster.broadcast_mask_intlist(s2, s1)
-    assert_true(mask == IntList(1, 0, 0), "broadcast mask assertion 2 failed")
-
+    pass
 
 @register_passable
 struct ShapeBroadcaster:
@@ -165,7 +150,6 @@ struct ShapeBroadcaster:
                     return False
         return True
 
-
     @always_inline
     @staticmethod
     fn broadcast_mask(original_shape: Shape, target_shape: Shape) -> IntArray:
@@ -195,7 +179,20 @@ struct ShapeBroadcaster:
 
         return mask^
 
-    @always_inline
     @staticmethod
-    fn broadcast_mask_intlist(original_shape: Shape, target_shape: Shape) -> IntList:
-        return IntList(Self.broadcast_mask(original_shape, target_shape))
+    fn broadcasted_indices(
+        target_indices: IntArray, target_shape: Shape, source_shape: Shape
+    ) -> IntArray:
+        # Get coordinates for source tensor given target coordinates
+        var source_indices = IntArray(size=len(source_shape))
+
+        for i in range(len(source_shape)):
+            target_idx = len(target_shape) - len(source_shape) + i
+            if source_shape[i] == 1:
+                source_indices[i] = 0  # Broadcasted dimension → use 0
+            else:
+                source_indices[i] = target_indices[
+                    target_idx
+                ]  # Normal dimension
+
+        return source_indices^

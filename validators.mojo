@@ -3,7 +3,7 @@ from intlist import IntList
 from strides import Strides
 from common_utils import Slicer, panic, Idx, NewAxis, i, s, il, newaxis
 from tenmo import Tensor
-
+from layout.int_tuple import IntArray
 
 struct Validator:
     @staticmethod
@@ -469,8 +469,8 @@ struct Validator:
                 continue
             elif idx.isa[Int]():
                 required_rank += 1
-            elif idx.isa[IntList]():
-                required_rank += len(idx[IntList])
+            elif idx.isa[IntArray]():
+                required_rank += idx[IntArray].size()
             elif idx.isa[Slice]():
                 required_rank += 1
 
@@ -510,9 +510,9 @@ struct Validator:
                     )
                 offset += axis * stride_dim
                 # No shape/strides append (reduces rank)
-            elif idx.isa[IntList]():
-                list = idx[IntList]
-                for t in range(len(list)):
+            elif idx.isa[IntArray]():
+                list = idx[IntArray]
+                for t in range(list.size()):
                     shape_dim = original_shape[dim_counter]
                     stride_dim = original_strides[dim_counter]
                     dim_counter += 1

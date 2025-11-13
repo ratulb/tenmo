@@ -100,14 +100,6 @@ fn variadiclist_as_str1(list: VariadicList[Int]) -> String:
     return s
 
 
-# Convert a VariadicList to List
-fn variadiclist_as_intlist(vlist: VariadicList[Int]) -> IntList:
-    list = IntList.with_capacity(capacity=len(vlist))
-    for each in vlist:
-        list.append(each)
-    return list^
-
-
 # Create a single or two element(s) VariadicList
 fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int]:
     fn create_variadic_list(*elems: Int) -> VariadicList[Int]:
@@ -123,7 +115,7 @@ struct NewAxis(Copyable & Movable):  # Empty struct as a sentinel
     pass
 
 
-alias Idx = Variant[Int, IntList, Slice, NewAxis]
+alias Idx = Variant[Int, IntArray, Slice, NewAxis]
 
 alias newaxis = Idx(NewAxis())
 
@@ -132,12 +124,15 @@ fn i(value: Int) -> Idx:
     return Idx(value)
 
 
-fn il(index_list: IntList) -> Idx:
+fn il(index_list: IntArray) -> Idx:
     return Idx(index_list)
 
 
 fn il(*indices: Int) -> Idx:
-    return Idx(IntList(indices))
+    intarray = IntArray(size=len(indices))
+    for i in range(len(indices)):
+        intarray[i] = indices[i]
+    return Idx(intarray)
 
 
 fn s() -> Idx:

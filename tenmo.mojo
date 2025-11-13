@@ -13,7 +13,7 @@ from common_utils_imports import *
 from common_utils import id as identity, IntArrayHelper, log_warning
 from operators_imports import *
 
-from matmul2d import Matmul2d
+from matmul import Matmul2d, MatmulNd
 
 # from walkback import *
 from backpropagation import BackwardFn
@@ -275,13 +275,14 @@ struct Tensor[dtype: DType = DType.float32](
         is_scalar = len(view_shape) == 0
         shape = Shape() if is_scalar else view_shape
         strides = Strides() if is_scalar else view_strides
+        abs_offset = self.offset() + offset
         return View[dtype].forward[track_grad=True](
             self,
             shape,
             strides,
-            offset,
+            abs_offset,
             self.requires_grad,
-            True,
+            validated=True,
         )
 
     @always_inline
@@ -1719,24 +1720,6 @@ struct Tensor[dtype: DType = DType.float32](
         )
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
-    @staticmethod
-    fn broadcasted_indices(
-        target_indices: IntList, target_shape: Shape, source_shape: Shape
-    ) -> IntList:
-        # Get coordinates for source tensor given target coordinates
-        var source_indices = IntList.with_capacity(len(source_shape))
-
-        for i in range(len(source_shape)):
-            target_idx = len(target_shape) - len(source_shape) + i
-            if source_shape[i] == 1:
-                source_indices.append(0)  # Broadcasted dimension → use 0
-            else:
-                source_indices.append(
-                    target_indices[target_idx]
-                )  # Normal dimension
-
-        return source_indices^
-
     fn matmul_2d[
         track_grad: Bool = True
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
@@ -1745,6 +1728,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn matmul_2d(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
         return Matmul2d[dtype].forward(A, B)
 
+    fn matmul_nd[
+        track_grad: Bool = True
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+        return MatmulNd[dtype].forward[track_grad=track_grad](A, B)
 
 @register_passable
 struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
@@ -1898,8 +1885,19 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
 
 
 fn main() raises:
-    A = Tensor.rand(2, 3, 4, init_seed=42)
+    A = Tensor.rand(2, 3, 4, init_seed=42, requires_grad=True)
     A.print()
-    A_indices = IntList(1)
+    A_indices = IntArray(1)
+    A_indices[0] = 1
     A_slice = A[il(A_indices), s(), s()]
+    print("\nA_slice\n")
     A_slice.print()
+    B = Tensor.rand(4, 2, init_seed=42, requires_grad=True)
+    print("\nB\n")
+    B.print()
+    C = A_slice.matmul_2d(B)
+    print("\nC\n")
+    C.print()
+    C.backward()
+    print("\nB.grad\n")
+    B.grad().print()

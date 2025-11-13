@@ -1,501 +1,349 @@
-from tensors import Tensor
-from shared import TensorLite
-from shapes import Shape
+from tenmo import Tensor
+from algorithm import vectorize
+from sys import simd_width_of
+from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
-from sys import simdwidthof
-from common_utils import il, s
-from dotproduct import DotBackward
-from vectormatrixmm import VectorMatrixMMBackward
-from matrixvectormm import MatrixVectorMMBackward
+from gradbox import Gradbox
+from ancestry import Ancestor
+from shapes import Shape
 
 
 @fieldwise_init
 @register_passable
-struct MatmulBackward[dtype: DType](Copyable):
+struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
+    fn backward[
+        simdwidth: Int = simd_width_of[dtype]()
+    ](self, output: Tensor[dtype]) -> List[
+        Tuple[Ancestor[dtype], Gradbox[dtype], Int]
+    ]:
+        var grad_out = output.grad().copy()  # Always contiguous
+        var A = output.ancestry().get(0)  # First input
+        var B = output.ancestry().get(1)  # Second input
+
+        var A_shape = A.shape()
+        var B_shape = B.shape()
+        var m = A_shape[0]
+        var n = A_shape[1]  # == B_shape[0]
+        var p = B_shape[1]
+
+        var result = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
+
+        # ===== GRADIENT FOR A: dL/dA = dL/dC × B^T =====
+        if A.requires_grad():
+            var grad_A = Gradbox[dtype].zeros(Shape([m, n]))
+
+            # Only compute B^T if we need gradients for A. We male B^T contiguous
+            var B_T = B.tensor().transpose[track_grad=False](1, 0).contiguous()
+
+            for i in range(m):
+                for k in range(p):
+                    var grad_ik = grad_out.load[simdwidth=1, validated=True](
+                        i, k
+                    )
+
+                    @parameter
+                    fn process_columns_a[simd_width: Int](j: Int):
+                        var b_vec = B_T.load[
+                            simdwidth=simd_width, validated=True
+                        ](k, j)
+                        var grad_a_vec = grad_A.load[
+                            simdwidth=simd_width, validated=True
+                        ](i, j)
+                        var result = grad_ik * b_vec + grad_a_vec
+                        grad_A.store[simdwidth=simd_width, validated=True](
+                            i, j, result
+                        )
+
+                    vectorize[process_columns_a, simdwidth](n)
+
+            result.append((A.copy(), grad_A^, AddTensor))
+
+        # ===== GRADIENT FOR B: dL/dB = A^T × dL/dC =====
+        if B.requires_grad():
+            var grad_B = Gradbox[dtype].zeros(Shape([n, p]))
+
+            # Only compute A^T if we need gradients for B
+            # var A_T = A.transpose().contiguous()
+            var A_T = A.tensor().transpose[track_grad=False](1, 0)
+
+            for j in range(n):
+                for i in range(m):
+                    var a_ji = A_T.load[simdwidth=1, validated=True](j, i)
+
+                    @parameter
+                    fn process_columns_b[simd_width: Int](k: Int):
+                        var grad_vec = grad_out.load[
+                            simdwidth=simd_width, validated=True
+                        ](i, k)
+                        var grad_b_vec = grad_B.load[
+                            simdwidth=simd_width, validated=True
+                        ](j, k)
+                        var result = a_ji * grad_vec + grad_b_vec
+                        grad_B.store[simdwidth=simd_width, validated=True](
+                            j, k, result
+                        )
+
+                    vectorize[process_columns_b, simdwidth](p)
+
+            result.append((B^, grad_B^, AddTensor))
+
+        return result^
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
 
-    fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        ancestor_1 = output.ancestry().get(0)
-        ancestor_2 = output.ancestry().get(1)
-
-        var outgoing_grads: List[
-            Tuple[TensorLite[dtype], Tensor[dtype], Int]
-        ] = []
-
-        dA, dB = Self.matmul_backward(
-            output.gradients(),
-            ancestor_1.inner_address(),
-            ancestor_2.inner_address(),
-            False,
-            False,
-        )
-
-        if dA:
-            outgoing_grads.append(
-                (
-                    ancestor_1,
-                    dA.take(),
-                    AddTensor,
-                )
-            )
-        if dB:
-            outgoing_grads.append(
-                (
-                    ancestor_2,
-                    dB.take(),
-                    AddTensor,
-                )
-            )
-
-        return outgoing_grads
-
-    @staticmethod
-    fn matmul_backward(
-        gradients_ptr: UnsafePointer[Tensor[dtype]],
-        A_ptr: UnsafePointer[Tensor[dtype]],
-        B_ptr: UnsafePointer[Tensor[dtype]],
-        trans_a: Bool = False,
-        trans_b: Bool = False,
-    ) -> (Optional[Tensor[dtype]], Optional[Tensor[dtype]]):
-        var dA: Optional[Tensor[dtype]] = None
-        var dB: Optional[Tensor[dtype]] = None
-
-        A = A_ptr[]
-        B = B_ptr[]
-        gradients = gradients_ptr[]
-
-        if not trans_a and not trans_b:
-            # Forward: C = A @ B
-            if A.requires_grad:
-                B_transposed = B.transpose[track_grad=False](
-                    requires_grad=False
-                )
-
-                dA = Optional(gradients.matmul(B_transposed))
-                B_transposed.free()
-            if B.requires_grad:
-                A_transposed = A.transpose[track_grad=False](
-                    requires_grad=False
-                )
-                dB = Optional(A_transposed.matmul(gradients))
-                A_transposed.free()
-
-        elif trans_a and not trans_b:
-            # Forward: C = A^T @ B
-            if A.requires_grad:
-                grad_transposed = gradients.transpose[track_grad=False](
-                    requires_grad=False
-                )
-
-                dA = Optional(B.matmul(grad_transposed))
-                grad_transposed.free()
-
-            if B.requires_grad:
-                dB = Optional(A.matmul(gradients))
-
-        elif not trans_a and trans_b:
-            # Forward: C = A @ B^T
-            if A.requires_grad:
-                dA = Optional(gradients.matmul(B))
-
-            if B.requires_grad:
-                grad_transposed = gradients.transpose[track_grad=False](
-                    requires_grad=False
-                )
-
-                dB = Optional(grad_transposed.matmul(A))
-                grad_transposed.free()
-
-        else:
-            # trans_a and trans_b
-            # Forward: C = A^T @ B^T
-            if A.requires_grad:
-                B_transposed = B.transpose[track_grad=False](
-                    requires_grad=False
-                )
-
-                grad_transposed = gradients.transpose[track_grad=False](
-                    requires_grad=False
-                )
-
-                dA = Optional(B_transposed.matmul(grad_transposed))
-                grad_transposed.free()
-                B_transposed.free()
-            if B.requires_grad:
-                grad_transposed = gradients.transpose[track_grad=False](
-                    requires_grad=False
-                )
-
-                A_transposed = A.transpose[track_grad=False](
-                    requires_grad=False
-                )
-
-                dB = Optional(grad_transposed.matmul(A_transposed))
-                A_transposed.free()
-                grad_transposed.free()
-            gradients.free()
-        return dA, dB
-
 
 @fieldwise_init
 @register_passable
-struct BatchedMatmulBackward[dtype: DType](Copyable):
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
-
-    fn backward(
-        self, output: TensorLite[dtype]
-    ) -> List[Tuple[TensorLite[dtype], Tensor[dtype], Int]]:
-        ancestor_1 = output.ancestry().get(0)
-        ancestor_2 = output.ancestry().get(1)
-        var outgoing_grads: List[
-            Tuple[TensorLite[dtype], Tensor[dtype], Int]
-        ] = []
-
-        dA, dB = Self.batched_matmul_backward(
-            output.gradients(),
-            ancestor_1.inner_address(),
-            ancestor_2.inner_address(),
-            False,
-            False,
-        )
-
-        if dA:
-            outgoing_grads.append(
-                (
-                    ancestor_1,
-                    dA.take(),
-                    AddTensor,
-                )
-            )
-        if dB:
-            outgoing_grads.append(
-                (
-                    ancestor_2,
-                    dB.take(),
-                    AddTensor,
-                )
-            )
-
-        return outgoing_grads
-
+struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     @staticmethod
-    fn batched_matmul_backward(
-        gradients_ptr: UnsafePointer[Tensor[dtype]],
-        A_ptr: UnsafePointer[Tensor[dtype]],
-        B_ptr: UnsafePointer[Tensor[dtype]],
-        trans_a: Bool = False,
-        trans_b: Bool = False,
-    ) -> (Optional[Tensor[dtype]], Optional[Tensor[dtype]]):
-        var dA: Optional[Tensor[dtype]] = None
-        var dB: Optional[Tensor[dtype]] = None
-
-        A = A_ptr[]
-        B = B_ptr[]
-        gradients = gradients_ptr[]
-        if not trans_a and not trans_b:
-            # Forward: C = A @ B
-            if A.requires_grad:
-                B_transposed = B.transpose[track_grad=False](
-                    axes=[-1, -2], requires_grad=False
-                )
-                A_batch_grad = gradients.matmul_nd(B_transposed)
-                dA = Optional(
-                    Tensor[dtype].sum_over_broadcasted_axes(
-                        A_batch_grad, A.shape
-                    )
-                )
-                B_transposed.free()
-                A_batch_grad.free()
-            if B.requires_grad:
-                A_transposed = A.transpose[track_grad=False](
-                    axes=[-1, -2], requires_grad=False
-                )
-                B_batch_grad = A_transposed.matmul_nd(gradients)
-                dB = Optional(
-                    Tensor[dtype].sum_over_broadcasted_axes(
-                        B_batch_grad, B.shape
-                    )
-                )
-
-                A_transposed.free()
-                B_batch_grad.free()
-
-        elif trans_a and not trans_b:
-            # Forward: C = A^T @ B
-            if A.requires_grad:
-                axes = gradients.shape.intlist()
-                axes.swap(-2, -1)
-                grad_transposed = gradients.transpose[track_grad=False](
-                    axes=axes, requires_grad=False
-                )
-                A_batch_grad = B.matmul_nd(grad_transposed)
-                dA = Optional(
-                    Tensor[dtype].sum_over_broadcasted_axes(
-                        A_batch_grad, A.shape
-                    )
-                )
-
-                grad_transposed.free()
-                A_batch_grad.free()
-
-            if B.requires_grad:
-                B_batch_grad = A.matmul_nd(gradients)
-                dB = Optional(
-                    Tensor[dtype].sum_over_broadcasted_axes(
-                        B_batch_grad, B.shape
-                    )
-                )
-                B_batch_grad.free()
-
-        elif not trans_a and trans_b:
-            # Forward: C = A @ B^T
-            if A.requires_grad:
-                dA = Optional(gradients.matmul(B))
-            if B.requires_grad:
-                grad_transposed = gradients.transpose[track_grad=False](
-                    requires_grad=False
-                )
-                dB = Optional(grad_transposed.matmul(A))
-                grad_transposed.free()
-
-        else:
-            # trans_a and trans_b
-            # Forward: C = A^T @ B^T
-            if A.requires_grad:
-                B_transposed = B.transpose[track_grad=False](
-                    requires_grad=False
-                )
-                grad_transposed = gradients.transpose[track_grad=False](
-                    requires_grad=False
-                )
-
-                dA = Optional(B_transposed.matmul(grad_transposed))
-                B_transposed.free()
-                grad_transposed.free()
-
-            if B.requires_grad:
-                grad_transposed = gradients.transpose[track_grad=False](
-                    requires_grad=False
-                )
-                A_transposed = A.transpose[track_grad=False](
-                    requires_grad=False
-                )
-
-                dB = Optional(grad_transposed.matmul(A_transposed))
-                grad_transposed.free()
-                A_transposed.free()
-            gradients.free()
-
-        return dA, dB
-
-
-@fieldwise_init
-@register_passable
-struct Matmul[dtype: DType](Copyable):
-    @staticmethod
+    @always_inline
     fn forward[
-        track_grad: Bool = True, simd_width: Int = simdwidthof[dtype]()
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        rank_a = A.rank()
-        rank_b = B.rank()
-        requires_grad = A.requires_grad or B.requires_grad
+        var A_shape = A.shape()
+        var B_shape = B.shape()
+        var m = A_shape[0]
+        var n = A_shape[1]
+        var p = B_shape[1]
+        # Validate shapes
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+        var C = Tensor[dtype].zeros(Shape([m, p]))
 
-        if rank_a <= 1 and rank_b <= 1:
-            C = A.dot[track_grad=False](B, requires_grad=False)
+        # Check if B is SIMD-friendly (contiguous in its row-major layout)
+        var contiguous = B.is_contiguous()
 
-            @parameter
-            if track_grad:
-                if requires_grad:
-                    C.requires_grad_()
-                    backward_fn = DotBackward[dtype]().into_backward_fn()
-                    C.backwardFn = Optional(backward_fn)
-                    C.add_ancestry(A, B)
-            return C
+        if contiguous:
+            # FAST PATH: SIMD vectorization over columns
+            for i in range(m):
+                for k in range(n):
+                    var a_ik = A.load[simdwidth=1, validated=True](
+                        i, k
+                    )  # Single scalar load
 
-        elif rank_a == 1 and rank_b >= 2:
-            C = A.vector_matrix_mm[track_grad=False](B, requires_grad=False)
+                    @parameter
+                    fn process_columns[simd_width: Int](j: Int):
+                        # Load contiguous SIMD vector from B's row
+                        var b_vec = B.load[
+                            simdwidth=simd_width, validated=True
+                        ](k, j)
+                        var c_vec = C.load[
+                            simdwidth=simd_width, validated=True
+                        ](i, j)
+                        var result = a_ik * b_vec + c_vec
+                        C.store[simdwidth=simd_width, validated=True](
+                            i, j, result
+                        )
 
-            @parameter
-            if track_grad:
-                if requires_grad:
-                    C.requires_grad_()
-                    backward_fn = VectorMatrixMMBackward[
-                        dtype
-                    ]().into_backward_fn()
-                    C.backwardFn = Optional(backward_fn)
-                    C.add_ancestry(A, B)
-            return C
-
-        elif rank_a >= 2 and rank_b == 1:
-            C = A.matrix_vector_mm[track_grad=False](B, requires_grad=False)
-
-            @parameter
-            if track_grad:
-                if requires_grad:
-                    C.requires_grad_()
-                    backward_fn = MatrixVectorMMBackward[
-                        dtype
-                    ]().into_backward_fn()
-                    C.backwardFn = Optional(backward_fn)
-                    C.add_ancestry(A, B)
-            return C
+                    # Vectorize across all columns of B and C
+                    vectorize[process_columns, simdwidth](p)
 
         else:
-            C = A.matmul_nd[track_grad=False](B, requires_grad=False)
+            # SLOW PATH: Scalar fallback for non-contiguous B
+            for i in range(m):
+                for k in range(n):
+                    var a_ik = A.load[simdwidth=1, validated=True](i, k)
+                    for j in range(p):
+                        # Scalar access - works for any stride pattern
+                        var current = C.load[simdwidth=1, validated=True](i, j)
+                        var result = current + (
+                            a_ik * B.load[simdwidth=1, validated=True](k, j)
+                        )
+                        C.store[simdwidth=1, validated=True](
+                            i,
+                            j,
+                            result,
+                        )
 
-            @parameter
-            if track_grad:
-                if requires_grad:
-                    C.requires_grad_()
-                    if rank_a == 2 and rank_b == 2:
-                        mbfn = MatmulBackward[dtype]().into_backward_fn()
-                        C.backwardFn = Optional(mbfn)
-                    else:
-                        bmbfn = BatchedMatmulBackward[
-                            dtype
-                        ]().into_backward_fn()
-                        C.backwardFn = Optional(bmbfn)
-
-                    C.add_ancestry(A, B)
-
-            return C
-
-
-@fieldwise_init
-@register_passable
-struct Matmul_2d[dtype: DType](Copyable):
-    @staticmethod
-    fn forward[
-        track_grad: Bool = True, simd_width: Int = simdwidthof[dtype]()
-    ](
-        A_ptr: UnsafePointer[Tensor[dtype]],
-        B_ptr: UnsafePointer[Tensor[dtype]],
-        C_ptr: UnsafePointer[Tensor[dtype]] = UnsafePointer[Tensor[dtype]](),
-        requires_grad: Bool = True,
-    ) -> Tensor[dtype]:
-        A = A_ptr[]
-        B = B_ptr[]
-
-        Shape.validate_matrix_shapes_2d(A.shape, B.shape)
-
-        rows_a = A.shape[0]
-        cols_a = A.shape[1]
-        cols_b = B.shape[1]
-        packed = B.is_contiguous()
-
-        C = C_ptr[] if C_ptr.__as_bool__() else Tensor[dtype].zeros(
-            rows_a, cols_b
-        )
-        for i in range(0, rows_a):
-            for j in range(0, cols_b, simd_width):
-                mbatch = min(simd_width, cols_b - j)
-                var accum = SIMD[dtype, simd_width](0)
-
-                for k in range(0, cols_a):
-                    scalar_a = A.load(i, k)
-                    if packed and mbatch == simd_width:
-                        simd_vector = B.load[simd_width](k, j)
-                        accum += simd_vector * scalar_a
-                    else:
-                        # mbatch < simd_width or scattered B cols
-                        for step in range(0, mbatch):
-                            scalar_b = B.load(k, j + step)
-                            accum[step] += scalar_a * scalar_b
-
-                if mbatch == simd_width:
-                    C.store[simd_width](i, j, accum)
-                else:
-                    for step in range(0, mbatch):
-                        C.store(i, j + step, accum[step])
-
+        # Only attach backward handler if gradients are needed
         @parameter
         if track_grad:
-            grad_required = (
-                A.requires_grad or B.requires_grad
-            ) and requires_grad
-
-            if grad_required:
+            var requires_grad = A.requires_grad or B.requires_grad
+            if requires_grad:
                 C.requires_grad_(True)
-                backward_fn = MatmulBackward[dtype]().into_backward_fn()
-                C.backwardFn = Optional(backward_fn)
-                C.add_ancestry(A, B)
+                var backward_fn = Matmul2dBackward[dtype]().into_backward_fn()
+                C.backwardFn = Optional(backward_fn^)
+                C.add_ancestry(A)
+                C.add_ancestry(B)
 
-        return C
+        return C^
+
+    # Tensor and Gradbox matmul_2d - No backward fn
+    @staticmethod
+    @always_inline
+    fn forward[
+        simdwidth: Int = simd_width_of[dtype]()
+    ](A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
+        var A_shape = A.shape()
+        var B_shape = B.shape()
+        var m = A_shape[0]
+        var n = A_shape[1]
+        var p = B_shape[1]
+        # Validate shapes
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+
+        var C = Gradbox[dtype].zeros(Shape([m, p]))
+
+        # FAST PATH: SIMD vectorization over columns - Gradbox is always contiguous
+        for i in range(m):
+            for k in range(n):
+                var a_ik = A.load[simdwidth=1, validated=True](
+                    i, k
+                )  # Single scalar load
+
+                @parameter
+                fn process_columns[simd_width: Int](j: Int):
+                    # Load contiguous SIMD vector from B's row
+                    var b_vec = B.load[simdwidth=simd_width, validated=True](
+                        k, j
+                    )
+                    var c_vec = C.load[simdwidth=simd_width, validated=True](
+                        i, j
+                    )
+                    var result = a_ik * b_vec + c_vec
+                    C.store[simdwidth=simd_width, validated=True](i, j, result)
+
+                # Vectorize across all columns of B and C
+                vectorize[process_columns, simdwidth](p)
+
+        return C^
+
+    # Gradbox and Tensor matmul_2d - No backward fn
+    @staticmethod
+    @always_inline
+    fn forward[
+        simdwidth: Int = simd_width_of[dtype]()
+    ](A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
+        var A_shape = A.shape()
+        var B_shape = B.shape()
+        var m = A_shape[0]
+        var n = A_shape[1]
+        var p = B_shape[1]
+        # Validate shapes
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+
+        var C = Gradbox[dtype].zeros(Shape([m, p]))
+
+        # FAST PATH: SIMD vectorization over columns - Gradbox is always contiguous
+        B_contiguous = B.copy() if B.is_contiguous() else B.contiguous()
+        for i in range(m):
+            for k in range(n):
+                var a_ik = A.load[simdwidth=1, validated=True](
+                    i, k
+                )  # Single scalar load
+
+                @parameter
+                fn process_columns[simd_width: Int](j: Int):
+                    # Load contiguous SIMD vector from B's row
+                    var b_vec = B_contiguous.load[
+                        simdwidth=simd_width, validated=True
+                    ](k, j)
+                    var c_vec = C.load[simdwidth=simd_width, validated=True](
+                        i, j
+                    )
+                    var result = a_ik * b_vec + c_vec
+                    C.store[simdwidth=simd_width, validated=True](i, j, result)
+
+                # Vectorize across all columns of B and C
+                vectorize[process_columns, simdwidth](p)
+
+        return C^
+
+
+from broadcasthelper import ShapeBroadcaster
+from common_utils import il, s
 
 
 @fieldwise_init
 @register_passable
-struct Matmul_nd[dtype: DType](Copyable):
+struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
+    fn backward(
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        var grad_out = output.grad().copy()
+        var A = output.ancestry().get(0)
+        var B = output.ancestry().get(1)
+
+        var results = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
+
+        if A.requires_grad():
+            var grad_A = MatmulNd.forward[track_grad=False](
+                grad_out.as_tensor(),
+                B.tensor().transpose[track_grad=False](axes=[-1, -2]),
+            ).as_gradbox()
+            grad_A = grad_A.sum_over_broadcasted_axes(A.shape())
+            results.append((A.copy(), grad_A^, AddTensor))
+
+        if B.requires_grad():
+            var grad_B = MatmulNd.forward[track_grad=False](
+                A.tensor().transpose[track_grad=False](axes=[-1, -2]),
+                grad_out.as_tensor(),
+            ).as_gradbox()
+            grad_B = grad_B.sum_over_broadcasted_axes(B.shape())
+            results.append((B^, grad_B^, AddTensor))
+
+        return results^
+
+    fn into_backward_fn(self) -> BackwardFn[dtype]:
+        return BackwardFn[dtype](Delegate[dtype](self))
+
+
+@fieldwise_init
+@register_passable
+struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](
-        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
-    ) -> Tensor[dtype]:
-        Shape.validate_matrix_shapes_nd(A.shape, B.shape)
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+        A_shape = A.shape()
+        B_shape = B.shape()
+        MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
         # shapes: batch + [m, k], batch + [k, n]
-        batch_shape = Shape.broadcast_shape(
-            A.shape[0:-2], B.shape[0:-2]
+        batch_shape = ShapeBroadcaster.broadcast_shape(
+            A_shape[0:-2], B_shape[0:-2]
         )  # all dims except last 2
 
-        m = A.shape[-2]
-        n = B.shape[-1]
+        m = A_shape[-2]
+        n = B_shape[-1]
 
-        batch_dims_a = A.shape[:-2]
-        batch_dims_b = B.shape[:-2]
+        batch_dims_a = A_shape[:-2]
+        batch_dims_b = B_shape[:-2]
 
         out_shape = batch_shape + [m, n]
         C = Tensor[dtype].zeros(out_shape)
 
         for indices in batch_shape:
             # select batch slices
-            A_indices = Tensor[dtype].broadcasted_indices(
+            A_indices = ShapeBroadcaster.broadcasted_indices(
                 indices, batch_shape, batch_dims_a
             )
-            B_indices = Tensor[dtype].broadcasted_indices(
+            B_indices = ShapeBroadcaster.broadcasted_indices(
                 indices, batch_shape, batch_dims_b
             )
             A_slice = A[il(A_indices), s(), s()]
             B_slice = B[il(B_indices), s(), s()]
             C_slice = C[il(indices), s(), s()]
 
-            _ = Matmul_2d.forward[track_grad=False](
-                UnsafePointer(to=A_slice),
-                UnsafePointer(to=B_slice),
-                UnsafePointer(to=C_slice),
-                requires_grad=False,
+            result = Matmul2d.forward[track_grad=False](
+                A_slice,
+                B_slice,
             )
-            A_slice.free()
-            B_slice.free()
-            C_slice.free()
+            C_slice.buffer.fill_equal_shape(result.buffer)
 
+        # Only attach backward handler if gradients are needed
         @parameter
         if track_grad:
-            grad_required = (
-                A.requires_grad or B.requires_grad
-            ) and requires_grad
+            var requires_grad = A.requires_grad or B.requires_grad
+            if requires_grad:
+                C.requires_grad_(True)
+                var backward_fn = MatmulNdBackward[dtype]().into_backward_fn()
+                C.backwardFn = Optional(backward_fn^)
+                C.add_ancestry(A)
+                C.add_ancestry(B)
 
-            if grad_required:
-                C.requires_grad_()
-
-                two_dim = A.rank() == 2 and B.rank() == 2
-
-                if two_dim:
-                    mbfn = MatmulBackward[dtype]().into_backward_fn()
-                    C.backwardFn = Optional(mbfn)
-                else:
-                    bmbfn = BatchedMatmulBackward[dtype]().into_backward_fn()
-                    C.backwardFn = Optional(bmbfn)
-
-                C.add_ancestry(A, B)
-
-        return C
+        return C^
 
 
-fn main():
+fn main() raises:
     pass

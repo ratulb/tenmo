@@ -389,6 +389,18 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
             max_index += (self.shape[i] - 1) * abs(self.strides[i])
         return max_index
 
+    @always_inline
+    fn offset_at(self, indices: IntArray) -> Int:
+        """Return the absolute linear offset in the underlying buffer
+        for the given multidimensional indices."""
+        if indices.size() != self.rank():
+            panic("NDBuffer.offset_at: Incorrect number of indices")
+
+        return IndexCalculator.flatten_index(
+            self.shape, indices, self.strides, self.offset
+        )
+
+
     fn to_dtype[NewType: DType](self) -> NDBuffer[NewType]:
         new_buffer = self.contiguous_buffer().to_dtype[NewType]()
         return NDBuffer[NewType](new_buffer^, self.shape)
@@ -643,6 +655,30 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable):
         for elem in uniques:
             distincts.append(elem)
         return NDBuffer[dtype](Buffer[dtype](distincts), self.shape)
+
+    @always_inline
+    fn fill_equal_shape(lhs, rhs: NDBuffer[dtype]):
+        if not lhs.shape == rhs.shape:
+            panic(
+                "NDBuffer → fill_equal_shape(lhs, other): dimension mismatch: lhs shape",
+                lhs.shape.__str__(),
+                "≠",
+                "other shape",
+                rhs.shape.__str__(),
+            )
+        if not rhs._contiguous:
+            panic(
+                "NDBuffer → fill_equal_shape(lhs, rhs): rhs is not contiguous",
+            )
+        if lhs._contiguous:
+            lhs.data().overwrite(
+                 rhs.data(), lhs.offset, lhs.offset + lhs.numels()
+            )
+        else:
+            var index = 0
+            for coord in lhs.shape:
+                lhs[coord] = rhs.data()[index]
+                index += 1
 
     @always_inline
     fn fill(lhs, other: NDBuffer[dtype]):

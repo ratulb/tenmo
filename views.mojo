@@ -129,11 +129,11 @@ struct View[dtype: DType](Copyable):
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[dtype]:
-        if not self.is_contiguous():
+        _="""if not self.is_contiguous():
             panic(
                 "Cannot create a view from a non-contiguous tensor. Use"
                 " reshape() or contiguous().view() instead"
-            )
+            )"""
 
         var abs_offset: Int
         var abs_strides: Strides
@@ -148,7 +148,8 @@ struct View[dtype: DType](Copyable):
             abs_strides = strides  # already absolute
 
         out = Tensor[dtype].build_view(
-            self.address(),
+            #self.address(),
+            UnsafePointer(to=self),
             shape,
             Optional(abs_strides),
             abs_offset,

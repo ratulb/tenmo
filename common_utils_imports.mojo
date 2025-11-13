@@ -13,8 +13,6 @@ from common_utils import (
     Idx,
     NewAxis,
     is_power_of_two,
-    validate_matrix_shapes,
-    variadiclist_as_intlist,
     is_null,
     addr as address,
     id,
