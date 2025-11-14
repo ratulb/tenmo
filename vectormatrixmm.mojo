@@ -93,9 +93,7 @@ struct VectorMatrixMMBackward[dtype: DType](Copyable):
                 B_batch_grad, tensor_b.shape
             )
             outgoing_grads.append((ancestor_2, dB, AddTensor))
-            A_tensor.free()
 
-        tensor_b.free()
         return outgoing_grads
 
 

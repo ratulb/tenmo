@@ -1612,9 +1612,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn unsqueeze[
         track_grad: Bool = True
-    ](self, axis: Int, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
+    ](self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         return Unsqueeze[dtype].forward[track_grad](
-            self, IntList(axis), requires_grad
+            self, IntList(axes), requires_grad
         )
 
     fn unsqueeze[

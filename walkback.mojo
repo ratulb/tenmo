@@ -1,7 +1,7 @@
 from backpropagation import BackwardFn
 from matmul import Matmul2dBackward, MatmulNdBackward
 from vectormatrix import VectorMatmulNdBackward
-#from vm import VectorMatmulNdBackward
+from matrixvector import MatrixVectorMulNdBackward
 from summation import SumBackward
 from mean_reduction import MeanBackward
 from addition import AddBackward, AddBackwardScalar, AddBroadcastBackward

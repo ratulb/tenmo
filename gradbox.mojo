@@ -281,6 +281,9 @@ struct Gradbox[dtype: DType](
 
         return Gradbox[dtype](ndb^, share=False)
 
+    fn contiguous(self) -> Gradbox[dtype]:
+        return Gradbox[dtype](self.buffer.contiguous(), share=False)
+
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
         if self.rank() == 0 and len(indices) != 0:

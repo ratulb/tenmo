@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|mmnd|mm2d|vm|argminmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
+    echo "Usage: $0 [tensors|mmnd|mm2d|mv|vm|argminmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
     exit 1
 fi
 
@@ -39,6 +39,10 @@ case $1 in
     vm)
         echo "Running mojo -I . tests/test_vm.mojo"
         mojo -I . $DEBUG_MODE tests/test_vm.mojo
+        ;;
+    mv)
+        echo "Running mojo -I . tests/test_mv.mojo"
+        mojo -I . $DEBUG_MODE tests/test_mv.mojo
         ;;
 
     slice)
@@ -155,6 +159,9 @@ case $1 in
         ;;
 
     all)
+        echo "Running tests/test_mv.mojo"
+        mojo -I . tests/test_mv.mojo
+
         echo "Running tests/test_vm.mojo"
         mojo -I . tests/test_vm.mojo
 
@@ -231,7 +238,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: mmnd, mm2d, vm, repeat, tiles, linspace, slice, relu, softmax permute, shuffle, argminmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
+        echo "Available tests: mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax permute, shuffle, argminmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
         exit 1
         ;;
 esac
