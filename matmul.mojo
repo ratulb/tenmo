@@ -8,7 +8,7 @@ from gradbox import Gradbox
 from ancestry import Ancestor
 from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
-from common_utils import il, s
+from common_utils import il, s, panic
 
 
 @fieldwise_init
@@ -230,7 +230,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
         if contiguous:
             # FAST PATH: SIMD vectorization over columns - Gradbox is always contiguous
-            # B_contiguous = B.copy() if B.is_contiguous() else B.contiguous()
             for i in range(m):
                 for k in range(n):
                     var a_ik = A.load[simdwidth=1, validated=True](
@@ -275,122 +274,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
 @fieldwise_init
 @register_passable
-struct MatmulNdBackward1[dtype: DType](ImplicitlyCopyable):
-    fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var grad_out = output.grad().copy()
-        print("grad_out is shared: ", grad_out.shared())
-        print("grad_out is shared: ", grad_out.shared())
-        print("grad_out is shared: ", grad_out.shared())
-        print("grad_out is shared: ", grad_out.shared())
-        var A = output.ancestry().get(0)
-        var B = output.ancestry().get(1)
-
-        var results = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
-
-        if A.requires_grad():
-            var grad_A = MatmulNd.forward[track_grad=False](
-                grad_out.as_tensor(),
-                B.tensor().transpose[track_grad=False](axes=[-1, -2]),
-            ).as_gradbox()
-            grad_A = grad_A.sum_over_broadcasted_axes(A.shape())
-            results.append((A.copy(), grad_A^, AddTensor))
-
-        if B.requires_grad():
-            var grad_B = MatmulNd.forward[track_grad=False](
-                A.tensor().transpose[track_grad=False](axes=[-1, -2]),
-                grad_out.as_tensor(),
-            ).as_gradbox()
-            grad_B = grad_B.sum_over_broadcasted_axes(B.shape())
-            results.append((B^, grad_B^, AddTensor))
-
-        return results^
-
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
-
-
-@fieldwise_init
-@register_passable
-struct MatmulNdBackward2[dtype: DType](ImplicitlyCopyable):
-    fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var grad_out = output.grad().copy()  # shape: batch_shape + [m, n]
-        var A = output.ancestry().get(0)
-        var B = output.ancestry().get(1)
-        var A_shape = A.shape()
-        var B_shape = B.shape()
-
-        var m = A_shape[-2]
-        var k = A_shape[-1]
-        var n = B_shape[-1]
-
-        var batch_shape = ShapeBroadcaster.broadcast_shape(
-            A_shape[0:-2], B_shape[0:-2]
-        )
-
-        var batch_dims_a = A_shape[:-2]
-        var batch_dims_b = B_shape[:-2]
-
-        var results = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
-
-        # Gradient wrt A: dA = grad_out @ B^T
-        if A.requires_grad():
-            var grad_A = Gradbox[dtype].zeros(A_shape, share=True)
-            for indices in batch_shape:
-                var A_indices = ShapeBroadcaster.broadcasted_indices(
-                    indices, batch_shape, batch_dims_a
-                )
-                var B_indices = ShapeBroadcaster.broadcasted_indices(
-                    indices, batch_shape, batch_dims_b
-                )
-
-                var grad_out_slice = grad_out[il(indices), s(), s()]
-                var B_slice = B.tensor()[il(B_indices), s(), s()]
-                var B_T = B_slice.transpose[track_grad=False](1, 0)
-
-                var grad_A_slice = Matmul2d[dtype].forward(grad_out_slice, B_T)
-                grad_A[il(A_indices), s(), s()].buffer.fill_equal_shape(
-                    grad_A_slice.buffer
-                )
-
-            # Reduce over broadcasted axes if A was broadcasted
-            grad_A = grad_A.sum_over_broadcasted_axes(A_shape)
-            results.append((A.copy(), grad_A^, AddTensor))
-
-        # Gradient wrt B: dB = A^T @ grad_out
-        if B.requires_grad():
-            var grad_B = Gradbox[dtype].zeros(B_shape, share=True)
-            for indices in batch_shape:
-                var A_indices = ShapeBroadcaster.broadcasted_indices(
-                    indices, batch_shape, batch_dims_a
-                )
-                var B_indices = ShapeBroadcaster.broadcasted_indices(
-                    indices, batch_shape, batch_dims_b
-                )
-
-                var A_slice = A.tensor()[il(A_indices), s(), s()]
-                var grad_out_slice = grad_out[il(indices), s(), s()]
-                var A_T = A_slice.transpose[track_grad=False](1, 0)
-
-                var grad_B_slice = Matmul2d[dtype].forward(A_T, grad_out_slice)
-                grad_B[il(B_indices), s(), s()].buffer.fill_equal_shape(
-                    grad_B_slice.buffer
-                )
-
-            grad_B = grad_B.sum_over_broadcasted_axes(B_shape)
-            results.append((B^, grad_B^, AddTensor))
-
-        return results^
-
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
-
-
-@fieldwise_init
-@register_passable
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
@@ -411,7 +294,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
             )
 
             # Batched matmul: GradBox @ Tensor → GradBox (no backward needed)
-            var A_batch_grad = MatmulNd.forward(grad_out, B_transposed)
+            var A_batch_grad = MatmulNd[dtype].forward(grad_out, B_transposed)
 
             # Sum over broadcasted dimensions
             var final_grad_A = A_batch_grad.sum_over_broadcasted_axes(A_shape)
@@ -425,7 +308,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
             )
 
             # Batched matmul: Tensor @ GradBox → GradBox (no backward needed)
-            var B_batch_grad = MatmulNd.forward(A_transposed, grad_out)
+            var B_batch_grad = MatmulNd[dtype].forward(A_transposed, grad_out)
 
             # Sum over broadcasted dimensions
             var final_grad_B = B_batch_grad.sum_over_broadcasted_axes(B_shape)
@@ -473,11 +356,11 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             B_slice = B[il(B_indices), s(), s()]
             C_slice = C[il(indices), s(), s()]
 
-            result = Matmul2d.forward[track_grad=False](
+            result = Matmul2d[dtype].forward[track_grad=False](
                 A_slice,
                 B_slice,
             )
-            C_slice.buffer.fill_equal_shape(result.buffer)
+            C_slice.buffer.fill_equal_shape[overwrite=True](result.buffer)
 
         # Only attach backward handler if gradients are needed
         @parameter
@@ -523,7 +406,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             var C_slice = C[il(indices), s(), s()]
 
             # Use 2D matmul for GradBox (no backward needed)
-            var result = Matmul2d.forward(A_slice, B_slice)
+            var result = Matmul2d[dtype].forward(A_slice, B_slice)
             C_slice.buffer.fill_equal_shape[overwrite=False](result.buffer)
 
         return C^
@@ -559,55 +442,11 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             var C_slice = C[il(indices), s(), s()]
 
             # Use 2D matmul for GradBox (no backward needed)
-            var result = Matmul2d.forward(A_slice, B_slice)
+            var result = Matmul2d[dtype].forward(A_slice, B_slice)
             C_slice.buffer.fill_equal_shape[overwrite=False](result.buffer)
 
         return C^
 
 
 fn main() raises:
-    test_matmul_nd_with_view_offset_grad()
-
-
-from testing import assert_true
-from strides import Strides
-
-
-fn test_matmul_nd_with_view_offset_grad() raises:
-    print("test_matmul_nd_with_view_offset_grad")
-    alias dtype = DType.float32
-    var base_A = Tensor[dtype].d3(
-        [
-            [[0.0, 0.0], [0.0, 0.0]],  # Padding
-            [[1.0, 2.0], [3.0, 4.0]],  # Actual data
-            [[5.0, 6.0], [7.0, 8.0]],  # More data
-        ],
-        requires_grad=True,
-    )
-
-    # Create view skipping first batch, taking next 2 batches
-    var A_view = base_A.view(
-        shape=Shape(2, 2, 2),
-        strides=Strides(2, 2, 1),
-        offset=4,  # Skip first 2x2 matrix (4 elements)
-    )
-    # var A_view = base_A[il(1), s(), s()]
-    # var A_view = base_A[s(3), s(), s()]
-
-    A_view.print()
-
-    var B = Tensor[dtype].d2([[1.0, 0.0], [0.0, 1.0]], requires_grad=True)
-    var C = A_view.matmul_nd(B)
-    var loss = C.sum()
-    loss.backward()
-
-    # Gradients should only flow to the viewed portion (batches 1 and 2)
-    var expected_base_grad = Tensor[dtype].d3(
-        [
-            [[0.0, 0.0], [0.0, 0.0]],
-            [[1.0, 1.0], [2.0, 2.0]],
-            [[1.0, 1.0], [0.0, 0.0]],
-        ]
-    )
-    base_A.grad().print()
-    assert_true(base_A.grad().all_close(expected_base_grad))
+    pass

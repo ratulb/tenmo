@@ -132,6 +132,10 @@ struct Ancestor[dtype: DType](
         return self._tensor.offset()
 
     @always_inline
+    fn rank(self) -> Int:
+        return self._tensor.rank()
+
+    @always_inline
     fn max_index(self) -> Int:
         return self._tensor.max_index()
 
