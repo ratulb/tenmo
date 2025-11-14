@@ -448,5 +448,80 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         return C^
 
 
+from dotproduct import DotBackward
+from vectormatrix import VectorMatmulNd, VectorMatmulNdBackward
+from matrixvector import MatrixVectorMulNd, MatrixVectorMulNdBackward
+
+
+@fieldwise_init
+@register_passable
+struct Matmul[dtype: DType](ImplicitlyCopyable):
+    @staticmethod
+    fn forward[
+        track_grad: Bool = True
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+        rank_a = A.rank()
+        rank_b = B.rank()
+        requires_grad = A.requires_grad or B.requires_grad
+
+        if rank_a <= 1 and rank_b <= 1:
+            C = A.dot[track_grad=False](B)
+
+            @parameter
+            if track_grad:
+                if requires_grad:
+                    C.requires_grad_()
+                    backward_fn = DotBackward[dtype]().into_backward_fn()
+                    C.backwardFn = Optional(backward_fn^)
+                    C.add_ancestry(A, B)
+            return C^
+
+        elif rank_a == 1 and rank_b >= 2:
+            C = VectorMatmulNd[dtype].forward[track_grad=False](A, B)
+
+            @parameter
+            if track_grad:
+                if requires_grad:
+                    C.requires_grad_()
+                    backward_fn = VectorMatmulNdBackward[
+                        dtype
+                    ]().into_backward_fn()
+                    C.backwardFn = Optional(backward_fn^)
+                    C.add_ancestry(A, B)
+            return C^
+
+        elif rank_a >= 2 and rank_b == 1:
+            C = MatrixVectorMulNd[dtype].forward[track_grad=False](A, B)
+
+            @parameter
+            if track_grad:
+                if requires_grad:
+                    C.requires_grad_()
+                    backward_fn = MatrixVectorMulNdBackward[
+                        dtype
+                    ]().into_backward_fn()
+                    C.backwardFn = Optional(backward_fn^)
+                    C.add_ancestry(A, B)
+            return C^
+
+        else:
+            C = MatmulNd[dtype].forward[track_grad=False](A, B)
+
+            @parameter
+            if track_grad:
+                if requires_grad:
+                    C.requires_grad_()
+                    if rank_a == 2 and rank_b == 2:
+                        mbfn = Matmul2dBackward[dtype]().into_backward_fn()
+                        C.backwardFn = Optional(mbfn^)
+                    else:
+                        bmbfn = MatmulNdBackward[dtype]().into_backward_fn()
+                        C.backwardFn = Optional(bmbfn^)
+
+                    C.add_ancestry(A, B)
+
+            return C^
+
+
 fn main() raises:
     pass
