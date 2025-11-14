@@ -55,7 +55,6 @@ struct Dot[dtype: DType](Copyable):
     ](
         lhs: Tensor[dtype],
         rhs: Tensor[dtype],
-        requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         rank_lhs = lhs.rank()
         rank_rhs = rhs.rank()
@@ -76,9 +75,7 @@ struct Dot[dtype: DType](Copyable):
 
         @parameter
         if track_grad:
-            grad_required = requires_grad.value() if requires_grad else (
-                lhs.requires_grad or rhs.requires_grad
-            )
+            grad_required = lhs.requires_grad or rhs.requires_grad
 
             if grad_required:
                 out.requires_grad_(True)

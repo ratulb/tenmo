@@ -11,7 +11,7 @@ from broadcasthelper import ShapeBroadcaster
 from intlist import IntList
 from strides import Strides
 from sys import simd_width_of
-from matmul import Matmul2d
+from matmul import Matmul
 
 struct Gradbox[dtype: DType](
     Copyable
@@ -534,8 +534,8 @@ struct Gradbox[dtype: DType](
             self.buffer.arithmetic_ops[Multiply](other.buffer), share=False
         )
 
-    fn matmul_2d(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
-        return Matmul2d[dtype].forward(A, B)
+    fn matmul(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
+        return Matmul[dtype].forward(A, B)
 
 
     fn __add__(self, other: Self) -> Gradbox[dtype]:

@@ -2,8 +2,6 @@ from tenmo import Tensor
 from shapes import Shape
 from testing import assert_true
 from strides import Strides
-from matmul import MatmulNd
-from vectormatrix import VectorMatmulNd
 
 
 fn main() raises:
@@ -52,7 +50,7 @@ fn test_vector_matrix_1d_2d_basic() raises:
     alias dtype = DType.float32
     var v = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var M = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True)
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -73,7 +71,7 @@ fn test_vector_matrix_identity() raises:
     var identity = Tensor.d2(
         [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], requires_grad=True
     )
-    var r = VectorMatmulNd.forward(v, identity)
+    var r = v.matmul(identity)
     var loss = r.sum()
     loss.backward()
 
@@ -91,7 +89,7 @@ fn test_vector_matrix_zeros() raises:
     alias dtype = DType.float32
     var v = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var M = Tensor.d2([[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]], requires_grad=True)
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -114,7 +112,7 @@ fn test_vector_matrix_2d_2d_batched() raises:
     var M = Tensor.d2(
         [[1.0, 0.0], [0.0, 1.0]], requires_grad=True
     )  # 2x2 matrix
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -127,23 +125,24 @@ fn test_vector_matrix_2d_2d_batched() raises:
 fn test_vector_matrix_2d_3d_batched() raises:
     print("test_vector_matrix_2d_3d_batched")
     alias dtype = DType.float32
-    var v = Tensor.d2(
+    var v = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
     )  # batch=2, dim=2
-    var M = Tensor.d3(
+    var M = Tensor[dtype].d3(
         [[[1.0, 0.0], [0.0, 1.0]], [[2.0, 0.0], [0.0, 2.0]]], requires_grad=True
     )  # batch=2, 2x2
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
     # Batch 0: [1,2] @ [[1,0],[0,1]] = [1,2]
     # Batch 1: [3,4] @ [[2,0],[0,2]] = [6,8]
-    assert_true(r.all_close(Tensor.d2([[1.0, 2.0], [6.0, 8.0]])))
-    assert_true(v.grad().all_close(Tensor.d2([[1.0, 1.0], [2.0, 2.0]])))
+
+    assert_true(r.all_close(Tensor[dtype].d2([[1.0, 2.0], [6.0, 8.0]])))
+    assert_true(v.grad().all_close(Tensor[dtype].d2([[1.0, 1.0], [2.0, 2.0]])))
     assert_true(
         M.grad().all_close(
-            Tensor.d3([[[1.0, 1.0], [2.0, 2.0]], [[3.0, 3.0], [4.0, 4.0]]])
+            Tensor[dtype].d3([[[1.0, 1.0], [2.0, 2.0]], [[3.0, 3.0], [4.0, 4.0]]])
         )
     )
 
@@ -155,7 +154,7 @@ fn test_vector_matrix_broadcast_vector() raises:
     var M = Tensor.d3(
         [[[1.0, 0.0], [0.0, 1.0]], [[2.0, 0.0], [0.0, 2.0]]], requires_grad=True
     )  # batch=2, 2x2
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -180,7 +179,7 @@ fn test_vector_matrix_broadcast_matrix() raises:
     var M = Tensor.d2(
         [[1.0, 0.0], [0.0, 1.0]], requires_grad=True
     )  # single matrix
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -202,7 +201,7 @@ fn test_vector_matrix_3d_3d_high_batch() raises:
     var M = Tensor.d3(
         [[[1.0, 0.0], [0.0, 1.0]]], requires_grad=True
     )  # shape: [1, 2, 2]
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -221,7 +220,7 @@ fn test_vector_matrix_4d_batch() raises:
     var M = Tensor.d2(
         [[1.0, 0.0], [0.0, 1.0]], requires_grad=True
     )  # shape: [2, 2]
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -241,7 +240,7 @@ fn test_vector_matrix_with_vector_view() raises:
         shape=Shape(3), strides=Strides(1), offset=1
     )  # [1,2,3]
     var M = Tensor.d2([[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]], requires_grad=True)
-    var r = VectorMatmulNd.forward(v_view, M)
+    var r = v_view.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -261,7 +260,7 @@ fn test_vector_matrix_with_matrix_view() raises:
     var M_view = base_M.view(
         shape=Shape(2, 2), strides=Strides(3, 1), offset=3
     )  # [[1,0],[0,1]]
-    var r = VectorMatmulNd.forward(v, M_view)
+    var r = v.matmul(M_view)
     var loss = r.sum()
     loss.backward()
 
@@ -283,7 +282,7 @@ fn test_vector_matrix_single_element() raises:
     alias dtype = DType.float32
     var v = Tensor.d1([2.0], requires_grad=True)  # 1D vector with 1 element
     var M = Tensor.d2([[3.0]], requires_grad=True)  # 1x1 matrix
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -301,7 +300,7 @@ fn test_vector_matrix_large_dimensions() raises:
         [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, 0.0]],
         requires_grad=True,
     )
-    var r = VectorMatmulNd.forward(v, M)
+    var r = v.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -321,7 +320,7 @@ fn test_vector_matrix_non_contiguous_batch() raises:
         shape=Shape(2, 3), strides=Strides(6, 1), offset=0
     )  # [[1,2,3], [7,8,9]]
     var M = Tensor.d2([[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]], requires_grad=True)
-    var r = VectorMatmulNd.forward(v_view, M)
+    var r =v_view.matmul(M)
     var loss = r.sum()
     loss.backward()
 
@@ -342,7 +341,7 @@ fn test_vector_matrix_basic_forward_backward() raises:
     print("test_vector_matrix_basic_forward_backward")
     var v = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var M = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True)
-    var r = VectorMatmulNd.forward(v, M)  # [2]
+    var r = v.matmul(M)  # [2]
 
     # Expected: [1*1+2*3+3*5, 1*2+2*4+3*6] = [22, 28]
     assert_true(r.all_close(Tensor.d1([22.0, 28.0])))
@@ -367,7 +366,7 @@ fn test_matrix_vector_basic_forward_backward() raises:
     var M = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     var v = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     # Matrix @ Vector
-    var r = MatmulNd.forward(M, v.unsqueeze([-1])).squeeze([-1])  # [2]
+    var r = M.matmul(v.unsqueeze([-1])).squeeze([-1])  # [2]
 
     # Expected: [1*1+2*2+3*3, 4*1+5*2+6*3] = [14, 32]
     assert_true(r.all_close(Tensor.d1([14.0, 32.0])))
@@ -388,7 +387,7 @@ fn test_vector_matrix_batched() raises:
     var M = Tensor.d3(
         [[[1.0, 0.0], [0.0, 1.0]], [[2.0, 1.0], [0.0, 1.0]]], requires_grad=True
     )  # batch=2, 2x2
-    var r = VectorMatmulNd.forward(v, M)  # [2,2]
+    var r = v.matmul(M)  # [2,2]
 
     var expected = Tensor.d2(
         [[1 * 1 + 2 * 0, 1 * 0 + 2 * 1], [3 * 2 + 4 * 0, 3 * 1 + 4 * 1]]
@@ -406,7 +405,7 @@ fn test_vector_matrix_broadcasting() raises:
     print("test_vector_matrix_broadcasting")
     var v = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)  # batch=2
     var M = Tensor.d2([[1.0, 0.0], [0.0, 1.0]], requires_grad=True)  # no batch
-    var r = VectorMatmulNd.forward(v, M)  # [2,2] batch broadcasting
+    var r = v.matmul(M)  # [2,2] batch broadcasting
 
     var expected = Tensor.d2([[1, 2], [3, 4]])
     assert_true(r.all_close(expected.float64()))
@@ -425,7 +424,7 @@ fn test_vector_matrix_with_views() raises:
         shape=Shape(2, 3), strides=Strides(3, 1), offset=0
     )  # [[1,2,3],[4,5,6]]
     var M = Tensor.d2([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]], requires_grad=True)
-    var r = VectorMatmulNd.forward(v, M)  # [2,2]
+    var r = v.matmul(M)  # [2,2]
     var loss = r.sum()
     loss.backward()
     # Check that grads flow correctly through the view to the base tensor
@@ -436,7 +435,7 @@ fn test_vector_matrix_singleton_batch() raises:
     print("test_vector_matrix_singleton_batch")
     var v = Tensor.d2([[1.0, 2.0]], requires_grad=True)  # batch=1
     var M = Tensor.d2([[1.0, 0.0], [0.0, 1.0]], requires_grad=True)
-    var r = VectorMatmulNd.forward(v, M)  # [1,2]
+    var r = v.matmul(M)  # [1,2]
     var loss = r.sum()
     loss.backward()
     assert_true(v.grad().shape() == v.shape())
@@ -447,7 +446,7 @@ fn test_vector_matrix_high_dimensional_batch() raises:
     print("test_vector_matrix_high_dimensional_batch")
     var v = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)  # [1,2,2]
     var M = Tensor.d3([[[1.0, 0.0], [0.0, 1.0]]], requires_grad=True)  # [1,2,2]
-    var r = VectorMatmulNd.forward(v, M)  # [1,2,2]
+    var r = v.matmul(M)  # [1,2,2]
     var loss = r.sum()
     loss.backward()
     assert_true(v.grad().shape() == v.shape())
@@ -476,7 +475,7 @@ fn test_matmul_nd_with_view_offset_grad() raises:
     # var A_view = base_A[s(3), s(), s()]
 
     var B = Tensor[dtype].d2([[1.0, 0.0], [0.0, 1.0]], requires_grad=True)
-    var C = A_view.matmul_nd(B)
+    var C = A_view.matmul(B)
     var loss = C.sum()
     loss.backward()
 

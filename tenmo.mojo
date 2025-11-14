@@ -13,7 +13,6 @@ from common_utils_imports import *
 from common_utils import id as identity, IntArrayHelper, log_warning
 from operators_imports import *
 
-from matmul import Matmul2d, MatmulNd
 
 # from walkback import *
 from backpropagation import BackwardFn
@@ -49,6 +48,7 @@ from forwards import (
     Softmax,
     Repeat,
     Tile,
+    Matmul,
 )
 from buffers import Buffer
 from validators import Validator
@@ -1324,8 +1324,8 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn dot[
         track_grad: Bool = True
-    ](self, other: Self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        return Dot[dtype].forward[track_grad](self, other, requires_grad)
+    ](self, other: Self) -> Tensor[dtype]:
+        return Dot[dtype].forward[track_grad](self, other)
 
     fn __iadd__(self, scalar: Scalar[dtype]):
         if self.is_leaf():
@@ -1743,18 +1743,14 @@ struct Tensor[dtype: DType = DType.float32](
         )
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
-    fn matmul_2d[
+    fn matmul[
         track_grad: Bool = True
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        return Matmul2d[dtype].forward[track_grad=track_grad](A, B)
+        return Matmul[dtype].forward[track_grad](A, B)
 
-    fn matmul_2d(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
-        return Matmul2d[dtype].forward(A, B)
+    fn matmul(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
+        return Matmul[dtype].forward(A, B)
 
-    fn matmul_nd[
-        track_grad: Bool = True
-    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        return MatmulNd[dtype].forward[track_grad=track_grad](A, B)
 
 @register_passable
 struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
@@ -1815,10 +1811,6 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
 
 
 
-    fn matmul[
-        track_grad: Bool = True, simd_width: Int = simd_width_of[dtype]()
-    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        return Matmul[dtype].forward[track_grad](A, B)
 
     @staticmethod
     fn matmul_2d[

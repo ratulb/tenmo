@@ -323,6 +323,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct MatmulNd[dtype: DType](ImplicitlyCopyable):
+    @always_inline
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -375,6 +376,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
 
         return C^
 
+    @always_inline
     @staticmethod
     fn forward(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
         A_shape = A.shape()
@@ -412,6 +414,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         return C^
 
     # Gradbox and Tensor matmul_nd - No backward fn needed
+    @always_inline
     @staticmethod
     fn forward(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
         A_shape = A.shape()
@@ -453,16 +456,20 @@ from vectormatrix import VectorMatmulNd, VectorMatmulNdBackward
 from matrixvector import MatrixVectorMulNd, MatrixVectorMulNdBackward
 
 
-@fieldwise_init
-@register_passable
 struct Matmul[dtype: DType](ImplicitlyCopyable):
+    @always_inline
     @staticmethod
     fn forward[
         track_grad: Bool = True
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        rank_a = A.rank()
-        rank_b = B.rank()
-        requires_grad = A.requires_grad or B.requires_grad
+        var a_shape = A.shape()
+        var b_shape = B.shape()
+        var rank_a = a_shape.rank()
+        var rank_b = b_shape.rank()
+        var requires_grad = A.requires_grad or B.requires_grad
+
+        var C: Tensor[dtype]
+        var backward_fn: Optional[BackwardFn[dtype]] = None
 
         if rank_a <= 1 and rank_b <= 1:
             C = A.dot[track_grad=False](B)
@@ -470,11 +477,9 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
             @parameter
             if track_grad:
                 if requires_grad:
-                    C.requires_grad_()
-                    backward_fn = DotBackward[dtype]().into_backward_fn()
-                    C.backwardFn = Optional(backward_fn^)
-                    C.add_ancestry(A, B)
-            return C^
+                    backward_fn = Optional(
+                        DotBackward[dtype]().into_backward_fn()
+                    )
 
         elif rank_a == 1 and rank_b >= 2:
             C = VectorMatmulNd[dtype].forward[track_grad=False](A, B)
@@ -482,13 +487,9 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
             @parameter
             if track_grad:
                 if requires_grad:
-                    C.requires_grad_()
-                    backward_fn = VectorMatmulNdBackward[
-                        dtype
-                    ]().into_backward_fn()
-                    C.backwardFn = Optional(backward_fn^)
-                    C.add_ancestry(A, B)
-            return C^
+                    backward_fn = Optional(
+                        VectorMatmulNdBackward[dtype]().into_backward_fn()
+                    )
 
         elif rank_a >= 2 and rank_b == 1:
             C = MatrixVectorMulNd[dtype].forward[track_grad=False](A, B)
@@ -496,13 +497,43 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
             @parameter
             if track_grad:
                 if requires_grad:
-                    C.requires_grad_()
-                    backward_fn = MatrixVectorMulNdBackward[
-                        dtype
-                    ]().into_backward_fn()
-                    C.backwardFn = Optional(backward_fn^)
-                    C.add_ancestry(A, B)
-            return C^
+                    backward_fn = Optional(
+                        MatrixVectorMulNdBackward[dtype]().into_backward_fn()
+                    )
+
+        elif rank_a >= 2 and rank_b >= 2:
+            var a_inner = a_shape[-1]
+            var b_inner = b_shape[-2]
+
+            if a_inner != b_inner:
+                panic("Matmul: inner dimensions must match")
+
+            var a_batch_dims = a_shape[:-1]
+            var b_batch_dims = b_shape[:-2]
+
+            if ShapeBroadcaster.broadcastable(a_batch_dims, b_batch_dims):
+                C = VectorMatmulNd[dtype].forward[track_grad=False](A, B)
+
+                @parameter
+                if track_grad:
+                    if requires_grad:
+                        backward_fn = Optional(
+                            VectorMatmulNdBackward[dtype]().into_backward_fn()
+                        )
+            else:
+                C = MatmulNd[dtype].forward[track_grad=False](A, B)
+
+                @parameter
+                if track_grad:
+                    if requires_grad:
+                        if rank_a == 2 and rank_b == 2:
+                            backward_fn = Optional(
+                                Matmul2dBackward[dtype]().into_backward_fn()
+                            )
+                        else:
+                            backward_fn = Optional(
+                                MatmulNdBackward[dtype]().into_backward_fn()
+                            )
 
         else:
             C = MatmulNd[dtype].forward[track_grad=False](A, B)
@@ -510,17 +541,31 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
             @parameter
             if track_grad:
                 if requires_grad:
-                    C.requires_grad_()
-                    if rank_a == 2 and rank_b == 2:
-                        mbfn = Matmul2dBackward[dtype]().into_backward_fn()
-                        C.backwardFn = Optional(mbfn^)
-                    else:
-                        bmbfn = MatmulNdBackward[dtype]().into_backward_fn()
-                        C.backwardFn = Optional(bmbfn^)
+                    backward_fn = Optional(
+                        MatmulNdBackward[dtype]().into_backward_fn()
+                    )
 
-                    C.add_ancestry(A, B)
+        # Common gradient setup for ALL cases
+        @parameter
+        if track_grad:
+            if requires_grad:
+                C.requires_grad_(True)
+                if backward_fn:
+                    C.backwardFn = backward_fn^
+                C.add_ancestry(A)
+                C.add_ancestry(B)
 
-            return C^
+        return C^  # SINGLE return point for all cases
+
+    @always_inline
+    @staticmethod
+    fn forward(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
+        return MatmulNd[dtype].forward(A, B)
+
+    @always_inline
+    @staticmethod
+    fn forward(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
+        return MatmulNd[dtype].forward(A, B)
 
 
 fn main() raises:
