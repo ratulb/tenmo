@@ -130,18 +130,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.backwardFn = None
         self.init_gradbox()
 
-    fn build_view1(
-        mut self,
-        shape: Shape,
-        strides: Optional[Strides] = None,
-        offset: Int = 0,
-        requires_grad: Bool = False,
-    ) -> Tensor[dtype]:
-
-        buffer = self.buffer.share(shape, strides, offset)
-        return Tensor[dtype](buffer=buffer^, requires_grad=requires_grad)
-
-
     @staticmethod
     fn build_view(
         source: UnsafePointer[Self],
@@ -556,9 +544,7 @@ struct Tensor[dtype: DType = DType.float32](
         mut = Origin(origin_of(self)).mut,
         origin = origin_of(self),
     ]:
-        return UnsafePointer(to=self).mut_cast[
-            Origin(origin_of(self)).mut
-        ]()
+        return UnsafePointer(to=self).mut_cast[Origin(origin_of(self)).mut]()
 
     fn seed_grad(mut self, with_tensor: Tensor[dtype]):
         if not self.requires_grad:
@@ -1322,9 +1308,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         return Exponentiator[dtype].forward[track_grad](self, exponent)
 
-    fn dot[
-        track_grad: Bool = True
-    ](self, other: Self) -> Tensor[dtype]:
+    fn dot[track_grad: Bool = True](self, other: Self) -> Tensor[dtype]:
         return Dot[dtype].forward[track_grad](self, other)
 
     fn __iadd__(self, scalar: Scalar[dtype]):
@@ -1367,7 +1351,6 @@ struct Tensor[dtype: DType = DType.float32](
         )
         empty = List[Int]()
         print_tensor_recursive[dtype](
-            # UnsafePointer(to=self),
             self,
             empty,
             1,
@@ -1402,7 +1385,6 @@ struct Tensor[dtype: DType = DType.float32](
         return ElemIterator[dtype, origin_of(self)](Pointer(to=self))
 
     fn element_at(self, index: Int) -> Scalar[dtype]:
-        # fn __getitem__(self, index: Int) -> Scalar[dtype]:
         return self.buffer[index]
 
     fn view[
@@ -1596,20 +1578,6 @@ struct Tensor[dtype: DType = DType.float32](
             self, IntList.new(axes), requires_grad
         )
 
-    # Squeeze single axis if provided, otherwise squeeze all dims of size 1
-    fn squeeze1[
-        track_grad: Bool = True
-    ](
-        self,
-        axis: Optional[Int] = None,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
-        return Squeeze[dtype].forward[track_grad](
-            self,
-            IntList(axis.value()) if axis else IntList(),
-            requires_grad,
-        )
-
     fn unsqueeze[
         track_grad: Bool = True
     ](self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
@@ -1744,9 +1712,9 @@ struct Tensor[dtype: DType = DType.float32](
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     fn matmul[
-        track_grad: Bool = True
+        track_grad: Bool = True, mode: Int = 3
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        return Matmul[dtype].forward[track_grad](A, B)
+        return Matmul[dtype].forward[track_grad=track_grad, mode=mode](A, B)
 
     fn matmul(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
         return Matmul[dtype].forward(A, B)
@@ -1776,63 +1744,7 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
     fn __has_next__(self) -> Bool:
         return self.index_itr.__has_next__()
 
-        _ = """@staticmethod
-    fn sum_over_broadcasted_axes(
-        batch_grad: Tensor[dtype], recipient_shape: Shape
-    ) -> Tensor[dtype]:
-        result = batch_grad.copy()
-        current_shape = batch_grad.shape.copy()
-
-        # Sum over extra leading dimensions
-        while len(current_shape) > len(recipient_shape):
-            result = result.sum(axes=[0], keepdims=False)
-            current_shape = result.shape.copy()
-
-        # Sum over mismatched dimensions
-        for i in range(len(recipient_shape)):
-            if current_shape[i] != recipient_shape[i] and current_shape[i] > 1:
-                result = result.sum(axes=[i], keepdims=True)
-                current_shape = result.shape.copy()
-        return result^
-
-    fn vector_matrix_mm[
-        track_grad: Bool = True
-    ](
-        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
-    ) -> Tensor[dtype]:
-        return VectorMatrixMM[dtype].forward[track_grad](A, B, requires_grad)
-
-    fn matrix_vector_mm[
-        track_grad: Bool = True
-    ](
-        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
-    ) -> Tensor[dtype]:
-        return MatrixVectorMM[dtype].forward[track_grad](A, B, requires_grad)
-
-
-
-
-    @staticmethod
-    fn matmul_2d[
-        track_grad: Bool = True, simd_width: Int = simd_width_of[dtype]()
-    ](
-        A_ptr: UnsafePointer[Tensor[dtype]],
-        B_ptr: UnsafePointer[Tensor[dtype]],
-        C_ptr: UnsafePointer[Tensor[dtype]] = UnsafePointer[Tensor[dtype]](),
-        requires_grad: Bool = True,
-    ) -> Tensor[dtype]:
-        return Matmul_2d[dtype].forward[track_grad](
-            A_ptr, B_ptr, C_ptr, requires_grad
-        )
-
-    fn matmul_nd[
-        track_grad: Bool = True
-    ](
-        A: Tensor[dtype], B: Tensor[dtype], requires_grad: Bool = True
-    ) -> Tensor[dtype]:
-        return Matmul_nd[dtype].forward[track_grad](A, B, requires_grad)
-
-    fn set(self, tensor: Tensor[dtype], *indices: Idx):
+        _ = """fn set(self, tensor: Tensor[dtype], *indices: Idx):
         shape, strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
                 self.shape, self.strides, indices
@@ -1901,7 +1813,7 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
 
 fn main() raises:
     pass
-    _="""A = Tensor.rand(2, 3, 4, init_seed=42, requires_grad=True)
+    _ = """A = Tensor.rand(2, 3, 4, init_seed=42, requires_grad=True)
     A.print()
     A_indices = IntArray(1)
     A_indices[0] = 1

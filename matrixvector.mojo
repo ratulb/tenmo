@@ -122,15 +122,13 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                     [-1]
                 )  # GradBox[m, 1]
                 var v_row = v_slice.unsqueeze([-2])  # Tensor[1, k]
-                var grad_M_slice_result = Matmul2d[dtype].forward(
-                    grad_out_col, v_row
-                )  # GradBox[m, k]
+                # Element-wise multiplication for outer product
+                var grad_M_slice_result = grad_out_col * v_row  # GradBox[m, k]
 
                 grad_M_slice.buffer.fill_equal_shape[overwrite=False](
                     grad_M_slice_result.buffer
                 )
 
-            grad_M = grad_M.sum_over_broadcasted_axes(M_shape)
             results.append((M.copy(), grad_M^, AddTensor))
 
         # Gradient for v: dv = M^T @ grad_out
@@ -172,7 +170,6 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                     grad_v_final.buffer
                 )
 
-            grad_v = grad_v.sum_over_broadcasted_axes(v_shape)
             results.append((v^, grad_v^, AddTensor))
 
         return results^

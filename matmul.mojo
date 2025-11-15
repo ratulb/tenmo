@@ -451,111 +451,52 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         return C^
 
 
-from dotproduct import DotBackward
-from vectormatrix import VectorMatmulNd, VectorMatmulNdBackward
-from matrixvector import MatrixVectorMulNd, MatrixVectorMulNdBackward
+from vectormatrix import VectorMatmulNd
+from matrixvector import MatrixVectorMulNd
 
 
+@fieldwise_init
+@register_passable
 struct Matmul[dtype: DType](ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
-        track_grad: Bool = True
+        track_grad: Bool = True, mode: Int = mm
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        var a_shape = A.shape()
-        var b_shape = B.shape()
-        var rank_a = a_shape.rank()
-        var rank_b = b_shape.rank()
-        var requires_grad = A.requires_grad or B.requires_grad
-
-        var C: Tensor[dtype]
-        var backward_fn: Optional[BackwardFn[dtype]] = None
-
-        if rank_a <= 1 and rank_b <= 1:
-            C = A.dot[track_grad=False](B)
-
-            @parameter
-            if track_grad:
-                if requires_grad:
-                    backward_fn = Optional(
-                        DotBackward[dtype]().into_backward_fn()
-                    )
-
-        elif rank_a == 1 and rank_b >= 2:
-            C = VectorMatmulNd[dtype].forward[track_grad=False](A, B)
-
-            @parameter
-            if track_grad:
-                if requires_grad:
-                    backward_fn = Optional(
-                        VectorMatmulNdBackward[dtype]().into_backward_fn()
-                    )
-
-        elif rank_a >= 2 and rank_b == 1:
-            C = MatrixVectorMulNd[dtype].forward[track_grad=False](A, B)
-
-            @parameter
-            if track_grad:
-                if requires_grad:
-                    backward_fn = Optional(
-                        MatrixVectorMulNdBackward[dtype]().into_backward_fn()
-                    )
-
-        elif rank_a >= 2 and rank_b >= 2:
-            var a_inner = a_shape[-1]
-            var b_inner = b_shape[-2]
-
-            if a_inner != b_inner:
-                panic("Matmul: inner dimensions must match")
-
-            var a_batch_dims = a_shape[:-1]
-            var b_batch_dims = b_shape[:-2]
-
-            if ShapeBroadcaster.broadcastable(a_batch_dims, b_batch_dims):
-                C = VectorMatmulNd[dtype].forward[track_grad=False](A, B)
-
-                @parameter
-                if track_grad:
-                    if requires_grad:
-                        backward_fn = Optional(
-                            VectorMatmulNdBackward[dtype]().into_backward_fn()
-                        )
-            else:
-                C = MatmulNd[dtype].forward[track_grad=False](A, B)
-
-                @parameter
-                if track_grad:
-                    if requires_grad:
-                        if rank_a == 2 and rank_b == 2:
-                            backward_fn = Optional(
-                                Matmul2dBackward[dtype]().into_backward_fn()
-                            )
-                        else:
-                            backward_fn = Optional(
-                                MatmulNdBackward[dtype]().into_backward_fn()
-                            )
-
-        else:
-            C = MatmulNd[dtype].forward[track_grad=False](A, B)
-
-            @parameter
-            if track_grad:
-                if requires_grad:
-                    backward_fn = Optional(
-                        MatmulNdBackward[dtype]().into_backward_fn()
-                    )
-
-        # Common gradient setup for ALL cases
         @parameter
-        if track_grad:
-            if requires_grad:
-                C.requires_grad_(True)
-                if backward_fn:
-                    C.backwardFn = backward_fn^
-                C.add_ancestry(A)
-                C.add_ancestry(B)
+        if mode == mm:
+            # Step 1: Pure analysis - get the opcode
+            var opcode = classify_matmul(A.shape(), B.shape())
 
-        return C^  # SINGLE return point for all cases
+            # Step 2: Simple dispatch based on opcode
+            if dot == opcode:
+                return A.dot[track_grad](B)
+
+            if vm == opcode:
+                return VectorMatmulNd[dtype].forward[track_grad](A, B)
+
+            if mv == opcode:
+                return MatrixVectorMulNd[dtype].forward[track_grad](A, B)
+
+            if mm == opcode:
+                return MatmulNd[dtype].forward[track_grad](A, B)
+
+            # Invalid case
+            panic("Matmul: incompatible shapes")
+            return Tensor[dtype].scalar(0)
+
+        elif mode == dot:
+            return A.dot[track_grad](B)
+
+        elif mode == vm:
+            return VectorMatmulNd[dtype].forward[track_grad](A, B)
+
+        elif mode == mv:
+            return MatrixVectorMulNd[dtype].forward[track_grad](A, B)
+        else:
+            # Invalid case
+            panic("Matmul: incompatible shapes")
+            return Tensor[dtype].scalar(0)
 
     @always_inline
     @staticmethod
@@ -566,6 +507,30 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
         return MatmulNd[dtype].forward(A, B)
+
+
+alias dot = 0  # dot product
+alias vm = 1  # vector & tensor matmul
+alias mv = 2  # tensor & vector matmul
+alias mm = 3  # tensor & tensor matmul
+alias invalid = 4  # Invalid case
+
+
+fn classify_matmul(a: Shape, b: Shape) -> Int:
+    var rank_a = a.rank()
+    var rank_b = b.rank()
+
+    if rank_a <= 1 and rank_b <= 1:
+        return dot
+    elif rank_a == 1 and rank_b >= 2:
+        return vm
+    elif rank_a >= 2 and rank_b == 1:
+        return mv
+    else:  # rank_a >= 2 and rank_b >= 2
+        if a[-1] == b[-2]:
+            return mm
+        else:
+            return invalid
 
 
 fn main() raises:

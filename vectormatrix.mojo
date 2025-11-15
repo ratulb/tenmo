@@ -6,7 +6,7 @@ from ancestry import Ancestor
 from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
 from common_utils import il, s, panic
-from matmul import Matmul2d, MatmulNd
+from matmul import Matmul2d
 
 
 @fieldwise_init
@@ -146,7 +146,6 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
                     grad_v_final.buffer
                 )
 
-            grad_v = grad_v.sum_over_broadcasted_axes(v_shape)
             results.append((v.copy(), grad_v^, AddTensor))
 
         # Gradient for M: dM = v^T @ grad_out (outer product)
@@ -178,15 +177,12 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
                 var grad_out_row = grad_out_slice.unsqueeze(
                     [-2]
                 )  # GradBox[1, n]
-                var grad_M_slice_result = Matmul2d[dtype].forward(
-                    v_col, grad_out_row
-                )  # GradBox[k, n]
+                var grad_M_slice_result = v_col * grad_out_row  # GradBox[k, n]
 
                 grad_M_slice.buffer.fill_equal_shape[overwrite=False](
                     grad_M_slice_result.buffer
                 )
 
-            grad_M = grad_M.sum_over_broadcasted_axes(M_shape)
             results.append((M^, grad_M^, AddTensor))
 
         return results^
