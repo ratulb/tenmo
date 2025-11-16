@@ -1,7 +1,7 @@
 # %s/Tensor\.walk_backward(\([^)]*\))/\1.backward()/g
 # %s/^\(fn test_\(.*\)() raises:\)$/&\r    print("test_\2")/
 from testing import assert_true, assert_false, assert_raises
-from tensors import Tensor
+from tenmo import Tensor
 from intlist import IntList
 from shapes import Shape
 from common_utils import *

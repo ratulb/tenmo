@@ -15,31 +15,70 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var gradbox = output.grad().copy()
-        var grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
+
+        # ------------------------------------------------------------
+        # This is the gradient flowing *into* this broadcasted op.
+        # We need to call copy explicitly because we have not annotated Gradbox with `ImplicitlyCopyable` yet - Intententionally
+        # ------------------------------------------------------------
+        var incoming_grad = output.grad().copy()
+
+
+        # ------------------------------------------------------------
+        # This will be returned to the engine to continue traversal.
+        # capacity = 2 because we always have 2 parents(at most)
+        # ------------------------------------------------------------
+        var parent_grad_list = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
             capacity=2
         )
 
-        var ancestor_lhs = output.ancestry().get(0)
-        var ancestor_rhs = output.ancestry().get(1)
+        # ------------------------------------------------------------
+        # Extract parents (ancestors)
+        # ------------------------------------------------------------
+        var left_parent  = output.ancestry().get(0)
+        var right_parent = output.ancestry().get(1)
 
-        var tensor_lhs = ancestor_lhs.tensor()
-        var tensor_rhs = ancestor_rhs.tensor()
+        # ------------------------------------------------------------
+        # Extract actual tensors from ancestors
+        # ------------------------------------------------------------
+        var left_tensor  = left_parent.tensor()
+        var right_tensor = right_parent.tensor()
 
-        if ancestor_lhs.requires_grad():
-            var lhs_share = tensor_lhs.upstream_grad_share[augment=augment](
-                tensor_rhs, gradbox
+        # ------------------------------------------------------------
+        # For left parent: compute the gradient contribution if needed
+        # ------------------------------------------------------------
+        if left_parent.requires_grad():
+
+
+            # This function reduces the broadcast grad back to left_tensor shape.
+            var left_parent_grad = left_tensor.upstream_grad_share[
+                augment = augment
+            ](right_tensor, incoming_grad)
+
+            # Append to return list:
+            #   - which ancestor gets the update
+            #   - the computed gradient box
+            #   - the operation code (AddTensor/SubtractTensor/etc.)
+            parent_grad_list.append(
+                (left_parent^, left_parent_grad^, lhs_op)
             )
-            grad_shares.append((ancestor_lhs^, lhs_share^, lhs_op))
 
-        if ancestor_rhs.requires_grad():
-            var rhs_share = tensor_rhs.upstream_grad_share[augment=augment](
-                tensor_lhs, gradbox
+        # ------------------------------------------------------------
+        # For right parent: compute its gradient if needed
+        # ------------------------------------------------------------
+        if right_parent.requires_grad():
+
+            var right_parent_grad = right_tensor.upstream_grad_share[
+                augment = augment
+            ](left_tensor, incoming_grad)
+
+            parent_grad_list.append(
+                (right_parent^, right_parent_grad^, rhs_op)
             )
-            grad_shares.append((ancestor_rhs^, rhs_share^, rhs_op))
 
-        return grad_shares^
-
+        # ------------------------------------------------------------
+        # Return the list of gradient contributions for both parents
+        # ------------------------------------------------------------
+        return parent_grad_list^
 
 fn main():
     pass
