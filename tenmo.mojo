@@ -322,6 +322,69 @@ struct Tensor[dtype: DType = DType.float32](
 
         self.buffer[indices] = value
 
+    fn set(self, value: Scalar[dtype], *indices: Idx):
+        # Compute view metadata
+        shape, strides, offset = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                self.shape(), self.strides(), indices
+            )
+        )
+        if len(shape) == 0:
+            self.buffer.data()[offset] = value
+        else:
+            sliced = self.view[track_grad=False](
+                shape=shape, strides=strides, offset=offset
+            )
+            for coord in shape:
+                sliced[coord] = value
+
+    fn set(self, tensor: Tensor[dtype], *indices: Idx):
+        shape, strides, offset = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                self.shape(), self.strides(), indices
+            )
+        )
+        if len(shape) == 0:
+            if not tensor.numels() == 1:
+                panic(
+                    (
+                        "Tensor → set: expected single element tensor. Received"
+                        " tensor with"
+                    ),
+                    tensor.numels().__str__(),
+                    "elements tensor",
+                )
+
+            else:
+                elem = (
+                    tensor.item() if tensor.shape()
+                    == Shape() else (tensor.squeeze[track_grad=False]([]))[
+                        IntArray()
+                    ]
+                )
+                self.buffer.data()[offset] = elem
+        else:
+            tensor_shape = tensor.shape()
+            if not ShapeBroadcaster.broadcastable(tensor_shape, shape):
+                panic(
+                    "Tensor → set: input tensor not broadcastable to shape",
+                    shape.__str__(),
+                )
+            else:
+                sliced = self.view[track_grad=False](
+                    shape=shape, strides=strides, offset=offset
+                )
+                if tensor_shape == shape:
+                    for coord in shape:
+                        sliced[coord] = tensor[coord]
+                else:
+                    mask = ShapeBroadcaster.broadcast_mask(tensor_shape, shape)
+                    for coord in shape:
+                        tensor_coord = ShapeBroadcaster.translate_index(
+                            tensor_shape, coord, mask, shape
+                        )
+                        sliced[coord] = tensor[tensor_coord]
+
     fn item(self) -> Scalar[dtype]:
         return self.buffer.item()
 
@@ -1744,88 +1807,43 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
     fn __has_next__(self) -> Bool:
         return self.index_itr.__has_next__()
 
-        _ = """fn set(self, tensor: Tensor[dtype], *indices: Idx):
-        shape, strides, offset = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                self.shape, self.strides, indices
-            )
-        )
-        if len(shape) == 0:
-            if not tensor.numels() == 1:
-                panic(
-                    (
-                        "Tensor → set: expected single element tensor. Received"
-                        " tensor with"
-                    ),
-                    tensor.numels().__str__(),
-                    "elements tensor",
-                )
-
-            else:
-                elem = (
-                    tensor.item() if tensor.shape
-                    == Shape() else (
-                        tensor.squeeze[track_grad=False](
-                            [], requires_grad=False
-                        )
-                    )[IntList()]
-                )
-                if self.owns_data:
-                    self.buffer[offset] = elem
-                else:
-                    self.shared_buffer.value()[][offset] = elem
-        else:
-            if not tensor.shape.broadcastable(shape):
-                panic(
-                    "Tensor → set: input tensor not broadcastable to shape",
-                    shape.__str__(),
-                )
-            else:
-                sliced = self.view(shape, strides, offset, False)
-                if tensor.shape == shape:
-                    for idx in shape:
-                        sliced[idx] = tensor[idx]
-                else:
-                    mask = tensor.shape.broadcast_mask(shape)
-                    for idx in shape:
-                        tensor_idx = tensor.shape.translate_index(
-                            idx, mask, shape
-                        )
-                        sliced[idx] = tensor[tensor_idx]
-
-    fn set(self, value: Scalar[dtype], *indices: Idx):
-        # Compute view metadata
-        shape, strides, offset = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                self.shape, self.strides, indices
-            )
-        )
-        if len(shape) == 0:
-            if self.owns_data:
-                self.buffer[offset] = value
-            else:
-                self.shared_buffer.value()[][offset] = value
-        else:
-            sliced = self.view(shape, strides, offset, False)
-            for idx in shape:
-                sliced[idx] = value"""
-
 
 fn main() raises:
+    # test_set_value()
+    # test_set_tensor()
     pass
-    _ = """A = Tensor.rand(2, 3, 4, init_seed=42, requires_grad=True)
-    A.print()
-    A_indices = IntArray(1)
-    A_indices[0] = 1
-    A_slice = A[il(A_indices), s(), s()]
-    print("\nA_slice\n")
-    A_slice.print()
-    B = Tensor.rand(4, 2, init_seed=42, requires_grad=True)
-    print("\nB\n")
-    B.print()
-    C = A_slice.matmul_2d(B)
-    print("\nC\n")
-    C.print()
-    C.backward()
-    print("\nB.grad\n")
-    B.grad().print()"""
+
+
+fn test_set_value() raises:
+    print("test_set_value")
+    a = Tensor.ones(2, 3, 4)
+    # Set the value
+    a.set(42, il(1), s(1, 2, 1), s())
+    # Get it back
+    r = a[il(1), s(1, 2, 1), s()]
+    assert_true(r == Tensor.d2([[42, 42, 42, 42]]))
+    a.set(1, il(1), s(1, 2, 1), s())  # Set it back to 1
+
+    a.set(42, il(1), s(1, 2, None), s())  # Same behaviour
+    # Get it back
+    r = a[il(1), s(1, 2, 1), s()]
+    assert_true(r == Tensor.d2([[42, 42, 42, 42]]))
+    a.set(1, il(1), s(1, 2, 1), s())  # Set it back to 1
+
+    a.set(42, il(1), il(1), il(2))  # Second block, 2nd row, second col
+    assert_true(a[1, 1, 2] == 42)
+
+
+fn test_set_tensor() raises:
+    print("test_set_tensor")
+    a = Tensor.ones(2, 3, 4)
+    # Set the value
+    tensor = Tensor.full([1, 4], 42)
+
+    a.set(tensor, il(1), s(), s())
+    # Get it back
+    r = a[il(1), s(), s()]
+    assert_true(r == Tensor.full([3, 4], 42))
+
+
+from testing import assert_true
