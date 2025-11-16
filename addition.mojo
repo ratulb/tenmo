@@ -4,7 +4,7 @@ from operators import AddTensor, Add
 from common_utils import panic
 from gradbox import Gradbox
 from ancestry import Ancestor
-
+from broadcastbackward import BroadcastBackward
 
 @fieldwise_init
 @register_passable
@@ -23,51 +23,9 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
         return [(ancestor^, gradbox^, AddTensor)]
 
 
-@fieldwise_init
-@register_passable
-struct AddBroadcastBackward[dtype: DType](ImplicitlyCopyable):
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
-
-    fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
-        var grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
-            capacity=2
-        )
-
-        ancestor_lhs = output.ancestry().get(0)
-        ancestor_rhs = output.ancestry().get(1)
-
-        tensor_lhs = ancestor_lhs.tensor()
-        tensor_rhs = ancestor_rhs.tensor()
-
-        if ancestor_lhs.requires_grad():
-            lhs_share = tensor_lhs.upstream_grad_share[augment=False](
-                tensor_rhs, gradbox
-            )
-            grad_shares.append(
-                (
-                    ancestor_lhs^,
-                    lhs_share^,
-                    AddTensor,
-                )
-            )
-
-        if ancestor_rhs.requires_grad():
-            rhs_share = tensor_rhs.upstream_grad_share[augment=False](
-                tensor_lhs, gradbox
-            )
-            grad_shares.append(
-                (
-                    ancestor_rhs^,
-                    rhs_share^,
-                    AddTensor,
-                )
-            )
-
-        return grad_shares^
+alias AddBroadcastBackward[dtype: DType] = BroadcastBackward[
+    dtype, augment=False, lhs_op=AddTensor, rhs_op=AddTensor
+]
 
 
 @fieldwise_init
