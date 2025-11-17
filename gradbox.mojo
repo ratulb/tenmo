@@ -12,6 +12,8 @@ from intlist import IntList
 from strides import Strides
 from sys import simd_width_of
 from matmul import Matmul
+from random import seed, random_float64
+from buffers import Buffer
 
 struct Gradbox[dtype: DType](
     Copyable
@@ -222,6 +224,28 @@ struct Gradbox[dtype: DType](
         return Gradbox[dtype](
             NDBuffer.full(shape, Scalar[dtype](0)), share=share
         )
+
+    @staticmethod
+    fn rand(
+        shape: Shape,
+        min: Scalar[dtype] = 0,
+        max: Scalar[dtype] = 1,
+        init_seed: Optional[Int] = None,
+        requires_grad: Bool = False,
+        share: Bool = False
+    ) -> Gradbox[dtype]:
+        if init_seed:
+            seed(init_seed.value())
+        else:
+            seed()
+        numels = shape.num_elements()
+        buffer = Buffer[dtype](numels)
+        for i in range(numels):
+            buffer[i] = random_float64(
+                min.cast[DType.float64](), max.cast[DType.float64]()
+            ).cast[dtype]()
+
+        return Gradbox[dtype](NDBuffer[dtype](buffer^, shape), share=share)
 
     @always_inline
     fn unshared(self) -> Gradbox[dtype]:
