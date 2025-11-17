@@ -77,7 +77,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var grad_out = output.grad().copy()  # GradBox: batch + [m]
+        ref grad_out = output.grad()  # GradBox: batch + [m]
         var M = output.ancestry().get(0)  # Tensor: batch_M + [m, k]
         var v = output.ancestry().get(1)  # Tensor: batch_v + [k]
 

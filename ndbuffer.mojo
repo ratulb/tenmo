@@ -6,7 +6,7 @@ from layout.int_tuple import IntArray
 from indexhelper import IndexCalculator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic
-from memory import memcpy, ArcPointer
+from memory import memcpy
 from collections import Set
 from sys import simd_width_of
 from operators import (
@@ -29,15 +29,13 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
     var shape: Shape
     var strides: Strides
     var offset: Int
-    var buffer: Optional[Buffer[dtype]]
-    var shared_buffer: Optional[ArcPointer[Buffer[dtype]]]
+    var buffer: Buffer[dtype]
     var _contiguous: Bool
 
     fn __init__(
         out self,
     ):
         self.buffer = Buffer[dtype](1)
-        self.shared_buffer = None
         self.shape = Shape()
         self.strides = Strides.Zero()
         self.offset = 0
@@ -62,8 +60,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
             )
         _shape = shape.value() if shape else Shape(buffer.size)
         self.shape = _shape.copy()
-        self.buffer = Optional(buffer^)
-        self.shared_buffer = None
+        self.buffer = buffer^
         self.strides = strides.value() if strides else Strides.default(_shape)
         self.offset = offset
         self._contiguous = False
@@ -75,8 +72,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ):
-        self.buffer = Optional(Buffer[dtype](shape.num_elements()))
-        self.shared_buffer = None
+        self.buffer = Buffer[dtype](shape.num_elements())
         self.shape = shape
         self.strides = strides.value() if strides else Strides.default(shape)
         self.offset = offset
@@ -85,13 +81,12 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
 
     fn __init__(
         out self,
-        shared_buffer: Optional[ArcPointer[Buffer[dtype]]],
+        var shared_buffer: Buffer[dtype],
         shape: Shape,
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ):
-        self.buffer = None
-        self.shared_buffer = shared_buffer.copy()
+        self.buffer = shared_buffer^
         self.shape = shape
         self.strides = strides.value() if strides else Strides.default(shape)
         self.offset = offset
@@ -100,15 +95,14 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
 
     fn __moveinit__(out self, deinit other: Self):
         self.buffer = other.buffer^
-        self.shared_buffer = other.shared_buffer^
         self.shape = other.shape^
         self.strides = other.strides^
         self.offset = other.offset
         self._contiguous = other._contiguous
 
     fn __copyinit__(out self, other: Self):
-        self.buffer = other.buffer.copy()
-        self.shared_buffer = other.shared_buffer.copy()
+        """Copy NDBuffer - buffer handles ref counting automatically!."""
+        self.buffer = other.buffer.copy()  # Buffer copy handles shared/unshared!
         self.shape = other.shape.copy()
         self.strides = other.strides.copy()
         self.offset = other.offset
@@ -116,7 +110,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
 
     fn __del__(deinit self):
         _ = self.buffer^
-        _ = self.shared_buffer^
         _ = self.shape^
         _ = self.strides^
 
@@ -157,77 +150,64 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         return self.strides.is_contiguous(self.shape)
 
     @always_inline
-    fn data(
-        ref self,
-    ) -> ref [
-        origin_of(self.buffer.value(), self.shared_buffer.value()[])
-    ] Buffer[dtype]:
-        if self.buffer:
-            return self.buffer.value()
-        return self.shared_buffer.value()[]
-
-    @always_inline
     fn size(self) -> Int:
-        if self.buffer:
-            return self.buffer.value().size
-        else:
-            return self.shared_buffer.value()[].size
+        return self.buffer.size
 
     @always_inline
     fn __getitem__(self, indices: IntArray) -> Scalar[dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        return self.data()[index]
+        return self.buffer[index]
 
     @always_inline
     fn __setitem__(self, indices: IntArray, value: Scalar[dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        self.data()[index] = value
+        self.buffer[index] = value
 
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        return self.data()[index]
+        return self.buffer[index]
 
     @always_inline
     fn __setitem__(self, indices: List[Int], value: Scalar[dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        self.data()[index] = value
+        self.buffer[index] = value
 
     @always_inline
     fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        return self.data()[index]
+        return self.buffer[index]
 
     @always_inline
     fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        self.data()[index] = value
+        self.buffer[index] = value
 
     @always_inline
     fn __getitem__(self, indices: VariadicList[Int]) -> Scalar[dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        return self.data()[index]
+        return self.buffer[index]
 
     @always_inline
     fn __setitem__(self, indices: VariadicList[Int], value: Scalar[dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        self.data()[index] = value
+        self.buffer[index] = value
 
     @always_inline
     fn item(self) -> Scalar[dtype]:
@@ -305,7 +285,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
                 )
 
         var addr = row * strides[0] + col * strides[1] + offset
-        return self.data().load[simdwidth](addr)
+        return self.buffer.load[simdwidth](addr)
 
     @always_inline
     fn store[
@@ -368,7 +348,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
                 )
 
         var addr = row * strides[0] + col * strides[1] + offset
-        self.data().store[simdwidth](addr, value)
+        self.buffer.store[simdwidth](addr, value)
 
 
     fn __str__(self) -> String:
@@ -442,7 +422,8 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
 
     @always_inline
     fn shared(self) -> Bool:
-        return self.buffer is None and self.shared_buffer is not None
+        """Check if underlying buffer is shared."""
+        return self.buffer.is_shared()
 
     fn share(
         mut self,
@@ -450,13 +431,18 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ) -> NDBuffer[dtype]:
+        """
+        Create shared view of this buffer.
+        First call enables ref counting. Subsequent calls just create views.
+        """
+        # Enable ref counting if not already shared
         if not self.shared():
-            self.shared_buffer = Optional(self.buffer.unsafe_take().shared())
+            self.buffer.shared()
 
         new_shape = shape.or_else(self.shape)
         new_strides = strides.or_else(self.strides)
         return NDBuffer[dtype](
-            shared_buffer=self.shared_buffer,
+            shared_buffer=self.buffer.copy(),
             shape=new_shape,
             strides=new_strides,
             offset=offset,
@@ -465,7 +451,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
     @always_inline
     fn __is__(self, other: NDBuffer[dtype]) -> Bool:
         if self.shared() and other.shared():
-            return self.shared_buffer.value() is other.shared_buffer.value()
+            return self.buffer.data == other.buffer.data
         return False
 
     @always_inline
@@ -475,7 +461,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
     @always_inline
     fn fill(self, value: Scalar[dtype]):
         if self._contiguous:
-            self.data().fill(value, self.offset, self.offset + self.numels())
+            self.buffer.fill(value, self.offset, self.offset + self.numels())
         else:
             for coord in self.shape:
                 self[coord] = value
@@ -493,7 +479,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         if self._contiguous:
             var start = self.offset
             var end = start + self.numels()
-            return map_buffer(self.data()[start:end])
+            return map_buffer(self.buffer[start:end])
         else:
             var buffer = Buffer[dtype](self.numels())
             var index = 0
@@ -511,7 +497,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         if self._contiguous:
             var start = self.offset
             var end = start + self.numels()
-            return reduce_buffer(self.data(), start, end)
+            return reduce_buffer(self.buffer, start, end)
         else:
             var accum: Scalar[dtype] = unit
             for coord in self.shape:
@@ -523,7 +509,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         if self._contiguous:
             var start = self.offset
             var end = start + self.numels()
-            return self.data().sum(start, end)
+            return self.buffer.sum(start, end)
         else:
             var accum_sum: Scalar[dtype] = Scalar[dtype](0)
             for coord in self.shape:
@@ -633,7 +619,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         if self._contiguous:
             var start = self.offset
             var end = start + self.numels()
-            return self.data()[start:end]
+            return self.buffer[start:end]
         else:
             var buffer = Buffer[dtype](self.numels())
             var index = 0
@@ -647,7 +633,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         if self._contiguous:
             var start = self.offset
             var end = start + self.numels()
-            return self.data().count(key, start, end)
+            return self.buffer.count(key, start, end)
         else:
             var _count = 0
             for coord in self.shape:
@@ -661,12 +647,12 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         if self._contiguous:
             if not self.shared():
                 for i in range(self.numels()):
-                    uniques.add(self.data()[i])
+                    uniques.add(self.buffer[i])
             else:
                 var start = self.offset
                 var end = start + self.numels()
                 for i in range(start, end):
-                    uniques.add(self.data()[i])
+                    uniques.add(self.buffer[i])
         else:
             for coord in self.shape:
                 uniques.add(self[coord])
@@ -692,25 +678,25 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         @parameter
         if overwrite:
             if lhs._contiguous:
-                lhs.data().overwrite(
-                     rhs.data(), lhs.offset, lhs.offset + lhs.numels()
+                lhs.buffer.overwrite(
+                     rhs.buffer, lhs.offset, lhs.offset + lhs.numels()
                 )
             else:
                 var index = 0
                 for coord in lhs.shape:
-                    lhs[coord] = rhs.data()[index]
+                    lhs[coord] = rhs.buffer[index]
                     index += 1
         else:
             if lhs._contiguous:
-                var existing = lhs.data()[lhs.offset:lhs.offset + lhs.numels()]
-                accumulated = rhs.data() + existing
-                lhs.data().overwrite(
+                var existing = lhs.buffer[lhs.offset:lhs.offset + lhs.numels()]
+                accumulated = rhs.buffer + existing
+                lhs.buffer.overwrite(
                      accumulated, lhs.offset, lhs.offset + lhs.numels()
                 )
             else:
                 var index = 0
                 for coord in lhs.shape:
-                    lhs[coord] += rhs.data()[index]
+                    lhs[coord] += rhs.buffer[index]
                     index += 1
 
 
@@ -742,13 +728,13 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
 
         if lhs.shape == rhs.shape:
             if lhs._contiguous:
-                lhs.data().overwrite(
-                    rhs.data(), lhs.offset, lhs.offset + lhs.numels()
+                lhs.buffer.overwrite(
+                    rhs.buffer, lhs.offset, lhs.offset + lhs.numels()
                 )
             else:
                 var index = 0
                 for coord in lhs.shape:
-                    lhs[coord] = rhs.data()[index]
+                    lhs[coord] = rhs.buffer[index]
                     index += 1
         else:  # Handle broadcast
             # lhs.shape -> Target shape
@@ -792,9 +778,8 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
             var broadcast_result = lhs.broadcast_buffer[opcode](rhs)
 
             if lhs._contiguous:
-                result_buffer = broadcast_result.take_buffer()
-                lhs.data().overwrite(
-                    result_buffer, lhs.offset, lhs.offset + lhs.numels()
+                lhs.buffer.overwrite(
+                    broadcast_result^.buffer, lhs.offset, lhs.offset + lhs.numels()
                 )
             else:
                 for coord in lhs.shape:
@@ -805,9 +790,8 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
             if lhs._contiguous and rhs._contiguous:
                 # Fast path: Use out-of-place operation + overwrite
                 var result = lhs.arithmetic_ops[opcode](rhs)
-                result_buffer = result.take_buffer()
-                lhs.data().overwrite(
-                    result_buffer, lhs.offset, lhs.offset + lhs.numels()
+                lhs.buffer.overwrite(
+                    result^.buffer, lhs.offset, lhs.offset + lhs.numels()
                 )
 
             else:
@@ -826,13 +810,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
                         lhs[coord] = lhs_val / rhs_val
 
     @always_inline
-    fn take_buffer(mut self) -> Buffer[dtype]:
-        """Take the underlying buffer out, panicking if None."""
-        if not self.buffer:
-            panic("NDBuffer: expected buffer to be present")
-        return self.buffer.unsafe_take()
-
-    @always_inline
     fn inplace_scalar_ops[
         opcode: Int,
     ](self: NDBuffer[dtype], scalar: Scalar[dtype]):
@@ -845,7 +822,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
             start = self.offset
             end = start + self.numels()
             var result = self.scalar_ops[opcode](scalar)
-            self.data().overwrite(result.take_buffer(), start, end)
+            self.buffer.overwrite(result.buffer, start, end)
 
         else:
             for coord in self.shape:
@@ -1088,10 +1065,10 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
             return NDBuffer[dtype](result_buffer^, self.shape)
 
     fn __eq__(self, other: Self) -> Bool:
-        return self.compare[Equal](other).buffer.value().all_true()
+        return self.compare[Equal](other).buffer.all_true()
 
     fn __ne__(self, other: Self) -> Bool:
-        return self.compare[NotEqual](other).buffer.value().all_true()
+        return self.compare[NotEqual](other).buffer.all_true()
 
     fn compare[
         opcode: Int,
@@ -1234,7 +1211,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
                 ", provided index",
                 index.__str__(),
             )
-        return self.data()[idx]
+        return self.buffer[idx]
 
     @always_inline
     fn sum_over_broadcasted_axes(

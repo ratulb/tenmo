@@ -15,7 +15,7 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        var gradbox = output.grad().copy()
         ancestor = output.ancestry().get(0)
         if ancestor.shape() != gradbox.shape():
             gradbox = gradbox.reshape(ancestor.shape())
@@ -37,7 +37,7 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        var gradbox = output.grad().copy()
         count = len(output.ancestry())
 
         var grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
@@ -58,7 +58,7 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
                 grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))
 
             elif lhs_requires_grad and not rhs_requires_grad:
-                grad_shares.append((ancestor_lhs^, gradbox^, AddTensor))
+                grad_shares.append((ancestor_lhs^, gradbox.copy(), AddTensor))
 
             elif not lhs_requires_grad and rhs_requires_grad:
                 grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))

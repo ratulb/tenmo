@@ -330,7 +330,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
         )
         if len(shape) == 0:
-            self.buffer.data()[offset] = value
+            self.buffer.buffer[offset] = value
         else:
             sliced = self.view[track_grad=False](
                 shape=shape, strides=strides, offset=offset
@@ -362,7 +362,7 @@ struct Tensor[dtype: DType = DType.float32](
                         IntArray()
                     ]
                 )
-                self.buffer.data()[offset] = elem
+                self.buffer.buffer[offset] = elem
         else:
             tensor_shape = tensor.shape()
             if not ShapeBroadcaster.broadcastable(tensor_shape, shape):

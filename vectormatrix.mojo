@@ -90,7 +90,7 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var grad_out = output.grad().copy()  # GradBox: batch + [n]
+        ref grad_out = output.grad()  # GradBox: batch + [n]
         var v = output.ancestry().get(0)  # Tensor: batch_v + [k]
         var M = output.ancestry().get(1)  # Tensor: batch_M + [k, n]
 

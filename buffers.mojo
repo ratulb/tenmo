@@ -1,25 +1,35 @@
 from algorithm import vectorize
-from sys import simd_width_of
+from sys import simd_width_of,  size_of
 from memory import memset_zero, memcpy, ArcPointer
 from math import exp, log, ceil
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
-
+from os.atomic import Atomic, Consistency, fence
 
 struct Buffer[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Writable & Representable & Absable
 ):
+
+    """
+    Unified buffer with optional reference counting built-in.
+
+    When unshared: Just manages data pointer (like before).
+    When shared: Adds atomic refcount in same allocation as data.
+    """
     var size: Int
     var data: UnsafePointer[Scalar[dtype]]
+    var _refcount: UnsafePointer[Atomic[DType.uint64]]  # Null if not shared!
     var external: Bool
 
-    @staticmethod
-    fn Empty() -> Buffer[dtype]:
-        return Buffer[dtype]()
+    # ========================================
+    # Constructors
+    # ========================================
+
 
     fn __init__(out self):
         self.size = 0
         self.data = UnsafePointer[Scalar[dtype]]()
+        self._refcount = UnsafePointer[Atomic[DType.uint64]]()  # Null
         self.external = False
 
     fn __init__(out self, size: Int, external: Bool = False):
@@ -27,22 +37,23 @@ struct Buffer[dtype: DType = DType.float32](
             panic("Buffer size must be >= 0")
         self.size = size
         self.external = external
+        self._refcount = UnsafePointer[Atomic[DType.uint64]]()  # Null (not shared yet)
 
         if size == 0:
             self.data = UnsafePointer[Scalar[dtype]]()
         else:
             if external:
-                # Expect data pointer to be set later
                 self.data = UnsafePointer[Scalar[dtype]]()
             else:
                 self.data = UnsafePointer[Scalar[dtype]].alloc(size)
 
     fn __init__(out self, elems: List[Scalar[dtype]]):
-        length = len(elems)
+        var length = len(elems)
         self.data = UnsafePointer[Scalar[dtype]].alloc(length)
         self.size = length
         memcpy(dest=self.data, src=elems._data, count=length)
         self.external = False
+        self._refcount = UnsafePointer[Atomic[DType.uint64]]()  # Null
 
     fn __init__(
         out self,
@@ -51,6 +62,7 @@ struct Buffer[dtype: DType = DType.float32](
         copy: Bool = False,
     ):
         self.size = size
+        self._refcount = UnsafePointer[Atomic[DType.uint64]]()  # Null
         if copy:
             self.data = UnsafePointer[Scalar[dtype]].alloc(size)
             memcpy(dest=self.data, src=data, count=size)
@@ -59,19 +71,128 @@ struct Buffer[dtype: DType = DType.float32](
             self.data = data
             self.external = True
 
-    fn __moveinit__(out self, deinit other: Self):
+    # ========================================
+    # Shared state management (NEW!)
+    # ========================================
+
+    fn is_shared(self) -> Bool:
+        """Check if this buffer has ref counting enabled."""
+        return self._refcount != UnsafePointer[Atomic[DType.uint64]]()
+
+
+    fn shared(mut self):
+        """
+        Convert this buffer to shared mode (enable ref counting).
+
+        Memory layout transformation:
+        Before: [data array]
+        After:  [refcount: 8 bytes][data array]
+        """
+        if self.is_shared():
+            return  # Already shared
+
+        if self.external:
+            panic("Cannot share external buffer")
+
+        if self.size == 0:
+            return  # Nothing to share
+
+        # Allocate new memory: [refcount][data]
+        var refcount_size = size_of[Atomic[DType.uint64]]()
+        var data_size = self.size *  size_of[Scalar[dtype]]()
+        var total_size = refcount_size + data_size
+        var new_alloc = UnsafePointer[UInt8].alloc(total_size)
+
+        # Initialize refcount at start
+        var refcount_ptr = new_alloc.bitcast[Atomic[DType.uint64]]()
+        refcount_ptr[] = Atomic[DType.uint64](1)
+
+        # Copy data after refcount
+        var new_data = new_alloc.offset(refcount_size).bitcast[Scalar[dtype]]()
+        memcpy(dest=new_data, src=self.data, count=self.size)
+
+        # Free old allocation
+
+        for i in range(self.size):
+            (self.data + i).destroy_pointee()
+        self.data.free()
+        log_debug("Buffer__del__ → freed data pointees")
+
+        # Update pointers
+        self.data = new_data
+        self._refcount = refcount_ptr
+
+    fn ref_count(self) -> UInt64:
+        """Count the amount of current references.
+
+        Returns:
+            The current amount of references to the pointee.
+        """
+        return self._refcount[].load[ordering = Consistency.MONOTONIC]()
+
+    # ========================================
+    # Copy/Move semantics
+    # ========================================
+
+    fn __copyinit__(out self, other: Self):
+        """Copy buffer - increment refcount if shared."""
         self.size = other.size
         self.data = other.data
         self.external = other.external
+        self._refcount = other._refcount
 
-    fn __copyinit__(out self, other: Self):
+        if self.is_shared():
+            # Atomic increment (only for shared buffers)
+            _ = self._refcount[].fetch_add[ordering=Consistency.MONOTONIC](1)
+        else:
+            # Not shared - deep copy data
+            if self.size > 0 and not self.external:
+                self.data = UnsafePointer[Scalar[dtype]].alloc(self.size)
+                memcpy(dest=self.data, src=other.data, count=self.size)
+
+    fn __moveinit__(out self, deinit other: Self):
+        """Move buffer - no refcount change."""
         self.size = other.size
-        self.data = UnsafePointer[Scalar[dtype]].alloc(other.size)
-        memcpy(dest=self.data, src=other.data, count=other.size)
+        self.data = other.data
         self.external = other.external
+        self._refcount = other._refcount
 
-    fn shared(var self) -> ArcPointer[Buffer[dtype]]:
-        return ArcPointer(self^)
+    fn __del__(deinit self):
+        """Destroy buffer - handle both shared and unshared cases."""
+        if self.size == 0 or not self.data.__as_bool__():
+            return
+
+        if self.external:
+            return  # Don't free external data
+
+        if self.is_shared():
+            # Shared buffer - atomic decrement
+            if self._refcount[].fetch_sub[ordering=Consistency.RELEASE](1) != 1:
+                return  # Other references exist
+
+            # Last reference - free everything
+            fence[ordering=Consistency.ACQUIRE]()
+
+            # Destroy data elements
+            for i in range(self.size):
+                (self.data + i).destroy_pointee()
+
+            # Free allocation (starts at refcount, not data)
+            var refcount_size = size_of[Atomic[DType.uint64]]()
+            var alloc_start = self._refcount.bitcast[Int64]()
+            alloc_start.free()
+
+        else:
+            # Unshared buffer - direct free
+            for i in range(self.size):
+                (self.data + i).destroy_pointee()
+            self.data.free()
+            log_debug("Buffer__del__ → freed unshared buffer")
+
+    @staticmethod
+    fn Empty() -> Buffer[dtype]:
+        return Buffer[dtype]()
+
 
     fn __len__(self) -> Int:
         return self.size
@@ -463,7 +584,6 @@ struct Buffer[dtype: DType = DType.float32](
         @parameter
         fn inplace_div_scalar[simdwidth: Int](idx: Int):
             this.store[simdwidth](idx, this.load[simdwidth](idx) / scalar)
-            print(idx)
 
         vectorize[inplace_div_scalar, simd_width](this.size)
 
@@ -1623,17 +1743,6 @@ struct Buffer[dtype: DType = DType.float32](
     fn __repr__(self) -> String:
         return self.__str__()
 
-    fn __del__(deinit self):
-        should_delete = (
-            self.data.__as_bool__() and self.size > 0 and not self.external
-        )
-        if should_delete:
-            for i in range(len(self)):
-                (self.data + i).destroy_pointee()
-            self.data.free()
-            log_debug("Buffer__del__ → freed data pointees")
-
-
 @register_passable
 struct ElementIterator[
     dtype: DType,
@@ -1666,7 +1775,11 @@ fn main() raises:
     l = List[Scalar[dtype]](0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
     b = Buffer[dtype](l)
     r = b[3:8]
-    print(r)
+    r.shared()
+    r1 = r.copy()
+    print(r.is_shared(), r.ref_count())
+    _= r^
 
+    print("done")
 
 from testing import assert_true, assert_false

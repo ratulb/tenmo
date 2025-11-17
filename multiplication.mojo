@@ -17,7 +17,7 @@ struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.grad()
         ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * self.factor
         return [
@@ -38,7 +38,7 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.grad()
         count = len(output.ancestry())
         ancestor_lhs = output.ancestry().get(0)
 

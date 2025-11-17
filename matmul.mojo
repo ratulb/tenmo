@@ -19,7 +19,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
     ](self, output: Tensor[dtype]) -> List[
         Tuple[Ancestor[dtype], Gradbox[dtype], Int]
     ]:
-        var grad_out = output.grad().copy()  # Always contiguous
+        ref grad_out = output.grad()  # Always contiguous
         var A = output.ancestry().get(0)  # First input
         var B = output.ancestry().get(1)  # Second input
 
@@ -278,7 +278,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var grad_out = output.grad().copy()  # GradBox: batch_shape + [m, n]
+        ref grad_out = output.grad()  # GradBox: batch_shape + [m, n]
         var A = output.ancestry().get(0)  # Tensor ancestor
         var B = output.ancestry().get(1)  # Tensor ancestor
         var A_shape = A.shape()

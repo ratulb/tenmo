@@ -20,7 +20,7 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
         # This is the gradient flowing *into* this broadcasted op.
         # We need to call copy explicitly because we have not annotated Gradbox with `ImplicitlyCopyable` yet - Intententionally
         # ------------------------------------------------------------
-        var incoming_grad = output.grad().copy()
+        ref incoming_grad = output.grad()
 
 
         # ------------------------------------------------------------

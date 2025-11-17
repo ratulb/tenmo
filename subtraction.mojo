@@ -29,7 +29,7 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.grad()
         count = len(output.ancestry())
         grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
             capacity=UInt(count)
@@ -57,10 +57,10 @@ struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.grad()
         ancestor = output.ancestry().get(0)
         return [
-            (ancestor^, gradbox^, SubtractTensor if self.negate else AddTensor)
+            (ancestor^, gradbox.copy(), SubtractTensor if self.negate else AddTensor)
         ]
 
 

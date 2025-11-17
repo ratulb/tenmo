@@ -300,7 +300,7 @@ struct Gradbox[dtype: DType](
         shape = Shape() if is_scalar else view_shape
         strides = Strides() if is_scalar else view_strides
         abs_offset = self.offset() + relative_offset
-        shared_buffer = self.buffer.shared_buffer.copy()
+        shared_buffer = self.buffer.buffer.copy()
         ndb = NDBuffer[dtype](shared_buffer=shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset)
 
         return Gradbox[dtype](ndb^, share=False)
@@ -454,7 +454,7 @@ struct Gradbox[dtype: DType](
                 other.shape().__str__(),
             )
         return (
-            self.buffer.compare[Equal](other.buffer).buffer.value().all_true()
+            self.buffer.compare[Equal](other.buffer).buffer.all_true()
         )
 
     fn __ne__(self, other: Gradbox[dtype]) -> Bool:
@@ -467,7 +467,7 @@ struct Gradbox[dtype: DType](
             )
         return (
             self.buffer.compare[NotEqual](other.buffer)
-            .buffer.value()
+            .buffer
             .all_true()
         )
 
@@ -676,7 +676,7 @@ struct Gradbox[dtype: DType](
                 tensor.shape().__str__(),
             )
         return (
-            self.buffer.compare[Equal](tensor.buffer).buffer.value().all_true()
+            self.buffer.compare[Equal](tensor.buffer).buffer.all_true()
         )
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
