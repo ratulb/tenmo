@@ -591,15 +591,26 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn __imul__(self, incoming: Gradbox[dtype]):
-        self.buffer.inplace_ops[Multiply](incoming.buffer)
+        #self.buffer.inplace_ops[Multiply](incoming.buffer)
+        var multiplied = self.buffer.buffer * incoming.buffer.buffer
+        var numels = self.buffer.buffer.size
+        self.buffer.buffer.overwrite(multiplied, 0, numels)
+
 
     @always_inline
     fn __iadd__(self, incoming: Gradbox[dtype]):
-        self.buffer.inplace_ops[Add](incoming.buffer)
+        #self.buffer.inplace_ops[Add](incoming.buffer)
+        var added = self.buffer.buffer + incoming.buffer.buffer
+        var numels = self.buffer.buffer.size
+        self.buffer.buffer.overwrite(added, 0, numels)
 
     @always_inline
     fn __isub__(self, incoming: Gradbox[dtype]):
-        self.buffer.inplace_ops[Subtract](incoming.buffer)
+        #self.buffer.inplace_ops[Subtract](incoming.buffer)
+        var subtracted = self.buffer.buffer - incoming.buffer.buffer
+        var numels = self.buffer.buffer.size
+        self.buffer.buffer.overwrite(subtracted, 0, numels)
+
 
     @always_inline
     fn __itruediv__(self, incoming: Gradbox[dtype]):

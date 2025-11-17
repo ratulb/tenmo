@@ -22,7 +22,6 @@ fn main() raises:
         result, t2 = bench_tensor_tensor(A, B)
         forward_only_time += t2
         assert_true(expected.all_close(result))
-        result.free()
     print(
         "Naive vs tensor matmul time without backward pass for ",
         runs,
@@ -37,16 +36,12 @@ fn main() raises:
         result, _, _, t3 = bench_tensor_tensor_backward(A, B)
         forward_backward_time += t3
         assert_true(expected.all_close(result))
-        result.free()
     print(
         "Tensor matmul time with/without backward pass for ",
         runs,
         "runs: ",
         forward_backward_time / forward_only_time,
     )
-    expected.free()
-    A.free()
-    B.free()
 
 fn bench_tensor_tensor[
     dtype: DType, //

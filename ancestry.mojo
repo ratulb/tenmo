@@ -260,13 +260,15 @@ struct Ancestor[dtype: DType](
             else:
                 print("[Ancestor] Reusing topology from previous backward")
 
-            var computation_graph = self._graph.value().copy()
+            var computation_graph = self._graph.take()
 
             # Refresh node registry with CURRENT tensor data
             computation_graph.refresh_node_registry(self)
 
             # Execute backward using reused topology + fresh data
             computation_graph.execute_backward(self.id())
+             # Put it back
+            self._graph = Optional(computation_graph^)
 
         except e:
             print(e)

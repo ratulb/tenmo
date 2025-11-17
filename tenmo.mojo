@@ -1225,6 +1225,7 @@ struct Tensor[dtype: DType = DType.float32](
             self.grad().__imul__(incoming)
         if opcode == AddTensor:
             self.grad().__iadd__(incoming)
+            #self.grad().buffer.fill_equal_shape(incoming.buffer)
         if opcode == SubtractTensor:
             self.grad().__isub__(incoming)
         if opcode == ZeroGrad:

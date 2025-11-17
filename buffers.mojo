@@ -179,7 +179,7 @@ struct Buffer[dtype: DType = DType.float32](
 
             # Free allocation (starts at refcount, not data)
             var refcount_size = size_of[Atomic[DType.uint64]]()
-            var alloc_start = self._refcount.bitcast[Int64]()
+            var alloc_start = self._refcount.bitcast[UInt8]()
             alloc_start.free()
 
         else:
