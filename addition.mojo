@@ -58,7 +58,7 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
                 grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))
 
             elif lhs_requires_grad and not rhs_requires_grad:
-                grad_shares.append((ancestor_lhs^, gradbox.copy(), AddTensor))
+                grad_shares.append((ancestor_lhs^, gradbox^, AddTensor))
 
             elif not lhs_requires_grad and rhs_requires_grad:
                 grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))

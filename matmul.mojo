@@ -35,7 +35,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         if A.requires_grad():
             var grad_A = Gradbox[dtype].zeros(Shape([m, n]))
 
-            # Only compute B^T if we need gradients for A. We male B^T contiguous
+            # Only compute B^T if we need gradients for A. We make B^T contiguous
             var B_T = B.tensor().transpose[track_grad=False](1, 0).contiguous()
 
             for i in range(m):
