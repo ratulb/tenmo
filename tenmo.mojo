@@ -12,7 +12,6 @@ from strides import Strides
 from common_utils_imports import *
 from common_utils import id as identity, IntArrayHelper, log_warning
 from operators_imports import *
-from ancestry import ComputationGraph
 
 # from walkback import *
 from backpropagation import BackwardFn
@@ -1434,24 +1433,11 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         output = Ancestor(self)
-        graph = output.backward(start_grad)
-        try:
-            graph.execute_backward(output.id())
-        except e:
-            panic(e.__str__())
+        output.backward(start_grad)
 
     fn backward(self, seed_tensor: Tensor[dtype]):
         output = Ancestor(self)
-        graph = output.backward(seed_tensor)
-        try:
-            graph.execute_backward(output.id())
-        except e:
-            panic(e.__str__())
-
-
-    fn backward_graph(self, start_grad: Scalar[dtype] = 1.0) -> ComputationGraph[dtype]:
-        output = Ancestor(self)
-        return output.backward(start_grad)
+        output.backward(seed_tensor)
 
 
     fn requires_grad_(mut self, requires_grad: Bool = True):
