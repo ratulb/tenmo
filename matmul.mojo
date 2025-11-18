@@ -11,15 +11,225 @@ from broadcasthelper import ShapeBroadcaster
 from common_utils import il, s, panic
 
 
+
+
+
+
 @fieldwise_init
 @register_passable
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
+    @always_inline
     fn backward[
         simdwidth: Int = simd_width_of[dtype]()
     ](self, output: Tensor[dtype]) -> List[
         Tuple[Ancestor[dtype], Gradbox[dtype], Int]
     ]:
-        ref grad_out = output.grad()  # Always contiguous
+        ref grad_out = output.gradients()[]
+        var A = output.ancestry().get(0)
+        var B = output.ancestry().get(1)
+
+        var m = A.shape()[0]
+        var n = A.shape()[1]
+        var p = B.shape()[1]
+
+        var result = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
+
+        # ===== GRADIENT FOR A: dL/dA = dL/dC × B^T =====
+        if A.requires_grad():
+            var grad_A = Gradbox[dtype].zeros(Shape([m, n]))
+
+            # Hoist all metadata
+            var grad_out_stride0 = grad_out.strides()[0]
+            var grad_out_stride1 = grad_out.strides()[1]
+            var grad_out_offset = grad_out.offset()
+            var grad_out_data = grad_out.buffer.buffer.data
+
+            var B_tensor = B.tensor()
+            var B_stride0 = B_tensor.buffer.strides[0]
+            var B_stride1 = B_tensor.buffer.strides[1]
+            var B_offset = B_tensor.buffer.offset
+            var B_data = B_tensor.buffer.buffer.data
+
+            var grad_A_stride0 = grad_A.strides()[0]
+            var grad_A_stride1 = grad_A.strides()[1]
+            var grad_A_offset = grad_A.offset()
+            var grad_A_data = grad_A.buffer.buffer.data
+
+            for i in range(m):
+                var grad_out_row_base = i * grad_out_stride0 + grad_out_offset
+                var grad_A_row_base = i * grad_A_stride0 + grad_A_offset
+
+                @parameter
+                fn process_columns_a[simd_width: Int](j: Int):
+                    var accumulator = SIMD[dtype, simd_width](0)
+
+                    for k in range(p):
+                        # grad_out[i,k]
+                        var grad_addr = grad_out_row_base + k * grad_out_stride1
+                        var grad_ik = grad_out_data[grad_addr]
+
+                        # B[j,k] - reading B transposed
+                        var b_addr = j * B_stride0 + B_offset + k * B_stride1
+                        var b_vec = B_data.load[width=simd_width](b_addr)
+
+                        accumulator += grad_ik * b_vec
+
+                    var grad_A_addr = grad_A_row_base + j * grad_A_stride1
+                    grad_A_data.store[width=simd_width](
+                        grad_A_addr, accumulator
+                    )
+
+                vectorize[process_columns_a, simdwidth](n)
+
+            result.append((A.copy(), grad_A^, AddTensor))
+
+        # ===== GRADIENT FOR B: Similar optimization =====
+        if B.requires_grad():
+            var grad_B = Gradbox[dtype].zeros(Shape([n, p]))
+
+            # Hoist metadata for B gradient computation
+            var A_tensor = A.tensor()
+            var A_stride0 = A_tensor.buffer.strides[0]
+            var A_stride1 = A_tensor.buffer.strides[1]
+            var A_offset = A_tensor.buffer.offset
+            var A_data = A_tensor.buffer.buffer.data
+
+            var grad_out_stride0 = grad_out.strides()[0]
+            var grad_out_stride1 = grad_out.strides()[1]
+            var grad_out_offset = grad_out.offset()
+            var grad_out_data = grad_out.buffer.buffer.data
+
+            var grad_B_stride0 = grad_B.strides()[0]
+            var grad_B_stride1 = grad_B.strides()[1]
+            var grad_B_offset = grad_B.offset()
+            var grad_B_data = grad_B.buffer.buffer.data
+
+            for j in range(n):
+                var grad_B_row_base = j * grad_B_stride0 + grad_B_offset
+
+                @parameter
+                fn process_columns_b[simd_width: Int](k: Int):
+                    var accumulator = SIMD[dtype, simd_width](0)
+
+                    for i in range(m):
+                        # A[i,j]
+                        var a_addr = i * A_stride0 + A_offset + j * A_stride1
+                        var a_ij = A_data[a_addr]
+
+                        # grad_out[i,k]
+                        var grad_addr = (
+                            i * grad_out_stride0
+                            + grad_out_offset
+                            + k * grad_out_stride1
+                        )
+                        var grad_vec = grad_out_data.load[width=simd_width](
+                            grad_addr
+                        )
+
+                        accumulator += a_ij * grad_vec
+
+                    var grad_B_addr = grad_B_row_base + k * grad_B_stride1
+                    grad_B_data.store[width=simd_width](
+                        grad_B_addr, accumulator
+                    )
+
+                vectorize[process_columns_b, simdwidth](p)
+
+            result.append((B^, grad_B^, AddTensor))
+
+        return result^
+
+    fn first_backward[
+        simdwidth: Int = simd_width_of[dtype]()
+    ](self, output: Tensor[dtype]) -> List[
+        Tuple[Ancestor[dtype], Gradbox[dtype], Int]
+    ]:
+        ref grad_out = output.gradients()[]  # Always contiguous
+        var A = output.ancestry().get(0)
+        var B = output.ancestry().get(1)
+
+        var A_shape = A.shape()
+        var B_shape = B.shape()
+        var m = A_shape[0]
+        var n = A_shape[1]
+        var p = B_shape[1]
+
+        var result = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
+
+        # ===== GRADIENT FOR A: dL/dA = dL/dC × B^T =====
+        if A.requires_grad():
+            var grad_A = Gradbox[dtype].zeros(Shape([m, n]))
+
+            # Access B in transposed fashion WITHOUT copying
+            # grad_A[i,j] = sum_k(grad_out[i,k] * B[j,k])
+            for i in range(m):
+
+                @parameter
+                fn process_columns_a[simd_width: Int](j: Int):
+                    # Accumulate in register across k dimension
+                    var accumulator = SIMD[dtype, simd_width](0)
+
+                    for k in range(p):
+                        var grad_ik = grad_out.load[
+                            simdwidth=1, validated=True
+                        ](i, k)
+                        # Access B[j,k] directly (reading B transposed without copy)
+                        var b_vec = B.tensor().load[
+                            simdwidth=simd_width, validated=True
+                        ](j, k)
+                        accumulator += grad_ik * b_vec
+
+                    # Single store after accumulation
+                    grad_A.store[simdwidth=simd_width, validated=True](
+                        i, j, accumulator
+                    )
+
+                vectorize[process_columns_a, simdwidth](n)
+
+            result.append((A.copy(), grad_A^, AddTensor))
+
+        # ===== GRADIENT FOR B: dL/dB = A^T × dL/dC =====
+        if B.requires_grad():
+            var grad_B = Gradbox[dtype].zeros(Shape([n, p]))
+
+            # grad_B[j,k] = sum_i(A[i,j] * grad_out[i,k])
+            for j in range(n):
+
+                @parameter
+                fn process_columns_b[simd_width: Int](k: Int):
+                    # Accumulate in register across i dimension
+                    var accumulator = SIMD[dtype, simd_width](0)
+
+                    for i in range(m):
+                        var a_ij = A.tensor().load[simdwidth=1, validated=True](
+                            i, j
+                        )
+                        # Load contiguous vector from grad_out (it's always contiguous)
+                        var grad_vec = grad_out.load[
+                            simdwidth=simd_width, validated=True
+                        ](i, k)
+                        accumulator += a_ij * grad_vec
+
+                    # Single store after accumulation
+                    grad_B.store[simdwidth=simd_width, validated=True](
+                        j, k, accumulator
+                    )
+
+                vectorize[process_columns_b, simdwidth](p)
+
+            result.append((B^, grad_B^, AddTensor))
+
+        return result^
+
+    fn into_backward_fn(self) -> BackwardFn[dtype]:
+        return BackwardFn[dtype](Delegate[dtype](self))
+
+    fn backward_orig[
+        simdwidth: Int = simd_width_of[dtype]()
+    ](self, output: Tensor[dtype]) -> List[
+        Tuple[Ancestor[dtype], Gradbox[dtype], Int]
+    ]:
+        ref grad_out = output.gradients()[]  # Always contiguous
         var A = output.ancestry().get(0)  # First input
         var B = output.ancestry().get(1)  # Second input
 
@@ -92,9 +302,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
         return result^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
-
 
 @fieldwise_init
 @register_passable
@@ -102,6 +309,236 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     @always_inline
     fn forward[
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+        var A_shape = A.shape()
+        var B_shape = B.shape()
+        var m = A_shape[0]
+        var n = A_shape[1]
+        var p = B_shape[1]
+
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+        var C = Tensor[dtype].zeros(Shape([m, p]))
+
+        # ========================================
+        # CRITICAL: Hoist ALL metadata access out of loops!
+        # ========================================
+        var A_stride0 = A.buffer.strides[0]
+        var A_stride1 = A.buffer.strides[1]
+        var A_offset = A.buffer.offset
+        var A_data = A.buffer.buffer.data
+
+        var B_stride0 = B.buffer.strides[0]
+        var B_stride1 = B.buffer.strides[1]
+        var B_offset = B.buffer.offset
+        var B_data = B.buffer.buffer.data
+        var B_contiguous = B.is_contiguous()
+
+        var C_stride0 = C.buffer.strides[0]
+        var C_stride1 = C.buffer.strides[1]
+        var C_offset = C.buffer.offset
+        var C_data = C.buffer.buffer.data
+
+        # ========================================
+        # Fast path: Direct pointer arithmetic
+        # ========================================
+        if B_contiguous:
+            for i in range(m):
+                var a_row_base = i * A_stride0 + A_offset
+                var c_row_base = i * C_stride0 + C_offset
+
+                @parameter
+                fn process_columns[simd_width: Int](j: Int):
+                    var accumulator = SIMD[dtype, simd_width](0)
+
+                    for k in range(n):
+                        # Direct pointer arithmetic - no function calls!
+                        var a_addr = a_row_base + k * A_stride1
+                        var a_ik = A_data[a_addr]
+
+                        var b_addr = k * B_stride0 + B_offset + j * B_stride1
+                        var b_vec = B_data.load[width=simd_width](b_addr)
+
+                        accumulator += a_ik * b_vec
+
+                    var c_addr = c_row_base + j * C_stride1
+                    C_data.store[width=simd_width](c_addr, accumulator)
+
+                vectorize[process_columns, simdwidth](p)
+        else:
+            # Slow path with same optimization
+            for i in range(m):
+                var a_row_base = i * A_stride0 + A_offset
+                var c_row_base = i * C_stride0 + C_offset
+
+                for j in range(p):
+                    var accumulator: Scalar[dtype] = 0
+
+                    for k in range(n):
+                        var a_addr = a_row_base + k * A_stride1
+                        var b_addr = k * B_stride0 + B_offset + j * B_stride1
+
+                        accumulator += A_data[a_addr] * B_data[b_addr]
+
+                    var c_addr = c_row_base + j * C_stride1
+                    C_data[c_addr] = accumulator
+
+        @parameter
+        if track_grad:
+            var requires_grad = A.requires_grad or B.requires_grad
+            if requires_grad:
+                C.requires_grad_(True)
+                var backward_fn = Matmul2dBackward[dtype]().into_backward_fn()
+                C.backwardFn = Optional(backward_fn^)
+                C.add_ancestry(A)
+                C.add_ancestry(B)
+
+        return C^
+
+    @staticmethod
+    @always_inline
+    fn first_forward[
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
+    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+        var A_shape = A.shape()
+        var B_shape = B.shape()
+        var m = A_shape[0]
+        var n = A_shape[1]
+        var p = B_shape[1]
+
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+        var C = Tensor[dtype].zeros(Shape([m, p]))
+
+        var contiguous = B.is_contiguous()
+
+        if contiguous:
+            # FAST PATH: Optimized i-j-k order with SIMD
+            for i in range(m):
+
+                @parameter
+                fn process_columns[simd_width: Int](j: Int):
+                    # Accumulate in SIMD register across k dimension
+                    var accumulator = SIMD[dtype, simd_width](0)
+
+                    for k in range(n):
+                        var a_ik = A.load[simdwidth=1, validated=True](i, k)
+                        var b_vec = B.load[
+                            simdwidth=simd_width, validated=True
+                        ](k, j)
+                        accumulator += a_ik * b_vec
+
+                    # Single store after accumulation
+                    C.store[simdwidth=simd_width, validated=True](
+                        i, j, accumulator
+                    )
+
+                vectorize[process_columns, simdwidth](p)
+        else:
+            # SLOW PATH: Still use i-j-k order for better cache behavior
+            for i in range(m):
+                for j in range(p):
+                    var accumulator: Scalar[dtype] = 0
+
+                    for k in range(n):
+                        var a_ik = A.load[simdwidth=1, validated=True](i, k)
+                        var b_kj = B.load[simdwidth=1, validated=True](k, j)
+                        accumulator += a_ik * b_kj
+
+                    C.store[simdwidth=1, validated=True](i, j, accumulator)
+
+        @parameter
+        if track_grad:
+            var requires_grad = A.requires_grad or B.requires_grad
+            if requires_grad:
+                C.requires_grad_(True)
+                var backward_fn = Matmul2dBackward[dtype]().into_backward_fn()
+                C.backwardFn = Optional(backward_fn^)
+                C.add_ancestry(A)
+                C.add_ancestry(B)
+
+        return C^
+
+    # Tensor × Gradbox
+    @staticmethod
+    @always_inline
+    fn forward[
+        simdwidth: Int = simd_width_of[dtype]()
+    ](A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
+        var m = A.shape()[0]
+        var n = A.shape()[1]
+        var p = B.shape()[1]
+
+        var C = Gradbox[dtype].zeros(Shape([m, p]))
+
+        for i in range(m):
+
+            @parameter
+            fn process_columns[simd_width: Int](j: Int):
+                var accumulator = SIMD[dtype, simd_width](0)
+
+                for k in range(n):
+                    var a_ik = A.load[simdwidth=1, validated=True](i, k)
+                    var b_vec = B.load[simdwidth=simd_width, validated=True](
+                        k, j
+                    )
+                    accumulator += a_ik * b_vec
+
+                C.store[simdwidth=simd_width, validated=True](i, j, accumulator)
+
+            vectorize[process_columns, simdwidth](p)
+
+        return C^
+
+    # Gradbox × Tensor
+    @staticmethod
+    @always_inline
+    fn forward[
+        simdwidth: Int = simd_width_of[dtype]()
+    ](A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
+        var m = A.shape()[0]
+        var n = A.shape()[1]
+        var p = B.shape()[1]
+
+        var C = Gradbox[dtype].zeros(Shape([m, p]))
+        var contiguous = B.is_contiguous()
+
+        if contiguous:
+            for i in range(m):
+
+                @parameter
+                fn process_columns[simd_width: Int](j: Int):
+                    var accumulator = SIMD[dtype, simd_width](0)
+
+                    for k in range(n):
+                        var a_ik = A.load[simdwidth=1, validated=True](i, k)
+                        var b_vec = B.load[
+                            simdwidth=simd_width, validated=True
+                        ](k, j)
+                        accumulator += a_ik * b_vec
+
+                    C.store[simdwidth=simd_width, validated=True](
+                        i, j, accumulator
+                    )
+
+                vectorize[process_columns, simdwidth](p)
+        else:
+            # Scalar fallback with register accumulation
+            for i in range(m):
+                for j in range(p):
+                    var accumulator: Scalar[dtype] = 0
+
+                    for k in range(n):
+                        var a_ik = A.load[simdwidth=1, validated=True](i, k)
+                        var b_kj = B.load[simdwidth=1, validated=True](k, j)
+                        accumulator += a_ik * b_kj
+
+                    C.store[simdwidth=1, validated=True](i, j, accumulator)
+
+        return C^
+
+    @staticmethod
+    @always_inline
+    fn forward_orig[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         var A_shape = A.shape()
@@ -127,6 +564,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                     @parameter
                     fn process_columns[simd_width: Int](j: Int):
                         # Load contiguous SIMD vector from B's row
+                        print("simd width: ", simd_width)
                         var b_vec = B.load[
                             simdwidth=simd_width, validated=True
                         ](k, j)
@@ -174,7 +612,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     # Tensor and Gradbox matmul_2d - No backward fn
     @staticmethod
     @always_inline
-    fn forward[
+    fn forward_orig[
         simdwidth: Int = simd_width_of[dtype]()
     ](A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
         var A_shape = A.shape()
@@ -214,7 +652,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     # Gradbox and Tensor matmul_2d - No backward fn
     @staticmethod
     @always_inline
-    fn forward[
+    fn forward_orig[
         simdwidth: Int = simd_width_of[dtype]()
     ](A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
         var A_shape = A.shape()
@@ -275,10 +713,11 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
-    fn backward(
+    @always_inline
+    fn backward[simdwidth: Int = simd_width_of[dtype]() ](
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        ref grad_out = output.grad()  # GradBox: batch_shape + [m, n]
+        ref grad_out = output.gradients()[]  # GradBox: batch_shape + [m, n]
         var A = output.ancestry().get(0)  # Tensor ancestor
         var B = output.ancestry().get(1)  # Tensor ancestor
         var A_shape = A.shape()
@@ -326,7 +765,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
-        track_grad: Bool = True
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         A_shape = A.shape()
         B_shape = B.shape()
