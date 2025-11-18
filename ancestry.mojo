@@ -152,8 +152,8 @@ struct Ancestor[dtype: DType](
         return self._tensor
 
     @always_inline
-    fn shape(self) -> Shape:
-        return self._tensor.shape()
+    fn shape(ref self) -> ref[self._tensor.buffer.shape] Shape:
+        return self._tensor.buffer.shape
 
     @always_inline
     fn offset(self) -> Int:
@@ -168,8 +168,8 @@ struct Ancestor[dtype: DType](
         return self._tensor.max_index()
 
     @always_inline
-    fn strides(self) -> Strides:
-        return self._tensor.strides()
+    fn strides(ref self) -> ref[self._tensor.buffer.strides] Strides:
+        return self._tensor.buffer.strides
 
     @always_inline
     fn is_contiguous(self) -> Bool:

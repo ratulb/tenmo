@@ -430,6 +430,10 @@ struct Gradbox[dtype: DType](
         return self.buffer.numels()
 
     @always_inline
+    fn is_contiguous(self) -> Bool:
+        return self.strides().is_contiguous(self.shape())
+
+    @always_inline
     fn rank(self) -> Int:
         return self.buffer.rank()
 

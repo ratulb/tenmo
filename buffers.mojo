@@ -1779,8 +1779,25 @@ fn main() raises:
     r.shared()
     r1 = r.copy()
     print(r.is_shared(), r.ref_count())
+    print("************")
+    print(r1, r)
+    r1[0] = 78787
+
+    print(r1, r)
+
+    r.zero()
+
+    print(r1, r)
     _= r^
 
     print("done")
+
+    buff = Buffer[dtype](l)
+    ref is_copy = UnsafePointer(to=buff)[]
+
+    print("Now check: ", is_copy.data == buff.data)
+    is_copy[0] = 999
+    print(is_copy, buff)
+
 
 from testing import assert_true, assert_false

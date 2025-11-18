@@ -3,7 +3,7 @@
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [tensors|mmnd|mm2d|mv|vm|argminmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|shared|bench|validators|ce|synth_smoke|synth_mnist|all]"
+    echo "Usage: $0 [tensors|mmnd|mm2d|mv|vm|argminmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|intlist|shapes|strides|ancestry|bench|validators|ce|synth_smoke|synth_mnist|shapebroadcast|all]"
     exit 1
 fi
 
@@ -63,6 +63,7 @@ case $1 in
         echo "Running mojo -I . tests/test_argminmax.mojo"
         mojo -I . $DEBUG_MODE tests/test_argminmax.mojo
         ;;
+
     relu)
         echo "Running mojo -I . tests/test_relu.mojo"
         mojo -I . $DEBUG_MODE tests/test_relu.mojo
@@ -72,8 +73,6 @@ case $1 in
         echo "Running mojo -I . tests/test_shuffle.mojo"
         mojo -I . $DEBUG_MODE tests/test_shuffle.mojo
         ;;
-
-
     permute)
         echo "Running mojo -I . tests/test_permute.mojo"
         mojo -I . $DEBUG_MODE tests/test_permute.mojo
@@ -83,10 +82,12 @@ case $1 in
         echo "Running mojo -I . tests/test_flatten.mojo"
         mojo -I . $DEBUG_MODE tests/test_flatten.mojo
         ;;
+
     squeeze)
         echo "Running mojo -I . tests/test_squeeze.mojo"
         mojo -I . $DEBUG_MODE tests/test_squeeze.mojo
         ;;
+
     unsqueeze)
         echo "Running mojo -I . tests/test_unsqueeze.mojo"
         mojo -I . $DEBUG_MODE tests/test_unsqueeze.mojo
@@ -101,6 +102,7 @@ case $1 in
         echo "Running mojo -I . tests/test_transpose.mojo"
         mojo -I . $DEBUG_MODE tests/test_transpose.mojo
         ;;
+
     ndb)
         echo "Running mojo -I . tests/test_ndb.mojo"
         mojo -I . $DEBUG_MODE tests/test_ndb.mojo
@@ -126,17 +128,20 @@ case $1 in
 	    echo "Running tensor multiplication benchmark(tests/test_matmul_bench.mojo)"
         mojo -I . $DEBUG_MODE tests/test_matmul_bench.mojo
         ;;
+
     views)
         echo "Running view test cases"
         mojo -I . $DEBUG_MODE tests/test_views.mojo
         ;;
+
     shapes)
         echo "Running mojo -I . tests/test_shapes.mojo"
         mojo -I . $DEBUG_MODE tests/test_shapes.mojo
         ;;
-    shared)
-        echo "Running shared test cases"
-        mojo -I . $DEBUG_MODE tests/test_shared.mojo
+
+    shapebroadcast)
+        echo "Running tests/test_broadcaster.mojo"
+        mojo -I . $DEBUG_MODE tests/test_broadcaster.mojo
         ;;
 
     strides)
@@ -153,12 +158,16 @@ case $1 in
         echo "Running intlist test cases"
         mojo -I . $DEBUG_MODE tests/test_intlist.mojo
         ;;
+
     validators)
         echo "Running validators test cases"
         mojo -I . $DEBUG_MODE tests/test_validators.mojo
         ;;
 
     all)
+        echo "Running tests/test_broadcaster.mojo"
+        mojo -I . tests/test_broadcaster.mojo
+
         echo "Running tests/test_mv.mojo"
         mojo -I . tests/test_mv.mojo
 
@@ -238,7 +247,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax permute, shuffle, argminmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shared, bench, validators, ce, synth_smoke, synth_mnist, all"
+        echo "Available tests: mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax permute, shuffle, argminmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, intlist, strides, ancestry, shapebroadcast, bench, validators, ce, synth_smoke, synth_mnist, all"
         exit 1
         ;;
 esac

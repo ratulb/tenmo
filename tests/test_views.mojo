@@ -770,6 +770,7 @@ fn test_basic_slicing() raises:
     var y = r[0:1, 1:3]
     ss = y.sum()
     ss.backward()
+
     var expected_grad = Tensor.d1([0, 1, 1, 0, 0, 0])
     assert_true((a.grad() == expected_grad))
 

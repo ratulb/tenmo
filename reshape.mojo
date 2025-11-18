@@ -15,13 +15,12 @@ struct ReshapeBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var gradbox = output.grad()
+        ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         reshaped = gradbox.reshape(ancestor.shape())
-
+        output.zero_grad()
         return [
             (ancestor^, reshaped^, AddTensor),
-            (Ancestor(output), gradbox^, ZeroGrad),
         ]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
