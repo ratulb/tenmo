@@ -33,7 +33,7 @@ struct SoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         softmax_out = Gradbox[dtype].zeros(gradbox.shape())
 
         # Reconstruct softmax output tensor from stored coordinate-value pairs

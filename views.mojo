@@ -25,7 +25,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         parent = output.ancestry().get(0)
-        gradbox = output.grad().copy()
+        var gradbox = output.grad()
         parent_shape = parent.shape()
         parent_strides = parent.strides()
         parent_offset = parent.offset()
@@ -69,46 +69,6 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
                 # Final check - no remainder and all coordinates valid
                 if valid and remaining == 0:
                     parent_gradbox[position] += gradbox[child_coord]
-        return [
-            (parent^, parent_gradbox^, AddTensor),
-            (Ancestor(output), gradbox^, ZeroGrad),
-        ]
-
-    fn backward_conservative(
-        # fn backward(
-        self,
-        output: Tensor[dtype],
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        parent = output.ancestry().get(0)
-        gradbox = output.grad().copy()
-        parent_shape = parent.shape()
-        parent_strides = parent.strides()
-
-        parent_gradbox = Gradbox[dtype].zeros(parent_shape)
-
-        if parent_shape == Shape():
-            parent_gradbox[IntArray()] = gradbox.item()
-        else:
-            var position = IntArray(size=parent_shape.rank())
-
-            for child_coord in self.shape:
-                # Compute absolute storage index
-                var abs_index = self.offset
-                for i in range(len(self.strides)):
-                    abs_index += self.strides[i] * child_coord[i]
-
-                # Convert to parent's logical coordinates
-                # Since we enforced boundaries, this MUST succeed
-                var remaining = abs_index - parent.offset()
-
-                for i in range(parent_shape.rank()):
-                    parent_stride = parent_strides[i]
-                    position[i] = remaining // parent_stride
-                    remaining = remaining % parent_stride
-
-                # With boundary enforcement, this should always be valid
-                parent_gradbox[position] += gradbox[child_coord]
-
         return [
             (parent^, parent_gradbox^, AddTensor),
             (Ancestor(output), gradbox^, ZeroGrad),
@@ -170,7 +130,6 @@ struct View[dtype: DType](Copyable):
                 out.add_ancestry(self)
 
         return out^
-
 
 fn main():
     pass

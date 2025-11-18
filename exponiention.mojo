@@ -16,7 +16,7 @@ struct ExponientionBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
 
         # ∂(x**n)/∂x = n * x**(n-1)

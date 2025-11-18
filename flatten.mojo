@@ -15,10 +15,11 @@ struct FlattenBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         ancestor_shape = ancestor.shape()
         # Just reshape gradient back to original
-        var reshaped_grad = output.grad().reshape(ancestor_shape)
+        var reshaped_grad = gradbox.reshape(ancestor_shape)
         return [
             (ancestor^, reshaped_grad^, AddTensor),
         ]

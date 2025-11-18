@@ -74,7 +74,7 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var grad_out = output.grad().copy()
+        ref grad_out = output.gradients()[]
         var parent = output.ancestry().get(0)
         var parent_shape = self.orig_shape
         var parent_rank = len(parent_shape)

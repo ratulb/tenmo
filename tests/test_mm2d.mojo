@@ -47,7 +47,7 @@ fn validate_matmul_2d_grads[dtype: DType, //](
         )
         return
 
-    var gradC = C.grad().copy()  # Guaranteed to exist if C.requires_grad == True
+    var gradC = C.gradients()[].copy()  # Guaranteed to exist if C.requires_grad == True
 
     var B_T = B.transpose[track_grad=False](1, 0)
     var A_T = A.transpose[track_grad=False](1, 0)
@@ -57,7 +57,7 @@ fn validate_matmul_2d_grads[dtype: DType, //](
 
     # --- Validate A.grad ---
     if A.requires_grad:
-        var auto_grad_A = A.grad().copy()
+        var auto_grad_A = A.grad()
         if expected_grad_A.shape() != auto_grad_A.shape():
             panic(
                 "Shape mismatch for grad(A). Expected "
@@ -76,7 +76,7 @@ fn validate_matmul_2d_grads[dtype: DType, //](
 
     # --- Validate B.grad ---
     if B.requires_grad:
-        var auto_grad_B = B.grad().copy()
+        var auto_grad_B = B.grad()
         if expected_grad_B.shape() != auto_grad_B.shape():
             panic(
                 "Shape mismatch for grad(B). Expected "

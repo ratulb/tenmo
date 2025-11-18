@@ -19,7 +19,7 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         ancestor = output.ancestry().get(0)
-        gradbox = output.grad().copy()
+        var gradbox = output.grad()
 
         var original_shape = ancestor.shape()
 

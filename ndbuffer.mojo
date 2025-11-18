@@ -224,7 +224,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         else:
             return self[IntArray()]
 
-    fn load[
+    fn load_orig[
         simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
     ](self, row: Int, col: Int) -> SIMD[dtype, simdwidth]:
         """SIMD load of a row segment from a 2D Tensor.
@@ -288,7 +288,7 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         return self.buffer.load[simdwidth](addr)
 
     @always_inline
-    fn store[
+    fn store_orig[
         simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
     ](self, row: Int, col: Int, value: SIMD[dtype, simdwidth]):
         """SIMD store of a row segment into a 2D NDBuffer.
@@ -348,6 +348,110 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
                 )
 
         var addr = row * strides[0] + col * strides[1] + offset
+        self.buffer.store[simdwidth](addr, value)
+
+    @always_inline
+    fn load[
+        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
+    ](self, row: Int, col: Int) -> SIMD[dtype, simdwidth]:
+        """SIMD load of a row segment from a 2D NDBuffer."""
+
+        constrained[
+            simdwidth.is_power_of_two(),
+            "NDBuffer → load: SIMD width must be a power of 2",
+        ]()
+
+        @parameter
+        if not validated:
+            var rank = self.rank()
+            ref shape = self.shape
+
+            if rank != 2:
+                panic("NDBuffer → load: Only 2D buffers are supported.")
+
+            if (
+                row < 0
+                or row >= shape[0]
+                or col < 0
+                or col + simdwidth > shape[1]
+            ):
+                panic(
+                    "NDBuffer → load: Out-of-bounds access. "
+                    + "Attempted row "
+                    + row.__str__()
+                    + ", col range ["
+                    + col.__str__()
+                    + ", "
+                    + (col + simdwidth).__str__()
+                    + ") "
+                    + "for shape "
+                    + shape.__str__()
+                    + "."
+                )
+
+            if simdwidth > 1 and self.strides[1] != 1:
+                panic(
+                    "NDBuffer → SIMD load requires contiguous column access. "
+                    + "Expected stride[1] == 1 but got "
+                    + self.strides[1].__str__()
+                    + ". "
+                    + "Use .contiguous() or scalar loads."
+                )
+
+        # Direct field access - no copy!
+        var addr = row * self.strides[0] + col * self.strides[1] + self.offset
+        return self.buffer.load[simdwidth](addr)
+
+    @always_inline
+    fn store[
+        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
+    ](self, row: Int, col: Int, value: SIMD[dtype, simdwidth]):
+        """SIMD store of a row segment into a 2D NDBuffer."""
+
+        constrained[
+            simdwidth.is_power_of_two(),
+            "NDBuffer → store: SIMD width must be a power of 2",
+        ]()
+
+        @parameter
+        if not validated:
+            var rank = self.rank()
+            ref shape = self.shape
+
+            if rank != 2:
+                panic("NDBuffer → store: Only 2D buffers are supported.")
+
+            if (
+                row < 0
+                or row >= shape[0]
+                or col < 0
+                or col + simdwidth > shape[1]
+            ):
+                panic(
+                    "NDBuffer → store: Out-of-bounds access. "
+                    + "Attempted row "
+                    + row.__str__()
+                    + ", col range ["
+                    + col.__str__()
+                    + ", "
+                    + (col + simdwidth).__str__()
+                    + ") "
+                    + "for shape "
+                    + shape.__str__()
+                    + "."
+                )
+
+            if simdwidth > 1 and self.strides[1] != 1:
+                panic(
+                    "NDBuffer → SIMD store requires contiguous column access. "
+                    + "Expected stride[1] == 1 but got "
+                    + self.strides[1].__str__()
+                    + ". "
+                    + "Use .contiguous() or scalar stores."
+                )
+
+        # Direct field access - no copy!
+        var addr = row * self.strides[0] + col * self.strides[1] + self.offset
         self.buffer.store[simdwidth](addr, value)
 
 

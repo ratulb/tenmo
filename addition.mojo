@@ -15,12 +15,12 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         if ancestor.shape() != gradbox.shape():
             gradbox = gradbox.reshape(ancestor.shape())
         # Gradient of addition is 1 → just pass through incoming grad
-        return [(ancestor^, gradbox^, AddTensor)]
+        return [(ancestor^, gradbox.copy(), AddTensor)]
 
 
 alias AddBroadcastBackward[dtype: DType] = BroadcastBackward[
@@ -37,7 +37,7 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var gradbox = output.grad().copy()
+        var gradbox = output.grad()
         count = len(output.ancestry())
 
         var grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](

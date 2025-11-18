@@ -24,7 +24,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         gradbox_shape = gradbox.shape()
         ancestor = output.ancestry().get(0)
         if gradbox_shape == Shape():
@@ -42,7 +42,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
                 )
             ]
 
-        var expanded = gradbox^
+        var expanded = gradbox.copy()
 
         if not self.keepdims:
             expanded = expanded.reshape(

@@ -15,40 +15,7 @@ from operators_imports import *
 
 # from walkback import *
 from backpropagation import BackwardFn
-from forwards import (
-    AddScalar,
-    Adder,
-    Reshape,
-    MultiplyScalar,
-    Multiplicator,
-    SubtractFromScalar,
-    SubtractScalar,
-    Subtractor,
-    DivideByScalar,
-    DivideScalar,
-    Divider,
-    Exponentiator,
-    Summer,
-    Mean,
-    View,
-    Contiguous,
-    Transpose,
-    Dot,
-    Expand,
-    Flatten,
-    Squeeze,
-    Unsqueeze,
-    Permute,
-    Argmax,
-    Argmin,
-    Shuffle,
-    ReLU,
-    MinMax,
-    Softmax,
-    Repeat,
-    Tile,
-    Matmul,
-)
+from forwards import *
 from buffers import Buffer
 from validators import Validator
 from collections import Set
@@ -68,6 +35,7 @@ struct Tensor[dtype: DType = DType.float32](
     & Writable
     & Absable
     & EqualityComparable
+    & ImplicitlyCopyable
 ):
     alias Row = List[Scalar[dtype]]
     alias Rows = List[Self.Row]
@@ -81,7 +49,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     var buffer: NDBuffer[dtype]
     var requires_grad: Bool
-    var gradbox: Optional[Gradbox[dtype]]
+    var gradbox: UnsafePointer[Gradbox[dtype]]
     var ancestors: Optional[Ancestors[dtype]]
     var backwardFn: Optional[BackwardFn[dtype]]
 
@@ -95,7 +63,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn __init__(out self, shape: Shape, requires_grad: Bool = False):
         self.buffer = NDBuffer[dtype](shape)
         self.requires_grad = requires_grad
-        self.gradbox = None
+        self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = None
         self.backwardFn = None
         self.init_gradbox()
@@ -112,7 +80,7 @@ struct Tensor[dtype: DType = DType.float32](
             Buffer[dtype](shape.num_elements(), ptr, copy=copy), shape
         )
         self.requires_grad = requires_grad
-        self.gradbox = None
+        self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = None
         self.backwardFn = None
         self.init_gradbox()
@@ -124,7 +92,7 @@ struct Tensor[dtype: DType = DType.float32](
     ):
         self.buffer = buffer^
         self.requires_grad = requires_grad
-        self.gradbox = None
+        self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = None
         self.backwardFn = None
         self.init_gradbox()
@@ -148,14 +116,18 @@ struct Tensor[dtype: DType = DType.float32](
     fn __moveinit__(out self, deinit other: Self):
         self.buffer = other.buffer^
         self.requires_grad = other.requires_grad
-        self.gradbox = other.gradbox^
+        self.gradbox = other.gradbox
         self.ancestors = other.ancestors^
         self.backwardFn = other.backwardFn^
 
     fn __copyinit__(out self, other: Self):
         self.buffer = other.buffer.copy()
         self.requires_grad = other.requires_grad
-        self.gradbox = other.gradbox.copy()
+        if other.gradbox != UnsafePointer[Gradbox[dtype]]():
+            self.gradbox = UnsafePointer[Gradbox[dtype]].alloc(1)
+            self.gradbox.init_pointee_copy(other.gradbox[])
+        else:
+            self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = other.ancestors.copy()
         self.backwardFn = other.backwardFn.copy()
 
@@ -165,10 +137,11 @@ struct Tensor[dtype: DType = DType.float32](
 
     @always_inline
     fn init_gradbox(mut self):
-        if self.requires_grad and self.gradbox == None:
+        if self.requires_grad and self.gradbox == UnsafePointer[Gradbox[dtype]]():
             gradbox = Gradbox[dtype](self.shape())
             gradbox.zero_grad()
-            self.gradbox = Optional(gradbox^)
+            self.gradbox = UnsafePointer[Gradbox[dtype]].alloc(1)
+            self.gradbox.init_pointee_move(gradbox^)
 
     @always_inline
     fn is_contiguous(self) -> Bool:
@@ -186,11 +159,11 @@ struct Tensor[dtype: DType = DType.float32](
         return self.shape()[0] if self.shape() != Shape() else 0
 
     @always_inline
-    fn shape(self) -> Shape:
+    fn shape(ref self) -> ref[self.buffer.shape] Shape:
         return self.buffer.shape
 
     @always_inline
-    fn strides(self) -> Strides:
+    fn strides(ref self) -> ref[self.buffer.strides] Strides:
         return self.buffer.strides
 
     @always_inline
@@ -428,30 +401,30 @@ struct Tensor[dtype: DType = DType.float32](
 
     @always_inline
     fn has_grad(self) -> Bool:
-        return self.gradbox != None
+        return self.gradbox != UnsafePointer[Gradbox[dtype]]()
 
     @always_inline
     fn zero_grad(self):
         if self.requires_grad and self.has_grad():
-            self.gradbox.value().zero_grad()
+            self.gradbox[].zero_grad()
 
     @always_inline
-    fn grad(ref self) -> ref [origin_of(self.gradbox.value())] Gradbox[dtype]:
+    fn gradients(self) -> UnsafePointer[Gradbox[dtype]]:
         if not self.requires_grad or not self.has_grad():
             panic(
                 "Tensor → grad(self): called on a tensor that does not require"
                 " grad or grad not initialized"
             )
-        return self.gradbox.value()
+        return self.gradbox
 
     @always_inline
-    fn unshared_grad(self) -> Gradbox[dtype]:
+    fn grad(self) -> Gradbox[dtype]:
         if not self.requires_grad or not self.has_grad():
             panic(
                 "Tensor → grad(self): called on a tensor that does not require"
                 " grad or grad not initialized"
             )
-        return self.gradbox.value().unshared()
+        return self.gradbox[].unshared()
 
     fn rows(self) -> Int:
         if not self.rank() == 2:
@@ -613,7 +586,7 @@ struct Tensor[dtype: DType = DType.float32](
             return
         if not self.has_grad():
             self.requires_grad_()
-        self.gradbox.value().seed_grad(with_tensor)
+        self.gradbox[].seed_grad(with_tensor)
 
     fn seed_grad(mut self, value: Scalar[dtype]):
         with_tensor = Tensor[dtype].full(self.shape(), value)
@@ -1221,13 +1194,14 @@ struct Tensor[dtype: DType = DType.float32](
         return Divider[dtype].forward[True](self, other)
 
     fn update_grad[opcode: Int](self, incoming: Gradbox[dtype]):
+        ref gradbox = self.gradbox[]
         if opcode == MulTensor:
-            self.grad().__imul__(incoming)
+            gradbox.__imul__(incoming)
         if opcode == AddTensor:
-            self.grad().__iadd__(incoming)
+            gradbox.__iadd__(incoming)
             #self.grad().buffer.fill_equal_shape(incoming.buffer)
         if opcode == SubtractTensor:
-            self.grad().__isub__(incoming)
+            gradbox.__isub__(incoming)
         if opcode == ZeroGrad:
             self.zero_grad()
 
@@ -1320,7 +1294,6 @@ struct Tensor[dtype: DType = DType.float32](
             Utils[dtype].invert_buffer, Utils[dtype].invert_scalar
         ]()
         var nd_buffer = NDBuffer[DType.bool](buffer^, self.buffer.shape)
-        # What is the meaning of requires_grad for boolean Tensor?
         return Tensor[DType.bool](nd_buffer^, requires_grad=False)
 
     fn __abs__(self) -> Tensor[dtype]:
@@ -1423,7 +1396,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __del__(deinit self):
         _ = self.buffer^
-        _ = self.gradbox^
+        if self.has_grad():
+            self.gradbox.destroy_pointee()
+            self.gradbox.free()
         _ = self.ancestors^
         _ = self.backwardFn^
 
@@ -1812,10 +1787,15 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
 fn main() raises:
     # test_set_value()
     # test_set_tensor()
+    a = Tensor.arange(10, requires_grad=True)
+    #r = a.reshape(2, 5)
+    b = a + 2
+    b.backward(42)
+    a.grad().print()
     pass
 
 
-fn test_set_value() raises:
+    _="""fn test_set_value() raises:
     print("test_set_value")
     a = Tensor.ones(2, 3, 4)
     # Set the value
@@ -1844,7 +1824,7 @@ fn test_set_tensor() raises:
     a.set(tensor, il(1), s(), s())
     # Get it back
     r = a[il(1), s(), s()]
-    assert_true(r == Tensor.full([3, 4], 42))
+    assert_true(r == Tensor.full([3, 4], 42))"""
 
 
 from testing import assert_true

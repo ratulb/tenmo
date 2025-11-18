@@ -21,7 +21,7 @@ struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        var gradbox = output.grad()
         # Remove the axis we had inserted
         squeezed_gradbox = gradbox.squeeze(self.axes)
 

@@ -21,7 +21,7 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        var gradbox = output.grad()
         parent = output.ancestry().get(0)
         # Compute inverse permutation
         inverse = IntList.filled(len(self.permutation), 0)

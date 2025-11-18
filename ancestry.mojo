@@ -148,8 +148,8 @@ struct Ancestor[dtype: DType](
 
 
     @always_inline
-    fn tensor(self) -> Tensor[dtype]:
-        return self._tensor.copy()
+    fn tensor(ref self) -> ref[self._tensor] Tensor[dtype]:
+        return self._tensor
 
     @always_inline
     fn shape(self) -> Shape:
@@ -237,7 +237,7 @@ struct Ancestor[dtype: DType](
         var seed_tensor = Tensor[dtype].full(shape, start_grad)
         output.backward(seed_tensor)
 
-    fn backward(mut self, seed_tensor: Tensor[dtype]):
+    fn backward_orig(mut self, seed_tensor: Tensor[dtype]):
         """
         Optimized backward with topology reuse and fresh data.
 
@@ -273,6 +273,49 @@ struct Ancestor[dtype: DType](
         except e:
             print(e)
             panic(e.__str__())
+
+
+
+
+    fn backward(mut self, seed_tensor: Tensor[dtype]):
+
+        if not self.requires_grad():
+            return
+
+        var t_start = perf_counter_ns()
+        self.seed_grad(seed_tensor)
+        var t_seed = perf_counter_ns()
+        print("[Backward] Seed grad:", (t_seed - t_start) / 1e6, "ms")
+
+        if not self._graph:
+            var t_build_start = perf_counter_ns()
+            var computation_graph = ComputationGraph[dtype]()
+            computation_graph.build_topology(self)
+            self._graph = Optional(computation_graph^)
+            var t_build_end = perf_counter_ns()
+            print("[Backward] Build topology:", (t_build_end - t_build_start) / 1e6, "ms")
+        else:
+            print("[Backward] Reusing existing topology")
+
+        var computation_graph = self._graph.take()
+
+        var t_refresh_start = perf_counter_ns()
+        computation_graph.refresh_node_registry(self)
+        var t_refresh_end = perf_counter_ns()
+        print("[Backward] Refresh registry:", (t_refresh_end - t_refresh_start) / 1e6, "ms")
+
+        var t_exec_start = perf_counter_ns()
+        try:
+            computation_graph.execute_backward(self.id())
+        except e:
+            panic(e.__str__())
+        var t_exec_end = perf_counter_ns()
+        print("[Backward] Execute backward:", (t_exec_end - t_exec_start) / 1e6, "ms")
+
+        self._graph = Optional(computation_graph^)
+
+        var t_total = perf_counter_ns()
+        print("[Backward] Total:", (t_total - t_start) / 1e6, "ms")
 
 
 struct ComputationGraph[dtype: DType](Copyable & Movable):

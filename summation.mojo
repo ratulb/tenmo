@@ -17,11 +17,11 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         rank = ancestor.shape().rank()
         if rank == 0:
-            return [(ancestor^, gradbox^, AddTensor)]
+            return [(ancestor^, gradbox.copy(), AddTensor)]
         shape = ancestor.shape()
 
         var grad_contrib: Gradbox[dtype]

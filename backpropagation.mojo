@@ -26,7 +26,6 @@ alias Delegate[dtype: DType] = Variant[
     TrueDivBackwardScalar[dtype],
     RightTrueDivBackwardScalar[dtype],
     DivideBackward[dtype],
-    SumBackward[dtype],
     MeanBackward[dtype],
     ViewBackward[dtype],
     TransposeBackward[dtype],

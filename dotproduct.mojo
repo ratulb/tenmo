@@ -15,7 +15,7 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         scalar_grad_value = gradbox.item()  # Scalar
         var grad_shares: List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]] = []
         ancestor_lhs = output.ancestry().get(0)

@@ -438,12 +438,12 @@ struct Gradbox[dtype: DType](
         return self.buffer.offset
 
     @always_inline
-    fn shape(self) -> Shape:
+    fn shape(ref self) -> ref [self.buffer.shape] Shape:
         return self.buffer.shape
 
     @always_inline
-    fn strides(self) -> Strides:
-        return Strides.default(self.buffer.shape)
+    fn strides(ref self) -> ref [self.buffer.strides] Strides:
+        return self.buffer.strides
 
     fn __eq__(self, other: Gradbox[dtype]) -> Bool:
         if self.shape() != other.shape():
@@ -728,4 +728,16 @@ fn main() raises:
 
     a_slice.print()
 
+    gg = Gradbox[dtype](Shape(3,4), share=True)
+    gg.print()
+    gg_copied = gg.copy()
+    gg_copied.print()
+
+    x = Tensor.arange(12, requires_grad=True)
+    x.print()
+    y = x.copy()
+    y.print()
+
+    x.gradients()[].print()
+    y.gradients()[].print()
 from testing import assert_true

@@ -27,7 +27,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
         var shape = gradbox.shape()

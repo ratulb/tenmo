@@ -18,7 +18,7 @@ struct TrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
         var divided = gradbox / self.factor
@@ -42,7 +42,8 @@ struct RightTrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+
+        var gradbox = output.grad()
         ancestor = output.ancestry().get(0)
         tensor = ancestor.tensor()
         squared = tensor.__pow__(2)
@@ -67,7 +68,8 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+
+        ref gradbox = output.gradients()[]
         ancestor_top = output.ancestry().get(0)
         ancestor_bottom = output.ancestry().get(1)
 

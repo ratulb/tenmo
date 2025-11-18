@@ -38,7 +38,7 @@ struct MinMaxBackward[dtype: DType = DType.float32](
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         # Retrieve upstream grad and saved tensors
-        var gradbox = output.grad().copy()
+        var gradbox = output.grad()
         var ancestor = output.ancestry().get(0)  # original input
         var mask = Gradbox[dtype].zeros(ancestor.shape(), share=False)
         for grad in self.gradbag:

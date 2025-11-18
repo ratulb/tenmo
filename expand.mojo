@@ -18,7 +18,7 @@ struct ExpandBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         parent_shape = ancestor.shape()
         gradbox_contracted = gradbox.sum_over_broadcasted_axes(parent_shape)

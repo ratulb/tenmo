@@ -231,14 +231,15 @@ struct Buffer[dtype: DType = DType.float32](
     fn load[simdwidth: Int = 1](self, offset: Int) -> SIMD[dtype, simdwidth]:
         return self.data.load[
             width=simdwidth,
-            volatile=True,
+            #volatile=True,
         ](offset)
 
     @always_inline
     fn store[
         simdwidth: Int = 1
     ](self, offset: Int, values: SIMD[dtype, simdwidth]):
-        self.data.store[width=simdwidth, volatile=True](offset, values)
+        #self.data.store[width=simdwidth, volatile=True](offset, values)
+        self.data.store[width=simdwidth](offset, values)
 
     @always_inline
     fn __add__[

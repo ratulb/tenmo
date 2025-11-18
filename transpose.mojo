@@ -17,7 +17,7 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        gradbox = output.grad().copy()
+        ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         inverted_axes = IntList.invert_permutation(self.axes)
         gradbox_transposed = gradbox.transpose(inverted_axes)
