@@ -25,7 +25,14 @@ from operators import (
 )
 
 
-struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringable & Representable & Writable):
+struct NDBuffer[dtype: DType](
+    Copyable
+    & Movable
+    & EqualityComparable
+    & Stringable
+    & Representable
+    & Writable
+):
     var shape: Shape
     var strides: Strides
     var offset: Int
@@ -102,7 +109,9 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
 
     fn __copyinit__(out self, other: Self):
         """Copy NDBuffer - buffer handles ref counting automatically!."""
-        self.buffer = other.buffer.copy()  # Buffer copy handles shared/unshared!
+        self.buffer = (
+            other.buffer.copy()
+        )  # Buffer copy handles shared/unshared!
         self.shape = other.shape.copy()
         self.strides = other.strides.copy()
         self.offset = other.offset
@@ -224,132 +233,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         else:
             return self[IntArray()]
 
-    fn load_orig[
-        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
-    ](self, row: Int, col: Int) -> SIMD[dtype, simdwidth]:
-        """SIMD load of a row segment from a 2D Tensor.
-
-        Preconditions:
-            - NDBuffer must be 2D.
-            - Columns must be contiguous (stride[1] == 1) for SIMD loads.
-            - `col + simdwidth` must not exceed the number of columns.
-        """
-
-        constrained[
-            simdwidth.is_power_of_two(),
-            "NDBuffer → load: SIMD width must be a power of 2",
-        ]()
-
-        @parameter
-        if not validated:
-            var rank = self.rank()
-            var shape = self.shape
-
-            if rank != 2:
-                panic("NDBuffer → load: Only 2D buffers are supported.")
-
-            # Bounds check
-            if (
-                row < 0
-                or row >= shape[0]
-                or col < 0
-                or col + simdwidth > shape[1]
-            ):
-                panic(
-                    "NDBuffer → load: Out-of-bounds access. "
-                    + "Attempted row "
-                    + row.__str__()
-                    + ", col range ["
-                    + col.__str__()
-                    + ", "
-                    + (col + simdwidth).__str__()
-                    + ") "
-                    + "for shape "
-                    + shape.__str__()
-                    + "."
-                )
-
-        var strides = self.strides
-        var offset = self.offset
-
-        @parameter
-        if not validated:
-            # Contiguity check for SIMD
-            if simdwidth > 1 and strides[1] != 1:
-                panic(
-                    "NDBuffer → SIMD load requires contiguous column access. "
-                    + "Expected stride[1] == 1 but got "
-                    + strides[1].__str__()
-                    + ". "
-                    + "Use .contiguous() or scalar loads."
-                )
-
-        var addr = row * strides[0] + col * strides[1] + offset
-        return self.buffer.load[simdwidth](addr)
-
-    @always_inline
-    fn store_orig[
-        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
-    ](self, row: Int, col: Int, value: SIMD[dtype, simdwidth]):
-        """SIMD store of a row segment into a 2D NDBuffer.
-
-        Preconditions:
-            - NDBuffer must be 2D.
-            - Columns must be contiguous for SIMD stores (stride[1] == 1).
-            - Caller may set validated=True if these checks are already ensured.
-        """
-
-        constrained[
-            simdwidth.is_power_of_two(),
-            "NDBuffer → store: SIMD width must be a power of 2",
-        ]()
-
-        @parameter
-        if not validated:
-            var rank = self.rank()
-            var shape = self.shape
-
-            if rank != 2:
-                panic("NDBuffer → store: Only 2D buffers are supported.")
-
-            # Bounds check
-            if (
-                row < 0
-                or row >= shape[0]
-                or col < 0
-                or col + simdwidth > shape[1]
-            ):
-                panic(
-                    "NDBuffer → store: Out-of-bounds access. "
-                    + "Attempted row "
-                    + row.__str__()
-                    + ", col range ["
-                    + col.__str__()
-                    + ", "
-                    + (col + simdwidth).__str__()
-                    + ") "
-                    + "for shape "
-                    + shape.__str__()
-                    + "."
-                )
-
-        var strides = self.strides
-        var offset = self.offset
-
-        @parameter
-        if not validated:
-            if simdwidth > 1 and strides[1] != 1:
-                panic(
-                    "NDBuffer → SIMD store requires contiguous column access. "
-                    + "Expected stride[1] == 1 but got "
-                    + strides[1].__str__()
-                    + ". "
-                    + "Use .contiguous() or scalar stores."
-                )
-
-        var addr = row * strides[0] + col * strides[1] + offset
-        self.buffer.store[simdwidth](addr, value)
-
     @always_inline
     fn load[
         simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
@@ -454,7 +337,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         var addr = row * self.strides[0] + col * self.strides[1] + self.offset
         self.buffer.store[simdwidth](addr, value)
 
-
     fn __str__(self) -> String:
         s = String("NDBuffer [")
         s += "Shape: " + self.shape.__str__()
@@ -502,7 +384,6 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         return IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-
 
     fn to_dtype[NewType: DType](self) -> NDBuffer[NewType]:
         new_buffer = self.contiguous_buffer().to_dtype[NewType]()
@@ -766,10 +647,13 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
         return NDBuffer[dtype](Buffer[dtype](distincts), self.shape)
 
     @always_inline
-    fn fill_equal_shape[overwrite: Bool=True](lhs, rhs: NDBuffer[dtype]):
+    fn fill_equal_shape[overwrite: Bool = True](lhs, rhs: NDBuffer[dtype]):
         if not lhs.shape == rhs.shape:
             panic(
-                "NDBuffer → fill_equal_shape(lhs, other): dimension mismatch: lhs shape",
+                (
+                    "NDBuffer → fill_equal_shape(lhs, other): dimension"
+                    " mismatch: lhs shape"
+                ),
                 lhs.shape.__str__(),
                 "≠",
                 "other shape",
@@ -779,11 +663,12 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
             panic(
                 "NDBuffer → fill_equal_shape(lhs, rhs): rhs is not contiguous",
             )
+
         @parameter
         if overwrite:
             if lhs._contiguous:
                 lhs.buffer.overwrite(
-                     rhs.buffer, lhs.offset, lhs.offset + lhs.numels()
+                    rhs.buffer, lhs.offset, lhs.offset + lhs.numels()
                 )
             else:
                 var index = 0
@@ -792,17 +677,18 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
                     index += 1
         else:
             if lhs._contiguous:
-                var existing = lhs.buffer[lhs.offset:lhs.offset + lhs.numels()]
+                var existing = lhs.buffer[
+                    lhs.offset : lhs.offset + lhs.numels()
+                ]
                 accumulated = rhs.buffer + existing
                 lhs.buffer.overwrite(
-                     accumulated, lhs.offset, lhs.offset + lhs.numels()
+                    accumulated, lhs.offset, lhs.offset + lhs.numels()
                 )
             else:
                 var index = 0
                 for coord in lhs.shape:
                     lhs[coord] += rhs.buffer[index]
                     index += 1
-
 
     @always_inline
     fn fill(lhs, other: NDBuffer[dtype]):
@@ -883,7 +769,9 @@ struct NDBuffer[dtype: DType](Copyable & Movable & EqualityComparable & Stringab
 
             if lhs._contiguous:
                 lhs.buffer.overwrite(
-                    broadcast_result^.buffer, lhs.offset, lhs.offset + lhs.numels()
+                    broadcast_result^.buffer,
+                    lhs.offset,
+                    lhs.offset + lhs.numels(),
                 )
             else:
                 for coord in lhs.shape:
