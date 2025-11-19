@@ -122,7 +122,7 @@ fn test_transpose_with_matmul() raises:
     var b = Tensor.d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
 
     var a_t = a.transpose()
-    _="""var result = a_t @ b
+    var result = a_t.matmul(b)
 
     # Forward pass validation
     var expected = Tensor.d2([[26.0, 30.0], [38.0, 44.0]])
@@ -131,10 +131,11 @@ fn test_transpose_with_matmul() raises:
     # Backward pass validation
     var loss = result.sum()
     loss.backward()
-    var expected_a_grad = Tensor.d2([[11.0, 15.0], [11.0, 15.0]])
-    var expected_b_grad = Tensor.d2([[4.0, 4.0], [6.0, 6.0]])
+    var expected_a_grad = Tensor.d2([[11.0, 11.0], [15.0, 15.0]])
+    var expected_b_grad = Tensor.d2([[3.0, 3.0], [7.0, 7.0]])
+
     assert_true(a.grad().all_close(expected_a_grad))
-    assert_true(b.grad().all_close(expected_b_grad))"""
+    assert_true(b.grad().all_close(expected_b_grad))
 
 fn test_transpose_scalar_equivalent() raises:
     print("test_transpose_scalar_equivalent")
