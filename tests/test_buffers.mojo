@@ -1,6 +1,227 @@
 from buffers import Buffer
 
 
+fn test_lt() raises:
+    print("test_lt")
+    size = 68
+    ll = List[Scalar[DType.int64]](capacity=size)
+    for _ in range(size):
+        ll.append(Scalar[DType.int64](2))
+    ll[0] = 5
+    ll[65] = 42
+    buffer = Buffer[DType.int64](ll)
+    cmp_result = buffer.lt(5)
+
+    # Assertions
+    assert_true(
+        cmp_result[0] == False,
+        "buffer.lt: index 0 should be False (5 is not < 5)",
+    )
+    assert_true(
+        cmp_result[1] == True, "buffer.lt: index 1 should be True (2 < 5)"
+    )
+    assert_true(
+        cmp_result[65] == False,
+        "buffer.lt: index 65 should be False (42 is not < 5)",
+    )
+    assert_true(
+        cmp_result[67] == True, "buffer.lt: index 67 should be True (2 < 5)"
+    )
+    print("test_lt passed")
+
+
+fn test_lt_breaks_original() raises:
+    print("test_lt_breaks_original")
+    size = 20
+    ll = List[Scalar[DType.float32]](capacity=size)
+
+    # Create a pattern that will show the bug clearly
+    for i in range(size):
+        ll.append(Scalar[DType.float32](i))
+
+    buffer = Buffer[DType.float32](ll)
+
+    cmp_result = buffer.lt(10.0)
+
+    # Assertions
+    assert_true(cmp_result[0] == True, "buffer.lt: 0 < 10 should be True")
+    assert_true(cmp_result[9] == True, "buffer.lt: 9 < 10 should be True")
+    assert_true(cmp_result[10] == False, "buffer.lt: 10 < 10 should be False")
+    assert_true(cmp_result[15] == False, "buffer.lt: 15 < 10 should be False")
+    assert_true(cmp_result[19] == False, "buffer.lt: 19 < 10 should be False")
+    print("test_lt_breaks_original passed")
+
+
+fn test_simd_indexing() raises:
+    print("test_simd_indexing")
+    alias simd_width = 8
+
+    # Create a SIMD vector with distinct values
+    var vec = SIMD[DType.int32, simd_width](0, 1, 2, 3, 4, 5, 6, 7)
+
+    print("Direct indexing:")
+    for i in range(simd_width):
+        assert_true(vec[i] == i, "SIMD vector indexing failed")
+
+    print("\nAttempting out of bounds indexing (expecting crash):")
+    # This will segfault - commenting out for safety
+    # var should_crash = vec[8]
+    print("test_simd_indexing passed (in-bounds checks only)")
+
+
+fn test_what_values() raises:
+    print("test_what_values")
+    alias simd_width = 8
+
+    var buffer = Buffer[DType.float32](16)
+    for i in range(16):
+        buffer[i] = i
+
+    for block in range(2):
+        idx = block * simd_width
+        cmp = buffer.load[simd_width](idx).lt(10.0)
+
+        # Verify expected values for Block 0
+        if block == 0:
+            for k in range(simd_width):
+                assert_true(
+                    cmp[k] == True, "Block 0: all values 0-7 should be < 10"
+                )
+
+        # Verify expected values for Block 1
+        if block == 1:
+            assert_true(
+                cmp[0] == True, "Block 1: cmp[0] (value 8) should be < 10"
+            )
+            assert_true(
+                cmp[1] == True, "Block 1: cmp[1] (value 9) should be < 10"
+            )
+            for k in range(2, simd_width):
+                assert_true(
+                    cmp[k] == False,
+                    "Block 1: cmp["
+                    + k.__str__()
+                    + "] (value "
+                    + (8 + k).__str__()
+                    + ") should be >= 10",
+                )
+
+    print("test_what_values passed")
+
+
+fn test_to_dtype_same_type() raises:
+    print("test_to_dtype_same_type")
+    var buffer = Buffer[DType.int32](5)
+    for i in range(5):
+        buffer[i] = i * 10
+
+    var result = buffer.to_dtype[DType.int32]()
+
+    for i in range(5):
+        assert_true(
+            result[i] == buffer[i],
+            "Same type conversion should preserve values",
+        )
+
+    print("test_to_dtype_same_type passed")
+
+
+fn test_to_dtype_non_bool() raises:
+    print("test_to_dtype_non_bool")
+    var buffer = Buffer[DType.int32](5)
+    for i in range(5):
+        buffer[i] = i * 10
+
+    var result = buffer.to_dtype[DType.float32]()
+
+    for i in range(5):
+        assert_true(
+            result[i] == Scalar[DType.float32](i * 10),
+            "int32 to float32 conversion failed",
+        )
+
+    print("test_to_dtype_non_bool passed")
+
+
+fn test_to_dtype_to_bool() raises:
+    print("test_to_dtype_to_bool")
+    var buffer = Buffer[DType.int32](5)
+    buffer[0] = 0
+    buffer[1] = 1
+    buffer[2] = 42
+    buffer[3] = 0
+    buffer[4] = -5
+
+    var result = buffer.to_dtype[DType.bool]()
+
+    assert_true(result[0] == False, "0 should cast to False")
+    assert_true(result[1] == True, "1 should cast to True")
+    assert_true(result[2] == True, "42 should cast to True")
+    assert_true(result[3] == False, "0 should cast to False")
+    assert_true(result[4] == True, "-5 should cast to True")
+
+    print("test_to_dtype_to_bool passed")
+
+
+fn test_to_dtype_from_bool() raises:
+    print("test_to_dtype_from_bool")
+    var buffer = Buffer[DType.bool](5)
+    buffer[0] = False
+    buffer[1] = True
+    buffer[2] = True
+    buffer[3] = False
+    buffer[4] = True
+
+    var result = buffer.to_dtype[DType.int32]()
+
+    assert_true(result[0] == 0, "False should cast to 0")
+    assert_true(result[1] == 1, "True should cast to 1")
+    assert_true(result[2] == 1, "True should cast to 1")
+    assert_true(result[3] == 0, "False should cast to 0")
+    assert_true(result[4] == 1, "True should cast to 1")
+
+    print("test_to_dtype_from_bool passed")
+
+
+fn test_to_dtype_large_buffer() raises:
+    print("test_to_dtype_large_buffer")
+    size = 100
+    var buffer = Buffer[DType.float64](size)
+    for i in range(size):
+        buffer[i] = i * 0.5
+
+    var result = buffer.to_dtype[DType.int32]()
+
+    for i in range(size):
+        expected = Int32(i * 0.5)
+        assert_true(
+            result[i] == expected,
+            "Large buffer conversion failed at index " + i.__str__(),
+        )
+
+    print("test_to_dtype_large_buffer passed")
+
+
+fn run_all_tests() raises:
+    print("=" * 50)
+    print("Running all buffer tests")
+    print("=" * 50)
+
+    test_lt()
+    test_lt_breaks_original()
+    test_simd_indexing()
+    test_what_values()
+    test_to_dtype_same_type()
+    test_to_dtype_non_bool()
+    test_to_dtype_to_bool()
+    test_to_dtype_from_bool()
+    test_to_dtype_large_buffer()
+
+    print("=" * 50)
+    print("All tests passed!")
+    print("=" * 50)
+
+
 fn main() raises:
     print("Running buffer tests")
     test_overwrite()
@@ -26,7 +247,7 @@ fn main() raises:
     test_buffer_float_less_eq_than()
     test_count()
     test_log()
-
+    run_all_tests()
     print("Done running buffer tests")
 
 

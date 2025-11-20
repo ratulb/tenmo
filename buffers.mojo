@@ -1,10 +1,11 @@
 from algorithm import vectorize
-from sys import simd_width_of,  size_of
+from sys import simd_width_of, size_of
 from memory import memset_zero, memcpy, ArcPointer
 from math import exp, log, ceil
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
 from os.atomic import Atomic, Consistency, fence
+
 
 struct Buffer[dtype: DType = DType.float32](
     Copyable & Movable & Sized & Stringable & Writable & Representable & Absable
@@ -16,6 +17,7 @@ struct Buffer[dtype: DType = DType.float32](
     When unshared: Just manages data pointer (like before).
     When shared: Adds atomic refcount in same allocation as data.
     """
+
     var size: Int
     var data: UnsafePointer[Scalar[dtype]]
     var _refcount: UnsafePointer[Atomic[DType.uint64]]  # Null if not shared!
@@ -24,7 +26,6 @@ struct Buffer[dtype: DType = DType.float32](
     # ========================================
     # Constructors
     # ========================================
-
 
     fn __init__(out self):
         self.size = 0
@@ -37,7 +38,9 @@ struct Buffer[dtype: DType = DType.float32](
             panic("Buffer size must be >= 0")
         self.size = size
         self.external = external
-        self._refcount = UnsafePointer[Atomic[DType.uint64]]()  # Null (not shared yet)
+        self._refcount = UnsafePointer[
+            Atomic[DType.uint64]
+        ]()  # Null (not shared yet)
 
         if size == 0:
             self.data = UnsafePointer[Scalar[dtype]]()
@@ -79,7 +82,6 @@ struct Buffer[dtype: DType = DType.float32](
         """Check if this buffer has ref counting enabled."""
         return self._refcount != UnsafePointer[Atomic[DType.uint64]]()
 
-
     fn shared(mut self):
         """
         Convert this buffer to shared mode (enable ref counting).
@@ -99,7 +101,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Allocate new memory: [refcount][data]
         var refcount_size = size_of[Atomic[DType.uint64]]()
-        var data_size = self.size *  size_of[Scalar[dtype]]()
+        var data_size = self.size * size_of[Scalar[dtype]]()
         var total_size = refcount_size + data_size
         var new_alloc = UnsafePointer[UInt8].alloc(total_size)
 
@@ -113,10 +115,8 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Free old allocation
 
-        for i in range(self.size):
-            (self.data + i).destroy_pointee()
         self.data.free()
-        log_debug("Buffer__del__ → freed data pointees")
+        log_debug("Buffer__del__ → freed data pointer")
 
         # Update pointers
         self.data = new_data
@@ -143,7 +143,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         if self.is_shared():
             # Atomic increment (only for shared buffers)
-            _ = self._refcount[].fetch_add[ordering=Consistency.MONOTONIC](1)
+            _ = self._refcount[].fetch_add[ordering = Consistency.MONOTONIC](1)
         else:
             # Not shared - deep copy data
             if self.size > 0 and not self.external:
@@ -167,11 +167,14 @@ struct Buffer[dtype: DType = DType.float32](
 
         if self.is_shared():
             # Shared buffer - atomic decrement
-            if self._refcount[].fetch_sub[ordering=Consistency.RELEASE](1) != 1:
+            if (
+                self._refcount[].fetch_sub[ordering = Consistency.RELEASE](1)
+                != 1
+            ):
                 return  # Other references exist
 
             # Last reference - free everything
-            fence[ordering=Consistency.ACQUIRE]()
+            fence[ordering = Consistency.ACQUIRE]()
 
             # Destroy data elements
             for i in range(self.size):
@@ -192,7 +195,6 @@ struct Buffer[dtype: DType = DType.float32](
     @staticmethod
     fn Empty() -> Buffer[dtype]:
         return Buffer[dtype]()
-
 
     fn __len__(self) -> Int:
         return self.size
@@ -222,23 +224,46 @@ struct Buffer[dtype: DType = DType.float32](
         return result^
 
     fn __getitem__(self, index: Int) -> Scalar[dtype]:
-        return self.data.load[width=1, volatile=True](index)
+        debug_assert(
+            index >= 0 and index < self.size,
+            "Buffer -> __getitem__: index out of bounds",
+            self.size,
+            index,
+        )
+        return self.data.load[width=1](index)
 
     fn __setitem__(self, index: Int, scalar: Scalar[dtype]):
-        self.data.store[width=1, volatile=True](index, scalar)
+        debug_assert(
+            index >= 0 and index < self.size,
+            "Buffer -> __setitem__: index out of bounds",
+            self.size,
+            index,
+        )
+        self.data.store[width=1](index, scalar)
 
     @always_inline
     fn load[simdwidth: Int = 1](self, offset: Int) -> SIMD[dtype, simdwidth]:
-        return self.data.load[
-            width=simdwidth,
-            #volatile=True,
-        ](offset)
+        debug_assert(
+            offset >= 0 and offset + simdwidth < self.size,
+            "Buffer -> load : offset out of bounds",
+            self.size,
+            offset,
+            simdwidth,
+        )
+        return self.data.load[width=simdwidth,](offset)
 
     @always_inline
     fn store[
         simdwidth: Int = 1
     ](self, offset: Int, values: SIMD[dtype, simdwidth]):
-        #self.data.store[width=simdwidth, volatile=True](offset, values)
+        debug_assert(
+            offset >= 0 and offset + simdwidth < self.size,
+            "Buffer -> store : offset out of bounds",
+            self.size,
+            offset,
+            simdwidth,
+        )
+
         self.data.store[width=simdwidth](offset, values)
 
     @always_inline
@@ -352,7 +377,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx) * rhs.load[simd_width](idx)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
             # out.store[simd_width](idx, cmp)
         i = simd_blocks * simd_width
 
@@ -439,12 +464,12 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx) * rhs.load[simd_width](idx)
             for k in range(simd_width):
-                lhs.store[simd_width](idx + k, cmp[idx + k])
+                lhs.store[simd_width](idx + k, cmp[k])
             # out.store[simd_width](idx, cmp)
         i = simd_blocks * simd_width
 
         for k in range(i, total):
-            lhs.store(k, Scalar[DType.bool](lhs.load(k) == rhs.load(k)))
+            lhs.store(k, Scalar[DType.bool](lhs.load(k) * rhs.load(k)))
 
     fn __truediv__[
         simd_width: Int = simd_width_of[dtype]()
@@ -887,7 +912,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = this.load[simd_width](idx).__invert__()
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -922,7 +947,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = this.load[simd_width](idx).eq(scalar)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -957,7 +982,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = this.load[simd_width](idx).ne(scalar)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -969,13 +994,15 @@ struct Buffer[dtype: DType = DType.float32](
     ](this: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
         total = this.size
         out = Buffer[DType.bool](total)
-
+        print("It is the one")
         simd_blocks = total // simd_width
         for block in range(simd_blocks):
             idx = block * simd_width
             cmp = this.load[simd_width](idx).lt(scalar)
+            # Store each boolean individually due to bit-packing
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
+            # out.store[simd_width](idx, cmp)
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -1029,7 +1056,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = this.load[simd_width](idx).le(scalar)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -1065,7 +1092,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = this.load[simd_width](idx).gt(scalar)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -1101,7 +1128,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = this.load[simd_width](idx).ge(scalar)
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -1126,7 +1153,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).eq(rhs.load[simd_width](idx))
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
             # out.store[simd_width](idx, cmp)
         i = simd_blocks * simd_width
 
@@ -1177,7 +1204,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).ne(rhs.load[simd_width](idx))
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -1227,7 +1254,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).lt(rhs.load[simd_width](idx))
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -1277,7 +1304,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).le(rhs.load[simd_width](idx))
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -1351,7 +1378,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).gt(rhs.load[simd_width](idx))
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -1401,7 +1428,7 @@ struct Buffer[dtype: DType = DType.float32](
             idx = block * simd_width
             cmp = lhs.load[simd_width](idx).ge(rhs.load[simd_width](idx))
             for k in range(simd_width):
-                out.store[simd_width](idx + k, cmp[idx + k])
+                out.store[simd_width](idx + k, cmp[k])
         i = simd_blocks * simd_width
 
         for k in range(i, total):
@@ -1421,7 +1448,23 @@ struct Buffer[dtype: DType = DType.float32](
         out = Buffer[NewType](total)
 
         @parameter
-        if NewType != DType.bool:
+        if (
+            (dtype == NewType)
+            or (dtype == DType.bool)
+            or (NewType == DType.bool)
+        ):
+            # Handle element-by-element cases:
+            # - Same type conversion
+            # - Converting FROM bool (bit-packed source)
+            # - Converting TO bool (bit-packed destination)
+            for i in range(total):
+                out[i] = self[i].cast[NewType]()
+        else:
+            # Both types are non-bool and different: use efficient SIMD vectorization
+            alias input_simd_width = simd_width_of[dtype]()
+
+            # Use the smaller of the two SIMD widths for safe vectorization
+            alias working_simd_width = input_simd_width if input_simd_width < simdwidth else simdwidth
 
             @parameter
             fn cast_values[simd_width: Int](idx: Int):
@@ -1429,18 +1472,7 @@ struct Buffer[dtype: DType = DType.float32](
                     idx, self.load[simd_width](idx).cast[NewType]()
                 )
 
-            vectorize[cast_values, simdwidth](self.size)
-        else:
-            simd_blocks = total // simdwidth
-            for block in range(simd_blocks):
-                idx = block * simdwidth
-                cmp = self.load[simdwidth](idx).cast[NewType]()
-                for k in range(simdwidth):
-                    out.store[simdwidth](idx + k, cmp[idx + k])
-            i = simd_blocks * simdwidth
-
-            for k in range(i, total):
-                out.store(k, self.load(k).cast[NewType]())
+            vectorize[cast_values, working_simd_width](self.size)
 
         return out^
 
@@ -1744,6 +1776,7 @@ struct Buffer[dtype: DType = DType.float32](
     fn __repr__(self) -> String:
         return self.__str__()
 
+
 @register_passable
 struct ElementIterator[
     dtype: DType,
@@ -1788,7 +1821,7 @@ fn main() raises:
     r.zero()
 
     print(r1, r)
-    _= r^
+    _ = r^
 
     print("done")
 
