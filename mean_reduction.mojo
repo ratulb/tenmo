@@ -58,6 +58,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         broadcasted = expanded.broadcast_to(ancestor.shape())
         # Compute total count of elements being reduced
         count = ancestor.shape().axes_spans.select(self.axes).product()
+        print(ancestor.shape(), count)
         average = broadcasted / Scalar[dtype](count)
 
         return [
@@ -88,7 +89,8 @@ struct Mean[dtype: DType](Copyable):
         normalized_axes = Validator.validate_and_normalize_axes(
             tensor.shape(), axes
         )
-        count = tensor.shape().axes_spans.select(normalized_axes).product()
+        var count = tensor.shape().axes_spans.select(normalized_axes).product()
+        count = count if count > 0 else 1
         out = tensor.sum[track_grad=False](
             axes=normalized_axes, keepdims=keepdims, requires_grad=False
         ) / Scalar[dtype](count)
@@ -108,7 +110,6 @@ struct Mean[dtype: DType](Copyable):
 
         return out^
 
-
     @always_inline
     @staticmethod
     fn forward(
@@ -120,12 +121,14 @@ struct Mean[dtype: DType](Copyable):
         normalized_axes = Validator.validate_and_normalize_axes(
             gradbox_shape, axes
         )
-        count = gradbox_shape.axes_spans.select(normalized_axes).product()
-        out = gradbox.sum(
-            axes=normalized_axes, keepdims=keepdims
-        ) / Scalar[dtype](count)
+        var count = gradbox_shape.axes_spans.select(normalized_axes).product()
+        count = count if count > 0 else 1
+        out = gradbox.sum(axes=normalized_axes, keepdims=keepdims) / Scalar[
+            dtype
+        ](count)
 
         return out^
+
 
 fn main():
     print("passes")
