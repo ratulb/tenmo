@@ -648,22 +648,24 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[dtype](Buffer[dtype](distincts), self.shape)
 
     @always_inline
-    fn fill_equal_shape[overwrite: Bool = True](lhs, rhs: NDBuffer[dtype]):
-        if not lhs.shape == rhs.shape:
-            panic(
-                (
-                    "NDBuffer → fill_equal_shape(lhs, other): dimension"
-                    " mismatch: lhs shape"
-                ),
-                lhs.shape.__str__(),
-                "≠",
-                "other shape",
-                rhs.shape.__str__(),
-            )
-        if not rhs._contiguous:
-            panic(
-                "NDBuffer → fill_equal_shape(lhs, rhs): rhs is not contiguous",
-            )
+    fn fill_equal_shape[overwrite: Bool = True, validate: Bool = True](lhs, rhs: NDBuffer[dtype]):
+        @parameter
+        if validate:
+            if not lhs.shape == rhs.shape:
+                panic(
+                    (
+                        "NDBuffer → fill_equal_shape(lhs, other): dimension"
+                        " mismatch: lhs shape"
+                    ),
+                    lhs.shape.__str__(),
+                    "≠",
+                    "other shape",
+                    rhs.shape.__str__(),
+                )
+            if not rhs._contiguous:
+                panic(
+                    "NDBuffer → fill_equal_shape(lhs, rhs): rhs is not contiguous",
+                )
 
         @parameter
         if overwrite:
@@ -683,7 +685,7 @@ struct NDBuffer[dtype: DType](
                 ]
                 accumulated = rhs.buffer + existing
                 lhs.buffer.overwrite(
-                    accumulated, lhs.offset, lhs.offset + lhs.numels()
+                    accumulated^, lhs.offset, lhs.offset + lhs.numels()
                 )
             else:
                 var index = 0
