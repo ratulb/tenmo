@@ -11,6 +11,7 @@ alias Delegate[dtype: DType] = Variant[
     VectorMatmulNdBackward[dtype],
     MatmulNdBackward[dtype],
     Matmul2dBackward[dtype],
+    CrossEntropyBackward[dtype],
     AddBackwardScalar[dtype],
     AddBackward[dtype],
     SubBackward[dtype],
@@ -40,6 +41,7 @@ alias Delegate[dtype: DType] = Variant[
     ReLUBackward[dtype],
     MinMaxBackward[dtype],
     SoftmaxBackward[dtype],
+    LogSoftmaxBackward[dtype],
     TileBackward[dtype],
 ]
 
@@ -72,6 +74,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.grad_fn.isa[MatrixVectorMulNdBackward[dtype]]():
             return self.grad_fn[MatrixVectorMulNdBackward[dtype]].backward(output)
 
+        elif self.grad_fn.isa[CrossEntropyBackward[dtype]]():
+            return self.grad_fn[CrossEntropyBackward[dtype]].backward(output)
+
         elif self.grad_fn.isa[AddBackwardScalar[dtype]]():
             return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
 
@@ -80,6 +85,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[SoftmaxBackward[dtype]]():
             return self.grad_fn[SoftmaxBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[LogSoftmaxBackward[dtype]]():
+            return self.grad_fn[LogSoftmaxBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[TransposeBackward[dtype]]():
             return self.grad_fn[TransposeBackward[dtype]].backward(output)

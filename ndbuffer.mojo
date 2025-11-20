@@ -86,7 +86,7 @@ struct NDBuffer[dtype: DType](
         self._contiguous = False
         self._contiguous = self.is_contiguous()
 
-    fn __init__(
+        _="""fn __init__(
         out self,
         var shared_buffer: Buffer[dtype],
         shape: Shape,
@@ -98,7 +98,7 @@ struct NDBuffer[dtype: DType](
         self.strides = strides.value() if strides else Strides.default(shape)
         self.offset = offset
         self._contiguous = False
-        self._contiguous = self.is_contiguous()
+        self._contiguous = self.is_contiguous()"""
 
     fn __moveinit__(out self, deinit other: Self):
         self.buffer = other.buffer^
@@ -427,7 +427,8 @@ struct NDBuffer[dtype: DType](
         new_shape = shape.or_else(self.shape)
         new_strides = strides.or_else(self.strides)
         return NDBuffer[dtype](
-            shared_buffer=self.buffer.copy(),
+            #shared_buffer=self.buffer.copy(),
+            buffer=self.buffer.copy(),
             shape=new_shape,
             strides=new_strides,
             offset=offset,
@@ -435,9 +436,7 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn __is__(self, other: NDBuffer[dtype]) -> Bool:
-        if self.shared() and other.shared():
-            return self.buffer.data == other.buffer.data
-        return False
+        return self.buffer.data == other.buffer.data
 
     @always_inline
     fn zero(self):
@@ -453,8 +452,10 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn contiguous(self, new_shape: Optional[Shape] = None) -> NDBuffer[dtype]:
-        shape = new_shape.or_else(self.shape)
-        return NDBuffer[dtype](self.contiguous_buffer(), shape)
+        target_shape = new_shape.or_else(self.shape)
+        if self.is_contiguous() and not self.shared() and target_shape == self.shape:
+            return self.copy()
+        return NDBuffer[dtype](self.contiguous_buffer(), target_shape)
 
     @always_inline
     fn map[

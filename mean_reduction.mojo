@@ -75,6 +75,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct Mean[dtype: DType](Copyable):
+    @always_inline
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -107,6 +108,24 @@ struct Mean[dtype: DType](Copyable):
 
         return out^
 
+
+    @always_inline
+    @staticmethod
+    fn forward(
+        gradbox: Gradbox[dtype],
+        axes: IntList,
+        keepdims: Bool = False,
+    ) -> Gradbox[dtype]:
+        var gradbox_shape = gradbox.shape()
+        normalized_axes = Validator.validate_and_normalize_axes(
+            gradbox_shape, axes
+        )
+        count = gradbox_shape.axes_spans.select(normalized_axes).product()
+        out = gradbox.sum(
+            axes=normalized_axes, keepdims=keepdims
+        ) / Scalar[dtype](count)
+
+        return out^
 
 fn main():
     print("passes")

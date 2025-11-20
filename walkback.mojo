@@ -27,16 +27,14 @@ from transpose import TransposeBackward
 from views import ViewBackward
 from permute import PermuteBackward
 from dotproduct import DotBackward
-from vectormatrixmm import VectorMatrixMMBackward
-from matrixvectormm import MatrixVectorMMBackward
 from unsqueeze import UnsqueezeBackward
 from squeeze import SqueezeBackward
 from expand import ExpandBackward
 from minmax import MinMaxBackward
 from shuffle import ShuffleBackward
 from relu import ReLUBackward
-from softmax import SoftmaxBackward
-from crossentropy import CrossEntropyBackward, CrossEntropyLoss
+from softmax import SoftmaxBackward, LogSoftmaxBackward
+from crossentropy import CrossEntropyBackward
 from tiles import TileBackward
 from flatten import FlattenBackward
 from contiguous import ContiguousBackward

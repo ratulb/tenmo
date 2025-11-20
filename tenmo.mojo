@@ -13,7 +13,6 @@ from common_utils_imports import *
 from common_utils import id as identity, IntArrayHelper, log_warning
 from operators_imports import *
 
-# from walkback import *
 from backpropagation import BackwardFn
 from forwards import *
 from buffers import Buffer
@@ -110,8 +109,8 @@ struct Tensor[dtype: DType = DType.float32](
         buffer = src_buffer.share(shape, strides, offset)
         return Tensor[dtype](buffer=buffer^, requires_grad=requires_grad)
 
-    fn as_gradbox(self, share: Bool = False) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.contiguous(), share=share)
+    fn as_gradbox(deinit self, share: Bool = False) -> Gradbox[dtype]:
+        return Gradbox[dtype](self^.buffer.contiguous(), share=share)
 
     fn __moveinit__(out self, deinit other: Self):
         self.buffer = other.buffer^
@@ -137,7 +136,10 @@ struct Tensor[dtype: DType = DType.float32](
 
     @always_inline
     fn init_gradbox(mut self):
-        if self.requires_grad and self.gradbox == UnsafePointer[Gradbox[dtype]]():
+        if (
+            self.requires_grad
+            and self.gradbox == UnsafePointer[Gradbox[dtype]]()
+        ):
             gradbox = Gradbox[dtype](self.shape())
             gradbox.zero_grad()
             self.gradbox = UnsafePointer[Gradbox[dtype]].alloc(1)
@@ -159,11 +161,11 @@ struct Tensor[dtype: DType = DType.float32](
         return self.shape()[0] if self.shape() != Shape() else 0
 
     @always_inline
-    fn shape(ref self) -> ref[self.buffer.shape] Shape:
+    fn shape(ref self) -> ref [self.buffer.shape] Shape:
         return self.buffer.shape
 
     @always_inline
-    fn strides(ref self) -> ref[self.buffer.strides] Strides:
+    fn strides(ref self) -> ref [self.buffer.strides] Strides:
         return self.buffer.strides
 
     @always_inline
@@ -728,7 +730,7 @@ struct Tensor[dtype: DType = DType.float32](
         nd_buffer = NDBuffer[dtype](buffer^, shape)
         return Tensor[dtype](nd_buffer^, requires_grad=requires_grad)
 
-    fn onehot(self: Tensor[DType.int64], num_classes: Int) -> Tensor[dtype]:
+    fn onehot(self: Tensor[DType.int32], num_classes: Int) -> Tensor[dtype]:
         """Convert tensor of class indices to one-hot encoding.
         Args:
             self: Tensor of shape (...,) containing class indices.
@@ -737,20 +739,20 @@ struct Tensor[dtype: DType = DType.float32](
         """
         shape = self.shape()
         result = Tensor[dtype](shape + [num_classes])
-
         result.fill(Scalar[dtype](0))
 
         # Set appropriate positions to 1.0
-        for idx in shape:
-            var class_idx = self[idx].__int__()
-            if class_idx < 0 or class_idx >= num_classes:
+        for coord in shape:
+            var class_index = self[coord].__int__()
+            if class_index < 0 or class_index >= num_classes:
                 panic(
-                    "Tensor → onehot: invalid class at coordinate: ",
+                    "Tensor → onehot: invalid class",
+                    class_index.__str__(),
+                    "at coordinate",
+                    IntArrayHelper.to_string(coord),
                 )
-            if class_idx >= 0 and class_idx < num_classes:
-                # var one_hot_idx = idx + [class_idx]
-                var one_hot_idx = IntArrayHelper.extend(idx, class_idx)
-                result[one_hot_idx] = Scalar[dtype](1)
+            var onehot_idx = IntArrayHelper.extend(coord, class_index)
+            result[onehot_idx] = Scalar[dtype](1)
 
         return result^
 
@@ -1199,7 +1201,7 @@ struct Tensor[dtype: DType = DType.float32](
             gradbox.__imul__(incoming)
         if opcode == AddTensor:
             gradbox.__iadd__(incoming)
-            #self.grad().buffer.fill_equal_shape(incoming.buffer)
+            # self.grad().buffer.fill_equal_shape(incoming.buffer)
         if opcode == SubtractTensor:
             gradbox.__isub__(incoming)
         if opcode == ZeroGrad:
@@ -1414,7 +1416,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn backward(self, seed_tensor: Tensor[dtype]):
         output = Ancestor(self)
         output.backward(seed_tensor)
-
 
     fn requires_grad_(mut self, requires_grad: Bool = True):
         self.requires_grad = requires_grad
@@ -1721,18 +1722,24 @@ struct Tensor[dtype: DType = DType.float32](
         return ReLU[dtype].forward(self, requires_grad)
 
     fn softmax[
-        track_grad: Bool = True
+        track_grad: Bool = True, log: Bool = False  # Whether to use LogSoftmax
     ](
         self,
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return Softmax[dtype].forward[track_grad](
-            self, IntList.new(axes), requires_grad
-        )
+        @parameter
+        if log:
+            return LogSoftmax[dtype].forward[track_grad](
+                self, IntList.new(axes), requires_grad
+            )
+        else:
+            return Softmax[dtype].forward[track_grad](
+                self, IntList.new(axes), requires_grad
+            )
 
     fn softmax[
-        track_grad: Bool = True
+        track_grad: Bool = True, log: Bool = False
     ](
         self,
         axes: IntList,
@@ -1740,7 +1747,13 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[
         dtype
     ]:
-        return Softmax[dtype].forward[track_grad](self, axes, requires_grad)
+        @parameter
+        if log:
+            return LogSoftmax[dtype].forward[track_grad](
+                self, axes, requires_grad
+            )
+        else:
+            return Softmax[dtype].forward[track_grad](self, axes, requires_grad)
 
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
@@ -1788,14 +1801,13 @@ fn main() raises:
     # test_set_value()
     # test_set_tensor()
     a = Tensor.arange(10, requires_grad=True)
-    #r = a.reshape(2, 5)
+    # r = a.reshape(2, 5)
     b = a + 2
     b.backward(42)
     a.grad().print()
     pass
 
-
-    _="""fn test_set_value() raises:
+    _ = """fn test_set_value() raises:
     print("test_set_value")
     a = Tensor.ones(2, 3, 4)
     # Set the value

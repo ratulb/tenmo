@@ -14,6 +14,7 @@ from sys import simd_width_of
 from matmul import Matmul
 from random import seed, random_float64
 from buffers import Buffer
+from forwards import Mean
 
 struct Gradbox[dtype: DType](
     Copyable
@@ -40,9 +41,9 @@ struct Gradbox[dtype: DType](
         self.buffer = other.buffer.copy()
 
     @always_inline
-    fn as_tensor(self, requires_grad: Bool = False) -> Tensor[dtype]:
+    fn as_tensor(deinit self, requires_grad: Bool = False) -> Tensor[dtype]:
         return Tensor[dtype](
-            self.buffer.contiguous(), requires_grad=requires_grad
+            self^.buffer.contiguous(), requires_grad=requires_grad
         )
 
     fn transpose(self, axes: IntList) -> Gradbox[dtype]:
@@ -262,6 +263,13 @@ struct Gradbox[dtype: DType](
         return Gradbox[dtype](nd_buffer^, share=False)
 
     @always_inline
+    fn mean(
+        self, axes: IntList = IntList(), keepdims: Bool = False
+    ) -> Gradbox[dtype]:
+        return Mean[dtype].forward(self, axes=axes, keepdims=keepdims)
+
+
+    @always_inline
     fn sum_over_broadcasted_axes(
         extended_grad: Gradbox[dtype], target_shape: Shape
     ) -> Gradbox[dtype]:
@@ -301,7 +309,8 @@ struct Gradbox[dtype: DType](
         strides = Strides() if is_scalar else view_strides
         abs_offset = self.offset() + relative_offset
         shared_buffer = self.buffer.buffer.copy()
-        ndb = NDBuffer[dtype](shared_buffer=shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset)
+        #ndb = NDBuffer[dtype](shared_buffer=shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset)
+        ndb = NDBuffer[dtype](shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset)
 
         return Gradbox[dtype](ndb^, share=False)
 
@@ -572,6 +581,11 @@ struct Gradbox[dtype: DType](
         )
 
     fn __sub__(self, other: Self) -> Gradbox[dtype]:
+        return Gradbox[dtype](
+            self.buffer.arithmetic_ops[Subtract](other.buffer), share=False
+        )
+
+    fn __sub__(self, other: Tensor[dtype]) -> Gradbox[dtype]:
         return Gradbox[dtype](
             self.buffer.arithmetic_ops[Subtract](other.buffer), share=False
         )

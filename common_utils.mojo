@@ -347,6 +347,14 @@ struct IntArrayHelper(Copyable):
             print(arr[i], end=end)
 
     @staticmethod
+    fn to_string(arr: IntArray) -> String:
+        s = String()
+        for i in range(arr.size()):
+            end = ", " if i < arr.size() - 1 else ""
+            s += arr[i].__str__() + end
+        return s
+
+    @staticmethod
     fn extend(arr: IntArray, *elems: Int) -> IntArray:
         out = IntArray(arr.size() + len(elems))
         out.copy_from(0, arr, arr.size())
