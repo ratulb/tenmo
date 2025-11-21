@@ -553,7 +553,7 @@ struct Buffer[dtype: DType = DType.float32](
                     self_start + idx
                 ) / other.load[simdwidth=smdwidth](other_start + idx)
 
-            out.store[simdwidth=smdwidth](self_start + idx, op_result)
+            out.store[simdwidth=smdwidth](idx, op_result)
 
         alias smdwidth = 1 if dtype == DType.bool else simd_width_of[dtype]()
         vectorize[arithmetic_op, smdwidth](self_extent)
@@ -609,7 +609,7 @@ struct Buffer[dtype: DType = DType.float32](
                     start_index + idx
                 ).__rtruediv__(scalar)
 
-            out.store[simdwidth=smdwidth](start_index + idx, op_result)
+            out.store[simdwidth=smdwidth](idx, op_result)
 
         alias smdwidth = 1 if dtype == DType.bool else simd_width_of[dtype]()
         vectorize[arithmetic_op_scalar, smdwidth](extent)
@@ -850,6 +850,13 @@ struct Buffer[dtype: DType = DType.float32](
         buffer = Buffer[dtype](size)
         buffer.fill(value)
         return buffer^
+
+    @always_inline
+    @staticmethod
+    fn arange[
+        max_arange_elements: Int = 1000000  # Safety limit to prevent infinite loops with very small steps
+    ](*args: Scalar[dtype]) -> Buffer[dtype]:
+        return Self.arange[max_arange_elements](args)
 
     @always_inline
     @staticmethod
@@ -1532,23 +1539,28 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Int:
-        extent = end_index.or_else(self.size)
+        extent = end_index.or_else(self.size) - start_index
         total = 0
 
         @parameter
         fn matches[smdwidth: Int](idx: Int):
             block = self.load[simdwidth=smdwidth](idx + start_index)
-            result = block == key
-            if result:
+            result = block.eq(key)
+
+            if result.reduce_and():
+                # All elements match
                 total += smdwidth
-            elif not result and smdwidth > 1:
+            elif not result.reduce_or():
+                # No elements match - do nothing
+                pass
+            else:
+                # Some elements match - count individually
                 for i in range(smdwidth):
-                    if block[i] == key:
+                    if result[i]:
                         total += 1
 
         alias simd_width = 1 if dtype == DType.bool else simd_width_of[dtype]()
         vectorize[matches, simd_width](extent)
-
         return total
 
     @always_inline
