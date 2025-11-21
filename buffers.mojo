@@ -599,6 +599,10 @@ struct Buffer[dtype: DType = DType.float32](
                 op_result = scalar - self.load[simdwidth=smdwidth](
                     start_index + idx
                 )
+            elif op_code == Divide:
+                op_result = (
+                    self.load[simdwidth=smdwidth](start_index + idx) / scalar
+                )
 
             else:  # ReverseDivide
                 op_result = self.load[simdwidth=smdwidth](
