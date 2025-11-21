@@ -1565,105 +1565,89 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn all_close[
-        simd_width: Int = simd_width_of[dtype](),
         rtol: Scalar[dtype] = 1e-5,
         atol: Scalar[dtype] = 1e-8,
-    ](lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Bool:
+    ](self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
+        """Check if all elements are close within tolerance: |a - b| <= atol + rtol * |b|.
+        """
         constrained[
             dtype.is_floating_point(),
             "Buffer → all_close is for floating point data types only",
         ]()
 
-        num_elems = len(lhs)
+        if self.size != other.size:
+            return False
+
+        if self.size == 0:
+            return True
+
+        @parameter
+        fn check_close[smdwidth: Int](idx: Int) -> Bool:
+            vec1 = self.load[simdwidth=smdwidth](idx)
+            vec2 = other.load[simdwidth=smdwidth](idx)
+            diff = abs(vec1 - vec2)
+            tolerance = atol + rtol * abs(vec2)
+            return diff.le(tolerance).reduce_and()
+
+        alias simd_width = simd_width_of[dtype]()
+        num_elems = self.size
         simd_blocks = num_elems // simd_width
-        tail_start = simd_blocks * simd_width
 
         for i in range(simd_blocks):
-            vector1 = lhs.load[simd_width](i * simd_width)
-            vector2 = rhs.load[simd_width](i * simd_width)
-
-            diff = abs(vector1 - vector2)
-            tolerance = atol + rtol * abs(vector2)
-            if not diff.le(tolerance).reduce_and():
+            if not check_close[simd_width](i * simd_width):
                 return False
 
-        # Handle tail (non-SIMD leftover)
-        for k in range(tail_start, num_elems):
-            value1 = lhs[k]
-            value2 = rhs[k]
-            if abs(value1 - value2).gt(atol + rtol * abs(value2)):
+        # Handle tail
+        for k in range(simd_blocks * simd_width, num_elems):
+            if abs(self[k] - other[k]) > atol + rtol * abs(other[k]):
                 return False
 
         return True
 
-    fn any[
-        simd_width: Int = simd_width_of[dtype](),
-    ](
-        this,
-        scalar_pred: fn (Scalar[dtype]) -> Bool,
-        simd_pred: Optional[
-            fn (SIMD[dtype, simd_width]) -> SIMD[DType.bool, simd_width]
-        ] = None,
-    ) -> Bool:
-        num_elems = len(this)
-        simd_blocks = num_elems // simd_width
-        remaining = num_elems % simd_width
-
-        for i in range(simd_blocks):
-            vector = this.load[simd_width](i * simd_width)
-            if simd_pred:
-                any_true = simd_pred.value()(vector)
-                if any_true.reduce_or():
-                    return True
-            else:
-                for j in range(simd_width):
-                    if scalar_pred(vector[j]):
-                        return True
-
-        for k in range(remaining):
-            scalar = this.load(simd_blocks * simd_width + k)
-            if scalar_pred(scalar):
+    @always_inline
+    fn any(self: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Bool:
+        """Check if any element satisfies the predicate."""
+        for i in range(self.size):
+            if pred(self[i]):
                 return True
-
         return False
 
-    fn for_all[
-        simd_width: Int = simd_width_of[dtype](),
-    ](this: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Buffer[
-        DType.bool
-    ]:
-        out = Buffer[DType.bool](len(this))
-
-        for i in range(len(this)):
-            out[i] = pred(this[i])
-
-        return out^
-
-    fn all_true[
-        simd_width: Int = simd_width_of[dtype](),
-    ](self: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Bool:
-        total = self.size
-
-        simd_blocks = total // simd_width
-        for block in range(simd_blocks):
-            idx = block * simd_width
-            vals = self.load[simd_width](idx)
-            for k in range(simd_width):
-                if not pred(vals[k]):
-                    return False
-
-        i = simd_blocks * simd_width
-        for k in range(i, total):
-            if not pred(self.load(k)):
+    @always_inline
+    fn all(self: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Bool:
+        """Check if all elements satisfy the predicate."""
+        for i in range(self.size):
+            if not pred(self[i]):
                 return False
-
         return True
 
-    fn all_true(buf: Buffer[DType.bool]) -> Bool:
-        fn pred(scalar: Scalar[DType.bool]) -> Bool:
-            return scalar == Scalar[DType.bool](True)
+    @always_inline
+    fn map_to_bool(
+        self: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool
+    ) -> Buffer[DType.bool]:
+        """Apply predicate to each element, returning a boolean buffer."""
+        var out = Buffer[DType.bool](self.size)
+        for i in range(self.size):
+            out[i] = pred(self[i])
+        return out^
 
-        return buf.all_true[1](pred)
+    @always_inline
+    fn all_true(self: Buffer[DType.bool]) -> Bool:
+        """Check if all elements in a boolean buffer are True."""
+        if self.size == 0:
+            return True
+
+        for i in range(self.size):
+            if not self[i]:
+                return False
+        return True
+
+    @always_inline
+    fn any_true(self: Buffer[DType.bool]) -> Bool:
+        """Check if any element in a boolean buffer is True."""
+        for i in range(self.size):
+            if self[i]:
+                return True
+        return False
 
     fn string(self) -> String:
         var result = "Buffer["
@@ -1753,49 +1737,4 @@ struct ElementIterator[
 
 
 fn main() raises:
-    alias dtype = DType.bool
-    b = Buffer[dtype](42)
-    b.fill(True, 10, 20)
-    b.fill(True, 30)
-    print(b)
-    print()
-    # c = Buffer[dtype].full(True, 42)
-    # print(c)
-
-    r = b.eq(True)
-
-    print()
-    print(r)
-
-    _ = """c *= b
-    print(c)"""
-
-    _ = """alias dtype = DType.float32
-    l = List[Scalar[dtype]](0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-    b = Buffer[dtype](l)
-    r = b[3:8]
-    r.shared()
-    r1 = r.copy()
-    print(r.is_shared(), r.ref_count())
-    print("************")
-    print(r1, r)
-    r1[0] = 78787
-
-    print(r1, r)
-
-    r.zero()
-
-    print(r1, r)
-    _ = r^
-
-    print("done")
-
-    buff = Buffer[dtype](l)
-    ref is_copy = UnsafePointer(to=buff)[]
-
-    print("Now check: ", is_copy.data == buff.data)
-    is_copy[0] = 999
-    print(is_copy, buff)"""
-
-
-from testing import assert_true, assert_false
+    pass
