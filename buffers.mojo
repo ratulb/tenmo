@@ -1565,53 +1565,42 @@ struct Buffer[dtype: DType = DType.float32](
         return result
 
     @always_inline
-    fn overwrite[
-        simd_width: Int = simd_width_of[dtype]()
-    ](
+    fn overwrite(
         self: Buffer[dtype],
-        result: Buffer[dtype],
+        buffer: Buffer[dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ):
         """Overwrite a segment of this buffer with result data."""
 
-        actual_end = end_index.value() if end_index else self.size
-        segment_size = actual_end - start_index
+        extent = end_index.or_else(self.size) - start_index
 
         # Safety checks
-        if segment_size != result.size:
+        if extent != buffer.size:
             panic(
-                (
-                    "Buffer → overwrite: segment size must match result buffer"
-                    " size."
-                ),
+                "Buffer → overwrite: write extent must match buffer size.",
                 "start_index:",
                 start_index.__str__(),
                 "end_index:",
-                actual_end.__str__(),
-                "segment_size:",
-                segment_size.__str__(),
-                "buffer size:",
+                end_index.__str__(),
+                "write extent:",
+                extent.__str__(),
+                "self buffer size:",
                 self.size.__str__(),
-                "result size:",
-                result.size.__str__(),
+                "buffer size:",
+                buffer.size.__str__(),
             )
 
-        if segment_size == 0:
-            return
-
-        # Special handling for bool due to bit packing
-        if dtype == DType.bool:
-            for i in range(segment_size):
-                self[start_index + i] = result[i]
+        if extent == 0:
             return
 
         @parameter
-        fn overwrite_elems[simdwidth: Int](idx: Int):
-            result_vec = result.load[simdwidth](idx)
-            self.store[simdwidth](start_index + idx, result_vec)
+        fn overwrite_elems[smdwidth: Int](idx: Int):
+            result_vec = buffer.load[simdwidth=smdwidth](idx)
+            self.store[simdwidth=smdwidth](start_index + idx, result_vec)
 
-        vectorize[overwrite_elems, simd_width](segment_size)
+        alias simd_width = 1 if dtype == DType.bool else simd_width_of[dtype]()
+        vectorize[overwrite_elems, simd_width](extent)
 
     fn count[
         simd_width: Int = simd_width_of[dtype]()
