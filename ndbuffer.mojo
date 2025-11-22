@@ -15,6 +15,7 @@ from operators import (
     Subtract,
     ReverseSubtract,
     Divide,
+    Overwrite,
     ReverseDivide,
     Equal,
     NotEqual,
@@ -38,15 +39,6 @@ struct NDBuffer[dtype: DType](
     var offset: Int
     var buffer: Buffer[dtype]
     var _contiguous: Bool
-
-    fn __init__(
-        out self,
-    ):
-        self.buffer = Buffer[dtype](1)
-        self.shape = Shape()
-        self.strides = Strides.Zero()
-        self.offset = 0
-        self._contiguous = True
 
     fn __init__(out self, *values: Scalar[dtype]):
         buffer = Buffer[dtype](len(values))
@@ -86,20 +78,6 @@ struct NDBuffer[dtype: DType](
         self._contiguous = False
         self._contiguous = self.is_contiguous()
 
-        _="""fn __init__(
-        out self,
-        var shared_buffer: Buffer[dtype],
-        shape: Shape,
-        strides: Optional[Strides] = None,
-        offset: Int = 0,
-    ):
-        self.buffer = shared_buffer^
-        self.shape = shape
-        self.strides = strides.value() if strides else Strides.default(shape)
-        self.offset = offset
-        self._contiguous = False
-        self._contiguous = self.is_contiguous()"""
-
     fn __moveinit__(out self, deinit other: Self):
         self.buffer = other.buffer^
         self.shape = other.shape^
@@ -116,11 +94,6 @@ struct NDBuffer[dtype: DType](
         self.strides = other.strides.copy()
         self.offset = other.offset
         self._contiguous = other._contiguous
-
-    fn __del__(deinit self):
-        _ = self.buffer^
-        _ = self.shape^
-        _ = self.strides^
 
     @staticmethod
     @always_inline
@@ -355,6 +328,9 @@ struct NDBuffer[dtype: DType](
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
+    fn data_buffer(ref self) -> ref [self.buffer] Buffer[dtype]:
+        return self.buffer
+
     @always_inline
     fn is_scalar(self) -> Bool:
         return self.numels() == 1 and self.shape == Shape()
@@ -385,6 +361,7 @@ struct NDBuffer[dtype: DType](
             self.shape, indices, self.strides, self.offset
         )
 
+    @always_inline
     fn to_dtype[NewType: DType](self) -> NDBuffer[NewType]:
         new_buffer = self.contiguous_buffer().to_dtype[NewType]()
         return NDBuffer[NewType](new_buffer^, self.shape)
@@ -425,9 +402,10 @@ struct NDBuffer[dtype: DType](
             self.buffer.shared()
 
         new_shape = shape.or_else(self.shape)
-        new_strides = strides.or_else(self.strides)
+        # new_strides = strides.or_else(self.strides)
+        new_strides = strides.or_else(Strides.default(new_shape))
         return NDBuffer[dtype](
-            #shared_buffer=self.buffer.copy(),
+            # shared_buffer=self.buffer.copy(),
             buffer=self.buffer.copy(),
             shape=new_shape,
             strides=new_strides,
@@ -453,7 +431,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn contiguous(self, new_shape: Optional[Shape] = None) -> NDBuffer[dtype]:
         target_shape = new_shape.or_else(self.shape)
-        if self.is_contiguous() and not self.shared() and target_shape == self.shape:
+        if (
+            self.is_contiguous()
+            and not self.shared()
+            and target_shape == self.shape
+        ):
             return self.copy()
         return NDBuffer[dtype](self.contiguous_buffer(), target_shape)
 
@@ -645,103 +627,119 @@ struct NDBuffer[dtype: DType](
         var distincts = List[Scalar[dtype]](capacity=UInt(len(uniques)))
         for elem in uniques:
             distincts.append(elem)
-        return NDBuffer[dtype](Buffer[dtype](distincts), self.shape)
+        var unique_shape = Shape(len(distincts))
+        return NDBuffer[dtype](Buffer[dtype](distincts), unique_shape)
 
     @always_inline
-    fn fill_equal_shape[overwrite: Bool = True, validate: Bool = True](lhs, rhs: NDBuffer[dtype]):
+    fn copy_from_alike[
+        overwrite: Bool = True, validate: Bool = True
+    ](self: NDBuffer[dtype], other: NDBuffer[dtype]):
         @parameter
         if validate:
-            if not lhs.shape == rhs.shape:
+            if not self.shape == other.shape:
                 panic(
                     (
-                        "NDBuffer → fill_equal_shape(lhs, other): dimension"
-                        " mismatch: lhs shape"
+                        "NDBuffer → copy_from_equal_shaped_buffer(other):"
+                        " dimension mismatch: self shape"
                     ),
-                    lhs.shape.__str__(),
+                    self.shape.__str__(),
                     "≠",
                     "other shape",
-                    rhs.shape.__str__(),
-                )
-            if not rhs._contiguous:
-                panic(
-                    "NDBuffer → fill_equal_shape(lhs, rhs): rhs is not contiguous",
+                    other.shape.__str__(),
                 )
 
-        @parameter
-        if overwrite:
-            if lhs._contiguous:
-                lhs.buffer.overwrite(
-                    rhs.buffer, lhs.offset, lhs.offset + lhs.numels()
+        if self.is_contiguous() and other.is_contiguous():
+            self_start = self.offset
+            other_start = other.offset
+            self_end = self_start + self.numels()
+            other_end = other_start + other.numels()
+
+            @parameter
+            if overwrite:
+                self.buffer.inplace_ops[Overwrite, validate=validate](
+                    other.buffer, self_start, self_end, other_start, other_end
                 )
             else:
-                var index = 0
-                for coord in lhs.shape:
-                    lhs[coord] = rhs.buffer[index]
-                    index += 1
+                self.buffer.inplace_ops[Add, validate=validate](
+                    other.buffer, self_start, self_end, other_start, other_end
+                )
+
+        elif self.is_contiguous() and not other.is_contiguous():
+            var index = self.offset
+            for coord in other.shape:
+
+                @parameter
+                if overwrite:
+                    self.buffer[index] = other[coord]
+                else:
+                    self.buffer[index] += other[coord]
+                index += 1
+
+        elif not self.is_contiguous() and other.is_contiguous():
+            var index = other.offset
+            for coord in self.shape:
+
+                @parameter
+                if overwrite:
+                    self[coord] = other.buffer[index]
+                else:
+                    self[coord] += other.buffer[index]
+                index += 1
+
         else:
-            if lhs._contiguous:
-                var existing = lhs.buffer[
-                    lhs.offset : lhs.offset + lhs.numels()
-                ]
-                accumulated = rhs.buffer + existing
-                lhs.buffer.overwrite(
-                    accumulated^, lhs.offset, lhs.offset + lhs.numels()
-                )
-            else:
-                var index = 0
-                for coord in lhs.shape:
-                    lhs[coord] += rhs.buffer[index]
-                    index += 1
+            for coord in self.shape:
+
+                @parameter
+                if overwrite:
+                    self[coord] = other[coord]
+                else:
+                    self[coord] += other[coord]
 
     @always_inline
-    fn fill(lhs, other: NDBuffer[dtype]):
-        if not ShapeBroadcaster.broadcastable(lhs.shape, other.shape):
-            panic(
-                "NDBuffer → fill(lhs, other): dimension mismatch: lhs shape",
-                lhs.shape.__str__(),
-                "≠",
-                "other shape",
-                other.shape.__str__(),
-            )
+    fn fill(self, other: NDBuffer[dtype]):
+        if self.__is__(other):
+            panic("NDBuffer → fill: cannot fill with self")
+
         if other.is_scalar() or other.shape == Shape.Unit():
-            lhs.fill(
+            self.fill(
                 other.item()
             )  # Scalar/Singleton NDBuffer - shared or otherwise
             return
-        var broadcast_shape = ShapeBroadcaster.broadcast_shape(
-            lhs.shape, other.shape
-        )
-        if broadcast_shape != lhs.shape:
-            panic(
-                "NDBuffer → fill: broadcasted shape must match receiver shape"
+
+        if self.shape == other.shape:
+            self.copy_from_alike[overwrite=True, validate=True](other)
+        else:
+            # Handle broadcast
+            if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
+                panic(
+                    "NDBuffer → fill(other): dimension mismatch: self shape",
+                    self.shape.__str__(),
+                    "≠",
+                    "other shape",
+                    other.shape.__str__(),
+                )
+            var broadcast_shape = ShapeBroadcaster.broadcast_shape(
+                self.shape, other.shape
             )
-
-        # Make other contiguous because it could be same storage and makes processing simpler/faster
-        var rhs = other.contiguous()
-
-        if lhs.shape == rhs.shape:
-            if lhs._contiguous:
-                lhs.buffer.overwrite(
-                    rhs.buffer, lhs.offset, lhs.offset + lhs.numels()
+            if broadcast_shape != self.shape:
+                panic(
+                    "NDBuffer → fill: broadcasted shape must match receiver"
+                    " shape"
                 )
-            else:
-                var index = 0
-                for coord in lhs.shape:
-                    lhs[coord] = rhs.buffer[index]
-                    index += 1
-        else:  # Handle broadcast
-            # lhs.shape -> Target shape
-            # rhs.shape -> Source shape
-            mask = ShapeBroadcaster.broadcast_mask(rhs.shape, lhs.shape)
-            for coord in lhs.shape:
+
+            # self.shape -> Target shape
+            # other.shape -> Source shape
+
+            mask = ShapeBroadcaster.broadcast_mask(other.shape, self.shape)
+            for coord in self.shape:
                 src_coord = ShapeBroadcaster.translate_index(
-                    rhs.shape, coord, mask, lhs.shape
+                    other.shape, coord, mask, self.shape
                 )
-                lhs[coord] = rhs[src_coord]
+                self[coord] = other[src_coord]
 
     @always_inline
     fn inplace_ops[
-        opcode: Int,
+        op_code: Int,
     ](lhs: NDBuffer[dtype], rhs: NDBuffer[dtype]):
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(lhs.shape, rhs.shape):
@@ -768,7 +766,7 @@ struct NDBuffer[dtype: DType](
                 )
 
             # Use existing broadcast operation
-            var broadcast_result = lhs.broadcast_buffer[opcode](rhs)
+            var broadcast_result = lhs.broadcast_buffer[op_code](rhs)
 
             if lhs._contiguous:
                 lhs.buffer.overwrite(
@@ -781,25 +779,51 @@ struct NDBuffer[dtype: DType](
                     lhs[coord] = broadcast_result[coord]
 
         else:
-            # Same shape case - use hybrid approach
+            # Same shape case
             if lhs._contiguous and rhs._contiguous:
-                # Fast path: Use out-of-place operation + overwrite
-                var result = lhs.arithmetic_ops[opcode](rhs)
-                lhs.buffer.overwrite(
-                    result^.buffer, lhs.offset, lhs.offset + lhs.numels()
+                # Fast path: Use inplace buffer operation
+                # var result = lhs.arithmetic_ops[op_code](rhs)
+                lhs_start = lhs.offset
+                lhs_end = lhs_start + lhs.numels()
+                rhs_start = rhs.offset
+                rhs_end = rhs_start + rhs.numels()
+                lhs.buffer.inplace_ops[op_code](
+                    rhs.buffer, lhs_start, lhs_end, rhs_start, rhs_end
                 )
+                _ = """lhs.buffer.overwrite(
+                    result^.buffer, lhs.offset, lhs.offset + lhs.numels()
+                )"""
 
+            elif lhs._contiguous and not rhs._contiguous:
+                var index = lhs.offset
+                for coord in rhs.shape:
+                    var left_value = lhs.buffer[index]
+                    var right_value = rhs[coord]
+                    lhs.buffer[index] = Self.scalar_fn[op_code](
+                        left_value, right_value
+                    )
+                    index += 1
+
+            elif not lhs._contiguous and rhs._contiguous:
+                var index = rhs.offset
+                for coord in lhs.shape:
+                    var left_value = lhs[coord]
+                    var right_value = lhs.buffer[index]
+                    lhs[coord] = Self.scalar_fn[op_code](
+                        left_value, right_value
+                    )
+                    index += 1
             else:
                 for coord in lhs.shape:
                     var lhs_val = lhs[coord]
                     var rhs_val = rhs[coord]
 
                     @parameter
-                    if opcode == Multiply:
+                    if op_code == Multiply:
                         lhs[coord] = lhs_val * rhs_val
-                    elif opcode == Add:
+                    elif op_code == Add:
                         lhs[coord] = lhs_val + rhs_val
-                    elif opcode == Subtract:
+                    elif op_code == Subtract:
                         lhs[coord] = lhs_val - rhs_val
                     else:  # Divide
                         lhs[coord] = lhs_val / rhs_val
@@ -816,8 +840,9 @@ struct NDBuffer[dtype: DType](
         if self._contiguous:
             start = self.offset
             end = start + self.numels()
-            var result = self.scalar_ops[opcode](scalar)
-            self.buffer.overwrite(result.buffer, start, end)
+            # var result = self.scalar_ops[opcode](scalar)
+            # self.buffer.overwrite(result.buffer, start, end)
+            self.buffer.inplace_ops_scalar[opcode](scalar, start, end)
 
         else:
             for coord in self.shape:
@@ -839,6 +864,14 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn __mul__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
         return self.arithmetic_ops[Multiply](other)
+
+    @always_inline
+    fn __mul__(self, scalar: Scalar[dtype]) -> NDBuffer[dtype]:
+        return self.scalar_ops[Multiply](scalar)
+
+    @always_inline
+    fn __rmul__(self, scalar: Scalar[dtype]) -> NDBuffer[dtype]:
+        return self.__mul__(scalar)
 
     @always_inline
     fn __sub__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
@@ -867,19 +900,30 @@ struct NDBuffer[dtype: DType](
 
         # Same shape case - use hybrid approach
         if lhs._contiguous and rhs._contiguous:
-            var lhs_contiguous = lhs.contiguous_buffer()
-            var rhs_contiguous = rhs.contiguous_buffer()
+            lhs_start = lhs.offset
+            lhs_end = lhs_start + lhs.numels()
+            rhs_start = rhs.offset
+            rhs_end = rhs_start + rhs.numels()
+
             var result_buffer: Buffer[dtype]
 
             @parameter
             if opcode == Multiply:
-                result_buffer = lhs_contiguous * rhs_contiguous
+                result_buffer = lhs.buffer.arithmetic_ops[Multiply](
+                    rhs.buffer, lhs_start, lhs_end, rhs_start, rhs_end
+                )
             elif opcode == Add:
-                result_buffer = lhs_contiguous + rhs_contiguous
+                result_buffer = lhs.buffer.arithmetic_ops[Add](
+                    rhs.buffer, lhs_start, lhs_end, rhs_start, rhs_end
+                )
             elif opcode == Subtract:
-                result_buffer = lhs_contiguous - rhs_contiguous
+                result_buffer = lhs.buffer.arithmetic_ops[Subtract](
+                    rhs.buffer, lhs_start, lhs_end, rhs_start, rhs_end
+                )
             else:  # Divide
-                result_buffer = lhs_contiguous / rhs_contiguous
+                result_buffer = lhs.buffer.arithmetic_ops[Divide](
+                    rhs.buffer, lhs_start, lhs_end, rhs_start, rhs_end
+                )
 
             return NDBuffer[dtype](result_buffer^, lhs.shape)
 
@@ -1017,22 +1061,43 @@ struct NDBuffer[dtype: DType](
                 panic("NDBuffer → scalar_ops: cannot divide by zero")
 
         if self._contiguous:
-            var contiguous_data = self.contiguous_buffer()
+            # var contiguous_data = self.contiguous_buffer()
+            # print("Contiguous_data: ", contiguous_data)
+            var start = self.offset
+            var end = start + self.numels()
             var result_buffer: Buffer[dtype]
 
             @parameter
             if opcode == Multiply:
-                result_buffer = contiguous_data * scalar
+                # result_buffer = contiguous_data * scalar
+                result_buffer = self.buffer.arithmetic_ops_scalar[Multiply](
+                    scalar, start, end
+                )
             elif opcode == Add:
-                result_buffer = contiguous_data + scalar
+                # result_buffer = contiguous_data + scalar
+                result_buffer = self.buffer.arithmetic_ops_scalar[Add](
+                    scalar, start, end
+                )
             elif opcode == Subtract:
-                result_buffer = contiguous_data - scalar
+                # result_buffer = contiguous_data - scalar
+                result_buffer = self.buffer.arithmetic_ops_scalar[Subtract](
+                    scalar, start, end
+                )
             elif opcode == ReverseSubtract:
-                result_buffer = scalar - contiguous_data
+                # result_buffer = scalar - contiguous_data
+                result_buffer = self.buffer.arithmetic_ops_scalar[
+                    ReverseSubtract
+                ](scalar, start, end)
             elif opcode == ReverseDivide:
-                result_buffer = scalar / contiguous_data
+                # result_buffer = scalar / contiguous_data
+                result_buffer = self.buffer.arithmetic_ops_scalar[
+                    ReverseDivide
+                ](scalar, start, end)
             else:  # Divide
-                result_buffer = contiguous_data / scalar
+                # result_buffer = contiguous_data / scalar
+                result_buffer = self.buffer.arithmetic_ops_scalar[Divide](
+                    scalar, start, end
+                )
 
             return NDBuffer[dtype](result_buffer^, self.shape)
 
@@ -1195,12 +1260,11 @@ struct NDBuffer[dtype: DType](
         )
 
     @always_inline
-    fn __getitem__(self, index: Int) -> Scalar[dtype]:
+    fn element_at(self, index: Int) -> Scalar[dtype]:
         idx = index + self.max_index() if index < 0 else index
         if idx < 0 or idx > self.max_index():
             panic(
-                # "NDBuffer → element_at: index out of bounds.",
-                "NDBuffer → __getitem__(int): index out of bounds.",
+                "NDBuffer → element_at: index out of bounds.",
                 "NDBuffer max index",
                 self.max_index().__str__(),
                 ", provided index",
@@ -1229,5 +1293,4 @@ struct NDBuffer[dtype: DType](
 
 
 fn main() raises:
-    # alias dtype = DType.float32
     pass
