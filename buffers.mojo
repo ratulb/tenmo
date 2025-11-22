@@ -1445,6 +1445,8 @@ struct Buffer[dtype: DType = DType.float32](
             "Buffer → sum is for numeric data types only",
         ]()
         var accum = Scalar[dtype](0)
+        if self.size == 0:
+            return accum
         extent = end_index.or_else(self.size) - start_index
         if extent == 0:
             return accum
@@ -1483,6 +1485,9 @@ struct Buffer[dtype: DType = DType.float32](
 
         var result = Scalar[dtype](1)
         extent = end_index.or_else(self.size) - start_index
+
+        if extent <= 0:
+            return result  # Empty product = multiplicative identity
 
         @parameter
         fn multiply[smdwidth: Int](idx: Int):
@@ -1539,6 +1544,8 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Int:
+        if self.size == 0:
+            return 0
         extent = end_index.or_else(self.size) - start_index
         total = 0
 
