@@ -466,13 +466,13 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     fn __eq__(self, other: Tensor[dtype]) -> Bool:
-        return self.eq(other).all_true()
+        return self.eq(other).buffer.buffer.all_true()
 
     fn eq(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.buffer.compare[Equal](other.buffer))
 
     fn __ne__(self, other: Tensor[dtype]) -> Bool:
-        return self.ne(other).all_true()
+        return self.ne(other).buffer.buffer.all_true()
 
     fn ne(self, other: Tensor[dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.buffer.compare[NotEqual](other.buffer))
@@ -530,29 +530,11 @@ struct Tensor[dtype: DType = DType.float32](
     fn broadcastable(self, to: Tensor[dtype]) -> Bool:
         return ShapeBroadcaster.broadcastable(self.shape(), to.shape())
 
-    fn all_true(self: Tensor[DType.bool]) -> Bool:
-        fn all_truthy(elem: Scalar[DType.bool]) -> Bool:
-            return elem == Scalar[DType.bool](True)
+    fn all(self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
+        return self.buffer.buffer.map_to_bool(pred).all_true()
 
-        return self.for_all(all_truthy)
-
-    fn any_true(self: Tensor[DType.bool]) -> Bool:
-        fn any_truthy(elem: Scalar[DType.bool]) -> Bool:
-            return elem == Scalar[DType.bool](True)
-
-        return self.any(any_truthy)
-
-    fn for_all[
-        simd_width: Int = simd_width_of[dtype]()
-    ](self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
-        return (
-            self.buffer.contiguous_buffer().for_all[simd_width](pred).all_true()
-        )
-
-    fn any[
-        simd_width: Int = simd_width_of[dtype]()
-    ](self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
-        return self.buffer.contiguous_buffer().any[simd_width](pred)
+    fn any(self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
+        return self.buffer.buffer.any(pred)
 
     fn log(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         grad_required = (

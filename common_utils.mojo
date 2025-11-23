@@ -75,9 +75,9 @@ def do_assert[
     shape_mismatch = String("{0}: shape mismatch {1} vs {2}")
     tensors_not_equal = String("{}: values mismatch")
     assert_true(
-        a.shape == b.shape, shape_mismatch.format(msg, a.shape, b.shape)
+        a.shape() == b.shape(), shape_mismatch.format(msg, a.shape(), b.shape())
     )
-    assert_true((a == b).all_true(), tensors_not_equal.format(msg))
+    assert_true((a == b), tensors_not_equal.format(msg))
 
 
 # Helper
@@ -85,7 +85,7 @@ def assert_grad[
     dtype: DType, //
 ](t: Tensor[dtype], expected: Tensor[dtype], label: String):
     assert_true(
-        (t.gradbox[] == expected).all_true(),
+        (t.grad() == expected),
         String("grad assertion failed for {0}").format(label),
     )
 
@@ -490,6 +490,7 @@ fn print_summary[
     print("  Total params:        ", total_params)
     print("  Trainable params:    ", trainable_params)
     print("  Non-trainable params:", non_trainable_params)
+
 
 fn main() raises:
     _ = """a = Tensor.arange(24, requires_grad=True).reshape(2, 3, 4)

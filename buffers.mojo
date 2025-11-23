@@ -1,6 +1,6 @@
 from algorithm import vectorize
 from sys import simd_width_of, size_of
-from memory import memset_zero, memcpy, ArcPointer
+from memory import memset_zero, memcpy
 from math import exp, log, ceil
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
@@ -11,6 +11,7 @@ from operators import (
     Subtract,
     ReverseSubtract,
     Divide,
+    Overwrite,
     ReverseDivide,
     Equal,
     NotEqual,
@@ -488,10 +489,13 @@ struct Buffer[dtype: DType = DType.float32](
                     self_start + idx
                 ) - other.load[simdwidth=smdwidth](other_start + idx)
 
-            else:  # Divide
+            elif op_code == Divide:
                 op_result = self.load[simdwidth=smdwidth](
                     self_start + idx
                 ) / other.load[simdwidth=smdwidth](other_start + idx)
+
+            else:  # Overwrite
+                op_result = other.load[simdwidth=smdwidth](other_start + idx)
 
             self.store[simdwidth=smdwidth](self_start + idx, op_result)
 
@@ -1501,41 +1505,16 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn overwrite(
-        self: Buffer[dtype],
-        buffer: Buffer[dtype],
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
+        self,
+        other: Buffer[dtype],
+        self_start: Int = 0,
+        self_end: Optional[Int] = None,
+        other_start: Int = 0,
+        other_end: Optional[Int] = None,
     ):
-        """Overwrite a segment of this buffer with result data."""
-
-        extent = end_index.or_else(self.size) - start_index
-
-        # Safety checks
-        if extent != buffer.size:
-            panic(
-                "Buffer → overwrite: write extent must match buffer size.",
-                "start_index:",
-                start_index.__str__(),
-                "end_index:",
-                end_index.__str__(),
-                "write extent:",
-                extent.__str__(),
-                "self buffer size:",
-                self.size.__str__(),
-                "buffer size:",
-                buffer.size.__str__(),
-            )
-
-        if extent == 0:
-            return
-
-        @parameter
-        fn overwrite_elems[smdwidth: Int](idx: Int):
-            result_vec = buffer.load[simdwidth=smdwidth](idx)
-            self.store[simdwidth=smdwidth](start_index + idx, result_vec)
-
-        alias simd_width = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[overwrite_elems, simd_width](extent)
+        self.inplace_ops[Overwrite, True](
+            other, self_start, self_end, other_start, other_end
+        )
 
     @always_inline
     fn count(

@@ -361,7 +361,7 @@ struct Shape(
 
     @always_inline
     fn product(shape: Shape) -> Int:
-        return shape.intlist().product()
+        return 1 if shape == Shape() else shape.intlist().product()
 
     @staticmethod
     fn of(*dims: Int) -> Shape:

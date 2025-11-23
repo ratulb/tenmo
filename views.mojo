@@ -73,11 +73,11 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
                         abs_index += self.strides[i] * child_coord[i]
 
                         # CRITICAL: PyTorch-style boundary check
-                        _="""if (
+                        if (
                             abs_index < parent_offset
                             or abs_index > parent_max_index
                         ):
-                            continue  # Skip - not in parent's storage region"""
+                            continue  # Skip - not in parent's storage region
 
                     # Step 2: Convert absolute index to parent-relative index
                     var parent_rel_index = abs_index - parent_offset
@@ -135,7 +135,7 @@ struct View[dtype: DType](Copyable):
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[dtype]:
-        _="""if not Self.is_non_overlapping(self.shape(), self.strides()):
+        _ = """if not Self.is_non_overlapping(self.shape(), self.strides()):
             log_warning("Warning: overlapping view detected")"""
 
         var abs_offset: Int
@@ -272,7 +272,7 @@ struct ViewBackward_orig[dtype: DType](ImplicitlyCopyable):
                         abs_index += self.strides[i] * child_coord[i]
 
                         # CRITICAL: PyTorch-style boundary check
-                        _="""if (
+                        _ = """if (
                             abs_index < parent_offset
                             or abs_index > parent_max_index
                         ):
@@ -334,7 +334,7 @@ struct View_orig[dtype: DType](Copyable):
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[dtype]:
-        _="""if not Self.is_non_overlapping(self.shape(), self.strides()):
+        _ = """if not Self.is_non_overlapping(self.shape(), self.strides()):
             log_warning("Warning: overlapping view detected")"""
 
         var abs_offset: Int

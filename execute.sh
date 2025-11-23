@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-
+clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"

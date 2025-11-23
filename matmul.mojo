@@ -589,7 +589,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
                 A_slice,
                 B_slice,
             )
-            C_slice.buffer.fill_equal_shape[overwrite=True](result.buffer)
+            C_slice.buffer.copy_from_alike[overwrite=True](result.buffer)
 
         # Only attach backward handler if gradients are needed
         @parameter
@@ -641,7 +641,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
 
             # Use 2D matmul for GradBox (no backward needed)
             var result = Matmul2d[dtype].forward(A_slice, B_slice)
-            C_slice.buffer.fill_equal_shape[overwrite=False](result.buffer)
+            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer)
 
         return C^
 
@@ -683,7 +683,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
 
             # Use 2D matmul for GradBox (no backward needed)
             var result = Matmul2d[dtype].forward(A_slice, B_slice)
-            C_slice.buffer.fill_equal_shape[overwrite=False](result.buffer)
+            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer)
 
         return C^
 

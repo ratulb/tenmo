@@ -2,6 +2,396 @@ from intlist import IntList
 from testing import assert_true, assert_false
 
 
+fn intlist_test_product_empty() raises:
+    print("intlist_test_product_empty")
+    var il = IntList()
+    assert_true(il.product() == 1, "Empty product should be 1")
+    print("intlist_test_product_empty passed")
+
+
+fn intlist_test_product() raises:
+    print("intlist_test_product")
+    var il = IntList(1, 2, 3, 4, 5)
+    assert_true(il.product() == 120, "1*2*3*4*5 = 120")
+    print("intlist_test_product passed")
+
+
+fn intlist_test_sum() raises:
+    print("intlist_test_sum")
+    var il = IntList(1, 2, 3, 4, 5)
+    assert_true(il.sum() == 15, "1+2+3+4+5 = 15")
+    print("intlist_test_sum passed")
+
+
+fn intlist_test_append_grow() raises:
+    print("intlist_test_append_grow")
+    var il = IntList()
+    for i in range(100):
+        il.append(i)
+    assert_true(len(il) == 100, "Length should be 100")
+    for i in range(100):
+        assert_true(il[i] == i, "Value mismatch")
+    print("intlist_test_append_grow passed")
+
+
+fn intlist_test_negative_indexing() raises:
+    print("intlist_test_negative_indexing")
+    var il = IntList(10, 20, 30, 40, 50)
+    assert_true(il[-1] == 50, "il[-1] should be 50")
+    assert_true(il[-2] == 40, "il[-2] should be 40")
+    assert_true(il[-5] == 10, "il[-5] should be 10")
+    print("intlist_test_negative_indexing passed")
+
+
+fn intlist_test_slice() raises:
+    print("intlist_test_slice")
+    var il = IntList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+
+    var slice1 = il[2:5]
+    assert_true(len(slice1) == 3, "Slice length")
+    assert_true(slice1[0] == 2, "Slice[0]")
+    assert_true(slice1[2] == 4, "Slice[2]")
+
+    var slice2 = il[::2]  # Every other element
+    assert_true(len(slice2) == 5, "Step slice length")
+    assert_true(slice2[0] == 0, "Step slice[0]")
+    assert_true(slice2[2] == 4, "Step slice[2]")
+    print("intlist_test_slice passed")
+
+
+fn intlist_test_sort() raises:
+    print("intlist_test_sort")
+    var il = IntList(5, 2, 8, 1, 9, 3)
+    il.sort()
+    assert_true(il[0] == 1, "Sorted[0]")
+    assert_true(il[5] == 9, "Sorted[5]")
+
+    il.sort(asc=False)
+    assert_true(il[0] == 9, "Desc sorted[0]")
+    assert_true(il[5] == 1, "Desc sorted[5]")
+    print("intlist_test_sort passed")
+
+
+fn intlist_test_sorted() raises:
+    print("intlist_test_sorted")
+    var il = IntList(5, 2, 8, 1, 9, 3)
+    var sorted_il = il.sorted()
+
+    # Original unchanged
+    assert_true(il[0] == 5, "Original unchanged")
+    # Sorted copy
+    assert_true(sorted_il[0] == 1, "Sorted copy")
+    print("intlist_test_sorted passed")
+
+
+fn intlist_test_sort_and_deduplicate() raises:
+    print("intlist_test_sort_and_deduplicate")
+    var il = IntList(3, 1, 2, 1, 3, 2, 1)
+    il.sort_and_deduplicate()
+    assert_true(len(il) == 3, "Deduplicated length")
+    assert_true(il[0] == 1, "Dedup[0]")
+    assert_true(il[1] == 2, "Dedup[1]")
+    assert_true(il[2] == 3, "Dedup[2]")
+    print("intlist_test_sort_and_deduplicate passed")
+
+
+fn intlist_test_has_duplicates() raises:
+    print("intlist_test_has_duplicates")
+    var il1 = IntList(1, 2, 3, 4, 5)
+    var il2 = IntList(1, 2, 3, 2, 5)
+    assert_true(not il1.has_duplicates(), "No duplicates")
+    assert_true(il2.has_duplicates(), "Has duplicates")
+    print("intlist_test_has_duplicates passed")
+
+
+fn intlist_test_select() raises:
+    print("intlist_test_select")
+    var il = IntList(10, 20, 30, 40, 50)
+    var indices = IntList(0, 2, 4)
+    var selected = il.select(indices)
+    assert_true(len(selected) == 3, "Select length")
+    assert_true(selected[0] == 10, "Select[0]")
+    assert_true(selected[1] == 30, "Select[1]")
+    assert_true(selected[2] == 50, "Select[2]")
+    print("intlist_test_select passed")
+
+
+fn intlist_test_permute() raises:
+    print("intlist_test_permute")
+    var il = IntList(10, 20, 30, 40)
+    var axes = IntList(3, 1, 2, 0)
+    var permuted = il.permute(axes)
+    assert_true(permuted[0] == 40, "Permute[0]")
+    assert_true(permuted[1] == 20, "Permute[1]")
+    assert_true(permuted[2] == 30, "Permute[2]")
+    assert_true(permuted[3] == 10, "Permute[3]")
+    print("intlist_test_permute passed")
+
+
+fn intlist_test_insert_single() raises:
+    print("intlist_test_insert_single")
+    var il = IntList(1, 2, 4, 5)
+    var result = il.insert(2, 3)
+    assert_true(len(result) == 5, "Insert length")
+    assert_true(result[2] == 3, "Inserted value")
+    assert_true(result == IntList(1, 2, 3, 4, 5), "Full comparison")
+    print("intlist_test_insert_single passed")
+
+
+fn intlist_test_insert_at_start() raises:
+    print("intlist_test_insert_at_start")
+    var il = IntList(2, 3, 4)
+    var result = il.insert(0, 1)
+    assert_true(result == IntList(1, 2, 3, 4), "Insert at start")
+    print("intlist_test_insert_at_start passed")
+
+
+fn intlist_test_insert_at_end() raises:
+    print("intlist_test_insert_at_end")
+    var il = IntList(1, 2, 3)
+    var result = il.insert(3, 4)
+    assert_true(result == IntList(1, 2, 3, 4), "Insert at end")
+    print("intlist_test_insert_at_end passed")
+
+
+fn intlist_test_pop() raises:
+    print("intlist_test_pop")
+    var il = IntList(1, 2, 3, 4, 5)
+
+    var last = il.pop()
+    assert_true(last == 5, "Pop last")
+    assert_true(len(il) == 4, "Length after pop")
+
+    var first = il.pop(0)
+    assert_true(first == 1, "Pop first")
+    assert_true(len(il) == 3, "Length after pop(0)")
+
+    var middle = il.pop(1)
+    assert_true(middle == 3, "Pop middle")
+    assert_true(il == IntList(2, 4), "Remaining")
+    print("intlist_test_pop passed")
+
+
+fn intlist_test_replace_single() raises:
+    print("intlist_test_replace_single")
+    var il = IntList(1, 2, 3, 4, 5)
+    var result = il.replace(2, 99)
+    assert_true(result[2] == 99, "Replace single")
+    assert_true(il[2] == 3, "Original unchanged")
+    print("intlist_test_replace_single passed")
+
+
+fn intlist_test_replace_multiple() raises:
+    print("intlist_test_replace_multiple")
+    var il = IntList(1, 2, 3, 4, 5)
+    var indices = IntList(0, 2, 4)
+    var values = IntList(10, 30, 50)
+    var result = il.replace(indices, values)
+    assert_true(result == IntList(10, 2, 30, 4, 50), "Replace multiple")
+    print("intlist_test_replace_multiple passed")
+
+
+fn intlist_test_swap() raises:
+    print("intlist_test_swap")
+    var il = IntList(1, 2, 3, 4, 5)
+    il.swap(0, 4)
+    assert_true(il[0] == 5, "Swap[0]")
+    assert_true(il[4] == 1, "Swap[4]")
+    print("intlist_test_swap passed")
+
+
+fn intlist_test_reverse() raises:
+    print("intlist_test_reverse")
+    var il = IntList(1, 2, 3, 4, 5)
+    il.reverse()
+    assert_true(il == IntList(5, 4, 3, 2, 1), "Reversed")
+    print("intlist_test_reverse passed")
+
+
+fn intlist_test_reversed() raises:
+    print("intlist_test_reversed")
+    var il = IntList(1, 2, 3, 4, 5)
+    var rev = il.reversed()
+    assert_true(rev == IntList(5, 4, 3, 2, 1), "Reversed copy")
+    assert_true(il == IntList(1, 2, 3, 4, 5), "Original unchanged")
+    print("intlist_test_reversed passed")
+
+
+fn intlist_test_prepend() raises:
+    print("intlist_test_prepend")
+    var il = IntList(2, 3, 4)
+    il.prepend(1)
+    assert_true(il == IntList(1, 2, 3, 4), "Prepend")
+    print("intlist_test_prepend passed")
+
+
+fn intlist_test_clear() raises:
+    print("intlist_test_clear")
+    var il = IntList(1, 2, 3, 4, 5)
+    il.clear()
+    assert_true(len(il) == 0, "Cleared length")
+    assert_true(il.is_empty(), "Is empty")
+    print("intlist_test_clear passed")
+
+
+fn intlist_test_contains() raises:
+    print("intlist_test_contains")
+    var il = IntList(1, 2, 3, 4, 5)
+    assert_true(3 in il, "Contains 3")
+    assert_true(not (99 in il), "Not contains 99")
+    print("intlist_test_contains passed")
+
+
+fn intlist_test_count() raises:
+    print("intlist_test_count")
+    var il = IntList(1, 2, 2, 3, 2, 4)
+    assert_true(il.count(2) == 3, "Count 2s")
+    assert_true(il.count(99) == 0, "Count 99s")
+    print("intlist_test_count passed")
+
+
+fn intlist_test_indices_of() raises:
+    print("intlist_test_indices_of")
+    var il = IntList(1, 2, 3, 2, 4, 2)
+    var indices = il.indices_of(2)
+    assert_true(indices == IntList(1, 3, 5), "Indices of 2")
+    print("intlist_test_indices_of passed")
+
+
+fn intlist_test_add_lists() raises:
+    print("intlist_test_add_lists")
+    var il1 = IntList(1, 2, 3)
+    var il2 = IntList(4, 5, 6)
+    var result = il1 + il2
+    assert_true(result == IntList(1, 2, 3, 4, 5, 6), "Concatenate")
+    print("intlist_test_add_lists passed")
+
+
+fn intlist_test_mul_factor() raises:
+    print("intlist_test_mul_factor")
+    var il = IntList(1, 2, 3)
+    var result = il * 3
+    assert_true(result == IntList(1, 2, 3, 1, 2, 3, 1, 2, 3), "Repeat")
+    print("intlist_test_mul_factor passed")
+
+
+fn intlist_test_mul_elementwise() raises:
+    print("intlist_test_mul_elementwise")
+    var il1 = IntList(1, 2, 3)
+    var il2 = IntList(4, 5, 6)
+    var result = il1 * il2
+    assert_true(result == IntList(4, 10, 18), "Elementwise mul")
+    print("intlist_test_mul_elementwise passed")
+
+
+fn intlist_test_iterator() raises:
+    print("intlist_test_iterator")
+    var il = IntList(1, 2, 3, 4, 5)
+    var sum = 0
+    for val in il:
+        sum += val
+    assert_true(sum == 15, "Iterator sum")
+    print("intlist_test_iterator passed")
+
+
+fn intlist_test_reversed_iterator() raises:
+    print("intlist_test_reversed_iterator")
+    var il = IntList(1, 2, 3, 4, 5)
+    var result = IntList()
+    for val in il.__reversed__():
+        result.append(val)
+    assert_true(result == IntList(5, 4, 3, 2, 1), "Reversed iterator")
+    print("intlist_test_reversed_iterator passed")
+
+
+fn intlist_test_range_list() raises:
+    print("intlist_test_range_list")
+    var il = IntList.range_list(5)
+    assert_true(il == IntList(0, 1, 2, 3, 4), "Range list")
+    print("intlist_test_range_list passed")
+
+
+fn intlist_test_filled() raises:
+    print("intlist_test_filled")
+    var il = IntList.filled(5, 42)
+    assert_true(len(il) == 5, "Filled length")
+    for i in range(5):
+        assert_true(il[i] == 42, "Filled value")
+    print("intlist_test_filled passed")
+
+
+fn intlist_test_invert_permutation() raises:
+    print("intlist_test_invert_permutation")
+    var perm = IntList(2, 0, 3, 1)
+    var inv = IntList.invert_permutation(perm)
+    # Verify: inv[perm[i]] == i
+    for i in range(4):
+        assert_true(inv[perm[i]] == i, "Invert permutation")
+    print("intlist_test_invert_permutation passed")
+
+
+fn intlist_test_any() raises:
+    print("intlist_test_any")
+    var il = IntList(1, 2, 3, 4, 5)
+
+    fn gt_3(x: Int) -> Bool:
+        return x > 3
+
+    fn gt_10(x: Int) -> Bool:
+        return x > 10
+
+    assert_true(il.any(gt_3), "Any > 3")
+    assert_true(not il.any(gt_10), "None > 10")
+    print("intlist_test_any passed")
+
+
+fn run_all_intlist_tests() raises:
+    print("=" * 60)
+    print("Running all IntList tests")
+    print("=" * 60)
+
+    intlist_test_product_empty()
+    intlist_test_product()
+    intlist_test_sum()
+    intlist_test_append_grow()
+    intlist_test_negative_indexing()
+    intlist_test_slice()
+    intlist_test_sort()
+    intlist_test_sorted()
+    intlist_test_sort_and_deduplicate()
+    intlist_test_has_duplicates()
+    intlist_test_select()
+    intlist_test_permute()
+    intlist_test_insert_single()
+    intlist_test_insert_at_start()
+    intlist_test_insert_at_end()
+    intlist_test_pop()
+    intlist_test_replace_single()
+    intlist_test_replace_multiple()
+    intlist_test_swap()
+    intlist_test_reverse()
+    intlist_test_reversed()
+    intlist_test_prepend()
+    intlist_test_clear()
+    intlist_test_contains()
+    intlist_test_count()
+    intlist_test_indices_of()
+    intlist_test_add_lists()
+    intlist_test_mul_factor()
+    intlist_test_mul_elementwise()
+    intlist_test_iterator()
+    intlist_test_reversed_iterator()
+    intlist_test_range_list()
+    intlist_test_filled()
+    intlist_test_invert_permutation()
+    intlist_test_any()
+
+    print("=" * 60)
+    print("All IntList tests passed!")
+    print("=" * 60)
+
+
+#######################
 fn test_large_list() raises:
     print("test_large_list")
     var big = IntList()
@@ -472,7 +862,7 @@ fn test_permute() raises:
 
 
 fn main() raises:
-    print("Running IntList test cases")
+    run_all_intlist_tests()
     test_large_list()
     test_contains_unsorted()
     test_negative_and_duplicates()

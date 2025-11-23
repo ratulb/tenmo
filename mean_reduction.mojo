@@ -6,6 +6,7 @@ from backpropagation import Delegate, BackwardFn
 from validators import Validator
 from ancestry import Ancestor
 from gradbox import Gradbox
+from forwards import DivideByScalar
 
 
 @register_passable
@@ -55,11 +56,11 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
             )
 
         # Broadcast and divide
-        broadcasted = expanded.broadcast_to(ancestor.shape())
+        var broadcasted = expanded.broadcast_to(ancestor.shape())
         # Compute total count of elements being reduced
-        count = ancestor.shape().axes_spans.select(self.axes).product()
-        print(ancestor.shape(), count)
-        average = broadcasted / Scalar[dtype](count)
+        var count = ancestor.shape().axes_spans.select(self.axes).product()
+        count = count if count > 0 else 1
+        var average = broadcasted / Scalar[dtype](count)
 
         return [
             (
@@ -91,15 +92,15 @@ struct Mean[dtype: DType](Copyable):
         )
         var count = tensor.shape().axes_spans.select(normalized_axes).product()
         count = count if count > 0 else 1
-        out = tensor.sum[track_grad=False](
-            axes=normalized_axes, keepdims=keepdims, requires_grad=False
-        ) / Scalar[dtype](count)
+        total = tensor.sum[track_grad=False](
+            axes=normalized_axes, keepdims=keepdims
+        )
+        var out = DivideByScalar[dtype].forward[track_grad=False](total, count)
 
         @parameter
         if track_grad:
-            grad_required = (
-                requires_grad.value() if requires_grad else tensor.requires_grad
-            )
+            grad_required = requires_grad.or_else(tensor.requires_grad)
+
             if grad_required:
                 out.requires_grad_(True)
                 backward_fn = MeanBackward[dtype](

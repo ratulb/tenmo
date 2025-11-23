@@ -2,6 +2,7 @@ from memory import Pointer
 from common_utils import panic
 from layout.int_tuple import IntArray
 
+
 @register_passable
 struct IntList(
     Sized & ImplicitlyCopyable & Stringable & Representable & Writable
@@ -118,7 +119,7 @@ struct IntList(
 
     fn product(self) -> Int:
         if self._size == 0:
-            return 0
+            return 1
         var prod = 1
         for i in range(self._size):
             prod *= self[i]
@@ -352,8 +353,8 @@ struct IntList(
         return result^
 
     fn __getitem__(self, slice: Slice) -> Self:
-        var start = slice.start.value() if slice.start else  0
-        var stop = slice.end.value() if slice.end  else self._size
+        var start = slice.start.value() if slice.start else 0
+        var stop = slice.end.value() if slice.end else self._size
         var step = slice.step.value() if slice.step else 1
 
         if start < 0:
@@ -639,6 +640,7 @@ struct Iterator[
         else:
             return self.index
 
+
 struct ZipIterator[
     origin_this: Origin[False],
     origin_that: Origin[False],
@@ -702,13 +704,15 @@ struct ZipIterator[
         else:
             return self.index
 
+
 fn main() raises:
     test_simple_slice()
-    _="""il = IntList()
+    _ = """il = IntList()
     il.append(1)
     il.append(3)
     il.append(2)
     print(il)"""
+
 
 fn test_simple_slice() raises:
     print("test_simple_slice")
