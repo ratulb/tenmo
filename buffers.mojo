@@ -1095,27 +1095,10 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * smdwidth
 
         for k in range(i, total):
-
-            @parameter
-            if op_code == Equal:
-                if not self.load[simdwidth=1](k) == scalar:
-                    return False
-            elif op_code == NotEqual:
-                if self.load[simdwidth=1](k) == scalar:
-                    return False
-            elif op_code == GreaterThanEqual:
-                if not self.load[simdwidth=1](k) >= scalar:
-                    return False
-            elif op_code == GreaterThan:
-                if not self.load[simdwidth=1](k) > scalar:
-                    return False
-            elif op_code == LessThanEqual:
-                if not self.load[simdwidth=1](k) <= scalar:
-                    return False
-            else:  # op_code == LessThan
-                if not self.load[simdwidth=1](k) < scalar:
-                    return False
-
+            if not Self.compare_pair[op_code](
+                self.load[simdwidth=1](k), scalar
+            ):
+                return False
         return True
 
     @always_inline
@@ -1347,27 +1330,10 @@ struct Buffer[dtype: DType = DType.float32](
         i = simd_blocks * smdwidth
 
         for k in range(i, total):
-
-            @parameter
-            if op_code == Equal:
-                if not self.load[simdwidth=1](k) == other.load[simdwidth=1](k):
-                    return False
-            elif op_code == NotEqual:
-                if self.load[simdwidth=1](k) == other.load[simdwidth=1](k):
-                    return False
-            elif op_code == GreaterThanEqual:
-                if not self.load[simdwidth=1](k) >= other.load[simdwidth=1](k):
-                    return False
-            elif op_code == GreaterThan:
-                if not self.load[simdwidth=1](k) > other.load[simdwidth=1](k):
-                    return False
-            elif op_code == LessThanEqual:
-                if not self.load[simdwidth=1](k) <= other.load[simdwidth=1](k):
-                    return False
-            else:  # op_code == LessThan
-                if not self.load[simdwidth=1](k) < other.load[simdwidth=1](k):
-                    return False
-
+            if not Self.compare_pair[op_code](
+                self.load[simdwidth=1](k), other.load[simdwidth=1](k)
+            ):
+                return False
         return True
 
     @always_inline
@@ -1393,6 +1359,25 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn __ge__(self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
         return self.compare_buffer[GreaterThanEqual](other)
+
+    @always_inline
+    @staticmethod
+    fn compare_pair[
+        op_code: Int
+    ](left: Scalar[dtype], right: Scalar[dtype]) -> Bool:
+        @parameter
+        if op_code == Equal:
+            return left == right
+        elif op_code == NotEqual:
+            return left != right
+        elif op_code == GreaterThanEqual:
+            return left >= right
+        elif op_code == GreaterThan:
+            return left > right
+        elif op_code == LessThanEqual:
+            return left <= right
+        else:  # op_code == LessThan
+            return left < right
 
     @always_inline
     fn float(self) -> Buffer[DType.float32]:

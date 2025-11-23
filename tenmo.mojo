@@ -304,10 +304,10 @@ struct Tensor[dtype: DType = DType.float32](
             )
         )
         if len(shape) == 0:
-            self.buffer.buffer[offset] = value
+            self.buffer.buffer[self.offset() + offset] = value
         else:
             sliced = self.view[track_grad=False](
-                shape=shape, strides=strides, offset=offset
+                shape=shape, strides=strides, offset=self.offset() + offset
             )
             for coord in shape:
                 sliced[coord] = value
@@ -336,7 +336,7 @@ struct Tensor[dtype: DType = DType.float32](
                         IntArray()
                     ]
                 )
-                self.buffer.buffer[offset] = elem
+                self.buffer.buffer[self.offset() + offset] = elem
         else:
             tensor_shape = tensor.shape()
             if not ShapeBroadcaster.broadcastable(tensor_shape, shape):
@@ -346,7 +346,7 @@ struct Tensor[dtype: DType = DType.float32](
                 )
             else:
                 sliced = self.view[track_grad=False](
-                    shape=shape, strides=strides, offset=offset
+                    shape=shape, strides=strides, offset=self.offset() + offset
                 )
                 if tensor_shape == shape:
                     for coord in shape:
@@ -537,9 +537,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.buffer.buffer.any(pred)
 
     fn log(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        grad_required = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
+        grad_required = requires_grad.or_else(self.requires_grad)
 
         buffer = self.buffer.map[
             Utils[dtype].log_buffer, Utils[dtype].log_scalar
@@ -954,9 +952,7 @@ struct Tensor[dtype: DType = DType.float32](
             )
 
         broadcasted_buffer = self.buffer.broadcast_to(target_shape)
-        grad_required = (
-            requires_grad.value() if requires_grad else self.requires_grad
-        )
+        grad_required = requires_grad.or_else(self.requires_grad)
         out = Tensor[dtype](broadcasted_buffer^, requires_grad=grad_required)
         return out^
 
@@ -1407,7 +1403,7 @@ struct Tensor[dtype: DType = DType.float32](
         return ElemIterator[dtype, origin_of(self)](Pointer(to=self))
 
     fn element_at(self, index: Int) -> Scalar[dtype]:
-        return self.buffer[index]
+        return self.buffer.element_at(index)
 
     fn view[
         track_grad: Bool = True

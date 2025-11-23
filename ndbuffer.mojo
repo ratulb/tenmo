@@ -57,10 +57,10 @@ struct NDBuffer[dtype: DType](
             panic(
                 "NDBuffer →__init__(Buffer, ...): zero sized buffer not allowed"
             )
-        _shape = shape.value() if shape else Shape(buffer.size)
+        _shape = shape.or_else(Shape(buffer.size))
         self.shape = _shape.copy()
         self.buffer = buffer^
-        self.strides = strides.value() if strides else Strides.default(_shape)
+        self.strides = strides.or_else(Strides.default(_shape))
         self.offset = offset
         self._contiguous = False
         self._contiguous = self.is_contiguous()
@@ -73,7 +73,7 @@ struct NDBuffer[dtype: DType](
     ):
         self.buffer = Buffer[dtype](shape.num_elements())
         self.shape = shape
-        self.strides = strides.value() if strides else Strides.default(shape)
+        self.strides = strides.or_else(Strides.default(shape))
         self.offset = offset
         self._contiguous = False
         self._contiguous = self.is_contiguous()

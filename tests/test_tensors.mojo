@@ -1755,7 +1755,7 @@ fn test_random() raises:
     fn each(e: Scalar[DType.float32]) -> Bool:
         return e >= 0 and e < 1
 
-    holds_true = rand_tensor.for_all(each)
+    holds_true = rand_tensor.all(each)
     assert_true(holds_true, "rand min and max range assertion failed")
 
     rand_tensor2 = Tensor.rand(10, 20, min=-2, max=2)
@@ -1763,7 +1763,7 @@ fn test_random() raises:
     fn each2(e: Scalar[DType.float32]) -> Bool:
         return e >= -2 and e < 2
 
-    holds_true = rand_tensor2.for_all(each2)
+    holds_true = rand_tensor2.all(each2)
     assert_true(holds_true, "rand min(-2) and max(2) range assertion failed")
 
 
@@ -2681,16 +2681,9 @@ fn test_slice_grad() raises:
     print("test_slice_grad")
 
     var a = Tensor.d1([1, 2, 3, 4], requires_grad=True)
-    a.print()
-    print("b")
     var b = a[1:3]  # [2,3]
-    b.print()
     var c = b * Tensor.d1([10, 20])
-    print("c")
-    c.print()
     c.sum().backward()
-    print("a.grad()")
-    a.grad().print()
     assert_true(a.grad().all_close(Tensor.d1([0, 10, 20, 0])))
 
 
@@ -2967,17 +2960,6 @@ fn test_sum_all() raises:
     s3 = v3.sum_all()
     s4 = v4.sum_all()
     s5 = v5.sum_all()
-    v.print()
-    v2.print()
-    v3.print()
-    v4.print()
-    v5.print()
-    print(s3, s4, s5, v.sum_all())
-
-    print(v.is_contiguous(), v4.is_contiguous())
-
-    print(v2.sum_all()[0])
-
     assert_true(
         s3 == 1575.0 and s4 == s5 and s5 == 330.0,
         "view sum_all assertion failed",
@@ -3705,13 +3687,8 @@ fn test_max_min() raises:
 fn test_mask() raises:
     print("test_mask")
     a = Tensor.arange(2 * 3).reshape(2, 3)
-    a.print()
-    print()
     mask = a != 2
-    mask.print()
     converted = mask.float64()
-    print()
-    converted.print()
 
     assert_true(
         (converted == Tensor.d2([[1.0, 1.0, 0.0], [1.0, 1.0, 1.0]])),
@@ -4315,7 +4292,6 @@ fn test_shuffle() raises:
     expected = Tensor.d1([42.0, 0.0, 0.0, 42.0, 42.0]).float()
     assert_true(a.grad().all_close(expected))
 
-
 fn test_fill() raises:
     print("test_fill")
     a = Tensor.zeros(10)
@@ -4340,14 +4316,16 @@ fn test_fill() raises:
         "fill sum_all assertion failed for views",
     )
     b = Tensor.d1([1919, 1919])
-    _ = """v2.set(b, s())
-    a.print()
+
+
+    v2.set(b, s())
+
     assert_true(
         (
             a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 1919, 42, 1919])
         ),
         "view set propagation to parent failed",
-    )"""  # TBE
+    )
 
 
 fn test_element_at() raises:
