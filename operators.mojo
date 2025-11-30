@@ -16,6 +16,23 @@ alias LessThanEqual = 14
 alias GreaterThan = 15
 alias GreaterThanEqual = 16
 alias Overwrite = 17
+alias SigmoidOp = 18
+alias Log = 19
+alias Exp = 20
+alias TanhForwardOp = 21
+alias TanhBackwardOp = 22
+alias Abs = 23
+alias Negate = 24
+alias Invert = 25
+alias ReLUForwardOp = 26
+alias ReLUBackwardOp = 27
+###################
+### matul ###########
+alias dot = 28  # dot product
+alias vm = 29  # vector & tensor matmul
+alias mv = 30  # tensor & vector matmul
+alias mm = 31  # tensor & tensor matmul
+alias invalid = 32  # Invalid case
 
 
 fn main() raises:

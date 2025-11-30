@@ -3,24 +3,23 @@ from algorithm import vectorize
 from sys import simd_width_of
 from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import Delegate, BackwardFn
-from operators import AddTensor
+from operators import AddTensor, mm, vm, mv, dot, invalid
 from gradbox import Gradbox
 from ancestry import Ancestor
 from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
-from common_utils import il, s, panic
-from time import perf_counter_ns
+from common_utils import il, s, panic, log_debug
 
 
 @fieldwise_init
 @register_passable
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
     @always_inline
-    fn backward[simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 64](
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        from time import perf_counter_ns
-
+    fn backward[
+        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 64
+    ](self, output: Tensor[dtype]) -> List[
+        Tuple[Ancestor[dtype], Gradbox[dtype], Int]
+    ]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
@@ -34,8 +33,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
         # grad_A[i,j] = sum_k(grad_out[i,k] * B[j,k])  ← Reading B transposed!
         if A.requires_grad():
-            var t0 = perf_counter_ns()
-
             var grad_A = Gradbox[dtype].zeros(Shape([m, n]))
 
             # Hoist all metadata
@@ -55,8 +52,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             var grad_A_offset = grad_A.offset()
             var grad_A_data = grad_A.buffer.buffer.data
 
-            var t1 = perf_counter_ns()
-
             # TILED computation - accessing B in transposed order
             for i_tile in range(0, m, tile_size):
                 for j_tile in range(0, n, tile_size):
@@ -66,8 +61,12 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                         var k_end = min(k_tile + tile_size, p)
 
                         for i in range(i_tile, i_end):
-                            var grad_out_row_base = i * grad_out_stride0 + grad_out_offset
-                            var grad_A_row_base = i * grad_A_stride0 + grad_A_offset
+                            var grad_out_row_base = (
+                                i * grad_out_stride0 + grad_out_offset
+                            )
+                            var grad_A_row_base = (
+                                i * grad_A_stride0 + grad_A_offset
+                            )
 
                             @parameter
                             fn process_columns_a[simd_width: Int](j_local: Int):
@@ -75,32 +74,42 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                 if j >= j_end:
                                     return
 
-                                var grad_A_addr = grad_A_row_base + j * grad_A_stride1
-                                var accumulator = grad_A_data.load[width=simd_width](grad_A_addr)
+                                var grad_A_addr = (
+                                    grad_A_row_base + j * grad_A_stride1
+                                )
+                                var accumulator = grad_A_data.load[
+                                    width=simd_width
+                                ](grad_A_addr)
 
                                 for k in range(k_tile, k_end):
-                                    var grad_addr = grad_out_row_base + k * grad_out_stride1
+                                    var grad_addr = (
+                                        grad_out_row_base + k * grad_out_stride1
+                                    )
                                     var grad_ik = grad_out_data[grad_addr]
 
                                     # B[j,k] - reading B transposed without creating transpose view
-                                    var b_addr = j * B_stride0 + B_offset + k * B_stride1
-                                    var b_vec = B_data.load[width=simd_width](b_addr)
+                                    var b_addr = (
+                                        j * B_stride0 + B_offset + k * B_stride1
+                                    )
+                                    var b_vec = B_data.load[width=simd_width](
+                                        b_addr
+                                    )
 
                                     accumulator += grad_ik * b_vec
 
-                                grad_A_data.store[width=simd_width](grad_A_addr, accumulator)
+                                grad_A_data.store[width=simd_width](
+                                    grad_A_addr, accumulator
+                                )
 
-                            vectorize[process_columns_a, simdwidth](j_end - j_tile)
+                            vectorize[process_columns_a, simdwidth](
+                                j_end - j_tile
+                            )
 
-            var t2 = perf_counter_ns()
-            print("  [Grad A] Setup:", (t1-t0)/1e6, "ms | Matmul (tiled):", (t2-t1)/1e6, "ms")
             result.append((A.copy(), grad_A^, AddTensor))
 
         # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
         # grad_B[j,k] = sum_i(A[i,j] * grad_out[i,k])  ← Reading A transposed!
         if B.requires_grad():
-            var t0 = perf_counter_ns()
-
             var grad_B = Gradbox[dtype].zeros(Shape([n, p]))
 
             var A_tensor = A.tensor()
@@ -119,8 +128,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             var grad_B_offset = grad_B.offset()
             var grad_B_data = grad_B.buffer.buffer.data
 
-            var t1 = perf_counter_ns()
-
             # TILED computation
             for j_tile in range(0, n, tile_size):
                 for k_tile in range(0, p, tile_size):
@@ -130,7 +137,9 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                         var i_end = min(i_tile + tile_size, m)
 
                         for j in range(j_tile, j_end):
-                            var grad_B_row_base = j * grad_B_stride0 + grad_B_offset
+                            var grad_B_row_base = (
+                                j * grad_B_stride0 + grad_B_offset
+                            )
 
                             @parameter
                             fn process_columns_b[simd_width: Int](k_local: Int):
@@ -138,32 +147,47 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                 if k >= k_end:
                                     return
 
-                                var grad_B_addr = grad_B_row_base + k * grad_B_stride1
-                                var accumulator = grad_B_data.load[width=simd_width](grad_B_addr)
+                                var grad_B_addr = (
+                                    grad_B_row_base + k * grad_B_stride1
+                                )
+                                var accumulator = grad_B_data.load[
+                                    width=simd_width
+                                ](grad_B_addr)
 
                                 for i in range(i_tile, i_end):
                                     # A[i,j] - reading A transposed
-                                    var a_addr = i * A_stride0 + A_offset + j * A_stride1
+                                    var a_addr = (
+                                        i * A_stride0 + A_offset + j * A_stride1
+                                    )
                                     var a_ij = A_data[a_addr]
 
                                     # grad_out[i,k] - contiguous access
-                                    var grad_addr = i * grad_out_stride0 + grad_out_offset + k * grad_out_stride1
-                                    var grad_vec = grad_out_data.load[width=simd_width](grad_addr)
+                                    var grad_addr = (
+                                        i * grad_out_stride0
+                                        + grad_out_offset
+                                        + k * grad_out_stride1
+                                    )
+                                    var grad_vec = grad_out_data.load[
+                                        width=simd_width
+                                    ](grad_addr)
 
                                     accumulator += a_ij * grad_vec
 
-                                grad_B_data.store[width=simd_width](grad_B_addr, accumulator)
+                                grad_B_data.store[width=simd_width](
+                                    grad_B_addr, accumulator
+                                )
 
-                            vectorize[process_columns_b, simdwidth](k_end - k_tile)
+                            vectorize[process_columns_b, simdwidth](
+                                k_end - k_tile
+                            )
 
-            var t2 = perf_counter_ns()
-            print("  [Grad B] Setup:", (t1-t0)/1e6, "ms | Matmul (tiled):", (t2-t1)/1e6, "ms")
             result.append((B^, grad_B^, AddTensor))
 
         return result^
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
+
 
 @fieldwise_init
 @register_passable
@@ -488,52 +512,22 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
         var results = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
 
         if A.requires_grad():
-            var t0 = perf_counter_ns()
             var B_transposed = B_tensor.transpose[track_grad=False](
                 axes=[-1, -2]
             )
-            var t1 = perf_counter_ns()
 
             var A_batch_grad = MatmulNd[dtype].forward(grad_out, B_transposed)
-            var t2 = perf_counter_ns()
-
             var final_grad_A = A_batch_grad.sum_over_broadcasted_axes(A_shape)
-            var t3 = perf_counter_ns()
-
-            print(
-                "  [Grad A] Transpose:",
-                (t1 - t0) / 1e6,
-                "ms | Matmul:",
-                (t2 - t1) / 1e6,
-                "ms | Sum:",
-                (t3 - t2) / 1e6,
-                "ms",
-            )
 
             results.append((A.copy(), final_grad_A^, AddTensor))
 
         if B.requires_grad():
-            var t0 = perf_counter_ns()
             var A_transposed = A_tensor.transpose[track_grad=False](
                 axes=[-1, -2]
             )
-            var t1 = perf_counter_ns()
-
             var B_batch_grad = MatmulNd[dtype].forward(A_transposed, grad_out)
-            var t2 = perf_counter_ns()
 
             var final_grad_B = B_batch_grad.sum_over_broadcasted_axes(B_shape)
-            var t3 = perf_counter_ns()
-
-            print(
-                "  [Grad B] Transpose:",
-                (t1 - t0) / 1e6,
-                "ms | Matmul:",
-                (t2 - t1) / 1e6,
-                "ms | Sum:",
-                (t3 - t2) / 1e6,
-                "ms",
-            )
 
             results.append((B^, final_grad_B^, AddTensor))
 
@@ -746,11 +740,11 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
         return MatmulNd[dtype].forward(A, B)
 
 
-alias dot = 0  # dot product
-alias vm = 1  # vector & tensor matmul
-alias mv = 2  # tensor & vector matmul
-alias mm = 3  # tensor & tensor matmul
-alias invalid = 4  # Invalid case
+# alias dot = 0  # dot product
+# alias vm = 1  # vector & tensor matmul
+# alias mv = 2  # tensor & vector matmul
+# alias mm = 3  # tensor & tensor matmul
+# alias invalid = 4  # Invalid case
 
 
 fn classify_matmul(a: Shape, b: Shape) -> Int:
