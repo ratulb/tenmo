@@ -1,6 +1,5 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn
-from intlist import IntList
 from operators import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
 from ancestry import Ancestor
