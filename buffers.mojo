@@ -1,7 +1,7 @@
 from algorithm import vectorize
 from sys import simd_width_of, size_of
 from memory import memset_zero, memcpy
-from math import exp, log, ceil
+from math import exp, log, ceil, tanh, sqrt
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
 from os.atomic import Atomic, Consistency, fence
@@ -12,7 +12,16 @@ from operators import (
     ReverseSubtract,
     Divide,
     Overwrite,
+    SigmoidOp,
+    TanhForwardOp,
+    TanhBackwardOp,
+    Log,
+    Exp,
+    ReLUBackwardOp,
+    ReLUForwardOp,
     ReverseDivide,
+    SqrtForwardOp,
+    SqrtBackwardOp,
     Equal,
     NotEqual,
     LessThan,
@@ -206,10 +215,6 @@ struct Buffer[dtype: DType = DType.float32](
                 (self.data + i).destroy_pointee()
             self.data.free()
             log_debug("Buffer__del__ → freed unshared buffer")
-
-    @staticmethod
-    fn Empty() -> Buffer[dtype]:
-        return Buffer[dtype]()
 
     @always_inline
     fn __len__(self) -> Int:
@@ -621,6 +626,60 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
+    fn select[
+        op_code: Int, validate: Bool = True
+    ](
+        self: Buffer[dtype],
+        other: Buffer[dtype],
+        self_start: Int = 0,
+        self_end: Optional[Int] = None,
+        other_start: Int = 0,
+        other_end: Optional[Int] = None,
+    ) -> Buffer[dtype]:
+        var self_extent = self_end.or_else(self.size) - self_start
+        var other_extent = other_end.or_else(other.size) - other_start
+
+        @parameter
+        if validate:
+            if (
+                self_extent <= 0
+                or other_extent <= 0
+                or self_extent != other_extent
+            ):
+                panic(
+                    "Buffer -> select: range mismatch: self range -> "
+                    + self_extent.__str__()
+                    + ", other range: ",
+                    other_extent.__str__(),
+                )
+
+        var out = Buffer[dtype].zeros(self_extent)
+        var zero = Scalar[dtype](0)
+
+        @parameter
+        fn select_op[smdwidth: Int](idx: Int):
+            var selected: SIMD[dtype, smdwidth]
+
+            @parameter
+            if op_code == ReLUBackwardOp:
+                # Input buffer
+                var cond_block = self.load[simdwidth=smdwidth](self_start + idx)
+                var true_block = other.load[simdwidth=smdwidth](
+                    other_start + idx
+                )  # grad buffer
+                var false_block = out.load[simdwidth=smdwidth](idx)
+                selected = cond_block.gt(zero).select(true_block, false_block)
+            else:  # Bogus
+                selected = out.load[simdwidth=smdwidth](idx)
+
+            out.store[simdwidth=smdwidth](idx, selected)
+
+        alias smdwidth = 1 if dtype == DType.bool else simd_width_of[dtype]()
+        vectorize[select_op, smdwidth](self_extent)
+
+        return out^
+
+    @always_inline
     fn __truediv__(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[dtype]:
         constrained[
             dtype.is_numeric(),
@@ -791,6 +850,59 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops_scalar[ReverseDivide](scalar)
 
     @always_inline
+    fn unary_ops[
+        op_code: Int
+    ](
+        self: Buffer[dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ) -> Buffer[dtype]:
+        var extent = end_index.or_else(self.size) - start_index
+        var out = Buffer[dtype](extent)
+
+        @parameter
+        fn unary_op[smdwidth: Int](idx: Int):
+            var block = self.load[simdwidth=smdwidth](start_index + idx)
+            var result = Self.unary_fn[op_code, smdwidth](
+                block
+            )  # Delegate to helper
+            out.store[simdwidth=smdwidth](idx, result)
+
+        alias simd_width = 1 if dtype == DType.bool else simd_width_of[dtype]()
+        vectorize[unary_op, simd_width](extent)
+        return out^
+
+    # Helper for compile-time dispatch
+    @always_inline
+    @staticmethod
+    fn unary_fn[
+        op_code: Int,
+        smdwidth: Int,
+        epsilon: Scalar[dtype] = Scalar[dtype](1e-12),
+    ](block: SIMD[dtype, smdwidth]) -> SIMD[dtype, smdwidth]:
+        @parameter
+        if op_code == SigmoidOp:
+            return 1.0 / (1.0 + exp(-block))
+        elif op_code == ReLUForwardOp:
+            return max(block, 0.0)
+        # tanh(x) = 2 * σ(2x) - 1  # where σ is sigmoid
+        elif op_code == TanhForwardOp:
+            # return 2 * (1.0 / (1.0 + exp(-2 * block))) - 1
+            return tanh(block)
+        elif op_code == TanhBackwardOp:
+            return 1 - (tanh(block) * tanh(block))
+        elif op_code == Exp:
+            return exp(block)
+        elif op_code == Log:
+            return log(block)
+        elif op_code == SqrtForwardOp:
+            return sqrt(block)
+        elif op_code == SqrtBackwardOp:
+            return 1 / (epsilon + 2 * sqrt(block))
+        else:
+            return block
+
+    @always_inline
     fn __pow__(self: Buffer[dtype], exponent: Scalar[dtype]) -> Buffer[dtype]:
         constrained[
             dtype.is_numeric(),
@@ -814,19 +926,18 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn __abs__(self) -> Buffer[dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __abs__ is for numeric data types only",
         ]()
-        total = self.size
-        out = Buffer[dtype](total)
+        var out = Buffer[Self.dtype](self.size)
 
         @parameter
-        fn absolute_value[smdwidth: Int](idx: Int):
+        fn absolute[smdwidth: Int](idx: Int):
             out.store[simdwidth=smdwidth](
                 idx, self.load[simdwidth=smdwidth](idx).__abs__()
             )
 
-        vectorize[absolute_value, simd_width_of[dtype]()](total)
+        vectorize[absolute, simd_width_of[Self.dtype]()](self.size)
         return out^
 
     @always_inline
@@ -836,17 +947,7 @@ struct Buffer[dtype: DType = DType.float32](
             "Buffer → exp is for numeric data types only",
         ]()
 
-        total = self.size
-        out = Buffer[dtype](total)
-
-        @parameter
-        fn exp_elems[smdwidth: Int](idx: Int):
-            out.store[simdwidth=smdwidth](
-                idx, exp(self.load[simdwidth=smdwidth](idx))
-            )
-
-        vectorize[exp_elems, simd_width_of[dtype]()](total)
-        return out^
+        return self.unary_ops[Exp]()
 
     @staticmethod
     @always_inline
@@ -986,19 +1087,18 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn __neg__(self: Buffer[dtype]) -> Buffer[dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __neg__ is for numeric data types only",
         ]()
-
-        var out = Buffer[dtype](self.size)
+        var out = Buffer[Self.dtype](self.size)
 
         @parameter
-        fn negate_elems[smdwidth: Int](idx: Int):
+        fn negate[smdwidth: Int](idx: Int):
             out.store[simdwidth=smdwidth](
                 idx, self.load[simdwidth=smdwidth](idx).__neg__()
             )
 
-        vectorize[negate_elems, simd_width_of[dtype]()](self.size)
+        vectorize[negate, simd_width_of[Self.dtype]()](self.size)
         return out^
 
     @always_inline
@@ -1008,30 +1108,27 @@ struct Buffer[dtype: DType = DType.float32](
             "Buffer → log is for numeric data types only",
         ]()
 
-        total = self.size
-        out = Buffer[dtype](total)
-
-        @parameter
-        fn log_of[smdwidth: Int](idx: Int):
-            out.store[simdwidth=smdwidth](
-                idx, log(self.load[simdwidth=smdwidth](idx))
-            )
-
-        vectorize[log_of, simd_width_of[dtype]()](total)
-        return out^
+        return self.unary_ops[Log]()
 
     @always_inline
-    fn __invert__(self: Buffer[DType.bool]) -> Buffer[DType.bool]:
-        total = self.size
-        out = Buffer[DType.bool](total)
+    fn __invert__(self) -> Buffer[Self.dtype]:
+        constrained[
+            Self.dtype.is_integral() or DType.bool == Self.dtype,
+            "Buffer → __invert__ is for Bool or integral data types only",
+        ]()
+
+        var out = Buffer[Self.dtype](self.size)
 
         @parameter
-        fn invert_elems[smdwidth: Int](idx: Int):
+        fn invert[smdwidth: Int](idx: Int):
             out.store[simdwidth=smdwidth](
                 idx, self.load[simdwidth=smdwidth](idx).__invert__()
             )
 
-        vectorize[invert_elems, 1](total)
+        alias simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
+            Self.dtype
+        ]()
+        vectorize[invert, simd_width](self.size)
         return out^
 
     @always_inline
@@ -1534,6 +1631,12 @@ struct Buffer[dtype: DType = DType.float32](
         vectorize[matches, simd_width](extent)
         return total
 
+    fn tolist(self: Buffer[dtype]) -> List[Scalar[dtype]]:
+        var result = List[Scalar[dtype]](capacity=UInt(len(self)))
+        for i in range(len(self)):
+            result.append(self[i])
+        return result^
+
     @always_inline
     fn all_close[
         rtol: Scalar[dtype] = 1e-5,
@@ -1708,4 +1811,16 @@ struct ElementIterator[
 
 
 fn main() raises:
+    alias dtype = DType.float32
+    ll = List[Scalar[dtype]](10, 23, 0.9, 100)
+    buffer = Buffer[dtype](ll)
+    result = buffer.unary_ops[TanhForwardOp]()
+    print(result)
+    print(
+        tanh(Scalar[dtype](10)),
+        tanh(Scalar[dtype](23)),
+        tanh(Scalar[dtype](0.9)),
+        tanh(Scalar[dtype](100)),
+    )
+
     pass
