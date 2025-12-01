@@ -21,18 +21,17 @@ alias Log = 19
 alias Exp = 20
 alias TanhForwardOp = 21
 alias TanhBackwardOp = 22
-alias Abs = 23
-alias Negate = 24
-alias Invert = 25
-alias ReLUForwardOp = 26
-alias ReLUBackwardOp = 27
+alias ReLUForwardOp = 23
+alias ReLUBackwardOp = 24
+alias SqrtForwardOp=25
+alias SqrtBackwardOp=26
 ###################
 ### matul ###########
-alias dot = 28  # dot product
-alias vm = 29  # vector & tensor matmul
-alias mv = 30  # tensor & vector matmul
-alias mm = 31  # tensor & tensor matmul
-alias invalid = 32  # Invalid case
+alias dot = 27  # dot product
+alias vm = 28  # vector & tensor matmul
+alias mv = 29  # tensor & vector matmul
+alias mm = 30  # tensor & tensor matmul
+alias invalid = 31  # Invalid case
 
 
 fn main() raises:
