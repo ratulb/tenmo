@@ -438,7 +438,7 @@ fn test_invert_bool() raises:
     print("test_invert_bool")
     var buffer = Buffer[DType.bool](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
-        buffer[i] = i % 2 == 0  # Alternating True/False
+        buffer[i] = Scalar[DType.bool](i % 2 == 0)  # Alternating True/False
 
     var result = ~buffer
     for i in range(MEDIUM_SIZE):
