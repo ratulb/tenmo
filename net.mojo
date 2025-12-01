@@ -287,8 +287,8 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
 
     fn train(mut self):
         """Set module to training mode."""
-        if self.layer.isa[Linear[dtype,mm]]():
-            self.layer[Linear[dtype,mm]].train()
+        if self.layer.isa[Linear[dtype, mm]]():
+            self.layer[Linear[dtype, mm]].train()
         elif self.layer.isa[ReLU[dtype]]():
             self.layer[ReLU[dtype]].train()
         elif self.layer.isa[Sigmoid[dtype]]():
@@ -401,7 +401,7 @@ struct BCELoss[dtype: DType = DType.float32]:
     ](
         pred: Tensor[dtype],
         target: Tensor[dtype],
-        epsilon: Scalar[dtype] = Scalar[dtype](1e-9)
+        epsilon: Scalar[dtype] = Scalar[dtype](1e-9),
     ) -> Tensor[dtype]:
         # Clip for numerical stability
         var pred_safe = Clip[dtype].forward[track_grad](
@@ -413,8 +413,12 @@ struct BCELoss[dtype: DType = DType.float32]:
         var term1 = Multiplicator[dtype].forward[track_grad](target, log_pred)
 
         var one = Tensor[dtype].scalar(1)
-        var one_minus_target = Subtractor[dtype].forward[track_grad](one, target)
-        var one_minus_pred = Subtractor[dtype].forward[track_grad](one, pred_safe)
+        var one_minus_target = Subtractor[dtype].forward[track_grad](
+            one, target
+        )
+        var one_minus_pred = Subtractor[dtype].forward[track_grad](
+            one, pred_safe
+        )
         var log_one_minus_pred = one_minus_pred.log[track_grad]()
         var term2 = Multiplicator[dtype].forward[track_grad](
             one_minus_target, log_one_minus_pred
@@ -459,7 +463,7 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32]:
     ](
         logits: Tensor[dtype],
         target: Tensor[dtype],
-        epsilon: Scalar[dtype] = Scalar[dtype](1e-9)
+        epsilon: Scalar[dtype] = Scalar[dtype](1e-9),
     ) -> Tensor[dtype]:
         # Apply sigmoid to convert logits to probabilities
         var pred_probs = logits.sigmoid[track_grad]()
@@ -474,8 +478,12 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32]:
         var term1 = Multiplicator[dtype].forward[track_grad](target, log_probs)
 
         var one = Tensor[dtype].scalar(1)
-        var one_minus_target = Subtractor[dtype].forward[track_grad](one, target)
-        var one_minus_probs = Subtractor[dtype].forward[track_grad](one, probs_safe)
+        var one_minus_target = Subtractor[dtype].forward[track_grad](
+            one, target
+        )
+        var one_minus_probs = Subtractor[dtype].forward[track_grad](
+            one, probs_safe
+        )
         var log_one_minus = one_minus_probs.log[track_grad]()
         var term2 = Multiplicator[dtype].forward[track_grad](
             one_minus_target, log_one_minus
@@ -492,6 +500,7 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32]:
 
     fn eval(mut self):
         self.training = False
+
 
 @fieldwise_init
 struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
@@ -832,7 +841,8 @@ fn test_xor_with_explicit_control():
     test_pred.print()
     print("Final loss:", test_loss.item())
 
-    #return test_loss.item()
+    # return test_loss.item()
+
 
 from common_utils import addrs
 from random import seed
@@ -840,5 +850,5 @@ from random import seed
 
 fn main():
     # _= test_xor_sigmoid() #Good
-    #test_xor_with_explicit_control()#Good
+    # test_xor_with_explicit_control()#Good
     pass
