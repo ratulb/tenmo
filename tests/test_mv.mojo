@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
-
-alias mv = 2 # matrix vector
+from operators import mv
+#alias mv = 2 # matrix vector
 
 fn main() raises:
     run_all_matrix_vector_tests()

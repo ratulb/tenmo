@@ -1,6 +1,5 @@
 from tensors import Tensor
 from shapes import Shape
-from intlist import IntList
 from layers import Linear, ReLU, Sequential
 from crossentropy import CrossEntropyLoss
 from sgd import SGD

@@ -1,5 +1,5 @@
 # layers.mojo
-from tensors import Tensor
+from tenmo import Tensor
 from common_utils import panic, log_debug, RED, CYAN, MAGENTA, addr
 from utils import Variant
 from math import sqrt
@@ -8,13 +8,9 @@ from math import sqrt
 # Module / Layer / Sequential definitions (safe pointers)
 # --------------------
 
-
-@explicit_destroy
+@fieldwise_init
 struct Module[dtype: DType = DType.float32](Copyable & Movable):
     var layer: Layer[dtype]
-
-    fn __init__(out self, layer: Layer[dtype]):
-        self.layer = layer
 
     fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
         if self.layer.isa[Linear[dtype]]():
@@ -41,35 +37,16 @@ struct Module[dtype: DType = DType.float32](Copyable & Movable):
         else:
             return 0
 
-    fn free_params(self):
-        if self.layer.isa[Linear[dtype]]():
-            var lin = self.layer[Linear[dtype]]
-            log_debug(
-                "Freeing Linear weights - shape: "
-                + lin.weights.shape.__str__(),
-                RED,
-            )
-            lin.weights.free()
-            log_debug(
-                "Freeing Linear bias - shape: " + lin.bias.shape.__str__(), RED
-            )
-            lin.bias.free()
-        elif self.layer.isa[ReLU[dtype]]():
-            log_debug("ReLU has no learnable params", MAGENTA)
-
-    fn free_all(self):
-        self.free_params()
 
     fn parameters_ptrs(self) -> List[UnsafePointer[Tensor[dtype]]]:
         var ptrs = List[UnsafePointer[Tensor[dtype]]]()
         if self.layer.isa[Linear[dtype]]():
-            var l = self.layer[Linear[dtype]]
+            var l = self.layer[Linear[dtype]].copy()
             ptrs.append(addr(l.weights))
             ptrs.append(addr(l.bias))
-        return ptrs
+        return ptrs^
 
-
-@explicit_destroy
+@fieldwise_init
 struct Linear[dtype: DType = DType.float32](Copyable & Movable):
     var weights: Tensor[dtype]
     var bias: Tensor[dtype]
@@ -95,12 +72,14 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
         self.bias = Tensor[dtype].zeros([out_features], requires_grad=True)
 
     fn __call__(self, xs: Tensor[dtype]) -> Tensor[dtype]:
-        if xs.shape[-1] != self.weights.shape[0]:
+        xs_shape = xs.shape()
+        weights_shape = self.weights.shape()
+        if xs_shape[-1] != weights_shape[0]:
             panic(
                 "Linear forward: input dim mismatch: input shape → ",
-                xs.shape.__str__(),
+                xs_shape.__str__(),
                 "and  weights shape → ",
-                self.weights.shape.__str__(),
+                weights_shape.__str__(),
             )
         return xs.matmul(self.weights) + self.bias
 
@@ -108,10 +87,10 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
         var p = List[Tensor[dtype]]()
         p.append(self.weights)
         p.append(self.bias)
-        return p
+        return p^
 
     fn into(self) -> Module[dtype]:
-        return Module[dtype](Layer[dtype](self))
+        return Module[dtype](Layer[dtype](self.copy()))
 
     fn num_parameters(self) -> Int:
         return self.weights.numels() + self.bias.numels()
@@ -120,12 +99,11 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
         var ptrs = List[UnsafePointer[Tensor[dtype]]]()
         ptrs.append(addr(self.weights))
         ptrs.append(addr(self.bias))
-        return ptrs
+        return ptrs^
 
-
-struct ReLU[dtype: DType = DType.float32](Copyable & Movable):
-    fn __init__(out self):
-        pass
+@fieldwise_init
+@register_passable
+struct ReLU[dtype: DType = DType.float32](ImplicitlyCopyable):
 
     fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
         return x.relu()
@@ -145,19 +123,15 @@ struct ReLU[dtype: DType = DType.float32](Copyable & Movable):
 
 alias Layer[dtype: DType] = Variant[Linear[dtype], ReLU[dtype]]
 
-
-@explicit_destroy
+@fieldwise_init
 struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
     var modules: List[Module[dtype]]
 
     fn __init__(out self):
         self.modules = List[Module[dtype]]()
 
-    fn __init__(out self, modules: List[Module[dtype]]):
-        self.modules = modules
-
     fn append(mut self, m: Module[dtype]):
-        self.modules.append(m)
+        self.modules.append(m.copy())
 
     fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
         var out = x
@@ -172,7 +146,7 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
             var ref m = self.modules[i]
             for p in m.parameters():
                 params.append(p)
-        return params
+        return params^
 
     fn num_parameters(self) -> Int:
         var total: Int = 0
@@ -180,18 +154,6 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
             total += p.numels()
         return total
 
-    fn free_params(self):
-        for i in range(len(self.modules)):
-            var ref m = self.modules[i]
-            m.free_params()
-
-    fn free_all(mut self):
-        log_debug("Freeing Sequential modules...", CYAN)
-        for i in range(len(self.modules)):
-            var ref m = self.modules[i]
-            m.free_all()
-        self.modules.clear()
-        log_debug("Sequential cleared", CYAN)
 
     fn parameters_ptrs(self) -> List[UnsafePointer[Tensor[dtype]]]:
         var ptrs = List[UnsafePointer[Tensor[dtype]]]()
@@ -201,7 +163,7 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
                 var ref l = m.layer[Linear[dtype]]
                 ptrs.append(addr(l.weights))
                 ptrs.append(addr(l.bias))
-        return ptrs
+        return ptrs^
 
     fn print_summary(self, input_shape: List[Int]):
         print("\nSequential Model Summary")
@@ -213,18 +175,20 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
             var ref m = self.modules[i]
             var name = "Unknown"
             var nparams = m.num_parameters()
-            var in_shape = x.shape
+            var in_shape = x.shape()
             var details = ""
             var trainable = "No"
 
             if m.layer.isa[Linear[dtype]]():
                 name = "Linear"
                 var ref l = m.layer[Linear[dtype]]
+                var l_weights_shape = l.weights.shape()
+                var l_bias_shape = l.bias.shape()
                 details = (
                     "weight="
-                    + l.weights.shape.__str__()
+                    + l_weights_shape.__str__()
                     + ", bias="
-                    + l.bias.shape.__str__()
+                    + l_bias_shape.__str__()
                 )
                 if l.weights.requires_grad or l.bias.requires_grad:
                     trainable = "Yes"
@@ -236,7 +200,7 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
                 trainable = "No"
                 x = m.layer[ReLU[dtype]](x)
 
-            var out_shape = x.shape
+            var out_shape = x.shape()
 
             print(
                 "Layer ",

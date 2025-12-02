@@ -1,5 +1,4 @@
 from tenmo import Tensor
-from intlist import IntList
 from operators import AddTensor
 from validators import Validator
 from backpropagation import Delegate, BackwardFn
@@ -68,7 +67,7 @@ struct Shuffle[dtype: DType](Copyable & Movable):
             permutation = perm.copy()
         else:
             seed()
-            permutation = List[Int](capacity=axis_length)
+            permutation = List[Int](capacity=UInt(axis_length))
             for i in range(axis_length):
                 permutation.append(i)
             shuffle(permutation)

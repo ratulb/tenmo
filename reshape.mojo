@@ -40,7 +40,7 @@ struct Reshape[dtype: DType](Copyable):
         validated: Bool = False,
     ) -> Tensor[dtype]:
         shape = new_shape if validated else Validator.validate_and_construct_new_shape(
-            tensor.shape(), new_shape.intlist()
+            tensor.shape(), new_shape.intarray()
         )
         var out: Tensor[dtype]
         if tensor.is_contiguous():

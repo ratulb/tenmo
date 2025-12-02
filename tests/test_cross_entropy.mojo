@@ -5,9 +5,9 @@ from testing import assert_false
 from time import perf_counter_ns
 from math import log, exp
 from shapes import Shape
-from intlist import IntList
 from common_utils import log_warning
 from gradbox import Gradbox
+from intarray import IntArray
 
 @always_inline("nodebug")
 fn inf[dtype: DType]() -> Scalar[dtype]:
@@ -1930,7 +1930,7 @@ fn test_ce_gradients_basic_uu() raises:
     # Gradients should exist and be non-zero
     assert_true(logits.grad().sum().item() != 0.0)
     # Specific gradient pattern check
-    var softmax = logits.softmax(axes=IntList(1))
+    var softmax = logits.softmax(axes=IntArray(1))
     assert_true(abs(logits.grad()[0, 0] - (softmax[0, 0] - 1.0)) < 1e-6)
 
 
@@ -1950,7 +1950,7 @@ fn test_ce_gradients_basic() raises:
     assert_true(logits.grad().sum().item() != 0.0)
 
     # Specific gradient pattern check - ACCOUNT FOR MEAN REDUCTION!
-    var softmax = logits.softmax(axes=IntList(1))
+    var softmax = logits.softmax(axes=IntArray(1))
     var batch_size = Scalar[DType.float32](logits.shape()[0])
 
     # For mean reduction: gradient = (softmax - one_hot) / batch_size

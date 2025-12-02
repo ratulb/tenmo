@@ -34,7 +34,15 @@ from minmax import MinMaxBackward
 from shuffle import ShuffleBackward
 from relu import ReLUBackward
 from softmax import SoftmaxBackward, LogSoftmaxBackward
+from logarithm import LogBackward
 from crossentropy import CrossEntropyBackward
 from tiles import TileBackward
 from flatten import FlattenBackward
 from contiguous import ContiguousBackward
+from sigmoid import SigmoidBackward
+from tanh import TanhBackward
+from clip import ClipBackward
+from bce import BCEBackward
+from squareroot import SqrtBackward
+from variance import VarianceBackward
+from std_deviation import StdBackward

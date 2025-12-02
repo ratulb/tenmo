@@ -1,15 +1,15 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor
-from intlist import IntList
 from validators import Validator
 from gradbox import Gradbox
 from ancestry import Ancestor
+from intarray import IntArray
 
 @fieldwise_init
 @register_passable
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
-    var axes: IntList
+    var axes: IntArray
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -19,7 +19,7 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
-        inverted_axes = IntList.invert_permutation(self.axes)
+        inverted_axes = IntArray.invert_permutation(self.axes)
         gradbox_transposed_contiguous = gradbox.transpose(inverted_axes).contiguous()
         return [
             (
@@ -39,7 +39,7 @@ struct Transpose[dtype: DType](Copyable):
         track_grad: Bool = True
     ](
         self: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         shape = self.shape()
@@ -47,12 +47,15 @@ struct Transpose[dtype: DType](Copyable):
             Validator.validate_and_normalize_axes(
                 shape, axes, ordered=False, fill_missing=True
             ) if len(axes)
-            > 0 else IntList.range_list(shape.rank()).reversed()
+            > 0 else IntArray.range(0, shape.rank()).reversed()
         )
 
         # Permute shape and create default strides and permute
+
+
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides().permute(normalized_axes)
+
 
         out = Tensor[dtype].build_view(
             self.address(), new_shape, new_strides, self.offset(), requires_grad=False
@@ -60,9 +63,7 @@ struct Transpose[dtype: DType](Copyable):
 
         @parameter
         if track_grad:
-            grad_required = (
-                requires_grad.value() if requires_grad else self.requires_grad
-            )
+            grad_required = requires_grad.or_else(self.requires_grad)
 
             if grad_required:
                 out.requires_grad_(True)

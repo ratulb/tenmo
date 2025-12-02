@@ -1,5 +1,4 @@
 from tenmo import Tensor
-from intlist import IntList
 
 
 # -----------------------------------------
@@ -14,7 +13,6 @@ struct MSELoss[dtype: DType = DType.float32]:
     ) -> Tensor[dtype]:
         # (1/N) * Σ (input - target)^2
         diff = preds - target
-        #loss = (diff * diff).mean(IntList(), False, True)
         loss = (diff * diff).mean()
         return loss^
 

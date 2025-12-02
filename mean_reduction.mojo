@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from intlist import IntList
+from intarray import IntArray
 from operators import AddTensor
 from shapes import Shape
 from backpropagation import Delegate, BackwardFn
@@ -11,10 +11,10 @@ from forwards import DivideByScalar
 
 @register_passable
 struct MeanBackward[dtype: DType](ImplicitlyCopyable):
-    var axes: IntList
+    var axes: IntArray
     var keepdims: Bool
 
-    fn __init__(out self, axes: IntList = IntList(), keepdims: Bool = False):
+    fn __init__(out self, axes: IntArray = IntArray(), keepdims: Bool = False):
         self.axes = axes
         self.keepdims = keepdims
 
@@ -48,9 +48,9 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         if not self.keepdims:
             expanded = expanded.reshape(
                 Shape(
-                    gradbox_shape.intlist().insert(
+                    gradbox_shape.intarray().insert(
                         self.axes,
-                        IntList.with_capacity(len(self.axes), 1),
+                        IntArray.filled(len(self.axes), 1),
                     )
                 )
             )
@@ -58,7 +58,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         # Broadcast and divide
         var broadcasted = expanded.broadcast_to(ancestor.shape())
         # Compute total count of elements being reduced
-        var count = ancestor.shape().axes_spans.select(self.axes).product()
+        var count = ancestor.shape().reduced_shape(self.axes).product()
         count = count if count > 0 else 1
         var average = broadcasted / Scalar[dtype](count)
 
@@ -83,14 +83,14 @@ struct Mean[dtype: DType](Copyable):
         track_grad: Bool = True
     ](
         tensor: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         normalized_axes = Validator.validate_and_normalize_axes(
             tensor.shape(), axes
         )
-        var count = tensor.shape().axes_spans.select(normalized_axes).product()
+        var count = tensor.shape().reduced_shape(normalized_axes).product()
         count = count if count > 0 else 1
         total = tensor.sum[track_grad=False](
             axes=normalized_axes, keepdims=keepdims
@@ -115,14 +115,14 @@ struct Mean[dtype: DType](Copyable):
     @staticmethod
     fn forward(
         gradbox: Gradbox[dtype],
-        axes: IntList,
+        axes: IntArray,
         keepdims: Bool = False,
     ) -> Gradbox[dtype]:
         var gradbox_shape = gradbox.shape()
         normalized_axes = Validator.validate_and_normalize_axes(
             gradbox_shape, axes
         )
-        var count = gradbox_shape.axes_spans.select(normalized_axes).product()
+        var count = gradbox_shape.reduced_shape(normalized_axes).product()
         count = count if count > 0 else 1
         out = gradbox.sum(axes=normalized_axes, keepdims=keepdims) / Scalar[
             dtype

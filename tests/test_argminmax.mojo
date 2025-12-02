@@ -1,5 +1,4 @@
 from tenmo import Tensor
-from intlist import IntList
 from shapes import Shape
 from argminmax import Argmin, Argmax
 

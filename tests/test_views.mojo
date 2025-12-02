@@ -1,7 +1,6 @@
 from tenmo import Tensor
 from shapes import Shape
 from strides import Strides
-from intlist import IntList
 from testing import assert_true, assert_false, assert_raises, assert_equal
 from common_utils import i, newaxis, s
 
@@ -535,7 +534,7 @@ fn test_into_tensor_nested_view() raises:
 
 fn test_backward_through_nested_views_non_contiguous() raises:
     print("test_backward_through_nested_views_non_contiguous")
-    a = Tensor.rand(4, 4, requires_grad=True)
+    a = Tensor.rand(Shape(4, 4), requires_grad=True)
     t = a.transpose(0, 1)
     p = t.permute([1, 0])
     c = p.contiguous()
@@ -551,7 +550,7 @@ fn test_backward_through_nested_views_non_contiguous() raises:
 
 fn test_identity_permutation() raises:
     print("test_identity_permutation")
-    x3 = Tensor.rand(3, 3, requires_grad=True)
+    x3 = Tensor.rand(Shape(3, 3), requires_grad=True)
     v3 = x3.into_view()
     y3 = v3.permute([0, 1])
     loss3 = y3.sum()
@@ -595,7 +594,7 @@ fn test_reshape_slice_sum_backward() raises:
 fn test_backward_through_nested_views() raises:
     print("test_backward_through_nested_views")
     # Test 1: Simple 2D transpose
-    x1 = Tensor.rand(2, 3, requires_grad=True)
+    x1 = Tensor.rand(Shape(2, 3), requires_grad=True)
     v1 = x1.into_view()
     y1 = v1.permute([1, 0])
     yt1 = y1.contiguous()
@@ -604,7 +603,7 @@ fn test_backward_through_nested_views() raises:
     loss1.backward()
     assert_true(x1.grad().shape() == [2, 3])
     # Test 2: 3D permutation
-    x2 = Tensor.rand(4, 5, 6, requires_grad=True)
+    x2 = Tensor.rand(Shape(4, 5, 6), requires_grad=True)
     v2 = x2.into_view()
     y2 = v2.permute([2, 0, 1])
     yt2 = y2.contiguous()
@@ -618,7 +617,7 @@ fn test_nested_views_grad_propagation_1() raises:
     print("test_nested_views_grad_propagation")
 
     # Step 1: Create a base tensor
-    var A = Tensor.rand(4, 5, 6, requires_grad=True)
+    var A = Tensor.rand(Shape(4, 5, 6), requires_grad=True)
 
     # Step 2: Reshape to 2D (simulate flattening last two dims)
     var V1 = A.view([4, 30])  # shape: (4, 30)
@@ -664,7 +663,7 @@ fn test_nested_views_grad_propagation() raises:
     print("test_nested_views_grad_propagation")
 
     # Step 1: Base tensor
-    var A = Tensor.rand(4, 5, 6, requires_grad=True)
+    var A = Tensor.rand(Shape(4, 5, 6), requires_grad=True)
 
     # Step 2: Flatten last two dims
     var V1 = A.view([4, 30])  # shape: (4, 30)

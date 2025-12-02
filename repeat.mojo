@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from intlist import IntList
+from intarray import IntArray
 from common_utils import panic
 from tiles import TileBackward, Tile
 
@@ -12,7 +12,7 @@ struct Repeat[dtype: DType]:
         track_grad: Bool = True
     ](
         self: Tensor[dtype],
-        repeat: IntList,
+        repeat: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         if len(repeat) < self.rank():

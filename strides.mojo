@@ -1,67 +1,58 @@
-from intlist import IntList
+from intarray import IntArray
 from shapes import Shape
-from common_utils import log_debug, panic
-from layout.int_tuple import IntArray
-
-
-fn main():
-    s = Shape.of(5, 3)
-    strides = Strides.default(s)
-    print(strides)
-    s1 = Strides(1, 3, 1)
-    s2 = Strides([1, 3, 1])
-    print(s1 == s2)
-    ia = IntArray(3)
-    ia[0] = 100
-    ia[1] = 200
-    ia[2] = 300
-    print(s1 * ia)
-
 
 @register_passable
-struct Strides(
-    Sized & ImplicitlyCopyable & Stringable & Representable & Writable
-):
-    var strides: IntArray
+struct Strides(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
+    """Strides for tensor indexing."""
 
-    @always_inline
+    var data: IntArray
+
     @staticmethod
+    @always_inline
     fn Zero() -> Strides:
         return Strides()
 
+    @always_inline("nodebug")
     fn __init__(out self):
-        self.strides = IntArray()
+        self.data = IntArray()
 
+    @always_inline("nodebug")
+    fn __init__(out self, values: IntArray):
+        self.data = values
+
+    @always_inline("nodebug")
     fn __init__(out self, values: List[Int]):
-        self.strides = IntArray(size=len(values))
-        for i in range(len(values)):
-            self.strides[i] = values[i]
+        self.data = IntArray(values)
 
-    fn __init__(out self, values: IntList):
-        self.strides = IntArray(size=len(values))
-        for i in range(len(values)):
-            self.strides[i] = values[i]
-
+    @always_inline("nodebug")
     fn __init__(out self, *values: Int):
-        ll = List[Int](capacity=UInt(len(values)))
-        for v in values:
-            ll.append(v)
-        self = Self(ll)
+        self.data = IntArray(values)
 
+    @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
-        self.strides = existing.strides.copy()
+        self.data = existing.data
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        return len(self.data)
+
+    @always_inline("nodebug")
+    fn __getitem__(self, i: Int) -> Int:
+        return self.data[i]
+
+    @always_inline("nodebug")
+    fn __setitem__(mut self, i: Int, value: Int):
+        self.data[i] = value
+
+    @always_inline("nodebug")
+    fn __getitem__(self, slice: Slice) -> Self:
+        return Strides(self.data[slice])
+
+    fn __eq__(self, other: Self) -> Bool:
+        return self.data == other.data
 
     fn __str__(self) -> String:
-        capacity = (self.strides.size() * 2) + 1
-        var s = String(capacity=capacity)
-        s += "("
-        for i in range(self.strides.size()):
-            s += self.strides[i].__str__()
-            if i < self.strides.size() - 1:
-                s += ", "
-        s += ")"
-
-        return s
+        return "(" + self.data.__str__()[1:-1] + ")"
 
     fn __repr__(self) -> String:
         return self.__str__()
@@ -69,89 +60,51 @@ struct Strides(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn __getitem__(self, i: Int) -> Int:
-        index = i + len(self) if i < 0 else i
-        if index < 0 or index >= len(self):
-            panic("Strides → __getitem(i)__: invalid index", i.__str__())
-        return self.strides[index]
-
-    fn __getitem__(self, slice: Slice) -> Self:
-        result = self.list()
-        strides = result[slice]
-        return Strides(strides)
-
-    fn __setitem__(mut self, i: Int, value: Int):
-        index = i + len(self) if i < 0 else i
-        if index < 0 or index >= len(self):
-            panic("Strides → __setitem(i, value)__: invalid index", i.__str__())
-        self.strides[i] = value
-
-    fn __len__(self) -> Int:
-        return self.strides.size()
-
-    fn __eq__(self, other: Self) -> Bool:
-        return self.list() == other.list()
-
-    fn list(self) -> List[Int]:
-        result = List[Int](capacity=UInt(len(self)))
-        for i in range(len(self)):
-            result.append(self.strides[i])
-        return result^
+    @always_inline
+    fn tolist(self) -> List[Int]:
+        return self.data.tolist()
 
     @always_inline
-    fn intlist(self) -> IntList:
-        il = IntList.with_capacity(len(self))
-        for i in range(len(self)):
-            il.append(self[i])
-        return il^
-
-    # Reorder dimensions (for transpose/permute)
-    @always_inline
-    fn permute(self, axes: IntList) -> Self:
-        il = self.intlist()
-        perm = il.permute(axes)
-        return Strides(perm)
+    fn intarray(self) -> IntArray:
+        return self.data
 
     @always_inline
-    fn __mul__(self, other: IntArray) -> IntList:
-        if len(self) != other.size():
-            panic(
-                "Strides → __mul__(IntArray): lengths are not equal → ",
-                String(len(self)),
-                "<=>",
-                String(other.size()),
-            )
-        var result = IntList.with_capacity(len(self))
-        for i in range(len(self)):
-            result.append(self[i] * other[i])
-        return result^
+    fn permute(self, axes: IntArray) -> Self:
+        """Reorder dimensions."""
+        var result = IntArray.with_capacity(len(axes))
+        for i in range(len(axes)):
+            result.append(self[axes[i]])
+        return Strides(result)
 
     @staticmethod
     @always_inline
     fn default(shape: Shape) -> Self:
+        """Compute default C-contiguous strides."""
         var rank = shape.rank()
-        var strides = List[Int](capacity=UInt(rank))
+        var strides = IntArray.with_capacity(rank)
         var acc = 1
-        for i in reversed(range(rank)):
-            strides.insert(0, acc)
+        for i in range(rank - 1, -1, -1):
+            strides.prepend(acc)
             acc *= shape[i]
         return Strides(strides)
 
     @always_inline
     fn is_contiguous(self, shape: Shape) -> Bool:
+        """Check if strides represent contiguous layout."""
         if shape.rank() == 0:
-            return True  # scalar is trivially contiguous
-        var expected_stride = 1
-        for i in reversed(range(shape.rank())):
-            if shape[i] > 1 and self[i] != expected_stride:
+            return True
+        var expected = 1
+        for i in range(shape.rank() - 1, -1, -1):
+            if shape[i] > 1 and self[i] != expected:
                 return False
-            expected_stride *= shape[i]
-
+            expected *= shape[i]
         return True
 
-    @always_inline
     @staticmethod
+    @always_inline
     fn with_capacity(capacity: Int) -> Strides:
-        new_strides = Self()
-        new_strides.strides = IntArray(size=capacity)
-        return new_strides
+        return Strides(IntArray.with_capacity(capacity))
+
+
+fn main():
+    pass

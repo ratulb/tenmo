@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from intlist import IntList
+from intarray import IntArray
 from common_utils import panic
 from shapes import Shape
 from utils.numerics import max_finite, min_finite
@@ -24,7 +24,7 @@ struct Argmin[dtype: DType]:
             )
 
         # --- Build output shape ---
-        var out_axes = IntList()
+        var out_axes = IntArray()
         for i in range(rank):
             if i == ax:
                 if keepdims:
@@ -37,7 +37,7 @@ struct Argmin[dtype: DType]:
         var out = Tensor[DType.int32].zeros(out_shape)
 
         # --- Iterate over output indices ---
-        for out_idx in out_shape.indices():
+        for out_idx in out_shape:
             var min_val = max_finite[dtype]()
             var min_pos = 0
 
@@ -80,7 +80,7 @@ struct Argmax[dtype: DType]:
             )
 
         # --- Build output shape ---
-        var out_axes = IntList()
+        var out_axes = IntArray()
         for i in range(rank):
             if i == ax:
                 if keepdims:
@@ -93,7 +93,7 @@ struct Argmax[dtype: DType]:
         var out = Tensor[DType.int32].zeros(out_shape)
 
         # --- Iterate over output indices ---
-        for out_idx in out_shape.indices():
+        for out_idx in out_shape:
             var max_val = min_finite[dtype]()
             var max_pos = 0
 

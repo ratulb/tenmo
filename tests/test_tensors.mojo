@@ -2,7 +2,7 @@
 # %s/^\(fn test_\(.*\)() raises:\)$/&\r    print("test_\2")/
 from testing import assert_true, assert_false, assert_raises
 from tenmo import Tensor
-from intlist import IntList
+from intarray import IntArray
 from shapes import Shape
 from common_utils import *
 from utils.numerics import min_finite
@@ -458,7 +458,7 @@ fn test_unsqueeze() raises:
     print("test_unsqueeze")
     _ = """tensor = Tensor.rand(2,3, requires_grad=True)
     tensor2 = tensor.unsqueeze(0)
-    tensor2[IntList(0, 0, 0)] = 100"""
+    tensor2[IntArray(0, 0, 0)] = 100"""
     pass
 
 
@@ -522,7 +522,7 @@ fn test_tensor_mean() raises:
     assert_true(m2.all_close(Tensor.d1([1.5, 3.5])))
 
     a2 = Tensor.d2([[10.0, 20.0], [30.0, 40.0]], requires_grad=True)
-    m_ = a2.mean(axes=IntList())
+    m_ = a2.mean(axes=IntArray())
     assert_true(m_.item() == 25.0)
 
 
@@ -1398,7 +1398,7 @@ fn test_reshape_tensor_to_scalar() raises:
     b = a.reshape(Shape())
 
     assert_true(b.is_scalar())
-    assert_true(b[IntList()] == Scalar(42.0))
+    assert_true(b[IntArray()] == Scalar(42.0))
 
     c = b * 2
     c.backward()
@@ -3044,7 +3044,6 @@ fn test_reshape_exp() raises:
     result = tensor3 * 12
     result.backward()
 
-
 fn test_validate_matmul_last_2_dims() raises:
     print("test_validate_matmul_last_2_dims")
     a = Tensor.arange(2 * 3 * 5 * 4, requires_grad=True)
@@ -3548,7 +3547,7 @@ fn test_max_min_mixed() raises:
         [[42.0, 0.0, -5.0], [0.0, 35.0, 0.0], [51.0, 0.0, 51.0]],
         requires_grad=True,
     )
-    var max_result = a.max(IntList(1))
+    var max_result = a.max(IntArray(1))
     var expected = Tensor.d1([42.0, 35.0, 51.0])
     assert_true(max_result.all_close(expected))
 
@@ -3563,7 +3562,7 @@ fn test_max_min_mixed() raises:
     a.zero_grad()
 
     # Test 2: Basic min reduction along axis 1
-    var min_result = a.min(IntList(1))
+    var min_result = a.min(IntArray(1))
     assert_true(min_result.all_close(Tensor.d1([-5.0, 0.0, 0.0])))
     min_result.backward()
 
@@ -3575,7 +3574,7 @@ fn test_max_min_mixed() raises:
 
     # Test 3: Max reduction along axis 0
     a.zero_grad()
-    var max_axis0 = a.max(IntList(0))
+    var max_axis0 = a.max(IntArray(0))
     assert_true(max_axis0.all_close(Tensor.d1([51.0, 35.0, 51.0])))
     max_axis0.backward()
     assert_true(
@@ -3586,7 +3585,7 @@ fn test_max_min_mixed() raises:
 
     # Test 4: Min reduction along axis 0
     a.zero_grad()
-    var min_axis0 = a.min(IntList(0))
+    var min_axis0 = a.min(IntArray(0))
     assert_true(min_axis0.all_close(Tensor.d1([0.0, 0.0, -5.0])))
     min_axis0.backward()
     assert_true(
@@ -3622,7 +3621,7 @@ fn test_max_min_mixed() raises:
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
 
-    var max_axes_01 = b.max(IntList([0, 1]))
+    var max_axes_01 = b.max(IntArray([0, 1]))
     assert_true(max_axes_01.all_close(Tensor.d1([7.0, 8.0])))
     max_axes_01.backward()
     assert_true(
@@ -3634,7 +3633,7 @@ fn test_max_min_mixed() raises:
     # Test 8: Edge case - all same values
     var c = Tensor.d2([[5.0, 5.0], [5.0, 5.0]], requires_grad=True)
 
-    var max_same = c.max(IntList(1))
+    var max_same = c.max(IntArray(1))
     assert_true(max_same.all_close(Tensor.d1([5.0, 5.0])))
     max_same.backward()
     assert_true(c.grad().all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
@@ -3642,7 +3641,7 @@ fn test_max_min_mixed() raises:
     # Test 9: Edge case - negative infinity
     var d = Tensor.d2([[-3.4028235e38, 0.0], [1.0, 2.0]], requires_grad=True)
 
-    var max_with_inf = d.max(IntList(1))
+    var max_with_inf = d.max(IntArray(1))
     assert_true(max_with_inf.all_close(Tensor.d1([0.0, 2.0])))
     max_with_inf.backward()
     assert_true(d.grad().all_close(Tensor.d2([[0.0, 1.0], [0.0, 1.0]])))
@@ -3650,7 +3649,7 @@ fn test_max_min_mixed() raises:
     # Test 10: Keep dimensions
     var e = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
 
-    var max_keepdim = e.max(IntList(1), keepdims=True)
+    var max_keepdim = e.max(IntArray(1), keepdims=True)
     assert_true(max_keepdim.all_close(Tensor.d2([[2.0], [4.0]])))
     max_keepdim.backward()
     assert_true(e.grad().all_close(Tensor.d2([[0.0, 1.0], [0.0, 1.0]])))
@@ -3663,7 +3662,7 @@ fn test_max_min() raises:
         requires_grad=True,
     )
 
-    max_result = a.max(IntList(1))
+    max_result = a.max(IntArray(1))
     expected = Tensor.d1([42.0, 35.0, 51.0])
     assert_true(max_result.all_close(expected))
 

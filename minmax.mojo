@@ -5,8 +5,7 @@ from backpropagation import Delegate, BackwardFn
 from common_utils import panic
 from validators import Validator
 from utils.numerics import min_finite, max_finite
-from layout.int_tuple import IntArray
-from intlist import IntList
+from intarray import IntArray
 from gradbox import Gradbox
 from ancestry import Ancestor
 from indexhelper import IndexCalculator
@@ -18,7 +17,7 @@ alias Gradbag[dtype: DType] = List[Tuple[IntArray, Scalar[dtype]]]
 struct MinMaxBackward[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
-    var axes: IntList
+    var axes: IntArray
     var keepdims: Bool
     var gradbag: Gradbag[dtype]
 
@@ -79,7 +78,7 @@ struct MinMax[dtype: DType = DType.float32]:
         max: Bool, track_grad: Bool = True
     ](
         self: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -126,7 +125,7 @@ struct MinMax[dtype: DType = DType.float32]:
     ](
         self: Tensor[dtype],
         shape: Shape,
-        normalized_axes: IntList,
+        normalized_axes: IntArray,
         keepdims: Bool,
         var result: Tensor[dtype],
         var gradbag: Gradbag[dtype],
@@ -135,19 +134,19 @@ struct MinMax[dtype: DType = DType.float32]:
         var total_elements = shape.num_elements()
 
         # Initialize with first element
-        var best_value = self[shape.first_index().intarray()]
+        var best_value = self[shape.first_index()]
         var best_positions = List[IntArray]()
 
         @parameter
         if track_grad:
-            best_positions.append(shape.first_index().intarray())
+            best_positions.append(shape.first_index())
 
         # ===== SEQUENTIAL SCAN (No vectorization for gradient tracking) =====
         # Vectorization doesn't help much for min/max with gradient tracking
         # because we need to track positions, which requires branching
 
         for flat_idx in range(1, total_elements):  # Start from 1, we already have element 0
-            var idx = IndexCalculator.index_to_coord(shape, flat_idx).intarray()
+            var idx = IndexCalculator.index_to_coord(shape, flat_idx)
             var cur = self[idx]
 
             @parameter
@@ -205,7 +204,7 @@ struct MinMax[dtype: DType = DType.float32]:
     ](
         self: Tensor[dtype],
         shape: Shape,
-        normalized_axes: IntList,
+        normalized_axes: IntArray,
         keepdims: Bool,
         out_shape: Shape,
         var result: Tensor[dtype],
@@ -214,7 +213,7 @@ struct MinMax[dtype: DType = DType.float32]:
     ) -> Tensor[dtype]:
         from algorithm import parallelize
 
-        var reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
+        var reduced_shape = shape.reduced_shape(normalized_axes)
         var num_output_elements = out_shape.num_elements()
 
         # Thread-local storage for gradient bags (one per output element)
@@ -227,7 +226,7 @@ struct MinMax[dtype: DType = DType.float32]:
         @parameter
         fn compute_output_element(out_flat_idx: Int):
             # Convert flat index to multidimensional index
-            var out_idx = IndexCalculator.index_to_coord(out_shape, out_flat_idx).intarray()
+            var out_idx = IndexCalculator.index_to_coord(out_shape, out_flat_idx)
             var best_value: Scalar[dtype]
             # Initialize best value for this output element
             @parameter
@@ -244,14 +243,14 @@ struct MinMax[dtype: DType = DType.float32]:
             var num_reduced_elements = reduced_shape.num_elements()
 
             for red_flat_idx in range(num_reduced_elements):
-                var red_idx = IndexCalculator.index_to_coord(reduced_shape, red_flat_idx).intarray()
+                var red_idx = IndexCalculator.index_to_coord(reduced_shape, red_flat_idx)
 
                 # Compute full input index
                 var full_idx = (
-                    IntList(out_idx).replace(normalized_axes, IntList(red_idx))
+                    out_idx.replace(normalized_axes, red_idx)
                     if keepdims
-                    else IntList(out_idx).insert(normalized_axes, IntList(red_idx))
-                ).intarray()
+                    else out_idx.insert(normalized_axes, red_idx)
+                )
 
                 var cur = self[full_idx]
 
@@ -326,7 +325,7 @@ struct MinMax[dtype: DType = DType.float32]:
 struct MinMaxBackward_orig[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
-    var axes: IntList
+    var axes: IntArray
     var keepdims: Bool
     var gradbag: Gradbag[dtype]
 
@@ -393,7 +392,7 @@ struct MinMax_orig[dtype: DType = DType.float32]:
         max: Bool, track_grad: Bool = True
     ](
         self: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -414,7 +413,7 @@ struct MinMax_orig[dtype: DType = DType.float32]:
             elif rank == len(normalized_axes) and not keepdims:
                 # reduce all dims -> scalar: find all positions equal to global max
                 var first_iter = True
-                var best_value = self[shape.first_index().intarray()]
+                var best_value = self[shape.first_index()]
 
                 var best_positions = List[IntArray]()
                 for idx in shape:
@@ -472,7 +471,7 @@ struct MinMax_orig[dtype: DType = DType.float32]:
                             gradbag.append((p, inv))
         else:
             # Partial reduction
-            var reduced_shape = Shape(shape.axes_spans.select(normalized_axes))
+            var reduced_shape = shape.reduced_shape(normalized_axes)
 
             for out_idx in out_shape:
                 # Track best value and all positions with that best (in the reduced block)
@@ -487,12 +486,12 @@ struct MinMax_orig[dtype: DType = DType.float32]:
 
                 for red_idx in reduced_shape:
                     var full_idx = (
-                        IntList(out_idx)
+                        out_idx
                         .replace(
-                            normalized_axes, IntList(red_idx)
-                        ) if keepdims else IntList(out_idx)
-                        .insert(normalized_axes, IntList(red_idx))
-                    ).intarray()
+                            normalized_axes,red_idx
+                        ) if keepdims else out_idx
+                        .insert(normalized_axes, red_idx)
+                    )
                     var cur = self[full_idx]
 
                     if first_iteration:

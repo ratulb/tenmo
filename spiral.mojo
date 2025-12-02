@@ -5,7 +5,7 @@ from common_utils import isnan
 from math import sqrt
 from time import perf_counter_ns
 from data import *
-
+from net import BCELoss
 
 fn generate_spiral_data(
     n_points: Int = 100,
@@ -1074,7 +1074,7 @@ fn train_with_batches_orig():
                 print("Epoch", epoch, "Acc:", val_acc, "%")
 
 
-fn train_with_batches():
+fn train_with_batches_good_absent_validation_loss():
     var (X_train, y_train) = generate_spiral_data(500, 2.0, 0.01)
     var (X_val, y_val) = generate_spiral_data(250, 2.0, 0.01)
     alias dtype = DType.float64
@@ -1180,7 +1180,6 @@ fn train_with_batches():
     var end_training = perf_counter_ns()
     print("Whole training loop took: ", (end_training - start_training) / (1e9 * 60), "mins")
 
-# ✅ Accuracy function looks correct
 fn accuracy[dtype: DType](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[Int, Int]:
     var correct = 0
     var total = pred.shape()[0]
@@ -1192,48 +1191,531 @@ fn accuracy[dtype: DType](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[I
             correct += 1
     return correct, total
 
+fn compute_accuracy[dtype: DType, //](pred: Tensor[dtype], target: Tensor[dtype]) -> Float64:
+    var correct = 0
+    var total = pred.shape()[0]
 
-fn train_deep_spiral():
-    var (X_train, y_train) = generate_spiral_data(500, 3.0, 0.01)
-    var (X_val, y_val) = generate_spiral_data(250, 3.0, 0.01)
+    for i in range(total):
+        var predicted_class = 1 if pred[i, 0] > 0.5 else 0
+        var true_class = Int(target[i, 0])
+        if predicted_class == true_class:
+            correct += 1
 
-    # ✅ DEEPER network (5-6 layers)
-    var model = Sequential[DType.float64]()
-    model.append(
-        Linear[DType.float64](2, 128, xavier=False).into(),
-        ReLU[DType.float64]().into(),
+    return Float64(correct) / Float64(total) * 100.0
 
-        Linear[DType.float64](128, 64, xavier=False).into(),
-        ReLU[DType.float64]().into(),
 
-        Linear[DType.float64](64, 32, xavier=False).into(),
-        ReLU[DType.float64]().into(),
 
-        Linear[DType.float64](32, 16, xavier=False).into(),
-        ReLU[DType.float64]().into(),
-        Linear[DType.float64](16, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+fn train_with_batches():
+    var (X_train, y_train) = generate_spiral_data(500, 2.0, 0.01)
+    var (X_val, y_val) = generate_spiral_data(250, 2.0, 0.01)
+    alias dtype = DType.float64
+
+    # DataLoader with batching
+    var train_dataset = TensorDataset[dtype](X_train, y_train)
+    var train_loader = DataLoader[dtype=dtype](
+        train_dataset^,
+        batch_size=32,
+        reshuffle=True,
+        drop_last=False
     )
 
-    # ✅ Lower LR for deeper network
-    var optimizer = SGD(model.parameters(), lr=0.05, momentum=0.1)
+    var val_dataset = TensorDataset(X_val, y_val)
+    var val_loader = DataLoader[dtype=dtype](
+        val_dataset^,
+        batch_size=64,
+        reshuffle=False
+    )
 
-    for epoch in range(20000):  # ✅ More epochs
-        # LR decay
-        if epoch == 10000: optimizer.set_lr(0.01)
-        if epoch == 15000: optimizer.set_lr(0.001)
+    # Model
+    var model = Sequential[dtype]()
+    model.append(
+        Linear[dtype](2, 64, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](64, 32, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](32, 16, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](16, 1, xavier=False).into(),
+        Sigmoid[dtype]().into()
+    )
 
-        var pred = model(X_train)
-        var loss = pred.binary_cross_entropy(y_train)
+    # Loss criterion with train/eval mode
+    var criterion = BCELoss[dtype]()
+    var optimizer = SGD[dtype=dtype](model.parameters(), lr=0.05, momentum=0.1)
+    var num_epochs = 15000
+    var start_training = perf_counter_ns()
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    print("Starting training for epochs: ", num_epochs)
 
-        if epoch % 2000 == 0:
-            var val_pred = model(X_val)
-            var val_acc = compute_accuracy(val_pred, y_val)
-            print("Epoch", epoch, "Loss:", loss.item(), "Acc:", val_acc, "%")
+    for epoch in range(num_epochs):
+        # ==================== Training Phase ====================
+        model.train()
+        criterion.train()  # Enable gradient tracking in loss
+
+        var epoch_train_loss = 0.0
+        var epoch_train_correct = 0
+        var epoch_train_total = 0
+
+        for train_batch in train_loader:
+            var train_pred = model(train_batch.features)
+            var train_loss = criterion(train_pred, train_batch.labels)
+
+            optimizer.zero_grad()
+            train_loss.backward()
+            optimizer.step()
+
+            epoch_train_loss += train_loss.item() * train_batch.batch_size
+            var batch_correct, _ = accuracy(train_pred, train_batch.labels)
+            epoch_train_correct += batch_correct
+            epoch_train_total += train_batch.batch_size
+
+        # ==================== Validation Phase ====================
+        model.eval()
+        criterion.eval()  # Disable gradient tracking in loss
+
+        var epoch_val_loss = 0.0
+        var epoch_val_correct = 0
+        var epoch_val_total = 0
+
+        for val_batch in val_loader:
+            var val_pred = model(val_batch.features)  # No graph built
+            var val_loss = criterion(val_pred, val_batch.labels)  # No graph built
+
+            epoch_val_loss += val_loss.item() * val_batch.batch_size
+
+            var val_correct, _ = accuracy(val_pred, val_batch.labels)
+            epoch_val_correct += val_correct
+            epoch_val_total += val_batch.batch_size
+
+        # ==================== Reporting ====================
+        if epoch % 1000 == 0:
+            var avg_train_loss = epoch_train_loss / epoch_train_total
+            var train_accuracy = 100.0 * epoch_train_correct / epoch_train_total
+            var avg_val_loss = epoch_val_loss / epoch_val_total
+            var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
+
+            print("Epoch", epoch,
+                  "| Train Loss:", avg_train_loss,
+                  "Train Acc:", train_accuracy, "%",
+                  "| Val Loss:", avg_val_loss,
+                  "Val Acc:", val_accuracy, "%")
+
+    var end_training = perf_counter_ns()
+    print("\nTraining completed in:", (end_training - start_training) / (1e9 * 60), "mins")
+
+    # Final evaluation
+    model.eval()
+    criterion.eval()
+    var final_val_loss = 0.0
+    var final_val_correct = 0
+    var final_val_total = 0
+
+    for val_batch in val_loader:
+        var val_pred = model(val_batch.features)
+        var val_loss = criterion(val_pred, val_batch.labels)
+        final_val_loss += val_loss.item() * val_batch.batch_size
+        var val_correct, _ = accuracy(val_pred, val_batch.labels)
+        final_val_correct += val_correct
+        final_val_total += val_batch.batch_size
+
+    print("\n=== Final Results ===")
+    print("Validation Loss:", final_val_loss / final_val_total)
+    print("Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%")
+
+
+fn train_deep_spiral():
+    var (X_train, y_train) = generate_spiral_data(500, 3.0, 0.001)
+    var (X_val, y_val) = generate_spiral_data(250, 3.0, 0.001)
+    alias dtype = DType.float64
+
+    # ✅ ADD BATCHING - Critical for deeper networks!
+    var train_dataset = TensorDataset[dtype](X_train, y_train)
+    var train_loader = DataLoader[dtype=dtype](
+        train_dataset^,
+        batch_size=32,  # Smaller batches for harder problem
+        reshuffle=True,
+        drop_last=False
+    )
+
+    var val_dataset = TensorDataset(X_val, y_val)
+    var val_loader = DataLoader[dtype=dtype](
+        val_dataset^,
+        batch_size=64,
+        reshuffle=False
+    )
+
+    # DEEPER network (5 hidden layers)
+    var model = Sequential[dtype]()
+    model.append(
+        Linear[dtype](2, 128, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](128, 64, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](64, 32, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](32, 16, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](16, 1, xavier=False).into(),
+        Sigmoid[dtype]().into()
+    )
+
+    # Loss criterion with train/eval mode
+    var criterion = BCELoss[dtype]()
+
+    # Lower LR for deeper network
+    var optimizer = SGD(model.parameters(), lr=0.035, momentum=0.085)
+    var num_epochs = 5000
+    var start_training = perf_counter_ns()
+
+    print("Starting deep spiral training for epochs:", num_epochs)
+    print("Problem difficulty: 3 rotations")
+
+    for epoch in range(num_epochs):
+        # LR decay schedule
+        if epoch == 1500:
+            optimizer.set_lr(0.02)
+            print("  → Learning rate reduced to 0.02")
+        if epoch == 2000:
+            optimizer.set_lr(0.01)
+            print("  → Learning rate reduced to 0.01")
+        if epoch == 3000:
+            optimizer.set_lr(0.001)
+            print("  → Learning rate reduced to 0.001")
+
+        # ==================== Training Phase ====================
+        model.train()
+        criterion.train()
+
+        var epoch_train_loss = 0.0
+        var epoch_train_correct = 0
+        var epoch_train_total = 0
+
+        for train_batch in train_loader:
+            var train_pred = model(train_batch.features)
+            var train_loss = criterion(train_pred, train_batch.labels)
+
+            optimizer.zero_grad()
+            train_loss.backward()
+            optimizer.step()
+
+            epoch_train_loss += train_loss.item() * train_batch.batch_size
+            var batch_correct, _ = accuracy(train_pred, train_batch.labels)
+            epoch_train_correct += batch_correct
+            epoch_train_total += train_batch.batch_size
+
+        # ==================== Validation Phase ====================
+        model.eval()
+        criterion.eval()
+
+        var epoch_val_loss = 0.0
+        var epoch_val_correct = 0
+        var epoch_val_total = 0
+
+        for val_batch in val_loader:
+            var val_pred = model(val_batch.features)  # No graph
+            var val_loss = criterion(val_pred, val_batch.labels)  # No graph
+
+            epoch_val_loss += val_loss.item() * val_batch.batch_size
+
+            var val_correct, _ = accuracy(val_pred, val_batch.labels)
+            epoch_val_correct += val_correct
+            epoch_val_total += val_batch.batch_size
+
+        # ==================== Reporting ====================
+        if epoch % 500 == 0:
+            var avg_train_loss = epoch_train_loss / epoch_train_total
+            var train_accuracy = 100.0 * epoch_train_correct / epoch_train_total
+            var avg_val_loss = epoch_val_loss / epoch_val_total
+            var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
+
+            print("Epoch", epoch,
+                  "| Train Loss:", avg_train_loss,
+                  "Train Acc:", train_accuracy, "%",
+                  "| Val Loss:", avg_val_loss,
+                  "Val Acc:", val_accuracy, "%")
+
+    var end_training = perf_counter_ns()
+    print("\nTraining completed in:", (end_training - start_training) / (1e9 * 60), "mins")
+
+    # Final evaluation
+    model.eval()
+    criterion.eval()
+    var final_val_loss = 0.0
+    var final_val_correct = 0
+    var final_val_total = 0
+
+    for val_batch in val_loader:
+        var val_pred = model(val_batch.features)
+        var val_loss = criterion(val_pred, val_batch.labels)
+        final_val_loss += val_loss.item() * val_batch.batch_size
+        var val_correct, _ = accuracy(val_pred, val_batch.labels)
+        final_val_correct += val_correct
+        final_val_total += val_batch.batch_size
+
+    print("\n=== Final Results ===")
+    print("Validation Loss:", final_val_loss / final_val_total)
+    print("Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%")
+
+
+
+fn train_deep_spiral_simple_arch_and_noise_increased():
+    var (X_train, y_train) = generate_spiral_data(500, 3.0, 0.01)
+    var (X_val, y_val) = generate_spiral_data(250, 3.0, 0.01)
+    alias dtype = DType.float64
+
+    # ✅ ADD BATCHING - Critical for deeper networks!
+    var train_dataset = TensorDataset[dtype](X_train, y_train)
+    var train_loader = DataLoader[dtype=dtype](
+        train_dataset^,
+        batch_size=32,  # Smaller batches for harder problem
+        reshuffle=True,
+        drop_last=False
+    )
+
+    var val_dataset = TensorDataset(X_val, y_val)
+    var val_loader = DataLoader[dtype=dtype](
+        val_dataset^,
+        batch_size=64,
+        reshuffle=False
+    )
+
+    # DEEPER network (5 hidden layers)
+    var model = Sequential[dtype]()
+    model.append(
+        Linear[dtype](2, 32, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](32, 16, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](16, 1, xavier=False).into(),
+        Sigmoid[dtype]().into()
+    )
+
+    # Loss criterion with train/eval mode
+    var criterion = BCELoss[dtype]()
+
+    # Lower LR for deeper network
+    var optimizer = SGD(model.parameters(), lr=0.035, momentum=0.085)
+    var num_epochs = 5000
+    var start_training = perf_counter_ns()
+
+    print("Starting deep spiral training for epochs:", num_epochs)
+    print("Problem difficulty: 3 rotations")
+
+    for epoch in range(num_epochs):
+        # LR decay schedule
+        if epoch == 1500:
+            optimizer.set_lr(0.02)
+            print("  → Learning rate reduced to 0.02")
+        if epoch == 2000:
+            optimizer.set_lr(0.01)
+            print("  → Learning rate reduced to 0.01")
+        if epoch == 3000:
+            optimizer.set_lr(0.001)
+            print("  → Learning rate reduced to 0.001")
+
+        # ==================== Training Phase ====================
+        model.train()
+        criterion.train()
+
+        var epoch_train_loss = 0.0
+        var epoch_train_correct = 0
+        var epoch_train_total = 0
+
+        for train_batch in train_loader:
+            var train_pred = model(train_batch.features)
+            var train_loss = criterion(train_pred, train_batch.labels)
+
+            optimizer.zero_grad()
+            train_loss.backward()
+            optimizer.step()
+
+            epoch_train_loss += train_loss.item() * train_batch.batch_size
+            var batch_correct, _ = accuracy(train_pred, train_batch.labels)
+            epoch_train_correct += batch_correct
+            epoch_train_total += train_batch.batch_size
+
+        # ==================== Validation Phase ====================
+        model.eval()
+        criterion.eval()
+
+        var epoch_val_loss = 0.0
+        var epoch_val_correct = 0
+        var epoch_val_total = 0
+
+        for val_batch in val_loader:
+            var val_pred = model(val_batch.features)  # No graph
+            var val_loss = criterion(val_pred, val_batch.labels)  # No graph
+
+            epoch_val_loss += val_loss.item() * val_batch.batch_size
+
+            var val_correct, _ = accuracy(val_pred, val_batch.labels)
+            epoch_val_correct += val_correct
+            epoch_val_total += val_batch.batch_size
+
+        # ==================== Reporting ====================
+        if epoch % 500 == 0:
+            var avg_train_loss = epoch_train_loss / epoch_train_total
+            var train_accuracy = 100.0 * epoch_train_correct / epoch_train_total
+            var avg_val_loss = epoch_val_loss / epoch_val_total
+            var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
+
+            print("Epoch", epoch,
+                  "| Train Loss:", avg_train_loss,
+                  "Train Acc:", train_accuracy, "%",
+                  "| Val Loss:", avg_val_loss,
+                  "Val Acc:", val_accuracy, "%")
+
+    var end_training = perf_counter_ns()
+    print("\nTraining completed in:", (end_training - start_training) / (1e9 * 60), "mins")
+
+    # Final evaluation
+    model.eval()
+    criterion.eval()
+    var final_val_loss = 0.0
+    var final_val_correct = 0
+    var final_val_total = 0
+
+    for val_batch in val_loader:
+        var val_pred = model(val_batch.features)
+        var val_loss = criterion(val_pred, val_batch.labels)
+        final_val_loss += val_loss.item() * val_batch.batch_size
+        var val_correct, _ = accuracy(val_pred, val_batch.labels)
+        final_val_correct += val_correct
+        final_val_total += val_batch.batch_size
+
+    print("\n=== Final Results ===")
+    print("Validation Loss:", final_val_loss / final_val_total)
+    print("Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%")
+
+
+fn train_deep_spiral_simple_arch_and_noise_increased_2():
+    var (X_train, y_train) = generate_spiral_data(1000, 5.0, 0.0)
+    var (X_val, y_val) = generate_spiral_data(500, 5.0, 0.0)
+    alias dtype = DType.float64
+
+    # ✅ ADD BATCHING - Critical for deeper networks!
+    var train_dataset = TensorDataset[dtype](X_train, y_train)
+    var train_loader = DataLoader[dtype=dtype](
+        train_dataset^,
+        batch_size=64,  # Smaller batches for harder problem
+        reshuffle=True,
+        drop_last=False
+    )
+
+    var val_dataset = TensorDataset(X_val, y_val)
+    var val_loader = DataLoader[dtype=dtype](
+        val_dataset^,
+        batch_size=64,
+        reshuffle=False
+    )
+
+    # DEEPER network (5 hidden layers)
+    var model = Sequential[dtype]()
+    model.append(
+        Linear[dtype](2, 32, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](32, 16, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](16, 1, xavier=False).into(),
+        Sigmoid[dtype]().into()
+    )
+
+    # Loss criterion with train/eval mode
+    var criterion = BCELoss[dtype]()
+
+    # Lower LR for deeper network
+    var optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
+    var num_epochs = 3000
+    var start_training = perf_counter_ns()
+
+    print("Starting deep spiral training for epochs:", num_epochs)
+    print("Problem difficulty: 5 rotations, noise: 0.0")
+
+    for epoch in range(num_epochs):
+        # LR decay schedule
+        _="""if epoch == 1500:
+            optimizer.set_lr(0.025)
+            print("  → Learning rate reduced to 0.025")"""
+        if epoch == 2000:
+            optimizer.set_lr(0.001)
+            print("  → Learning rate reduced to 0.001")
+        _="""if epoch == 3000:
+            optimizer.set_lr(0.001)
+            print("  → Learning rate reduced to 0.001")"""
+
+        # ==================== Training Phase ====================
+        model.train()
+        criterion.train()
+
+        var epoch_train_loss = 0.0
+        var epoch_train_correct = 0
+        var epoch_train_total = 0
+
+        for train_batch in train_loader:
+            var train_pred = model(train_batch.features)
+            var train_loss = criterion(train_pred, train_batch.labels)
+
+            optimizer.zero_grad()
+            train_loss.backward()
+            optimizer.step()
+
+            epoch_train_loss += train_loss.item() * train_batch.batch_size
+            var batch_correct, _ = accuracy(train_pred, train_batch.labels)
+            epoch_train_correct += batch_correct
+            epoch_train_total += train_batch.batch_size
+
+        # ==================== Validation Phase ====================
+        model.eval()
+        criterion.eval()
+
+        var epoch_val_loss = 0.0
+        var epoch_val_correct = 0
+        var epoch_val_total = 0
+
+        for val_batch in val_loader:
+            var val_pred = model(val_batch.features)  # No graph
+            var val_loss = criterion(val_pred, val_batch.labels)  # No graph
+
+            epoch_val_loss += val_loss.item() * val_batch.batch_size
+
+            var val_correct, _ = accuracy(val_pred, val_batch.labels)
+            epoch_val_correct += val_correct
+            epoch_val_total += val_batch.batch_size
+
+        # ==================== Reporting ====================
+        if epoch % 500 == 0:
+            var avg_train_loss = epoch_train_loss / epoch_train_total
+            var train_accuracy = 100.0 * epoch_train_correct / epoch_train_total
+            var avg_val_loss = epoch_val_loss / epoch_val_total
+            var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
+
+            print("Epoch", epoch,
+                  "| Train Loss:", avg_train_loss,
+                  "Train Acc:", train_accuracy, "%",
+                  "| Val Loss:", avg_val_loss,
+                  "Val Acc:", val_accuracy, "%")
+
+    var end_training = perf_counter_ns()
+    print("\nTraining completed in:", (end_training - start_training) / (1e9 * 60), "mins")
+
+    # Final evaluation
+    model.eval()
+    criterion.eval()
+    var final_val_loss = 0.0
+    var final_val_correct = 0
+    var final_val_total = 0
+
+    for val_batch in val_loader:
+        var val_pred = model(val_batch.features)
+        var val_loss = criterion(val_pred, val_batch.labels)
+        final_val_loss += val_loss.item() * val_batch.batch_size
+        var val_correct, _ = accuracy(val_pred, val_batch.labels)
+        final_val_correct += val_correct
+        final_val_total += val_batch.batch_size
+
+    print("\n=== Final Results ===")
+    print("Validation Loss:", final_val_loss / final_val_total)
+    print("Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%")
 
 
 
@@ -1250,18 +1732,9 @@ fn main():
     #train_spiral_fixed() #too Good
     #test_hardest_spiral() # Not yet good
     #train_with_batches()# Working
-    train_deep_spiral()
+    #train_deep_spiral() #This good too
+    #train_with_batches()
     #train_spiral_normalized() #No good as it is
-
-fn compute_accuracy[dtype: DType, //](pred: Tensor[dtype], target: Tensor[dtype]) -> Float64:
-    var correct = 0
-    var total = pred.shape()[0]
-
-    for i in range(total):
-        var predicted_class = 1 if pred[i, 0] > 0.5 else 0
-        var true_class = Int(target[i, 0])
-        if predicted_class == true_class:
-            correct += 1
-
-    return Float64(correct) / Float64(total) * 100.0
+    #train_deep_spiral_simple_arch_and_noise_increased()#very good
+    train_deep_spiral_simple_arch_and_noise_increased_2()
 

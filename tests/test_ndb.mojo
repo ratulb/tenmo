@@ -1,11 +1,10 @@
 from testing import assert_true, assert_false
 from buffers import Buffer
-from layout.int_tuple import IntArray
+from intarray import IntArray
 from shapes import Shape
 from strides import Strides
 from ndbuffer import NDBuffer
 from operators import *
-from intlist import IntList
 
 # ============================================
 # Test Constants
@@ -28,7 +27,7 @@ fn ndb_ops_test_arithmetic_add_same_shape_both_contiguous() raises:
     assert_true(result.shape == Shape(3, 4), "Shape should be preserved")
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 15, "10 + 5 = 15")
+            assert_true(result[IntArray(i, j)] == 15, "10 + 5 = 15")
     print("ndb_ops_test_arithmetic_add_same_shape_both_contiguous passed")
 
 
@@ -41,7 +40,7 @@ fn ndb_ops_test_arithmetic_sub_same_shape_both_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 7, "10 - 3 = 7")
+            assert_true(result[IntArray(i, j)] == 7, "10 - 3 = 7")
     print("ndb_ops_test_arithmetic_sub_same_shape_both_contiguous passed")
 
 
@@ -54,7 +53,7 @@ fn ndb_ops_test_arithmetic_mul_same_shape_both_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 12, "4 * 3 = 12")
+            assert_true(result[IntArray(i, j)] == 12, "4 * 3 = 12")
     print("ndb_ops_test_arithmetic_mul_same_shape_both_contiguous passed")
 
 
@@ -67,7 +66,7 @@ fn ndb_ops_test_arithmetic_div_same_shape_both_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(abs(result[IntList(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
+            assert_true(abs(result[IntArray(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
     print("ndb_ops_test_arithmetic_div_same_shape_both_contiguous passed")
 
 
@@ -87,9 +86,9 @@ fn ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous() raises:
 
     for i in range(2):
         for j in range(3):
-            var expected = 10 + b[IntList(i, j)]
+            var expected = 10 + b[IntArray(i, j)]
             assert_true(
-                result[IntList(i, j)] == expected,
+                result[IntArray(i, j)] == expected,
                 "Mismatch at " + i.__str__() + "," + j.__str__(),
             )
     print("ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous passed")
@@ -112,8 +111,8 @@ fn ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous() raises:
 
     for i in range(2):
         for j in range(3):
-            var expected = a[IntList(i, j)] + 5
-            assert_true(result[IntList(i, j)] == expected, "Mismatch")
+            var expected = a[IntArray(i, j)] + 5
+            assert_true(result[IntArray(i, j)] == expected, "Mismatch")
     print("ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous passed")
 
 
@@ -133,8 +132,8 @@ fn ndb_ops_test_arithmetic_both_noncontiguous() raises:
 
     for i in range(2):
         for j in range(3):
-            var expected = a[IntList(i, j)] * b[IntList(i, j)]
-            assert_true(result[IntList(i, j)] == expected, "Mismatch")
+            var expected = a[IntArray(i, j)] * b[IntArray(i, j)]
+            assert_true(result[IntArray(i, j)] == expected, "Mismatch")
     print("ndb_ops_test_arithmetic_both_noncontiguous passed")
 
 
@@ -159,8 +158,8 @@ fn ndb_ops_test_arithmetic_with_offset() raises:
 
     for i in range(2):
         for j in range(3):
-            var expected = a[IntList(i, j)] + b[IntList(i, j)]
-            assert_true(result[IntList(i, j)] == expected, "Offset mismatch")
+            var expected = a[IntArray(i, j)] + b[IntArray(i, j)]
+            assert_true(result[IntArray(i, j)] == expected, "Offset mismatch")
     print("ndb_ops_test_arithmetic_with_offset passed")
 
 
@@ -169,14 +168,14 @@ fn ndb_ops_test_arithmetic_broadcast_row() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
     for j in range(4):
-        b[IntList(0, j)] = j
+        b[IntArray(0, j)] = j
 
     var result = a.arithmetic_ops[Add](b)
 
     assert_true(result.shape == Shape(3, 4), "Broadcast shape")
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 10 + j, "Broadcast row add")
+            assert_true(result[IntArray(i, j)] == 10 + j, "Broadcast row add")
     print("ndb_ops_test_arithmetic_broadcast_row passed")
 
 
@@ -185,13 +184,13 @@ fn ndb_ops_test_arithmetic_broadcast_col() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(3, 1))
     for i in range(3):
-        b[IntList(i, 0)] = i * 100
+        b[IntArray(i, 0)] = i * 100
 
     var result = a.arithmetic_ops[Add](b)
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 10 + i * 100, "Broadcast col")
+            assert_true(result[IntArray(i, j)] == 10 + i * 100, "Broadcast col")
     print("ndb_ops_test_arithmetic_broadcast_col passed")
 
 
@@ -199,13 +198,13 @@ fn ndb_ops_test_arithmetic_broadcast_scalar() raises:
     print("ndb_ops_test_arithmetic_broadcast_scalar")
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape())
-    b[IntList()] = 5
+    b[IntArray()] = 5
 
     var result = a.arithmetic_ops[Multiply](b)
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 50, "Broadcast scalar mul")
+            assert_true(result[IntArray(i, j)] == 50, "Broadcast scalar mul")
     print("ndb_ops_test_arithmetic_broadcast_scalar passed")
 
 
@@ -218,7 +217,7 @@ fn ndb_ops_test_arithmetic_1d() raises:
 
     assert_true(result.shape == Shape(10), "1D shape")
     for i in range(10):
-        assert_true(abs(result[IntList(i)] - 4.0) < 0.001, "1D add")
+        assert_true(abs(result[IntArray(i)] - 4.0) < 0.001, "1D add")
     print("ndb_ops_test_arithmetic_1d passed")
 
 
@@ -232,7 +231,7 @@ fn ndb_ops_test_arithmetic_3d() raises:
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                assert_true(result[IntList(i, j, k)] == 5, "3D subtract")
+                assert_true(result[IntArray(i, j, k)] == 5, "3D subtract")
     print("ndb_ops_test_arithmetic_3d passed")
 
 
@@ -250,7 +249,7 @@ fn ndb_ops_test_inplace_add_same_shape_both_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 15, "10 + 5 = 15")
+            assert_true(a[IntArray(i, j)] == 15, "10 + 5 = 15")
     print("ndb_ops_test_inplace_add_same_shape_both_contiguous passed")
 
 
@@ -263,7 +262,7 @@ fn ndb_ops_test_inplace_sub_same_shape() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 7, "10 - 3 = 7")
+            assert_true(a[IntArray(i, j)] == 7, "10 - 3 = 7")
     print("ndb_ops_test_inplace_sub_same_shape passed")
 
 
@@ -276,7 +275,7 @@ fn ndb_ops_test_inplace_mul_same_shape() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 12, "4 * 3 = 12")
+            assert_true(a[IntArray(i, j)] == 12, "4 * 3 = 12")
     print("ndb_ops_test_inplace_mul_same_shape passed")
 
 
@@ -289,7 +288,7 @@ fn ndb_ops_test_inplace_div_same_shape() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(abs(a[IntList(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
+            assert_true(abs(a[IntArray(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
     print("ndb_ops_test_inplace_div_same_shape passed")
 
 
@@ -306,13 +305,13 @@ fn ndb_ops_test_inplace_self_contiguous_other_noncontiguous() raises:
     var expected = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
         for j in range(3):
-            expected[IntList(i, j)] = 10 + b[IntList(i, j)]
+            expected[IntArray(i, j)] = 10 + b[IntArray(i, j)]
 
     a.inplace_ops[Add](b)
 
     for i in range(2):
         for j in range(3):
-            assert_true(a[IntList(i, j)] == expected[IntList(i, j)], "Mismatch")
+            assert_true(a[IntArray(i, j)] == expected[IntArray(i, j)], "Mismatch")
     print("ndb_ops_test_inplace_self_contiguous_other_noncontiguous passed")
 
 
@@ -330,13 +329,13 @@ fn ndb_ops_test_inplace_self_noncontiguous_other_contiguous() raises:
     var expected = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
         for j in range(3):
-            expected[IntList(i, j)] = a[IntList(i, j)] + 5
+            expected[IntArray(i, j)] = a[IntArray(i, j)] + 5
 
     a.inplace_ops[Add](b)
 
     for i in range(2):
         for j in range(3):
-            assert_true(a[IntList(i, j)] == expected[IntList(i, j)], "Mismatch")
+            assert_true(a[IntArray(i, j)] == expected[IntArray(i, j)], "Mismatch")
     print("ndb_ops_test_inplace_self_noncontiguous_other_contiguous passed")
 
 
@@ -356,13 +355,13 @@ fn ndb_ops_test_inplace_both_noncontiguous() raises:
     var expected = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
         for j in range(3):
-            expected[IntList(i, j)] = a[IntList(i, j)] * b[IntList(i, j)]
+            expected[IntArray(i, j)] = a[IntArray(i, j)] * b[IntArray(i, j)]
 
     a.inplace_ops[Multiply](b)
 
     for i in range(2):
         for j in range(3):
-            assert_true(a[IntList(i, j)] == expected[IntList(i, j)], "Mismatch")
+            assert_true(a[IntArray(i, j)] == expected[IntArray(i, j)], "Mismatch")
     print("ndb_ops_test_inplace_both_noncontiguous passed")
 
 
@@ -371,13 +370,13 @@ fn ndb_ops_test_inplace_broadcast_row() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
     for j in range(4):
-        b[IntList(0, j)] = j
+        b[IntArray(0, j)] = j
 
     a.inplace_ops[Add](b)
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 10 + j, "Broadcast row inplace")
+            assert_true(a[IntArray(i, j)] == 10 + j, "Broadcast row inplace")
     print("ndb_ops_test_inplace_broadcast_row passed")
 
 
@@ -386,14 +385,14 @@ fn ndb_ops_test_inplace_broadcast_col() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(3, 1))
     for i in range(3):
-        b[IntList(i, 0)] = i * 10
+        b[IntArray(i, 0)] = i * 10
 
     a.inplace_ops[Multiply](b)
 
     for i in range(3):
         for j in range(4):
             assert_true(
-                a[IntList(i, j)] == 10 * i * 10, "Broadcast col inplace"
+                a[IntArray(i, j)] == 10 * i * 10, "Broadcast col inplace"
             )
     print("ndb_ops_test_inplace_broadcast_col passed")
 
@@ -418,13 +417,13 @@ fn ndb_ops_test_inplace_with_offset() raises:
     var expected = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
         for j in range(3):
-            expected[IntList(i, j)] = a[IntList(i, j)] + b[IntList(i, j)]
+            expected[IntArray(i, j)] = a[IntArray(i, j)] + b[IntArray(i, j)]
 
     a.inplace_ops[Add](b)
 
     for i in range(2):
         for j in range(3):
-            assert_true(a[IntList(i, j)] == expected[IntList(i, j)], "Offset")
+            assert_true(a[IntArray(i, j)] == expected[IntArray(i, j)], "Offset")
     print("ndb_ops_test_inplace_with_offset passed")
 
 
@@ -441,7 +440,7 @@ fn ndb_ops_test_inplace_scalar_add_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 15, "10 + 5 = 15")
+            assert_true(a[IntArray(i, j)] == 15, "10 + 5 = 15")
     print("ndb_ops_test_inplace_scalar_add_contiguous passed")
 
 
@@ -453,7 +452,7 @@ fn ndb_ops_test_inplace_scalar_sub_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 7, "10 - 3 = 7")
+            assert_true(a[IntArray(i, j)] == 7, "10 - 3 = 7")
     print("ndb_ops_test_inplace_scalar_sub_contiguous passed")
 
 
@@ -465,7 +464,7 @@ fn ndb_ops_test_inplace_scalar_mul_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 12, "4 * 3 = 12")
+            assert_true(a[IntArray(i, j)] == 12, "4 * 3 = 12")
     print("ndb_ops_test_inplace_scalar_mul_contiguous passed")
 
 
@@ -477,7 +476,7 @@ fn ndb_ops_test_inplace_scalar_div_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(abs(a[IntList(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
+            assert_true(abs(a[IntArray(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
     print("ndb_ops_test_inplace_scalar_div_contiguous passed")
 
 
@@ -493,7 +492,7 @@ fn ndb_ops_test_inplace_scalar_noncontiguous() raises:
 
     for i in range(2):
         for j in range(3):
-            assert_true(a[IntList(i, j)] == 15, "Non-contiguous scalar add")
+            assert_true(a[IntArray(i, j)] == 15, "Non-contiguous scalar add")
     print("ndb_ops_test_inplace_scalar_noncontiguous passed")
 
 
@@ -511,7 +510,7 @@ fn ndb_ops_test_inplace_scalar_with_offset() raises:
 
     for i in range(2):
         for j in range(3):
-            assert_true(a[IntList(i, j)] == 30, "Offset scalar mul")
+            assert_true(a[IntArray(i, j)] == 30, "Offset scalar mul")
     print("ndb_ops_test_inplace_scalar_with_offset passed")
 
 
@@ -522,7 +521,7 @@ fn ndb_ops_test_inplace_scalar_1d() raises:
     a.inplace_scalar_ops[Add](1.5)
 
     for i in range(10):
-        assert_true(abs(a[IntList(i)] - 4.0) < 0.001, "1D scalar add")
+        assert_true(abs(a[IntArray(i)] - 4.0) < 0.001, "1D scalar add")
     print("ndb_ops_test_inplace_scalar_1d passed")
 
 
@@ -535,7 +534,7 @@ fn ndb_ops_test_inplace_scalar_3d() raises:
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                assert_true(a[IntList(i, j, k)] == 7, "3D scalar sub")
+                assert_true(a[IntArray(i, j, k)] == 7, "3D scalar sub")
     print("ndb_ops_test_inplace_scalar_3d passed")
 
 
@@ -553,8 +552,8 @@ fn ndb_ops_test_scalar_add_contiguous() raises:
     assert_true(result.shape == Shape(3, 4), "Shape preserved")
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 15, "10 + 5 = 15")
-            assert_true(a[IntList(i, j)] == 10, "Original unchanged")
+            assert_true(result[IntArray(i, j)] == 15, "10 + 5 = 15")
+            assert_true(a[IntArray(i, j)] == 10, "Original unchanged")
     print("ndb_ops_test_scalar_add_contiguous passed")
 
 
@@ -566,7 +565,7 @@ fn ndb_ops_test_scalar_sub_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 7, "10 - 3 = 7")
+            assert_true(result[IntArray(i, j)] == 7, "10 - 3 = 7")
     print("ndb_ops_test_scalar_sub_contiguous passed")
 
 
@@ -578,7 +577,7 @@ fn ndb_ops_test_scalar_mul_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 12, "4 * 3 = 12")
+            assert_true(result[IntArray(i, j)] == 12, "4 * 3 = 12")
     print("ndb_ops_test_scalar_mul_contiguous passed")
 
 
@@ -590,7 +589,7 @@ fn ndb_ops_test_scalar_div_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(abs(result[IntList(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
+            assert_true(abs(result[IntArray(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
     print("ndb_ops_test_scalar_div_contiguous passed")
 
 
@@ -602,7 +601,7 @@ fn ndb_ops_test_scalar_reverse_sub_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 7, "10 - 3 = 7")
+            assert_true(result[IntArray(i, j)] == 7, "10 - 3 = 7")
     print("ndb_ops_test_scalar_reverse_sub_contiguous passed")
 
 
@@ -614,7 +613,7 @@ fn ndb_ops_test_scalar_reverse_div_contiguous() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(abs(result[IntList(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
+            assert_true(abs(result[IntArray(i, j)] - 5.0) < 0.001, "10 / 2 = 5")
 
 
 fn ndb_ops_test_scalar_noncontiguous() raises:
@@ -630,7 +629,7 @@ fn ndb_ops_test_scalar_noncontiguous() raises:
     for i in range(2):
         for j in range(3):
             assert_true(
-                result[IntList(i, j)] == 15, "Non-contiguous scalar add"
+                result[IntArray(i, j)] == 15, "Non-contiguous scalar add"
             )
     print("ndb_ops_test_scalar_noncontiguous passed")
 
@@ -649,7 +648,7 @@ fn ndb_ops_test_scalar_with_offset() raises:
 
     for i in range(2):
         for j in range(3):
-            assert_true(result[IntList(i, j)] == 30, "Offset scalar mul")
+            assert_true(result[IntArray(i, j)] == 30, "Offset scalar mul")
     print("ndb_ops_test_scalar_with_offset passed")
 
 
@@ -660,7 +659,7 @@ fn ndb_ops_test_scalar_1d() raises:
     var result = a.scalar_ops[Add](1.5)
 
     for i in range(10):
-        assert_true(abs(result[IntList(i)] - 4.0) < 0.001, "1D scalar add")
+        assert_true(abs(result[IntArray(i)] - 4.0) < 0.001, "1D scalar add")
     print("ndb_ops_test_scalar_1d passed")
 
 
@@ -673,7 +672,7 @@ fn ndb_ops_test_scalar_3d() raises:
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                assert_true(result[IntList(i, j, k)] == 7, "3D scalar sub")
+                assert_true(result[IntArray(i, j, k)] == 7, "3D scalar sub")
     print("ndb_ops_test_scalar_3d passed")
 
 
@@ -691,7 +690,7 @@ fn ndb_ops_test_dunder_add() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 15, "__add__")
+            assert_true(result[IntArray(i, j)] == 15, "__add__")
     print("ndb_ops_test_dunder_add passed")
 
 
@@ -704,7 +703,7 @@ fn ndb_ops_test_dunder_sub() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 7, "__sub__")
+            assert_true(result[IntArray(i, j)] == 7, "__sub__")
     print("ndb_ops_test_dunder_sub passed")
 
 
@@ -717,7 +716,7 @@ fn ndb_ops_test_dunder_mul() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 12, "__mul__")
+            assert_true(result[IntArray(i, j)] == 12, "__mul__")
     print("ndb_ops_test_dunder_mul passed")
 
 
@@ -730,7 +729,7 @@ fn ndb_ops_test_dunder_truediv() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(abs(result[IntList(i, j)] - 5.0) < 0.001, "__truediv__")
+            assert_true(abs(result[IntArray(i, j)] - 5.0) < 0.001, "__truediv__")
     print("ndb_ops_test_dunder_truediv passed")
 
 
@@ -742,7 +741,7 @@ fn ndb_ops_test_dunder_mul_scalar() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 12, "__mul__ scalar")
+            assert_true(result[IntArray(i, j)] == 12, "__mul__ scalar")
     print("ndb_ops_test_dunder_mul_scalar passed")
 
 
@@ -754,7 +753,7 @@ fn ndb_ops_test_dunder_rmul_scalar() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntList(i, j)] == 12, "__rmul__ scalar")
+            assert_true(result[IntArray(i, j)] == 12, "__rmul__ scalar")
     print("ndb_ops_test_dunder_rmul_scalar passed")
 
 
@@ -767,7 +766,7 @@ fn ndb_ops_test_dunder_iadd() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 15, "__iadd__")
+            assert_true(a[IntArray(i, j)] == 15, "__iadd__")
     print("ndb_ops_test_dunder_iadd passed")
 
 
@@ -780,7 +779,7 @@ fn ndb_ops_test_dunder_isub() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 7, "__isub__")
+            assert_true(a[IntArray(i, j)] == 7, "__isub__")
     print("ndb_ops_test_dunder_isub passed")
 
 
@@ -793,7 +792,7 @@ fn ndb_ops_test_dunder_imul() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntList(i, j)] == 12, "__imul__")
+            assert_true(a[IntArray(i, j)] == 12, "__imul__")
     print("ndb_ops_test_dunder_imul passed")
 
 
@@ -806,7 +805,7 @@ fn ndb_ops_test_dunder_itruediv() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(abs(a[IntList(i, j)] - 5.0) < 0.001, "__itruediv__")
+            assert_true(abs(a[IntArray(i, j)] - 5.0) < 0.001, "__itruediv__")
     print("ndb_ops_test_dunder_itruediv passed")
 
 
@@ -818,10 +817,10 @@ fn ndb_ops_test_dunder_itruediv() raises:
 fn ndb_ops_test_scalar_ndbuffer_ops() raises:
     print("ndb_ops_test_scalar_ndbuffer_ops")
     var a = NDBuffer[DType.int32](Shape())
-    a[IntList()] = 10
+    a[IntArray()] = 10
 
     var b = NDBuffer[DType.int32](Shape())
-    b[IntList()] = 5
+    b[IntArray()] = 5
 
     var result = a.arithmetic_ops[Add](b)
     assert_true(result.item() == 15, "Scalar NDBuffer add")
@@ -838,18 +837,18 @@ fn ndb_ops_test_different_dtypes() raises:
     var f64 = NDBuffer[DType.float64].full(Shape(2, 2), 3.14159)
     var f64_result = f64.scalar_ops[Multiply](2.0)
     assert_true(
-        abs(f64_result[IntList(0, 0)] - 6.28318) < 0.0001, "float64 scalar mul"
+        abs(f64_result[IntArray(0, 0)] - 6.28318) < 0.0001, "float64 scalar mul"
     )
 
     # Int64
     var i64 = NDBuffer[DType.int64].full(Shape(2, 2), 1000000)
     var i64_result = i64.scalar_ops[Add](999999)
-    assert_true(i64_result[IntList(0, 0)] == 1999999, "int64 scalar add")
+    assert_true(i64_result[IntArray(0, 0)] == 1999999, "int64 scalar add")
 
     # Int8
     var i8 = NDBuffer[DType.int8].full(Shape(2, 2), 10)
     var i8_result = i8.scalar_ops[Multiply](2)
-    assert_true(i8_result[IntList(0, 0)] == 20, "int8 scalar mul")
+    assert_true(i8_result[IntArray(0, 0)] == 20, "int8 scalar mul")
 
     print("ndb_ops_test_different_dtypes passed")
 
@@ -862,9 +861,9 @@ fn ndb_ops_test_large_buffer() raises:
     var result = a.arithmetic_ops[Add](b)
 
     # Spot check
-    assert_true(result[IntList(0, 0)] == 3, "Large buffer [0,0]")
-    assert_true(result[IntList(50, 50)] == 3, "Large buffer [50,50]")
-    assert_true(result[IntList(99, 99)] == 3, "Large buffer [99,99]")
+    assert_true(result[IntArray(0, 0)] == 3, "Large buffer [0,0]")
+    assert_true(result[IntArray(50, 50)] == 3, "Large buffer [50,50]")
+    assert_true(result[IntArray(99, 99)] == 3, "Large buffer [99,99]")
     print("ndb_ops_test_large_buffer passed")
 
 
@@ -963,7 +962,7 @@ fn test_copy_from_equal_shaped_both_contiguous_overwrite() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(dest[IntList(i, j)] == 42, "Should be 42")
+            assert_true(dest[IntArray(i, j)] == 42, "Should be 42")
     print("test_copy_from_equal_shaped_both_contiguous_overwrite passed")
 
 
@@ -976,7 +975,7 @@ fn test_copy_from_equal_shaped_both_contiguous_add() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(dest[IntList(i, j)] == 15, "Should be 10 + 5 = 15")
+            assert_true(dest[IntArray(i, j)] == 15, "Should be 10 + 5 = 15")
     print("test_copy_from_equal_shaped_both_contiguous_add passed")
 
 
@@ -1003,8 +1002,8 @@ fn test_copy_from_equal_shaped_dest_contiguous_src_noncontiguous_overwrite() rai
     # Verify values were copied correctly
     for i in range(2):
         for j in range(3):
-            var expected = src[IntList(i, j)]
-            var actual = dest[IntList(i, j)]
+            var expected = src[IntArray(i, j)]
+            var actual = dest[IntArray(i, j)]
             assert_true(
                 actual == expected,
                 "Mismatch at " + i.__str__() + "," + j.__str__(),
@@ -1034,7 +1033,7 @@ fn test_copy_from_equal_shaped_dest_noncontiguous_src_contiguous_overwrite() rai
     for i in range(2):
         for j in range(3):
             assert_true(
-                dest[IntList(i, j)] == 99,
+                dest[IntArray(i, j)] == 99,
                 "Should be 99 at " + i.__str__() + "," + j.__str__(),
             )
     print(
@@ -1065,8 +1064,8 @@ fn test_copy_from_equal_shaped_both_noncontiguous_overwrite() raises:
 
     for i in range(2):
         for j in range(3):
-            var expected = src[IntList(i, j)]
-            var actual = dest[IntList(i, j)]
+            var expected = src[IntArray(i, j)]
+            var actual = dest[IntArray(i, j)]
             assert_true(
                 actual == expected,
                 "Mismatch at " + i.__str__() + "," + j.__str__(),
@@ -1095,7 +1094,7 @@ fn test_copy_from_equal_shaped_both_noncontiguous_add() raises:
 
     for i in range(2):
         for j in range(3):
-            assert_true(dest[IntList(i, j)] == 15, "Should be 10 + 5 = 15")
+            assert_true(dest[IntArray(i, j)] == 15, "Should be 10 + 5 = 15")
     print("test_copy_from_equal_shaped_both_noncontiguous_add passed")
 
 
@@ -1128,8 +1127,8 @@ fn test_copy_from_equal_shaped_with_offset() raises:
     # Verify correct values were copied
     for i in range(2):
         for j in range(3):
-            var expected = src[IntList(i, j)]
-            var actual = dest[IntList(i, j)]
+            var expected = src[IntArray(i, j)]
+            var actual = dest[IntArray(i, j)]
             assert_true(
                 actual == expected,
                 "Mismatch at " + i.__str__() + "," + j.__str__(),
@@ -1145,7 +1144,7 @@ fn test_copy_from_equal_shaped_1d() raises:
     dest.copy_from_alike[overwrite=True](src)
 
     for i in range(10):
-        assert_true(abs(dest[IntList(i)] - 3.14) < 0.001, "Should be 3.14")
+        assert_true(abs(dest[IntArray(i)] - 3.14) < 0.001, "Should be 3.14")
     print("test_copy_from_equal_shaped_1d passed")
 
 
@@ -1158,7 +1157,7 @@ fn test_copy_from_equal_shaped_3d() raises:
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                src[IntList(i, j, k)] = i * 100 + j * 10 + k
+                src[IntArray(i, j, k)] = i * 100 + j * 10 + k
 
     dest.copy_from_alike[overwrite=True](src)
 
@@ -1167,7 +1166,7 @@ fn test_copy_from_equal_shaped_3d() raises:
             for k in range(4):
                 var expected = i * 100 + j * 10 + k
                 assert_true(
-                    dest[IntList(i, j, k)] == expected, "3D copy mismatch"
+                    dest[IntArray(i, j, k)] == expected, "3D copy mismatch"
                 )
     print("test_copy_from_equal_shaped_3d passed")
 
@@ -1175,10 +1174,10 @@ fn test_copy_from_equal_shaped_3d() raises:
 fn test_copy_from_equal_shaped_scalar() raises:
     print("test_copy_from_equal_shaped_scalar")
     var dest = NDBuffer[DType.int32](Shape())
-    dest[IntList()] = 0
+    dest[IntArray()] = 0
 
     var src = NDBuffer[DType.int32](Shape())
-    src[IntList()] = 42
+    src[IntArray()] = 42
 
     dest.copy_from_alike[overwrite=True](src)
 
@@ -1200,7 +1199,7 @@ fn test_fill_same_shape() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(dest[IntList(i, j)] == 77, "Should be 77")
+            assert_true(dest[IntArray(i, j)] == 77, "Should be 77")
     print("test_fill_same_shape passed")
 
 
@@ -1208,13 +1207,13 @@ fn test_fill_from_scalar_ndbuffer() raises:
     print("test_fill_from_scalar_ndbuffer")
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var scalar_src = NDBuffer[DType.int32](Shape())
-    scalar_src[IntList()] = 99
+    scalar_src[IntArray()] = 99
 
     dest.fill(scalar_src)
 
     for i in range(3):
         for j in range(4):
-            assert_true(dest[IntList(i, j)] == 99, "Should be 99")
+            assert_true(dest[IntArray(i, j)] == 99, "Should be 99")
     print("test_fill_from_scalar_ndbuffer passed")
 
 
@@ -1227,7 +1226,7 @@ fn test_fill_from_singleton_ndbuffer() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(dest[IntList(i, j)] == 88, "Should be 88")
+            assert_true(dest[IntArray(i, j)] == 88, "Should be 88")
     print("test_fill_from_singleton_ndbuffer passed")
 
 
@@ -1236,14 +1235,14 @@ fn test_fill_broadcast_row() raises:
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var src = NDBuffer[DType.int32](Shape(1, 4))
     for j in range(4):
-        src[IntList(0, j)] = j * 10
+        src[IntArray(0, j)] = j * 10
 
     dest.fill(src)
 
     for i in range(3):
         for j in range(4):
             assert_true(
-                dest[IntList(i, j)] == j * 10, "Broadcast row fill mismatch"
+                dest[IntArray(i, j)] == j * 10, "Broadcast row fill mismatch"
             )
     print("test_fill_broadcast_row passed")
 
@@ -1253,14 +1252,14 @@ fn test_fill_broadcast_col() raises:
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var src = NDBuffer[DType.int32](Shape(3, 1))
     for i in range(3):
-        src[IntList(i, 0)] = i * 100
+        src[IntArray(i, 0)] = i * 100
 
     dest.fill(src)
 
     for i in range(3):
         for j in range(4):
             assert_true(
-                dest[IntList(i, j)] == i * 100, "Broadcast col fill mismatch"
+                dest[IntArray(i, j)] == i * 100, "Broadcast col fill mismatch"
             )
     print("test_fill_broadcast_col passed")
 
@@ -1270,7 +1269,7 @@ fn test_fill_broadcast_3d() raises:
     var dest = NDBuffer[DType.int32].zeros(Shape(2, 3, 4))
     var src = NDBuffer[DType.int32](Shape(1, 3, 1))
     for j in range(3):
-        src[IntList(0, j, 0)] = j + 1
+        src[IntArray(0, j, 0)] = j + 1
 
     dest.fill(src)
 
@@ -1278,7 +1277,7 @@ fn test_fill_broadcast_3d() raises:
         for j in range(3):
             for k in range(4):
                 assert_true(
-                    dest[IntList(i, j, k)] == j + 1,
+                    dest[IntArray(i, j, k)] == j + 1,
                     "3D broadcast fill mismatch",
                 )
     print("test_fill_broadcast_3d passed")
@@ -1312,7 +1311,7 @@ fn test_fill_preserves_dest_structure() raises:
     for i in range(2):
         for j in range(3):
             assert_true(
-                dest[IntList(i, j)] == 55, "Non-contiguous dest fill mismatch"
+                dest[IntArray(i, j)] == 55, "Non-contiguous dest fill mismatch"
             )
     print("test_fill_preserves_dest_structure passed")
 
@@ -1324,19 +1323,19 @@ fn test_fill_different_dtypes() raises:
     var dest_f32 = NDBuffer[DType.float32].zeros(Shape(2, 2))
     var src_f32 = NDBuffer[DType.float32].full(Shape(2, 2), 3.14)
     dest_f32.fill(src_f32)
-    assert_true(abs(dest_f32[IntList(0, 0)] - 3.14) < 0.001, "float32 fill")
+    assert_true(abs(dest_f32[IntArray(0, 0)] - 3.14) < 0.001, "float32 fill")
 
     # Float64
     var dest_f64 = NDBuffer[DType.float64].zeros(Shape(2, 2))
     var src_f64 = NDBuffer[DType.float64].full(Shape(2, 2), 2.718)
     dest_f64.fill(src_f64)
-    assert_true(abs(dest_f64[IntList(0, 0)] - 2.718) < 0.001, "float64 fill")
+    assert_true(abs(dest_f64[IntArray(0, 0)] - 2.718) < 0.001, "float64 fill")
 
     # Int64
     var dest_i64 = NDBuffer[DType.int64].zeros(Shape(2, 2))
     var src_i64 = NDBuffer[DType.int64].full(Shape(2, 2), 9999)
     dest_i64.fill(src_i64)
-    assert_true(dest_i64[IntList(0, 0)] == 9999, "int64 fill")
+    assert_true(dest_i64[IntArray(0, 0)] == 9999, "int64 fill")
 
     print("test_fill_different_dtypes passed")
 
@@ -1386,8 +1385,8 @@ fn test_ndbuffer_from_varargs() raises:
     print("test_ndbuffer_from_varargs")
     var ndb = NDBuffer[DType.float32](1.0, 2.0, 3.0, 4.0)
     assert_true(ndb.shape == Shape(4), "Shape should be (4,)")
-    assert_true(ndb[IntList(0)] == 1.0, "First element")
-    assert_true(ndb[IntList(3)] == 4.0, "Last element")
+    assert_true(ndb[IntArray(0)] == 1.0, "First element")
+    assert_true(ndb[IntArray(3)] == 4.0, "Last element")
     print("test_ndbuffer_from_varargs passed")
 
 
@@ -1405,7 +1404,7 @@ fn test_ndbuffer_zeros() raises:
     var ndb = NDBuffer[DType.float32].zeros(Shape(2, 3))
     for i in range(2):
         for j in range(3):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(ndb[idx] == 0.0, "Should be zero")
     print("test_ndbuffer_zeros passed")
 
@@ -1415,7 +1414,7 @@ fn test_ndbuffer_full() raises:
     var ndb = NDBuffer[DType.int32].full(Shape(2, 3), 42)
     for i in range(2):
         for j in range(3):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(ndb[idx] == 42, "Should be 42")
     print("test_ndbuffer_full passed")
 
@@ -1429,12 +1428,12 @@ fn test_ndbuffer_getitem_setitem() raises:
 
     for i in range(3):
         for j in range(4):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             ndb[idx] = i * 10 + j
 
     for i in range(3):
         for j in range(4):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(
                 ndb[idx] == i * 10 + j,
                 "Value mismatch at " + i.__str__() + "," + j.__str__(),
@@ -1445,7 +1444,7 @@ fn test_ndbuffer_getitem_setitem() raises:
 fn test_ndbuffer_item_scalar() raises:
     print("test_ndbuffer_item_scalar")
     var ndb = NDBuffer[DType.float32](Shape(1))
-    ndb[IntList(0)] = 42.5
+    ndb[IntArray(0)] = 42.5
     assert_true(ndb.item() == 42.5, "item() should return scalar value")
     print("test_ndbuffer_item_scalar passed")
 
@@ -1461,7 +1460,7 @@ fn test_ndbuffer_add() raises:
 
     for i in range(2):
         for j in range(3):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(result[idx] == 15, "Add result should be 15")
     print("test_ndbuffer_add passed")
 
@@ -1474,7 +1473,7 @@ fn test_ndbuffer_mul() raises:
 
     for i in range(2):
         for j in range(3):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(result[idx] == 12, "Mul result should be 12")
     print("test_ndbuffer_mul passed")
 
@@ -1486,7 +1485,7 @@ fn test_ndbuffer_scalar_mul() raises:
 
     for i in range(2):
         for j in range(3):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(result[idx] == 15, "Scalar mul result should be 15")
     print("test_ndbuffer_scalar_mul passed")
 
@@ -1499,7 +1498,7 @@ fn test_ndbuffer_iadd() raises:
 
     for i in range(2):
         for j in range(3):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(a[idx] == 15, "iadd result should be 15")
     print("test_ndbuffer_iadd passed")
 
@@ -1516,7 +1515,7 @@ fn test_ndbuffer_broadcast_scalar() raises:
     assert_true(result.shape == Shape(2, 3), "Broadcast shape")
     for i in range(2):
         for j in range(3):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(result[idx] == 15, "Broadcast add result should be 15")
     print("test_ndbuffer_broadcast_scalar passed")
 
@@ -1526,14 +1525,14 @@ fn test_ndbuffer_broadcast_row() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
     for j in range(4):
-        b[IntList(0, j)] = j
+        b[IntArray(0, j)] = j
 
     var result = a + b
     assert_true(result.shape == Shape(3, 4), "Broadcast shape")
 
     for i in range(3):
         for j in range(4):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(result[idx] == 10 + j, "Broadcast row add")
     print("test_ndbuffer_broadcast_row passed")
 
@@ -1546,7 +1545,7 @@ fn test_ndbuffer_broadcast_to() raises:
     assert_true(result.shape == Shape(4, 3), "broadcast_to shape")
     for i in range(4):
         for j in range(3):
-            var idx = IntList(i, j)
+            var idx = IntArray(i, j)
             assert_true(result[idx] == 5, "broadcast_to value")
     print("test_ndbuffer_broadcast_to passed")
 
@@ -1560,7 +1559,7 @@ fn test_ndbuffer_sum_all() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntList(i, j)] = val
+            ndb[IntArray(i, j)] = val
             val += 1
     # Values: 1,2,3,4,5,6 -> sum = 21
 
@@ -1577,15 +1576,15 @@ fn test_ndbuffer_sum_axis() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntList(i, j)] = val
+            ndb[IntArray(i, j)] = val
             val += 1
 
     # Sum over axis 0 (rows) -> shape (3,)
-    var result = ndb.sum(IntList(0), keepdims=False)
+    var result = ndb.sum(IntArray(0), keepdims=False)
     assert_true(result.shape == Shape(3), "Sum axis 0 shape")
-    assert_true(result[IntList(0)] == 5, "Sum col 0: 1+4=5")
-    assert_true(result[IntList(1)] == 7, "Sum col 1: 2+5=7")
-    assert_true(result[IntList(2)] == 9, "Sum col 2: 3+6=9")
+    assert_true(result[IntArray(0)] == 5, "Sum col 0: 1+4=5")
+    assert_true(result[IntArray(1)] == 7, "Sum col 1: 2+5=7")
+    assert_true(result[IntArray(2)] == 9, "Sum col 2: 3+6=9")
     print("test_ndbuffer_sum_axis passed")
 
 
@@ -1595,10 +1594,10 @@ fn test_ndbuffer_sum_axis_keepdims() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntList(i, j)] = val
+            ndb[IntArray(i, j)] = val
             val += 1
 
-    var result = ndb.sum(IntList(0), keepdims=True)
+    var result = ndb.sum(IntArray(0), keepdims=True)
     assert_true(result.shape == Shape(1, 3), "Sum keepdims shape")
     print("test_ndbuffer_sum_axis_keepdims passed")
 
@@ -1611,7 +1610,7 @@ fn test_ndbuffer_contiguous() raises:
     var ndb = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
         for j in range(3):
-            ndb[IntList(i, j)] = i * 10 + j
+            ndb[IntArray(i, j)] = i * 10 + j
 
     assert_true(ndb.is_contiguous(), "Should be contiguous")
 
@@ -1628,7 +1627,7 @@ fn test_ndbuffer_contiguous_buffer() raises:
     var ndb = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
         for j in range(3):
-            ndb[IntList(i, j)] = i * 10 + j
+            ndb[IntArray(i, j)] = i * 10 + j
 
     var buf = ndb.contiguous_buffer()
     assert_true(buf.size == 6, "Contiguous buffer size")
@@ -1655,13 +1654,13 @@ fn test_ndbuffer_compare_elementwise() raises:
     print("test_ndbuffer_compare_elementwise")
     var a = NDBuffer[DType.int32](Shape(4))
     for i in range(4):
-        a[IntList(i)] = i  # 0, 1, 2, 3
+        a[IntArray(i)] = i  # 0, 1, 2, 3
 
     var result = a.compare_scalar[LessThan](2)
-    assert_true(result[IntList(0)] == True, "0 < 2")
-    assert_true(result[IntList(1)] == True, "1 < 2")
-    assert_true(result[IntList(2)] == False, "2 < 2")
-    assert_true(result[IntList(3)] == False, "3 < 2")
+    assert_true(result[IntArray(0)] == True, "0 < 2")
+    assert_true(result[IntArray(1)] == True, "1 < 2")
+    assert_true(result[IntArray(2)] == False, "2 < 2")
+    assert_true(result[IntArray(3)] == False, "3 < 2")
     print("test_ndbuffer_compare_elementwise passed")
 
 
@@ -1686,7 +1685,7 @@ fn test_ndbuffer_fill() raises:
 
     for i in range(2):
         for j in range(3):
-            assert_true(ndb[IntList(i, j)] == 99, "Fill value")
+            assert_true(ndb[IntArray(i, j)] == 99, "Fill value")
     print("test_ndbuffer_fill passed")
 
 
@@ -1695,7 +1694,7 @@ fn test_ndbuffer_count() raises:
     var ndb = NDBuffer[DType.int32](Shape(3, 4))
     for i in range(3):
         for j in range(4):
-            ndb[IntList(i, j)] = (i + j) % 3
+            ndb[IntArray(i, j)] = (i + j) % 3
 
     var count_0 = ndb.count(0)
     var count_1 = ndb.count(1)
@@ -1711,7 +1710,7 @@ fn test_ndbuffer_flatten() raises:
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                ndb[IntList(i, j, k)] = i * 100 + j * 10 + k
+                ndb[IntArray(i, j, k)] = i * 100 + j * 10 + k
 
     var flat = ndb.flatten()
     assert_true(flat.shape == Shape(24), "Flatten shape")
@@ -1736,7 +1735,7 @@ fn test_ndbuffer_to_dtype() raises:
     assert_true(result.shape == Shape(2, 3), "Shape preserved")
     for i in range(2):
         for j in range(3):
-            assert_true(result[IntList(i, j)] == 42.0, "Value converted")
+            assert_true(result[IntArray(i, j)] == 42.0, "Value converted")
     print("test_ndbuffer_to_dtype passed")
 
 
@@ -1753,8 +1752,8 @@ fn test_ndbuffer_share() raises:
     assert_true(view.shared(), "View is shared")
 
     # Modify original
-    ndb[IntList(0, 0)] = 99
-    assert_true(view[IntList(0, 0)] == 99, "View sees modification")
+    ndb[IntArray(0, 0)] = 99
+    assert_true(view[IntArray(0, 0)] == 99, "View sees modification")
     print("test_ndbuffer_share passed")
 
 
@@ -1768,7 +1767,7 @@ fn test_ndbuffer_simd_load_store() raises:
     # Fill with pattern
     for i in range(4):
         for j in range(8):
-            ndb[IntList(i, j)] = Scalar[DType.float32](i * 10 + j)
+            ndb[IntArray(i, j)] = Scalar[DType.float32](i * 10 + j)
 
     # SIMD load row 1, starting at col 0, width 4
     var vec = ndb.load[4](1, 0)
@@ -1780,8 +1779,8 @@ fn test_ndbuffer_simd_load_store() raises:
     # SIMD store
     var new_vec = SIMD[DType.float32, 4](100.0, 101.0, 102.0, 103.0)
     ndb.store[4](2, 0, new_vec)
-    assert_true(ndb[IntList(2, 0)] == 100.0, "SIMD store [0]")
-    assert_true(ndb[IntList(2, 3)] == 103.0, "SIMD store [3]")
+    assert_true(ndb[IntArray(2, 0)] == 100.0, "SIMD store [0]")
+    assert_true(ndb[IntArray(2, 3)] == 103.0, "SIMD store [3]")
     print("test_ndbuffer_simd_load_store passed")
 
 
@@ -1889,20 +1888,20 @@ fn test_buffer_sum() raises:
 
     buffer = Buffer[dtype](l)
     ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
-    result = ndb.sum(IntList(0), True)
+    result = ndb.sum(IntArray(0), True)
     assert_true(
         result.data_buffer() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39])
     )
 
-    result = ndb.sum(IntList(0), False)
+    result = ndb.sum(IntArray(0), False)
     assert_true(
         result.data_buffer() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39])
     )
 
-    result = ndb.sum(IntList(0, 1), True)
+    result = ndb.sum(IntArray(0, 1), True)
     assert_true(result.data_buffer() == Buffer[dtype]([210]))
 
-    result = ndb.sum(IntList(1), True)
+    result = ndb.sum(IntArray(1), True)
     assert_true(result.data_buffer() == Buffer[dtype]([21, 70, 119]))
 
 
@@ -1931,7 +1930,7 @@ fn test_buffer_sum_all() raises:
     # Shape(1)
     ndb = NDBuffer[dtype](Shape(1))
     ndb.fill(39)
-    assert_true(ndb.sum_all() == 39 and ndb[IntList(0)] == 39)
+    assert_true(ndb.sum_all() == 39 and ndb[IntArray(0)] == 39)
     shared = ndb.share()
     assert_true(
         shared.sum_all() == 39 and shared.item() == 39 and ndb.item() == 39
@@ -2175,7 +2174,6 @@ fn test_zero() raises:
     shared = ndb.share(Shape(3), offset=3)
     shared.zero()
     assert_true(ndb.data_buffer() == Buffer[dtype]([42, 42, 42, 0, 0, 0]))
-
 
 fn test_broadcast_fill() raises:
     print("test_broadcast_fill")
@@ -2428,9 +2426,7 @@ fn test_ndbuffer_inplace_ops() raises:
     buffer1.fill(42)
     shape = Shape(5, 6)
     ndbuffer1 = NDBuffer[dtype](buffer1^, shape, None)
-    index1 = IntList(2)
-    index1[0] = 4
-    index1[1] = 5
+    index1 = IntArray(4, 5)
     assert_true(ndbuffer1[index1] == 42, "NDBuffer get failed")
 
     buffer2 = Buffer[dtype](30)
@@ -2463,8 +2459,8 @@ fn test_ndbuffer_set_get() raises:
     buffer[0] = 42
     shape = Shape()
     ndbuffer = NDBuffer[dtype](buffer.copy(), shape, None)
-    assert_true(ndbuffer[IntList()] == 42, "NDBuffer get failed")
-    ndbuffer[IntList()] = 97
-    assert_true(ndbuffer[IntList()] == 97, "NDBuffer get failed post update")
+    assert_true(ndbuffer[IntArray()] == 42, "NDBuffer get failed")
+    ndbuffer[IntArray()] = 97
+    assert_true(ndbuffer[IntArray()] == 97, "NDBuffer get failed post update")
     assert_true(ndbuffer.item() == 97, "NDBuffer item() failed post update")
     assert_true(ndbuffer.is_scalar(), "NDBuffer is_scalar check failed")

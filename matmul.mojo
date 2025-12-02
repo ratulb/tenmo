@@ -16,7 +16,7 @@ from common_utils import il, s, panic, log_debug
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
     @always_inline
     fn backward[
-        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 64
+        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 32
     ](self, output: Tensor[dtype]) -> List[
         Tuple[Ancestor[dtype], Gradbox[dtype], Int]
     ]:
@@ -41,7 +41,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             var grad_out_offset = grad_out.offset()
             var grad_out_data = grad_out.buffer.buffer.data
 
-            var B_tensor = B.tensor()
+            #var B_tensor = B.tensor()
+            ref B_tensor = B.tensor()
             var B_stride0 = B_tensor.buffer.strides[0]
             var B_stride1 = B_tensor.buffer.strides[1]
             var B_offset = B_tensor.buffer.offset
@@ -112,7 +113,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         if B.requires_grad():
             var grad_B = Gradbox[dtype].zeros(Shape([n, p]))
 
-            var A_tensor = A.tensor()
+            ref A_tensor = A.tensor()
             var A_stride0 = A_tensor.buffer.strides[0]
             var A_stride1 = A_tensor.buffer.strides[1]
             var A_offset = A_tensor.buffer.offset
@@ -197,10 +198,10 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     fn forward[
         track_grad: Bool = True,
         simdwidth: Int = simd_width_of[dtype](),
-        tile_size: Int = 64,  # Tune this: 32, 64, or 128
+        tile_size: Int = 32,  # Tune this: 32, 64, or 128
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        var A_shape = A.shape()
-        var B_shape = B.shape()
+        ref A_shape = A.shape()
+        ref B_shape = B.shape()
         var m = A_shape[0]
         var n = A_shape[1]
         var p = B_shape[1]
@@ -306,7 +307,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     @always_inline
     fn forward[
-        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 64
+        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 32
     ](A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
         var m = A.shape()[0]
         var n = A.shape()[1]
@@ -380,7 +381,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     @always_inline
     fn forward[
-        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 64
+        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 32
     ](A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
         var m = A.shape()[0]
         var n = A.shape()[1]
@@ -507,8 +508,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
         ref A_tensor = A.tensor()
         ref B_tensor = B.tensor()
 
-        var A_shape = A_tensor.shape()
-        var B_shape = B_tensor.shape()
+        ref A_shape = A_tensor.shape()
+        ref B_shape = B_tensor.shape()
         var results = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
 
         if A.requires_grad():
@@ -545,8 +546,8 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     fn forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-        A_shape = A.shape()
-        B_shape = B.shape()
+        ref A_shape = A.shape()
+        ref B_shape = B.shape()
 
         # Short-circuit for pure 2D case
         if A_shape.rank() == 2 and B_shape.rank() == 2:
@@ -601,8 +602,8 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
-        A_shape = A.shape()
-        B_shape = B.shape()
+        ref A_shape = A.shape()
+        ref B_shape = B.shape()
         # Short-circuit for 2D
         if A_shape.rank() == 2 and B_shape.rank() == 2:
             return Matmul2d[dtype].forward(A, B)
@@ -643,8 +644,8 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
-        A_shape = A.shape()
-        B_shape = B.shape()
+        ref A_shape = A.shape()
+        ref B_shape = B.shape()
 
         # Short-circuit for 2D
         if A_shape.rank() == 2 and B_shape.rank() == 2:

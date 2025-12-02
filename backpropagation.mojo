@@ -43,6 +43,14 @@ alias Delegate[dtype: DType] = Variant[
     SoftmaxBackward[dtype],
     LogSoftmaxBackward[dtype],
     TileBackward[dtype],
+    SigmoidBackward[dtype],
+    TanhBackward[dtype],
+    LogBackward[dtype],
+    ClipBackward[dtype],
+    BCEBackward[dtype],
+    SqrtBackward[dtype],
+    VarianceBackward[dtype],
+    StdBackward[dtype],
 ]
 
 
@@ -180,6 +188,28 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.grad_fn.isa[TileBackward[dtype]]():
             return self.grad_fn[TileBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[SigmoidBackward[dtype]]():
+            return self.grad_fn[SigmoidBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[TanhBackward[dtype]]():
+            return self.grad_fn[TanhBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[LogBackward[dtype]]():
+            return self.grad_fn[LogBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[ClipBackward[dtype]]():
+            return self.grad_fn[ClipBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[BCEBackward[dtype]]():
+            return self.grad_fn[BCEBackward[dtype]].backward(output)
+
+        elif self.grad_fn.isa[SqrtBackward[dtype]]():
+            return self.grad_fn[SqrtBackward[dtype]].backward(output)
+        elif self.grad_fn.isa[VarianceBackward[dtype]]():
+            return self.grad_fn[VarianceBackward[dtype]].backward(output)
+        elif self.grad_fn.isa[StdBackward[dtype]]():
+            return self.grad_fn[StdBackward[dtype]].backward(output)
 
         else:
             panic("I am not here to receive you")

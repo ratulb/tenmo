@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor, ZeroGrad
-from intlist import IntList
+from intarray import IntArray
 from shapes import Shape
 from strides import Strides
 from backpropagation import Delegate, BackwardFn
@@ -13,7 +13,7 @@ from ancestry import Ancestor
 @fieldwise_init
 @register_passable
 struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable):
-    var axes: IntList  # where axes were inserted
+    var axes: IntArray  # where axes were inserted
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -39,7 +39,7 @@ struct Unsqueeze[dtype: DType]:
         track_grad: Bool = True
     ](
         tensor: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
@@ -53,8 +53,8 @@ struct Unsqueeze[dtype: DType]:
 
         new_rank = rank + new_axes_count
 
-        normalized_axes = IntList.with_capacity(new_axes_count)
-        seen = IntList.with_capacity(new_axes_count)
+        normalized_axes = IntArray.with_capacity(new_axes_count)
+        seen = IntArray.with_capacity(new_axes_count)
 
         for axis in axes:
             normalized = axis if axis >= 0 else new_rank + axis
@@ -73,8 +73,8 @@ struct Unsqueeze[dtype: DType]:
         normalized_axes.sort()
 
         # Pre-allocate with exact capacity
-        var new_shape = IntList.with_capacity(new_rank)
-        var new_strides = IntList.with_capacity(new_rank)
+        var new_shape = IntArray.with_capacity(new_rank)
+        var new_strides = IntArray.with_capacity(new_rank)
 
         var orig_axis_index = 0
         var new_axis_index = 0

@@ -1,6 +1,5 @@
 from time import perf_counter_ns
 from tensors import Tensor
-from intlist import IntList
 from testing import assert_true
 from algorithm import vectorize
 from sys import simdwidthof
@@ -13,8 +12,8 @@ fn main() raises:
     forward_only_time = 0
     forward_backward_time = 0
 
-    A = Tensor.rand(A_rows, A_cols)
-    B = Tensor.rand(B_rows, B_cols)
+    A = Tensor.rand(Shape(A_rows, A_cols))
+    B = Tensor.rand(Shape(B_rows, B_cols))
     expected, t1 = mm_naive(A, B)
 
     naive_time = t1 * runs

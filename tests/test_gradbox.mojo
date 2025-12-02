@@ -5,7 +5,7 @@ from shapes import Shape
 from gradbox import Gradbox
 from unsqueeze import Unsqueeze
 from tenmo import Tensor
-from intlist import IntList
+from intarray import IntArray
 
 fn main() raises:
     run = 1
@@ -136,7 +136,7 @@ fn test_gradbox_permute_basic() raises:
     print("Running test_gradbox_permute_basic")
     g1 = Gradbox[dtype](Shape(3, 4))
     g1.buffer.fill(Scalar[dtype](1.0))
-    p = g1.permute(IntList([1, 0]))
+    p = g1.permute(IntArray([1, 0]))
     assert_true(p.shape() == Shape(4, 3))
     assert_true(g1.numels() == p.numels())
     print("✓ Passed test_gradbox_permute_basic")
@@ -146,7 +146,7 @@ fn test_gradbox_permute_3d() raises:
     print("Running test_gradbox_permute_3d")
     g1 = Gradbox[dtype](Shape(3, 4, 5))
     g1.buffer.fill(Scalar[dtype](2.0))
-    p = g1.permute(IntList([2, 0, 1]))
+    p = g1.permute(IntArray([2, 0, 1]))
     assert_true(p.shape() == Shape(5, 3, 4))
     assert_true(g1.numels() == p.numels())
     print("✓ Passed test_gradbox_permute_3d")
@@ -156,8 +156,8 @@ fn test_gradbox_permute_inverse() raises:
     print("Running test_gradbox_permute_inverse")
     g1 = Gradbox[dtype](Shape(2, 3, 4))
     g1.buffer.fill(Scalar[dtype](3.0))
-    p = g1.permute(IntList([1, 2, 0]))
-    inv = p.permute(IntList([2, 0, 1]))
+    p = g1.permute(IntArray([1, 2, 0]))
+    inv = p.permute(IntArray([2, 0, 1]))
     assert_true(inv.shape() == g1.shape())
     assert_true(inv.all_close(g1))
     print("✓ Passed test_gradbox_permute_inverse")
@@ -167,7 +167,7 @@ fn test_gradbox_permute_identity() raises:
     print("Running test_gradbox_permute_identity")
     g1 = Gradbox[dtype](Shape(3, 4, 5))
     g1.buffer.fill(Scalar[dtype](5.0))
-    p = g1.permute(IntList([0, 1, 2]))
+    p = g1.permute(IntArray([0, 1, 2]))
     assert_true(p.shape() == g1.shape())
     assert_true(p.all_close(g1))
     print("✓ Passed test_gradbox_permute_identity")
@@ -177,7 +177,7 @@ fn test_gradbox_permute_singleton_dims() raises:
     print("Running test_gradbox_permute_singleton_dims")
     g1 = Gradbox[dtype](Shape(1, 4, 1))
     g1.buffer.fill(Scalar[dtype](7.0))
-    p = g1.permute(IntList([2, 1, 0]))
+    p = g1.permute(IntArray([2, 1, 0]))
     assert_true(p.shape() == Shape(1, 4, 1))
     assert_true(p.numels() == g1.numels())
     assert_true(p.all_close(g1))
@@ -188,7 +188,7 @@ fn test_gradbox_permute_high_rank() raises:
     print("Running test_gradbox_permute_high_rank")
     g1 = Gradbox[dtype](Shape(2, 3, 4, 5))
     g1.buffer.fill(Scalar[dtype](9.0))
-    p = g1.permute(IntList([3, 2, 1, 0]))
+    p = g1.permute(IntArray([3, 2, 1, 0]))
     assert_true(p.shape() == Shape(5, 4, 3, 2))
     assert_true(g1.numels() == p.numels())
     print("✓ Passed test_gradbox_permute_high_rank")
@@ -218,7 +218,7 @@ fn test_gradbox_squeeze_with_axes_list() raises:
         NDBuffer[DType.float32].full(Shape.of(2, 1, 3), Scalar[DType.float32](2.0)), share=False
     )
     # specify axis 1 to squeeze -> shape becomes (2,3)
-    var s = g.squeeze(IntList([1]))
+    var s = g.squeeze(IntArray([1]))
     assert_true(s.shape() == Shape.of(2, 3))
     # values preserved
     assert_true(s.as_tensor(requires_grad=False).all_close(Tensor.d2([[2, 2, 2], [2, 2, 2]])))
@@ -255,7 +255,7 @@ fn test_gradbox_squeeze_integration_with_unsqueeze_backward() raises:
     # should be reduced (squeezed) back to original shape. Behaviourally this uses Gradbox.squeeze().
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)  # shape (2,2)
     # Unsqueeze axes [0, 2] -> new rank = 4, shape (1, 2, 1, 2)
-    var u = Unsqueeze.forward[track_grad=True](a, IntList([0, 2]), requires_grad=None)
+    var u = Unsqueeze.forward[track_grad=True](a, IntArray([0, 2]), requires_grad=None)
     # do a simple op and backward
     var out = u.sum()
     out.backward()
@@ -266,7 +266,7 @@ fn test_gradbox_squeeze_chain_of_ops() raises:
     print("test_gradbox_squeeze_chain_of_ops")
     # chain: Tensor -> Unsqueeze -> some ops -> backward uses Gradbox.squeeze internally
     var a = Tensor.d3([[[1.0, 2.0]]], requires_grad=True)  # shape (1,1,2)
-    var u = Unsqueeze.forward[track_grad=True](a, IntList([0, 2]), requires_grad=None)
+    var u = Unsqueeze.forward[track_grad=True](a, IntArray([0, 2]), requires_grad=None)
     var v = u * 3.0
     var loss = v.sum()
     loss.backward()

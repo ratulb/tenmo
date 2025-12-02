@@ -6,7 +6,7 @@ from operators import AddTensor, ZeroGrad
 from validators import Validator
 from ancestry import Ancestor
 from gradbox import Gradbox
-from layout.int_tuple import IntArray
+from intarray import IntArray
 from common_utils import panic, log_warning
 from sys import simd_width_of
 
@@ -64,9 +64,10 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
                     ]
             else:
                 # General path: Handle all view types using absolute offset mapping
-                var position = IntArray(size=parent_rank)
+                var position = IntArray.with_capacity(parent_rank)
 
                 for child_coord in self.shape:
+                    position.clear()
                     # Step 1: Compute absolute buffer index from child coordinates
                     var abs_index = self.offset
                     for i in range(view_rank):
@@ -89,9 +90,11 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
                     for i in range(parent_rank):
                         var stride = parent_strides[i]
                         if stride == 0:
-                            position[i] = 0  # Broadcast dimension
+                            #position[i] = 0  # Broadcast dimension
+                            position.append(0)  # Broadcast dimension
                         else:
-                            position[i] = remaining // stride
+                            #position[i] = remaining // stride
+                            position.append(remaining // stride)
                             if (
                                 position[i] < 0
                                 or position[i] >= parent_shape[i]
@@ -135,15 +138,12 @@ struct View[dtype: DType](Copyable):
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[dtype]:
-        _ = """if not Self.is_non_overlapping(self.shape(), self.strides()):
-            log_warning("Warning: overlapping view detected")"""
-
         var abs_offset: Int
         var abs_strides: Strides
 
         if not validated:
             (abs_offset, abs_strides) = Validator.validate_view_params(
-                self, shape, strides, offset
+                self.buffer.size(), shape, strides, offset
             )
         else:
             abs_offset = offset
@@ -170,46 +170,6 @@ struct View[dtype: DType](Copyable):
 
         return out^
 
-    @staticmethod
-    fn is_non_overlapping(shape: Shape, strides: Strides) -> Bool:
-        """
-        Fast heuristic to check if a view is non-overlapping.
-        Equivalent to PyTorch's TensorImpl::is_non_overlapping_and_dense()
-        (ignoring density condition).
-
-        A view is non-overlapping if, when dimensions are sorted by
-        increasing absolute stride, each stride is at least as large
-        as the total span of all faster-changing dimensions.
-        """
-        rank = shape.rank()
-        if rank == 0:
-            return True
-
-        # Pair (abs_stride, dim)
-        var pairs = List[Tuple[Int, Int]](capacity=UInt(rank))
-        for i in range(rank):
-            pairs.append((abs(strides[i]), i))
-
-        # Sort by stride ascending
-        fn comp_fn(
-            pair_a: Tuple[Int, Int], pair_b: Tuple[Int, Int]
-        ) capturing -> Bool:
-            return pair_a[0] < pair_b[0]
-
-        sort[comp_fn](pairs)
-
-        var required_stride = 1
-        for abs_stride, dim in pairs:
-            if shape[dim] == 0:
-                continue
-            if abs_stride < required_stride:
-                # Overlap possible
-                return False
-            required_stride *= shape[dim]
-
-        return True
-
-
 @fieldwise_init
 @register_passable
 struct ViewBackward_orig[dtype: DType](ImplicitlyCopyable):
@@ -227,7 +187,7 @@ struct ViewBackward_orig[dtype: DType](ImplicitlyCopyable):
     ]:
         var parent = output.ancestry().get(0)
         ref gradbox = output.gradients()[]
-
+        gradbox.print()
         var parent_shape = parent.shape()
         ref parent_strides = parent.strides()
         var parent_offset = parent.offset()
@@ -254,7 +214,7 @@ struct ViewBackward_orig[dtype: DType](ImplicitlyCopyable):
             var use_fast_path = self.shape == parent_shape
 
             if use_fast_path:
-                # Ultra-fast path: Same shape, both contiguous
+                # Fast path: Same shape, both contiguous
                 # Direct element-wise copy
                 var numel = self.shape.num_elements()
                 for i in range(numel):
@@ -263,9 +223,10 @@ struct ViewBackward_orig[dtype: DType](ImplicitlyCopyable):
                     ]
             else:
                 # General path: Handle all view types using absolute offset mapping
-                var position = IntArray(size=parent_rank)
-
+                var position = IntArray.with_capacity(parent_rank)
+                print("We are in this territory")
                 for child_coord in self.shape:
+                    position.clear()
                     # Step 1: Compute absolute buffer index from child coordinates
                     var abs_index = self.offset
                     for i in range(view_rank):
@@ -288,9 +249,11 @@ struct ViewBackward_orig[dtype: DType](ImplicitlyCopyable):
                     for i in range(parent_rank):
                         var stride = parent_strides[i]
                         if stride == 0:
-                            position[i] = 0  # Broadcast dimension
+                            #position[i] = 0  # Broadcast dimension
+                            position.append(0)  # Broadcast dimension
                         else:
-                            position[i] = remaining // stride
+                            #position[i] = remaining // stride
+                            position.append(remaining // stride)
                             if (
                                 position[i] < 0
                                 or position[i] >= parent_shape[i]
@@ -312,8 +275,10 @@ struct ViewBackward_orig[dtype: DType](ImplicitlyCopyable):
                             view_addr += child_coord[i] * view_strides[i]
 
                         # Accumulate gradient
+                        print("parent_addr: ", parent_addr, "view_addr: ", view_addr)
                         parent_grad_data[parent_addr] += view_data[view_addr]
-
+        print("\nparent's gradbox\n")
+        parent_gradbox.print()
         output.zero_grad()
         return [
             (parent^, parent_gradbox^, AddTensor),
@@ -334,15 +299,12 @@ struct View_orig[dtype: DType](Copyable):
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[dtype]:
-        _ = """if not Self.is_non_overlapping(self.shape(), self.strides()):
-            log_warning("Warning: overlapping view detected")"""
-
         var abs_offset: Int
         var abs_strides: Strides
 
         if not validated:
             (abs_offset, abs_strides) = Validator.validate_view_params(
-                self, shape, strides, offset
+                self.buffer.size(), shape, strides, offset
             )
         else:
             abs_offset = offset
@@ -368,45 +330,6 @@ struct View_orig[dtype: DType](Copyable):
                 out.add_ancestry(self)
 
         return out^
-
-    @staticmethod
-    fn is_non_overlapping(shape: Shape, strides: Strides) -> Bool:
-        """
-        Fast heuristic to check if a view is non-overlapping.
-        Equivalent to PyTorch's TensorImpl::is_non_overlapping_and_dense()
-        (ignoring density condition).
-
-        A view is non-overlapping if, when dimensions are sorted by
-        increasing absolute stride, each stride is at least as large
-        as the total span of all faster-changing dimensions.
-        """
-        rank = shape.rank()
-        if rank == 0:
-            return True
-
-        # Pair (abs_stride, dim)
-        var pairs = List[Tuple[Int, Int]](capacity=UInt(rank))
-        for i in range(rank):
-            pairs.append((abs(strides[i]), i))
-
-        # Sort by stride ascending
-        fn comp_fn(
-            pair_a: Tuple[Int, Int], pair_b: Tuple[Int, Int]
-        ) capturing -> Bool:
-            return pair_a[0] < pair_b[0]
-
-        sort[comp_fn](pairs)
-
-        var required_stride = 1
-        for abs_stride, dim in pairs:
-            if shape[dim] == 0:
-                continue
-            if abs_stride < required_stride:
-                # Overlap possible
-                return False
-            required_stride *= shape[dim]
-
-        return True
 
 
 fn main():

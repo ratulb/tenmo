@@ -257,59 +257,58 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self))
 
 
-        _="""```
 
----
+#---
 
 ## Key Optimizations Applied:
 
 ### **Forward Pass:**
-1. ✅ **No unsqueeze/squeeze overhead**: Direct computation `M[m,k] @ v[k]`
-2. ✅ **Metadata hoisting**: All strides computed once
-3. ✅ **Simple loops**: Just nested for-loops for dot products
-4. ✅ **Cache-friendly**: Sequential access to matrix rows
+#1. ✅ **No unsqueeze/squeeze overhead**: Direct computation `M[m,k] @ v[k]`
+#2. ✅ **Metadata hoisting**: All strides computed once
+#3. ✅ **Simple loops**: Just nested for-loops for dot products
+#4. ✅ **Cache-friendly**: Sequential access to matrix rows
 
 ### **Backward Pass:**
 
-**For grad_M (outer product):**
-1. ✅ **SIMD vectorization** for contiguous case
-2. ✅ **Direct outer product**: `grad_out[m] ⊗ v[k]`
-3. ✅ **No intermediate tensors**
+#**For grad_M (outer product):**
+#1. ✅ **SIMD vectorization** for contiguous case
+#2. ✅ **Direct outer product**: `grad_out[m] ⊗ v[k]`
+#3. ✅ **No intermediate tensors**
 
-**For grad_v (matrix-vector product):**
-1. ✅ **Direct M^T @ grad_out**: `sum_i(M[i,k] * grad_out[i])`
-2. ✅ **No transpose view overhead**
-3. ✅ **Accumulate in scalar, then write once**
+#**For grad_v (matrix-vector product):**
+#1. ✅ **Direct M^T @ grad_out**: `sum_i(M[i,k] * grad_out[i])`
+#2. ✅ **No transpose view overhead**
+#3. ✅ **Accumulate in scalar, then write once**
 
----
+#---
 
 ## Performance Comparison
 
 ### Matrix-Vector (1024×1024 @ 1024):
 
-**Before:**
-- Forward: ~2-3ms (reshape + full 2D matmul)
-- Backward grad_M: ~2-3ms (reshape + matmul)
-- Backward grad_v: ~2-3ms (transpose + reshape + matmul)
-- **Total: ~6-9ms**
+#**Before:**
+#- Forward: ~2-3ms (reshape + full 2D matmul)
+#- Backward grad_M: ~2-3ms (reshape + matmul)
+#- Backward grad_v: ~2-3ms (transpose + reshape + matmul)
+#- **Total: ~6-9ms**
 
-**After:**
-- Forward: ~0.2ms (direct dot products)
-- Backward grad_M: ~0.2ms (SIMD outer product)
-- Backward grad_v: ~0.2ms (direct accumulation)
-- **Total: ~0.6ms**
+#**After:**
+#- Forward: ~0.2ms (direct dot products)
+#- Backward grad_M: ~0.2ms (SIMD outer product)
+#- Backward grad_v: ~0.2ms (direct accumulation)
+#- **Total: ~0.6ms**
 
-**Speedup: 10-15× faster!** 🚀
+#**Speedup: 10-15× faster!** 🚀
 
----
+#---
 
 ## Summary of All Three Optimizations
-```
-Operation               Before    After    Speedup
-─────────────────────────────────────────────────
-Matrix × Matrix         30s       0.21s    143×
-Vector × Matrix         3ms       0.3ms    10×
-Matrix × Vector         3ms       0.3ms    10×
+#```
+#Operation               Before    After    Speedup
+#─────────────────────────────────────────────────
+#Matrix × Matrix         30s       0.21s    143×
+#Vector × Matrix         3ms       0.3ms    10×
+#Matrix × Vector         3ms       0.3ms    10×
 
 # Key Differences from VectorMatmulNdBackward:
 # 1. Gradient for M (dM)
@@ -370,7 +369,7 @@ Matrix × Vector         3ms       0.3ms    10×
 
 # dM = grad_out @ v^T → shape [..., m, k]
 
-# dv = M^T @ grad_out → shape [..., k]"""
+# dv = M^T @ grad_out → shape [..., k]
 
 
 @fieldwise_init
@@ -427,7 +426,7 @@ struct MatrixVectorMulNdBackward_unoptim[dtype: DType](ImplicitlyCopyable):
                 # Element-wise multiplication for outer product
                 var grad_M_slice_result = grad_out_col * v_row  # GradBox[m, k]
 
-                grad_M_slice.buffer.fill_equal_shape[overwrite=False](
+                grad_M_slice.buffer.copy_from_alike[overwrite=False](
                     grad_M_slice_result.buffer
                 )
 
@@ -468,7 +467,7 @@ struct MatrixVectorMulNdBackward_unoptim[dtype: DType](ImplicitlyCopyable):
                 )  # GradBox[k, 1]
                 var grad_v_final = grad_v_lifted.squeeze([-1])  # GradBox[k]
 
-                grad_v_slice.buffer.fill_equal_shape[overwrite=False](
+                grad_v_slice.buffer.copy_from_alike[overwrite=False](
                     grad_v_final.buffer
                 )
 
@@ -585,7 +584,7 @@ struct MatrixVectorMulNd_unoptim[dtype: DType](ImplicitlyCopyable):
             var result_final = result_lifted.squeeze([-1])  # Tensor[m]
 
             # Copy result
-            result_slice.buffer.fill_equal_shape[overwrite=True](
+            result_slice.buffer.copy_from_alike[overwrite=True](
                 result_final.buffer
             )
 

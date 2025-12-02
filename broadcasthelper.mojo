@@ -1,7 +1,6 @@
 from shapes import Shape
 from common_utils import panic
-from layout.int_tuple import IntArray
-from intlist import IntList
+from intarray import IntArray
 
 from testing import assert_true
 
@@ -58,9 +57,10 @@ struct ShapeBroadcaster:
         var padded = ShapeBroadcaster.pad_shapes(this, that)
         var shape1 = padded[0].copy()
         var shape2 = padded[1].copy()
-        var result_shape = IntList.with_capacity(len(shape1))
-        var s1 = shape1.intlist()
-        var s2 = shape2.intlist()
+        var result_shape = IntArray.with_capacity(len(shape1))
+        var s1 = shape1.intarray()
+        var s2 = shape2.intarray()
+
 
         for dims in s1.zip(s2):
             if dims[0] == dims[1]:
@@ -77,7 +77,6 @@ struct ShapeBroadcaster:
                     + ", "
                     + that.__str__()
                 )
-
         return Shape(result_shape)
 
     @always_inline
@@ -100,31 +99,31 @@ struct ShapeBroadcaster:
             Indices in original tensor's space.
         """
         # Input Validation
-        if original_shape.ndim > broadcast_shape.ndim:
+        if original_shape.ndim() > broadcast_shape.ndim():
             panic(
                 "ShapeBroadcaster → translate_index: original dims greater than"
                 " broadcast dims"
             )
-        if mask.size() != broadcast_shape.ndim:
+        if mask.size() != broadcast_shape.ndim():
             panic(
                 "ShapeBroadcaster → translate_index: mask size does not match"
                 " broadcast ndim"
             )
-        if indices.size() != broadcast_shape.ndim:
+        if indices.size() != broadcast_shape.ndim():
             panic(
                 "ShapeBroadcaster → translate_index: indices size does not"
                 " match broadcast ndim"
             )
 
-        var translated = IntArray(size=original_shape.ndim)
-        var offset = broadcast_shape.ndim - original_shape.ndim
+        var translated = IntArray.with_capacity(original_shape.ndim())
+        var offset = broadcast_shape.ndim() - original_shape.ndim()
 
         # Perform the translation
-        for i in range(original_shape.ndim):
+        for i in range(original_shape.ndim()):
             var broadcast_axis = i + offset
 
             if mask[broadcast_axis] == 1:
-                translated[i] = 0  # Broadcasted dim
+                translated.append(0)  # Broadcasted dim
             else:
                 var original_index = indices[broadcast_axis]
                 # CRITICAL: Check if the index is valid for the original shape
@@ -133,7 +132,7 @@ struct ShapeBroadcaster:
                         "ShapeBroadcaster → translate_index: index out of"
                         " bounds for original tensor"
                     )
-                translated[i] = original_index
+                translated.append(original_index)
 
         return translated^
 
@@ -141,8 +140,8 @@ struct ShapeBroadcaster:
     @staticmethod
     fn broadcastable(shape1: Shape, shape2: Shape) -> Bool:
         """Check if two shapes are broadcastable."""
-        var dims1 = shape1.intlist()
-        var dims2 = shape2.intlist()
+        var dims1 = shape1.intarray()
+        var dims2 = shape2.intarray()
         var zip_reversed = dims1.zip_reversed(dims2)
         for dims in zip_reversed:
             if dims[0] != dims[1]:
@@ -155,27 +154,27 @@ struct ShapeBroadcaster:
     fn broadcast_mask(original_shape: Shape, target_shape: Shape) -> IntArray:
         """Create a broadcast mask indicating which dimensions are broadcasted.
         """
-        var mask = IntArray(size=target_shape.ndim)
-        var offset = target_shape.ndim - original_shape.ndim
+        var mask = IntArray.with_capacity(target_shape.ndim())
+        var offset = target_shape.ndim() - original_shape.ndim()
         if offset < 0:
             panic(
                 "ShapeBroadcaster → broadcast_mask → target_shape.ndim is"
                 " smaller than original_shape.ndim: "
-                + String(target_shape.ndim)
+                + String(target_shape.ndim())
                 + ", "
-                + String(original_shape.ndim)
+                + String(original_shape.ndim())
             )
 
-        for i in range(target_shape.ndim):
+        for i in range(target_shape.ndim()):
             if i < offset:
-                mask[i] = 1  # original_shape has no dimension here
+                mask.append(1)  # original_shape has no dimension here
             else:
                 var base_dim = original_shape[i - offset]
                 var target_dim = target_shape[i]
                 if base_dim == 1 and target_dim != 1:
-                    mask[i] = 1  # original_shape is being expanded
+                    mask.append(1)  # original_shape is being expanded
                 else:
-                    mask[i] = 0  # match or both 1 → not broadcasted
+                    mask.append(0)  # match or both 1 → not broadcasted
 
         return mask^
 
@@ -184,15 +183,15 @@ struct ShapeBroadcaster:
         target_indices: IntArray, target_shape: Shape, source_shape: Shape
     ) -> IntArray:
         # Get coordinates for source tensor given target coordinates
-        var source_indices = IntArray(size=len(source_shape))
+        var source_indices = IntArray.with_capacity(len(source_shape))
 
         for i in range(len(source_shape)):
             target_idx = len(target_shape) - len(source_shape) + i
             if source_shape[i] == 1:
-                source_indices[i] = 0  # Broadcasted dimension → use 0
+                source_indices.append(0)  # Broadcasted dimension → use 0
             else:
-                source_indices[i] = target_indices[
+                source_indices.append(target_indices[
                     target_idx
-                ]  # Normal dimension
+                ])  # Normal dimension
 
         return source_indices^

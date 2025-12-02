@@ -1,6 +1,6 @@
-from tensors import Tensor
+from tenmo import Tensor
 from shapes import Shape
-from intlist import IntList
+from intarray import IntArray
 from layers import Linear, ReLU, Sequential
 from crossentropy import CrossEntropyLoss
 from sgd import SGD
@@ -26,15 +26,15 @@ fn make_synthetic_dataset(
             # horizontal bar
             for r in range(3, 5):
                 for c in range(8):
-                    X[IntList([i, 0, r, c])] = 1.0
+                    X[IntArray([i, 0, r, c])] = 1.0
         else:
             # vertical bar
             for r in range(8):
                 for c in range(3, 5):
-                    X[IntList([i, 0, r, c])] = 1.0
+                    X[IntArray([i, 0, r, c])] = 1.0
 
     # flatten to (n_samples × 64)
-    var X_flat = X.flatten(start_dim=1)  # squash everything but batch dim
+    var X_flat = X.flatten[track_grad=False](start_dim=1)  # squash everything but batch dim
     return (X_flat, y)
 
 
@@ -43,7 +43,6 @@ fn test_tiny_training_smoke() raises:
 
     var (X, y) = make_synthetic_dataset(5)  # small dataset
 
-    print("var (X, y): ", X.shape, y.shape)
 
     var model = Sequential[DType.float32](
         [
@@ -82,7 +81,6 @@ fn test_tiny_training_smoke_and_flatten_grad() raises:
     # --- synthetic training ---
     var (X, y) = make_synthetic_dataset(32)
     var X_flat = X.flatten(1)  # flatten from dim=1
-    print(X.shape, y.shape, X_flat.shape)
     var model = Sequential(
         [
             Linear(8 * 8, 16).into(),
@@ -139,11 +137,10 @@ fn test_tiny_training_deterministic_smoke() raises:
     var X, y = make_synthetic_dataset(32)  # small fixed size
     var X_flat = X.flatten(1)  # match input shape
 
-    print("var (X, y), X_flat: ", X.shape, y.shape, X_flat.shape)
     # simple MLP
     var model = Sequential(
         [
-            Linear(X_flat.shape[1], 16).into(),
+            Linear(X_flat.shape()[1], 16).into(),
             ReLU().into(),
             Linear(16, 2, init_seed=42).into(),
         ]

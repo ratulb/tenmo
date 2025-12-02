@@ -2,7 +2,7 @@ from tenmo import Tensor
 from operators import AddTensor
 from backpropagation import Delegate, BackwardFn
 from shapes import Shape
-from intlist import IntList
+from intarray import IntArray
 from strides import Strides
 from gradbox import Gradbox
 from ancestry import Ancestor
@@ -45,10 +45,10 @@ struct Expand[dtype: DType]:
         unit_shape = Shape.Unit()  # Shape(1)
         shape_padded = unit_shape * extra_dims + curr_shape
         padded_strides = (
-            IntList.filled(extra_dims, 0) + tensor.strides().intlist()
+            IntArray.filled(extra_dims, 0) + tensor.strides().intarray()
         )
 
-        strides_expanded = IntList.with_capacity(capacity=len(padded_strides))
+        strides_expanded = IntArray.with_capacity(len(padded_strides))
         for i in range(len(shape_expanded)):
             if shape_padded[i] == 1 and shape_expanded[i] > 1:
                 # Broadcasted dimension → stride 0
@@ -70,9 +70,7 @@ struct Expand[dtype: DType]:
 
         @parameter
         if track_grad:
-            grad_required = (
-                requires_grad.value() if requires_grad else tensor.requires_grad
-            )
+            grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:
                 out.requires_grad_()
@@ -113,26 +111,8 @@ fn test_deep_view_chain_backward() raises:
          [19, 20, 21, 22, 23, 24]],
         requires_grad=True
     )
-    print("\na\n")
-    a.print()
-
-    # --- All parameters now absolute w.r.t. base buffer ---
-    v1 = a.view(shape=Shape(3, 4), strides=Strides(6, 1), offset=1)
-    print("\nv1\n")
-    v1.print()
-
-    v2 = a.view(shape=Shape(2, 3), strides=Strides(6, 1), offset=7)
-    print("\nv2\n")
-    v2.print()
-
-    v3 = a.view(shape=Shape(2, 2), strides=Strides(6, 3), offset=7)
-    print("\nv3\n")
-    v3.print()
 
     v4 = a.view(shape=Shape(2, 2), strides=Strides(12, 3), offset=7)
-    print("\nv4\n")
-    v4.print()
-
     result = v4.sum()
     result.backward(42)
 
@@ -143,7 +123,6 @@ fn test_deep_view_chain_backward() raises:
          [0, 42, 0, 0, 42, 0]]
     )
 
-    a.grad().print()
     assert_true(a.grad().as_tensor() == expected_grad)
     print("✓ Deep view chain backward pass works correctly!")
 
@@ -223,7 +202,6 @@ fn test_absolute_stride_offset_chain() raises:
 
 
 fn test_deep_view_chain_backward1() raises:
-
     print("test_deep_view_chain_backward")
     alias dtype = DType.float32
 

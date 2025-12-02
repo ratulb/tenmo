@@ -24,6 +24,14 @@ from softmax import Softmax, LogSoftmax
 from repeat import Repeat
 from tiles import Tile
 from crossentropy import CrossEntropyLoss
+from sigmoid import Sigmoid
+from tanh import Tanh
+from logarithm import Logarithm
+from clip import Clip
+from net import BCELoss, BCEWithLogitsLoss
+from squareroot import Sqrt
+from variance import Variance
+from std_deviation import StdDev
 
 
 

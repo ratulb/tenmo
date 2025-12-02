@@ -1,8 +1,7 @@
 from shapes import Shape
 from strides import Strides
-from intlist import IntList
 from buffers import Buffer
-from layout.int_tuple import IntArray
+from intarray import IntArray
 from indexhelper import IndexCalculator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic
@@ -164,20 +163,6 @@ struct NDBuffer[dtype: DType](
         self.buffer[index] = value
 
     @always_inline
-    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
-        index = IndexCalculator.flatten_index(
-            self.shape, indices, self.strides, self.offset
-        )
-        return self.buffer[index]
-
-    @always_inline
-    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
-        index = IndexCalculator.flatten_index(
-            self.shape, indices, self.strides, self.offset
-        )
-        self.buffer[index] = value
-
-    @always_inline
     fn __getitem__(self, indices: VariadicList[Int]) -> Scalar[dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
@@ -200,9 +185,7 @@ struct NDBuffer[dtype: DType](
                 + self.shape.__str__()
             )
         if self.shape == Shape(1):
-            index = IntArray(size=1)
-            index[0] = 0
-            return self[index]
+            return self[IntArray(0)]
         else:
             return self[IntArray()]
 
@@ -482,7 +465,7 @@ struct NDBuffer[dtype: DType](
                 accum_sum += self[coord]
             return accum_sum
 
-    fn sum(self, reduction_axes: IntList, keepdims: Bool) -> NDBuffer[dtype]:
+    fn sum(self, reduction_axes: IntArray, keepdims: Bool) -> NDBuffer[dtype]:
         # Step 1: Normalize and validate reduction axes
         var normalized_axes = self._normalize_reduction_axes(reduction_axes)
 
@@ -499,13 +482,11 @@ struct NDBuffer[dtype: DType](
             out[IntArray()] = self.sum_all()
         else:
             # Step 4: Handle partial reduction with proper coordinate mapping
-            reduction_axes_shape = Shape(
-                self.shape.axes_spans.select(normalized_axes)
-            )
+            reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
 
-            for out_coord in out_shape.indices():
+            for out_coord in out_shape:
                 var accum_sum = Scalar[dtype](0)
-                for red_coord in reduction_axes_shape.indices():
+                for red_coord in reduction_axes_shape:
                     # Use normalized_axes (sorted) for coordinate reconstruction
                     var self_coord = out_coord.replace(
                         normalized_axes, red_coord
@@ -517,17 +498,17 @@ struct NDBuffer[dtype: DType](
 
         return out^
 
-    fn _normalize_reduction_axes(self, axes: IntList) -> IntList:
+    fn _normalize_reduction_axes(self, axes: IntArray) -> IntArray:
         """Normalize reduction axes: handle empty list, negative indices, sort, and deduplicate.
         """
         var rank = self.rank()
 
         # Empty axes list means reduce over all dimensions
         if len(axes) == 0:
-            return IntList.range_list(rank)
+            return IntArray.range(start=0, end=rank, step=1)
 
         # Normalize negative indices and validate bounds
-        var normalized = IntList.with_capacity(len(axes))
+        var normalized = IntArray.with_capacity(len(axes))
         for axis in axes:
             var norm_axis = axis
             if norm_axis < 0:
@@ -543,7 +524,7 @@ struct NDBuffer[dtype: DType](
 
         # Sort and remove duplicates
         normalized.sort(asc=True)
-        var result = IntList.with_capacity(len(normalized))
+        var result = IntArray.with_capacity(len(normalized))
         var prev = -1
         for axis in normalized:
             if axis != prev:
@@ -1158,12 +1139,12 @@ struct NDBuffer[dtype: DType](
         current_shape = extended_buffer.shape
         # Sum over extra leading dimensions
         while len(current_shape) > len(target_shape):
-            result = result.sum(reduction_axes=IntList(0), keepdims=False)
+            result = result.sum(reduction_axes=IntArray(0), keepdims=False)
             current_shape = result.shape
         # Sum over mismatched dimensions
         for i in range(len(target_shape)):
             if current_shape[i] != target_shape[i] and current_shape[i] > 1:
-                result = result.sum(reduction_axes=IntList(i), keepdims=True)
+                result = result.sum(reduction_axes=IntArray(i), keepdims=True)
                 current_shape = result.shape
         return result^
 

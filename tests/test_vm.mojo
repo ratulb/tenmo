@@ -2,8 +2,8 @@ from tenmo import Tensor
 from shapes import Shape
 from testing import assert_true
 from strides import Strides
-
-alias vm = 1
+from operators import vm
+#alias vm = 1
 
 fn main() raises:
     test_vector_matrix_no_batch()

@@ -66,7 +66,7 @@ struct VectorMatmulNd_orig[dtype: DType](ImplicitlyCopyable):
             var result_final = result_lifted.squeeze([-2])  # Tensor[n]
 
             # Copy result
-            result_slice.buffer.fill_equal_shape[overwrite=True](
+            result_slice.buffer.copy_from_alike[overwrite=True](
                 result_final.buffer
             )
 
@@ -144,7 +144,7 @@ struct VectorMatmulNdBackward_orig[dtype: DType](ImplicitlyCopyable):
                 )  # GradBox[1, k]
                 var grad_v_final = grad_v_lifted.squeeze([-2])  # GradBox[k]
 
-                grad_v_slice.buffer.fill_equal_shape[overwrite=False](
+                grad_v_slice.buffer.copy_from_alike[overwrite=False](
                     grad_v_final.buffer
                 )
 
@@ -181,7 +181,7 @@ struct VectorMatmulNdBackward_orig[dtype: DType](ImplicitlyCopyable):
                 )  # GradBox[1, n]
                 var grad_M_slice_result = v_col * grad_out_row  # GradBox[k, n]
 
-                grad_M_slice.buffer.fill_equal_shape[overwrite=False](
+                grad_M_slice.buffer.copy_from_alike[overwrite=False](
                     grad_M_slice_result.buffer
                 )
 

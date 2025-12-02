@@ -1,13 +1,12 @@
 from tenmo import Tensor
 from operators import AddTensor
-from intlist import IntList
 from validators import Validator
 from backpropagation import Delegate, BackwardFn
 from summation import Summer
 from subtraction import Subtractor
 from division import Divider
 from minmax import MinMax
-from layout.int_tuple import IntArray
+from intarray import IntArray
 from gradbox import Gradbox
 from ancestry import Ancestor
 from shapes import Shape
@@ -25,7 +24,7 @@ from ndbuffer import NDBuffer
 
 @fieldwise_init
 struct SoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    var axes: IntList
+    var axes: IntArray
     var softmax_out_buffer: Buffer[dtype]  # Store raw buffer instead of tensor
     var softmax_out_shape: Shape
 
@@ -67,7 +66,7 @@ struct Softmax[dtype: DType]:
         track_grad: Bool = True
     ](
         this: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         var shape = this.shape()
@@ -115,7 +114,7 @@ struct Softmax[dtype: DType]:
 
 @fieldwise_init
 struct LogSoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    var axes: IntList
+    var axes: IntArray
     var softmax_out_buffer: Buffer[dtype]
     var softmax_out_shape: Shape
 
@@ -157,7 +156,7 @@ struct LogSoftmax[dtype: DType]:
         track_grad: Bool = True
     ](
         this: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         var shape = this.shape()
@@ -215,7 +214,7 @@ struct SoftmaxBackwardRecompute[dtype: DType](ImplicitlyCopyable & Movable):
     Memory-efficient version that recomputes softmax during backward pass.
     Trade-off: Uses less memory but slightly slower backward pass.
     """
-    var axes: IntList
+    var axes: IntArray
 
     fn __copyinit__(out self, other: Self):
         self.axes = other.axes.copy()
@@ -263,7 +262,7 @@ struct LogSoftmaxBackwardRecompute[dtype: DType](ImplicitlyCopyable & Movable):
     """
     Memory-efficient version that recomputes softmax during backward pass.
     """
-    var axes: IntList
+    var axes: IntArray
 
     fn __copyinit__(out self, other: Self):
         self.axes = other.axes.copy()
@@ -336,16 +335,16 @@ struct LogSoftmaxBackwardRecompute[dtype: DType](ImplicitlyCopyable & Movable):
 
 # Standard softmax
 #var logits = Tensor.randn(Shape([32, 1000]), requires_grad=True)
-#var probs = Softmax[DType.float32].forward(logits, IntList(1))
+#var probs = Softmax[DType.float32].forward(logits, IntArray(1))
 
 # Log softmax (more numerically stable for cross entropy)
-#var log_probs = LogSoftmax[DType.float32].forward(logits, IntList(1))
+#var log_probs = LogSoftmax[DType.float32].forward(logits, IntArray(1))
 
 # Multi-axis softmax
 #var spatial_logits = Tensor.randn(Shape([32, 10, 28, 28]), requires_grad=True)
 #var probs_2d = Softmax[DType.float32].forward(
 #    spatial_logits,
-#    IntList(1)  # Softmax over classes
+#    IntArray(1)  # Softmax over classes
 #)
 #"""
 
@@ -356,7 +355,7 @@ alias SoftmaxOutput[dtype: DType] = List[Tuple[IntArray, Scalar[dtype]]]
 
 @fieldwise_init
 struct SoftmaxBackward_orig[dtype: DType](ImplicitlyCopyable & Movable):
-    var axes: IntList
+    var axes: IntArray
     var softmax_out: SoftmaxOutput[dtype]
 
     fn __copyinit__(out self, other: Self):
@@ -397,7 +396,7 @@ struct Softmax_orig[dtype: DType]:
         track_grad: Bool = True
     ](
         this: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         shape = this.shape()
@@ -439,7 +438,7 @@ struct Softmax_orig[dtype: DType]:
 
 @fieldwise_init
 struct LogSoftmaxBackward_orig[dtype: DType](ImplicitlyCopyable & Movable):
-    var axes: IntList
+    var axes: IntArray
     var softmax_out: SoftmaxOutput[dtype]  # Still need regular softmax for gradient
 
     fn __copyinit__(out self, other: Self):
@@ -479,7 +478,7 @@ struct LogSoftmax_orig[dtype: DType]:
         track_grad: Bool = True
     ](
         this: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         shape = this.shape()

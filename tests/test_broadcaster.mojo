@@ -1,6 +1,5 @@
 from tenmo import Tensor
 from shapes import Shape
-from intlist import IntList
 from testing import assert_true, assert_raises
 from broadcasthelper import ShapeBroadcaster
 
@@ -29,7 +28,7 @@ fn test_empty_shape_broadcastable() raises:
     )
     broadcast_mask = ShapeBroadcaster.broadcast_mask(shape, Shape.of(1))
     assert_true(
-        IntList(1) == broadcast_mask,
+        IntArray(1) == broadcast_mask,
         "Empty shape broadcast mask assertion failed",
     )
 

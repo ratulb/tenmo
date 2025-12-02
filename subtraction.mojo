@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from intlist import IntList
+from intarray import IntArray
 from operators import AddTensor, SubtractTensor, Subtract, ReverseSubtract
 from backpropagation import Delegate, BackwardFn
 from common_utils import panic
@@ -9,10 +9,10 @@ from broadcastbackward import BroadcastBackward
 
 @register_passable
 struct SubBackward[dtype: DType](ImplicitlyCopyable):
-    var signs: IntList
+    var signs: IntArray
 
     fn __init__(out self):
-        self.signs = IntList()
+        self.signs = IntArray()
 
     fn __copyinit__(out self, existing: Self):
         self.signs = existing.signs.copy()

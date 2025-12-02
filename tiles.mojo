@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn
-from intlist import IntList
+from intlist import IntArray
 from operators import AddTensor
 from shapes import Shape
 from validators import Validator
@@ -12,7 +12,7 @@ from indexhelper import IndexCalculator
 @fieldwise_init
 @register_passable
 struct TileBackward[dtype: DType](ImplicitlyCopyable):
-    var repeat: IntList
+    var repeat: IntArray
     var orig_shape: Shape
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
@@ -38,8 +38,8 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable):
         var effective_rank = max(parent_rank, repeat_rank)
 
         # --- 1. Expand each dim into (orig_dim, repeat_factor) ---
-        var reshaped_dims = IntList.with_capacity(effective_rank * 2)
-        var reduce_axes = IntList.with_capacity(effective_rank)
+        var reshaped_dims = IntArray.with_capacity(effective_rank * 2)
+        var reduce_axes = IntArray.with_capacity(effective_rank)
         for i in range(effective_rank):
             var parent_index = parent_rank - effective_rank + i
             var repeat_index = repeat_rank - effective_rank + i
@@ -92,8 +92,8 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable):
         var effective_rank = max(parent_rank, repeat_rank)
 
         # --- 1. Expand each dim into (orig_dim, repeat_factor) ---
-        var reshaped_dims = IntList.with_capacity(effective_rank * 2)
-        var reduce_axes = IntList.with_capacity(effective_rank)
+        var reshaped_dims = IntArray.with_capacity(effective_rank * 2)
+        var reduce_axes = IntArray.with_capacity(effective_rank)
 
         for i in range(effective_rank):
             var parent_index = parent_rank - effective_rank + i
@@ -133,7 +133,7 @@ struct Tile[dtype: DType]:
         track_grad: Bool = True
     ](
         self: Tensor[dtype],
-        repeat: IntList,
+        repeat: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         """
@@ -195,7 +195,7 @@ struct Tile[dtype: DType]:
 
         # Handle dimension alignment (PyTorch-style: align trailing dims)
         var effective_rank = max(orig_rank, repeat_rank)
-        var new_shape = IntList.with_capacity(effective_rank)
+        var new_shape = IntArray.with_capacity(effective_rank)
 
         for i in range(effective_rank):
             orig_index = orig_rank - effective_rank + i
@@ -214,7 +214,7 @@ struct Tile[dtype: DType]:
             var out_coord = IndexCalculator.index_to_coord(
                 out_shape, flat_index
             )
-            var src_coord = IntList.with_capacity(orig_rank)
+            var src_coord = IntArray.with_capacity(orig_rank)
 
             # Align coordinates to the trailing dimensions of the source
             coord_offset = effective_rank - orig_rank
@@ -234,7 +234,7 @@ struct Tile[dtype: DType]:
             if grad_required:
                 out.requires_grad_(True)
                 backward_fn = TileBackward[dtype](
-                    repeat.copy(), orig_shape.copy()
+                    repeat, orig_shape
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)

@@ -1,5 +1,4 @@
 from tenmo import Tensor
-from intlist import IntList
 from testing import assert_true
 from math import exp
 from shapes import Shape

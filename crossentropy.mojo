@@ -1,5 +1,4 @@
 from tenmo import Tensor
-from intlist import IntList
 from shapes import Shape
 from common_utils import panic
 from math import log, exp

@@ -1,15 +1,15 @@
 from shapes import Shape
-from intlist import IntList
 from strides import Strides
-from common_utils import Slicer, panic, Idx, NewAxis, i, s, il, newaxis
+from common_utils import Slicer, panic, Idx, NewAxis, i, s, il, newaxis, log_warning
 from tenmo import Tensor
-from layout.int_tuple import IntArray
+from intarray import IntArray
+
 
 struct Validator:
     @staticmethod
     fn validate_repeat_args(
         original_shape: Shape,
-        repeat: IntList,
+        repeat: IntArray,
     ):
         if len(repeat) != original_shape.rank():
             panic(
@@ -39,7 +39,7 @@ struct Validator:
             )
 
         # Must contain all indices 0..axis_len-1 exactly once
-        var seen = IntList.with_capacity(axis_length)
+        var seen = IntArray.with_capacity(axis_length)
         for v in permutation:
             if v < 0 or v >= axis_length:
                 panic(
@@ -66,155 +66,207 @@ struct Validator:
                     " point types. "
                 )
 
+    # ============================================
+    # OPTIMIZED VALIDATOR METHODS USING INTARRAY
+    # ============================================
+    @always_inline
     @staticmethod
     fn validate_and_normalize_axes(
         shape: Shape,
-        axes: IntList,
+        axes: IntArray,
         ordered: Bool = True,
         fill_missing: Bool = False,
-    ) -> IntList:
+    ) -> IntArray:
         """Validate and normalize axes for reduction operations.
+
         Args:
             shape: Tensor shape to validate against.
             axes: Input axes to normalize.
-            ordered: Wheather to sort the axes.
-            fill_missing: Wheather add missing axes.
+            ordered: Whether to sort the axes.
+            fill_missing: Whether to add missing axes.
+
         Returns:
-            Normalized, sorted(default) axes.
+            Normalized, sorted (default) axes.
+
         Behavior:
             - For scalar tensors (rank=0):
-                - `[-1]` → empty list (reduce all).
+                - Empty or `[-1]` → empty array (reduce all).
                 - Any other non-empty axes → error.
             - For non-scalar tensors:
-                - Empty list → reduce all axes (return 0..rank-1).
+                - Empty array → reduce all axes (return 0..rank-1).
                 - Normalize negative indices.
                 - Validate bounds.
-                - Error on deduplicate axes.
+                - Error on duplicate axes.
                 - Fill missing axes if explicitly asked.
-
         """
-        rank = shape.rank()
+        var rank = shape.rank()
+
         # Handle scalar case (rank=0)
         if rank == 0:
-            if axes.is_empty() or axes == IntList(-1):
-                return (
-                    IntList()
-                )  # Special case: [-1] means reduce all/# Empty axes for scalar is valid
-            if len(axes) > 0:
-                panic(
-                    "Tensor → validate_and_normalize_axes - cannot reduce over"
-                    " axes "
-                    + axes.__str__()
-                    + " for scalar tensor with shape: "
-                    + shape.__str__()
-                )
+            if len(axes) == 0:
+                return IntArray()
+            if len(axes) == 1 and axes[0] == -1:
+                return IntArray()
+            # Any other axes for scalar is invalid
+            panic(
+                "Validator → validate_and_normalize_axes: cannot reduce over"
+                " axes "
+                + axes.__str__()
+                + " for scalar tensor with shape: "
+                + shape.__str__()
+            )
 
         # Default case: reduce all axes
         if len(axes) == 0:
-            return IntList.range_list(rank)
+            return IntArray.range(0, rank)
 
-        # Normalize and validate axes
-        var normalized = IntList.with_capacity(len(axes))
-        for axis in axes:
-            normalized_axis = axis if axis >= 0 else axis + rank
+        # Normalize negative indices and validate bounds
+        var normalized = IntArray.with_capacity(len(axes))
+        for i in range(len(axes)):
+            var axis = axes[i]
+            var normalized_axis = axis if axis >= 0 else axis + rank
+
             if normalized_axis < 0 or normalized_axis >= rank:
                 panic(
-                    "Validator → validate_and_normalize_axes - invalid axis: "
+                    "Validator → validate_and_normalize_axes: invalid axis "
                     + String(axis)
-                    + " for tensor shape: "
+                    + " for tensor shape "
                     + shape.__str__()
                 )
+
             normalized.append(normalized_axis)
 
-        # Validate uniqueness always
-        unique = IntList()
-        for axis in normalized:
-            if axis in unique:
-                panic(
-                    "validate_and_normalize_axes → duplicate axis",
-                    axis.__str__(),
-                )
-            unique.append(axis)
+        # Validate uniqueness using a simple seen array (O(n²) but n is small)
+        for i in range(len(normalized)):
+            for j in range(i + 1, len(normalized)):
+                if normalized[i] == normalized[j]:
+                    panic(
+                        "Validator → validate_and_normalize_axes: duplicate"
+                        " axis "
+                        + String(normalized[i])
+                    )
 
-        # Sorted order
+        # Sort if ordered
         if ordered:
-            normalized.sort()
+            # Simple insertion sort (axes are typically small)
+            for i in range(1, len(normalized)):
+                var key = normalized[i]
+                var j = i - 1
+                while j >= 0 and normalized[j] > key:
+                    normalized[j + 1] = normalized[j]
+                    j -= 1
+                normalized[j + 1] = key
+
+        # Fill missing axes if requested
         if not fill_missing:
-            return normalized
-        # If partial: specified axes go to front, others follow in original order
+            return normalized^
+
+        # Add missing axes: insert each missing axis at its own position
+        var result = normalized  # Start with specified axes
         seen = normalized
-        result = normalized  # Start with specified axes
         for i in range(rank):
             if i not in seen:
                 result = result.insert(i, i)
-        return result
+        return result^
 
     @always_inline
     @staticmethod
     fn validate_and_construct_new_shape(
-        current_shape: Shape, newdims: IntList
+        current_shape: Shape, newdims: IntArray
     ) -> Shape:
-        """
-
-        Validates if a tensor can be reshaped from `current_shape` to `new_shape`.
+        """Validate if a tensor can be reshaped from current_shape to new shape.
 
         Args:
-            current_shape: Original shape of the tensor (e.g., `3, 4, 5`).
-            newdims: Requested new shape (e.g., `2, -1, 10`). May contain at most one `-1`.
+            current_shape: Original shape of the tensor (e.g., `(3, 4, 5)`).
+            newdims: Requested new shape (e.g., `[2, -1, 10]`). May contain at most one `-1`.
 
         Returns:
-            Shape: Validated concrete shape (e.g., `Shape(2, 6, 10)`).
+            Validated concrete shape (e.g., `Shape(2, 6, 10)`).
 
+        Behavior:
+            - Infers dimension marked with `-1`.
+            - Validates total element count matches.
+            - Handles scalar ↔ 1-element tensor conversions.
         """
-        if current_shape == Shape(1) and (
-            newdims == IntList() or newdims == IntList(-1)
-        ):
+        var current_numels = current_shape.num_elements()
+
+        # Special case: scalar → scalar
+        if current_shape.rank() == 0 and len(newdims) == 0:
             return Shape()
 
-        if current_shape == Shape() and newdims == IntList():
-            return Shape()
+        # Special case: (1,) → scalar or scalar → (1,)
+        if current_numels == 1:
+            if len(newdims) == 0:
+                return Shape()
+            if len(newdims) == 1 and (newdims[0] == 1 or newdims[0] == -1):
+                return Shape(1)
 
-        if current_shape == Shape() and (
-            newdims == IntList(1) or newdims == IntList(-1)
-        ):
-            return Shape(1)
+        # Special case: scalar → (1,)
+        if current_shape.rank() == 0:
+            if len(newdims) == 1 and (newdims[0] == 1 or newdims[0] == -1):
+                return Shape(1)
 
-        if current_shape.num_elements() == newdims.product():
-            return Shape(newdims)
-
-        if current_shape.num_elements() == 1 and newdims == IntList():
-            return Shape()
-
+        # Validate newdims and find -1 position
         var estimated_size = 1
-        var concrete_dims = IntList.with_capacity(len(newdims))
         var infer_index = -1
+        var concrete_dims = IntArray.with_capacity(len(newdims))
 
         for i in range(len(newdims)):
-            if newdims[i] == -1:
-                if infer_index != -1:
-                    panic("Tensor → reshape: only one -1 allowed in reshape")
-                infer_index = i
-                concrete_dims.append(1)  # temporary placeholder
+            var dim = newdims[i]
 
-            elif newdims[i] == 0 or newdims[i] < -1:
-                panic("Tensor → reshape: invalid dim: ", newdims[i].__str__())
+            if dim == -1:
+                if infer_index != -1:
+                    panic(
+                        "Validator → validate_and_construct_new_shape: only one"
+                        " -1 allowed in reshape"
+                    )
+                infer_index = i
+                concrete_dims.append(1)  # Temporary placeholder
+
+            elif dim == 0 or dim < -1:
+                panic(
+                    "Validator → validate_and_construct_new_shape: invalid"
+                    " dimension "
+                    + String(dim)
+                )
 
             else:
-                concrete_dims.append(newdims[i])
-                estimated_size *= newdims[i]
+                concrete_dims.append(dim)
+                estimated_size *= dim
 
+        # Infer the -1 dimension
         if infer_index != -1:
-            concrete_dims[infer_index] = Int(
-                current_shape.num_elements() / estimated_size
-            )
+            if estimated_size == 0:
+                panic(
+                    "Validator → validate_and_construct_new_shape: cannot infer"
+                    " dimension when other dimensions are 0"
+                )
 
-        if concrete_dims.product() != current_shape.num_elements():
+            var inferred_dim = current_numels // estimated_size
+
+            # Check if division is exact
+            if inferred_dim * estimated_size != current_numels:
+                panic(
+                    "Validator → validate_and_construct_new_shape: cannot infer"
+                    " dimension exactly. "
+                    + "Total elements: "
+                    + String(current_numels)
+                    + ", estimated size: "
+                    + String(estimated_size)
+                )
+
+            concrete_dims[infer_index] = inferred_dim
+
+        # Validate total element count
+        var new_numels = concrete_dims.product()
+        if new_numels != current_numels:
             panic(
-                "Tensor → reshape: can't reshape tensor containing ",
-                current_shape.num_elements().__str__(),
-                "elements to a tensor of ",
-                concrete_dims.product().__str__(),
-                "elements",
+                "Validator → validate_and_construct_new_shape: cannot reshape"
+                " tensor with "
+                + String(current_numels)
+                + " elements to shape with "
+                + String(new_numels)
+                + " elements"
             )
 
         return Shape(concrete_dims)
@@ -262,8 +314,10 @@ struct Validator:
             )
 
         # Prepare new shape, strides, offset
-        var new_shape: IntList = IntList.with_capacity(original_shape.rank())
-        var new_strides: IntList = IntList.with_capacity(original_shape.rank())
+        var new_shape: IntArray = IntArray.with_capacity(original_shape.rank())
+        var new_strides: IntArray = IntArray.with_capacity(
+            original_shape.rank()
+        )
         var new_offset: Int = 0
 
         for i in range(original_shape.rank()):
@@ -299,10 +353,10 @@ struct Validator:
     fn validate_and_compute_slice_metadata_multi(
         original_shape: Shape,
         original_strides: Strides,
-        axes: IntList,
-        starts: IntList,
-        ends: IntList,
-        steps: IntList,
+        axes: List[Int],
+        starts: List[Int],
+        ends: List[Int],
+        steps: IntArray,
     ) -> Tuple[Shape, Strides, Int]:
         """
         Compute new shape, strides, offset for multi-axis slicing.
@@ -321,14 +375,14 @@ struct Validator:
 
         var rank = original_shape.rank()
         if (
-            axes.len() != starts.len()
-            or axes.len() != ends.len()
-            or axes.len() != steps.len()
+            len(axes) != len(starts)
+            or len(axes) != len(ends)
+            or len(axes) != len(steps)
         ):
             panic("axes, starts, ends, steps must all have same length")
 
         # Normalize axes
-        var actual_axes: IntList = IntList.with_capacity(axes.len())
+        var actual_axes: IntArray = IntArray.with_capacity(len(axes))
         for a in axes:
             var axis = a
             if axis < 0:
@@ -343,8 +397,8 @@ struct Validator:
             actual_axes.append(axis)
 
         # Prepare new shape, strides, offset
-        var new_shape: IntList = IntList.with_capacity(rank)
-        var new_strides: IntList = IntList.with_capacity(rank)
+        var new_shape: IntArray = IntArray.with_capacity(rank)
+        var new_strides: IntArray = IntArray.with_capacity(rank)
         var new_offset: Int = 0
 
         for i in range(rank):
@@ -353,7 +407,7 @@ struct Validator:
 
             # Check if this axis is sliced
             var idx = -1
-            for j in range(actual_axes.len()):
+            for j in range(len(actual_axes)):
                 if actual_axes[j] == i:
                     idx = j
                     break
@@ -416,8 +470,8 @@ struct Validator:
         if len(slices) != rank:
             panic("Number of slices must match tensor rank")
 
-        new_shape = IntList.with_capacity(rank)
-        new_strides = IntList.with_capacity(rank)
+        new_shape = IntArray.with_capacity(rank)
+        new_strides = IntArray.with_capacity(rank)
         new_offset = 0
 
         for i in range(rank):
@@ -461,7 +515,7 @@ struct Validator:
             Tuple[Shape, Strides, int]: New shape, strides, and offset.
         """
         # Validate rank vs non-newaxis indices count
-        # Count required rank: Int contributes 1; IntList contributes len(list); Slice contributes 1; NewAxis contributes 0
+        # Count required rank: Int contributes 1; IntArray contributes len(list); Slice contributes 1; NewAxis contributes 0
         var required_rank = 0
 
         for idx in indices:
@@ -483,8 +537,8 @@ struct Validator:
                 ") mismatch",
             )
 
-        new_shape = IntList.with_capacity(len(indices))
-        new_strides = IntList.with_capacity(len(indices))
+        new_shape = IntArray.with_capacity(len(indices))
+        new_strides = IntArray.with_capacity(len(indices))
         offset = 0
         dim_counter = 0  # Tracks original tensor dimensions
 
@@ -562,10 +616,8 @@ struct Validator:
 
     @always_inline
     @staticmethod
-    fn validate_view_params[
-        dtype: DType
-    ](
-        this: Tensor[dtype],
+    fn validate_view_params(
+        storage_size: Int,
         shape: Shape,
         strides: Strides,
         offset: Int,
@@ -573,12 +625,13 @@ struct Validator:
         """
         Validate absolute view parameters.
         Both strides and offset are absolute w.r.t. the underlying buffer.
+
+        Precondition: All shape dimensions are >= 1 (enforced by Shape constructor).
         """
-        storage_size = this.buffer.size()
 
         # --- 1. Validate offset ---
         if offset < 0 or offset >= storage_size:
-            print("Absolute offset validation failed:")
+            print("Offset validation failed:")
             print("  Storage size:", storage_size)
             print("  Offset:", offset)
             panic("Tensor → view: offset out of storage bounds")
@@ -592,95 +645,76 @@ struct Validator:
         var max_index = offset
 
         for i in range(shape.rank()):
-            stride = strides[i]
+            var stride = strides[i]
+            var size = shape[i]  # Guaranteed >= 1
 
             # Zero stride only valid for singleton dims
             if stride == 0:
-                if shape[i] > 1:
+                if size > 1:
                     panic(
                         "Tensor → view: zero stride only allowed for singleton"
                         " dims"
                     )
-                continue
+                continue  # size == 1, no span contribution
 
+            # Compute bounds (size >= 1, stride != 0)
+            var span = (size - 1) * stride
             if stride > 0:
-                max_index += (shape[i] - 1) * stride
+                max_index += span
             else:
-                min_index += (shape[i] - 1) * stride
+                min_index += span
 
         # --- 4. Validate against storage ---
         if min_index < 0 or max_index >= storage_size:
-            print("Absolute strides validation failed:")
+            print("Strides validation failed:")
             print("  Storage size:", storage_size)
             print("  Offset:", offset)
             print("  Shape:", shape)
             print("  Strides:", strides)
             print("  Min index:", min_index)
             print("  Max index:", max_index)
-            panic("Tensor → view: absolute strides access out of bounds")
+            panic("Tensor → view: strides access out of bounds")
 
-        # --- 5. Optional sanity check ---
-        for i in range(1, shape.rank()):
-            if strides[i - 1] != 0 and strides[i] != 0:
-                if abs(strides[i]) > abs(strides[i - 1]):
-                    # Possible transposed layout - valid but noteworthy
-                    pass
+        # --- 5. Check for self-overlapping layout ---
+        if not Self.is_non_overlapping(shape, strides):
+            log_warning("Tensor → view: self-overlapping layout detected")
+            log_warning("  Shape:", shape.__str__())
+            log_warning("  Strides:", strides.__str__())
 
         return (offset, strides)
 
-    @always_inline
     @staticmethod
-    fn validate_view_params_conservative[
-        dtype: DType
-    ](
-        this: Tensor[dtype],
-        shape: Shape,
-        strides: Strides,
-        offset: Int,
-    ) -> Tuple[Int, Strides]:
-        """
-        Validate that the child view accesses ONLY within parent's storage region.
-        """
-        storage_size = this.buffer.size()
-        parent_offset = this.offset()
-        parent_max_index = this.max_index()
+    @always_inline
+    fn is_non_overlapping(shape: Shape, strides: Strides) -> Bool:
+        """Check if view has self-overlapping positions."""
+        rank = shape.rank()
+        if rank == 0:
+            return True
 
-        # --- 1. Compute absolute offset ---
-        abs_offset = parent_offset + offset  # Convert relative to absolute
+        var pairs = List[Tuple[Int, Int]](capacity=UInt(rank))
+        for i in range(rank):
+            pairs.append((abs(strides[i]), i))
 
-        # --- 2. Enforce parent boundaries ---
-        if abs_offset < parent_offset:
-            panic("Child view cannot access storage before parent's offset")
+        # Sort by stride ascending
+        fn comp_fn(
+            pair_a: Tuple[Int, Int], pair_b: Tuple[Int, Int]
+        ) capturing -> Bool:
+            return pair_a[0] < pair_b[0]
 
-        # --- 3. Check max access doesn't exceed parent's bounds ---
-        var max_child_index = abs_offset
-        for i in range(shape.rank()):
-            if strides[i] > 0:
-                max_child_index += (shape[i] - 1) * strides[i]
+        sort[comp_fn](pairs)  # Sort by stride ascending
 
-        if max_child_index > parent_max_index:
-            panic("Child view cannot access storage beyond parent's bounds")
-
-        # --- 4. Validate against storage (safety check) ---
-        if abs_offset < 0 or abs_offset >= storage_size:
-            panic("Absolute offset out of storage bounds")
-
-        # Compute and validate min/max indices for storage safety
-        var min_index = abs_offset
-        var max_index = abs_offset
-        for i in range(shape.rank()):
-            stride = strides[i]
-            if stride == 0:
+        var required_stride = 1
+        for abs_stride, dim in pairs:
+            # Skip dimensions with no elements or broadcast dims
+            if shape[dim] <= 1 or strides[dim] == 0:
                 continue
-            elif stride > 0:
-                max_index += (shape[i] - 1) * stride
-            else:
-                min_index += (shape[i] - 1) * stride
 
-        if min_index < 0 or max_index >= storage_size:
-            panic("View would access outside storage bounds")
+            if abs_stride < required_stride:
+                return False  # Self-overlap detected
 
-        return (abs_offset, strides)
+            required_stride *= shape[dim]
+
+        return True
 
 
 fn main() raises:

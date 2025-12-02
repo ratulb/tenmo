@@ -2,7 +2,7 @@ from memory import Pointer
 from common_utils import log_debug, panic
 from tenmo import Tensor
 from shapes import Shape
-from intlist import IntList
+from intarray import IntArray
 from strides import Strides
 from backpropagation import BackwardFn
 from operators import AddTensor, SubtractTensor
@@ -363,7 +363,7 @@ struct ComputationGraph[dtype: DType](Copyable & Movable):
         # ----------------------------
         # Phase 1: Graph tracing (DFS)
         # ----------------------------
-        var visited_node_ids = IntList()
+        var visited_node_ids = IntArray()
         var collected_nodes = List[Ancestor[dtype]]()
         var parent_fanin_counts = Dict[Int, Int]()
 
@@ -428,7 +428,7 @@ struct ComputationGraph[dtype: DType](Copyable & Movable):
         self.node_registry.clear()
 
         # Rebuild with fresh data
-        var visited_node_ids = IntList()
+        var visited_node_ids = IntArray()
         var dfs_stack = List[Ancestor[dtype]]()
         dfs_stack.append(output.copy())
 

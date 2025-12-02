@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn
 from operators import AddTensor, ZeroGrad
-from intlist import IntList
+from intarray import IntArray
 from shapes import Shape
 from strides import Strides
 from common_utils import panic
@@ -13,7 +13,7 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
-    var permutation: IntList  # forward permutation used
+    var permutation: IntArray  # forward permutation used
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self))
@@ -24,7 +24,7 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
         var gradbox = output.grad()
         parent = output.ancestry().get(0)
         # Compute inverse permutation
-        inverse = IntList.filled(len(self.permutation), 0)
+        inverse = IntArray.filled(len(self.permutation), 0)
         for i in range(len(self.permutation)):
             inverse[self.permutation[i]] = i
 
@@ -45,14 +45,14 @@ struct Permute[dtype: DType]:
         track_grad: Bool = True
     ](
         self: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         if len(axes) != self.rank():
             panic("Tensor → permute: number of axes must match tensor rank")
 
         # Check for valid permutation
-        seen = IntList.with_capacity(len(axes))
+        seen = IntArray.with_capacity(len(axes))
         for axis in axes:
             if axis < 0 or axis >= self.rank():
                 panic("Tensor → permute: invalid axis index")
@@ -61,8 +61,8 @@ struct Permute[dtype: DType]:
             seen.append(axis)
 
         # Create new shape and strides
-        new_shape = IntList.with_capacity(len(axes))
-        new_strides = IntList.with_capacity(len(axes))
+        new_shape = IntArray.with_capacity(len(axes))
+        new_strides = IntArray.with_capacity(len(axes))
         for axis in axes:
             new_shape.append(self.shape()[axis])
             new_strides.append(self.strides()[axis])

@@ -5,16 +5,16 @@ from common_utils_imports import *
 from operators import *
 from validators import Validator
 from tenmo import Tensor
-from layout.int_tuple import IntArray
+from intarray import IntArray
 from ndbuffer import NDBuffer
 from broadcasthelper import ShapeBroadcaster
-from intlist import IntList
 from strides import Strides
 from sys import simd_width_of
 from matmul import Matmul
 from random import seed, random_float64
 from buffers import Buffer
 from forwards import Mean
+from utilities import Utils
 
 struct Gradbox[dtype: DType](
     Copyable
@@ -24,6 +24,7 @@ struct Gradbox[dtype: DType](
     & Representable
     & Writable
     & EqualityComparable
+    & Absable
 ):
     var buffer: NDBuffer[dtype]
 
@@ -46,13 +47,14 @@ struct Gradbox[dtype: DType](
             self^.buffer.contiguous(), requires_grad=requires_grad
         )
 
-    fn transpose(self, axes: IntList) -> Gradbox[dtype]:
+    @always_inline
+    fn transpose(self, axes: IntArray) -> Gradbox[dtype]:
         shape = self.shape()
         normalized_axes = (
             Validator.validate_and_normalize_axes(
                 shape, axes, ordered=False, fill_missing=True
             ) if len(axes)
-            > 0 else IntList.range_list(shape.rank()).reversed()
+            > 0 else IntArray.range(0, shape.rank()).reversed()
         )
 
         # Permute shape and create default strides and permute
@@ -63,6 +65,11 @@ struct Gradbox[dtype: DType](
         nd_buffer = NDBuffer[dtype](
             buffer^, Optional(new_shape^), Optional(new_strides^), offset=0
         )
+        return Gradbox[dtype](nd_buffer^, share=False)
+
+    fn __abs__(self) -> Gradbox[dtype]:
+        var buffer = self.buffer.map[Utils[dtype].abs_buffer, Utils[dtype].abs_scalar]()
+        var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
         return Gradbox[dtype](nd_buffer^, share=False)
 
     @staticmethod
@@ -80,16 +87,16 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn squeeze(self, axes: List[Int] = []) -> Gradbox[dtype]:
-        return self.squeeze(IntList(axes))
+        return self.squeeze(IntArray(axes))
 
     @always_inline
-    fn squeeze(self, axes: IntList) -> Gradbox[dtype]:
+    fn squeeze(self, axes: IntArray) -> Gradbox[dtype]:
         shape = self.shape()
         rank = shape.rank()
 
         # Validate axes
-        var validated_axes = IntList()
-        if axes.len() == 0:
+        var validated_axes = IntArray()
+        if len(axes) == 0:
             # Default: squeeze all dimensions with size 1
             for i in range(rank):
                 if shape[i] == 1:
@@ -111,7 +118,7 @@ struct Gradbox[dtype: DType](
                     )
 
         # construct new shape
-        var new_dims = IntList()
+        var new_dims = IntArray()
         for i in range(rank):
             if i not in validated_axes:
                 new_dims.append(shape[i])
@@ -123,9 +130,9 @@ struct Gradbox[dtype: DType](
         return Gradbox[dtype](nd_buffer^, share=False)
 
     fn unsqueeze(self, axes: List[Int]) -> Self:
-        return self.unsqueeze(IntList(axes))
+        return self.unsqueeze(IntArray(axes))
 
-    fn unsqueeze(self, axes: IntList) -> Self:
+    fn unsqueeze(self, axes: IntArray) -> Self:
         var rank = self.rank()
         var sorted_axes = axes.sorted()
         var new_rank = rank + sorted_axes.size()
@@ -145,7 +152,7 @@ struct Gradbox[dtype: DType](
 
         # Build new shape
         shape = self.shape()
-        var new_shape_dims = IntList.with_capacity(new_rank)
+        var new_shape_dims = IntArray.with_capacity(new_rank)
         var src_i = 0
         for dst_i in range(new_rank):
             if dst_i in sorted_axes:
@@ -164,7 +171,7 @@ struct Gradbox[dtype: DType](
         return Gradbox[dtype](nd_buffer^, share=False)
 
     @always_inline
-    fn permute(self, axes: IntList) -> Gradbox[dtype]:
+    fn permute(self, axes: IntArray) -> Gradbox[dtype]:
         # Validate rank / axis count
         var rank = self.rank()
         if len(axes) != rank:
@@ -177,7 +184,7 @@ struct Gradbox[dtype: DType](
             )
 
         # Validate permutation (no duplicates, indices in range)
-        var seen = IntList.with_capacity(rank)
+        var seen = IntArray.with_capacity(rank)
         for axis in axes:
             if axis < 0 or axis >= rank:
                 panic(
@@ -194,8 +201,8 @@ struct Gradbox[dtype: DType](
             seen.append(axis)
 
         # Build permuted shape and strides
-        var new_shape = IntList.with_capacity(rank)
-        var new_strides = IntList.with_capacity(rank)
+        var new_shape = IntArray.with_capacity(rank)
+        var new_strides = IntArray.with_capacity(rank)
         for axis in axes:
             new_shape.append(self.shape()[axis])
             new_strides.append(self.strides()[axis])
@@ -257,14 +264,14 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn sum(
-        self, axes: IntList = IntList(), keepdims: Bool = False
+        self, axes: IntArray = IntArray(), keepdims: Bool = False
     ) -> Gradbox[dtype]:
         var nd_buffer = self.buffer.sum(reduction_axes=axes, keepdims=keepdims)
         return Gradbox[dtype](nd_buffer^, share=False)
 
     @always_inline
     fn mean(
-        self, axes: IntList = IntList(), keepdims: Bool = False
+        self, axes: IntArray = IntArray(), keepdims: Bool = False
     ) -> Gradbox[dtype]:
         return Mean[dtype].forward(self, axes=axes, keepdims=keepdims)
 
@@ -338,16 +345,6 @@ struct Gradbox[dtype: DType](
         return self.buffer[indices]
 
     @always_inline
-    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
-        if self.rank() == 0 and len(indices) != 0:
-            panic(
-                "Gradbox → __getitem__(IntList): Scalar gradbox expects empty"
-                " indices"
-            )
-
-        return self.buffer[indices]
-
-    @always_inline
     fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
         if self.rank() == 0 and len(indices) != 0:
             panic(
@@ -372,15 +369,6 @@ struct Gradbox[dtype: DType](
         if self.rank() == 0 and indices.size() != 0:
             panic(
                 "Gradbox → __setitem__(IntArray): Scalar gradbox expects empty"
-                " indices"
-            )
-        self.buffer[indices] = value
-
-    @always_inline
-    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
-        if self.rank() == 0 and len(indices) != 0:
-            panic(
-                "Gradbox → __setitem__(IntList): Scalar gradbox expects empty"
                 " indices"
             )
         self.buffer[indices] = value
@@ -689,7 +677,7 @@ struct Gradbox[dtype: DType](
         validated: Bool = False,
     ) -> Gradbox[dtype]:
         shape = new_shape if validated else Validator.validate_and_construct_new_shape(
-            self.shape(), new_shape.intlist()
+            self.shape(), new_shape.intarray()
         )
         buffer = self.buffer.contiguous_buffer()
         nd_buffer = NDBuffer[dtype](buffer^, shape^)

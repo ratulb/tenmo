@@ -3,14 +3,13 @@ from tenmo import Tensor
 from gradbox import Gradbox
 from sys.param_env import env_get_string
 from logger import Level, Logger
-from intlist import IntList
 from layers import Sequential, Linear, ReLU
 
 # from strides import Strides
 from os import abort
 from utils import Variant
 from testing import assert_true
-from layout.int_tuple import IntArray
+from intarray import IntArray
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -50,7 +49,8 @@ fn panic(*s: String):
 
 
 fn id[type: AnyType, //](t: type) -> Int:
-    return Int(UnsafePointer(to=t))
+    #return Int(UnsafePointer(to=t))
+    return Int(addr(t))
 
 
 fn addr[type: AnyType, //](t: type) -> UnsafePointer[type]:
@@ -61,11 +61,91 @@ fn addrs[type: AnyType, //](*ts: type) -> List[UnsafePointer[type]]:
     l = List[UnsafePointer[type]](capacity=len(ts))
     for t in ts:
         l.append(UnsafePointer(to=t))
-    return l
+    return l^
 
 
 fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
     return ptr.__as_bool__() == False
+
+
+@always_inline("nodebug")
+fn inf[dtype: DType]() -> Scalar[dtype]:
+    """Gets a +inf value for the given dtype.
+
+    Constraints:
+        Can only be used for FP dtypes.
+
+    Parameters:
+        dtype: The value dtype.
+
+    Returns:
+        The +inf value of the given dtype.
+    """
+    constrained[
+        dtype.is_floating_point(),
+        "Only floating point dtypes support +inf.",
+    ]()
+
+    @parameter
+    if dtype is DType.bfloat16:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
+        )
+    elif dtype is DType.float16:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f16>`,
+        )
+    elif dtype is DType.float32:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f32>`,
+        )
+    elif dtype is DType.float64:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
+        )
+    else:
+        constrained[False, "unsupported float type"]()
+        return {}
+
+
+fn isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
+    return inf[dtype]() == value
+
+
+
+fn isnan[dtype: DType, //](value: Scalar[dtype]) -> Bool:
+    return nan[dtype]() == value
+
+@always_inline("nodebug")
+fn nan[dtype: DType]() -> Scalar[dtype]:
+    """Gets a NaN value for the given dtype.
+
+    Constraints:
+        Can only be used for FP dtypes.
+
+    Parameters:
+        dtype: The value dtype.
+
+    Returns:
+        The NaN value of the given dtype.
+    """
+    constrained[
+        dtype.is_floating_point(),
+        "Only floating point dtypes support NaN.",
+    ]()
+
+    @parameter
+    if dtype is DType.float32:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
+        )
+    elif dtype is DType.float64:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
+        )
+    else:
+        constrained[False, "unsupported float type"]()
+        return {}
 
 
 # Helper
@@ -129,9 +209,9 @@ fn il(index_list: IntArray) -> Idx:
 
 
 fn il(*indices: Int) -> Idx:
-    intarray = IntArray(size=len(indices))
+    intarray = IntArray.with_capacity(len(indices))
     for i in range(len(indices)):
-        intarray[i] = indices[i]
+        intarray.append(indices[i])
     return Idx(intarray)
 
 
@@ -337,41 +417,6 @@ fn print_tensor_recursive[
 
         print(indent + "]", end="")
 
-
-@register_passable
-struct IntArrayHelper(Copyable):
-    @staticmethod
-    fn print(arr: IntArray):
-        for i in range(arr.size()):
-            end = ", " if i < arr.size() - 1 else "\n"
-            print(arr[i], end=end)
-
-    @staticmethod
-    fn to_string(arr: IntArray) -> String:
-        s = String()
-        for i in range(arr.size()):
-            end = ", " if i < arr.size() - 1 else ""
-            s += arr[i].__str__() + end
-        return s
-
-    @staticmethod
-    fn extend(arr: IntArray, *elems: Int) -> IntArray:
-        out = IntArray(arr.size() + len(elems))
-        out.copy_from(0, arr, arr.size())
-        idx = 0
-        for i in range(arr.size(), arr.size() + len(elems)):
-            out[i] = elems[idx]
-            idx += 1
-        return out
-
-    @staticmethod
-    fn from_list(l: List[Int]) -> IntArray:
-        out = IntArray(size=len(l))
-        for i in range(len(l)):
-            out[i] = l[i]
-        return out
-
-
 # Utility repeat function
 fn str_repeat(s: String, n: Int) -> String:
     if n <= 0:
@@ -395,7 +440,7 @@ fn print_summary[
     headers.append("Trainable")
 
     var rows = List[List[String]]()
-    rows.append(headers)
+    rows.append(headers.copy())
 
     var total_params = 0
     var trainable_params = 0
@@ -405,29 +450,29 @@ fn print_summary[
     var current_shape = "(?, ?)"
 
     for i in range(len(mod.modules)):
-        m = mod.modules[i]
+        m = mod.modules[i].copy()
         var name = "Layer" + i.__str__()
 
         if m.layer.isa[Linear[dtype]]():
-            var l = m.layer[Linear[dtype]]
+            var l = m.layer[Linear[dtype]].copy()
 
             # Infer input/output shapes
-            var in_features = l.weights.shape[0]
-            var out_features = l.weights.shape[1]
+            var in_features = l.weights.shape()[0]
+            var out_features = l.weights.shape()[1]
 
             var input_shape = "(?, " + in_features.__str__() + ")"
             var output_shape = "(?, " + out_features.__str__() + ")"
 
             if x:
-                input_shape = x.value().shape.__str__()
+                input_shape = x.value().shape().__str__()
                 x = Optional(m(x.value()))
-                output_shape = x.value().shape.__str__()
+                output_shape = x.value().shape().__str__()
 
             current_shape = output_shape
 
             # Params
             var params = (
-                l.weights.shape.num_elements() + l.bias.shape.num_elements()
+                l.weights.shape().num_elements() + l.bias.shape().num_elements()
             )
             total_params += params
             if l.weights.requires_grad or l.bias.requires_grad:
@@ -449,9 +494,9 @@ fn print_summary[
             var output_shape = current_shape
 
             if x:
-                input_shape = x.value().shape.__str__()
+                input_shape = x.value().shape().__str__()
                 x = Optional(m(x.value()))
-                output_shape = x.value().shape.__str__()
+                output_shape = x.value().shape().__str__()
                 current_shape = output_shape
 
             rows.append([name, "ReLU", input_shape, output_shape, "0", "False"])
@@ -466,15 +511,15 @@ fn print_summary[
         widths.append(maxw)
 
     # Print horizontal rule
-    fn print_rule():
+    fn print_rule(read widths: List[Int]):
         var line = ""
-        for w in widths:
+        for  w in  widths:
             line += "+" + str_repeat("-", w + 2)
         line += "+"
         print(line)
 
     # Print table
-    print_rule()
+    print_rule(widths)
     for idx in range(len(rows)):
         var line = ""
         for j in range(len(rows[idx])):
@@ -482,7 +527,7 @@ fn print_summary[
             line += "| " + val + str_repeat(" ", widths[j] - len(val)) + " "
         line += "|"
         print(line)
-        print_rule()
+        print_rule(widths)
 
     # Footer summary
     var non_trainable_params = total_params - trainable_params
@@ -493,10 +538,4 @@ fn print_summary[
 
 
 fn main() raises:
-    _ = """a = Tensor.arange(24, requires_grad=True).reshape(2, 3, 4)
-    b = Tensor.scalar(10)
-    l = addrs(a, b)
-    for e in l:
-        e[].print()"""
-    l = List(8, 9, 0)
-    IntArrayHelper.print(IntArrayHelper.from_list(l))
+    pass

@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from intlist import IntList
+from intarray import IntArray
 from shapes import Shape
 from testing import assert_true
 from permute import Permute
@@ -17,15 +17,12 @@ fn main() raises:
     test_tensor_permute_grad_partial_ops()
     print("=== All Tensor.permute gradient tests passed ===")
 
-    pass
-
-
 
 fn test_tensor_permute_basic() raises:
     alias dtype = DType.float32
     print("Running test_tensor_permute_basic")
     t1 = Tensor[dtype].arange(0, 12).reshape(Shape(3, 4))
-    p = t1.permute(IntList([1, 0]))
+    p = t1.permute(IntArray([1, 0]))
     assert_true(p.shape() == Shape(4, 3))
     assert_true(p.strides()[0] == t1.strides()[1])
     assert_true(p.strides()[1] == t1.strides()[0])
@@ -44,8 +41,8 @@ fn test_tensor_permute_inverse() raises:
     alias dtype = DType.float32
     print("Running test_tensor_permute_inverse")
     t1 = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4))
-    p = Permute[dtype].forward(t1, IntList([2, 0, 1]))
-    inv = Permute[dtype].forward(p, IntList([1, 2, 0]))
+    p = Permute[dtype].forward(t1, IntArray([2, 0, 1]))
+    inv = Permute[dtype].forward(p, IntArray([1, 2, 0]))
     assert_true(inv.shape() == t1.shape())
     assert_true(inv.all_close(t1))
     print("✓ Passed inverse permutation test")
@@ -56,7 +53,7 @@ fn test_tensor_permute_grad_sum_2d() raises:
     alias dtype = DType.float32
     var t = Tensor[dtype].arange(0, 12).reshape(Shape(3, 4))
     t.requires_grad_(True)
-    var p = Permute[dtype].forward(t, IntList([1, 0]))
+    var p = Permute[dtype].forward(t, IntArray([1, 0]))
     # p.sum() should produce gradient of ones when backpropagated
     p.sum().backward()
     var expected = Tensor.d2([ [1.0, 1.0, 1.0, 1.0],
@@ -73,9 +70,9 @@ fn test_tensor_permute_grad_inverse_chain() raises:
     var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4))
     t.requires_grad_(True)
     # Apply a permutation and then its inverse (should return original layout)
-    var p = Permute[dtype].forward(t, IntList([1, 2, 0]))
+    var p = Permute[dtype].forward(t, IntArray([1, 2, 0]))
     # inverse of [1,2,0] is [2,0,1] (since inverse[ permutation[i] ] = i)
-    var r = Permute[dtype].forward(p, IntList([2, 0, 1]))  # r should match t's layout
+    var r = Permute[dtype].forward(p, IntArray([2, 0, 1]))  # r should match t's layout
     r.sum().backward()
     var expected = Tensor.d3(
         [[[1.0,1.0,1.0,1.0],
@@ -110,7 +107,7 @@ fn test_tensor_permute_grad_scaled_sum_3d() raises:
     alias dtype = DType.float32
     var t = Tensor[dtype].arange(0, 60).reshape(Shape(3, 4, 5))
     t.requires_grad_(True)
-    var p = Permute[dtype].forward(t, IntList([2, 0, 1]))  # shape -> (5,3,4)
+    var p = Permute[dtype].forward(t, IntArray([2, 0, 1]))  # shape -> (5,3,4)
     var q = p * 2.0
     q.sum().backward()
     # corrected expected shape (3, 4, 5)

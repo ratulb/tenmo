@@ -1,8 +1,9 @@
 from tenmo import Tensor
-from operators import AddTensor
+from operators import AddTensor, ReLUForwardOp, ReLUBackwardOp
 from backpropagation import Delegate, BackwardFn
 from ancestry import Ancestor
 from gradbox import Gradbox
+from ndbuffer import NDBuffer
 
 
 @fieldwise_init
@@ -15,16 +16,26 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable):
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
-        input_tensor = ancestor.tensor()
-        shape = ancestor.shape()
-        gradbox_ancestor = Gradbox[dtype].zeros(
-            shape, share=False
-        )
+        var ancestor = output.ancestry().get(0)
+        ref input_tensor = ancestor.tensor()
+        ref shape = ancestor.shape()
+        var gradbox_ancestor: Gradbox[dtype]
         var zero = Scalar[dtype](0)
-        for coord in shape:
-            if input_tensor[coord] > zero:
-                gradbox_ancestor[coord] = gradbox[coord]
+        if input_tensor.is_contiguous():
+            var start = input_tensor.offset()
+            var end = start + input_tensor.numels()
+            var grad_buffer = input_tensor.buffer.data_buffer().select[
+                ReLUBackwardOp
+            ](gradbox.buffer.data_buffer(), start, end)
+            var ndb = NDBuffer[dtype](grad_buffer^, shape)
+            gradbox_ancestor = Gradbox[dtype](ndb^, share=False)
+        else:
+            gradbox_ancestor = Gradbox[dtype].zeros(shape, share=False)
+            ref gradbox_buffer = gradbox.buffer.data_buffer()
+            var index = 0
+            for coord in shape:
+                if input_tensor[coord] > zero:
+                    gradbox_ancestor[coord] = gradbox_buffer[index]
 
         return [(ancestor^, gradbox_ancestor^, AddTensor)]
 
@@ -42,10 +53,24 @@ struct ReLU[dtype: DType]:
         dtype
     ]:
         shape = self.shape()
-        out = Tensor[dtype].zeros(shape, requires_grad=False)
-        zero = Scalar[dtype](0)
-        for coord in shape:
-            out[coord] = self[coord] if self[coord] > zero else zero
+        var out: Tensor[dtype]
+        if self.is_contiguous():
+            var start = self.offset()
+            var end = start + self.numels()
+            var buffer = self.buffer.data_buffer().unary_ops[ReLUForwardOp](
+                start, end
+            )
+            out = Tensor[dtype](
+                NDBuffer[dtype](buffer^, shape), requires_grad=False
+            )
+        else:
+            out = Tensor[dtype].zeros(shape, requires_grad=False)
+            ref out_buffer = out.buffer.data_buffer()
+            var index = 0
+            zero = Scalar[dtype](0)
+            for coord in shape:
+                out_buffer[index] = self[coord] if self[coord] > zero else zero
+                index += 1
 
         @parameter
         if track_grad:

@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor, ZeroGrad
-from intlist import IntList
+from intarray import IntArray
 from backpropagation import Delegate, BackwardFn
 from common_utils import panic
 from shapes import Shape
@@ -41,7 +41,7 @@ struct Squeeze[dtype: DType]:
         track_grad: Bool = True
     ](
         tensor: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         """
@@ -63,11 +63,11 @@ struct Squeeze[dtype: DType]:
             return tensor.copy()
         rank = tensor.rank()
         # Determine which axes to squeeze
-        var axes_to_squeeze: IntList
-        if not axes == IntList():
+        var axes_to_squeeze: IntArray
+        if not axes == IntArray():
             # Use the specified axes after validation
-            axes_to_squeeze = IntList.with_capacity(rank)
-            seen = IntList.with_capacity(len(axes))
+            axes_to_squeeze = IntArray.with_capacity(rank)
+            seen = IntArray.with_capacity(len(axes))
             for axis in axes:
                 normalized = axis if axis >= 0 else axis + rank
                 if normalized < 0 or normalized >= rank:
@@ -97,8 +97,8 @@ struct Squeeze[dtype: DType]:
             return tensor.copy()
 
         new_size = rank - len(axes_to_squeeze)
-        new_shape = IntList.with_capacity(new_size)
-        new_strides = IntList.with_capacity(new_size)
+        new_shape = IntArray.with_capacity(new_size)
+        new_strides = IntArray.with_capacity(new_size)
 
         for i in range(rank):
             if i not in axes_to_squeeze:

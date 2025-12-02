@@ -1,6 +1,6 @@
 from tenmo import Tensor
-from intlist import IntList
 from operators import AddTensor
+from intarray import IntArray
 from shapes import Shape
 from backpropagation import Delegate, BackwardFn
 from validators import Validator
@@ -11,7 +11,7 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct SumBackward[dtype: DType](ImplicitlyCopyable):
-    var axes: IntList
+    var axes: IntArray
     var keepdims: Bool
 
     fn backward(
@@ -39,10 +39,10 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
                 # Determine axes/unsqueeze (insert dims of size 1)
                 axes = (
                     gradbox.shape()
-                    .intlist()
+                    .intarray()
                     .insert(
                         self.axes,
-                        IntList.with_capacity(len(self.axes), 1),
+                        IntArray.filled(len(self.axes), 1),
                     )
                 )
                 unsqueezed_shape = Shape(axes)
@@ -73,7 +73,7 @@ struct Summer[dtype: DType](Copyable):
         track_grad: Bool = True
     ](
         tensor: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:

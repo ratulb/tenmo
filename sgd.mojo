@@ -1,7 +1,6 @@
-from tensors import Tensor
+from tenmo import Tensor
 
 
-@explicit_destroy
 struct SGD[dtype: DType = DType.float32](Copyable & Movable):
     """
     Stochastic Gradient Descent (SGD) Optimizer.
@@ -39,18 +38,18 @@ struct SGD[dtype: DType = DType.float32](Copyable & Movable):
         lr: Scalar[dtype] = Scalar[dtype](0.01),
         zero_grad_post_step: Bool = True,
     ):
-        self.params = params
+        self.params = params.copy()
         self.lr = lr
         self.zero_grad_post_step = zero_grad_post_step
 
     # Copy/move initializers (default shallow pointer copies are fine).
     fn __copyinit__(out self, existing: Self):
-        self.params = existing.params
+        self.params = existing.params.copy()
         self.lr = existing.lr
         self.zero_grad_post_step = existing.zero_grad_post_step
 
     fn __moveinit__(out self, deinit existing: Self):
-        self.params = existing.params
+        self.params = existing.params^
         self.lr = existing.lr
         self.zero_grad_post_step = existing.zero_grad_post_step
 
@@ -62,14 +61,16 @@ struct SGD[dtype: DType = DType.float32](Copyable & Movable):
         """
 
         for param_ptr in self.params:
-            var ref param = param_ptr[]  # Mutably borrow the pointee
+            #var ref param = param_ptr[]  # Mutably borrow the pointee
+            ref param = param_ptr[]  # Mutably borrow the pointee
             if param.requires_grad and param.has_grad():
-                grad = param.gradbox[]
+                ref grad = param.gradbox[]
                 # Update the parameter values in place
                 param.buffer -= grad.buffer * self.lr
 
             if self.zero_grad_post_step:
-                param.zero_grad()
+                #param.zero_grad()
+                pass
 
     fn zero_grad(self):
         for param_ptr in self.params:
@@ -98,9 +99,9 @@ fn main():
     b.seed_grad(24)
 
     print("\npost seeding a and b grads\n")
-    a.gprint()
+    a.grad().print()
     print()
-    b.gprint()
+    b.grad().print()
 
     sgd.step()
 
@@ -110,9 +111,9 @@ fn main():
     b.print()
 
     print("\na's and b's grad now\n")
-    a.gprint()
+    a.grad().print()
     print()
-    b.gprint()
+    b.grad().print()
 
     # Sanity check: directly viewing params inside optimizer
     sgd.params[0][].print()

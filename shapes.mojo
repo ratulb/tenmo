@@ -1,22 +1,302 @@
-from common_utils import log_debug, panic
-from intlist import IntList
-from memory import Pointer
-from strides import Strides
-from layout.int_tuple import IntArray
+from common_utils import panic
+from intarray import IntArray
+
+
+@register_passable
+struct Shape(
+    ImplicitlyCopyable, Movable, Representable, Sized, Stringable, Writable
+):
+    """Shape of a tensor."""
+
+    var dims: IntArray
+    var _numels: Int
+
+    @staticmethod
+    @always_inline
+    fn Void() -> Shape:
+        return Shape()
+
+    @staticmethod
+    @always_inline
+    fn Unit() -> Shape:
+        return Shape(1)
+
+    @always_inline("nodebug")
+    fn __init__(out self):
+        self.dims = IntArray()
+        self._numels = 1
+
+    @always_inline("nodebug")
+    fn __init__(out self, *values: Int):
+        self.dims = IntArray(values)
+        self._numels = 0
+        self._numels = self._compute_numels()
+
+    @always_inline("nodebug")
+    fn __init__(out self, values: VariadicList[Int]):
+        self.dims = IntArray(values)
+        self._numels = 0
+        self._numels = self._compute_numels()
+
+    @always_inline("nodebug")
+    fn __init__(out self, values: List[Int]):
+        self.dims = IntArray(values)
+        self._numels = 0
+        self._numels = self._compute_numels()
+
+    @always_inline("nodebug")
+    fn __init__(out self, values: IntArray):
+        self.dims = values
+        self._numels = 0
+        self._numels = self._compute_numels()
+
+    @always_inline("nodebug")
+    fn __copyinit__(out self, existing: Self):
+        self.dims = existing.dims
+        self._numels = existing._numels
+
+    @always_inline("nodebug")
+    fn _compute_numels(self) -> Int:
+        """Compute number of elements, validating dimensions."""
+        if len(self.dims) == 0:
+            return 1
+        var prod = 1
+        for i in range(len(self.dims)):
+            if self.dims[i] < 1:
+                panic(
+                    "Shape: dimension must be >= 1, got " + String(self.dims[i])
+                )
+            prod *= self.dims[i]
+        return prod
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        return len(self.dims)
+
+    @always_inline("nodebug")
+    fn rank(self) -> Int:
+        return len(self.dims)
+
+    @always_inline("nodebug")
+    fn ndim(self) -> Int:
+        return len(self.dims)
+
+    @always_inline("nodebug")
+    fn num_elements(self) -> Int:
+        return self._numels
+
+    @always_inline("nodebug")
+    fn numels(self) -> Int:
+        return self._numels
+
+    @always_inline("nodebug")
+    fn __getitem__(self, idx: Int) -> Int:
+        return self.dims[idx]
+
+    @always_inline
+    fn __getitem__(self, slice: Slice) -> Self:
+        s = self.dims[slice]
+        return Self(s)
+
+    @always_inline("nodebug")
+    fn __eq__(self, other: Self) -> Bool:
+        return self.dims == other.dims
+
+    @always_inline("nodebug")
+    fn __eq__(self, other: List[Int]) -> Bool:
+        return self.dims == other
+
+    @always_inline("nodebug")
+    fn __ne__(self, other: Self) -> Bool:
+        return not (self.dims == other.dims)
+
+    fn __str__(self) -> String:
+        return "(" + self.dims.__str__()[1:-1] + ")"
+
+    fn __repr__(self) -> String:
+        return self.__str__()
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
+
+    @always_inline("nodebug")
+    fn __iter__(ref self) -> ShapeIndexIterator[origin_of(self)]:
+        return ShapeIndexIterator(Pointer(to=self))
+
+    @always_inline("nodebug")
+    fn tolist(self) -> List[Int]:
+        return self.dims.tolist()
+
+    @always_inline("nodebug")
+    fn intarray(self) -> IntArray:
+        return self.dims
+
+    # ========== Operations ==========
+
+    @always_inline("nodebug")
+    fn __add__(self, other: Shape) -> Shape:
+        """Concatenate shapes."""
+        # Use extend for bulk copy instead of loop
+        dims = self.dims + other.dims
+        return Shape(dims^)
+
+    @always_inline("nodebug")
+    fn __add__(self, other: List[Int]) -> Shape:
+        """Concatenate with list."""
+        dims = self.dims + other
+        return Shape(dims^)
+
+    @always_inline("nodebug")
+    fn __radd__(self, other: List[Int]) -> Shape:
+        """Concatenate list + shape."""
+        var from_list = IntArray(other)
+        dims = from_list + self.dims
+        return Shape(dims^)
+
+    @always_inline("nodebug")
+    fn __mul__(self, factor: Int) -> Shape:
+        """Repeat shape."""
+        if factor <= 0:
+            return Shape()
+        var result = self.dims
+        for _ in range(factor - 1):
+            result = result + self.dims
+        return Shape(result)
+
+    @always_inline("nodebug")
+    fn __rmul__(self, factor: Int) -> Shape:
+        return self.__mul__(factor)
+
+    @always_inline("nodebug")
+    fn reverse(self) -> Self:
+        """Return reversed shape."""
+        return Shape(self.dims.reversed())
+
+    @always_inline("nodebug")
+    fn replace(self, axis: Int, extent: Int) -> Shape:
+        """Replace dimension at axis."""
+        if axis < 0 or axis >= len(self):
+            panic("Shape: invalid axis " + String(axis))
+        if extent < 1:
+            panic("Shape: invalid extent " + String(extent))
+        var result = self.dims
+        result[axis] = extent
+        return Shape(result)
+
+    @always_inline("nodebug")
+    fn permute(self, axes: IntArray) -> Self:
+        """Reorder dimensions."""
+        var result = IntArray.with_capacity(len(axes))
+        result.reserve(len(axes))  # Guarantee no realloc
+        for i in range(len(axes)):
+            result.append(self[axes[i]])
+        return Shape(result)
+
+    @always_inline
+    fn count_axes_of_size(self, size: Int) -> Int:
+        """Count dimensions with given size."""
+        var count = 0
+        for i in range(len(self)):
+            if self[i] == size:
+                count += 1
+        return count
+
+    @always_inline("nodebug")
+    fn indices_of_axes_with_size(self, size: Int) -> IntArray:
+        """Get indices of dimensions with given size."""
+        var result = IntArray.with_capacity(len(self))
+        for i in range(len(self)):
+            if self[i] == size:
+                result.append(i)
+        return result^
+
+    @always_inline("nodebug")
+    fn first_index(self) -> IntArray:
+        """Get first index (all zeros)."""
+        return IntArray.filled(len(self), 0)
+
+    @always_inline("nodebug")
+    fn compute_output_shape(
+        self, normalized_axes: IntArray, keepdims: Bool, validated: Bool = False
+    ) -> Shape:
+        """Compute output shape after reduction.
+
+        Args:
+            normalized_axes: Sorted axes to reduce (empty = reduce all).
+            keepdims: Keep reduced dims as 1.
+            validated: Skip validation if True.
+        """
+        var rank = self.rank()
+
+        # Reduce all axes
+        if len(normalized_axes) == 0:
+            if keepdims:
+                return Shape(IntArray.filled(rank, 1))
+            else:
+                return Shape()
+
+        # Validate if needed
+        if not validated:
+            for i in range(len(normalized_axes)):
+                var axis = normalized_axes[i]
+                if axis < 0 or axis >= rank:
+                    panic("Shape: reduction axis out of bounds")
+                if i > 0 and axis <= normalized_axes[i - 1]:
+                    panic("Shape: reduction axes must be sorted and unique")
+
+        # Full reduction without keepdims
+        if len(normalized_axes) == rank and not keepdims:
+            return Shape()
+
+        # Build output shape
+        var expected_size = rank if keepdims else rank - len(normalized_axes)
+        var result = IntArray.with_capacity(expected_size)
+        result.reserve(expected_size)  # Guarantee no realloc
+        var axes_idx = 0
+
+        for dim in range(rank):
+            if (
+                axes_idx < len(normalized_axes)
+                and dim == normalized_axes[axes_idx]
+            ):
+                if keepdims:
+                    result.append(1)
+                axes_idx += 1
+            else:
+                result.append(self[dim])
+
+        return Shape(result)
+
+    @always_inline("nodebug")
+    fn reduced_shape(self, axes: IntArray) -> Shape:
+        if len(axes) > self.rank():
+            panic("Shape -> reduced_shape: axes greater that shape rank")
+        var reduced_axes = IntArray.with_capacity(len(axes))
+        for i in range(len(axes)):
+            reduced_axes.append(self[axes[i]])
+        return Shape(reduced_axes)
+
+    @staticmethod
+    fn of(*dims: Int) -> Shape:
+        return Shape(dims)
+
+    @always_inline
+    fn product(self) -> Int:
+        return self._numels
 
 
 @register_passable
 struct ShapeIndexIterator[origin: ImmutableOrigin](ImplicitlyCopyable):
+    """Iterator over IntArray coordinates of a shape."""
+
     var shape: Pointer[Shape, origin]
     var current: IntArray
     var index: Int
 
     fn __init__(out self, shape: Pointer[Shape, origin]):
         self.shape = shape
-        self.current = IntArray(shape[].rank())
+        self.current = IntArray.filled(shape[].rank(), 0)
         self.index = 0
-        for i in range(self.current.size()):
-            self.current[i] = 0
 
     fn __copyinit__(out self, other: Self):
         self.shape = other.shape
@@ -27,9 +307,10 @@ struct ShapeIndexIterator[origin: ImmutableOrigin](ImplicitlyCopyable):
         return self
 
     fn __next__(mut self) -> IntArray:
-        result = self.current
+        var result = self.current
         self.index += 1
-        for i in range(self.shape[].ndim - 1, -1, -1):
+        # This loop is hot - uses __setitem__ which is already optimized
+        for i in range(self.shape[].rank() - 1, -1, -1):
             self.current[i] += 1
             if self.current[i] < self.shape[][i]:
                 break
@@ -40,362 +321,15 @@ struct ShapeIndexIterator[origin: ImmutableOrigin](ImplicitlyCopyable):
         return self.shape[].num_elements() - self.index
 
     fn __has_next__(self) -> Bool:
-        return self.shape[].num_elements() - self.index > 0
+        return self.index < self.shape[].num_elements()
 
 
-@register_passable
-struct IndexIterator[origin: ImmutableOrigin](Copyable):
-    var shape: Pointer[Shape, origin]
-    var current: IntList
-    var index: Int
+fn main():
+    A_shape = Shape(2, 3, 5, 4)
+    B_shape = Shape(4, 5)
 
-    fn __init__(out self, shape: Pointer[Shape, origin]):
-        self.shape = shape
-        self.current = IntList.filled(shape[].rank(), 0)
-        self.index = 0
-
-    fn __copyinit__(out self, other: Self):
-        self.shape = other.shape
-        self.current = other.current.copy()
-        self.index = other.index
-
-    fn __iter__(self) -> Self:
-        return self.copy()
-
-    fn __next__(mut self) -> IntList:
-        result = self.current[::]
-        self.index += 1
-        for i in range(self.shape[].ndim - 1, -1, -1):
-            self.current[i] += 1
-            if self.current[i] < self.shape[][i]:
-                break
-            self.current[i] = 0
-        return result^
-
-    fn __len__(self) -> Int:
-        return self.shape[].num_elements() - self.index
-
-    fn __has_next__(self) -> Bool:
-        return self.shape[].num_elements() - self.index > 0
-
-
-@register_passable
-struct Shape(
-    Sized & Stringable & Writable & Representable & ImplicitlyCopyable & Movable
-):
-    var axes_spans: IntList
-    var ndim: Int
-    var numels: Int
-
-    @always_inline
-    @staticmethod
-    fn Void() -> Shape:
-        return Shape()
-
-    @always_inline
-    @staticmethod
-    fn Unit() -> Shape:
-        return Shape(1)
-
-    fn __init__(out self):
-        self = Self(IntList())
-
-    fn __init__(out self, dims: VariadicList[Int]):
-        spans = IntList.with_capacity(len(dims))
-        for each in dims:
-            spans.append(each)
-        self = Self(spans)
-
-    fn __init__(out self, *values: Int):
-        spans = IntList(values)
-        self = Self(spans)
-
-    fn __init__(out self, dims: List[Int]):
-        spans = IntList.new(dims)
-        self = Self(spans^)
-
-    fn __copyinit__(out self, other: Self):
-        self.axes_spans = other.axes_spans.copy()
-        self.ndim = other.ndim
-        self.numels = other.numels
-
-    fn __init__(out self, dims: IntList):
-        ndim = len(dims)
-        # Allow scalar tensors (rank 0, i.e., Shape())
-        if ndim == 0:
-            self.axes_spans = IntList()
-            self.ndim = 0
-            self.numels = 1
-            return
-        numels = 1
-        for i in range(ndim):
-            if dims[i] < 1:
-                panic(
-                    "Shape → __init__: negative or zero sized dimension(s) are"
-                    " not allowed →"
-                    + " dimension = "
-                    + String(dims[i])
-                    + " @index = "
-                    + String(i)
-                )
-            numels *= dims[i]
-        self.axes_spans = dims[::]
-        self.ndim = ndim
-        self.numels = numels
-
-    fn __iter__(ref self) -> ShapeIndexIterator[origin_of(self)]:
-        return ShapeIndexIterator(Pointer(to=self))
-
-    fn indices(ref self) -> IndexIterator[origin_of(self)]:
-        return IndexIterator(Pointer(to=self))
-
-    @always_inline
-    fn count_axes_of_size(self, axis_size: Int) -> Int:
-        return self.axes_spans.count(axis_size)
-
-    @always_inline
-    fn indices_of_axes_with_size(self, axis_size: Int) -> IntList:
-        indices = IntList.with_capacity(len(self))
-        for i in range(len(self.axes_spans)):
-            if self[i] == axis_size:
-                indices.append(i)
-        return indices^
-
-    @always_inline
-    fn first_index(self) -> IntList:
-        return IntList.filled(len(self), 0)
-
-    fn __mul__(self, factor: Int) -> Shape:
-        repeated = self.intlist() * factor
-        return Shape(repeated)
-
-    fn __rmul__(self, factor: Int) -> Shape:
-        return self.__mul__(factor)
-
-    fn __add__(self, other: Shape) -> Shape:
-        dims = self.intlist() + other.intlist()
-        return Shape(dims)
-
-    fn __radd__(self, other: List[Int]) -> Shape:
-        return Shape(IntList(other) + self.intlist())
-
-    fn __add__(self, other: List[Int]) -> Shape:
-        dims = self.intlist() + IntList.new(other)
-        return Shape(dims)
-
-    fn compute_output_shape(
-        self, normalized_axes: IntList, keepdims: Bool, validated: Bool = False
-    ) -> Shape:
-        """Compute the output shape after reduction along specified axes.
-
-        Args:
-            normalized_axes: Sorted list of axes to reduce over.
-                - Empty list means reduce over ALL axes.
-            keepdims: Whether to keep reduced dimensions as size 1.
-            validated: If True, skips axis validation (assumes axes are sorted, unique, and in bounds).
-
-        Returns:
-            Shape after reduction
-
-        Behavior:
-            - If reducing all axes (empty list or all indices) and keepdims=False → returns Shape() (scalar)
-            - Otherwise:
-                - For reduced axes: keep as 1 if keepdims=True, else remove
-                - For non-reduced axes: keep original size.
-        """
-        var rank = self.rank()
-
-        # Handle empty axes case: reduce over ALL axes
-        if len(normalized_axes) == 0:
-            if keepdims:
-                # Return shape of all 1's
-                var ones = IntList.filled(rank, 1)
-                return Shape(ones)
-            else:
-                return Shape()  # Scalar
-
-        # Validate axes only if not already validated
-        if not validated:
-            for i in range(len(normalized_axes)):
-                var axis = normalized_axes[i]
-                if axis < 0 or axis >= rank:
-                    panic(
-                        (
-                            "Shape → compute_output_shape: reduction axis out"
-                            " of bounds: normalized_axes: "
-                        ),
-                        normalized_axes.__str__(),
-                        "keepdims: ",
-                        keepdims.__str__(),
-                        "→ for shape: ",
-                        self.__str__(),
-                    )
-                if i > 0 and axis <= normalized_axes[i - 1]:
-                    panic(
-                        (
-                            "Shape → compute_output_shape: reduction axes must"
-                            " be sorted and unique. normalized_axes: "
-                        ),
-                        normalized_axes.__str__(),
-                        "keepdims: ",
-                        keepdims.__str__(),
-                        "→ for shape: ",
-                        self.__str__(),
-                    )
-
-        # Full reduction case (all specified axes reduced, not keeping dims)
-        if len(normalized_axes) == rank and not keepdims:
-            return Shape()
-
-        # Build output shape efficiently using sorted axes property
-        var spans = IntList.with_capacity(
-            rank if keepdims else rank - len(normalized_axes)
-        )
-        var axes_index = 0
-
-        for dim in range(rank):
-            if (
-                axes_index < len(normalized_axes)
-                and dim == normalized_axes[axes_index]
-            ):
-                # This dimension is being reduced
-                if keepdims:
-                    spans.append(1)
-                axes_index += 1
-            else:
-                # This dimension is kept as-is
-                spans.append(self[dim])
-
-        return Shape(spans)
-
-    fn reverse(self) -> Self:
-        dims = self.intlist()
-        dims.reverse()
-        return Shape(dims)
-
-    fn replace(self, axis: Int, extent: Int) -> Shape:
-        if axis < 0 or axis >= self.ndim:
-            panic(
-                "Shape → replace: Invalid axis: "
-                + String(axis)
-                + " for shape: "
-                + self.__str__()
-            )
-        if extent < 1:
-            panic("Shape → replace: Invalid extent: " + String(extent))
-        axes = self.intlist()
-        axes[axis] = extent
-        return Shape(axes)
-
-    @always_inline
-    fn __len__(self) -> Int:
-        return self.ndim
-
-    @always_inline
-    fn rank(self) -> Int:
-        return self.ndim
-
-    @always_inline
-    fn __getitem__(self, idx: Int) -> Int:
-        index = idx if idx >= 0 else idx + self.__len__()
-        if 0 <= index < self.ndim:
-            return self.axes_spans[index]
-        else:
-            return -1
-
-    fn __getitem__(self, slice: Slice) -> Self:
-        l = self.axes_spans[slice]
-        return Self(l)
-
-    fn permute(self, axes: IntList) -> Self:
-        log_debug(
-            "Stride -> permute: strides "
-            + self.axes_spans.__str__()
-            + ", axes: "
-            + axes.__str__()
-        )
-
-        return Shape(self.axes_spans.permute(axes))
-
-    fn __eq__(self, other: List[Int]) -> Bool:
-        shape = Self(other)
-        return self.__eq__(shape)
-
-    fn __eq__(self, other: Self) -> Bool:
-        if self.ndim != other.ndim:
-            return False
-        for idx in range(self.ndim):
-            if self.axes_spans[idx] != other.axes_spans[idx]:
-                return False
-        return True
-
-    fn __ne__(self, other: Self) -> Bool:
-        return not self.__eq__(other)
-
-    @always_inline
-    fn num_elements(self) -> Int:
-        return self.numels
-
-    fn __str__(self) -> String:
-        var s = String("(")
-        for i in range(self.ndim):
-            s += String(self.axes_spans[i])
-            if i < self.ndim - 1:
-                s += ", "
-        s += ")"
-        return s
-
-    fn __repr__(self) -> String:
-        return self.__str__()
-
-    fn write_to[W: Writer](self, mut writer: W):
-        writer.write(self.__str__())
-
-    @always_inline
-    fn intlist(self) -> IntList:
-        return self.axes_spans.copy()
-
-    @always_inline
-    fn tolist(self) -> List[Int]:
-        return self.axes_spans.tolist()
-
-    @always_inline
-    fn product(shape: Shape) -> Int:
-        return 1 if shape == Shape() else shape.intlist().product()
-
-    @staticmethod
-    fn of(*dims: Int) -> Shape:
-        return Shape(dims)
-
-
-from common_utils import IntArrayHelper
-from testing import assert_true
-
-
-fn main() raises:
-    # test_compute_output_shape_with_validation_flag()
-    s = Shape(1)
-    print(s.num_elements(), Shape().num_elements(), Shape(1, 1).num_elements())
-
-
-fn test_compute_output_shape_with_validation_flag() raises:
-    print("test_compute_output_shape_with_validation_flag")
-    var shape = Shape(2, 3, 4)
-
-    # Test with default validation (should work)
-    assert_true(shape.compute_output_shape(IntList([1]), False) == Shape(2, 4))
-
-    # Test with validated=True (should work and be faster)
-    var pre_validated_axes = IntList([0, 2])
-    assert_true(
-        shape.compute_output_shape(pre_validated_axes, True, validated=True)
-        == Shape(1, 3, 1)
-    )
-
-    # Test with invalid axes but validated=True (dangerous but allowed)
-    # This would panic if validated=False, but with validated=True it assumes caller knows what they're doing
-    var risky_axes = IntList([5])  # Out of bounds
-    var output_shape = shape.compute_output_shape(
-        risky_axes, False, validated=False
-    )  # Could cause undefined behavior
-    print(output_shape)
+    print(A_shape[-1], B_shape[-2], A_shape[0:-2], B_shape[0:-2])
+    _ = """for coord in shape:
+        print(coord)
+    shape = shape * 0
+    print(shape)"""
