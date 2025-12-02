@@ -1,5 +1,3 @@
-# %s/Tensor\.walk_backward(\([^)]*\))/\1.backward()/g
-# %s/^\(fn test_\(.*\)() raises:\)$/&\r    print("test_\2")/
 from testing import assert_true, assert_false, assert_raises
 from tenmo import Tensor
 from intarray import IntArray
@@ -456,7 +454,7 @@ fn test_scalar_tensor_mul() raises:
 
 fn test_unsqueeze() raises:
     print("test_unsqueeze")
-    _ = """tensor = Tensor.rand(2,3, requires_grad=True)
+    _ = """tensor = Tensor.rand([2,3], requires_grad=True)
     tensor2 = tensor.unsqueeze(0)
     tensor2[IntArray(0, 0, 0)] = 100"""
     pass
@@ -560,8 +558,8 @@ fn test_training_convergence() raises:
     var x = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]).float()
     var y = Tensor.d2([[13.0], [23.0], [33.0]]).float()
 
-    var w = Tensor.rand(2, 1, requires_grad=True)
-    var b = Tensor.rand(1, requires_grad=True)
+    var w = Tensor.rand([2, 1], requires_grad=True)
+    var b = Tensor.rand([1], requires_grad=True)
     var lr = Scalar[DType.float32](0.01)
     for _ in range(1000):
         var y_pred = x.matmul(w) + b
@@ -1636,9 +1634,9 @@ fn test_broadcast_add_2_tensors() raises:
     )
 
     tensor1 = Tensor.rand(
-        2, 1, 4, 1, init_seed=Optional(42), requires_grad=True
+       [2, 1, 4, 1], init_seed=Optional(42), requires_grad=True
     )
-    tensor2 = Tensor.rand(2, 1, 5, init_seed=Optional(42), requires_grad=True)
+    tensor2 = Tensor.rand([2, 1, 5], init_seed=Optional(42), requires_grad=True)
 
     result = tensor1 + tensor2
 
@@ -1720,8 +1718,8 @@ fn test_broadcast_add_2_tensors() raises:
 fn test_add_2_tensors() raises:
     print("test_add_2_tensors")
 
-    tensor_a = Tensor.rand(128, 128, requires_grad=True)
-    tensor_b = Tensor.rand(128, 128, requires_grad=True)
+    tensor_a = Tensor.rand([128, 128], requires_grad=True)
+    tensor_b = Tensor.rand([128, 128], requires_grad=True)
     assert_true(
         tensor_a.shape() == tensor_b.shape(),
         "Input tensors shape match assertion failed",
@@ -1750,7 +1748,7 @@ fn test_arange() raises:
 
 fn test_random() raises:
     print("test_random")
-    rand_tensor = Tensor.rand(10)
+    rand_tensor = Tensor.rand([10])
 
     fn each(e: Scalar[DType.float32]) -> Bool:
         return e >= 0 and e < 1
@@ -1758,7 +1756,7 @@ fn test_random() raises:
     holds_true = rand_tensor.all(each)
     assert_true(holds_true, "rand min and max range assertion failed")
 
-    rand_tensor2 = Tensor.rand(10, 20, min=-2, max=2)
+    rand_tensor2 = Tensor.rand([10, 20], min=-2, max=2)
 
     fn each2(e: Scalar[DType.float32]) -> Bool:
         return e >= -2 and e < 2
@@ -1775,7 +1773,7 @@ fn test_item() raises:
 
 fn test_view() raises:
     print("test_view")
-    tensor = Tensor.rand(1).reshape()
+    tensor = Tensor.rand([1]).reshape()
     view = tensor.view(Shape())
     assert_true(
         tensor.shape() == view.shape(),
@@ -1830,7 +1828,7 @@ fn test_scalar_tensor() raises:
 
 fn test_reshape() raises:
     print("test_reshape")
-    tensor = Tensor.rand(3, 3)
+    tensor = Tensor.rand([3, 3])
     reshaped = tensor.reshape(9)
     assert_true(
         tensor[2, 2] == reshaped[8], "reshape __getitem__ assertion 1 failed"
@@ -1869,7 +1867,7 @@ fn test_reshape() raises:
         "post reshape 3 - item assertion failed for scalar tensor",
     )
 
-    tensor = Tensor.rand(1, 1)
+    tensor = Tensor.rand([1, 1])
     reshaped = tensor.reshape()
     assert_true(
         reshaped.shape() == Shape() and reshaped.item() == tensor[0, 0],
@@ -2938,7 +2936,7 @@ fn test_exponentiation() raises:
 fn test_grad_update() raises:
     print("test_grad_update")
     alias dtype = DType.float32
-    a = Tensor[dtype].rand(3, 4, requires_grad=True)
+    a = Tensor[dtype].rand([3, 4], requires_grad=True)
     v = a.into_view()
     v.init_gradbox()
     grad = Gradbox[dtype].full(Shape.of(3, 4), 42)
@@ -3700,7 +3698,7 @@ fn test_randint() raises:
     print("test_randint")
     low = 10
     high = 30
-    a = Tensor.randint([3, 4], low, high)
+    a = Tensor[DType.int32].rand([3, 4], low, high)
     count_low = a.count(low)
     count_high = a.count(high)
     assert_true(

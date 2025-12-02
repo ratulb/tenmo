@@ -206,14 +206,14 @@ struct Tensor[dtype: DType = DType.float32](
 
         return self.buffer[indices]
 
-    fn __getitem__(self, *slices: Slice) -> Tensor[dtype]:
+    fn __getitem__[track_grad: Bool=True](self, *slices: Slice) -> Tensor[dtype]:
         # Delegate shape/strides/offset computation
         shape, strides, offset = Validator.validate_and_compute_view_metadata(
             self.shape(),
             self.strides(),
             slices,
         )
-        return View[dtype].forward[track_grad=True](
+        return View[dtype].forward[track_grad=track_grad](
             self,
             shape=shape,
             strides=strides,
@@ -222,7 +222,7 @@ struct Tensor[dtype: DType = DType.float32](
             validated=True,
         )
 
-    fn __getitem__(self, *indices: Idx) -> Tensor[dtype]:
+    fn __getitem__[track_grad: Bool=True](self, *indices: Idx) -> Tensor[dtype]:
         # Compute view metadata
         view_shape, view_strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
@@ -235,7 +235,7 @@ struct Tensor[dtype: DType = DType.float32](
         shape = Shape() if is_scalar else view_shape
         strides = Strides() if is_scalar else view_strides
         abs_offset = self.offset() + offset
-        return View[dtype].forward[track_grad=True](
+        return View[dtype].forward[track_grad=track_grad](
             self,
             shape,
             strides,

@@ -226,9 +226,6 @@ alias Layer[dtype: DType] = Variant[
     ReLU[dtype],
     Sigmoid[dtype],
     Tanh[dtype],
-    Linear[dtype, vm],
-    Linear[dtype, mv],
-    Linear[dtype, dot],
 ]
 
 
@@ -245,12 +242,6 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Sigmoid[dtype]](xs)
         elif self.layer.isa[Tanh[dtype]]():
             return self.layer[Tanh[dtype]](xs)
-        elif self.layer.isa[Linear[dtype, vm]]():
-            return self.layer[Linear[dtype, vm]](xs)
-        elif self.layer.isa[Linear[dtype, mv]]():
-            return self.layer[Linear[dtype, mv]](xs)
-        elif self.layer.isa[Linear[dtype, dot]]():
-            return self.layer[Linear[dtype, dot]](xs)
 
         else:
             panic("Unknown module type")
@@ -271,12 +262,7 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Sigmoid[dtype]].num_parameters()
         elif self.layer.isa[Tanh[dtype]]():
             return self.layer[Tanh[dtype]].num_parameters()
-        elif self.layer.isa[Linear[dtype, vm]]():
-            return self.layer[Linear[dtype, vm]].num_parameters()
-        elif self.layer.isa[Linear[dtype, vm]]():
-            return self.layer[Linear[dtype, vm]].num_parameters()
-        elif self.layer.isa[Linear[dtype, dot]]():
-            return self.layer[Linear[dtype, dot]].num_parameters()
+
         else:
             return 0
 

@@ -321,7 +321,6 @@ struct Gradbox[dtype: DType](
         strides = Strides() if is_scalar else view_strides
         abs_offset = self.offset() + relative_offset
         shared_buffer = self.buffer.buffer.copy()
-        # ndb = NDBuffer[dtype](shared_buffer=shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset)
         ndb = NDBuffer[dtype](
             shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset
         )

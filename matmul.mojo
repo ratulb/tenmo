@@ -576,9 +576,9 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             B_indices = ShapeBroadcaster.broadcasted_indices(
                 indices, batch_shape, batch_dims_b
             )
-            A_slice = A[il(A_indices), s(), s()]
-            B_slice = B[il(B_indices), s(), s()]
-            C_slice = C[il(indices), s(), s()]
+            A_slice = A.__getitem__[track_grad=False](il(A_indices), s(), s())
+            B_slice = B.__getitem__[track_grad=False](il(B_indices), s(), s())
+            C_slice = C.__getitem__[track_grad=False](il(indices), s(), s())
 
             result = Matmul2d[dtype].forward[track_grad=False](
                 A_slice,
@@ -620,7 +620,9 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         batch_dims_b = B_shape[:-2]
 
         out_shape = batch_shape + [m, n]
-        var C = Gradbox[dtype].zeros(out_shape, share=True)
+        var C = Gradbox[dtype].zeros(
+            out_shape, share=True
+        )  # Views are not allowed from unshared gradbox
 
         for indices in batch_shape:
             var A_indices = ShapeBroadcaster.broadcasted_indices(
@@ -630,12 +632,16 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
                 indices, batch_shape, batch_dims_b
             )
 
-            var A_slice = A[il(A_indices), s(), s()]
+            var A_slice = A.__getitem__[track_grad=False](
+                il(A_indices), s(), s()
+            )
             var B_slice = B[il(B_indices), s(), s()]
             var C_slice = C[il(indices), s(), s()]
 
             # Use 2D matmul for GradBox (no backward needed)
-            var result = Matmul2d[dtype].forward(A_slice, B_slice)
+            var result = Matmul2d[dtype].forward(
+                A_slice, B_slice
+            )  # Backward fn would not be attached
             C_slice.buffer.copy_from_alike[overwrite=False](result.buffer)
 
         return C^
@@ -673,7 +679,9 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             )
 
             var A_slice = A[il(A_indices), s(), s()]
-            var B_slice = B[il(B_indices), s(), s()]
+            var B_slice = B.__getitem__[track_grad=False](
+                il(B_indices), s(), s()
+            )
             var C_slice = C[il(indices), s(), s()]
 
             # Use 2D matmul for GradBox (no backward needed)
