@@ -1,17 +1,16 @@
 ### Mojo Tensor
 ### Implement tensor library in mojo from first principles
-from math import exp, floor
+from math import exp, floor, log, cos, sin, sqrt, pi
 from random import seed, random_float64
 from sys import simd_width_of
 from utils.numerics import min_finite
-from memory import memcpy, memset, memset_zero, ArcPointer
+from memory import memcpy, memset, memset_zero
 from shapes import Shape, ShapeIndexIterator
-from intlist import IntList
 from ancestry import Ancestors, Ancestor
 from strides import Strides
 from common_utils_imports import *
-from common_utils import id as identity, IntArrayHelper, log_warning
-from operators_imports import *
+from common_utils import id as identity, log_warning
+from operators import *
 
 from backpropagation import BackwardFn
 from forwards import *
@@ -19,7 +18,7 @@ from buffers import Buffer
 from validators import Validator
 from collections import Set
 from gradbox import Gradbox
-from layout.int_tuple import IntArray
+from intarray import IntArray
 from broadcasthelper import ShapeBroadcaster
 from ndbuffer import NDBuffer
 from utilities import Utils
@@ -40,11 +39,6 @@ struct Tensor[dtype: DType = DType.float32](
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
     alias Blocks = List[Self.Block]
-
-    alias randint = Tensor[DType.int64].randn
-    alias randfloat = Tensor[DType.float64].randn
-    alias randint32 = Tensor[DType.int32].randn
-    alias randfloat32 = Tensor[DType.float32].randn
 
     var buffer: NDBuffer[dtype]
     var requires_grad: Bool
@@ -194,15 +188,6 @@ struct Tensor[dtype: DType = DType.float32](
         return self.buffer[indices]
 
     @always_inline
-    fn __getitem__(self, indices: IntList) -> Scalar[dtype]:
-        if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
-            panic(
-                "Tensor → __getitem__(IntList): Scalar tensor expects no"
-                " indices"
-            )
-        return self.buffer[indices]
-
-    @always_inline
     fn __getitem__(self, indices: IntArray) -> Scalar[dtype]:
         if self.rank() == 0 and indices.size() != 0:  # Tensor with Shape ()
             panic(
@@ -273,15 +258,6 @@ struct Tensor[dtype: DType = DType.float32](
         if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
             panic(
                 "Tensor → __setitem__(List[Int]): Scalar tensor expects no"
-                " indices"
-            )
-        self.buffer[indices] = value
-
-    @always_inline
-    fn __setitem__(self, indices: IntList, value: Scalar[dtype]):
-        if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
-            panic(
-                "Tensor → __setitem__(IntList): Scalar tensor expects no"
                 " indices"
             )
         self.buffer[indices] = value
@@ -536,14 +512,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn any(self, pred: fn (Scalar[dtype]) -> Bool) -> Bool:
         return self.buffer.buffer.any(pred)
 
-    fn log(self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        grad_required = requires_grad.or_else(self.requires_grad)
-
-        buffer = self.buffer.map[
-            Utils[dtype].log_buffer, Utils[dtype].log_scalar
-        ]()
-        nd_buffer = NDBuffer[dtype](buffer^, self.shape())
-        return Tensor[dtype](nd_buffer^, requires_grad=grad_required)
+    fn log[
+        track_grad: Bool = True
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
+        return Logarithm[dtype].forward[track_grad](self, requires_grad)
 
     fn all_close[
         rtol: Scalar[dtype] = 1e-5,
@@ -609,7 +581,7 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         constrained[
             dtype.is_numeric(),
-            "Tensor → randint: is supported only for integral type",
+            "Tensor → randint: is supported only for numeric type",
         ]()
 
         return Self.rand(Shape(shape), low, high, init_seed, requires_grad)
@@ -626,35 +598,79 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn rand(
-        *axes_spans: Int,
-        min: Scalar[dtype] = 0,
-        max: Scalar[dtype] = 1,
-        init_seed: Optional[Int] = None,
-        requires_grad: Bool = False,
-    ) -> Tensor[dtype]:
-        return Self.rand(Shape(axes_spans), min, max, init_seed, requires_grad)
-
-    @staticmethod
-    fn rand(
         shape: Shape,
         min: Scalar[dtype] = 0,
         max: Scalar[dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Tensor → rand: is supported only for numeric type",
+        ]()
+
+        # Set seed if provided
         if init_seed:
             seed(init_seed.value())
         else:
             seed()
-        numels = shape.num_elements()
-        buffer = Buffer[dtype](numels)
+        # let it use whatever seed state exists
+
+        var numels = shape.num_elements()
+        var buffer = Buffer[dtype](numels)
+
+        var min_f64 = min.cast[DType.float64]()
+        var max_f64 = max.cast[DType.float64]()
+
         for i in range(numels):
-            buffer[i] = random_float64(
-                min.cast[DType.float64](), max.cast[DType.float64]()
-            ).cast[dtype]()
+            buffer[i] = random_float64(min_f64, max_f64).cast[dtype]()
 
-        nd_buffer = NDBuffer[dtype](buffer^, shape)
+        var nd_buffer = NDBuffer[dtype](buffer^, shape)
+        return Tensor[dtype](nd_buffer^, requires_grad=requires_grad)
 
+    @staticmethod
+    fn randn(
+        shape: Shape,
+        mean: Float64 = 0.0,
+        std: Float64 = 1.0,
+        init_seed: Optional[Int] = None,
+        requires_grad: Bool = False,
+    ) -> Tensor[dtype]:
+        constrained[
+            dtype.is_numeric(),
+            "Tensor → randn: is supported only for numeric type",
+        ]()
+
+        # Set seed if provided
+        if init_seed:
+            seed(init_seed.value())
+        else:
+            # let it use whatever seed state exists
+            seed()
+        var numels = shape.num_elements()
+        var buffer = Buffer[dtype](numels)
+
+        # Box-Muller transform generates pairs
+        var i = 0
+        while i < numels:
+            var u1 = random_float64(0.0, 1.0)
+            var u2 = random_float64(0.0, 1.0)
+
+            # Avoid log(0)
+            if u1 < 1e-10:
+                u1 = 1e-10
+
+            # Box-Muller transform
+            var mag = std * sqrt(-2.0 * log(u1))
+            var z0 = mag * cos(2.0 * pi * u2) + mean
+            var z1 = mag * sin(2.0 * pi * u2) + mean
+
+            buffer[i] = z0.cast[dtype]()
+            if i + 1 < numels:
+                buffer[i + 1] = z1.cast[dtype]()
+            i += 2
+
+        var nd_buffer = NDBuffer[dtype](buffer^, shape)
         return Tensor[dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
@@ -718,8 +734,7 @@ struct Tensor[dtype: DType = DType.float32](
         Returns: Tensor of shape (..., num_classes).
         """
         shape = self.shape()
-        result = Tensor[dtype](shape + [num_classes])
-        result.fill(Scalar[dtype](0))
+        result = Tensor[dtype].zeros(shape + [num_classes])
 
         # Set appropriate positions to 1.0
         for coord in shape:
@@ -729,10 +744,10 @@ struct Tensor[dtype: DType = DType.float32](
                     "Tensor → onehot: invalid class",
                     class_index.__str__(),
                     "at coordinate",
-                    IntArrayHelper.to_string(coord),
+                    coord.__str__(),
                 )
-            var onehot_idx = IntArrayHelper.extend(coord, class_index)
-            result[onehot_idx] = Scalar[dtype](1)
+            var onehot_coord = coord + class_index
+            result[onehot_coord] = Scalar[dtype](1)
 
         return result^
 
@@ -745,7 +760,7 @@ struct Tensor[dtype: DType = DType.float32](
                 min_finite[dtype](), requires_grad=requires_grad
             )
         numels = len(row)
-        shape = Shape(IntList(numels))
+        shape = Shape(IntArray(numels))
         buffer = Buffer[dtype](numels)
         memcpy(dest=buffer.data, src=row._data, count=numels)
         nd_buffer = NDBuffer[dtype](buffer^, shape)
@@ -754,7 +769,7 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn d2(rows: List[Self.Row], requires_grad: Bool = False) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "d2")
-        dims = IntList(len(rows), len(rows[0]))
+        dims = IntArray(len(rows), len(rows[0]))
         flattened = List[Scalar[dtype]](capacity=dims.product())
         for row in rows:
             if len(row) != dims[1]:
@@ -772,7 +787,7 @@ struct Tensor[dtype: DType = DType.float32](
         blocks: List[Self.Rows], requires_grad: Bool = False
     ) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "d3")
-        dims = IntList(len(blocks), len(blocks[0]), len(blocks[0][0]))
+        dims = IntArray(len(blocks), len(blocks[0]), len(blocks[0][0]))
         flattened = List[Scalar[dtype]](capacity=dims.product())
         for block in blocks:
             if len(block) != dims[1]:
@@ -794,7 +809,7 @@ struct Tensor[dtype: DType = DType.float32](
         blockgrid: List[Self.Block], requires_grad: Bool = False
     ) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "d4")
-        dims = IntList(
+        dims = IntArray(
             len(blockgrid),
             len(blockgrid[0]),
             len(blockgrid[0][0]),
@@ -832,7 +847,7 @@ struct Tensor[dtype: DType = DType.float32](
         blockhive: List[Self.Blocks], requires_grad: Bool = False
     ) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "d5")
-        dims = IntList(
+        dims = IntArray(
             len(blockhive),
             len(blockhive[0]),
             len(blockhive[0][0]),
@@ -872,7 +887,7 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn of(*elems: Scalar[dtype], requires_grad: Bool = False) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "of(*elems)")
-        shape = Shape(IntList(len(elems)))
+        shape = Shape(IntArray(len(elems)))
         tensor = Tensor[dtype](shape, requires_grad)
         for i in range(len(elems)):
             tensor[i] = elems[i]
@@ -884,7 +899,7 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Bool = False,
     ) -> Tensor[dtype]:
         Validator.validate_dtype_consistency(dtype, requires_grad, "of(elems)")
-        shape = Shape(IntList(len(elems)))
+        shape = Shape(IntArray(len(elems)))
         tensor = Tensor[dtype](shape, requires_grad)
         for i in range(len(elems)):
             tensor[i] = elems[i]
@@ -1000,7 +1015,7 @@ struct Tensor[dtype: DType = DType.float32](
         dtype
     ]:
         return Repeat[dtype].forward[track_grad](
-            self, IntList.new(repeat), requires_grad
+            self, IntArray(repeat), requires_grad
         )
 
     fn repeat[
@@ -1009,7 +1024,7 @@ struct Tensor[dtype: DType = DType.float32](
         dtype
     ]:
         return Repeat[dtype].forward[track_grad](
-            self, IntList(repeat), requires_grad
+            self, IntArray(repeat), requires_grad
         )
 
     fn tile[
@@ -1018,7 +1033,7 @@ struct Tensor[dtype: DType = DType.float32](
         dtype
     ]:
         return Tile[dtype].forward[track_grad](
-            self, IntList.new(repeat), requires_grad
+            self, IntArray(repeat), requires_grad
         )
 
     fn tile[
@@ -1027,7 +1042,7 @@ struct Tensor[dtype: DType = DType.float32](
         dtype
     ]:
         return Tile[dtype].forward[track_grad](
-            self, IntList(repeat), requires_grad
+            self, IntArray(repeat), requires_grad
         )
 
     fn contiguous[
@@ -1055,7 +1070,7 @@ struct Tensor[dtype: DType = DType.float32](
         if len(newdims) == 1 and newdims[0] == 0:
             return self.reshape[track_grad](requires_grad=requires_grad)
         shape = Validator.validate_and_construct_new_shape(
-            self.shape(), IntList(newdims)
+            self.shape(), IntArray(newdims)
         )
         return self.reshape[track_grad](
             shape, requires_grad=requires_grad, validated=True
@@ -1067,7 +1082,7 @@ struct Tensor[dtype: DType = DType.float32](
         dtype
     ]:
         new_shape = Validator.validate_and_construct_new_shape(
-            self.shape(), IntList.new(shape)
+            self.shape(), IntArray(shape)
         )
         return self.reshape[track_grad](
             new_shape, requires_grad=requires_grad, validated=True
@@ -1108,10 +1123,8 @@ struct Tensor[dtype: DType = DType.float32](
                 grad_contrib = upstream_grad.copy()
 
             if grad_contrib.shape() != self.shape():
-                axes = IntList(
-                    ShapeBroadcaster.broadcast_mask(
-                        self.shape(), grad_contrib.shape()
-                    )
+                axes = ShapeBroadcaster.broadcast_mask(
+                    self.shape(), grad_contrib.shape()
                 ).indices_of(1)
                 grad_contrib = grad_contrib.sum(axes=axes, keepdims=True)
             if grad_contrib.shape() != self.shape():
@@ -1127,19 +1140,28 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return self.sum[track_grad](IntList.new(axes), keepdims, requires_grad)
+        return self.sum[track_grad](IntArray(axes), keepdims, requires_grad)
 
     fn sum[
         track_grad: Bool = True
     ](
         self,
-        axes: IntList,
+        axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         return Summer[dtype].forward[track_grad](
             self, axes, keepdims, requires_grad
         )
+
+    fn sqrt[
+        track_grad: Bool = True
+    ](
+        self,
+        epsilon: Scalar[dtype] = Scalar[dtype](1e-12),
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Sqrt[dtype].forward[track_grad](self, epsilon, requires_grad)
 
     fn mean[
         track_grad: Bool = True
@@ -1149,13 +1171,13 @@ struct Tensor[dtype: DType = DType.float32](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return self.mean[track_grad](IntList.new(axes), keepdims, requires_grad)
+        return self.mean[track_grad](IntArray(axes), keepdims, requires_grad)
 
     fn mean[
         track_grad: Bool = True
     ](
         self: Tensor[dtype],
-        axes: IntList,
+        axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -1163,15 +1185,63 @@ struct Tensor[dtype: DType = DType.float32](
             self, axes, keepdims, requires_grad
         )
 
-    fn __rtruediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return DivideScalar[dtype].forward[True](self, scalar)
+    fn variance[
+        track_grad: Bool = True
+    ](
+        self,
+        axis: Int = -100,
+        keepdims: Bool = False,
+        unbiased: Bool = True,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return Variance[dtype].forward[track_grad](
+            self, axis, keepdims, unbiased, requires_grad
+        )
 
-    fn __truediv__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return DivideByScalar[dtype].forward[True](self, scalar)
+    fn std[
+        track_grad: Bool = True
+    ](
+        self,
+        axis: Int = -100,
+        keepdims: Bool = False,
+        unbiased: Bool = True,
+        epsilon: Scalar[dtype] = Scalar[dtype](1e-12),
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[dtype]:
+        return StdDev[dtype].forward[track_grad](
+            self, axis, keepdims, unbiased, epsilon, requires_grad
+        )
+
+    fn norm(
+        self,
+        p: Float64 = 2.0,
+        axis: Optional[Int] = None,
+        keepdims: Bool = False,
+    ) -> Tensor[dtype]:
+        """Compute Lp norm. Supports L2 (p=2) only."""
+        if p == 2.0:
+            # L2 norm: sqrt(sum(x²))
+            var squared = self.__mul__[track_grad=False](self)
+            var dim = [axis.value()] if axis else List[Int]()
+            var sum_sq = squared.sum[track_grad=False](dim, keepdims=keepdims)
+            return sum_sq.sqrt[track_grad=False]()
+        else:
+            panic("Only L2 norm (p=2) currently supported")
+            return Tensor[dtype].scalar(0)
+
+    fn __rtruediv__[
+        track_grad: Bool = True
+    ](self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return DivideScalar[dtype].forward[track_grad](self, scalar)
+
+    fn __truediv__[
+        track_grad: Bool = True
+    ](self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return DivideByScalar[dtype].forward[track_grad](self, scalar)
 
     # Element wise division of two tensors
-    fn __truediv__(self, other: Self) -> Tensor[dtype]:
-        return Divider[dtype].forward[True](self, other)
+    fn __truediv__[track_grad: Bool = True](self, other: Self) -> Tensor[dtype]:
+        return Divider[dtype].forward[track_grad](self, other)
 
     fn update_grad[opcode: Int](self, incoming: Gradbox[dtype]):
         ref gradbox = self.gradbox[]
@@ -1200,6 +1270,9 @@ struct Tensor[dtype: DType = DType.float32](
                 " operation on a leaf tensor requiring grad."
             )
 
+        self.buffer.inplace_ops[Subtract](other.buffer)
+
+    fn __isub__(self, other: Gradbox[dtype]):
         self.buffer.inplace_ops[Subtract](other.buffer)
 
     fn __imul__(self, other: Self):
@@ -1283,33 +1356,45 @@ struct Tensor[dtype: DType = DType.float32](
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
-    fn __radd__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return self.__add__(scalar)
+    fn __radd__[
+        track_grad: Bool = True
+    ](self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return self.__add__[track_grad](scalar)
 
-    fn __add__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return AddScalar[dtype].forward[True](self, scalar)
+    fn __add__[
+        track_grad: Bool = True
+    ](self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return AddScalar[dtype].forward[track_grad](self, scalar)
 
-    fn __add__(self, other: Self) -> Tensor[dtype]:
-        return Adder[dtype].forward[True](self, other)
+    fn __add__[track_grad: Bool = True](self, other: Self) -> Tensor[dtype]:
+        return Adder[dtype].forward[track_grad](self, other)
 
-    fn __rsub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return SubtractFromScalar[dtype].forward[True](self, scalar)
+    fn __rsub__[
+        track_grad: Bool = True
+    ](self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return SubtractFromScalar[dtype].forward[track_grad](self, scalar)
 
-    fn __sub__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return SubtractScalar[dtype].forward[True](self, scalar)
+    fn __sub__[
+        track_grad: Bool = True
+    ](self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return SubtractScalar[dtype].forward[track_grad](self, scalar)
 
-    fn __sub__(self, other: Self) -> Tensor[dtype]:
-        return Subtractor[dtype].forward[True](self, other)
+    fn __sub__[track_grad: Bool = True](self, other: Self) -> Tensor[dtype]:
+        return Subtractor[dtype].forward[track_grad](self, other)
 
-    fn __rmul__(self, scalar: Scalar[dtype]) -> Tensor[dtype]:
-        return self.__mul__(scalar)
+    fn __rmul__[
+        track_grad: Bool = True
+    ](self, scalar: Scalar[dtype]) -> Tensor[dtype]:
+        return self.__mul__[track_grad](scalar)
 
-    fn __mul__(self, factor: Scalar[dtype]) -> Tensor[dtype]:
-        return MultiplyScalar[dtype].forward[True](self, factor)
+    fn __mul__[
+        track_grad: Bool = True
+    ](self, factor: Scalar[dtype]) -> Tensor[dtype]:
+        return MultiplyScalar[dtype].forward[track_grad](self, factor)
 
     # Element wise multiplication of two tensors
-    fn __mul__(self, other: Self) -> Tensor[dtype]:
-        return Multiplicator[dtype].forward[True](self, other)
+    fn __mul__[track_grad: Bool = True](self, other: Self) -> Tensor[dtype]:
+        return Multiplicator[dtype].forward[track_grad](self, other)
 
     fn __mul__(self, other: Gradbox[dtype]) -> Gradbox[dtype]:
         return Multiplicator[dtype].forward(self, other)
@@ -1384,8 +1469,12 @@ struct Tensor[dtype: DType = DType.float32](
 
         log_debug("Tensor freed: " + self.id().__str__())
 
-    fn mse(self, target: Tensor[dtype]) -> Tensor[dtype]:
-        return ((self - target) ** 2).mean()
+    fn mse[
+        track_grad: Bool = True
+    ](self, target: Tensor[dtype]) -> Tensor[dtype]:
+        var diff = Subtractor[dtype].forward[track_grad](self, target)
+        var squared = Multiplicator[dtype].forward[track_grad](diff, diff)
+        return squared.mean[track_grad]()
 
     fn backward(self, start_grad: Scalar[dtype] = 1.0):
         output = Ancestor(self)
@@ -1488,18 +1577,18 @@ struct Tensor[dtype: DType = DType.float32](
     fn transpose[
         track_grad: Bool = True
     ](self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
-        return self.transpose[track_grad](IntList(axes), requires_grad)
+        return self.transpose[track_grad](IntArray(axes), requires_grad)
 
     fn transpose[
         track_grad: Bool = True
     ](
         self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
-        return self.transpose[track_grad](IntList.new(axes), requires_grad)
+        return self.transpose[track_grad](IntArray(axes), requires_grad)
 
     fn transpose[
         track_grad: Bool = True
-    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, axes: IntArray, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
         return Transpose.forward[track_grad](self, axes, requires_grad)
@@ -1536,10 +1625,8 @@ struct Tensor[dtype: DType = DType.float32](
         steps: List[Int] = [],
     ) -> Tensor[dtype]:
         # Default step = 1 if not provided
-        jumps = IntList(steps)
-        if len(steps) == 0:
-            jumps = IntList.filled(len(axes), 1)
-        elif len(steps) != len(axes):
+        step_sizes = IntArray(steps) if steps else IntArray.filled(len(axes), 1)
+        if len(step_sizes) != len(axes):
             panic("Tensor → slice: length of steps must match axes length")
 
         # Call Validator
@@ -1547,10 +1634,10 @@ struct Tensor[dtype: DType = DType.float32](
             Validator.validate_and_compute_slice_metadata_multi(
                 self.shape(),
                 self.strides(),
-                IntList(axes),
-                IntList(starts),
-                IntList(ends),
-                jumps,
+                axes,
+                starts,
+                ends,
+                step_sizes,
             )
         )
 
@@ -1593,14 +1680,14 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         return Squeeze[dtype].forward[track_grad](
-            self, IntList.new(axes), requires_grad
+            self, IntArray(axes), requires_grad
         )
 
     fn unsqueeze[
         track_grad: Bool = True
     ](self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[dtype]:
         return Unsqueeze[dtype].forward[track_grad](
-            self, IntList(axes), requires_grad
+            self, IntArray(axes), requires_grad
         )
 
     fn unsqueeze[
@@ -1609,12 +1696,12 @@ struct Tensor[dtype: DType = DType.float32](
         self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
     ) -> Tensor[dtype]:
         return Unsqueeze[dtype].forward[track_grad](
-            self, IntList.new(axes), requires_grad
+            self, IntArray(axes), requires_grad
         )
 
     fn unsqueeze[
         track_grad: Bool = True
-    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, axes: IntArray, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
         return Unsqueeze[dtype].forward[track_grad](self, axes, requires_grad)
@@ -1625,12 +1712,12 @@ struct Tensor[dtype: DType = DType.float32](
         dtype
     ]:
         return Permute[dtype].forward[track_grad](
-            self, IntList.new(axes), requires_grad
+            self, IntArray(axes), requires_grad
         )
 
     fn permute[
         track_grad: Bool = True
-    ](self, axes: IntList, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, axes: IntArray, requires_grad: Optional[Bool] = None) -> Tensor[
         dtype
     ]:
         return Permute[dtype].forward[track_grad](self, axes, requires_grad)
@@ -1652,12 +1739,12 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         return MinMax[dtype].forward[True](
-            self, IntList.new(axes), keepdims, requires_grad
+            self, IntArray(axes), keepdims, requires_grad
         )
 
     fn max(
         self,
-        axes: IntList,
+        axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -1670,12 +1757,12 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
         return MinMax[dtype].forward[False](
-            self, IntList.new(axes), keepdims, requires_grad
+            self, IntArray(axes), keepdims, requires_grad
         )
 
     fn min(
         self,
-        axes: IntList,
+        axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
@@ -1693,11 +1780,32 @@ struct Tensor[dtype: DType = DType.float32](
             self, perm, axis, requires_grad
         )
 
-    fn relu(
+    fn relu[
+        track_grad: Bool = True
+    ](self, requires_grad: Optional[Bool] = None,) -> Tensor[dtype]:
+        return ReLU[dtype].forward[track_grad](self, requires_grad)
+
+    fn clip[
+        track_grad: Bool = True
+    ](
         self,
+        min_val: Scalar[dtype],
+        max_val: Scalar[dtype],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[dtype]:
-        return ReLU[dtype].forward(self, requires_grad)
+        return Clip[dtype].forward[track_grad](
+            self, min_val, max_val, requires_grad
+        )
+
+    fn tanh[
+        track_grad: Bool = True
+    ](self, requires_grad: Optional[Bool] = None,) -> Tensor[dtype]:
+        return Tanh[dtype].forward[track_grad](self, requires_grad)
+
+    fn sigmoid[
+        track_grad: Bool = True
+    ](self, requires_grad: Optional[Bool] = None,) -> Tensor[dtype]:
+        return Sigmoid[dtype].forward[track_grad](self, requires_grad)
 
     fn softmax[
         track_grad: Bool = True, log: Bool = False  # Whether to use LogSoftmax
@@ -1709,18 +1817,18 @@ struct Tensor[dtype: DType = DType.float32](
         @parameter
         if log:
             return LogSoftmax[dtype].forward[track_grad](
-                self, IntList.new(axes), requires_grad
+                self, IntArray(axes), requires_grad
             )
         else:
             return Softmax[dtype].forward[track_grad](
-                self, IntList.new(axes), requires_grad
+                self, IntArray(axes), requires_grad
             )
 
     fn softmax[
         track_grad: Bool = True, log: Bool = False
     ](
         self,
-        axes: IntList,
+        axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[
         dtype
@@ -1733,6 +1841,26 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             return Softmax[dtype].forward[track_grad](self, axes, requires_grad)
 
+    fn binary_cross_entropy[
+        track_grad: Bool = True
+    ](
+        pred: Tensor[dtype],
+        target: Tensor[dtype],
+        epsilon: Scalar[dtype] = Scalar[dtype](1e-9),
+    ) -> Tensor[dtype]:
+        return BCELoss[dtype].forward[track_grad](pred, target, epsilon)
+
+    fn binary_cross_entropy_with_logits[
+        track_grad: Bool = True
+    ](
+        logits: Tensor[dtype],
+        target: Tensor[dtype],
+        epsilon: Scalar[dtype] = Scalar[dtype](1e-9),
+    ) -> Tensor[dtype]:
+        return BCEWithLogitsLoss[dtype].forward[track_grad](
+            logits, target, epsilon
+        )
+
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[dtype], target_shape: Shape
     ) -> Tensor[dtype]:
@@ -1742,7 +1870,7 @@ struct Tensor[dtype: DType = DType.float32](
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     fn matmul[
-        track_grad: Bool = True, mode: Int = 3
+        track_grad: Bool = True, mode: Int = mm
     ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         return Matmul[dtype].forward[track_grad=track_grad, mode=mode](A, B)
 
@@ -1775,7 +1903,7 @@ struct ElemIterator[dtype: DType, origin: ImmutableOrigin](ImplicitlyCopyable):
         return self.index_itr.__has_next__()
 
 
-fn main() raises:
+fn main_1() raises:
     # test_set_value()
     # test_set_tensor()
     a = Tensor.arange(10, requires_grad=True)
@@ -1815,6 +1943,66 @@ fn test_set_tensor() raises:
     # Get it back
     r = a[il(1), s(), s()]
     assert_true(r == Tensor.full([3, 4], 42))"""
+
+
+fn test_bce():
+    # Test case: perfect predictions
+    var logits_perfect = Tensor[DType.float64].d2(
+        [[10.0], [-10.0]]
+    )  # High confidence
+    var targets = Tensor[DType.float64]([[1.0], [0.0]])
+    var loss_perfect = logits_perfect.binary_cross_entropy_with_logits(targets)
+    print("Perfect predictions loss (should be ~0):", loss_perfect.item())
+
+    # Test case: wrong predictions
+    var logits_wrong = Tensor[DType.float64].d2([[-10.0], [10.0]])  # Opposite
+    var loss_wrong = logits_wrong.binary_cross_entropy_with_logits(targets)
+    print("Wrong predictions loss (should be high):", loss_wrong.item())
+
+    # Test case: uncertain
+    var logits_uncertain = Tensor[DType.float64].d2([[0.0], [0.0]])  # 50/50
+    var loss_uncertain = logits_uncertain.binary_cross_entropy_with_logits(
+        targets
+    )
+    print(
+        "Uncertain predictions loss (should be ~0.693):", loss_uncertain.item()
+    )
+
+
+fn test_gradients():
+    var x = Tensor[DType.float64].d1([0.5], requires_grad=True)
+    var y = Tensor[DType.float64].d1([1.0])
+
+    var loss = y.binary_cross_entropy_with_logits(x)
+    print("Loss:", loss.item())
+
+    loss.backward()
+
+    if x.has_grad():
+        print("Gradient:", x.grad()[0])
+    else:
+        print("ERROR: No gradient!")
+
+
+fn main():
+    # test_bce()
+    # test_gradients()
+
+    a = Tensor.arange(12, requires_grad=True)
+    b = a.__add__[True](10)
+    print(b.has_backward_fn())
+    b.backward()
+    a.grad().print()
+    _ = """a.print()
+    print()
+    m_keep = a.mean(axes=[2], keepdims=True)
+    print()
+    m_keep.print()
+    m_nokeep = a.mean(axes=[2], keepdims = False)
+    print()
+    m_nokeep.print()"""
+
+    pass
 
 
 from testing import assert_true
