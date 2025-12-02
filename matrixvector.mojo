@@ -10,6 +10,7 @@ from matmul import Matmul2d, MatmulNd
 from sys import simd_width_of
 from algorithm import vectorize
 
+
 @fieldwise_init
 @register_passable
 struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
@@ -99,7 +100,9 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
             var requires_grad = M.requires_grad or v.requires_grad
             if requires_grad:
                 result.requires_grad_(True)
-                var backward_fn = MatrixVectorMulNdBackward[dtype]().into_backward_fn()
+                var backward_fn = MatrixVectorMulNdBackward[
+                    dtype
+                ]().into_backward_fn()
                 result.backwardFn = Optional(backward_fn^)
                 result.add_ancestry(M)
                 result.add_ancestry(v)
@@ -110,9 +113,11 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
-    fn backward[simdwidth: Int = simd_width_of[dtype]()](
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+    fn backward[
+        simdwidth: Int = simd_width_of[dtype]()
+    ](self, output: Tensor[dtype]) -> List[
+        Tuple[Ancestor[dtype], Gradbox[dtype], Int]
+    ]:
         ref grad_out = output.gradients()[]
         var M = output.ancestry().get(0)
         var v = output.ancestry().get(1)
@@ -174,7 +179,9 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                 # Outer product: grad_M[m, k] = grad_out[m] * v[k]
                 if grad_M_contiguous:
                     for i in range(m):
-                        var grad_out_val = grad_out_data[grad_out_base + i * grad_out_stride]
+                        var grad_out_val = grad_out_data[
+                            grad_out_base + i * grad_out_stride
+                        ]
                         var grad_M_row_base = grad_M_base + i * grad_M_stride0
 
                         @parameter
@@ -182,17 +189,29 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                             var v_addr = v_base + j * v_stride
                             var v_vec = v_data.load[width=simd_width](v_addr)
 
-                            var grad_M_addr = grad_M_row_base + j * grad_M_stride1
-                            var current = grad_M_data.load[width=simd_width](grad_M_addr)
-                            grad_M_data.store[width=simd_width](grad_M_addr, current + grad_out_val * v_vec)
+                            var grad_M_addr = (
+                                grad_M_row_base + j * grad_M_stride1
+                            )
+                            var current = grad_M_data.load[width=simd_width](
+                                grad_M_addr
+                            )
+                            grad_M_data.store[width=simd_width](
+                                grad_M_addr, current + grad_out_val * v_vec
+                            )
 
                         vectorize[compute_row, simdwidth](k)
                 else:
                     for i in range(m):
-                        var grad_out_val = grad_out_data[grad_out_base + i * grad_out_stride]
+                        var grad_out_val = grad_out_data[
+                            grad_out_base + i * grad_out_stride
+                        ]
                         for j in range(k):
                             var v_val = v_data[v_base + j * v_stride]
-                            var grad_M_addr = grad_M_base + i * grad_M_stride0 + j * grad_M_stride1
+                            var grad_M_addr = (
+                                grad_M_base
+                                + i * grad_M_stride0
+                                + j * grad_M_stride1
+                            )
                             grad_M_data[grad_M_addr] += grad_out_val * v_val
 
             results.append((M.copy(), grad_M^, AddTensor))
@@ -242,8 +261,12 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                     var accumulator: Scalar[dtype] = 0
 
                     for i in range(m):
-                        var m_val = M_data[M_base + i * M_stride0 + j * M_stride1]
-                        var grad_val = grad_out_data[grad_out_base + i * grad_out_stride]
+                        var m_val = M_data[
+                            M_base + i * M_stride0 + j * M_stride1
+                        ]
+                        var grad_val = grad_out_data[
+                            grad_out_base + i * grad_out_stride
+                        ]
                         accumulator += m_val * grad_val
 
                     var grad_v_addr = grad_v_base + j * grad_v_stride
@@ -257,58 +280,57 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self))
 
 
-
-#---
+# ---
 
 ## Key Optimizations Applied:
 
 ### **Forward Pass:**
-#1. ✅ **No unsqueeze/squeeze overhead**: Direct computation `M[m,k] @ v[k]`
-#2. ✅ **Metadata hoisting**: All strides computed once
-#3. ✅ **Simple loops**: Just nested for-loops for dot products
-#4. ✅ **Cache-friendly**: Sequential access to matrix rows
+# 1. ✅ **No unsqueeze/squeeze overhead**: Direct computation `M[m,k] @ v[k]`
+# 2. ✅ **Metadata hoisting**: All strides computed once
+# 3. ✅ **Simple loops**: Just nested for-loops for dot products
+# 4. ✅ **Cache-friendly**: Sequential access to matrix rows
 
 ### **Backward Pass:**
 
-#**For grad_M (outer product):**
-#1. ✅ **SIMD vectorization** for contiguous case
-#2. ✅ **Direct outer product**: `grad_out[m] ⊗ v[k]`
-#3. ✅ **No intermediate tensors**
+# **For grad_M (outer product):**
+# 1. ✅ **SIMD vectorization** for contiguous case
+# 2. ✅ **Direct outer product**: `grad_out[m] ⊗ v[k]`
+# 3. ✅ **No intermediate tensors**
 
-#**For grad_v (matrix-vector product):**
-#1. ✅ **Direct M^T @ grad_out**: `sum_i(M[i,k] * grad_out[i])`
-#2. ✅ **No transpose view overhead**
-#3. ✅ **Accumulate in scalar, then write once**
+# **For grad_v (matrix-vector product):**
+# 1. ✅ **Direct M^T @ grad_out**: `sum_i(M[i,k] * grad_out[i])`
+# 2. ✅ **No transpose view overhead**
+# 3. ✅ **Accumulate in scalar, then write once**
 
-#---
+# ---
 
 ## Performance Comparison
 
 ### Matrix-Vector (1024×1024 @ 1024):
 
-#**Before:**
-#- Forward: ~2-3ms (reshape + full 2D matmul)
-#- Backward grad_M: ~2-3ms (reshape + matmul)
-#- Backward grad_v: ~2-3ms (transpose + reshape + matmul)
-#- **Total: ~6-9ms**
+# **Before:**
+# - Forward: ~2-3ms (reshape + full 2D matmul)
+# - Backward grad_M: ~2-3ms (reshape + matmul)
+# - Backward grad_v: ~2-3ms (transpose + reshape + matmul)
+# - **Total: ~6-9ms**
 
-#**After:**
-#- Forward: ~0.2ms (direct dot products)
-#- Backward grad_M: ~0.2ms (SIMD outer product)
-#- Backward grad_v: ~0.2ms (direct accumulation)
-#- **Total: ~0.6ms**
+# **After:**
+# - Forward: ~0.2ms (direct dot products)
+# - Backward grad_M: ~0.2ms (SIMD outer product)
+# - Backward grad_v: ~0.2ms (direct accumulation)
+# - **Total: ~0.6ms**
 
-#**Speedup: 10-15× faster!** 🚀
+# **Speedup: 10-15× faster!** 🚀
 
-#---
+# ---
 
 ## Summary of All Three Optimizations
-#```
-#Operation               Before    After    Speedup
-#─────────────────────────────────────────────────
-#Matrix × Matrix         30s       0.21s    143×
-#Vector × Matrix         3ms       0.3ms    10×
-#Matrix × Vector         3ms       0.3ms    10×
+# ```
+# Operation               Before    After    Speedup
+# ─────────────────────────────────────────────────
+# Matrix × Matrix         30s       0.21s    143×
+# Vector × Matrix         3ms       0.3ms    10×
+# Matrix × Vector         3ms       0.3ms    10×
 
 # Key Differences from VectorMatmulNdBackward:
 # 1. Gradient for M (dM)

@@ -1,6 +1,7 @@
 from intlist import IntList
 from testing import assert_true, assert_false
 
+
 fn test_intlist_filled() raises:
     print("test_intlist_filled")
     var lst = IntList.filled(5, 42)
@@ -9,13 +10,17 @@ fn test_intlist_filled() raises:
         assert_true(lst[i] == 42, "all elements should be 42")
     print("test_intlist_filled passed")
 
+
 fn test_intlist_range_list() raises:
     print("test_intlist_range_list")
     var lst = IntList.range_list(10)
     assert_true(len(lst) == 10, "range_list should create list of size 10")
     for i in range(10):
-        assert_true(lst[i] == i, "element " + String(i) + " should be " + String(i))
+        assert_true(
+            lst[i] == i, "element " + String(i) + " should be " + String(i)
+        )
     print("test_intlist_range_list passed")
+
 
 fn test_intlist_with_capacity() raises:
     print("test_intlist_with_capacity")
@@ -23,6 +28,7 @@ fn test_intlist_with_capacity() raises:
     assert_true(len(lst) == 0, "with_capacity should start with size 0")
     assert_true(lst.capacity() >= 20, "capacity should be at least 20")
     print("test_intlist_with_capacity passed")
+
 
 fn test_intlist_append() raises:
     print("test_intlist_append")
@@ -34,6 +40,7 @@ fn test_intlist_append() raises:
     assert_true(lst[2] == 3, "last element should be 3")
     print("test_intlist_append passed")
 
+
 fn test_intlist_prepend() raises:
     print("test_intlist_prepend")
     var lst = IntList()
@@ -44,6 +51,7 @@ fn test_intlist_prepend() raises:
     assert_true(lst[0] == 1, "first element should be 1")
     print("test_intlist_prepend passed")
 
+
 fn test_intlist_pop() raises:
     print("test_intlist_pop")
     var lst = IntList(10, 20, 30, 40, 50)
@@ -52,12 +60,14 @@ fn test_intlist_pop() raises:
     assert_true(len(lst) == 4, "list should have 4 elements")
     print("test_intlist_pop passed")
 
+
 fn test_intlist_clear() raises:
     print("test_intlist_clear")
     var lst = IntList(1, 2, 3, 4, 5)
     lst.clear()
     assert_true(len(lst) == 0, "list should be empty")
     print("test_intlist_clear passed")
+
 
 fn test_intlist_add() raises:
     print("test_intlist_add")
@@ -69,6 +79,7 @@ fn test_intlist_add() raises:
     assert_true(result[5] == 6, "last element should be 6")
     print("test_intlist_add passed")
 
+
 fn test_intlist_mul_scalar() raises:
     print("test_intlist_mul_scalar")
     var lst = IntList(1, 2, 3)
@@ -77,6 +88,7 @@ fn test_intlist_mul_scalar() raises:
     assert_true(result[0] == 1, "first element should be 1")
     assert_true(result[6] == 1, "element 6 should be 1")
     print("test_intlist_mul_scalar passed")
+
 
 fn test_intlist_mul_elementwise() raises:
     print("test_intlist_mul_elementwise")
@@ -89,17 +101,20 @@ fn test_intlist_mul_elementwise() raises:
     assert_true(result[2] == 28, "4 * 7 = 28")
     print("test_intlist_mul_elementwise passed")
 
+
 fn test_intlist_product() raises:
     print("test_intlist_product")
     var lst = IntList(2, 3, 4)
     assert_true(lst.product() == 24, "product should be 24")
     print("test_intlist_product passed")
 
+
 fn test_intlist_sum() raises:
     print("test_intlist_sum")
     var lst = IntList(1, 2, 3, 4, 5)
     assert_true(lst.sum() == 15, "sum should be 15")
     print("test_intlist_sum passed")
+
 
 fn test_intlist_reverse() raises:
     print("test_intlist_reverse")
@@ -109,6 +124,7 @@ fn test_intlist_reverse() raises:
     assert_true(lst[4] == 1, "last element should be 1")
     print("test_intlist_reverse passed")
 
+
 fn test_intlist_reversed() raises:
     print("test_intlist_reversed")
     var lst = IntList(1, 2, 3, 4, 5)
@@ -117,12 +133,14 @@ fn test_intlist_reversed() raises:
     assert_true(lst[0] == 1, "original unchanged")
     print("test_intlist_reversed passed")
 
+
 fn test_intlist_count() raises:
     print("test_intlist_count")
     var lst = IntList(1, 2, 3, 2, 4, 2, 5)
     assert_true(lst.count(2) == 3, "count of 2 should be 3")
     assert_true(lst.count(99) == 0, "count of 99 should be 0")
     print("test_intlist_count passed")
+
 
 fn test_intlist_has_duplicates() raises:
     print("test_intlist_has_duplicates")
@@ -132,6 +150,7 @@ fn test_intlist_has_duplicates() raises:
     assert_true(lst2.has_duplicates(), "lst2 should have duplicates")
     print("test_intlist_has_duplicates passed")
 
+
 fn test_intlist_sort() raises:
     print("test_intlist_sort")
     var lst = IntList(5, 2, 8, 1, 9)
@@ -139,6 +158,7 @@ fn test_intlist_sort() raises:
     assert_true(lst[0] == 1, "first element should be 1")
     assert_true(lst[4] == 9, "last element should be 9")
     print("test_intlist_sort passed")
+
 
 fn test_intlist_sorted() raises:
     print("test_intlist_sorted")
@@ -148,6 +168,7 @@ fn test_intlist_sorted() raises:
     assert_true(lst[0] == 5, "original unchanged")
     print("test_intlist_sorted passed")
 
+
 fn test_intlist_swap() raises:
     print("test_intlist_swap")
     var lst = IntList(10, 20, 30, 40, 50)
@@ -156,6 +177,7 @@ fn test_intlist_swap() raises:
     assert_true(lst[3] == 20, "element at index 3 should be 20")
     print("test_intlist_swap passed")
 
+
 fn test_intlist_replace_single() raises:
     print("test_intlist_replace_single")
     var lst = IntList(1, 2, 3, 4, 5)
@@ -163,6 +185,7 @@ fn test_intlist_replace_single() raises:
     assert_true(result[2] == 99, "element at index 2 should be 99")
     assert_true(lst[2] == 3, "original unchanged")
     print("test_intlist_replace_single passed")
+
 
 fn test_intlist_replace_multiple() raises:
     print("test_intlist_replace_multiple")
@@ -173,6 +196,7 @@ fn test_intlist_replace_multiple() raises:
     assert_true(result[1] == 20, "element at index 1 should be 20")
     assert_true(result[3] == 40, "element at index 3 should be 40")
     print("test_intlist_replace_multiple passed")
+
 
 fn test_intlist_permute() raises:
     print("test_intlist_permute")
@@ -185,6 +209,7 @@ fn test_intlist_permute() raises:
     assert_true(result[3] == 20, "fourth element should be 20")
     print("test_intlist_permute passed")
 
+
 fn test_intlist_select() raises:
     print("test_intlist_select")
     var lst = IntList(10, 20, 30, 40, 50)
@@ -196,6 +221,7 @@ fn test_intlist_select() raises:
     assert_true(result[2] == 50, "third element should be 50")
     print("test_intlist_select passed")
 
+
 fn test_intlist_indices_of() raises:
     print("test_intlist_indices_of")
     var lst = IntList(1, 2, 3, 2, 4, 2, 5)
@@ -206,6 +232,7 @@ fn test_intlist_indices_of() raises:
     assert_true(indices[2] == 5, "third occurrence at index 5")
     print("test_intlist_indices_of passed")
 
+
 fn test_intlist_insert_single() raises:
     print("test_intlist_insert_single")
     var lst = IntList(1, 2, 4, 5)
@@ -213,6 +240,7 @@ fn test_intlist_insert_single() raises:
     assert_true(len(result) == 5, "result should have 5 elements")
     assert_true(result[2] == 3, "inserted element should be at index 2")
     print("test_intlist_insert_single passed")
+
 
 fn test_intlist_invert_permutation() raises:
     print("test_intlist_invert_permutation")
@@ -223,6 +251,7 @@ fn test_intlist_invert_permutation() raises:
     assert_true(inv[2] == 0, "inv[2] should be 0")
     print("test_intlist_invert_permutation passed")
 
+
 fn test_intlist_tolist() raises:
     print("test_intlist_tolist")
     var lst = IntList(10, 20, 30)
@@ -230,6 +259,7 @@ fn test_intlist_tolist() raises:
     assert_true(len(l) == 3, "list should have 3 elements")
     assert_true(l[0] == 10, "first element should be 10")
     print("test_intlist_tolist passed")
+
 
 fn test_intlist_intarray() raises:
     print("test_intlist_intarray")

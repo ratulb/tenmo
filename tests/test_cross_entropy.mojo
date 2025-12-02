@@ -9,6 +9,7 @@ from common_utils import log_warning
 from gradbox import Gradbox
 from intarray import IntArray
 
+
 @always_inline("nodebug")
 fn inf[dtype: DType]() -> Scalar[dtype]:
     """Gets a +inf value for the given dtype.
@@ -53,9 +54,9 @@ fn isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
     return inf[dtype]() == value
 
 
-
 fn isnan[dtype: DType, //](value: Scalar[dtype]) -> Bool:
     return nan[dtype]() == value
+
 
 @always_inline("nodebug")
 fn nan[dtype: DType]() -> Scalar[dtype]:
@@ -592,9 +593,7 @@ fn test_ce_spatial_with_ignore_index() raises:
         requires_grad=True,
     ).float()
 
-    var targets = Tensor[DType.int32].d2(
-        [[0, -100, 2], [1, 0, -100]]
-    )
+    var targets = Tensor[DType.int32].d2([[0, -100, 2], [1, 0, -100]])
 
     var criterion = CrossEntropyLoss[DType.float32](
         ignore_index=-100, reduction="mean"
@@ -609,7 +608,9 @@ fn test_ce_spatial_with_ignore_index() raises:
     for c in range(3):
         assert_true(
             abs(logits.grad()[0, c, 1]) < 1e-10,
-            "Batch 0, spatial pos 1, class " + c.__str__() + " grad should be 0"
+            "Batch 0, spatial pos 1, class "
+            + c.__str__()
+            + " grad should be 0",
         )
 
     # Batch 1, spatial position 2 is ignored (target=-100)
@@ -617,7 +618,9 @@ fn test_ce_spatial_with_ignore_index() raises:
     for c in range(3):
         assert_true(
             abs(logits.grad()[1, c, 2]) < 1e-10,
-            "Batch 1, spatial pos 2, class " + c.__str__() + " grad should be 0"
+            "Batch 1, spatial pos 2, class "
+            + c.__str__()
+            + " grad should be 0",
         )
 
     # Non-ignored positions should have non-zero gradients
@@ -627,7 +630,9 @@ fn test_ce_spatial_with_ignore_index() raises:
         if abs(logits.grad()[0, c, 0]) > 1e-6:
             has_nonzero_grad = True
             break
-    assert_true(has_nonzero_grad, "Non-ignored position should have non-zero grads")
+    assert_true(
+        has_nonzero_grad, "Non-ignored position should have non-zero grads"
+    )
 
     print("✓ Spatial with ignore index test passed")
 
@@ -958,6 +963,7 @@ fn test_ce_gradients_spatial() raises:
 # Equivalence Tests
 # ============================================================================
 
+
 fn test_ce_class_indices_vs_onehot() raises:
     """Test that class indices give same result as one-hot probabilities."""
     print("test_ce_class_indices_vs_onehot")
@@ -966,9 +972,7 @@ fn test_ce_class_indices_vs_onehot() raises:
         [[2.0, 1.0, 0.1], [0.5, 2.0, 0.3]], requires_grad=True
     ).float()
     var targets_indices = Tensor[DType.int32].d1([0, 1])
-    var targets_onehot = Tensor.d2(
-        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-    ).float()
+    var targets_onehot = Tensor.d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]).float()
 
     var criterion = CrossEntropyLoss[DType.float32](reduction="mean")
 
@@ -978,13 +982,15 @@ fn test_ce_class_indices_vs_onehot() raises:
     assert_close(
         loss_indices,
         loss_onehot,
-        msg="Class indices and one-hot should give same loss"
+        msg="Class indices and one-hot should give same loss",
     )
     print("✓ Class indices vs one-hot equivalence test passed")
+
 
 # ============================================================================
 # Main Test Runner
 # ============================================================================
+
 
 fn run_all_tests() raises:
     """Run all CrossEntropyLoss tests."""
@@ -1259,9 +1265,11 @@ fn run_all_tests() raises:
 
     print("=" * 80)
 
+
 # ============================================================================
 # Quick Test Runners for Specific Categories
 # ============================================================================
+
 
 fn run_basic_tests() raises:
     """Run only basic functionality tests."""
@@ -1339,6 +1347,7 @@ fn run_equivalence_tests() raises:
     test_ce_mean_vs_manual_average()
     print("Equivalence tests completed!")
 
+
 fn test_ce_mean_vs_manual_average() raises:
     """Test that mean reduction equals manual average of none reduction."""
     print("test_ce_mean_vs_manual_average")
@@ -1358,7 +1367,7 @@ fn test_ce_mean_vs_manual_average() raises:
 
     assert_true(
         abs(loss_mean.item() - manual_mean) < 1e-5,
-        "Mean reduction should equal average of individual losses"
+        "Mean reduction should equal average of individual losses",
     )
     print("✓ Mean vs manual average test passed")
 
@@ -1367,8 +1376,10 @@ fn test_ce_mean_vs_manual_average() raises:
 # Performance/Optimization Tests
 # ============================================================================
 
+
 fn test_ce_no_validation_speedup() raises:
-    """Test that disabling validation works (can't test speedup, just correctness)."""
+    """Test that disabling validation works (can't test speedup, just correctness).
+    """
     print("test_ce_no_validation_speedup")
 
     var logits = Tensor.d2(
@@ -1386,7 +1397,6 @@ fn test_ce_no_validation_speedup() raises:
     assert_close(loss1, loss2, msg="Repeated calls should give same result")
     assert_close(loss2, loss3, msg="Repeated calls should give same result")
     print("✓ No validation speedup test passed")
-
 
 
 fn main() raises:

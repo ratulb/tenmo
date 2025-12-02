@@ -49,7 +49,7 @@ fn panic(*s: String):
 
 
 fn id[type: AnyType, //](t: type) -> Int:
-    #return Int(UnsafePointer(to=t))
+    # return Int(UnsafePointer(to=t))
     return Int(addr(t))
 
 
@@ -112,9 +112,9 @@ fn isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
     return inf[dtype]() == value
 
 
-
 fn isnan[dtype: DType, //](value: Scalar[dtype]) -> Bool:
     return nan[dtype]() == value
+
 
 @always_inline("nodebug")
 fn nan[dtype: DType]() -> Scalar[dtype]:
@@ -417,6 +417,7 @@ fn print_tensor_recursive[
 
         print(indent + "]", end="")
 
+
 # Utility repeat function
 fn str_repeat(s: String, n: Int) -> String:
     if n <= 0:
@@ -513,7 +514,7 @@ fn print_summary[
     # Print horizontal rule
     fn print_rule(read widths: List[Int]):
         var line = ""
-        for  w in  widths:
+        for w in widths:
             line += "+" + str_repeat("-", w + 2)
         line += "+"
         print(line)

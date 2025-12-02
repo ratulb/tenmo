@@ -61,7 +61,7 @@ struct SGD[dtype: DType = DType.float32](Copyable & Movable):
         """
 
         for param_ptr in self.params:
-            #var ref param = param_ptr[]  # Mutably borrow the pointee
+            # var ref param = param_ptr[]  # Mutably borrow the pointee
             ref param = param_ptr[]  # Mutably borrow the pointee
             if param.requires_grad and param.has_grad():
                 ref grad = param.gradbox[]
@@ -69,7 +69,7 @@ struct SGD[dtype: DType = DType.float32](Copyable & Movable):
                 param.buffer -= grad.buffer * self.lr
 
             if self.zero_grad_post_step:
-                #param.zero_grad()
+                # param.zero_grad()
                 pass
 
     fn zero_grad(self):

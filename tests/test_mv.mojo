@@ -1,7 +1,9 @@
 from tenmo import Tensor
 from shapes import Shape
 from operators import mv
-#alias mv = 2 # matrix vector
+
+# alias mv = 2 # matrix vector
+
 
 fn main() raises:
     run_all_matrix_vector_tests()
@@ -13,6 +15,7 @@ fn main() raises:
     print("=" * 50)
     print("ALL TESTS PASSED! ✓")
     print("=" * 50)
+
 
 # ===== BASIC MATRIX-VECTOR TESTS =====
 
@@ -30,8 +33,9 @@ fn test_matrix_vector_no_batch() raises:
     # v = [1, 2, 3]    (3,)
     # result = [1*1+2*2+3*3, 4*1+5*2+6*3] = [14, 32]
 
-    var M = Tensor[dtype].d2([[1.0, 2.0, 3.0],
-                               [4.0, 5.0, 6.0]], requires_grad=True)
+    var M = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     var v = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var r = M.matmul[mode=mv](v)
     var loss = r.sum()  # loss = 14 + 32 = 46
@@ -47,8 +51,9 @@ fn test_matrix_vector_no_batch() raises:
     #           [1*1, 1*2, 1*3]] = [[1,2,3], [1,2,3]]
     print("grad_M:")
     M.grad().print()
-    assert_true(M.grad().all_close(Tensor[dtype].d2([[1.0, 2.0, 3.0],
-                                                       [1.0, 2.0, 3.0]])))
+    assert_true(
+        M.grad().all_close(Tensor[dtype].d2([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]))
+    )
 
     # grad_v[j] = sum_i(M[i,j] * grad_out[i])
     # grad_v = [1*1+4*1, 2*1+5*1, 3*1+6*1] = [5, 7, 9]
@@ -71,18 +76,15 @@ fn test_matrix_vector_batch_v_only() raises:
     # result[0] = M @ v[0] = [1*1+2*0, 3*1+4*0] = [1, 3]
     # result[1] = M @ v[1] = [1*0+2*1, 3*0+4*1] = [2, 4]
 
-    var M = Tensor[dtype].d2([[1.0, 2.0],
-                               [3.0, 4.0]], requires_grad=True)
-    var v = Tensor[dtype].d2([[1.0, 0.0],
-                               [0.0, 1.0]], requires_grad=True)
+    var M = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v = Tensor[dtype].d2([[1.0, 0.0], [0.0, 1.0]], requires_grad=True)
     var r = M.matmul[mode=mv](v)
     var loss = r.sum()  # loss = 1+3+2+4 = 10
     loss.backward()
 
     print("Forward:")
     r.print()
-    assert_true(r.all_close(Tensor[dtype].d2([[1.0, 3.0],
-                                                [2.0, 4.0]])))
+    assert_true(r.all_close(Tensor[dtype].d2([[1.0, 3.0], [2.0, 4.0]])))
 
     # grad_out = [[1, 1],
     #             [1, 1]]
@@ -92,16 +94,14 @@ fn test_matrix_vector_batch_v_only() raises:
     # grad_M = [[1,0], [1,0]] + [[0,1], [0,1]] = [[1,1], [1,1]]
     print("grad_M:")
     M.grad().print()
-    assert_true(M.grad().all_close(Tensor[dtype].d2([[1.0, 1.0],
-                                                       [1.0, 1.0]])))
+    assert_true(M.grad().all_close(Tensor[dtype].d2([[1.0, 1.0], [1.0, 1.0]])))
 
     # grad_v[b,j] = sum_i(M[i,j] * grad_out[b,i])
     # For batch 0: grad_v[0] = M^T @ grad_out[0] = [[1,3],[2,4]] @ [1,1] = [4, 6]
     # For batch 1: grad_v[1] = M^T @ grad_out[1] = [[1,3],[2,4]] @ [1,1] = [4, 6]
     print("grad_v:")
     v.grad().print()
-    assert_true(v.grad().all_close(Tensor[dtype].d2([[4.0, 6.0],
-                                                       [4.0, 6.0]])))
+    assert_true(v.grad().all_close(Tensor[dtype].d2([[4.0, 6.0], [4.0, 6.0]])))
     print("✓ PASSED\n")
 
 
@@ -119,8 +119,9 @@ fn test_matrix_vector_batch_M_only() raises:
     # result[0] = M[0] @ v = [1+2, 3+4] = [3, 7]
     # result[1] = M[1] @ v = [5+6, 7+8] = [11, 15]
 
-    var M = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]],
-                               [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True)
+    var M = Tensor[dtype].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    )
     var v = Tensor[dtype].d1([1.0, 1.0], requires_grad=True)
     var r = M.matmul[mode=mv](v)
     var loss = r.sum()  # loss = 3+7+11+15 = 36
@@ -128,8 +129,7 @@ fn test_matrix_vector_batch_M_only() raises:
 
     print("Forward:")
     r.print()
-    assert_true(r.all_close(Tensor[dtype].d2([[3.0, 7.0],
-                                                [11.0, 15.0]])))
+    assert_true(r.all_close(Tensor[dtype].d2([[3.0, 7.0], [11.0, 15.0]])))
 
     # grad_out = [[1, 1],
     #             [1, 1]]
@@ -138,8 +138,13 @@ fn test_matrix_vector_batch_M_only() raises:
     # For batch 1: grad_M[1] = [1,1]^T ⊗ [1,1] = [[1,1], [1,1]]
     print("grad_M:")
     M.grad().print()
-    assert_true(M.grad().all_close(Tensor[dtype].d3([[[1.0, 1.0], [1.0, 1.0]],
-                                                       [[1.0, 1.0], [1.0, 1.0]]])))
+    assert_true(
+        M.grad().all_close(
+            Tensor[dtype].d3(
+                [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
+            )
+        )
+    )
 
     # grad_v[j] = sum over batches and i of (M[b,i,j] * grad_out[b,i])
     # grad_v[0] = 1*1 + 3*1 + 5*1 + 7*1 = 16
@@ -165,18 +170,17 @@ fn test_matrix_vector_both_batched() raises:
     # result[0] = M[0] @ v[0] = [1*2+2*1, 3*2+4*1] = [4, 10]
     # result[1] = M[1] @ v[1] = [5*1+6*2, 7*1+8*2] = [17, 23]
 
-    var M = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]],
-                               [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True)
-    var v = Tensor[dtype].d2([[2.0, 1.0],
-                               [1.0, 2.0]], requires_grad=True)
+    var M = Tensor[dtype].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
+    )
+    var v = Tensor[dtype].d2([[2.0, 1.0], [1.0, 2.0]], requires_grad=True)
     var r = M.matmul[mode=mv](v)
     var loss = r.sum()  # loss = 4+10+17+23 = 54
     loss.backward()
 
     print("Forward:")
     r.print()
-    assert_true(r.all_close(Tensor[dtype].d2([[4.0, 10.0],
-                                                [17.0, 23.0]])))
+    assert_true(r.all_close(Tensor[dtype].d2([[4.0, 10.0], [17.0, 23.0]])))
 
     # grad_out = [[1, 1],
     #             [1, 1]]
@@ -185,16 +189,22 @@ fn test_matrix_vector_both_batched() raises:
     # For batch 1: grad_M[1] = [1,1]^T ⊗ [1,2] = [[1,2], [1,2]]
     print("grad_M:")
     M.grad().print()
-    assert_true(M.grad().all_close(Tensor[dtype].d3([[[2.0, 1.0], [2.0, 1.0]],
-                                                       [[1.0, 2.0], [1.0, 2.0]]])))
+    assert_true(
+        M.grad().all_close(
+            Tensor[dtype].d3(
+                [[[2.0, 1.0], [2.0, 1.0]], [[1.0, 2.0], [1.0, 2.0]]]
+            )
+        )
+    )
 
     # grad_v[b,j] = sum_i(M[b,i,j] * grad_out[b,i])
     # For batch 0: grad_v[0] = [[1,3],[2,4]] @ [1,1] = [4, 6]
     # For batch 1: grad_v[1] = [[5,7],[6,8]] @ [1,1] = [12, 14]
     print("grad_v:")
     v.grad().print()
-    assert_true(v.grad().all_close(Tensor[dtype].d2([[4.0, 6.0],
-                                                       [12.0, 14.0]])))
+    assert_true(
+        v.grad().all_close(Tensor[dtype].d2([[4.0, 6.0], [12.0, 14.0]]))
+    )
     print("✓ PASSED\n")
 
 
@@ -225,16 +235,25 @@ fn test_matrix_vector_broadcast_batch() raises:
     # For batch (1,1): M[1,1] @ v[1] = [[5,6],[7,8]] @ [0,1] = [6, 8]
     # For batch (1,2): M[1,2] @ v[2] = [[6,7],[8,9]] @ [1,1] = [13, 17]
 
-    var M = Tensor[dtype].d4([
-        [[[1.0, 2.0], [3.0, 4.0]], [[2.0, 3.0], [4.0, 5.0]], [[3.0, 4.0], [5.0, 6.0]]],
-        [[[4.0, 5.0], [6.0, 7.0]], [[5.0, 6.0], [7.0, 8.0]], [[6.0, 7.0], [8.0, 9.0]]]
-    ], requires_grad=True)
+    var M = Tensor[dtype].d4(
+        [
+            [
+                [[1.0, 2.0], [3.0, 4.0]],
+                [[2.0, 3.0], [4.0, 5.0]],
+                [[3.0, 4.0], [5.0, 6.0]],
+            ],
+            [
+                [[4.0, 5.0], [6.0, 7.0]],
+                [[5.0, 6.0], [7.0, 8.0]],
+                [[6.0, 7.0], [8.0, 9.0]],
+            ],
+        ],
+        requires_grad=True,
+    )
 
-    var v = Tensor[dtype].d2([
-        [1.0, 0.0],
-        [0.0, 1.0],
-        [1.0, 1.0]
-    ], requires_grad=True)
+    var v = Tensor[dtype].d2(
+        [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]], requires_grad=True
+    )
 
     var r = M.matmul[mode=mv](v)
     var loss = r.sum()  # loss = 1+3+3+5+7+11+4+6+6+8+13+17 = 84
@@ -242,10 +261,16 @@ fn test_matrix_vector_broadcast_batch() raises:
 
     print("Forward:")
     r.print()
-    assert_true(r.all_close(Tensor[dtype].d3([
-        [[1.0, 3.0], [3.0, 5.0], [7.0, 11.0]],
-        [[4.0, 6.0], [6.0, 8.0], [13.0, 17.0]]
-    ])))
+    assert_true(
+        r.all_close(
+            Tensor[dtype].d3(
+                [
+                    [[1.0, 3.0], [3.0, 5.0], [7.0, 11.0]],
+                    [[4.0, 6.0], [6.0, 8.0], [13.0, 17.0]],
+                ]
+            )
+        )
+    )
 
     # grad_out[b1,b2,i] = 1 for all elements
     # grad_M[b1,b2,i,j] = grad_out[b1,b2,i] * v[b2,j]
@@ -260,10 +285,24 @@ fn test_matrix_vector_broadcast_batch() raises:
     # Same for M[1,*]
     print("grad_M:")
     M.grad().print()
-    assert_true(M.grad().all_close(Tensor[dtype].d4([
-        [[[1.0, 0.0], [1.0, 0.0]], [[0.0, 1.0], [0.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]],
-        [[[1.0, 0.0], [1.0, 0.0]], [[0.0, 1.0], [0.0, 1.0]], [[1.0, 1.0], [1.0, 1.0]]]
-    ])))
+    assert_true(
+        M.grad().all_close(
+            Tensor[dtype].d4(
+                [
+                    [
+                        [[1.0, 0.0], [1.0, 0.0]],
+                        [[0.0, 1.0], [0.0, 1.0]],
+                        [[1.0, 1.0], [1.0, 1.0]],
+                    ],
+                    [
+                        [[1.0, 0.0], [1.0, 0.0]],
+                        [[0.0, 1.0], [0.0, 1.0]],
+                        [[1.0, 1.0], [1.0, 1.0]],
+                    ],
+                ]
+            )
+        )
+    )
 
     # grad_v[b2,j] = sum over b1 and i of (M[b1,b2,i,j] * grad_out[b1,b2,i])
     # For v[0]: sum from M[0,0] and M[1,0]
@@ -277,13 +316,12 @@ fn test_matrix_vector_broadcast_batch() raises:
     #   grad_v[2,1] = (4+6) + (7+9) = 26
     print("grad_v:")
     v.grad().print()
-    assert_true(v.grad().all_close(Tensor[dtype].d2([
-        [14.0, 18.0],
-        [18.0, 22.0],
-        [22.0, 26.0]
-    ])))
+    assert_true(
+        v.grad().all_close(
+            Tensor[dtype].d2([[14.0, 18.0], [18.0, 22.0], [22.0, 26.0]])
+        )
+    )
     print("✓ PASSED\n")
-
 
 
 fn test_matrix_vector_basic_forward_backward() raises:

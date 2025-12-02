@@ -311,7 +311,9 @@ fn ndb_ops_test_inplace_self_contiguous_other_noncontiguous() raises:
 
     for i in range(2):
         for j in range(3):
-            assert_true(a[IntArray(i, j)] == expected[IntArray(i, j)], "Mismatch")
+            assert_true(
+                a[IntArray(i, j)] == expected[IntArray(i, j)], "Mismatch"
+            )
     print("ndb_ops_test_inplace_self_contiguous_other_noncontiguous passed")
 
 
@@ -335,7 +337,9 @@ fn ndb_ops_test_inplace_self_noncontiguous_other_contiguous() raises:
 
     for i in range(2):
         for j in range(3):
-            assert_true(a[IntArray(i, j)] == expected[IntArray(i, j)], "Mismatch")
+            assert_true(
+                a[IntArray(i, j)] == expected[IntArray(i, j)], "Mismatch"
+            )
     print("ndb_ops_test_inplace_self_noncontiguous_other_contiguous passed")
 
 
@@ -361,7 +365,9 @@ fn ndb_ops_test_inplace_both_noncontiguous() raises:
 
     for i in range(2):
         for j in range(3):
-            assert_true(a[IntArray(i, j)] == expected[IntArray(i, j)], "Mismatch")
+            assert_true(
+                a[IntArray(i, j)] == expected[IntArray(i, j)], "Mismatch"
+            )
     print("ndb_ops_test_inplace_both_noncontiguous passed")
 
 
@@ -729,7 +735,9 @@ fn ndb_ops_test_dunder_truediv() raises:
 
     for i in range(3):
         for j in range(4):
-            assert_true(abs(result[IntArray(i, j)] - 5.0) < 0.001, "__truediv__")
+            assert_true(
+                abs(result[IntArray(i, j)] - 5.0) < 0.001, "__truediv__"
+            )
     print("ndb_ops_test_dunder_truediv passed")
 
 
@@ -2174,6 +2182,7 @@ fn test_zero() raises:
     shared = ndb.share(Shape(3), offset=3)
     shared.zero()
     assert_true(ndb.data_buffer() == Buffer[dtype]([42, 42, 42, 0, 0, 0]))
+
 
 fn test_broadcast_fill() raises:
     print("test_broadcast_fill")

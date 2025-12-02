@@ -3,6 +3,7 @@ from shapes import Shape
 from common_utils import panic
 from sys import simd_width_of
 
+
 fn matmul_naive[
     dtype: DType, //
 ](A: Tensor[dtype], B: Tensor[dtype]) raises -> Tensor[dtype]:
@@ -32,11 +33,10 @@ fn matmul_naive[
 
     return C^
 
-fn validate_matmul_2d_grads[dtype: DType, //](
-    A: Tensor[dtype],
-    B: Tensor[dtype],
-    C: Tensor[dtype]
-) raises:
+
+fn validate_matmul_2d_grads[
+    dtype: DType, //
+](A: Tensor[dtype], B: Tensor[dtype], C: Tensor[dtype]) raises:
     print("validate_matmul_2d_grads")
 
     # --- Early exit if no gradients were tracked ---
@@ -47,7 +47,9 @@ fn validate_matmul_2d_grads[dtype: DType, //](
         )
         return
 
-    var gradC = C.gradients()[].copy()  # Guaranteed to exist if C.requires_grad == True
+    var gradC = (
+        C.gradients()[].copy()
+    )  # Guaranteed to exist if C.requires_grad == True
 
     var B_T = B.transpose[track_grad=False](1, 0)
     var A_T = A.transpose[track_grad=False](1, 0)
@@ -98,6 +100,7 @@ fn validate_matmul_2d_grads[dtype: DType, //](
 
 fn main() raises:
     run_all_matmul_2d_forward_tests()
+
 
 fn run_all_matmul_2d_forward_tests() raises:
     print("Running matmul_2d tests")
@@ -199,6 +202,7 @@ fn test_matmul_2d_very_large_matrices() raises:
 
     validate_matmul_2d_grads(A, B, C)
 
+
 fn test_matmul_2d_very_very_large_matrices() raises:
     print("test_matmul_2d_very_very_large_matrices")
     var m: Int = 512
@@ -259,6 +263,7 @@ fn test_matmul_2d_non_multiple_simd_width() raises:
 
     validate_matmul_2d_grads(A, B, C)
 
+
 fn test_matmul_2d_large_views_simd_path() raises:
     print("test_matmul_2d_large_views_simd_path")
     # Create large base tensors and take contiguous views from them
@@ -314,6 +319,7 @@ fn test_matmul_2d_basic() raises:
     assert_true(C.all_close(expected))
     validate_matmul_2d_grads(A, B, C)
 
+
 fn test_matmul_2d_rectangular() raises:
     print("test_matmul_2d_rectangular")
     var A = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).float()
@@ -332,12 +338,15 @@ fn test_matmul_2d_non_contiguous_A_view() raises:
     ).float()
     # View skips first row: start offset = 3, shape = (2×3)
     var A1 = A_base.view(shape=Shape(2, 3), strides=Strides(3, 1), offset=3)
-    var B = Tensor.d2([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]], requires_grad=True).float()
+    var B = Tensor.d2(
+        [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]], requires_grad=True
+    ).float()
     var C = A1.matmul(B)
     var expected = Tensor.d2([[10.0, 11.0], [16.0, 17.0]]).float()
     assert_true(C.all_close(expected))
 
     validate_matmul_2d_grads(A1, B, C)
+
 
 fn test_matmul_2d_identity() raises:
     print("test_matmul_2d_identity")
@@ -347,6 +356,7 @@ fn test_matmul_2d_identity() raises:
     assert_true(C.all_close(A))
 
     validate_matmul_2d_grads(A, I, C)
+
 
 fn test_matmul_2d_non_contiguous_B_view() raises:
     print("test_matmul_2d_non_contiguous_B_view")
@@ -360,6 +370,7 @@ fn test_matmul_2d_non_contiguous_B_view() raises:
     assert_true(C.all_close(expected))
 
     validate_matmul_2d_grads(AA, BB, C)
+
 
 fn test_matmul_2d_non_contiguous_both_views() raises:
     print("test_matmul_2d_non_contiguous_both_views")
@@ -378,6 +389,7 @@ fn test_matmul_2d_non_contiguous_both_views() raises:
 
     validate_matmul_2d_grads(AA, BB, C)
 
+
 fn test_matmul_2d_single_row_col() raises:
     print("test_matmul_2d_single_row_col")
     var A = Tensor.d2([[1.0, 2.0, 3.0]]).float()  # 1×3
@@ -387,6 +399,7 @@ fn test_matmul_2d_single_row_col() raises:
     assert_true(C.all_close(expected))
 
     validate_matmul_2d_grads(A, B, C)
+
 
 fn test_matmul_2d_high_values() raises:
     print("test_matmul_2d_high_values")
@@ -401,6 +414,7 @@ fn test_matmul_2d_high_values() raises:
     )
 
     validate_matmul_2d_grads(A, B, C)
+
 
 fn test_matmul_2d_mixed_stride_views() raises:
     print("test_matmul_2d_mixed_stride_views")
@@ -418,6 +432,7 @@ fn test_matmul_2d_mixed_stride_views() raises:
 
     validate_matmul_2d_grads(A, B, C)
 
+
 # ===== BASIC MATRIX MULTIPLICATION =====
 
 from testing import assert_true
@@ -434,6 +449,7 @@ fn test_matmul_2d_1x1_identity() raises:
 
     validate_matmul_2d_grads(a, b, c)
 
+
 fn test_matmul_2d_1x1_scalar_multiplication() raises:
     print("test_matmul_2d_1x1_scalar_multiplication")
     var a = Tensor.d2([[3.0]])
@@ -442,6 +458,7 @@ fn test_matmul_2d_1x1_scalar_multiplication() raises:
     assert_true(c.all_close(Tensor.d2([[12.0]])))
 
     validate_matmul_2d_grads(a, b, c)
+
 
 fn test_matmul_2d_2x2_square_matrices() raises:
     print("test_matmul_2d_2x2_square_matrices")
@@ -452,6 +469,7 @@ fn test_matmul_2d_2x2_square_matrices() raises:
 
     validate_matmul_2d_grads(a, b, c)
 
+
 fn test_matmul_2d_2x3_times_3x2() raises:
     print("test_matmul_2d_2x3_times_3x2")
     var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -461,6 +479,7 @@ fn test_matmul_2d_2x3_times_3x2() raises:
 
     validate_matmul_2d_grads(a, b, c)
 
+
 fn test_matmul_2d_1x3_times_3x1() raises:
     print("test_matmul_2d_1x3_times_3x1")
     var a = Tensor.d2([[1.0, 2.0, 3.0]])
@@ -469,6 +488,7 @@ fn test_matmul_2d_1x3_times_3x1() raises:
     assert_true(c.all_close(Tensor.d2([[32.0]])))
 
     validate_matmul_2d_grads(a, b, c)
+
 
 fn test_matmul_2d_3x1_times_1x3() raises:
     print("test_matmul_2d_3x1_times_1x3")
@@ -483,6 +503,7 @@ fn test_matmul_2d_3x1_times_1x3() raises:
 
     validate_matmul_2d_grads(a, b, c)
 
+
 fn test_matmul_2d_identity_matrix() raises:
     print("test_matmul_2d_identity_matrix")
     var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -494,6 +515,7 @@ fn test_matmul_2d_identity_matrix() raises:
 
     validate_matmul_2d_grads(a, identity, c)
 
+
 fn test_matmul_2d_zero_matrix() raises:
     print("test_matmul_2d_zero_matrix")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]])
@@ -502,6 +524,7 @@ fn test_matmul_2d_zero_matrix() raises:
     assert_true(c.all_close(zeros))
 
     validate_matmul_2d_grads(a, zeros, c)
+
 
 # ===== EDGE CASES =====
 
@@ -554,9 +577,12 @@ fn test_matmul_2d_transposed_b_slow_path() raises:
 
     validate_matmul_2d_grads(a, b, c)
 
+
 fn test_matmul_2d_view_slice_of_a() raises:
     print("test_matmul_2d_view_slice_of_a")
-    var a_orig = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True)
+    var a_orig = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True
+    )
     var a = a_orig.view(
         shape=Shape(2, 2), strides=Strides(3, 1), offset=0
     )  # First 2x2 block
@@ -566,10 +592,13 @@ fn test_matmul_2d_view_slice_of_a() raises:
 
     validate_matmul_2d_grads(a, b, c)
 
+
 fn test_matmul_2d_view_slice_of_b() raises:
     print("test_matmul_2d_view_slice_of_b")
     var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
-    var b_orig = Tensor.d2([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True)
+    var b_orig = Tensor.d2(
+        [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True
+    )
     var b = b_orig.view(
         shape=Shape(2, 2), strides=Strides(4, 1), offset=2
     )  # Middle 2x2 columns
@@ -578,10 +607,15 @@ fn test_matmul_2d_view_slice_of_b() raises:
 
     validate_matmul_2d_grads(a, b, c)
 
+
 fn test_matmul_2d_both_views() raises:
     print("test_matmul_2d_both_views")
-    var a_orig = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True)
-    var b_orig = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True)
+    var a_orig = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True
+    )
+    var b_orig = Tensor.d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True
+    )
 
     var a = a_orig.view(
         shape=Shape(2, 2), strides=Strides(3, 1), offset=1
@@ -596,9 +630,12 @@ fn test_matmul_2d_both_views() raises:
 
     validate_matmul_2d_grads(a, b, c)
 
+
 fn test_matmul_2d_strided_view_columns() raises:
     print("test_matmul_2d_strided_view_columns")
-    var a_orig = Tensor.d2([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True)
+    var a_orig = Tensor.d2(
+        [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True
+    )
     var a = a_orig.view(
         shape=Shape(2, 2), strides=Strides(4, 2), offset=0
     )  # Take every other column
@@ -607,6 +644,7 @@ fn test_matmul_2d_strided_view_columns() raises:
     assert_true(c.all_close(Tensor.d2([[2.0, 6.0], [10.0, 14.0]])))
 
     validate_matmul_2d_grads(a, b, c)
+
 
 fn test_matmul_2d_view_with_offset() raises:
     print("test_matmul_2d_view_with_offset")

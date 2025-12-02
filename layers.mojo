@@ -8,6 +8,7 @@ from math import sqrt
 # Module / Layer / Sequential definitions (safe pointers)
 # --------------------
 
+
 @fieldwise_init
 struct Module[dtype: DType = DType.float32](Copyable & Movable):
     var layer: Layer[dtype]
@@ -37,7 +38,6 @@ struct Module[dtype: DType = DType.float32](Copyable & Movable):
         else:
             return 0
 
-
     fn parameters_ptrs(self) -> List[UnsafePointer[Tensor[dtype]]]:
         var ptrs = List[UnsafePointer[Tensor[dtype]]]()
         if self.layer.isa[Linear[dtype]]():
@@ -45,6 +45,7 @@ struct Module[dtype: DType = DType.float32](Copyable & Movable):
             ptrs.append(addr(l.weights))
             ptrs.append(addr(l.bias))
         return ptrs^
+
 
 @fieldwise_init
 struct Linear[dtype: DType = DType.float32](Copyable & Movable):
@@ -101,10 +102,10 @@ struct Linear[dtype: DType = DType.float32](Copyable & Movable):
         ptrs.append(addr(self.bias))
         return ptrs^
 
+
 @fieldwise_init
 @register_passable
 struct ReLU[dtype: DType = DType.float32](ImplicitlyCopyable):
-
     fn __call__(self, x: Tensor[dtype]) -> Tensor[dtype]:
         return x.relu()
 
@@ -122,6 +123,7 @@ struct ReLU[dtype: DType = DType.float32](ImplicitlyCopyable):
 
 
 alias Layer[dtype: DType] = Variant[Linear[dtype], ReLU[dtype]]
+
 
 @fieldwise_init
 struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
@@ -153,7 +155,6 @@ struct Sequential[dtype: DType = DType.float32](Copyable & Movable):
         for p in self.parameters():
             total += p.numels()
         return total
-
 
     fn parameters_ptrs(self) -> List[UnsafePointer[Tensor[dtype]]]:
         var ptrs = List[UnsafePointer[Tensor[dtype]]]()

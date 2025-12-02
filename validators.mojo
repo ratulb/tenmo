@@ -1,6 +1,16 @@
 from shapes import Shape
 from strides import Strides
-from common_utils import Slicer, panic, Idx, NewAxis, i, s, il, newaxis, log_warning
+from common_utils import (
+    Slicer,
+    panic,
+    Idx,
+    NewAxis,
+    i,
+    s,
+    il,
+    newaxis,
+    log_warning,
+)
 from tenmo import Tensor
 from intarray import IntArray
 

@@ -93,6 +93,7 @@ struct MinMax[dtype: DType = DType.float32]:
         if rank == 0:
             var v = self[IntArray()]
             result[IntArray()] = v
+
             @parameter
             if track_grad:
                 grad_required = requires_grad.or_else(self.requires_grad)
@@ -108,12 +109,25 @@ struct MinMax[dtype: DType = DType.float32]:
         # ===== FAST PATH: Full Reduction to Scalar =====
         if out_shape == Shape():
             return Self._full_reduction_vectorized[max, track_grad](
-                self, shape, normalized_axes, keepdims, result^, gradbag^, requires_grad
+                self,
+                shape,
+                normalized_axes,
+                keepdims,
+                result^,
+                gradbag^,
+                requires_grad,
             )
 
         # ===== GENERAL CASE: Partial Reduction (Parallelized) =====
         return Self._partial_reduction_parallel[max, track_grad](
-            self, shape, normalized_axes, keepdims, out_shape, result^, gradbag^, requires_grad
+            self,
+            shape,
+            normalized_axes,
+            keepdims,
+            out_shape,
+            result^,
+            gradbag^,
+            requires_grad,
         )
 
     # ===== VECTORIZED FULL REDUCTION (All axes → scalar) =====
@@ -145,7 +159,9 @@ struct MinMax[dtype: DType = DType.float32]:
         # Vectorization doesn't help much for min/max with gradient tracking
         # because we need to track positions, which requires branching
 
-        for flat_idx in range(1, total_elements):  # Start from 1, we already have element 0
+        for flat_idx in range(
+            1, total_elements
+        ):  # Start from 1, we already have element 0
             var idx = IndexCalculator.index_to_coord(shape, flat_idx)
             var cur = self[idx]
 
@@ -153,22 +169,26 @@ struct MinMax[dtype: DType = DType.float32]:
             if max:
                 if cur > best_value:
                     best_value = cur
+
                     @parameter
                     if track_grad:
                         best_positions.clear()
                         best_positions.append(idx)
                 elif cur == best_value:
+
                     @parameter
                     if track_grad:
                         best_positions.append(idx)
             else:
                 if cur < best_value:
                     best_value = cur
+
                     @parameter
                     if track_grad:
                         best_positions.clear()
                         best_positions.append(idx)
                 elif cur == best_value:
+
                     @parameter
                     if track_grad:
                         best_positions.append(idx)
@@ -226,8 +246,11 @@ struct MinMax[dtype: DType = DType.float32]:
         @parameter
         fn compute_output_element(out_flat_idx: Int):
             # Convert flat index to multidimensional index
-            var out_idx = IndexCalculator.index_to_coord(out_shape, out_flat_idx)
+            var out_idx = IndexCalculator.index_to_coord(
+                out_shape, out_flat_idx
+            )
             var best_value: Scalar[dtype]
+
             # Initialize best value for this output element
             @parameter
             if max:
@@ -243,44 +266,50 @@ struct MinMax[dtype: DType = DType.float32]:
             var num_reduced_elements = reduced_shape.num_elements()
 
             for red_flat_idx in range(num_reduced_elements):
-                var red_idx = IndexCalculator.index_to_coord(reduced_shape, red_flat_idx)
+                var red_idx = IndexCalculator.index_to_coord(
+                    reduced_shape, red_flat_idx
+                )
 
                 # Compute full input index
-                var full_idx = (
-                    out_idx.replace(normalized_axes, red_idx)
-                    if keepdims
-                    else out_idx.insert(normalized_axes, red_idx)
-                )
+                var full_idx = out_idx.replace(
+                    normalized_axes, red_idx
+                ) if keepdims else out_idx.insert(normalized_axes, red_idx)
 
                 var cur = self[full_idx]
 
                 if first_iteration:
                     best_value = cur
                     first_iteration = False
+
                     @parameter
                     if track_grad:
                         best_positions.append(full_idx)
                 else:
+
                     @parameter
                     if max:
                         if cur > best_value:
                             best_value = cur
+
                             @parameter
                             if track_grad:
                                 best_positions.clear()
                                 best_positions.append(full_idx)
                         elif cur == best_value:
+
                             @parameter
                             if track_grad:
                                 best_positions.append(full_idx)
                     else:
                         if cur < best_value:
                             best_value = cur
+
                             @parameter
                             if track_grad:
                                 best_positions.clear()
                                 best_positions.append(full_idx)
                         elif cur == best_value:
+
                             @parameter
                             if track_grad:
                                 best_positions.append(full_idx)
@@ -318,7 +347,6 @@ struct MinMax[dtype: DType = DType.float32]:
                 result.add_ancestry(self)
 
         return result^
-
 
 
 @fieldwise_init
@@ -485,13 +513,9 @@ struct MinMax_orig[dtype: DType = DType.float32]:
                 var first_iteration = True
 
                 for red_idx in reduced_shape:
-                    var full_idx = (
-                        out_idx
-                        .replace(
-                            normalized_axes,red_idx
-                        ) if keepdims else out_idx
-                        .insert(normalized_axes, red_idx)
-                    )
+                    var full_idx = out_idx.replace(
+                        normalized_axes, red_idx
+                    ) if keepdims else out_idx.insert(normalized_axes, red_idx)
                     var cur = self[full_idx]
 
                     if first_iteration:

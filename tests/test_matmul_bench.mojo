@@ -42,6 +42,7 @@ fn main() raises:
         forward_backward_time / forward_only_time,
     )
 
+
 fn bench_tensor_tensor[
     dtype: DType, //
 ](A: Tensor[dtype], B: Tensor[dtype]) -> (Tensor[dtype], UInt):

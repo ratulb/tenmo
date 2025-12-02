@@ -69,7 +69,6 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
     fn __call__(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-
         if self.grad_fn.isa[Matmul2dBackward[dtype]]():
             return self.grad_fn[Matmul2dBackward[dtype]].backward(output)
 
@@ -80,7 +79,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[VectorMatmulNdBackward[dtype]].backward(output)
 
         elif self.grad_fn.isa[MatrixVectorMulNdBackward[dtype]]():
-            return self.grad_fn[MatrixVectorMulNdBackward[dtype]].backward(output)
+            return self.grad_fn[MatrixVectorMulNdBackward[dtype]].backward(
+                output
+            )
 
         elif self.grad_fn.isa[CrossEntropyBackward[dtype]]():
             return self.grad_fn[CrossEntropyBackward[dtype]].backward(output)

@@ -8,6 +8,7 @@ from testing import assert_true
 fn main() raises:
     pass
 
+
 @register_passable
 struct ShapeBroadcaster:
     """Utility for broadcasting and manipulating shapes for tensor operations.
@@ -60,7 +61,6 @@ struct ShapeBroadcaster:
         var result_shape = IntArray.with_capacity(len(shape1))
         var s1 = shape1.intarray()
         var s2 = shape2.intarray()
-
 
         for dims in s1.zip(s2):
             if dims[0] == dims[1]:
@@ -190,8 +190,8 @@ struct ShapeBroadcaster:
             if source_shape[i] == 1:
                 source_indices.append(0)  # Broadcasted dimension → use 0
             else:
-                source_indices.append(target_indices[
-                    target_idx
-                ])  # Normal dimension
+                source_indices.append(
+                    target_indices[target_idx]
+                )  # Normal dimension
 
         return source_indices^

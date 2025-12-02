@@ -84,12 +84,18 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         self.label_smoothing = existing.label_smoothing
 
     fn __call__(
-        self, logits: Tensor[dtype], target: Tensor[DType.int32], validate: Bool = True
+        self,
+        logits: Tensor[dtype],
+        target: Tensor[DType.int32],
+        validate: Bool = True,
     ) -> Tensor[dtype]:
         return self._forward_class_indices(logits, target, validate)
 
     fn __call__(
-        self, logits: Tensor[dtype], target: Tensor[dtype], validate: Bool = True
+        self,
+        logits: Tensor[dtype],
+        target: Tensor[dtype],
+        validate: Bool = True,
     ) -> Tensor[dtype]:
         return self._forward_probabilities(logits, target, validate)
 
@@ -100,7 +106,9 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         # 1. Validate inputs
 
         if validate:
-            Self._validate_class_indices_inputs(logits, target, self.ignore_index)
+            Self._validate_class_indices_inputs(
+                logits, target, self.ignore_index
+            )
 
         # 2. Reshape to unified 2D format
         var logits_shape = logits.shape()
@@ -124,7 +132,9 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
         if smoothing_active:
             var uniform_val = Scalar[dtype](1) / Scalar[dtype](C)
             non_true_smoothed = self.label_smoothing * uniform_val
-            true_smoothed = Scalar[dtype](1) - self.label_smoothing + non_true_smoothed
+            true_smoothed = (
+                Scalar[dtype](1) - self.label_smoothing + non_true_smoothed
+            )
 
         # 4. Fused log_softmax + loss computation
         var losses = Tensor[dtype].zeros(Shape([M]), requires_grad=False)
@@ -155,7 +165,9 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                 var loss_val = Scalar[dtype](0)
                 for c in range(C):
                     var log_prob = logits_2d[m, c] - log_sum_exp
-                    var true_prob = true_smoothed if c == class_idx else non_true_smoothed
+                    var true_prob = (
+                        true_smoothed if c == class_idx else non_true_smoothed
+                    )
                     loss_val += true_prob * -log_prob
                 losses[m] = loss_val
             else:
@@ -179,7 +191,6 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                 out.add_ancestry(logits)
 
         return out^
-
 
     fn _forward_probabilities(
         self, logits: Tensor[dtype], target: Tensor[dtype], validate: Bool
@@ -232,7 +243,9 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                 var target_prob = target_2d[m, c]
 
                 if smoothing_active:
-                    target_prob = (Scalar[dtype](1) - self.label_smoothing) * target_prob + self.label_smoothing * uniform_val
+                    target_prob = (
+                        Scalar[dtype](1) - self.label_smoothing
+                    ) * target_prob + self.label_smoothing * uniform_val
 
                 loss_val += target_prob * -log_prob
 
@@ -240,7 +253,9 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
 
         # 5. Apply reduction
         var valid_count = M
-        var out = self._apply_reduction(losses, target.shape()[0:-1], valid_count)
+        var out = self._apply_reduction(
+            losses, target.shape()[0:-1], valid_count
+        )
 
         # Setup autograd if needed
         @parameter
@@ -334,7 +349,6 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                         "Spatial dimension mismatch at dimension " + i.__str__()
                     )
 
-
     @staticmethod
     fn _validate_target_indices(
         target: Tensor[DType.int32], num_classes: Int, ignore_index: Int
@@ -366,7 +380,9 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
                 )
 
 
-struct CrossEntropyBackward[dtype: DType](Copyable & Movable & ImplicitlyCopyable):
+struct CrossEntropyBackward[dtype: DType](
+    Copyable & Movable & ImplicitlyCopyable
+):
     var reduction: Reduction
     var ignore_index: Int
     var label_smoothing: Scalar[dtype]
@@ -453,7 +469,9 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable & ImplicitlyCopyabl
         if smoothing_active:
             var uniform_val = Scalar[dtype](1) / Scalar[dtype](C)
             non_true_smoothed = self.label_smoothing * uniform_val
-            true_smoothed = Scalar[dtype](1) - self.label_smoothing + non_true_smoothed
+            true_smoothed = (
+                Scalar[dtype](1) - self.label_smoothing + non_true_smoothed
+            )
 
         # Fused softmax + gradient computation
         for m in range(M):
@@ -479,10 +497,14 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable & ImplicitlyCopyabl
                 var softmax_prob = exp(logits_2d[m, c] - max_val) / sum_exp
 
                 if smoothing_active:
-                    var target_prob = true_smoothed if c == class_idx else non_true_smoothed
+                    var target_prob = (
+                        true_smoothed if c == class_idx else non_true_smoothed
+                    )
                     grad_input_2d[m, c] = softmax_prob - target_prob
                 else:
-                    var target_val = Scalar[dtype](1) if c == class_idx else Scalar[dtype](0)
+                    var target_val = Scalar[dtype](
+                        1
+                    ) if c == class_idx else Scalar[dtype](0)
                     grad_input_2d[m, c] = softmax_prob - target_val
 
         # Apply reduction scaling
@@ -493,7 +515,6 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable & ImplicitlyCopyabl
         var final_grad_input = grad_input_2d.reshape(logits_shape)
 
         return [(logits_ancestor^, final_grad_input^, AddTensor)]
-
 
     fn _backward_probabilities(
         self,
@@ -541,7 +562,9 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable & ImplicitlyCopyabl
                 var target_prob = target_2d[m, c]
 
                 if smoothing_active:
-                    target_prob = (Scalar[dtype](1) - self.label_smoothing) * target_prob + self.label_smoothing * uniform_val
+                    target_prob = (
+                        Scalar[dtype](1) - self.label_smoothing
+                    ) * target_prob + self.label_smoothing * uniform_val
 
                 grad_input_2d[m, c] = softmax_prob - target_prob
 
@@ -591,8 +614,7 @@ struct CrossEntropyBackward[dtype: DType](Copyable & Movable & ImplicitlyCopyabl
         return scaled_grad^
 
 
-
-#=============================
+# =============================
 
 
 @register_passable
@@ -635,9 +657,9 @@ struct Reduction_orig(Copyable, EqualityComparable, ImplicitlyCopyable):
 
 
 @register_passable
-struct CrossEntropyLoss_orig[dtype: DType = DType.float32, track_grad: Bool = True](
-    Copyable
-):
+struct CrossEntropyLoss_orig[
+    dtype: DType = DType.float32, track_grad: Bool = True
+](Copyable):
     var reduction: Reduction
     var ignore_index: Int  # index to ignore (-100 for none)
     var label_smoothing: Scalar[dtype]  # usually 0.0
@@ -757,7 +779,7 @@ struct CrossEntropyLoss_orig[dtype: DType = DType.float32, track_grad: Bool = Tr
                     self.reduction.value(),
                     self.ignore_index,
                     self.label_smoothing,
-                    #Target -> Buffer[DType.int32] as part of backward fn
+                    # Target -> Buffer[DType.int32] as part of backward fn
                     Optional((target_shape, target.buffer.contiguous_buffer())),
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
@@ -809,7 +831,9 @@ struct CrossEntropyLoss_orig[dtype: DType = DType.float32, track_grad: Bool = Tr
             losses[m] = loss_val
 
         # 6. Apply reduction (ignore_index doesn't apply to probability targets)
-        var out = self._apply_reduction(losses, target.shape()[0:-1], valid_count)
+        var out = self._apply_reduction(
+            losses, target.shape()[0:-1], valid_count
+        )
 
         # Setup autograd if needed
         @parameter
@@ -824,8 +848,7 @@ struct CrossEntropyLoss_orig[dtype: DType = DType.float32, track_grad: Bool = Tr
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 # Target is not really a parent - but we need it in the backward pass!
-                out.add_ancestry(logits, target) #Target is of same dtype
-
+                out.add_ancestry(logits, target)  # Target is of same dtype
 
         return out^
 
@@ -998,7 +1021,9 @@ struct CrossEntropyLoss_orig[dtype: DType = DType.float32, track_grad: Bool = Tr
                 )
 
 
-struct CrossEntropyBackward_orig[dtype: DType](Copyable & Movable & ImplicitlyCopyable):
+struct CrossEntropyBackward_orig[dtype: DType](
+    Copyable & Movable & ImplicitlyCopyable
+):
     var reduction: Reduction
     var ignore_index: Int
     var label_smoothing: Scalar[dtype]
@@ -1083,9 +1108,7 @@ struct CrossEntropyBackward_orig[dtype: DType](Copyable & Movable & ImplicitlyCo
         var softmax_probs = self._softmax(logits_2d)
 
         # Create gradient tensor
-        var grad_input_2d = Gradbox[dtype].zeros(
-            Shape([M, C]), share=False
-        )
+        var grad_input_2d = Gradbox[dtype].zeros(Shape([M, C]), share=False)
         var valid_count = 0
 
         # Precompute smoothing values (same as forward pass)
@@ -1132,10 +1155,7 @@ struct CrossEntropyBackward_orig[dtype: DType](Copyable & Movable & ImplicitlyCo
         )
 
         # Reshape back to original shape
-        var final_grad_input = grad_input_2d.reshape(
-            logits_shape
-        )
-
+        var final_grad_input = grad_input_2d.reshape(logits_shape)
 
         return [(logits_ancestor^, final_grad_input^, AddTensor)]
 
@@ -1172,7 +1192,9 @@ struct CrossEntropyBackward_orig[dtype: DType](Copyable & Movable & ImplicitlyCo
         var softmax_probs = self._softmax(logits_2d)
 
         # Gradient for probability targets: softmax_probs - target
-        var grad_input_2d = Gradbox[dtype](softmax_probs.buffer - smoothed_target.buffer, share=False)
+        var grad_input_2d = Gradbox[dtype](
+            softmax_probs.buffer - smoothed_target.buffer, share=False
+        )
 
         # Apply reduction scaling (ignore_index doesn't apply to probability targets)
         var valid_count = M  # All elements are valid
@@ -1181,9 +1203,7 @@ struct CrossEntropyBackward_orig[dtype: DType](Copyable & Movable & ImplicitlyCo
         )
 
         # Reshape back to original shape
-        var final_grad_input = grad_input_2d.reshape(
-            logits_shape
-        )
+        var final_grad_input = grad_input_2d.reshape(logits_shape)
 
         return [(logits_ancestor^, final_grad_input^, AddTensor)]
 
@@ -1201,7 +1221,6 @@ struct CrossEntropyBackward_orig[dtype: DType](Copyable & Movable & ImplicitlyCo
         var grad_input_2d_shape = grad_input_2d.shape()
         var scaled_grad = grad_input_2d.copy()
 
-
         # Apply reduction scaling first
         if self.reduction == Reduction.Mean and valid_count > 0:
             # Scale by 1/valid_count for mean reduction
@@ -1213,9 +1232,7 @@ struct CrossEntropyBackward_orig[dtype: DType](Copyable & Movable & ImplicitlyCo
         if self.reduction == Reduction.`None`:
             # For "none" reduction, upstream gradient matches target shape
             # We need to expand it to (M, C) shape
-            var upstream_1d = upstream_grad.reshape(
-                Shape([total_elements])
-            )
+            var upstream_1d = upstream_grad.reshape(Shape([total_elements]))
             var expanded_upstream = Gradbox[dtype](
                 Shape([total_elements, grad_input_2d_shape[1]]),
             )

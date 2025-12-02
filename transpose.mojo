@@ -6,6 +6,7 @@ from gradbox import Gradbox
 from ancestry import Ancestor
 from intarray import IntArray
 
+
 @fieldwise_init
 @register_passable
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
@@ -20,7 +21,9 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         inverted_axes = IntArray.invert_permutation(self.axes)
-        gradbox_transposed_contiguous = gradbox.transpose(inverted_axes).contiguous()
+        gradbox_transposed_contiguous = gradbox.transpose(
+            inverted_axes
+        ).contiguous()
         return [
             (
                 ancestor^,
@@ -33,7 +36,6 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct Transpose[dtype: DType](Copyable):
-
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -52,13 +54,15 @@ struct Transpose[dtype: DType](Copyable):
 
         # Permute shape and create default strides and permute
 
-
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides().permute(normalized_axes)
 
-
         out = Tensor[dtype].build_view(
-            self.address(), new_shape, new_strides, self.offset(), requires_grad=False
+            self.address(),
+            new_shape,
+            new_strides,
+            self.offset(),
+            requires_grad=False,
         )
 
         @parameter

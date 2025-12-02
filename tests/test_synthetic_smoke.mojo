@@ -34,7 +34,9 @@ fn make_synthetic_dataset(
                     X[IntArray([i, 0, r, c])] = 1.0
 
     # flatten to (n_samples × 64)
-    var X_flat = X.flatten[track_grad=False](start_dim=1)  # squash everything but batch dim
+    var X_flat = X.flatten[track_grad=False](
+        start_dim=1
+    )  # squash everything but batch dim
     return (X_flat, y)
 
 
@@ -42,7 +44,6 @@ fn test_tiny_training_smoke() raises:
     print("test_tiny_training_smoke")
 
     var (X, y) = make_synthetic_dataset(5)  # small dataset
-
 
     var model = Sequential[DType.float32](
         [

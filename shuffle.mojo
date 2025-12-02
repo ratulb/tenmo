@@ -97,5 +97,3 @@ struct Shuffle[dtype: DType](Copyable & Movable):
 
 fn main() raises:
     print("passes")
-
-

@@ -3044,6 +3044,7 @@ fn test_reshape_exp() raises:
     result = tensor3 * 12
     result.backward()
 
+
 fn test_validate_matmul_last_2_dims() raises:
     print("test_validate_matmul_last_2_dims")
     a = Tensor.arange(2 * 3 * 5 * 4, requires_grad=True)
@@ -4291,6 +4292,7 @@ fn test_shuffle() raises:
     expected = Tensor.d1([42.0, 0.0, 0.0, 42.0, 42.0]).float()
     assert_true(a.grad().all_close(expected))
 
+
 fn test_fill() raises:
     print("test_fill")
     a = Tensor.zeros(10)
@@ -4316,13 +4318,10 @@ fn test_fill() raises:
     )
     b = Tensor.d1([1919, 1919])
 
-
     v2.set(b, s())
 
     assert_true(
-        (
-            a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 1919, 42, 1919])
-        ),
+        (a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 1919, 42, 1919])),
         "view set propagation to parent failed",
     )
 

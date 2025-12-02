@@ -16,6 +16,7 @@ from buffers import Buffer
 from forwards import Mean
 from utilities import Utils
 
+
 struct Gradbox[dtype: DType](
     Copyable
     & Movable
@@ -68,7 +69,9 @@ struct Gradbox[dtype: DType](
         return Gradbox[dtype](nd_buffer^, share=False)
 
     fn __abs__(self) -> Gradbox[dtype]:
-        var buffer = self.buffer.map[Utils[dtype].abs_buffer, Utils[dtype].abs_scalar]()
+        var buffer = self.buffer.map[
+            Utils[dtype].abs_buffer, Utils[dtype].abs_scalar
+        ]()
         var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
         return Gradbox[dtype](nd_buffer^, share=False)
 
@@ -240,7 +243,7 @@ struct Gradbox[dtype: DType](
         max: Scalar[dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
-        share: Bool = False
+        share: Bool = False,
     ) -> Gradbox[dtype]:
         if init_seed:
             seed(init_seed.value())
@@ -275,7 +278,6 @@ struct Gradbox[dtype: DType](
     ) -> Gradbox[dtype]:
         return Mean[dtype].forward(self, axes=axes, keepdims=keepdims)
 
-
     @always_inline
     fn sum_over_broadcasted_axes(
         extended_grad: Gradbox[dtype], target_shape: Shape
@@ -302,7 +304,10 @@ struct Gradbox[dtype: DType](
 
     fn __getitem__(self, *indices: Idx) -> Gradbox[dtype]:
         if not self.shared():
-            panic("Gradbox -> __getitem__(self, *indices: Idx): can not call on an unshared gradbox")
+            panic(
+                "Gradbox -> __getitem__(self, *indices: Idx): can not call on"
+                " an unshared gradbox"
+            )
         # Compute view metadata
         view_shape, view_strides, relative_offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
@@ -316,8 +321,10 @@ struct Gradbox[dtype: DType](
         strides = Strides() if is_scalar else view_strides
         abs_offset = self.offset() + relative_offset
         shared_buffer = self.buffer.buffer.copy()
-        #ndb = NDBuffer[dtype](shared_buffer=shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset)
-        ndb = NDBuffer[dtype](shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset)
+        # ndb = NDBuffer[dtype](shared_buffer=shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset)
+        ndb = NDBuffer[dtype](
+            shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset
+        )
 
         return Gradbox[dtype](ndb^, share=False)
 
@@ -384,8 +391,7 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn load[
-        simdwidth: Int = simd_width_of[dtype](),
-        validated: Bool = False
+        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
     ](self, row: Int, col: Int) -> SIMD[dtype, simdwidth]:
         """SIMD load of a row segment from a 2D Gradbox.
 
@@ -396,11 +402,9 @@ struct Gradbox[dtype: DType](
         """
         return self.buffer.load[simdwidth, validated](row, col)
 
-
     @always_inline
     fn store[
-        simdwidth: Int = simd_width_of[dtype](),
-        validated: Bool = False
+        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
     ](self, row: Int, col: Int, value: SIMD[dtype, simdwidth]):
         """SIMD store of a row segment into a 2D Gradbox.
 
@@ -454,9 +458,7 @@ struct Gradbox[dtype: DType](
                 "≠",
                 other.shape().__str__(),
             )
-        return (
-            self.buffer.compare[Equal](other.buffer).buffer.all_true()
-        )
+        return self.buffer.compare[Equal](other.buffer).buffer.all_true()
 
     fn __ne__(self, other: Gradbox[dtype]) -> Bool:
         if self.shape() != other.shape():
@@ -466,11 +468,7 @@ struct Gradbox[dtype: DType](
                 "≠",
                 other.shape().__str__(),
             )
-        return (
-            self.buffer.compare[NotEqual](other.buffer)
-            .buffer
-            .all_true()
-        )
+        return self.buffer.compare[NotEqual](other.buffer).buffer.all_true()
 
     fn __str__(self) -> String:
         rank = self.rank()
@@ -562,7 +560,6 @@ struct Gradbox[dtype: DType](
     fn matmul(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
         return Matmul[dtype].forward(A, B)
 
-
     fn __add__(self, other: Self) -> Gradbox[dtype]:
         return Gradbox[dtype](
             self.buffer.arithmetic_ops[Add](other.buffer), share=False
@@ -597,26 +594,24 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn __imul__(self, incoming: Gradbox[dtype]):
-        #self.buffer.inplace_ops[Multiply](incoming.buffer)
+        # self.buffer.inplace_ops[Multiply](incoming.buffer)
         var multiplied = self.buffer.buffer * incoming.buffer.buffer
         var numels = self.buffer.buffer.size
         self.buffer.buffer.overwrite(multiplied, 0, numels)
 
-
     @always_inline
     fn __iadd__(self, incoming: Gradbox[dtype]):
-        #self.buffer.inplace_ops[Add](incoming.buffer)
+        # self.buffer.inplace_ops[Add](incoming.buffer)
         var added = self.buffer.buffer + incoming.buffer.buffer
         var numels = self.buffer.buffer.size
         self.buffer.buffer.overwrite(added, 0, numels)
 
     @always_inline
     fn __isub__(self, incoming: Gradbox[dtype]):
-        #self.buffer.inplace_ops[Subtract](incoming.buffer)
+        # self.buffer.inplace_ops[Subtract](incoming.buffer)
         var subtracted = self.buffer.buffer - incoming.buffer.buffer
         var numels = self.buffer.buffer.size
         self.buffer.buffer.overwrite(subtracted, 0, numels)
-
 
     @always_inline
     fn __itruediv__(self, incoming: Gradbox[dtype]):
@@ -692,9 +687,7 @@ struct Gradbox[dtype: DType](
                 ",",
                 tensor.shape().__str__(),
             )
-        return (
-            self.buffer.compare[Equal](tensor.buffer).buffer.all_true()
-        )
+        return self.buffer.compare[Equal](tensor.buffer).buffer.all_true()
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(
@@ -714,7 +707,9 @@ struct Gradbox[dtype: DType](
     fn __del__(deinit self):
         _ = self.buffer^
 
+
 from common_utils import s, il
+
 
 fn main() raises:
     alias dtype = DType.float32
@@ -734,7 +729,7 @@ fn main() raises:
 
     a_slice.print()
 
-    gg = Gradbox[dtype](Shape(3,4), share=True)
+    gg = Gradbox[dtype](Shape(3, 4), share=True)
     gg.print()
     gg_copied = gg.copy()
     gg_copied.print()
@@ -746,4 +741,6 @@ fn main() raises:
 
     x.gradients()[].print()
     y.gradients()[].print()
+
+
 from testing import assert_true

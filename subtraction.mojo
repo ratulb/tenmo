@@ -7,6 +7,7 @@ from gradbox import Gradbox
 from ancestry import Ancestor
 from broadcastbackward import BroadcastBackward
 
+
 @register_passable
 struct SubBackward[dtype: DType](ImplicitlyCopyable):
     var signs: IntArray
@@ -60,7 +61,11 @@ struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         return [
-            (ancestor^, gradbox.copy(), SubtractTensor if self.negate else AddTensor)
+            (
+                ancestor^,
+                gradbox.copy(),
+                SubtractTensor if self.negate else AddTensor,
+            )
         ]
 
 

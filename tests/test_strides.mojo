@@ -7,11 +7,13 @@ from intarray import IntArray
 # STRIDES TESTS
 # ============================================
 
+
 fn test_strides_default_constructor() raises:
     print("test_strides_default_constructor")
     var s = Strides()
     assert_true(len(s) == 0, "default constructor should create empty strides")
     print("test_strides_default_constructor passed")
+
 
 fn test_strides_zero() raises:
     print("test_strides_zero")
@@ -19,13 +21,17 @@ fn test_strides_zero() raises:
     assert_true(len(s) == 0, "Zero() should create empty strides")
     print("test_strides_zero passed")
 
+
 fn test_strides_variadic_constructor() raises:
     print("test_strides_variadic_constructor")
     var s = Strides(1, 2, 3, 4)
-    assert_true(len(s) == 4, "variadic constructor should create strides of length 4")
+    assert_true(
+        len(s) == 4, "variadic constructor should create strides of length 4"
+    )
     assert_true(s[0] == 1, "first element should be 1")
     assert_true(s[3] == 4, "last element should be 4")
     print("test_strides_variadic_constructor passed")
+
 
 fn test_strides_list_constructor() raises:
     print("test_strides_list_constructor")
@@ -34,17 +40,23 @@ fn test_strides_list_constructor() raises:
     lst.append(10)
     lst.append(15)
     var s = Strides(lst)
-    assert_true(len(s) == 3, "list constructor should create strides of length 3")
+    assert_true(
+        len(s) == 3, "list constructor should create strides of length 3"
+    )
     assert_true(s[1] == 10, "second element should be 10")
     print("test_strides_list_constructor passed")
+
 
 fn test_strides_intarray_constructor() raises:
     print("test_strides_intarray_constructor")
     var arr = IntArray(2, 4, 6)
     var s = Strides(arr)
-    assert_true(len(s) == 3, "IntArray constructor should create strides of length 3")
+    assert_true(
+        len(s) == 3, "IntArray constructor should create strides of length 3"
+    )
     assert_true(s[2] == 6, "third element should be 6")
     print("test_strides_intarray_constructor passed")
+
 
 fn test_strides_getitem() raises:
     print("test_strides_getitem")
@@ -53,6 +65,7 @@ fn test_strides_getitem() raises:
     assert_true(s[2] == 30, "third element should be 30")
     assert_true(s[-1] == 40, "last element should be 40")
     print("test_strides_getitem passed")
+
 
 fn test_strides_setitem() raises:
     print("test_strides_setitem")
@@ -63,6 +76,7 @@ fn test_strides_setitem() raises:
     assert_true(s[2] == 200, "s[2] should be 200")
     print("test_strides_setitem passed")
 
+
 fn test_strides_slice() raises:
     print("test_strides_slice")
     var s = Strides(10, 20, 30, 40, 50)
@@ -71,6 +85,7 @@ fn test_strides_slice() raises:
     assert_true(sliced[0] == 20, "first element should be 20")
     assert_true(sliced[2] == 40, "last element should be 40")
     print("test_strides_slice passed")
+
 
 fn test_strides_eq() raises:
     print("test_strides_eq")
@@ -81,12 +96,14 @@ fn test_strides_eq() raises:
     assert_true(not (s1 == s3), "s1 should not equal s3")
     print("test_strides_eq passed")
 
+
 fn test_strides_str() raises:
     print("test_strides_str")
     var s = Strides(10, 20, 30)
     var str_repr = s.__str__()
     assert_true(str_repr == "(10, 20, 30)", "string should be '(10, 20, 30)'")
     print("test_strides_str passed")
+
 
 fn test_strides_tolist() raises:
     print("test_strides_tolist")
@@ -95,6 +112,7 @@ fn test_strides_tolist() raises:
     assert_true(len(lst) == 3, "list should have 3 elements")
     assert_true(lst[1] == 10, "second element should be 10")
     print("test_strides_tolist passed")
+
 
 fn test_strides_permute() raises:
     print("test_strides_permute")
@@ -107,6 +125,7 @@ fn test_strides_permute() raises:
     assert_true(result[3] == 20, "fourth element should be 20")
     print("test_strides_permute passed")
 
+
 fn test_strides_default() raises:
     print("test_strides_default")
     var shape = Shape(2, 3, 4)
@@ -117,12 +136,14 @@ fn test_strides_default() raises:
     assert_true(s[2] == 1, "stride[2] should be 1")
     print("test_strides_default passed")
 
+
 fn test_strides_default_scalar() raises:
     print("test_strides_default_scalar")
     var shape = Shape()
     var s = Strides.default(shape)
     assert_true(len(s) == 0, "scalar should have empty strides")
     print("test_strides_default_scalar passed")
+
 
 fn test_strides_is_contiguous() raises:
     print("test_strides_is_contiguous")
@@ -133,6 +154,7 @@ fn test_strides_is_contiguous() raises:
     assert_true(not s2.is_contiguous(shape), "s2 should not be contiguous")
     print("test_strides_is_contiguous passed")
 
+
 fn test_strides_is_contiguous_scalar() raises:
     print("test_strides_is_contiguous_scalar")
     var shape = Shape()
@@ -140,11 +162,13 @@ fn test_strides_is_contiguous_scalar() raises:
     assert_true(s.is_contiguous(shape), "scalar is trivially contiguous")
     print("test_strides_is_contiguous_scalar passed")
 
+
 fn test_strides_with_capacity() raises:
     print("test_strides_with_capacity")
     var s = Strides.with_capacity(10)
     assert_true(len(s) == 0, "with_capacity should start with size 0")
     print("test_strides_with_capacity passed")
+
 
 fn test_compute_default_strides() raises:
     shape = Shape.of(2, 3, 4)
@@ -154,10 +178,11 @@ fn test_compute_default_strides() raises:
         "stride compute assertion 1 failed",
     )
 
+
 fn run_all_strides_tests() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("RUNNING STRIDES TESTS")
-    print("="*60)
+    print("=" * 60)
 
     test_strides_default_constructor()
     test_strides_zero()
@@ -177,12 +202,12 @@ fn run_all_strides_tests() raises:
     test_strides_is_contiguous_scalar()
     test_strides_with_capacity()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("ALL STRIDES TESTS PASSED ✓")
-    print("="*60)
+    print("=" * 60)
+
 
 fn main() raises:
     print("Running strides tests")
     test_compute_default_strides()
     run_all_strides_tests()
-

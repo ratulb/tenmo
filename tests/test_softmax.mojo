@@ -3,6 +3,7 @@ from testing import assert_true
 from math import exp
 from shapes import Shape
 
+
 fn main() raises:
     test_tensor_softmax_backward_1d()
     test_softmax_1d_basic()
@@ -15,8 +16,6 @@ fn main() raises:
     test_softmax_numerical_stability()
     test_softmax_negative_values()
     print("passes")
-
-
 
 
 fn test_tensor_softmax_backward_1d() raises:
@@ -49,6 +48,7 @@ fn test_softmax_1d_basic() raises:
     s = output.sum()
     s.backward()
     assert_true(input_data.grad().all_close(Tensor.d1([0.0, 0.0, 0.0])))
+
 
 fn test_softmax_1d_with_grad_validation() raises:
     print("test_softmax_1d_with_grad_validation")
@@ -266,4 +266,3 @@ fn test_softmax_negative_values() raises:
     assert_true(abs(output_sum - 1.0) < 1e-6)
 
     output.sum().backward()
-

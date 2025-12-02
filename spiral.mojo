@@ -7,10 +7,9 @@ from time import perf_counter_ns
 from data import *
 from net import BCELoss
 
+
 fn generate_spiral_data(
-    n_points: Int = 100,
-    n_rotations: Float64 = 3.0,
-    noise: Float64 = 0.1
+    n_points: Int = 100, n_rotations: Float64 = 3.0, noise: Float64 = 0.1
 ) -> Tuple[Tensor[DType.float64], Tensor[DType.float64]]:
     """Generate two intertwined spirals.
 
@@ -55,7 +54,9 @@ fn generate_spiral_data(
 
     return (X, y)
 
+
 from net import Linear, Tanh, Sigmoid, Sequential, SGD, ReLU
+
 
 struct SpiralNet[dtype: DType]:
     """Network designed for spiral classification."""
@@ -73,7 +74,7 @@ struct SpiralNet[dtype: DType]:
         self.fc4 = Linear[dtype](50, 1)
 
     fn forward(mut self, x: Tensor[dtype]) -> Tensor[dtype]:
-        var h1 = self.fc1(x).tanh()     # Tanh works well here
+        var h1 = self.fc1(x).tanh()  # Tanh works well here
         var h2 = self.fc2(h1).tanh()
         var h3 = self.fc3(h2).tanh()
         var out = self.fc4(h3).sigmoid()
@@ -83,10 +84,10 @@ struct SpiralNet[dtype: DType]:
 fn train_spiral_1():
     # Generate data
     var (X_train, y_train) = generate_spiral_data(
-        #n_points=1000,
+        # n_points=1000,
         n_points=500,
         n_rotations=3.0,
-        noise=0.1
+        noise=0.1,
     )
 
     # Separate train/val
@@ -102,15 +103,11 @@ fn train_spiral_1():
         Linear[DType.float64](100, 50).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](50, 1).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     # Optimizer
-    var optimizer = SGD(
-        model.parameters(),
-        lr=0.01,
-        momentum=0.9
-    )
+    var optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
 
     # Training loop
     for epoch in range(10000):
@@ -134,6 +131,7 @@ fn train_spiral_1():
             print("  Val Loss:", val_loss.item())
             print("  Val Accuracy:", accuracy, "%")
 
+
 fn train_spiral_2():
     var (X_train, y_train) = generate_spiral_data(500, 3.0, 0.1)
     var (X_val, y_val) = generate_spiral_data(250, 3.0, 0.1)
@@ -146,7 +144,7 @@ fn train_spiral_2():
         Linear[DType.float64](128, 64, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](64, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     # ✅ LR = 0.1 for ReLU
@@ -171,7 +169,6 @@ fn train_spiral_2():
             print("  Val Accuracy:", accuracy, "%")
 
         if epoch % 100 == 0:
-
             var weight_norm: Scalar[DType.float64] = 0
             var grad_norm: Scalar[DType.float64] = 0
 
@@ -183,12 +180,21 @@ fn train_spiral_2():
 
             print("Weight norm:", weight_norm)
             print("Gradient norm:", grad_norm)
-            print("Prediction range: [", pred.min().item(), ",", pred.max().item(), "]")
+            print(
+                "Prediction range: [",
+                pred.min().item(),
+                ",",
+                pred.max().item(),
+                "]",
+            )
 
 
 from math import exp
 
-fn compute_accuracy_10[dtype: DType, //](logits: Tensor[dtype], target: Tensor[dtype]) -> Float64:
+
+fn compute_accuracy_10[
+    dtype: DType, //
+](logits: Tensor[dtype], target: Tensor[dtype]) -> Float64:
     var correct = 0
     var total = logits.shape()[0]
 
@@ -202,13 +208,14 @@ fn compute_accuracy_10[dtype: DType, //](logits: Tensor[dtype], target: Tensor[d
 
     return Float64(correct) / Float64(total) * 100.0
 
+
 fn train_spiral_parked():
     var (X_train, y_train) = generate_spiral_data(500, 3.0, 0.1)
     var (X_val, y_val) = generate_spiral_data(250, 3.0, 0.1)
 
     # ✅ Simple 2-layer network with He init
     var model = Sequential[DType.float64]()
-    _="""model.append(
+    _ = """model.append(
         Linear[DType.float64](2, 128, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](128, 64, xavier=False).into(),
@@ -221,13 +228,13 @@ fn train_spiral_parked():
         ReLU[DType.float64]().into(),
         Linear[DType.float64](64, 32, xavier=False).into(),
         ReLU[DType.float64]().into(),
-        Linear[DType.float64](32, 1, xavier=False).into()
+        Linear[DType.float64](32, 1, xavier=False).into(),
     )
 
     # ✅ LR = 0.1 for ReLU
     var optimizer = SGD(model.parameters(), lr=0.1, momentum=0.9)
 
-    #for epoch in range(5000):  # Might converge faster now
+    # for epoch in range(5000):  # Might converge faster now
     var base_lr = 0.5
     for epoch in range(10000):
         # Reduce LR over time
@@ -260,7 +267,6 @@ fn train_spiral_parked():
             print("  Val Accuracy:", accuracy, "%")
 
         if epoch % 100 == 0:
-
             var weight_norm: Scalar[DType.float64] = 0
             var grad_norm: Scalar[DType.float64] = 0
 
@@ -272,7 +278,14 @@ fn train_spiral_parked():
 
             print("Weight norm:", weight_norm)
             print("Gradient norm:", grad_norm)
-            print("Prediction range: [", pred.min().item(), ",", pred.max().item(), "]")
+            print(
+                "Prediction range: [",
+                pred.min().item(),
+                ",",
+                pred.max().item(),
+                "]",
+            )
+
 
 fn train_spiral():
     var (X_train, y_train) = generate_spiral_data(500, 3.0, 0.1)
@@ -284,7 +297,7 @@ fn train_spiral():
         ReLU[DType.float64]().into(),
         Linear[DType.float64](64, 32, xavier=False).into(),
         ReLU[DType.float64]().into(),
-        Linear[DType.float64](32, 1, xavier=False).into()
+        Linear[DType.float64](32, 1, xavier=False).into(),
     )
 
     var optimizer = SGD(model.parameters(), lr=0.3, momentum=0.9)
@@ -302,27 +315,37 @@ fn train_spiral():
             var val_loss = val_pred.binary_cross_entropy_with_logits(y_val)
             var accuracy = compute_accuracy(val_pred, y_val)
 
-            print("Epoch", epoch, "| Train:", loss.item(), "| Val:", val_loss.item(), "| Acc:", accuracy, "%")
+            print(
+                "Epoch",
+                epoch,
+                "| Train:",
+                loss.item(),
+                "| Val:",
+                val_loss.item(),
+                "| Acc:",
+                accuracy,
+                "%",
+            )
 
 
-#```
+# ```
 
 ### Expected Training Curve
-#```
-#Epoch 0:     Loss: 0.25, Accuracy: 50%  (random)
-#Epoch 2000:  Loss: 0.20, Accuracy: 65%  (learning basic patterns)
-#Epoch 5000:  Loss: 0.12, Accuracy: 80%  (spirals emerging)
-#Epoch 10000: Loss: 0.05, Accuracy: 92%  (good separation)
-#Epoch 20000: Loss: 0.02, Accuracy: 96%+ (nearly perfect)
+# ```
+# Epoch 0:     Loss: 0.25, Accuracy: 50%  (random)
+# Epoch 2000:  Loss: 0.20, Accuracy: 65%  (learning basic patterns)
+# Epoch 5000:  Loss: 0.12, Accuracy: 80%  (spirals emerging)
+# Epoch 10000: Loss: 0.05, Accuracy: 92%  (good separation)
+# Epoch 20000: Loss: 0.02, Accuracy: 96%+ (nearly perfect)
+
 
 fn main_parked():
-    _="""pair = generate_spiral_data()
+    _ = """pair = generate_spiral_data()
     print()
     pair[0].print()
     print()
     pair[1].print()"""
     train_spiral()
-
 
 
 fn test_tiny_overfit():
@@ -331,10 +354,14 @@ fn test_tiny_overfit():
 
     # Just 4 points - 2 per class
     var X = Tensor[DType.float64].zeros(4, 2)
-    X[0, 0] = 0.0; X[0, 1] = 0.0  # Class 0
-    X[1, 0] = 0.1; X[1, 1] = 0.1  # Class 0
-    X[2, 0] = 1.0; X[2, 1] = 1.0  # Class 1
-    X[3, 0] = 0.9; X[3, 1] = 0.9  # Class 1
+    X[0, 0] = 0.0
+    X[0, 1] = 0.0  # Class 0
+    X[1, 0] = 0.1
+    X[1, 1] = 0.1  # Class 0
+    X[2, 0] = 1.0
+    X[2, 1] = 1.0  # Class 1
+    X[3, 0] = 0.9
+    X[3, 1] = 0.9  # Class 1
 
     var y = Tensor[DType.float64].zeros(4, 1)
     y[0, 0] = 0.0
@@ -348,7 +375,7 @@ fn test_tiny_overfit():
         Linear[DType.float64](2, 10, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](10, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     var optimizer = SGD(model.parameters(), lr=0.1, momentum=0.0)
@@ -389,13 +416,16 @@ fn test_tiny_overfit():
     else:
         print("\n✅ PASSED: Network can learn!")
 
+
 fn test_gradients() -> Bool:
     """Check if gradients are computed and non-zero."""
     print("=== Testing Gradient Flow ===")
 
     var X = Tensor[DType.float64].zeros(2, 2)
-    X[0, 0] = 1.0; X[0, 1] = 2.0
-    X[1, 0] = 3.0; X[1, 1] = 4.0
+    X[0, 0] = 1.0
+    X[0, 1] = 2.0
+    X[1, 0] = 3.0
+    X[1, 1] = 4.0
 
     var y = Tensor[DType.float64].zeros(2, 1)
     y[0, 0] = 0.0
@@ -406,7 +436,7 @@ fn test_gradients() -> Bool:
         Linear[DType.float64](2, 4, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](4, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     var pred = model(X)
@@ -461,15 +491,18 @@ fn test_gradients() -> Bool:
     return all_ok
 
 
-
 fn test_tiny_overfit_detailed():
     print("=== Detailed Tiny Dataset Test ===")
 
     var X = Tensor[DType.float64].zeros(4, 2)
-    X[0, 0] = 0.0; X[0, 1] = 0.0
-    X[1, 0] = 0.1; X[1, 1] = 0.1
-    X[2, 0] = 1.0; X[2, 1] = 1.0
-    X[3, 0] = 0.9; X[3, 1] = 0.9
+    X[0, 0] = 0.0
+    X[0, 1] = 0.0
+    X[1, 0] = 0.1
+    X[1, 1] = 0.1
+    X[2, 0] = 1.0
+    X[2, 1] = 1.0
+    X[3, 0] = 0.9
+    X[3, 1] = 0.9
 
     var y = Tensor[DType.float64].zeros(4, 1)
     y[0, 0] = 0.0
@@ -482,7 +515,7 @@ fn test_tiny_overfit_detailed():
         Linear[DType.float64](2, 10, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](10, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     var optimizer = SGD(model.parameters(), lr=0.1, momentum=0.0)
@@ -523,7 +556,17 @@ fn test_tiny_overfit_detailed():
                 var true_class = Int(y[i, 0])
                 var is_correct = pred_class == true_class
                 var marker = "✓" if is_correct else "✗"
-                print("    [", i, "]:", pred_val, "→ class", pred_class, "(", marker, ")")
+                print(
+                    "    [",
+                    i,
+                    "]:",
+                    pred_val,
+                    "→ class",
+                    pred_class,
+                    "(",
+                    marker,
+                    ")",
+                )
 
     # ✅ Final check
     print("\n=== After Training ===")
@@ -587,7 +630,6 @@ fn test_tiny_overfit_detailed():
         print("✅ Everything working! Network learned correctly.")
 
 
-
 fn train_spiral_simple():
     print("=== Training Spiral with Simple Architecture ===")
 
@@ -597,10 +639,12 @@ fn train_spiral_simple():
     # ✅ Use EXACT same architecture that passed tiny test
     var model = Sequential[DType.float64]()
     model.append(
-        Linear[DType.float64](2, 10, xavier=False).into(),  # Same: 10 hidden units
+        Linear[DType.float64](
+            2, 10, xavier=False
+        ).into(),  # Same: 10 hidden units
         ReLU[DType.float64]().into(),
         Linear[DType.float64](10, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     # ✅ Same hyperparameters
@@ -638,7 +682,17 @@ fn train_spiral_simple():
                 var true_class = Int(t)
                 var ok = pred_class == true_class
                 var marker = "✓" if ok else "✗"
-                print("    [", i, "] pred:", p, "→", pred_class, "target:", true_class, marker)
+                print(
+                    "    [",
+                    i,
+                    "] pred:",
+                    p,
+                    "→",
+                    pred_class,
+                    "target:",
+                    true_class,
+                    marker,
+                )
 
     print("\n=== Final Results ===")
     var final_pred = model(X_val)
@@ -702,10 +756,14 @@ fn debug_spiral_data():
     var y_coord_max = X[0, 1]
 
     for i in range(total):
-        if X[i, 0] < x_min: x_min = X[i, 0]
-        if X[i, 0] > x_max: x_max = X[i, 0]
-        if X[i, 1] < y_coord_min: y_coord_min = X[i, 1]
-        if X[i, 1] > y_coord_max: y_coord_max = X[i, 1]
+        if X[i, 0] < x_min:
+            x_min = X[i, 0]
+        if X[i, 0] > x_max:
+            x_max = X[i, 0]
+        if X[i, 1] < y_coord_min:
+            y_coord_min = X[i, 1]
+        if X[i, 1] > y_coord_max:
+            y_coord_max = X[i, 1]
 
     print("\nInput data ranges:")
     print("  X[:,0]: [", x_min, ",", x_max, "]")
@@ -731,10 +789,13 @@ fn debug_spiral_data():
     for i in range(100, 103):
         print("  Sample", i, "position: (", X[i, 0], ",", X[i, 1], ")")
 
+
 fn test_spiral_tiny():
     print("=== Testing on 20 Spiral Points ===\n")
 
-    var (X_full, y_full) = generate_spiral_data(n_points=10, n_rotations=1.0, noise=0.0)
+    var (X_full, y_full) = generate_spiral_data(
+        n_points=10, n_rotations=1.0, noise=0.0
+    )
 
     # Just 20 points total (10 per class, 1 rotation, no noise)
     print("Dataset: 20 points, 10 per class, 1 rotation, no noise")
@@ -748,7 +809,7 @@ fn test_spiral_tiny():
         Linear[DType.float64](2, 10, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](10, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     var optimizer = SGD(model.parameters(), lr=0.1, momentum=0.0)
@@ -775,7 +836,16 @@ fn test_spiral_tiny():
                     var t = y_full[i, 0]
                     var pred_class = 1 if p > 0.5 else 0
                     var true_class = Int(t)
-                    print("    [", i, "] pred:", p, "→", pred_class, "target:", true_class)
+                    print(
+                        "    [",
+                        i,
+                        "] pred:",
+                        p,
+                        "→",
+                        pred_class,
+                        "target:",
+                        true_class,
+                    )
 
     var final_pred = model(X_full)
     var final_acc = compute_accuracy(final_pred, y_full)
@@ -809,7 +879,7 @@ fn test_spiral_xor_architecture():
         Linear[DType.float64](2, 4, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](4, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     # ✅ EXACT same hyperparameters as XOR
@@ -835,7 +905,17 @@ fn test_spiral_xor_architecture():
                 var pred_class = 1 if p > 0.5 else 0
                 var true_class = Int(t)
                 var ok = pred_class == true_class
-                print("    [", i, "] pred:", p, "→", pred_class, "target:", true_class, "✓" if ok else "✗")
+                print(
+                    "    [",
+                    i,
+                    "] pred:",
+                    p,
+                    "→",
+                    pred_class,
+                    "target:",
+                    true_class,
+                    "✓" if ok else "✗",
+                )
 
     var final_acc = compute_accuracy(model(X), y)
     print("\nFinal Accuracy:", final_acc, "%")
@@ -844,8 +924,6 @@ fn test_spiral_xor_architecture():
         print("✅ Architecture can handle spiral!")
     else:
         print("❌ Same architecture fails on spiral")
-
-
 
 
 fn normalize_data(X: Tensor[DType.float64]) -> Tensor[DType.float64]:
@@ -892,7 +970,7 @@ fn train_spiral_normalized():
     var X_val_norm = normalize_data(X_val)
 
     var model = Sequential[DType.float64]()
-    _="""model.append(
+    _ = """model.append(
         Linear[DType.float64](2, 10, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](10, 1, xavier=False).into(),
@@ -904,7 +982,7 @@ fn train_spiral_normalized():
         Linear[DType.float64](64, 16, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](16, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     var optimizer = SGD(model.parameters(), lr=0.075, momentum=0.95)
@@ -927,6 +1005,7 @@ fn train_spiral_normalized():
             for i in range(5):
                 print("    pred:", val_pred[i, 0], "target:", y_val[i, 0])
 
+
 fn train_spiral_fixed():
     var (X_train, y_train) = generate_spiral_data(400, 2.0, 0.01)
     var (X_val, y_val) = generate_spiral_data(200, 2.0, 0.01)
@@ -940,7 +1019,7 @@ fn train_spiral_fixed():
         Linear[DType.float64](32, 16, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](16, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     var optimizer = SGD(model.parameters(), lr=0.05, momentum=0.1)
@@ -948,15 +1027,15 @@ fn train_spiral_fixed():
     for epoch in range(15000):
         if epoch == 10000:
             var current_lr = optimizer.lr
-            optimizer.set_lr(current_lr/10)
+            optimizer.set_lr(current_lr / 10)
 
         if epoch == 13000:
             var current_lr = optimizer.lr
-            optimizer.set_lr(current_lr/10)
+            optimizer.set_lr(current_lr / 10)
 
         if epoch == 14000:
             var current_lr = optimizer.lr
-            optimizer.set_lr(current_lr/10)
+            optimizer.set_lr(current_lr / 10)
 
         var pred = model(X_train)
         var loss = pred.binary_cross_entropy(y_train)
@@ -969,6 +1048,7 @@ fn train_spiral_fixed():
             var val_pred = model(X_val)
             var val_acc = compute_accuracy(val_pred, y_val)
             print("Epoch", epoch, "Loss:", loss.item(), "Acc:", val_acc, "%")
+
 
 fn test_hardest_spiral():
     print("=== Testing Hardest Spiral ===")
@@ -985,15 +1065,17 @@ fn test_hardest_spiral():
         Linear[DType.float64](128, 64, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](64, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     var optimizer = SGD(model.parameters(), lr=0.075, momentum=0.025)
 
     for epoch in range(20000):
-        #LR decay
-        if epoch == 10000: optimizer.set_lr(0.01)
-        if epoch == 15000: optimizer.set_lr(0.001)
+        # LR decay
+        if epoch == 10000:
+            optimizer.set_lr(0.01)
+        if epoch == 15000:
+            optimizer.set_lr(0.001)
 
         var pred = model(X_train)
         var loss = pred.binary_cross_entropy(y_train)
@@ -1007,27 +1089,23 @@ fn test_hardest_spiral():
             var val_acc = compute_accuracy(val_pred, y_val)
             print("Epoch", epoch, "Loss:", loss.item(), "Acc:", val_acc, "%")
 
+
 fn train_with_batches_orig():
     var (X_train, y_train) = generate_spiral_data(500, 2.0, 0.01)
     var (X_val, y_val) = generate_spiral_data(250, 2.0, 0.01)
     alias dtype = DType.float64
-    #✅ Use DataLoader with batching
+    # ✅ Use DataLoader with batching
     var train_dataset = TensorDataset[dtype](X_train, y_train)
     var train_loader = DataLoader[dtype=dtype](
-        train_dataset^,
-        batch_size=32,
-        reshuffle=True,
-        drop_last=False
+        train_dataset^, batch_size=32, reshuffle=True, drop_last=False
     )
 
     var val_dataset = TensorDataset(X_val, y_val)
-    var val_loader = DataLoader[dtype=DType.float64](
-        val_dataset^,
-        batch_size=64,
-        reshuffle=False
+    var val_loader = DataLoader[dtype = DType.float64](
+        val_dataset^, batch_size=64, reshuffle=False
     )
 
-    #Same model that worked
+    # Same model that worked
     var model = Sequential[DType.float64]()
     model.append(
         Linear[DType.float64](2, 64, xavier=False).into(),
@@ -1037,23 +1115,22 @@ fn train_with_batches_orig():
         Linear[DType.float64](32, 16, xavier=False).into(),
         ReLU[DType.float64]().into(),
         Linear[DType.float64](16, 1, xavier=False).into(),
-        Sigmoid[DType.float64]().into()
+        Sigmoid[DType.float64]().into(),
     )
 
     var optimizer = SGD[dtype=dtype](model.parameters(), lr=0.05, momentum=0.1)
 
-    #Train with batches
+    # Train with batches
     for epoch in range(15000):
         var train_iter = train_loader.__iter__()
         var epoch_loss = 0.0
         var num_batches = 0
 
         for _batch in train_loader:
-
-
             while train_iter.__has_next__():
                 var batch = train_iter.__next__()
-                if batch.batch_size == 0: break
+                if batch.batch_size == 0:
+                    break
 
                 var pred = model(batch.features)
                 var loss = pred.binary_cross_entropy(batch.labels)
@@ -1068,7 +1145,6 @@ fn train_with_batches_orig():
         if epoch % 1000 == 0:
             print("Epoch", epoch, "Avg Loss:", epoch_loss / num_batches)
             for batch in val_loader:
-
                 var val_pred = model(batch.features)
                 var val_acc = compute_accuracy(val_pred, batch.labels)
                 print("Epoch", epoch, "Acc:", val_acc, "%")
@@ -1079,33 +1155,28 @@ fn train_with_batches_good_absent_validation_loss():
     var (X_val, y_val) = generate_spiral_data(250, 2.0, 0.01)
     alias dtype = DType.float64
 
-    #✅ Use DataLoader with batching
+    # ✅ Use DataLoader with batching
     var train_dataset = TensorDataset[dtype](X_train, y_train)
     var train_loader = DataLoader[dtype=dtype](
-        train_dataset^,
-        batch_size=32,
-        reshuffle=True,
-        drop_last=False
+        train_dataset^, batch_size=32, reshuffle=True, drop_last=False
     )
 
     var val_dataset = TensorDataset(X_val, y_val)
-    var val_loader = DataLoader[dtype=DType.float64](
-        val_dataset^,
-        batch_size=64,
-        reshuffle=False
+    var val_loader = DataLoader[dtype = DType.float64](
+        val_dataset^, batch_size=64, reshuffle=False
     )
 
     # Same model that worked - FIXED: Enable Xavier initialization
     var model = Sequential[DType.float64]()
     model.append(
-        Linear[DType.float64](2, 64, xavier=False).into(),        # ✅ Disable Xavier
+        Linear[DType.float64](2, 64, xavier=False).into(),  # ✅ Disable Xavier
         ReLU[DType.float64]().into(),
-        Linear[DType.float64](64, 32, xavier=False).into(),       # ✅ Disable Xavier
+        Linear[DType.float64](64, 32, xavier=False).into(),  # ✅ Disable Xavier
         ReLU[DType.float64]().into(),
-        Linear[DType.float64](32, 16, xavier=False).into(),       # ✅ Disable Xavier
+        Linear[DType.float64](32, 16, xavier=False).into(),  # ✅ Disable Xavier
         ReLU[DType.float64]().into(),
-        Linear[DType.float64](16, 1, xavier=False).into(),        # ✅ Disable Xavier
-        Sigmoid[DType.float64]().into()
+        Linear[DType.float64](16, 1, xavier=False).into(),  # ✅ Disable Xavier
+        Sigmoid[DType.float64]().into(),
     )
 
     var optimizer = SGD[dtype=dtype](model.parameters(), lr=0.05, momentum=0.1)
@@ -1116,7 +1187,7 @@ fn train_with_batches_good_absent_validation_loss():
 
     # Train with batches
     for epoch in range(num_epochs):
-        #var epoch_start = perf_counter_ns()
+        # var epoch_start = perf_counter_ns()
         model.train()
 
         var epoch_train_loss = 0.0
@@ -1124,8 +1195,7 @@ fn train_with_batches_good_absent_validation_loss():
         var epoch_correct = 0
 
         for train_batch in train_loader:
-
-            #var batch_start = perf_counter_ns()
+            # var batch_start = perf_counter_ns()
             var train_pred = model(train_batch.features)
 
             # ✅ FIXED: Use train_pred instead of undefined 'pred'
@@ -1135,17 +1205,19 @@ fn train_with_batches_good_absent_validation_loss():
             train_loss.backward()
             optimizer.step()
 
-            epoch_train_loss += train_loss.item() * train_batch.batch_size  # ✅ Scale by batch size
+            epoch_train_loss += (
+                train_loss.item() * train_batch.batch_size
+            )  # ✅ Scale by batch size
             var batch_correct, _ = accuracy(train_pred, train_batch.labels)
             epoch_correct += batch_correct
             epoch_train_size += train_batch.batch_size
 
-            #var batch_end = perf_counter_ns()
-            #print("One batch of size:", train_batch.batch_size,  "took: ", (batch_end - batch_start) / 1e9, "secs")
+            # var batch_end = perf_counter_ns()
+            # print("One batch of size:", train_batch.batch_size,  "took: ", (batch_end - batch_start) / 1e9, "secs")
 
         # ==================== Validation Phase ====================
         model.eval()
-        #var epoch_val_loss = 0.0  # ✅ Added validation loss tracking
+        # var epoch_val_loss = 0.0  # ✅ Added validation loss tracking
         var epoch_val_correct = 0
         var epoch_val_total = 0
 
@@ -1153,8 +1225,8 @@ fn train_with_batches_good_absent_validation_loss():
             var val_pred = model(val_batch.features)
 
             # ✅ Added validation loss calculation
-            #var val_loss = val_pred.binary_cross_entropy(val_batch.labels)
-            #epoch_val_loss += val_loss.item() * val_batch.batch_size
+            # var val_loss = val_pred.binary_cross_entropy(val_batch.labels)
+            # epoch_val_loss += val_loss.item() * val_batch.batch_size
 
             var val_correct, _ = accuracy(val_pred, val_batch.labels)
             epoch_val_correct += val_correct
@@ -1162,25 +1234,41 @@ fn train_with_batches_good_absent_validation_loss():
 
         if epoch % 1000 == 0:
             # Calculate training metrics for this epoch
-            var avg_train_loss = epoch_train_loss / epoch_train_size  # ✅ Fixed variable name
+            var avg_train_loss = (
+                epoch_train_loss / epoch_train_size
+            )  # ✅ Fixed variable name
             var train_accuracy = 100.0 * epoch_correct / epoch_train_size
             var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
-            #var avg_val_loss = epoch_val_loss / epoch_val_total  # ✅ Added avg validation loss
+            # var avg_val_loss = epoch_val_loss / epoch_val_total  # ✅ Added avg validation loss
 
-            print("Epoch", epoch,
-                  "Train Loss:", avg_train_loss,
-                  "Train Acc:", train_accuracy, "%",
-                  #"Val Loss:", avg_val_loss,  # ✅ Report validation loss too
-                  "Val Acc:", val_accuracy, "%")
+            print(
+                "Epoch",
+                epoch,
+                "Train Loss:",
+                avg_train_loss,
+                "Train Acc:",
+                train_accuracy,
+                "%",
+                # "Val Loss:", avg_val_loss,  # ✅ Report validation loss too
+                "Val Acc:",
+                val_accuracy,
+                "%",
+            )
 
-
-        #var epoch_end = perf_counter_ns()
-        #print("One epoch took: ", (epoch_end - epoch_start) / (1e9 * 60), "mins")
+        # var epoch_end = perf_counter_ns()
+        # print("One epoch took: ", (epoch_end - epoch_start) / (1e9 * 60), "mins")
 
     var end_training = perf_counter_ns()
-    print("Whole training loop took: ", (end_training - start_training) / (1e9 * 60), "mins")
+    print(
+        "Whole training loop took: ",
+        (end_training - start_training) / (1e9 * 60),
+        "mins",
+    )
 
-fn accuracy[dtype: DType](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[Int, Int]:
+
+fn accuracy[
+    dtype: DType
+](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[Int, Int]:
     var correct = 0
     var total = pred.shape()[0]
 
@@ -1191,7 +1279,10 @@ fn accuracy[dtype: DType](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[I
             correct += 1
     return correct, total
 
-fn compute_accuracy[dtype: DType, //](pred: Tensor[dtype], target: Tensor[dtype]) -> Float64:
+
+fn compute_accuracy[
+    dtype: DType, //
+](pred: Tensor[dtype], target: Tensor[dtype]) -> Float64:
     var correct = 0
     var total = pred.shape()[0]
 
@@ -1204,7 +1295,6 @@ fn compute_accuracy[dtype: DType, //](pred: Tensor[dtype], target: Tensor[dtype]
     return Float64(correct) / Float64(total) * 100.0
 
 
-
 fn train_with_batches():
     var (X_train, y_train) = generate_spiral_data(500, 2.0, 0.01)
     var (X_val, y_val) = generate_spiral_data(250, 2.0, 0.01)
@@ -1213,17 +1303,12 @@ fn train_with_batches():
     # DataLoader with batching
     var train_dataset = TensorDataset[dtype](X_train, y_train)
     var train_loader = DataLoader[dtype=dtype](
-        train_dataset^,
-        batch_size=32,
-        reshuffle=True,
-        drop_last=False
+        train_dataset^, batch_size=32, reshuffle=True, drop_last=False
     )
 
     var val_dataset = TensorDataset(X_val, y_val)
     var val_loader = DataLoader[dtype=dtype](
-        val_dataset^,
-        batch_size=64,
-        reshuffle=False
+        val_dataset^, batch_size=64, reshuffle=False
     )
 
     # Model
@@ -1236,7 +1321,7 @@ fn train_with_batches():
         Linear[dtype](32, 16, xavier=False).into(),
         ReLU[dtype]().into(),
         Linear[dtype](16, 1, xavier=False).into(),
-        Sigmoid[dtype]().into()
+        Sigmoid[dtype]().into(),
     )
 
     # Loss criterion with train/eval mode
@@ -1279,7 +1364,9 @@ fn train_with_batches():
 
         for val_batch in val_loader:
             var val_pred = model(val_batch.features)  # No graph built
-            var val_loss = criterion(val_pred, val_batch.labels)  # No graph built
+            var val_loss = criterion(
+                val_pred, val_batch.labels
+            )  # No graph built
 
             epoch_val_loss += val_loss.item() * val_batch.batch_size
 
@@ -1294,14 +1381,27 @@ fn train_with_batches():
             var avg_val_loss = epoch_val_loss / epoch_val_total
             var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
 
-            print("Epoch", epoch,
-                  "| Train Loss:", avg_train_loss,
-                  "Train Acc:", train_accuracy, "%",
-                  "| Val Loss:", avg_val_loss,
-                  "Val Acc:", val_accuracy, "%")
+            print(
+                "Epoch",
+                epoch,
+                "| Train Loss:",
+                avg_train_loss,
+                "Train Acc:",
+                train_accuracy,
+                "%",
+                "| Val Loss:",
+                avg_val_loss,
+                "Val Acc:",
+                val_accuracy,
+                "%",
+            )
 
     var end_training = perf_counter_ns()
-    print("\nTraining completed in:", (end_training - start_training) / (1e9 * 60), "mins")
+    print(
+        "\nTraining completed in:",
+        (end_training - start_training) / (1e9 * 60),
+        "mins",
+    )
 
     # Final evaluation
     model.eval()
@@ -1320,7 +1420,9 @@ fn train_with_batches():
 
     print("\n=== Final Results ===")
     print("Validation Loss:", final_val_loss / final_val_total)
-    print("Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%")
+    print(
+        "Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%"
+    )
 
 
 fn train_deep_spiral():
@@ -1334,14 +1436,12 @@ fn train_deep_spiral():
         train_dataset^,
         batch_size=32,  # Smaller batches for harder problem
         reshuffle=True,
-        drop_last=False
+        drop_last=False,
     )
 
     var val_dataset = TensorDataset(X_val, y_val)
     var val_loader = DataLoader[dtype=dtype](
-        val_dataset^,
-        batch_size=64,
-        reshuffle=False
+        val_dataset^, batch_size=64, reshuffle=False
     )
 
     # DEEPER network (5 hidden layers)
@@ -1356,7 +1456,7 @@ fn train_deep_spiral():
         Linear[dtype](32, 16, xavier=False).into(),
         ReLU[dtype]().into(),
         Linear[dtype](16, 1, xavier=False).into(),
-        Sigmoid[dtype]().into()
+        Sigmoid[dtype]().into(),
     )
 
     # Loss criterion with train/eval mode
@@ -1428,14 +1528,27 @@ fn train_deep_spiral():
             var avg_val_loss = epoch_val_loss / epoch_val_total
             var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
 
-            print("Epoch", epoch,
-                  "| Train Loss:", avg_train_loss,
-                  "Train Acc:", train_accuracy, "%",
-                  "| Val Loss:", avg_val_loss,
-                  "Val Acc:", val_accuracy, "%")
+            print(
+                "Epoch",
+                epoch,
+                "| Train Loss:",
+                avg_train_loss,
+                "Train Acc:",
+                train_accuracy,
+                "%",
+                "| Val Loss:",
+                avg_val_loss,
+                "Val Acc:",
+                val_accuracy,
+                "%",
+            )
 
     var end_training = perf_counter_ns()
-    print("\nTraining completed in:", (end_training - start_training) / (1e9 * 60), "mins")
+    print(
+        "\nTraining completed in:",
+        (end_training - start_training) / (1e9 * 60),
+        "mins",
+    )
 
     # Final evaluation
     model.eval()
@@ -1454,8 +1567,9 @@ fn train_deep_spiral():
 
     print("\n=== Final Results ===")
     print("Validation Loss:", final_val_loss / final_val_total)
-    print("Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%")
-
+    print(
+        "Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%"
+    )
 
 
 fn train_deep_spiral_simple_arch_and_noise_increased():
@@ -1469,14 +1583,12 @@ fn train_deep_spiral_simple_arch_and_noise_increased():
         train_dataset^,
         batch_size=32,  # Smaller batches for harder problem
         reshuffle=True,
-        drop_last=False
+        drop_last=False,
     )
 
     var val_dataset = TensorDataset(X_val, y_val)
     var val_loader = DataLoader[dtype=dtype](
-        val_dataset^,
-        batch_size=64,
-        reshuffle=False
+        val_dataset^, batch_size=64, reshuffle=False
     )
 
     # DEEPER network (5 hidden layers)
@@ -1487,7 +1599,7 @@ fn train_deep_spiral_simple_arch_and_noise_increased():
         Linear[dtype](32, 16, xavier=False).into(),
         ReLU[dtype]().into(),
         Linear[dtype](16, 1, xavier=False).into(),
-        Sigmoid[dtype]().into()
+        Sigmoid[dtype]().into(),
     )
 
     # Loss criterion with train/eval mode
@@ -1559,14 +1671,27 @@ fn train_deep_spiral_simple_arch_and_noise_increased():
             var avg_val_loss = epoch_val_loss / epoch_val_total
             var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
 
-            print("Epoch", epoch,
-                  "| Train Loss:", avg_train_loss,
-                  "Train Acc:", train_accuracy, "%",
-                  "| Val Loss:", avg_val_loss,
-                  "Val Acc:", val_accuracy, "%")
+            print(
+                "Epoch",
+                epoch,
+                "| Train Loss:",
+                avg_train_loss,
+                "Train Acc:",
+                train_accuracy,
+                "%",
+                "| Val Loss:",
+                avg_val_loss,
+                "Val Acc:",
+                val_accuracy,
+                "%",
+            )
 
     var end_training = perf_counter_ns()
-    print("\nTraining completed in:", (end_training - start_training) / (1e9 * 60), "mins")
+    print(
+        "\nTraining completed in:",
+        (end_training - start_training) / (1e9 * 60),
+        "mins",
+    )
 
     # Final evaluation
     model.eval()
@@ -1585,7 +1710,9 @@ fn train_deep_spiral_simple_arch_and_noise_increased():
 
     print("\n=== Final Results ===")
     print("Validation Loss:", final_val_loss / final_val_total)
-    print("Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%")
+    print(
+        "Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%"
+    )
 
 
 fn train_deep_spiral_simple_arch_and_noise_increased_2():
@@ -1599,14 +1726,12 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
         train_dataset^,
         batch_size=64,  # Smaller batches for harder problem
         reshuffle=True,
-        drop_last=False
+        drop_last=False,
     )
 
     var val_dataset = TensorDataset(X_val, y_val)
     var val_loader = DataLoader[dtype=dtype](
-        val_dataset^,
-        batch_size=64,
-        reshuffle=False
+        val_dataset^, batch_size=64, reshuffle=False
     )
 
     # DEEPER network (5 hidden layers)
@@ -1617,7 +1742,7 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
         Linear[dtype](32, 16, xavier=False).into(),
         ReLU[dtype]().into(),
         Linear[dtype](16, 1, xavier=False).into(),
-        Sigmoid[dtype]().into()
+        Sigmoid[dtype]().into(),
     )
 
     # Loss criterion with train/eval mode
@@ -1633,13 +1758,13 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
 
     for epoch in range(num_epochs):
         # LR decay schedule
-        _="""if epoch == 1500:
+        _ = """if epoch == 1500:
             optimizer.set_lr(0.025)
             print("  → Learning rate reduced to 0.025")"""
-        if epoch == 2000:
+        if epoch == 1500:
             optimizer.set_lr(0.001)
             print("  → Learning rate reduced to 0.001")
-        _="""if epoch == 3000:
+        _ = """if epoch == 3000:
             optimizer.set_lr(0.001)
             print("  → Learning rate reduced to 0.001")"""
 
@@ -1689,14 +1814,27 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
             var avg_val_loss = epoch_val_loss / epoch_val_total
             var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
 
-            print("Epoch", epoch,
-                  "| Train Loss:", avg_train_loss,
-                  "Train Acc:", train_accuracy, "%",
-                  "| Val Loss:", avg_val_loss,
-                  "Val Acc:", val_accuracy, "%")
+            print(
+                "Epoch",
+                epoch,
+                "| Train Loss:",
+                avg_train_loss,
+                "Train Acc:",
+                train_accuracy,
+                "%",
+                "| Val Loss:",
+                avg_val_loss,
+                "Val Acc:",
+                val_accuracy,
+                "%",
+            )
 
     var end_training = perf_counter_ns()
-    print("\nTraining completed in:", (end_training - start_training) / (1e9 * 60), "mins")
+    print(
+        "\nTraining completed in:",
+        (end_training - start_training) / (1e9 * 60),
+        "mins",
+    )
 
     # Final evaluation
     model.eval()
@@ -1715,26 +1853,25 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
 
     print("\n=== Final Results ===")
     print("Validation Loss:", final_val_loss / final_val_total)
-    print("Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%")
-
-
+    print(
+        "Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%"
+    )
 
 
 fn main():
-    #test_tiny_overfit()
-    #test_gradients()
-    #test_tiny_overfit_detailed()
-    #train_spiral_simple()
-    #debug_spiral_data()#Good
-    #test_spiral_tiny()# Good
-    #test_spiral_xor_architecture()#Good
+    # test_tiny_overfit()
+    # test_gradients()
+    # test_tiny_overfit_detailed()
+    # train_spiral_simple()
+    # debug_spiral_data()#Good
+    # test_spiral_tiny()# Good
+    # test_spiral_xor_architecture()#Good
 
-    #train_spiral_fixed() #too Good
-    #test_hardest_spiral() # Not yet good
-    #train_with_batches()# Working
-    #train_deep_spiral() #This good too
-    #train_with_batches()
-    #train_spiral_normalized() #No good as it is
-    #train_deep_spiral_simple_arch_and_noise_increased()#very good
+    # train_spiral_fixed() #too Good
+    # test_hardest_spiral() # Not yet good
+    # train_with_batches()# Working
+    # train_deep_spiral() #This good too
+    # train_with_batches()
+    # train_spiral_normalized() #No good as it is
+    # train_deep_spiral_simple_arch_and_noise_increased()#very good
     train_deep_spiral_simple_arch_and_noise_increased_2()
-

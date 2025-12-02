@@ -1,5 +1,6 @@
 from common_utils import panic
 from intarray import IntArray
+
 # ============================================================
 # INTLIST (Simplified - mostly delegates to IntArray)
 # ============================================================
@@ -438,8 +439,6 @@ struct IntList(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
 # ============================================================
 
 
-
-
 @register_passable
 struct Iterator[
     origin: Origin[False],
@@ -546,7 +545,6 @@ struct ZipIterator[
 
 
 fn main():
-
     il = IntList.range_list(4).reversed()
     ia = IntArray.range(0, 4).reversed()
     print(il, ia)

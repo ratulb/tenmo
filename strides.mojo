@@ -1,6 +1,7 @@
 from intarray import IntArray
 from shapes import Shape
 
+
 @register_passable
 struct Strides(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     """Strides for tensor indexing."""

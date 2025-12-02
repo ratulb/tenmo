@@ -2,6 +2,7 @@ from tenmo import Tensor
 from shapes import Shape
 from argminmax import Argmin, Argmax
 
+
 fn main() raises:
     test_tensor_argmax_keepdims()
     print("\n=== Running all Argmin tests ===")
@@ -24,6 +25,7 @@ fn main() raises:
 
 from testing import assert_true
 
+
 fn test_tensor_argmax_keepdims() raises:
     print("test_tensor_argmax_keepdims")
     alias dtype = DType.float32
@@ -41,6 +43,7 @@ fn test_tensor_argmax_keepdims() raises:
 # Argmax Tests
 # ==========================================================
 
+
 fn test_tensor_argmax_1d() raises:
     print("test_tensor_argmax_1d")
     alias dtype = DType.float32
@@ -53,9 +56,9 @@ fn test_tensor_argmax_1d() raises:
 fn test_tensor_argmax_2d_basic() raises:
     print("test_tensor_argmax_2d_basic")
     alias dtype = DType.float32
-    var t = Tensor[dtype].d2([[1.0, 3.0, 2.0],
-                              [4.0, 0.5, 7.0],
-                              [2.5, 5.5, 1.0]])
+    var t = Tensor[dtype].d2(
+        [[1.0, 3.0, 2.0], [4.0, 0.5, 7.0], [2.5, 5.5, 1.0]]
+    )
     var a0 = t.argmax(axis=0)
     var a1 = t.argmax(axis=1)
     assert_true(a0 == Tensor[DType.int32].d1([1, 2, 1]))
@@ -106,6 +109,7 @@ fn test_tensor_argmax_keepdims_true_false_3d() raises:
 # Argmin Tests
 # ==========================================================
 
+
 fn test_tensor_argmin_1d() raises:
     print("test_tensor_argmin_1d")
     alias dtype = DType.float32
@@ -118,9 +122,9 @@ fn test_tensor_argmin_1d() raises:
 fn test_tensor_argmin_2d_basic() raises:
     print("test_tensor_argmin_2d_basic")
     alias dtype = DType.float32
-    var t = Tensor[dtype].d2([[3.0, 1.0, 4.0],
-                              [2.0, 0.5, 6.0],
-                              [7.0, 5.5, 1.0]])
+    var t = Tensor[dtype].d2(
+        [[3.0, 1.0, 4.0], [2.0, 0.5, 6.0], [7.0, 5.5, 1.0]]
+    )
     var a0 = t.argmin(axis=0)
     var a1 = t.argmin(axis=1)
     assert_true(a0 == Tensor[DType.int32].d1([1, 1, 2]))
@@ -131,8 +135,7 @@ fn test_tensor_argmin_2d_basic() raises:
 fn test_tensor_argmin_2d_keepdims() raises:
     print("test_tensor_argmin_2d_keepdims")
     alias dtype = DType.float32
-    var t = Tensor[dtype].d2([[5.0, 2.0, 3.0],
-                              [1.0, 9.0, 0.5]])
+    var t = Tensor[dtype].d2([[5.0, 2.0, 3.0], [1.0, 9.0, 0.5]])
     var a1 = Argmin[dtype].argmin(t, axis=1, keepdims=False)
     var a2 = t.argmin(axis=1, keepdims=True)
     assert_true(a1.shape() == Shape(2))
@@ -166,4 +169,3 @@ fn test_tensor_argmin_keepdims_true_false_3d() raises:
     assert_true(a_no.shape() == Shape(2, 4))
     assert_true(a_yes.shape() == Shape(2, 1, 4))
     print("✓ Passed argmin keepdims true/false shape test")
-

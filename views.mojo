@@ -90,10 +90,10 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
                     for i in range(parent_rank):
                         var stride = parent_strides[i]
                         if stride == 0:
-                            #position[i] = 0  # Broadcast dimension
+                            # position[i] = 0  # Broadcast dimension
                             position.append(0)  # Broadcast dimension
                         else:
-                            #position[i] = remaining // stride
+                            # position[i] = remaining // stride
                             position.append(remaining // stride)
                             if (
                                 position[i] < 0
@@ -169,6 +169,7 @@ struct View[dtype: DType](Copyable):
                 out.add_ancestry(self)
 
         return out^
+
 
 @fieldwise_init
 @register_passable
@@ -249,10 +250,10 @@ struct ViewBackward_orig[dtype: DType](ImplicitlyCopyable):
                     for i in range(parent_rank):
                         var stride = parent_strides[i]
                         if stride == 0:
-                            #position[i] = 0  # Broadcast dimension
+                            # position[i] = 0  # Broadcast dimension
                             position.append(0)  # Broadcast dimension
                         else:
-                            #position[i] = remaining // stride
+                            # position[i] = remaining // stride
                             position.append(remaining // stride)
                             if (
                                 position[i] < 0
@@ -275,7 +276,12 @@ struct ViewBackward_orig[dtype: DType](ImplicitlyCopyable):
                             view_addr += child_coord[i] * view_strides[i]
 
                         # Accumulate gradient
-                        print("parent_addr: ", parent_addr, "view_addr: ", view_addr)
+                        print(
+                            "parent_addr: ",
+                            parent_addr,
+                            "view_addr: ",
+                            view_addr,
+                        )
                         parent_grad_data[parent_addr] += view_data[view_addr]
         print("\nparent's gradbox\n")
         parent_gradbox.print()

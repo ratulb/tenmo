@@ -41,7 +41,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             var grad_out_offset = grad_out.offset()
             var grad_out_data = grad_out.buffer.buffer.data
 
-            #var B_tensor = B.tensor()
+            # var B_tensor = B.tensor()
             ref B_tensor = B.tensor()
             var B_stride0 = B_tensor.buffer.strides[0]
             var B_stride1 = B_tensor.buffer.strides[1]

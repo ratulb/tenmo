@@ -33,7 +33,6 @@ fn test_empty_shape_broadcastable() raises:
     )
 
 
-
 fn test_broadcast_shape() raises:
     print("test_broadcast_shape")
     shape1 = Shape.of(32, 16)
@@ -63,7 +62,6 @@ fn test_broadcast_shape() raises:
         result == Shape.of(4, 16, 32, 64), "Shape broadcast 3 assertion failed"
     )
 
-
     shape1 = Shape.of(1)
     shape2 = Shape.of(
         3,
@@ -76,7 +74,6 @@ fn test_broadcast_shape() raises:
     assert_true(
         result == Shape.of(4, 2, 5), "Shape broadcast 5 assertion failed"
     )
-
 
 
 fn test_broadcastable() raises:
@@ -100,11 +97,9 @@ fn test_broadcastable() raises:
     tensor1 = Tensor.of(1, 2, 3, 4, 5)
     tensor2 = Tensor.of(6)
     assert_true(
-        tensor1.broadcastable(tensor2)
-        and tensor2.broadcastable(tensor1),
+        tensor1.broadcastable(tensor2) and tensor2.broadcastable(tensor1),
         "Tensor shape broadcastable assertion failed",
     )
-
 
 
 fn test_pad_shapes() raises:
@@ -141,7 +136,6 @@ fn test_pad_shapes() raises:
         padded1 == shape1 and padded2 == shape2,
         "Padding of shapes (3,4,5,2 ) and (3,4,5,2) assertion failed",
     )
-
 
 
 fn main() raises:

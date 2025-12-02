@@ -28,6 +28,7 @@ fn test_tensor_permute_basic() raises:
     assert_true(p.strides()[1] == t1.strides()[0])
     print("✓ Passed basic permute test")
 
+
 fn test_tensor_permute_3d_axes() raises:
     alias dtype = DType.float32
     print("Running test_tensor_permute_3d_axes")
@@ -36,6 +37,7 @@ fn test_tensor_permute_3d_axes() raises:
     assert_true(p.shape() == Shape(5, 3, 4))
     assert_true(p.rank() == 3)
     print("✓ Passed 3D permutation")
+
 
 fn test_tensor_permute_inverse() raises:
     alias dtype = DType.float32
@@ -56,12 +58,11 @@ fn test_tensor_permute_grad_sum_2d() raises:
     var p = Permute[dtype].forward(t, IntArray([1, 0]))
     # p.sum() should produce gradient of ones when backpropagated
     p.sum().backward()
-    var expected = Tensor.d2([ [1.0, 1.0, 1.0, 1.0],
-                               [1.0, 1.0, 1.0, 1.0],
-                               [1.0, 1.0, 1.0, 1.0] ]).to_dtype[dtype]()
+    var expected = Tensor.d2(
+        [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]]
+    ).to_dtype[dtype]()
     assert_true(t.grad().all_close(expected))
     print("✓ Passed test_tensor_permute_grad_sum_2d")
-
 
 
 fn test_tensor_permute_grad_inverse_chain() raises:
@@ -72,22 +73,26 @@ fn test_tensor_permute_grad_inverse_chain() raises:
     # Apply a permutation and then its inverse (should return original layout)
     var p = Permute[dtype].forward(t, IntArray([1, 2, 0]))
     # inverse of [1,2,0] is [2,0,1] (since inverse[ permutation[i] ] = i)
-    var r = Permute[dtype].forward(p, IntArray([2, 0, 1]))  # r should match t's layout
+    var r = Permute[dtype].forward(
+        p, IntArray([2, 0, 1])
+    )  # r should match t's layout
     r.sum().backward()
     var expected = Tensor.d3(
-        [[[1.0,1.0,1.0,1.0],
-          [1.0,1.0,1.0,1.0],
-          [1.0,1.0,1.0,1.0]],
-         [[1.0,1.0,1.0,1.0],
-          [1.0,1.0,1.0,1.0],
-          [1.0,1.0,1.0,1.0]]]).to_dtype[dtype]()
+        [
+            [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]],
+            [[1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]],
+        ]
+    ).to_dtype[dtype]()
     assert_true(t.grad().all_close(expected))
     print("✓ Passed test_tensor_permute_grad_inverse_chain")
 
 
 fn test_tensor_permute_grad_partial_ops() raises:
     print("test_tensor_permute_grad_partial_ops")
-    print("This test checks a permute followed by a partial reduction along permuted axes")
+    print(
+        "This test checks a permute followed by a partial reduction along"
+        " permuted axes"
+    )
     alias dtype = DType.float32
     var t = Tensor[dtype].arange(0, 60, requires_grad=True)
     var r = t.reshape(Shape(3, 4, 5))
@@ -112,19 +117,26 @@ fn test_tensor_permute_grad_scaled_sum_3d() raises:
     q.sum().backward()
     # corrected expected shape (3, 4, 5)
     var expected = Tensor.d3(
-        [[[2.0, 2.0, 2.0, 2.0, 2.0],
-          [2.0, 2.0, 2.0, 2.0, 2.0],
-          [2.0, 2.0, 2.0, 2.0, 2.0],
-          [2.0, 2.0, 2.0, 2.0, 2.0]],
-         [[2.0, 2.0, 2.0, 2.0, 2.0],
-          [2.0, 2.0, 2.0, 2.0, 2.0],
-          [2.0, 2.0, 2.0, 2.0, 2.0],
-          [2.0, 2.0, 2.0, 2.0, 2.0]],
-         [[2.0, 2.0, 2.0, 2.0, 2.0],
-          [2.0, 2.0, 2.0, 2.0, 2.0],
-          [2.0, 2.0, 2.0, 2.0, 2.0],
-          [2.0, 2.0, 2.0, 2.0, 2.0]]]
+        [
+            [
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+            ],
+            [
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+            ],
+            [
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+                [2.0, 2.0, 2.0, 2.0, 2.0],
+            ],
+        ]
     ).to_dtype[dtype]()
     assert_true(t.grad().all_close(expected))
     print("✓ Passed test_tensor_permute_grad_scaled_sum_3d")
-
