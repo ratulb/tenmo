@@ -8,7 +8,7 @@ from backpropagation import BackwardFn
 from operators import AddTensor, SubtractTensor
 from collections import Deque
 from gradbox import Gradbox
-from time import perf_counter_ns, monotonic
+from time import perf_counter_ns as now, monotonic
 
 
 struct IDGen:
@@ -16,7 +16,7 @@ struct IDGen:
     @staticmethod
     fn generate_id() -> Int:
         # Use both perf_counter and monotonic for additional entropy
-        perf_time = perf_counter_ns()
+        perf_time = now()
         mono_time = monotonic()
 
         # Combine them in a way that preserves uniqueness
@@ -237,50 +237,13 @@ struct Ancestor[dtype: DType](
         var seed_tensor = Tensor[dtype].full(shape, start_grad)
         output.backward(seed_tensor)
 
-    fn backward_orig(mut self, seed_tensor: Tensor[dtype]):
-        """
-        Optimized backward with topology reuse and fresh data.
-
-        First call: Builds topology structure (expensive, once only)
-        Subsequent calls: Reuses topology, refreshes node registry (cheap)
-        """
-        try:
-            if not self.requires_grad():
-                return
-
-            # Seed the gradient for this output node
-            self.seed_grad(seed_tensor)
-
-            # Build topology structure on FIRST backward pass only
-            if not self._graph:
-                print("[Ancestor] First backward - building topology")
-                var computation_graph = ComputationGraph[dtype]()
-                computation_graph.build_topology(self)
-                self._graph = Optional(computation_graph^)
-            else:
-                print("[Ancestor] Reusing topology from previous backward")
-
-            var computation_graph = self._graph.take()
-
-            # Refresh node registry with CURRENT tensor data
-            computation_graph.refresh_node_registry(self)
-
-            # Execute backward using reused topology + fresh data
-            computation_graph.execute_backward(self.id())
-            # Put it back
-            self._graph = Optional(computation_graph^)
-
-        except e:
-            print(e)
-            panic(e.__str__())
-
     fn backward(mut self, seed_tensor: Tensor[dtype]):
         if not self.requires_grad():
             return
 
-        var t_start = perf_counter_ns()
+        var t_start = now()
         self.seed_grad(seed_tensor)
-        var t_seed = perf_counter_ns()
+        var t_seed = now()
         log_debug(
             "[Backward] Seed grad: "
             + ((t_seed - t_start) / 1e6).__str__()
@@ -288,12 +251,12 @@ struct Ancestor[dtype: DType](
         )
 
         if not self._graph:
-            var t_build_start = perf_counter_ns()
+            var t_build_start = now()
             var computation_graph = ComputationGraph[dtype]()
             computation_graph.build_topology(self)
             self._graph = Optional(computation_graph^)
-            var t_build_end = perf_counter_ns()
-            log_debug(
+            var t_build_end = now()
+            print(
                 "[Backward] Build topology: "
                 + ((t_build_end - t_build_start) / 1e6).__str__()
                 + " ms"
@@ -303,22 +266,22 @@ struct Ancestor[dtype: DType](
 
         var computation_graph = self._graph.take()
 
-        var t_refresh_start = perf_counter_ns()
+        var t_refresh_start = now()
         computation_graph.refresh_node_registry(self)
-        var t_refresh_end = perf_counter_ns()
-        log_debug(
+        var t_refresh_end = now()
+        print(
             "[Backward] Refresh registry: "
             + ((t_refresh_end - t_refresh_start) / 1e6).__str__()
             + " ms"
         )
 
-        var t_exec_start = perf_counter_ns()
+        var t_exec_start = now()
         try:
             computation_graph.execute_backward(self.id())
         except e:
             panic(e.__str__())
-        var t_exec_end = perf_counter_ns()
-        log_debug(
+        var t_exec_end = now()
+        print(
             "[Backward] Execute backward: "
             + ((t_exec_end - t_exec_start) / 1e6).__str__()
             + " ms"
@@ -326,8 +289,8 @@ struct Ancestor[dtype: DType](
 
         self._graph = Optional(computation_graph^)
 
-        var t_total = perf_counter_ns()
-        log_debug(
+        var t_total = now()
+        print(
             "[Backward] Total: " + ((t_total - t_start) / 1e6).__str__() + " ms"
         )
 
@@ -353,7 +316,74 @@ struct ComputationGraph[dtype: DType](Copyable & Movable):
         self.node_registry = Dict[Int, Ancestor[dtype]]()
         self.has_topology_been_built = False
 
+
     fn build_topology(mut self, output: Ancestor[dtype]):
+        """Build graph topology ONCE - called only on first backward."""
+        if self.has_topology_been_built:
+            return
+
+        log_debug("[ComputationGraph] Building topology structure (once)...")
+
+        # ----------------------------
+        # Phase 1: Graph tracing (DFS)
+        # ----------------------------
+        var visited = Dict[Int, Bool]()  # ← Changed from IntArray
+        var collected_nodes = List[Ancestor[dtype]]()
+        var parent_fanin_counts = Dict[Int, Int]()
+
+        var dfs_stack = List[Ancestor[dtype]]()
+        dfs_stack.append(output.copy())
+
+        while len(dfs_stack) > 0:
+            var current_node = dfs_stack.pop()
+            var current_node_id = current_node.id()
+
+            if current_node_id in visited:  # ← O(1) lookup now
+                continue
+
+            visited[current_node_id] = True  # ← Mark visited
+            collected_nodes.append(current_node.copy())
+
+            # Count parent fan-in and traverse upwards
+            if current_node.has_ancestry():
+                for parent in current_node.ancestry():
+                    var parent_node_id = parent.id()
+                    parent_fanin_counts[parent_node_id] = (
+                        parent_fanin_counts.get(parent_node_id, 0) + 1
+                    )
+                    dfs_stack.append(parent.copy())
+
+        # ----------------------------
+        # Phase 2: Store topology order
+        # ----------------------------
+        # Extract node IDs from collected_nodes instead of visited dict
+        self.topo_order_node_ids = List[Int](capacity=len(collected_nodes))
+        for i in range(len(collected_nodes)):
+            self.topo_order_node_ids.append(collected_nodes[i].id())  # ← Use collected_nodes
+
+        # ----------------------------
+        # Phase 3: Store initial fan-in template
+        # ----------------------------
+        self.initial_fanin_template = List[Int](capacity=len(collected_nodes))
+        for i in range(len(collected_nodes)):
+            var node_id = collected_nodes[i].id()  # ← Use collected_nodes
+            var fanin_value = parent_fanin_counts.get(node_id, 0)
+            self.initial_fanin_template.append(fanin_value)
+
+        # ----------------------------
+        # Phase 4: Build lookup: node_id → topo index
+        # ----------------------------
+        for i in range(len(self.topo_order_node_ids)):
+            self.node_id_to_topo_index[self.topo_order_node_ids[i]] = i
+
+        self.has_topology_been_built = True
+        log_debug(
+            "[ComputationGraph] Topology built with "
+            + len(self.topo_order_node_ids).__str__()
+            + " nodes (reusable)"
+        )
+
+    fn build_topology_orig(mut self, output: Ancestor[dtype]):
         """Build graph topology ONCE - called only on first backward."""
         if self.has_topology_been_built:
             return  # Already built, skip
@@ -363,7 +393,7 @@ struct ComputationGraph[dtype: DType](Copyable & Movable):
         # ----------------------------
         # Phase 1: Graph tracing (DFS)
         # ----------------------------
-        var visited_node_ids = IntArray()
+        var visited_node_ids = Set[Int]()
         var collected_nodes = List[Ancestor[dtype]]()
         var parent_fanin_counts = Dict[Int, Int]()
 
@@ -377,7 +407,7 @@ struct ComputationGraph[dtype: DType](Copyable & Movable):
             if current_node_id in visited_node_ids:
                 continue
 
-            visited_node_ids.append(current_node_id)
+            visited_node_ids.add(current_node_id)
             collected_nodes.append(current_node.copy())
 
             # Count parent fan-in and traverse upwards
