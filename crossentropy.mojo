@@ -3,7 +3,7 @@ from shapes import Shape
 from common_utils import panic
 from math import log, exp
 from subtraction import Subtractor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_CROSS_ENTROPY
 from operators import AddTensor
 from buffers import Buffer
 from gradbox import Gradbox
@@ -383,6 +383,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32, track_grad: Bool = True](
 struct CrossEntropyBackward[dtype: DType](
     Copyable & Movable & ImplicitlyCopyable
 ):
+    alias TAG = BACKWARD_CROSS_ENTROPY
     var reduction: Reduction
     var ignore_index: Int
     var label_smoothing: Scalar[dtype]
@@ -413,7 +414,7 @@ struct CrossEntropyBackward[dtype: DType](
         self.original_target = existing.original_target^
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from operators import AddTensor
 from shapes import Shape
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_MINMAX
 from common_utils import panic
 from validators import Validator
 from utils.numerics import min_finite, max_finite
@@ -17,6 +17,7 @@ alias Gradbag[dtype: DType] = List[Tuple[IntArray, Scalar[dtype]]]
 struct MinMaxBackward[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
+    alias TAG = BACKWARD_MINMAX
     var axes: IntArray
     var keepdims: Bool
     var gradbag: Gradbag[dtype]
@@ -32,7 +33,7 @@ struct MinMaxBackward[dtype: DType = DType.float32](
         self.gradbag = other.gradbag^
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

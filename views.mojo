@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
 from strides import Strides
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_VIEW
 from operators import AddTensor, ZeroGrad
 from validators import Validator
 from ancestry import Ancestor
@@ -14,12 +14,13 @@ from sys import simd_width_of
 @fieldwise_init
 @register_passable
 struct ViewBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_VIEW
     var shape: Shape
     var strides: Strides
     var offset: Int
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward[
         simdwidth: Int = simd_width_of[dtype]()

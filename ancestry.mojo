@@ -6,7 +6,7 @@ from intarray import IntArray
 from strides import Strides
 from backpropagation import BackwardFn
 from operators import AddTensor, SubtractTensor
-from collections import Deque
+from collections import Deque, Set
 from gradbox import Gradbox
 from time import perf_counter_ns as now, monotonic
 
@@ -25,30 +25,21 @@ struct IDGen:
 
 
 fn main() raises:
-    _ = """alias dtype = DType.float32
-    var W = Tensor[dtype].rand(Shape([20, 30]), requires_grad=True)
-    var graph: Optional[ComputationGraph[dtype]] = None
+    pass
 
-    for epoch in range(100):
-        # Forward pass
-        var x = Tensor[dtype].rand([30, 30])
-        var y = x.matmul(W)
-        var loss = y.sum()
+@fieldwise_init
+struct Parents[dtype: DType](Sized & Copyable & Movable):
+    var parents: List[Tensor[dtype]]
 
-        # Backward pass
-        if not graph:
-            # First iteration - build graph
-            graph = Optional(loss.backward_graph())
-        else:
-            # Subsequent iterations - reuse graph
-            loss.seed_grad(Tensor[dtype].ones(loss.shape()))
-            graph.value().execute_backward(loss.id())
+    fn __len__(self) -> Int:
+        return len(self.parents)
 
-        # Update weights
-        W -= W.grad() * 0.01
+    fn __init__(out self):
+        self.parents = List[Tensor[dtype]]()
 
-        # Zero gradients
-        graph.value().zero_grads()"""
+    fn get(self, idx: Int) -> Tensor[dtype]:
+        return self.parents[idx]
+
 
 
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
@@ -127,25 +118,18 @@ struct Ancestor[dtype: DType](
 ):
     var _tensor: Tensor[dtype]
     var _id: Int
-    var _graph: Optional[
-        ComputationGraph[dtype]
-    ]  # Persistent graph with topology
 
     fn __init__(out self, tensor: Tensor[dtype]):
         self._tensor = tensor.copy()
         self._id = IDGen.generate_id()
-        self._graph = None  # Graph not built yet
 
     fn __copyinit__(out self, other: Self):
         self._id = other._id
         self._tensor = other._tensor.copy()
-        # Don't copy graph - each Ancestor manages its own graph
-        self._graph = None
 
     fn __moveinit__(out self, deinit existing: Self):
         self._id = existing._id
         self._tensor = existing._tensor^
-        self._graph = existing._graph^
 
     @always_inline
     fn tensor(ref self) -> ref [self._tensor] Tensor[dtype]:
@@ -218,17 +202,84 @@ struct Ancestor[dtype: DType](
     fn seed_grad(mut self, with_tensor: Tensor[dtype]):
         self._tensor.seed_grad(with_tensor)
 
-    fn update_grad[opcode: Int](mut self, incoming: Gradbox[dtype]):
+    fn update_grad[opcode: Int](self, incoming: Gradbox[dtype]):
         self._tensor.update_grad[opcode](incoming)
 
     fn init_grad(mut self):
         self._tensor.init_gradbox()
 
-    fn reset_graph(mut self):
-        """Reset graph - call when computation graph structure changes."""
-        if self._graph:
-            self._graph.value().reset()
-            self._graph = None
+    # fn backward_optimized(mut output, seed_tensor: Tensor[dtype]):
+    fn backward(mut output, seed_tensor: Tensor[dtype]):
+        if not output.requires_grad():
+            return
+
+        output.seed_grad(seed_tensor)
+
+        try:
+            # Phase 1: Lightweight topology discovery
+
+            var visited = Set[Int]()
+            var topo_ids = List[Int]()
+            var fanin = Dict[Int, Int]()
+            var id_to_node = Dict[Int, Ancestor[dtype]]()
+
+            # Use ID-based DFS to avoid copying in stack
+            var dfs_stack = List[Int]()
+            dfs_stack.append(output.id())
+            id_to_node[output.id()] = output.copy()  # Copy ONCE
+
+            while len(dfs_stack) > 0:
+                var node_id = dfs_stack.pop()
+
+                if node_id in visited:
+                    continue
+
+                visited.add(node_id)
+                topo_ids.append(node_id)
+
+                ref node = id_to_node[node_id]
+                if node.has_ancestry():
+                    for parent in node.ancestry():
+                        var parent_id = parent.id()
+                        fanin[parent_id] = fanin.get(parent_id, 0) + 1
+
+                        if parent_id not in id_to_node:
+                            id_to_node[parent_id] = parent.copy()  # Copy ONCE
+                            dfs_stack.append(parent_id)
+
+            var ready_queue = Deque[Int]()  # Store IDs, not Ancestors!
+            ready_queue.append(output.id())
+
+            while len(ready_queue) > 0:
+                var node_id = ready_queue.popleft()  # Just an Int
+                ref node = id_to_node[node_id]  # Reference to stored copy
+
+                if node.has_backward_fn():
+                    # Execute backward - this is the expensive part
+                    for result in node.backward_fn()(node.tensor()):
+                        var target_node = result[0].copy()
+                        var grad = result[1].copy()
+                        var op_code = result[2]
+
+                        var target_id = target_node.id()
+
+                        # Update gradient
+                        if target_id in id_to_node:
+                            ref target = id_to_node[target_id]
+                            if op_code == AddTensor:
+                                target.update_grad[AddTensor](grad^)
+                            else:
+                                target.update_grad[SubtractTensor](grad^)
+
+                        # Schedule when ready
+                        if target_id in fanin:
+                            fanin[target_id] -= 1
+                            if fanin[target_id] == 0:
+                                if id_to_node[target_id].has_backward_fn():
+                                    ready_queue.append(target_id)
+
+        except e:
+            print(e)
 
     fn backward(mut output: Ancestor[dtype], start_grad: Scalar[dtype] = 1.0):
         if not output.requires_grad():
@@ -237,329 +288,4 @@ struct Ancestor[dtype: DType](
         var seed_tensor = Tensor[dtype].full(shape, start_grad)
         output.backward(seed_tensor)
 
-    fn backward(mut self, seed_tensor: Tensor[dtype]):
-        if not self.requires_grad():
-            return
 
-        var t_start = now()
-        self.seed_grad(seed_tensor)
-        var t_seed = now()
-        log_debug(
-            "[Backward] Seed grad: "
-            + ((t_seed - t_start) / 1e6).__str__()
-            + " ms"
-        )
-
-        if not self._graph:
-            var t_build_start = now()
-            var computation_graph = ComputationGraph[dtype]()
-            computation_graph.build_topology(self)
-            self._graph = Optional(computation_graph^)
-            var t_build_end = now()
-            print(
-                "[Backward] Build topology: "
-                + ((t_build_end - t_build_start) / 1e6).__str__()
-                + " ms"
-            )
-        else:
-            log_debug("[Backward] Reusing existing topology")
-
-        var computation_graph = self._graph.take()
-
-        var t_refresh_start = now()
-        computation_graph.refresh_node_registry(self)
-        var t_refresh_end = now()
-        print(
-            "[Backward] Refresh registry: "
-            + ((t_refresh_end - t_refresh_start) / 1e6).__str__()
-            + " ms"
-        )
-
-        var t_exec_start = now()
-        try:
-            computation_graph.execute_backward(self.id())
-        except e:
-            panic(e.__str__())
-        var t_exec_end = now()
-        print(
-            "[Backward] Execute backward: "
-            + ((t_exec_end - t_exec_start) / 1e6).__str__()
-            + " ms"
-        )
-
-        self._graph = Optional(computation_graph^)
-
-        var t_total = now()
-        print(
-            "[Backward] Total: " + ((t_total - t_start) / 1e6).__str__() + " ms"
-        )
-
-
-struct ComputationGraph[dtype: DType](Copyable & Movable):
-    """Persistent graph structure - topology built once, registry refreshed each backward.
-    """
-
-    # REUSED: Built once, reused forever
-    var topo_order_node_ids: List[Int]
-    var initial_fanin_template: List[Int]
-    var node_id_to_topo_index: Dict[Int, Int]
-
-    # REFRESHED: Rebuilt each backward with current tensor data
-    var node_registry: Dict[Int, Ancestor[dtype]]
-
-    var has_topology_been_built: Bool
-
-    fn __init__(out self):
-        self.topo_order_node_ids = List[Int]()
-        self.initial_fanin_template = List[Int]()
-        self.node_id_to_topo_index = Dict[Int, Int]()
-        self.node_registry = Dict[Int, Ancestor[dtype]]()
-        self.has_topology_been_built = False
-
-
-    fn build_topology(mut self, output: Ancestor[dtype]):
-        """Build graph topology ONCE - called only on first backward."""
-        if self.has_topology_been_built:
-            return
-
-        log_debug("[ComputationGraph] Building topology structure (once)...")
-
-        # ----------------------------
-        # Phase 1: Graph tracing (DFS)
-        # ----------------------------
-        var visited = Dict[Int, Bool]()  # ← Changed from IntArray
-        var collected_nodes = List[Ancestor[dtype]]()
-        var parent_fanin_counts = Dict[Int, Int]()
-
-        var dfs_stack = List[Ancestor[dtype]]()
-        dfs_stack.append(output.copy())
-
-        while len(dfs_stack) > 0:
-            var current_node = dfs_stack.pop()
-            var current_node_id = current_node.id()
-
-            if current_node_id in visited:  # ← O(1) lookup now
-                continue
-
-            visited[current_node_id] = True  # ← Mark visited
-            collected_nodes.append(current_node.copy())
-
-            # Count parent fan-in and traverse upwards
-            if current_node.has_ancestry():
-                for parent in current_node.ancestry():
-                    var parent_node_id = parent.id()
-                    parent_fanin_counts[parent_node_id] = (
-                        parent_fanin_counts.get(parent_node_id, 0) + 1
-                    )
-                    dfs_stack.append(parent.copy())
-
-        # ----------------------------
-        # Phase 2: Store topology order
-        # ----------------------------
-        # Extract node IDs from collected_nodes instead of visited dict
-        self.topo_order_node_ids = List[Int](capacity=len(collected_nodes))
-        for i in range(len(collected_nodes)):
-            self.topo_order_node_ids.append(collected_nodes[i].id())  # ← Use collected_nodes
-
-        # ----------------------------
-        # Phase 3: Store initial fan-in template
-        # ----------------------------
-        self.initial_fanin_template = List[Int](capacity=len(collected_nodes))
-        for i in range(len(collected_nodes)):
-            var node_id = collected_nodes[i].id()  # ← Use collected_nodes
-            var fanin_value = parent_fanin_counts.get(node_id, 0)
-            self.initial_fanin_template.append(fanin_value)
-
-        # ----------------------------
-        # Phase 4: Build lookup: node_id → topo index
-        # ----------------------------
-        for i in range(len(self.topo_order_node_ids)):
-            self.node_id_to_topo_index[self.topo_order_node_ids[i]] = i
-
-        self.has_topology_been_built = True
-        log_debug(
-            "[ComputationGraph] Topology built with "
-            + len(self.topo_order_node_ids).__str__()
-            + " nodes (reusable)"
-        )
-
-    fn build_topology_orig(mut self, output: Ancestor[dtype]):
-        """Build graph topology ONCE - called only on first backward."""
-        if self.has_topology_been_built:
-            return  # Already built, skip
-
-        log_debug("[ComputationGraph] Building topology structure (once)...")
-
-        # ----------------------------
-        # Phase 1: Graph tracing (DFS)
-        # ----------------------------
-        var visited_node_ids = Set[Int]()
-        var collected_nodes = List[Ancestor[dtype]]()
-        var parent_fanin_counts = Dict[Int, Int]()
-
-        var dfs_stack = List[Ancestor[dtype]]()
-        dfs_stack.append(output.copy())
-
-        while len(dfs_stack) > 0:
-            var current_node = dfs_stack.pop()
-            var current_node_id = current_node.id()
-
-            if current_node_id in visited_node_ids:
-                continue
-
-            visited_node_ids.add(current_node_id)
-            collected_nodes.append(current_node.copy())
-
-            # Count parent fan-in and traverse upwards
-            if current_node.has_ancestry():
-                for parent in current_node.ancestry():
-                    var parent_node_id = parent.id()
-                    parent_fanin_counts[parent_node_id] = (
-                        parent_fanin_counts.get(parent_node_id, 0) + 1
-                    )
-                    dfs_stack.append(parent.copy())
-
-        # ----------------------------
-        # Phase 2: Store topology order
-        # ----------------------------
-        self.topo_order_node_ids = List[Int](capacity=len(visited_node_ids))
-        for i in range(len(visited_node_ids)):
-            self.topo_order_node_ids.append(visited_node_ids[i])
-
-        # ----------------------------
-        # Phase 3: Store initial fan-in template
-        # ----------------------------
-        self.initial_fanin_template = List[Int](capacity=len(visited_node_ids))
-        for i in range(len(visited_node_ids)):
-            var traced_node_id = visited_node_ids[i]
-            var fanin_value = parent_fanin_counts.get(traced_node_id, 0)
-            self.initial_fanin_template.append(fanin_value)
-
-        # ----------------------------
-        # Phase 4: Build lookup: node_id ? topo index
-        # ----------------------------
-        for i in range(len(self.topo_order_node_ids)):
-            self.node_id_to_topo_index[self.topo_order_node_ids[i]] = i
-
-        self.has_topology_been_built = True
-        log_debug(
-            "[ComputationGraph] Topology built with "
-            + len(self.topo_order_node_ids).__str__()
-            + " nodes (reusable)"
-        )
-
-    fn refresh_node_registry(mut self, output: Ancestor[dtype]):
-        """Rebuild node registry with CURRENT tensor data."""
-        log_debug(
-            "[ComputationGraph] Refreshing node registry with current data..."
-        )
-
-        # Clear old registry
-        self.node_registry.clear()
-
-        # Rebuild with fresh data
-        var visited_node_ids = IntArray()
-        var dfs_stack = List[Ancestor[dtype]]()
-        dfs_stack.append(output.copy())
-
-        while len(dfs_stack) > 0:
-            var current_node = dfs_stack.pop()
-            var current_node_id = current_node.id()
-
-            if current_node_id in visited_node_ids:
-                continue
-
-            visited_node_ids.append(current_node_id)
-
-            # Store fresh copy with current tensor data
-            self.node_registry[current_node_id] = current_node.copy()
-
-            if current_node.has_ancestry():
-                for parent in current_node.ancestry():
-                    dfs_stack.append(parent.copy())
-
-        log_debug(
-            "[ComputationGraph] Registry refreshed with "
-            + len(self.node_registry).__str__()
-            + " nodes"
-        )
-
-    fn execute_backward(mut self, output_id: Int) raises:
-        """Execute backward pass using pre-built topology and fresh node registry.
-        """
-
-        if not self.has_topology_been_built:
-            panic(
-                "[ComputationGraph] Topology not built - call build_topology"
-                " first"
-            )
-
-        log_debug("[ComputationGraph] Executing backward pass...")
-
-        # Get fresh copy of use counts (cheap array copy)
-        var remaining_parent_counts = self.initial_fanin_template.copy()
-
-        # Ensure root exists in topology
-        if output_id not in self.node_id_to_topo_index:
-            panic("[ComputationGraph] Root node not in graph topology")
-
-        # Initialize ready queue with root
-        var ready_queue = Deque[Ancestor[dtype]]()
-        ready_queue.append(self.node_registry[output_id].copy())
-
-        # ----------------------------
-        # Execute backward ops in schedule order
-        # ----------------------------
-        while len(ready_queue) > 0:
-            var active_node = ready_queue.popleft()
-
-            if active_node.has_backward_fn():
-                # Execute backward function
-                for result in active_node.backward_fn()(
-                    active_node.tensor().copy()
-                ):
-                    var target_node = result[0].copy()
-                    var incoming_grad = result[1].copy()
-                    var op_code = result[2]
-
-                    # -----------------------------------
-                    # Accumulate gradient into target
-                    # -----------------------------------
-                    if op_code == AddTensor:
-                        target_node.update_grad[AddTensor](incoming_grad^)
-                    else:
-                        target_node.update_grad[SubtractTensor](incoming_grad^)
-
-                    # -----------------------------------
-                    # Update dependency counters
-                    # -----------------------------------
-                    var target_node_id = target_node.id()
-
-                    # Skip if not in topology (shouldn't happen in well-formed graph)
-                    if target_node_id not in self.node_id_to_topo_index:
-                        continue
-
-                    var topo_index = self.node_id_to_topo_index[target_node_id]
-
-                    # Decrement remaining inputs expected
-                    remaining_parent_counts[topo_index] -= 1
-
-                    # When all parent contributions received ? schedule it
-                    if remaining_parent_counts[topo_index] == 0:
-                        if target_node_id in self.node_registry:
-                            var target_from_registry = self.node_registry.pop(
-                                target_node_id
-                            )
-                            if target_from_registry.has_backward_fn():
-                                ready_queue.append(target_from_registry.copy())
-
-        log_debug("[ComputationGraph] Backward pass complete")
-
-    fn reset(mut self):
-        """Reset entire graph - forces topology rebuild on next use."""
-        log_debug("[ComputationGraph] Resetting entire graph structure")
-        self.topo_order_node_ids.clear()
-        self.initial_fanin_template.clear()
-        self.node_id_to_topo_index.clear()
-        self.node_registry.clear()
-        self.has_topology_been_built = False

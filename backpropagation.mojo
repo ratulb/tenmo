@@ -53,230 +53,222 @@ alias BACKWARD_VARIANCE = 41
 alias BACKWARD_STD = 42
 alias BACKWARD_SUBTRACT_BROADCAST = 43
 
+# ========== Delegate (Variant) - Keep the same ==========
 
 alias Delegate[dtype: DType] = Variant[
-    # ========== TIER 1: MOST COMMON (Your network uses these heavily) ==========
-    AddBackward[dtype],                    # 1. Used in every layer (bias addition, residuals)
-    MultiplyBackward[dtype],               # 2. Very common (scaling, attention, etc.)
-    ReLUBackward[dtype],                   # 3. You have 4 ReLU layers
-    MatmulNdBackward[dtype],               # 4. You have 5 Linear layers
-    BCEBackward[dtype],                    # 5. Your loss function
-
-    Matmul2dBackward[dtype],               # 21. Specific 2D case
-    TransposeBackward[dtype],              # 14. Used in matmul backward internally
-    PermuteBackward[dtype],                # 24. Advanced indexing
-
-
-    # ========== TIER 2: COMMON IN MANY NETWORKS ==========
-    SigmoidBackward[dtype],                # 6. Your output activation
-    AddBroadcastBackward[dtype],           # 7. Broadcasting adds (very common)
-    MultiplyBroadcastBackward[dtype],      # 8. Broadcasting multiply (common)
-
-    SoftmaxBackward[dtype],                # 9. Common loss/activation
-    CrossEntropyBackward[dtype],           # 10. Common loss
-
-    # ========== TIER 3: MODERATELY COMMON ==========
-    TanhBackward[dtype],                   # 11. Alternative activation
-    SubBackward[dtype],                    # 12. Residual connections
-    ReshapeBackward[dtype],                # 13. Shape manipulation
-    ViewBackward[dtype],                   # 15. View operations
-
-    # ========== TIER 4: OCCASIONALLY USED ==========
-    MeanBackward[dtype],                   # 16. Pooling, normalization
-    SumBackward[dtype],                    # 17. Reductions
-    LogSoftmaxBackward[dtype],             # 18. NLLLoss companion
-    ContiguousBackward[dtype],             # 19. Memory layout
-    DivideBackward[dtype],                 # 20. Normalization
-
-    # ========== TIER 5: SPECIALIZED/LESS COMMON ==========
-    MatrixVectorMulNdBackward[dtype],      # 22. Specialized matmul
-    VectorMatmulNdBackward[dtype],         # 23. Specialized matmul
-    ExpandBackward[dtype],                 # 25. Broadcasting expansion
-
-    # ========== TIER 6: SCALAR OPERATIONS ==========
-    AddBackwardScalar[dtype],              # 26. Scalar ops (less common)
-    MultiplyBackwardScalar[dtype],         # 27. Scalar ops
-    SubLeftRightBackwardScalar[dtype],     # 28. Scalar ops
-    TrueDivBackwardScalar[dtype],          # 29. Scalar ops
-    RightTrueDivBackwardScalar[dtype],     # 30. Scalar ops
-
-    # ========== TIER 7: RARELY USED ==========
-    ExponientionBackward[dtype],           # 31. Specialized
-    DotBackward[dtype],                    # 32. 1D specific
-    LogBackward[dtype],                    # 33. Specialized
-    SqrtBackward[dtype],                   # 34. Specialized
-    ClipBackward[dtype],                   # 35. Gradient clipping (if manual)
-
-    # ========== TIER 8: VERY SPECIALIZED ==========
-    SubtractBroadcastBackward[dtype],      # 36. Less common than add
-    FlattenBackward[dtype],                # 37. Shape manipulation
-    SqueezeBackward[dtype],                # 38. Shape manipulation
-    UnsqueezeBackward[dtype],              # 39. Shape manipulation
-    ShuffleBackward[dtype],                # 40. Rare operation
-    MinMaxBackward[dtype],                 # 41. Specialized
-    TileBackward[dtype],                   # 42. Rare
-    VarianceBackward[dtype],               # 43. Statistics
-    StdBackward[dtype],                    # 44. Statistics
+    MatrixVectorMulNdBackward[dtype],
+    VectorMatmulNdBackward[dtype],
+    MatmulNdBackward[dtype],
+    Matmul2dBackward[dtype],
+    CrossEntropyBackward[dtype],
+    AddBackwardScalar[dtype],
+    AddBackward[dtype],
+    SubBackward[dtype],
+    SubLeftRightBackwardScalar[dtype],
+    SubtractBroadcastBackward[dtype],
+    ReshapeBackward[dtype],
+    SumBackward[dtype],
+    AddBroadcastBackward[dtype],
+    MultiplyBackwardScalar[dtype],
+    MultiplyBackward[dtype],
+    MultiplyBroadcastBackward[dtype],
+    ExponientionBackward[dtype],
+    TrueDivBackwardScalar[dtype],
+    RightTrueDivBackwardScalar[dtype],
+    DivideBackward[dtype],
+    MeanBackward[dtype],
+    ViewBackward[dtype],
+    TransposeBackward[dtype],
+    DotBackward[dtype],
+    ExpandBackward[dtype],
+    ContiguousBackward[dtype],
+    FlattenBackward[dtype],
+    SqueezeBackward[dtype],
+    UnsqueezeBackward[dtype],
+    PermuteBackward[dtype],
+    ShuffleBackward[dtype],
+    ReLUBackward[dtype],
+    MinMaxBackward[dtype],
+    SoftmaxBackward[dtype],
+    LogSoftmaxBackward[dtype],
+    TileBackward[dtype],
+    BCEBackward[dtype],
+    SigmoidBackward[dtype],
+    TanhBackward[dtype],
+    LogBackward[dtype],
+    ClipBackward[dtype],
+    SqrtBackward[dtype],
+    VarianceBackward[dtype],
+    StdBackward[dtype],
 ]
+
+# ========== BackwardFn with Tag-Based Dispatch ==========
 
 struct BackwardFn[dtype: DType](Copyable & Movable):
     var grad_fn: Delegate[dtype]
+    var tag: Int  # O(1) lookup key
 
-    fn __init__(out self, grad_fn: Delegate[dtype]):
+    fn __init__(out self, grad_fn: Delegate[dtype], tag: Int):
         self.grad_fn = grad_fn
+        self.tag = tag
 
     fn __moveinit__(out self, deinit other: Self):
         self.grad_fn = other.grad_fn^
+        self.tag = other.tag
 
     fn __copyinit__(out self, other: Self):
         self.grad_fn = other.grad_fn.copy()
+        self.tag = other.tag
 
-    fn __call__(self, output: Tensor[dtype]) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        # ========== TIER 1: MOST COMMON ==========
-        if self.grad_fn.isa[AddBackward[dtype]]():
+    fn __call__(
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        """O(1) dispatch using integer tag comparison.
+
+        Compiler optimizes integer comparisons to jump table for true O(1).
+        Order: Most common operations first for branch prediction.
+        """
+
+        # ========== TIER 1: MOST COMMON (Your network) ==========
+        if self.tag == BACKWARD_ADD:
             return self.grad_fn[AddBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[MultiplyBackward[dtype]]():
+        elif self.tag == BACKWARD_MULTIPLY:
             return self.grad_fn[MultiplyBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[ReLUBackward[dtype]]():
+        elif self.tag == BACKWARD_RELU:
             return self.grad_fn[ReLUBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[MatmulNdBackward[dtype]]():
+        elif self.tag == BACKWARD_MATMUL_ND:
             return self.grad_fn[MatmulNdBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[BCEBackward[dtype]]():
+        elif self.tag == BACKWARD_BCE:
             return self.grad_fn[BCEBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[Matmul2dBackward[dtype]]():
-            return self.grad_fn[Matmul2dBackward[dtype]].backward(output)
-
-        elif self.grad_fn.isa[PermuteBackward[dtype]]():
-            return self.grad_fn[PermuteBackward[dtype]].backward(output)
-
-         elif self.grad_fn.isa[ReshapeBackward[dtype]]():
-            return self.grad_fn[ReshapeBackward[dtype]].backward(output)
-
-        elif self.grad_fn.isa[TransposeBackward[dtype]]():
-            return self.grad_fn[TransposeBackward[dtype]].backward(output)
-
-        elif self.grad_fn.isa[ViewBackward[dtype]]():
-            return self.grad_fn[ViewBackward[dtype]].backward(output)
-
-
-        # ========== TIER 2: COMMON ==========
-        elif self.grad_fn.isa[SigmoidBackward[dtype]]():
+        elif self.tag == BACKWARD_SIGMOID:
             return self.grad_fn[SigmoidBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[AddBroadcastBackward[dtype]]():
+        # ========== TIER 2: MATMUL CHAIN (Called by MatmulNd) ==========
+        elif self.tag == BACKWARD_MATMUL_2D:
+            return self.grad_fn[Matmul2dBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_TRANSPOSE:
+            return self.grad_fn[TransposeBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_PERMUTE:
+            return self.grad_fn[PermuteBackward[dtype]].backward(output)
+
+        # ========== TIER 3: COMMON OPERATIONS ==========
+        elif self.tag == BACKWARD_ADD_BROADCAST:
             return self.grad_fn[AddBroadcastBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[MultiplyBroadcastBackward[dtype]]():
+        elif self.tag == BACKWARD_MULTIPLY_BROADCAST:
             return self.grad_fn[MultiplyBroadcastBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[SoftmaxBackward[dtype]]():
+        elif self.tag == BACKWARD_SOFTMAX:
             return self.grad_fn[SoftmaxBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[CrossEntropyBackward[dtype]]():
+        elif self.tag == BACKWARD_CROSS_ENTROPY:
             return self.grad_fn[CrossEntropyBackward[dtype]].backward(output)
 
-        # ========== TIER 3: MODERATELY COMMON ==========
-        elif self.grad_fn.isa[TanhBackward[dtype]]():
+        elif self.tag == BACKWARD_TANH:
             return self.grad_fn[TanhBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[SubBackward[dtype]]():
+        elif self.tag == BACKWARD_SUB:
             return self.grad_fn[SubBackward[dtype]].backward(output)
 
+        elif self.tag == BACKWARD_RESHAPE:
+            return self.grad_fn[ReshapeBackward[dtype]].backward(output)
 
-        # ========== TIER 4: OCCASIONALLY USED ==========
-        elif self.grad_fn.isa[MeanBackward[dtype]]():
+        elif self.tag == BACKWARD_VIEW:
+            return self.grad_fn[ViewBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_MEAN:
             return self.grad_fn[MeanBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[SumBackward[dtype]]():
+        elif self.tag == BACKWARD_SUM:
             return self.grad_fn[SumBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[LogSoftmaxBackward[dtype]]():
+        # ========== TIER 4: MODERATELY COMMON ==========
+        elif self.tag == BACKWARD_LOG_SOFTMAX:
             return self.grad_fn[LogSoftmaxBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[ContiguousBackward[dtype]]():
+        elif self.tag == BACKWARD_CONTIGUOUS:
             return self.grad_fn[ContiguousBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[DivideBackward[dtype]]():
+        elif self.tag == BACKWARD_DIVIDE:
             return self.grad_fn[DivideBackward[dtype]].backward(output)
 
-        # ========== TIER 5: SPECIALIZED ==========
-
-        elif self.grad_fn.isa[MatrixVectorMulNdBackward[dtype]]():
+        elif self.tag == BACKWARD_MATRIX_VECTOR_MUL:
             return self.grad_fn[MatrixVectorMulNdBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[VectorMatmulNdBackward[dtype]]():
+        elif self.tag == BACKWARD_VECTOR_MATMUL:
             return self.grad_fn[VectorMatmulNdBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[ExpandBackward[dtype]]():
+        elif self.tag == BACKWARD_EXPAND:
             return self.grad_fn[ExpandBackward[dtype]].backward(output)
 
-        # ========== TIER 6: SCALAR OPERATIONS ==========
-        elif self.grad_fn.isa[AddBackwardScalar[dtype]]():
-            return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
-
-        elif self.grad_fn.isa[MultiplyBackwardScalar[dtype]]():
-            return self.grad_fn[MultiplyBackwardScalar[dtype]].backward(output)
-
-        elif self.grad_fn.isa[SubLeftRightBackwardScalar[dtype]]():
-            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward(output)
-
-        elif self.grad_fn.isa[TrueDivBackwardScalar[dtype]]():
-            return self.grad_fn[TrueDivBackwardScalar[dtype]].backward(output)
-
-        elif self.grad_fn.isa[RightTrueDivBackwardScalar[dtype]]():
-            return self.grad_fn[RightTrueDivBackwardScalar[dtype]].backward(output)
-
-        # ========== TIER 7: RARELY USED ==========
-        elif self.grad_fn.isa[ExponientionBackward[dtype]]():
-            return self.grad_fn[ExponientionBackward[dtype]].backward(output)
-
-        elif self.grad_fn.isa[DotBackward[dtype]]():
-            return self.grad_fn[DotBackward[dtype]].backward(output)
-
-        elif self.grad_fn.isa[LogBackward[dtype]]():
-            return self.grad_fn[LogBackward[dtype]].backward(output)
-
-        elif self.grad_fn.isa[SqrtBackward[dtype]]():
-            return self.grad_fn[SqrtBackward[dtype]].backward(output)
-
-        elif self.grad_fn.isa[ClipBackward[dtype]]():
-            return self.grad_fn[ClipBackward[dtype]].backward(output)
-
-        # ========== TIER 8: VERY SPECIALIZED ==========
-        elif self.grad_fn.isa[SubtractBroadcastBackward[dtype]]():
-            return self.grad_fn[SubtractBroadcastBackward[dtype]].backward(output)
-
-        elif self.grad_fn.isa[FlattenBackward[dtype]]():
+        elif self.tag == BACKWARD_FLATTEN:
             return self.grad_fn[FlattenBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[SqueezeBackward[dtype]]():
+        elif self.tag == BACKWARD_SQUEEZE:
             return self.grad_fn[SqueezeBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[UnsqueezeBackward[dtype]]():
+        elif self.tag == BACKWARD_UNSQUEEZE:
             return self.grad_fn[UnsqueezeBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[ShuffleBackward[dtype]]():
+        # ========== TIER 5: SCALAR OPERATIONS ==========
+        elif self.tag == BACKWARD_ADD_SCALAR:
+            return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_MULTIPLY_SCALAR:
+            return self.grad_fn[MultiplyBackwardScalar[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_SUB_SCALAR:
+            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_DIV_SCALAR:
+            return self.grad_fn[TrueDivBackwardScalar[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_RIGHT_DIV_SCALAR:
+            return self.grad_fn[RightTrueDivBackwardScalar[dtype]].backward(output)
+
+        # ========== TIER 6: SPECIALIZED OPERATIONS ==========
+        elif self.tag == BACKWARD_EXPONENTIATION:
+            return self.grad_fn[ExponientionBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_DOT:
+            return self.grad_fn[DotBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_LOG:
+            return self.grad_fn[LogBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_SQRT:
+            return self.grad_fn[SqrtBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_CLIP:
+            return self.grad_fn[ClipBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_SUBTRACT_BROADCAST:
+            return self.grad_fn[SubtractBroadcastBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_SHUFFLE:
             return self.grad_fn[ShuffleBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[MinMaxBackward[dtype]]():
+        elif self.tag == BACKWARD_MINMAX:
             return self.grad_fn[MinMaxBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[TileBackward[dtype]]():
+        elif self.tag == BACKWARD_TILE:
             return self.grad_fn[TileBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[VarianceBackward[dtype]]():
+        elif self.tag == BACKWARD_VARIANCE:
             return self.grad_fn[VarianceBackward[dtype]].backward(output)
 
-        elif self.grad_fn.isa[StdBackward[dtype]]():
+        elif self.tag == BACKWARD_STD:
             return self.grad_fn[StdBackward[dtype]].backward(output)
 
         else:
-            panic("BackwardFn: Unknown gradient function type")
+            panic("BackwardFn: Unknown backward tag: " + String(self.tag))
 
         return []
 

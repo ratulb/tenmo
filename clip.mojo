@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_CLIP
 from ancestry import Ancestor
 from gradbox import Gradbox
 from sys import simd_width_of
@@ -9,11 +9,12 @@ from sys import simd_width_of
 @fieldwise_init
 @register_passable
 struct ClipBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_CLIP
     var min_val: Scalar[dtype]
     var max_val: Scalar[dtype]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

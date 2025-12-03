@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from common_utils import panic
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_DOT
 from operators import AddTensor
 from gradbox import Gradbox
 from ancestry import Ancestor
@@ -9,8 +9,9 @@ from ancestry import Ancestor
 @fieldwise_init
 @register_passable
 struct DotBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_DOT
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

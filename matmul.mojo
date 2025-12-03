@@ -2,7 +2,7 @@ from tenmo import Tensor
 from algorithm import vectorize
 from sys import simd_width_of
 from matrixshapevalidator import MatrixShapeValidator
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_MATMUL_ND, BACKWARD_MATMUL_2D
 from operators import AddTensor, mm, vm, mv, dot, invalid
 from gradbox import Gradbox
 from ancestry import Ancestor
@@ -10,16 +10,18 @@ from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
 from common_utils import il, s, panic, log_debug
 
-
 @fieldwise_init
 @register_passable
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_MATMUL_2D
     @always_inline
     fn backward[
         simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 32
     ](self, output: Tensor[dtype]) -> List[
         Tuple[Ancestor[dtype], Gradbox[dtype], Int]
     ]:
+
+
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
@@ -38,7 +40,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             # Hoist all metadata
             var grad_out_stride0 = grad_out.strides()[0]
             var grad_out_stride1 = grad_out.strides()[1]
-            var grad_out_offset = grad_out.offset()
             var grad_out_data = grad_out.buffer.buffer.data
 
             # var B_tensor = B.tensor()
@@ -50,7 +51,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
             var grad_A_stride0 = grad_A.strides()[0]
             var grad_A_stride1 = grad_A.strides()[1]
-            var grad_A_offset = grad_A.offset()
             var grad_A_data = grad_A.buffer.buffer.data
 
             # TILED computation - accessing B in transposed order
@@ -63,10 +63,10 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
                         for i in range(i_tile, i_end):
                             var grad_out_row_base = (
-                                i * grad_out_stride0 + grad_out_offset
+                                i * grad_out_stride0
                             )
                             var grad_A_row_base = (
-                                i * grad_A_stride0 + grad_A_offset
+                                i * grad_A_stride0
                             )
 
                             @parameter
@@ -108,6 +108,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
             result.append((A.copy(), grad_A^, AddTensor))
 
+        # Step 3: Compute grad_B (if needed)
         # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
         # grad_B[j,k] = sum_i(A[i,j] * grad_out[i,k])  ← Reading A transposed!
         if B.requires_grad():
@@ -121,12 +122,10 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
             var grad_out_stride0 = grad_out.strides()[0]
             var grad_out_stride1 = grad_out.strides()[1]
-            var grad_out_offset = grad_out.offset()
             var grad_out_data = grad_out.buffer.buffer.data
 
             var grad_B_stride0 = grad_B.strides()[0]
             var grad_B_stride1 = grad_B.strides()[1]
-            var grad_B_offset = grad_B.offset()
             var grad_B_data = grad_B.buffer.buffer.data
 
             # TILED computation
@@ -139,7 +138,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
                         for j in range(j_tile, j_end):
                             var grad_B_row_base = (
-                                j * grad_B_stride0 + grad_B_offset
+                                j * grad_B_stride0
                             )
 
                             @parameter
@@ -165,7 +164,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                     # grad_out[i,k] - contiguous access
                                     var grad_addr = (
                                         i * grad_out_stride0
-                                        + grad_out_offset
                                         + k * grad_out_stride1
                                     )
                                     var grad_vec = grad_out_data.load[
@@ -187,7 +185,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         return result^
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -325,7 +323,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
         ref B_strides = B.strides()
         var B_stride0 = B_strides[0]
         var B_stride1 = B_strides[1]
-        var B_offset = B.offset()
         var B_data = B.buffer.buffer.data
 
         ref C_strides = C.strides()
@@ -364,7 +361,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                                 var a_ik = A_data[a_addr]
 
                                 var b_addr = (
-                                    k * B_stride0 + B_offset + j * B_stride1
+                                    k * B_stride0  + j * B_stride1
                                 )
                                 var b_vec = B_data.load[width=simd_width](
                                     b_addr
@@ -395,7 +392,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             ref A_strides = A.strides()
             var A_stride0 = A_strides[0]
             var A_stride1 = A_strides[1]
-            var A_offset = A.offset()
             var A_data = A.buffer.buffer.data
 
             ref B_strides = B.strides()
@@ -407,7 +403,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             ref C_strides = C.strides()
             var C_stride0 = C_strides[0]
             var C_stride1 = C_strides[1]
-            var C_offset = C.offset()
             var C_data = C.buffer.buffer.data
 
             # ========================================
@@ -422,8 +417,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
                         # Process tile
                         for i in range(i_tile, i_end):
-                            var a_row_base = i * A_stride0 + A_offset
-                            var c_row_base = i * C_stride0 + C_offset
+                            var a_row_base = i * A_stride0
+                            var c_row_base = i * C_stride0
+
 
                             @parameter
                             fn process_columns[simd_width: Int](j_local: Int):
@@ -461,7 +457,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             ref A_strides = A.strides()
             var A_stride0 = A_strides[0]
             var A_stride1 = A_strides[1]
-            var A_offset = A.offset()
             var A_data = A.buffer.buffer.data
 
             ref B_strides = B.strides()
@@ -473,12 +468,12 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             ref C_strides = C.strides()
             var C_stride0 = C_strides[0]
             var C_stride1 = C_strides[1]
-            var C_offset = C.offset()
             var C_data = C.buffer.buffer.data
 
             for i in range(m):
-                var a_row_base = i * A_stride0 + A_offset
-                var c_row_base = i * C_stride0 + C_offset
+                var a_row_base = i * A_stride0
+                var c_row_base = i * C_stride0
+
 
                 for j in range(p):
                     var accumulator: Scalar[dtype] = 0
@@ -497,11 +492,13 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_MATMUL_ND
     fn backward[
         simdwidth: Int = simd_width_of[dtype]()
     ](self, output: Tensor[dtype]) -> List[
         Tuple[Ancestor[dtype], Gradbox[dtype], Int]
     ]:
+
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
@@ -535,7 +532,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
         return results^
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -709,6 +706,7 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
             var opcode = classify_matmul(A.shape(), B.shape())
 
             # Step 2: Simple dispatch based on opcode
+
             if dot == opcode:
                 return A.dot[track_grad](B)
 

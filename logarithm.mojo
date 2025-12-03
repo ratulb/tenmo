@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_LOG
 from ancestry import Ancestor
 from gradbox import Gradbox
 from math import log
@@ -10,8 +10,9 @@ from sys import simd_width_of
 @fieldwise_init
 @register_passable
 struct LogBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_LOG
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

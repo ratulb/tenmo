@@ -6,7 +6,7 @@ from sys import simd_width_of
 from utils.numerics import min_finite
 from memory import memcpy, memset, memset_zero
 from shapes import Shape, ShapeIndexIterator
-from ancestry import Ancestors, Ancestor
+from ancestry import Ancestors, Ancestor, Parents
 from strides import Strides
 from common_utils_imports import *
 from common_utils import id as identity, log_warning
@@ -44,6 +44,7 @@ struct Tensor[dtype: DType = DType.float32](
     var requires_grad: Bool
     var gradbox: UnsafePointer[Gradbox[dtype]]
     var ancestors: Optional[Ancestors[dtype]]
+    var parents: Optional[Parents[dtype]]
     var backwardFn: Optional[BackwardFn[dtype]]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
@@ -58,6 +59,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = None
+        self.parents = None
         self.backwardFn = None
         self.init_gradbox()
 
@@ -75,6 +77,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = None
+        self.parents = None
         self.backwardFn = None
         self.init_gradbox()
 
@@ -87,6 +90,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = None
+        self.parents = None
         self.backwardFn = None
         self.init_gradbox()
 
@@ -111,6 +115,7 @@ struct Tensor[dtype: DType = DType.float32](
         self.requires_grad = other.requires_grad
         self.gradbox = other.gradbox
         self.ancestors = other.ancestors^
+        self.parents = other.parents^
         self.backwardFn = other.backwardFn^
 
     fn __copyinit__(out self, other: Self):
@@ -122,6 +127,7 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = other.ancestors.copy()
+        self.parents = other.parents.copy()
         self.backwardFn = other.backwardFn.copy()
 
     @always_inline
@@ -1988,11 +1994,24 @@ fn main():
     # test_bce()
     # test_gradients()
 
-    a = Tensor.arange(12, requires_grad=True)
-    b = a.__add__[True](10)
-    print(b.has_backward_fn())
-    b.backward()
-    a.grad().print()
+    a = Tensor.arange(12)
+    b = a
+    c = a.into_view()
+
+    r = c.reshape([3,4])
+    r[2, 3] = 99
+
+    a.print()
+    print()
+    b.print()
+    print()
+    c.print()
+    print()
+    r.print()
+    x = r
+    x[1, 1] = 89
+    x.print()
+    a.print()
     _ = """a.print()
     print()
     m_keep = a.mean(axes=[2], keepdims=True)

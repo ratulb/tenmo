@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_PERMUTE
 from operators import AddTensor, ZeroGrad
 from intarray import IntArray
 from shapes import Shape
@@ -13,10 +13,11 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_PERMUTE
     var permutation: IntArray  # forward permutation used
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_VARIANCE
 from ancestry import Ancestor
 from gradbox import Gradbox
 from common_utils import panic
@@ -9,12 +9,13 @@ from common_utils import panic
 @fieldwise_init
 @register_passable
 struct VarianceBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_VARIANCE
     var axis: Int
     var unbiased: Bool
     var keepdims: Bool  # Track if user wanted keepdims
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

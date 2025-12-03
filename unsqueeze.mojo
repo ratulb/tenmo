@@ -3,7 +3,7 @@ from operators import AddTensor, ZeroGrad
 from intarray import IntArray
 from shapes import Shape
 from strides import Strides
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_UNSQUEEZE
 from squeeze import Squeeze
 from common_utils import panic
 from gradbox import Gradbox
@@ -13,10 +13,11 @@ from ancestry import Ancestor
 @fieldwise_init
 @register_passable
 struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_UNSQUEEZE
     var axes: IntArray  # where axes were inserted
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

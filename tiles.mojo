@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_TILE
 from intlist import IntArray
 from operators import AddTensor
 from shapes import Shape
@@ -12,11 +12,12 @@ from indexhelper import IndexCalculator
 @fieldwise_init
 @register_passable
 struct TileBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_TILE
     var repeat: IntArray
     var orig_shape: Shape
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward_orig(
         self, output: Tensor[dtype]

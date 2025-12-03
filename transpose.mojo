@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_TRANSPOSE
 from operators import AddTensor
 from validators import Validator
 from gradbox import Gradbox
@@ -10,10 +10,11 @@ from intarray import IntArray
 @fieldwise_init
 @register_passable
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_TRANSPOSE
     var axes: IntArray
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

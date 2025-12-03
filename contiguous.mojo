@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_CONTIGUOUS
 from operators import AddTensor
 from ancestry import Ancestor
 from gradbox import Gradbox
@@ -7,9 +7,9 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct ContiguousBackward[dtype: DType](ImplicitlyCopyable):
-
+    alias TAG = BACKWARD_CONTIGUOUS
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from operators import AddTensor, ZeroGrad
 from intarray import IntArray
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_SQUEEZE
 from common_utils import panic
 from shapes import Shape
 from strides import Strides
@@ -12,8 +12,9 @@ from ancestry import Ancestor
 @fieldwise_init
 @register_passable
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_SQUEEZE
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

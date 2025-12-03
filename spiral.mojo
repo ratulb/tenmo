@@ -1757,6 +1757,7 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
     print("Problem difficulty: 5 rotations, noise: 0.0")
 
     for epoch in range(num_epochs):
+        var epoch_start = perf_counter_ns()
         # LR decay schedule
         _ = """if epoch == 1500:
             optimizer.set_lr(0.025)
@@ -1776,7 +1777,11 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
         var epoch_train_correct = 0
         var epoch_train_total = 0
 
+        var batch_start = 0
+        var batch_end = 0
+
         for train_batch in train_loader:
+            batch_start = perf_counter_ns()
             var train_pred = model(train_batch.features)
             var train_loss = criterion(train_pred, train_batch.labels)
 
@@ -1789,6 +1794,7 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
             epoch_train_correct += batch_correct
             epoch_train_total += train_batch.batch_size
 
+            batch_end = perf_counter_ns()
         # ==================== Validation Phase ====================
         model.eval()
         criterion.eval()
@@ -1797,7 +1803,11 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
         var epoch_val_correct = 0
         var epoch_val_total = 0
 
+        var val_batch_start = 0
+        var val_batch_end = 0
+
         for val_batch in val_loader:
+            val_batch_start = perf_counter_ns()
             var val_pred = model(val_batch.features)  # No graph
             var val_loss = criterion(val_pred, val_batch.labels)  # No graph
 
@@ -1807,6 +1817,9 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
             epoch_val_correct += val_correct
             epoch_val_total += val_batch.batch_size
 
+            val_batch_end = perf_counter_ns()
+
+        var epoch_end = perf_counter_ns()
         # ==================== Reporting ====================
         if epoch % 500 == 0:
             var avg_train_loss = epoch_train_loss / epoch_train_total
@@ -1827,6 +1840,15 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
                 "Val Acc:",
                 val_accuracy,
                 "%",
+                "Time taken for one train batch: ",
+                (batch_end - batch_start) / 1e-6,
+                "milli  secs",
+                "Time taken for one validation batch: ",
+                (val_batch_end - val_batch_start) / 1e-6,
+                "milli  secs",
+                "Time taken for one epoch: ",
+                (epoch_end - epoch_start) / 1e-9,
+                "secs",
             )
 
     var end_training = perf_counter_ns()
@@ -1858,6 +1880,336 @@ fn train_deep_spiral_simple_arch_and_noise_increased_2():
     )
 
 
+fn train_deep_spiral_timings():
+    var (X_train, y_train) = generate_spiral_data(1000, 5.0, 0.0)
+    var (X_val, y_val) = generate_spiral_data(500, 5.0, 0.0)
+    alias dtype = DType.float64
+
+    var train_dataset = TensorDataset[dtype](X_train, y_train)
+    var train_loader = DataLoader[dtype=dtype](
+        train_dataset^,
+        batch_size=64,
+        reshuffle=True,
+        drop_last=False,
+    )
+
+    var val_dataset = TensorDataset(X_val, y_val)
+    var val_loader = DataLoader[dtype=dtype](
+        val_dataset^, batch_size=64, reshuffle=False
+    )
+
+    var model = Sequential[dtype]()
+    model.append(
+        Linear[dtype](2, 32, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](32, 16, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](16, 1, xavier=False).into(),
+        Sigmoid[dtype]().into(),
+    )
+
+    var criterion = BCELoss[dtype]()
+    var optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
+    var num_epochs = 3000
+
+    var start_training = perf_counter_ns()
+
+    print("Starting deep spiral training for epochs:", num_epochs)
+    print("Problem difficulty: 5 rotations, noise: 0.0")
+
+    for epoch in range(num_epochs):
+        var epoch_start = perf_counter_ns()
+
+        if epoch == 1500:
+            optimizer.set_lr(0.001)
+            print("  → Learning rate reduced to 0.001")
+
+        # ==================== Training Phase ====================
+        model.train()
+        criterion.train()
+
+        var epoch_train_loss = 0.0
+        var epoch_train_correct = 0
+        var epoch_train_total = 0
+
+        # Track timing for LAST batch only (to avoid overhead)
+        var last_train_batch_time = 0
+
+        for train_batch in train_loader:
+            var batch_start = perf_counter_ns()
+
+            var train_pred = model(train_batch.features)
+            var train_loss = criterion(train_pred, train_batch.labels)
+
+            optimizer.zero_grad()
+            train_loss.backward()
+            optimizer.step()
+
+            epoch_train_loss += train_loss.item() * train_batch.batch_size
+            var batch_correct, _ = accuracy(train_pred, train_batch.labels)
+            epoch_train_correct += batch_correct
+            epoch_train_total += train_batch.batch_size
+
+            var batch_end = perf_counter_ns()
+            last_train_batch_time = batch_end - batch_start
+
+        # ==================== Validation Phase ====================
+        model.eval()
+        criterion.eval()
+
+        var epoch_val_loss = 0.0
+        var epoch_val_correct = 0
+        var epoch_val_total = 0
+
+        var last_val_batch_time = 0
+
+        for val_batch in val_loader:
+            var val_batch_start = perf_counter_ns()
+
+            var val_pred = model(val_batch.features)
+            var val_loss = criterion(val_pred, val_batch.labels)
+
+            epoch_val_loss += val_loss.item() * val_batch.batch_size
+
+            var val_correct, _ = accuracy(val_pred, val_batch.labels)
+            epoch_val_correct += val_correct
+            epoch_val_total += val_batch.batch_size
+
+            var val_batch_end = perf_counter_ns()
+            last_val_batch_time = val_batch_end - val_batch_start
+
+        var epoch_end = perf_counter_ns()
+
+        # ==================== Reporting ====================
+        if epoch % 500 == 0:
+            var avg_train_loss = epoch_train_loss / epoch_train_total
+            var train_accuracy = 100.0 * epoch_train_correct / epoch_train_total
+            var avg_val_loss = epoch_val_loss / epoch_val_total
+            var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
+
+            # CORRECT unit conversions
+            var epoch_time_seconds = Float64((epoch_end - epoch_start)) / 1e9
+            var train_batch_time_ms = Float64(last_train_batch_time) / 1e6
+            var val_batch_time_ms = Float64(last_val_batch_time) / 1e6
+
+            print(
+                "Epoch",
+                epoch,
+                "| Train Loss:",
+                avg_train_loss,
+                "Train Acc:",
+                train_accuracy,
+                "%",
+                "| Val Loss:",
+                avg_val_loss,
+                "Val Acc:",
+                val_accuracy,
+                "%",
+            )
+            print(
+                "  Timing: Epoch =",
+                epoch_time_seconds,
+                "s",
+                "| Train batch =",
+                train_batch_time_ms,
+                "ms",
+                "| Val batch =",
+                val_batch_time_ms,
+                "ms",
+            )
+
+    var end_training = perf_counter_ns()
+    var total_time_minutes = Float64((end_training - start_training)) / 6e10
+
+    print("\nTraining completed in:", total_time_minutes, "mins")
+
+    # ==================== Final Evaluation ====================
+    model.eval()
+    criterion.eval()
+
+    var final_val_loss = 0.0
+    var final_val_correct = 0
+    var final_val_total = 0
+
+    for val_batch in val_loader:
+        var val_pred = model(val_batch.features)
+        var val_loss = criterion(val_pred, val_batch.labels)
+        final_val_loss += val_loss.item() * val_batch.batch_size
+        var val_correct, _ = accuracy(val_pred, val_batch.labels)
+        final_val_correct += val_correct
+        final_val_total += val_batch.batch_size
+
+    print("\n=== Final Results ===")
+    print("Validation Loss:", final_val_loss / final_val_total)
+    print(
+        "Validation Accuracy:", 100.0 * final_val_correct / final_val_total, "%"
+    )
+
+
+# ==================== Even Better: Detailed Profiling ====================
+
+
+fn train_with_detailed_profiling():
+    """Training with detailed timing breakdown."""
+    var (X_train, y_train) = generate_spiral_data(1000, 5.0, 0.0)
+    var (X_val, y_val) = generate_spiral_data(500, 5.0, 0.0)
+    alias dtype = DType.float64
+
+    var train_dataset = TensorDataset[dtype](X_train, y_train)
+    var train_loader = DataLoader[dtype=dtype](
+        train_dataset^, batch_size=64, reshuffle=True, drop_last=False
+    )
+
+    var model = Sequential[dtype]()
+    model.append(
+        Linear[dtype](2, 32, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](32, 16, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](16, 1, xavier=False).into(),
+        Sigmoid[dtype]().into(),
+    )
+
+    var criterion = BCELoss[dtype]()
+    var optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
+
+    print("=== Profiling First 10 Epochs ===\n")
+
+    # Accumulators for detailed timing
+    var total_forward_time = 0
+    var total_loss_time = 0
+    var total_backward_time = 0
+    var total_optimizer_time = 0
+    var num_batches = 0
+
+    for _epoch in range(10):  # Just profile first 10 epochs
+        model.train()
+        criterion.train()
+
+        for train_batch in train_loader:
+            # Forward pass
+            var t0 = perf_counter_ns()
+            var train_pred = model(train_batch.features)
+            var t1 = perf_counter_ns()
+
+            # Loss computation
+            var train_loss = criterion(train_pred, train_batch.labels)
+            var t2 = perf_counter_ns()
+
+            # Backward pass
+            optimizer.zero_grad()
+            train_loss.backward()
+            var t3 = perf_counter_ns()
+
+            # Optimizer step
+            optimizer.step()
+            var t4 = perf_counter_ns()
+
+            # Accumulate times
+            total_forward_time += t1 - t0
+            total_loss_time += t2 - t1
+            total_backward_time += t3 - t2
+            total_optimizer_time += t4 - t3
+            num_batches += 1
+
+    # Report averages
+    var avg_forward = Float64(total_forward_time) / num_batches / 1e6
+    var avg_loss = Float64(total_loss_time) / num_batches / 1e6
+    var avg_backward = Float64(total_backward_time) / num_batches / 1e6
+    var avg_optimizer = Float64(total_optimizer_time) / num_batches / 1e6
+    var avg_total = avg_forward + avg_loss + avg_backward + avg_optimizer
+
+    print("\n=== Average Time per Batch (ms) ===")
+    print(
+        "Forward pass:    ",
+        avg_forward,
+        "ms (",
+        100 * avg_forward / avg_total,
+        "%)",
+    )
+    print(
+        "Loss computation:", avg_loss, "ms (", 100 * avg_loss / avg_total, "%)"
+    )
+    print(
+        "Backward pass:   ",
+        avg_backward,
+        "ms (",
+        100 * avg_backward / avg_total,
+        "%)",
+    )
+    print(
+        "Optimizer step:  ",
+        avg_optimizer,
+        "ms (",
+        100 * avg_optimizer / avg_total,
+        "%)",
+    )
+    print("Total per batch: ", avg_total, "ms")
+    print(
+        "\nEstimated time for 3000 epochs:",
+        (avg_total * num_batches * 3000) / 60000,
+        "minutes",
+    )
+
+
+fn diagnose_one_batch():
+    """Run EXACTLY ONE batch with profiling."""
+    var (X_train, y_train) = generate_spiral_data(1000, 5.0, 0.0)
+    alias dtype = DType.float64
+
+    var train_dataset = TensorDataset[dtype](X_train, y_train)
+    var train_loader = DataLoader[dtype=dtype](
+        train_dataset^,
+        batch_size=64,
+        reshuffle=False,  # No shuffle for consistency
+    )
+
+    var model = Sequential[dtype]()
+    model.append(
+        Linear[dtype](2, 32, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](32, 16, xavier=False).into(),
+        ReLU[dtype]().into(),
+        Linear[dtype](16, 1, xavier=False).into(),
+        Sigmoid[dtype]().into(),
+    )
+
+    var criterion = BCELoss[dtype]()
+    var optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
+    optimizer.zero_grad()
+    print("\n=== ONE BATCH DIAGNOSTIC ===\n")
+
+    model.train()
+    criterion.train()
+
+    for train_batch in train_loader:
+        print("Forward...")
+        forward_start = perf_counter_ns()
+        var train_pred = model(train_batch.features)
+        forward_end = perf_counter_ns()
+        print("\nForward took: ", (forward_end - forward_start) / 1e6, "ms")
+        var train_loss = criterion(train_pred, train_batch.labels)
+        print(
+            "Loss calculated in: ",
+            (perf_counter_ns() - forward_end) / 1e6,
+            "ms",
+        )
+
+        print("\nBackward (watch MatmulNd timings)...")
+        optimizer.zero_grad()
+        backward_start = perf_counter_ns()
+        train_loss.backward()
+        print(
+            "Backward took: ", (perf_counter_ns() - backward_start) / 1e6, "ms"
+        )
+
+        print("\nDone!")
+        panic("Boom")
+        # if 1 == 1:
+        #    return
+        # break  # ONLY ONE BATCH
+
+
 fn main():
     # test_tiny_overfit()
     # test_gradients()
@@ -1874,4 +2226,6 @@ fn main():
     # train_with_batches()
     # train_spiral_normalized() #No good as it is
     # train_deep_spiral_simple_arch_and_noise_increased()#very good
-    train_deep_spiral_simple_arch_and_noise_increased_2()
+    # train_deep_spiral_simple_arch_and_noise_increased_2()
+    train_with_detailed_profiling()
+    #diagnose_one_batch()

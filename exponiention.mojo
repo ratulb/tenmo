@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import BackwardFn, Delegate
+from backpropagation import BackwardFn, Delegate, BACKWARD_EXPONENTIATION
 from operators import AddTensor
 from ancestry import Ancestor
 from gradbox import Gradbox
@@ -8,10 +8,11 @@ from ndbuffer import NDBuffer
 @fieldwise_init
 @register_passable
 struct ExponientionBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_EXPONENTIATION
     var exponent: Scalar[dtype]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

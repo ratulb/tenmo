@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_ADD, BACKWARD_ADD_SCALAR, BACKWARD_ADD_BROADCAST
 from operators import AddTensor, Add
 from common_utils import panic
 from gradbox import Gradbox
@@ -9,8 +9,9 @@ from broadcastbackward import BroadcastBackward
 @fieldwise_init
 @register_passable
 struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_ADD_SCALAR
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]
@@ -24,15 +25,16 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
 
 alias AddBroadcastBackward[dtype: DType] = BroadcastBackward[
-    dtype, augment=False, lhs_op=AddTensor, rhs_op=AddTensor
+    dtype, augment=False, lhs_op=AddTensor, rhs_op=AddTensor, TAG=BACKWARD_ADD_BROADCAST
 ]
 
 
 @fieldwise_init
 @register_passable
 struct AddBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_ADD
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor, TanhForwardOp, TanhBackwardOp
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_TANH
 from ancestry import Ancestor
 from gradbox import Gradbox
 from math import tanh, exp
@@ -10,8 +10,9 @@ from ndbuffer import NDBuffer
 @fieldwise_init
 @register_passable
 struct TanhBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_TANH
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

@@ -6,11 +6,11 @@ from ancestry import Ancestor
 
 @fieldwise_init
 @register_passable
-struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
+struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int, TAG: Int](
     ImplicitlyCopyable
 ):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), TAG)
 
     fn backward(
         self, output: Tensor[dtype]

@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_STD
 from ancestry import Ancestor
 from gradbox import Gradbox
 from common_utils import panic
@@ -9,13 +9,14 @@ from common_utils import panic
 @fieldwise_init
 @register_passable
 struct StdBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_STD
     var axis: Int
     var unbiased: Bool
     var keepdims: Bool
     var epsilon: Scalar[dtype]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_MULTIPLY, BACKWARD_MULTIPLY_SCALAR, BACKWARD_MULTIPLY_BROADCAST
 from operators import AddTensor, Multiply
 from common_utils import panic, id
 from ancestry import Ancestor
@@ -9,10 +9,11 @@ from broadcastbackward import BroadcastBackward
 @fieldwise_init
 @register_passable
 struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_MULTIPLY_SCALAR
     var factor: Scalar[dtype]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]
@@ -32,8 +33,9 @@ struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_MULTIPLY
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]
@@ -77,7 +79,7 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
 
 
 alias MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
-    dtype, augment=True, lhs_op=AddTensor, rhs_op=AddTensor
+    dtype, augment=True, lhs_op=AddTensor, rhs_op=AddTensor, TAG=BACKWARD_MULTIPLY_BROADCAST
 ]
 
 

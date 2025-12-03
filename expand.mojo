@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_EXPAND
 from shapes import Shape
 from intarray import IntArray
 from strides import Strides
@@ -12,8 +12,9 @@ from broadcasthelper import ShapeBroadcaster
 @fieldwise_init
 @register_passable
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_EXPAND
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

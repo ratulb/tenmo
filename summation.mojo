@@ -2,7 +2,7 @@ from tenmo import Tensor
 from operators import AddTensor
 from intarray import IntArray
 from shapes import Shape
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_SUM
 from validators import Validator
 from ancestry import Ancestor
 from gradbox import Gradbox
@@ -11,6 +11,7 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct SumBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_SUM
     var axes: IntArray
     var keepdims: Bool
 
@@ -62,7 +63,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
         ]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
 
 @fieldwise_init

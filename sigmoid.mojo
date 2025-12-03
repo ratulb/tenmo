@@ -1,17 +1,17 @@
 from tenmo import Tensor
 from operators import AddTensor, SigmoidOp
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_SIGMOID
 from ancestry import Ancestor
 from gradbox import Gradbox
 from math import exp
 from ndbuffer import NDBuffer
 
-
 @fieldwise_init
 @register_passable
 struct SigmoidBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_SIGMOID
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]
@@ -45,7 +45,6 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable):
                     gradbox_buffer[index] * sigmoid_value * (1 - sigmoid_value)
                 )
                 index += 1
-
         return [(ancestor^, gradbox_ancestor^, AddTensor)]
 
 

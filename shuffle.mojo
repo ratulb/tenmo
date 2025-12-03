@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from operators import AddTensor
 from validators import Validator
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_SHUFFLE
 from random import shuffle, seed
 from gradbox import Gradbox
 from ancestry import Ancestor
@@ -9,6 +9,7 @@ from ancestry import Ancestor
 
 @fieldwise_init
 struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
+    alias TAG = BACKWARD_SHUFFLE
     var axis: Int
     var permutation: List[Int]
 
@@ -21,7 +22,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
         self.permutation = other.permutation^
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]

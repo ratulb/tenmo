@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor, ZeroGrad
-from backpropagation import BackwardFn, Delegate
+from backpropagation import BackwardFn, Delegate, BACKWARD_RESHAPE
 from shapes import Shape
 from validators import Validator
 from ancestry import Ancestor
@@ -12,6 +12,7 @@ from strides import Strides
 @fieldwise_init
 @register_passable
 struct ReshapeBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_RESHAPE
     fn backward(
         self, output: Tensor[dtype]
     ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
@@ -24,7 +25,7 @@ struct ReshapeBackward[dtype: DType](ImplicitlyCopyable):
         ]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
 
 @fieldwise_init

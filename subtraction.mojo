@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from intarray import IntArray
 from operators import AddTensor, SubtractTensor, Subtract, ReverseSubtract
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_SUB, BACKWARD_SUBTRACT_BROADCAST, BACKWARD_SUB_SCALAR
 from common_utils import panic
 from gradbox import Gradbox
 from ancestry import Ancestor
@@ -10,6 +10,7 @@ from broadcastbackward import BroadcastBackward
 
 @register_passable
 struct SubBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_SUB
     var signs: IntArray
 
     fn __init__(out self):
@@ -25,7 +26,7 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable):
             self.signs.append(0)
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]
@@ -50,10 +51,11 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_SUB_SCALAR
     var negate: Bool
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]
@@ -70,7 +72,7 @@ struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
 
 alias SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[
-    dtype, augment=False, lhs_op=AddTensor, rhs_op=SubtractTensor
+    dtype, augment=False, lhs_op=AddTensor, rhs_op=SubtractTensor, TAG=BACKWARD_SUBTRACT_BROADCAST
 ]
 
 

@@ -2,7 +2,7 @@ from tenmo import Tensor
 from intarray import IntArray
 from operators import AddTensor
 from shapes import Shape
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_MEAN
 from validators import Validator
 from ancestry import Ancestor
 from gradbox import Gradbox
@@ -11,6 +11,7 @@ from forwards import DivideByScalar
 
 @register_passable
 struct MeanBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_MEAN
     var axes: IntArray
     var keepdims: Bool
 
@@ -71,7 +72,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         ]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
 
 @fieldwise_init

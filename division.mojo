@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn
+from backpropagation import Delegate, BackwardFn, BACKWARD_DIVIDE, BACKWARD_DIV_SCALAR, BACKWARD_RIGHT_DIV_SCALAR
 from operators import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
 from ancestry import Ancestor
@@ -9,10 +9,11 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct TrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_DIV_SCALAR
     var factor: Scalar[dtype]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]
@@ -33,10 +34,11 @@ struct TrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct RightTrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_RIGHT_DIV_SCALAR
     var scalar: Scalar[dtype]
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]
@@ -61,8 +63,9 @@ struct RightTrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct DivideBackward[dtype: DType](ImplicitlyCopyable):
+    alias TAG = BACKWARD_DIVIDE
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, output: Tensor[dtype]
