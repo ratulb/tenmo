@@ -3,7 +3,6 @@ from operators import AddTensor, ZeroGrad
 from backpropagation import BackwardFn, Delegate, BACKWARD_RESHAPE
 from shapes import Shape
 from validators import Validator
-from ancestry import Ancestor
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from strides import Strides
@@ -13,12 +12,13 @@ from strides import Strides
 @register_passable
 struct ReshapeBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_RESHAPE
+
     fn backward(
         self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
-        reshaped = gradbox.reshape(ancestor.shape())
+        var ancestor = output.ancestry().get(0)
+        var reshaped = gradbox.reshape(ancestor.shape())
         output.zero_grad()
         return [
             (ancestor^, reshaped^, AddTensor),

@@ -2095,7 +2095,6 @@ fn train_with_detailed_profiling():
             # Loss computation
             var train_loss = criterion(train_pred, train_batch.labels)
             var t2 = perf_counter_ns()
-
             # Backward pass
             optimizer.zero_grad()
             train_loss.backward()

@@ -6,7 +6,6 @@ from shapes import Shape
 from strides import Strides
 from common_utils import panic
 from views import View
-from ancestry import Ancestor
 from gradbox import Gradbox
 
 
@@ -20,8 +19,8 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradbox = output.grad()
         parent = output.ancestry().get(0)
         # Compute inverse permutation
@@ -30,11 +29,11 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
             inverse[self.permutation[i]] = i
 
         # Apply inverse permutation to gradients
-        parent_gradbox = gradbox.permute(inverse)
+        var parent_gradbox = gradbox.permute(inverse)
 
         return [
             (parent^, parent_gradbox^, AddTensor),
-            (Ancestor(output), gradbox^, ZeroGrad),
+            (output, gradbox^, ZeroGrad),
         ]
 
 

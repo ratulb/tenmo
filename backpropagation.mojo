@@ -4,7 +4,6 @@ from utils import Variant
 from walkback import *
 from common_utils import panic
 from gradbox import Gradbox
-from ancestry import Ancestor
 
 # Centralized backward operation tags
 
@@ -15,45 +14,44 @@ alias BACKWARD_MATMUL_ND = 3
 alias BACKWARD_MATMUL_2D = 4
 alias BACKWARD_TRANSPOSE = 5
 alias BACKWARD_PERMUTE = 6
-alias BACKWARD_BCE = 7
-alias BACKWARD_SIGMOID = 8
-alias BACKWARD_ADD_BROADCAST = 9
-alias BACKWARD_MULTIPLY_BROADCAST = 10
-alias BACKWARD_SOFTMAX = 11
-alias BACKWARD_CROSS_ENTROPY = 12
-alias BACKWARD_TANH = 13
-alias BACKWARD_SUB = 14
-alias BACKWARD_RESHAPE = 15
-alias BACKWARD_VIEW = 16
-alias BACKWARD_MEAN = 17
-alias BACKWARD_SUM = 18
-alias BACKWARD_LOG_SOFTMAX = 19
-alias BACKWARD_CONTIGUOUS = 20
-alias BACKWARD_DIVIDE = 21
-alias BACKWARD_MATRIX_VECTOR_MUL = 22
-alias BACKWARD_VECTOR_MATMUL = 23
-alias BACKWARD_ADD_SCALAR = 24
-alias BACKWARD_MULTIPLY_SCALAR = 25
-alias BACKWARD_SUB_SCALAR = 26
-alias BACKWARD_DIV_SCALAR = 27
-alias BACKWARD_RIGHT_DIV_SCALAR = 28
-alias BACKWARD_EXPONENTIATION = 29
-alias BACKWARD_DOT = 30
-alias BACKWARD_EXPAND = 31
-alias BACKWARD_FLATTEN = 32
-alias BACKWARD_SQUEEZE = 33
-alias BACKWARD_UNSQUEEZE = 34
-alias BACKWARD_SHUFFLE = 35
-alias BACKWARD_MINMAX = 36
-alias BACKWARD_TILE = 37
-alias BACKWARD_LOG = 38
-alias BACKWARD_SQRT = 39
-alias BACKWARD_CLIP = 40
-alias BACKWARD_VARIANCE = 41
-alias BACKWARD_STD = 42
-alias BACKWARD_SUBTRACT_BROADCAST = 43
+alias BACKWARD_SIGMOID = 7
+alias BACKWARD_ADD_BROADCAST = 8
+alias BACKWARD_MULTIPLY_BROADCAST = 9
+alias BACKWARD_SOFTMAX = 10
+alias BACKWARD_CROSS_ENTROPY = 11
+alias BACKWARD_TANH = 12
+alias BACKWARD_SUB = 13
+alias BACKWARD_RESHAPE = 14
+alias BACKWARD_VIEW = 15
+alias BACKWARD_MEAN = 16
+alias BACKWARD_SUM = 17
+alias BACKWARD_LOG_SOFTMAX = 18
+alias BACKWARD_CONTIGUOUS = 19
+alias BACKWARD_DIVIDE = 20
+alias BACKWARD_MATRIX_VECTOR_MUL = 21
+alias BACKWARD_VECTOR_MATMUL = 22
+alias BACKWARD_ADD_SCALAR = 23
+alias BACKWARD_MULTIPLY_SCALAR = 24
+alias BACKWARD_SUB_SCALAR = 25
+alias BACKWARD_DIV_SCALAR = 26
+alias BACKWARD_RIGHT_DIV_SCALAR = 27
+alias BACKWARD_EXPONENTIATION = 28
+alias BACKWARD_DOT = 29
+alias BACKWARD_EXPAND = 30
+alias BACKWARD_FLATTEN = 31
+alias BACKWARD_SQUEEZE = 32
+alias BACKWARD_UNSQUEEZE = 33
+alias BACKWARD_SHUFFLE = 34
+alias BACKWARD_MINMAX = 35
+alias BACKWARD_TILE = 36
+alias BACKWARD_LOG = 37
+alias BACKWARD_SQRT = 38
+alias BACKWARD_CLIP = 39
+alias BACKWARD_VARIANCE = 40
+alias BACKWARD_STD = 41
+alias BACKWARD_SUBTRACT_BROADCAST = 42
 
-# ========== Delegate (Variant) - Keep the same ==========
+# ========== Delegate (Variant) ==========
 
 alias Delegate[dtype: DType] = Variant[
     MatrixVectorMulNdBackward[dtype],
@@ -92,7 +90,6 @@ alias Delegate[dtype: DType] = Variant[
     SoftmaxBackward[dtype],
     LogSoftmaxBackward[dtype],
     TileBackward[dtype],
-    BCEBackward[dtype],
     SigmoidBackward[dtype],
     TanhBackward[dtype],
     LogBackward[dtype],
@@ -121,15 +118,15 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         self.tag = other.tag
 
     fn __call__(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         """O(1) dispatch using integer tag comparison.
 
         Compiler optimizes integer comparisons to jump table for true O(1).
         Order: Most common operations first for branch prediction.
         """
 
-        # ========== TIER 1: MOST COMMON (Your network) ==========
+        # ========== TIER 1: MOST COMMON ==========
         if self.tag == BACKWARD_ADD:
             return self.grad_fn[AddBackward[dtype]].backward(output)
 
@@ -141,9 +138,6 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.tag == BACKWARD_MATMUL_ND:
             return self.grad_fn[MatmulNdBackward[dtype]].backward(output)
-
-        elif self.tag == BACKWARD_BCE:
-            return self.grad_fn[BCEBackward[dtype]].backward(output)
 
         elif self.tag == BACKWARD_SIGMOID:
             return self.grad_fn[SigmoidBackward[dtype]].backward(output)
@@ -273,4 +267,4 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         return []
 
 fn main():
-    print("passed")
+    print("passes")

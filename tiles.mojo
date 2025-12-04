@@ -1,11 +1,10 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_TILE
-from intlist import IntArray
+from intarray import IntArray
 from operators import AddTensor
 from shapes import Shape
 from validators import Validator
 from gradbox import Gradbox
-from ancestry import Ancestor
 from indexhelper import IndexCalculator
 
 
@@ -19,62 +18,9 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
-    fn backward_orig(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        var grad_out = output.grad().copy()
-        var parent = output.ancestry().get(0)
-        var parent_shape = self.orig_shape
-        var parent_rank = len(parent_shape)
-        var repeat_rank = len(self.repeat)
-        # Handle scalar case
-        if parent_rank == 0:
-            var total_grad = grad_out.sum().item()
-            var gradbox_parent = Gradbox[dtype].full(
-                Shape(), total_grad, share=False
-            )
-            return [(parent^, gradbox_parent^, AddTensor)]
-
-        # --- Handle dimension alignment ---
-        var effective_rank = max(parent_rank, repeat_rank)
-
-        # --- 1. Expand each dim into (orig_dim, repeat_factor) ---
-        var reshaped_dims = IntArray.with_capacity(effective_rank * 2)
-        var reduce_axes = IntArray.with_capacity(effective_rank)
-        for i in range(effective_rank):
-            var parent_index = parent_rank - effective_rank + i
-            var repeat_index = repeat_rank - effective_rank + i
-
-            var orig_dim = 1 if parent_index < 0 else parent_shape[parent_index]
-            var repeat_factor = (
-                1 if repeat_index < 0 else self.repeat[repeat_index]
-            )
-
-            reshaped_dims.append(orig_dim)
-            reshaped_dims.append(repeat_factor)
-
-            reduce_axes.append(
-                i * 2 + 1
-            )  # The repeat axis is the second one in each pair
-
-        var reshaped_shape = Shape(reshaped_dims)
-
-        # --- CRITICAL: Sort reduce_axes in DESCENDING order ---
-        # reduce_axes.sort(asc=False) - NEVER SORT!!!!
-
-        # --- 2. Reshape grad_out to that pattern ---
-        var reshaped = grad_out.reshape(reshaped_shape)
-
-        # --- 3. Sum over every "repeat" axis ---
-        var gradbox_parent = reshaped.sum(reduce_axes, keepdims=False)
-        if gradbox_parent.shape() != parent_shape:
-            gradbox_parent = gradbox_parent.reshape(parent_shape)
-
-        return [(parent^, gradbox_parent^, AddTensor)]
-
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref grad_out = output.gradients()[]
         var parent = output.ancestry().get(0)
         var parent_shape = self.orig_shape

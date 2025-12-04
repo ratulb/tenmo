@@ -4,7 +4,6 @@ from intarray import IntArray
 from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_SUM
 from validators import Validator
-from ancestry import Ancestor
 from gradbox import Gradbox
 
 
@@ -16,10 +15,10 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
     var keepdims: Bool
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
+        var ancestor = output.ancestry().get(0)
         rank = ancestor.shape().rank()
         if rank == 0:
             return [(ancestor^, gradbox.copy(), AddTensor)]

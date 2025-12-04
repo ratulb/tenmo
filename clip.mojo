@@ -1,7 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_CLIP
-from ancestry import Ancestor
 from gradbox import Gradbox
 from sys import simd_width_of
 
@@ -17,13 +16,12 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         """Gradient passes where min ≤ x ≤ max, blocked elsewhere."""
         ref grad_output = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        ref shape = ancestor.shape()
-        ref parent = ancestor.tensor()  # Access original input
+        var parent = output.ancestry().get(0)
+        ref shape = parent.shape()
         var parent_gradbox = Gradbox[dtype].zeros(shape, share=False)
 
         if parent.is_contiguous():
@@ -40,7 +38,7 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable):
                 var grad_out = grad_output_data.load[width=simd_width](i)
 
                 # Mask: gradient passes only if min ≤ x ≤ max
-                var in_range = (x.ge(self.min_val) & x.le(self.max_val))
+                var in_range = x.ge(self.min_val) & x.le(self.max_val)
 
                 var mask_float = in_range.cast[dtype]()
                 var grad_in = grad_out * mask_float
@@ -65,7 +63,7 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable):
                 else:
                     parent_gradbox[coord] = Scalar[dtype](0)
 
-        return [(ancestor^, parent_gradbox^, AddTensor)]
+        return [(parent^, parent_gradbox^, AddTensor)]
 
 
 @fieldwise_init
@@ -119,6 +117,7 @@ struct Clip[dtype: DType]:
                 out.add_ancestry(self)
 
         return out^
+
 
 fn main():
     a = Tensor.d1([4, 1, 3, 9, 7, 0, 10], requires_grad=True)

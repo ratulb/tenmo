@@ -4,7 +4,6 @@ from validators import Validator
 from backpropagation import Delegate, BackwardFn, BACKWARD_SHUFFLE
 from random import shuffle, seed
 from gradbox import Gradbox
-from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -25,8 +24,8 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 

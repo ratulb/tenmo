@@ -4,8 +4,7 @@ from gradbox import Gradbox
 from sys.param_env import env_get_string
 from logger import Level, Logger
 from layers import Sequential, Linear, ReLU
-
-# from strides import Strides
+from time import perf_counter_ns, monotonic
 from os import abort
 from utils import Variant
 from testing import assert_true
@@ -48,15 +47,18 @@ fn panic(*s: String):
     abort(RED + message + RESET.__str__())
 
 
+@always_inline
 fn id[type: AnyType, //](t: type) -> Int:
     # return Int(UnsafePointer(to=t))
     return Int(addr(t))
 
 
+@always_inline
 fn addr[type: AnyType, //](t: type) -> UnsafePointer[type]:
     return UnsafePointer(to=t)
 
 
+@always_inline
 fn addrs[type: AnyType, //](*ts: type) -> List[UnsafePointer[type]]:
     l = List[UnsafePointer[type]](capacity=len(ts))
     for t in ts:
@@ -66,6 +68,21 @@ fn addrs[type: AnyType, //](*ts: type) -> List[UnsafePointer[type]]:
 
 fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
     return ptr.__as_bool__() == False
+
+
+
+@register_passable
+struct IDGen:
+    @always_inline
+    @staticmethod
+    fn generate_id() -> Int:
+        # Use both perf_counter and monotonic for additional entropy
+        perf_time = perf_counter_ns()
+        mono_time = monotonic()
+
+        # Combine them in a way that preserves uniqueness
+        # Use XOR to mix the values
+        return perf_time ^ (mono_time << 32)
 
 
 @always_inline("nodebug")
@@ -168,16 +185,6 @@ def assert_grad[
         (t.grad() == expected),
         String("grad assertion failed for {0}").format(label),
     )
-
-
-fn variadiclist_as_str1(list: VariadicList[Int]) -> String:
-    s = String("[")
-    for idx in range(len(list)):
-        s += list[idx].__str__()
-        if idx != len(list) - 1:
-            s += ", "
-    s += "]"
-    return s
 
 
 # Create a single or two element(s) VariadicList

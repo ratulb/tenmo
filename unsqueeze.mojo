@@ -7,7 +7,6 @@ from backpropagation import Delegate, BackwardFn, BACKWARD_UNSQUEEZE
 from squeeze import Squeeze
 from common_utils import panic
 from gradbox import Gradbox
-from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -20,16 +19,16 @@ struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradbox = output.grad()
         # Remove the axis we had inserted
-        squeezed_gradbox = gradbox.squeeze(self.axes)
+        var squeezed_gradbox = gradbox.squeeze(self.axes)
 
-        ancestor = output.ancestry().get(0)
+        var ancestor = output.ancestry().get(0)
         return [
             (ancestor^, squeezed_gradbox^, AddTensor),
-            (Ancestor(output), gradbox^, ZeroGrad),
+            (output, gradbox^, ZeroGrad),
         ]
 
 

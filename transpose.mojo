@@ -3,7 +3,6 @@ from backpropagation import Delegate, BackwardFn, BACKWARD_TRANSPOSE
 from operators import AddTensor
 from validators import Validator
 from gradbox import Gradbox
-from ancestry import Ancestor
 from intarray import IntArray
 
 
@@ -17,8 +16,8 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         inverted_axes = IntArray.invert_permutation(self.axes)

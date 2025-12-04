@@ -5,7 +5,6 @@ from shapes import Shape
 from intarray import IntArray
 from strides import Strides
 from gradbox import Gradbox
-from ancestry import Ancestor
 from broadcasthelper import ShapeBroadcaster
 
 
@@ -17,8 +16,8 @@ struct ExpandBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         parent_shape = ancestor.shape()

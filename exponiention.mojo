@@ -1,9 +1,9 @@
 from tenmo import Tensor
 from backpropagation import BackwardFn, Delegate, BACKWARD_EXPONENTIATION
 from operators import AddTensor
-from ancestry import Ancestor
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
+
 
 @fieldwise_init
 @register_passable
@@ -15,18 +15,16 @@ struct ExponientionBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
+        var ancestor = output.ancestry().get(0)
 
         # ∂(x**n)/∂x = n * x**(n-1)
-        # Need to see if base_pow gets a grad_fn or not - we don't want it to have one!
         # var base_pow = self ** (scalar - 1.0)
-        base_pow = ancestor.tensor() ** (self.exponent - 1.0)
-        base_pow.requires_grad = False
-        var local_grad = base_pow * self.exponent
-        gradbox_prod = gradbox * local_grad
+        base_pow = ancestor.__pow__[track_grad=False](self.exponent - 1.0)
+        var local_grad = base_pow.__mul__[track_grad=False](self.exponent)
+        gradbox_prod = local_grad * gradbox
         return [
             (
                 ancestor^,
@@ -43,7 +41,9 @@ struct Exponentiator[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[dtype], exponent: Scalar[dtype]) -> Tensor[dtype]:
-        nd_buffer = NDBuffer[dtype]((self.buffer.contiguous_buffer() ** exponent), self.shape())
+        nd_buffer = NDBuffer[dtype](
+            (self.buffer.contiguous_buffer() ** exponent), self.shape()
+        )
         var out = Tensor[dtype](nd_buffer^, requires_grad=False)
 
         @parameter

@@ -1,10 +1,15 @@
 from tenmo import Tensor
 from intarray import IntArray
 from operators import AddTensor, SubtractTensor, Subtract, ReverseSubtract
-from backpropagation import Delegate, BackwardFn, BACKWARD_SUB, BACKWARD_SUBTRACT_BROADCAST, BACKWARD_SUB_SCALAR
+from backpropagation import (
+    Delegate,
+    BackwardFn,
+    BACKWARD_SUB,
+    BACKWARD_SUBTRACT_BROADCAST,
+    BACKWARD_SUB_SCALAR,
+)
 from common_utils import panic
 from gradbox import Gradbox
-from ancestry import Ancestor
 from broadcastbackward import BroadcastBackward
 
 
@@ -29,11 +34,11 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
-        grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
+        grad_shares = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]](
             capacity=UInt(count)
         )
         for i in range(count):
@@ -58,8 +63,8 @@ struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         return [
@@ -72,7 +77,11 @@ struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
 
 alias SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[
-    dtype, augment=False, lhs_op=AddTensor, rhs_op=SubtractTensor, TAG=BACKWARD_SUBTRACT_BROADCAST
+    dtype,
+    augment=False,
+    lhs_op=AddTensor,
+    rhs_op=SubtractTensor,
+    TAG=BACKWARD_SUBTRACT_BROADCAST,
 ]
 
 

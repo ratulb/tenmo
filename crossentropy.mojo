@@ -7,7 +7,6 @@ from backpropagation import Delegate, BackwardFn, BACKWARD_CROSS_ENTROPY
 from operators import AddTensor
 from buffers import Buffer
 from gradbox import Gradbox
-from ancestry import Ancestor
 from ndbuffer import NDBuffer
 
 
@@ -417,11 +416,10 @@ struct CrossEntropyBackward[dtype: DType](
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradients = output.grad()
-        var ancestor_1 = output.ancestry().get(0)
-        var logits = ancestor_1.tensor()
+        var logits = output.ancestry().get(0)
 
         if self.original_target:
             var shape_buffer_pair = self.original_target.value().copy()
@@ -429,23 +427,17 @@ struct CrossEntropyBackward[dtype: DType](
             var buffer = shape_buffer_pair[1].copy()
             var ndb = NDBuffer[DType.int32](buffer^, shape^)
             target = Tensor[DType.int32](ndb^, requires_grad=False)
-            return self._backward_class_indices(
-                logits^, target^, gradients^, ancestor_1^
-            )
+            return self._backward_class_indices(logits^, target^, gradients^)
         else:
-            var ancestor_2 = output.ancestry().get(1)
-            var target = ancestor_2.tensor()
-            return self._backward_probabilities(
-                logits^, target^, gradients^, ancestor_1^
-            )
+            var target = output.ancestry().get(1)
+            return self._backward_probabilities(logits^, target^, gradients^)
 
     fn _backward_class_indices(
         self,
         var logits: Tensor[dtype],
         var target: Tensor[DType.int32],
         upstream_grad: Gradbox[dtype],
-        var logits_ancestor: Ancestor[dtype],
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         """Optimized backward pass for class indices targets."""
         var logits_shape = logits.shape()
         var N = logits_shape[0]
@@ -515,15 +507,14 @@ struct CrossEntropyBackward[dtype: DType](
 
         var final_grad_input = grad_input_2d.reshape(logits_shape)
 
-        return [(logits_ancestor^, final_grad_input^, AddTensor)]
+        return [(logits, final_grad_input^, AddTensor)]
 
     fn _backward_probabilities(
         self,
         logits: Tensor[dtype],
         target: Tensor[dtype],
         upstream_grad: Gradbox[dtype],
-        var logits_ancestor: Ancestor[dtype],
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         """Optimized backward pass for probability/one-hot targets."""
         var logits_shape = logits.shape()
         var N = logits_shape[0]
@@ -577,7 +568,7 @@ struct CrossEntropyBackward[dtype: DType](
 
         var final_grad_input = grad_input_2d.reshape(logits_shape)
 
-        return [(logits_ancestor^, final_grad_input^, AddTensor)]
+        return [(logits, final_grad_input^, AddTensor)]
 
     fn _apply_reduction_scaling(
         self,
@@ -1029,6 +1020,7 @@ struct CrossEntropyBackward_orig[dtype: DType](
     var ignore_index: Int
     var label_smoothing: Scalar[dtype]
     var original_target: Optional[Tuple[Shape, Buffer[DType.int32]]]
+    alias TAG = BACKWARD_CROSS_ENTROPY
 
     fn __init__(
         out self,
@@ -1055,14 +1047,13 @@ struct CrossEntropyBackward_orig[dtype: DType](
         self.original_target = existing.original_target^
 
     fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self))
+        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradients = output.grad()
-        var ancestor_1 = output.ancestry().get(0)  # logits
-        var logits = ancestor_1.tensor()
+        var logits = output.ancestry().get(0)  # logits
 
         # Class indices case
         if self.original_target:
@@ -1071,24 +1062,18 @@ struct CrossEntropyBackward_orig[dtype: DType](
             var buffer = shape_buffer_pair[1].copy()
             var ndb = NDBuffer[DType.int32](buffer^, shape^)
             target = Tensor[DType.int32](ndb^, requires_grad=False)
-            return self._backward_class_indices(
-                logits^, target^, gradients^, ancestor_1^
-            )
+            return self._backward_class_indices(logits^, target^, gradients^)
         else:
             # Probability targets case
-            var ancestor_2 = output.ancestry().get(1)
-            var target = ancestor_2.tensor()
-            return self._backward_probabilities(
-                logits^, target^, gradients^, ancestor_1^
-            )
+            var target = output.ancestry().get(1)
+            return self._backward_probabilities(logits^, target^, gradients^)
 
     fn _backward_class_indices(
         self,
         var logits: Tensor[dtype],
         var target: Tensor[DType.int32],
         upstream_grad: Gradbox[dtype],
-        var logits_ancestor: Ancestor[dtype],
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         """
         Backward pass for class indices targets.
         """
@@ -1158,15 +1143,14 @@ struct CrossEntropyBackward_orig[dtype: DType](
         # Reshape back to original shape
         var final_grad_input = grad_input_2d.reshape(logits_shape)
 
-        return [(logits_ancestor^, final_grad_input^, AddTensor)]
+        return [(logits, final_grad_input^, AddTensor)]
 
     fn _backward_probabilities(
         self,
         logits: Tensor[dtype],
         target: Tensor[dtype],
         upstream_grad: Gradbox[dtype],
-        var logits_ancestor: Ancestor[dtype],
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         """
         Backward pass for probability/one-hot targets.
         """
@@ -1206,7 +1190,7 @@ struct CrossEntropyBackward_orig[dtype: DType](
         # Reshape back to original shape
         var final_grad_input = grad_input_2d.reshape(logits_shape)
 
-        return [(logits_ancestor^, final_grad_input^, AddTensor)]
+        return [(logits, final_grad_input^, AddTensor)]
 
     fn _apply_reduction_scaling(
         self,

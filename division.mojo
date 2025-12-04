@@ -1,8 +1,13 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_DIVIDE, BACKWARD_DIV_SCALAR, BACKWARD_RIGHT_DIV_SCALAR
+from backpropagation import (
+    Delegate,
+    BackwardFn,
+    BACKWARD_DIVIDE,
+    BACKWARD_DIV_SCALAR,
+    BACKWARD_RIGHT_DIV_SCALAR,
+)
 from operators import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
-from ancestry import Ancestor
 from gradbox import Gradbox
 
 
@@ -16,8 +21,8 @@ struct TrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
@@ -41,19 +46,17 @@ struct RightTrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradbox = output.grad()
-        ancestor = output.ancestry().get(0)
-        tensor = ancestor.tensor()
-        squared = tensor.__pow__(2)
+        var tensor = output.ancestry().get(0)
+        squared = tensor.__pow__[track_grad=False](2)
         squared_reciprocal = 1.0 / squared
         gradbox = (gradbox * self.scalar) * squared_reciprocal
 
         return [
             (
-                ancestor^,
+                tensor^,
                 gradbox^,
                 SubtractTensor,
             )
@@ -64,46 +67,46 @@ struct RightTrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
 @register_passable
 struct DivideBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_DIVIDE
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
-        ancestor_top = output.ancestry().get(0)
-        ancestor_bottom = output.ancestry().get(1)
+        var tensor_top = output.ancestry().get(0)
+        var tensor_bottom = output.ancestry().get(1)
 
-        grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
+        grad_shares = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]](
             capacity=2
         )
 
-        if ancestor_top.requires_grad():
-            tensor_bottom = ancestor_bottom.tensor()
-            tensor_bottom.requires_grad_(False)
-            tensor_bottom_reciprocal = 1 / tensor_bottom
-            tensor_top_shape = ancestor_top.shape()
-            tensor_top_gradbox = gradbox * tensor_bottom_reciprocal
+        if tensor_top.requires_grad:
+            tensor_bottom_reciprocal = DivideScalar[dtype].forward[
+                track_grad=False
+            ](tensor_bottom, 1)
+            tensor_top_shape = tensor_top.shape()
+            tensor_top_gradbox = tensor_bottom_reciprocal * gradbox
             if tensor_top_gradbox.shape() != tensor_top_shape:
                 tensor_top_gradbox = (
                     tensor_top_gradbox.sum_over_broadcasted_axes(
                         tensor_top_shape
                     )
                 )
-            grad_shares.append(
-                (ancestor_top.copy(), tensor_top_gradbox^, AddTensor)
-            )
+            grad_shares.append((tensor_top, tensor_top_gradbox^, AddTensor))
 
-        if ancestor_bottom.requires_grad():
-            tensor_top = ancestor_top.tensor()
-            tensor_bottom = ancestor_bottom.tensor()
-            tensor_top.requires_grad_(False)
-            tensor_bottom.requires_grad_(False)
-            tensor_bottom_squared = tensor_bottom * tensor_bottom
-            tensor_bottom_squared_reciprocal = 1 / tensor_bottom_squared
-            tensor_bottom_grad = tensor_top * tensor_bottom_squared_reciprocal
-            tensor_bottom_gradbox = gradbox * tensor_bottom_grad
+        if tensor_bottom.requires_grad:
+            tensor_bottom_squared = tensor_bottom.__mul__[track_grad=False](
+                tensor_bottom
+            )
+            tensor_bottom_squared_reciprocal = DivideScalar[dtype].forward[
+                track_grad=False
+            ](tensor_bottom_squared, 1)
+            tensor_bottom_grad = tensor_top.__mul__[track_grad=False](
+                tensor_bottom_squared_reciprocal
+            )
+            tensor_bottom_gradbox = tensor_bottom_grad * gradbox
             if tensor_bottom_gradbox.shape() != tensor_bottom.shape():
                 tensor_bottom_gradbox = (
                     tensor_bottom_gradbox.sum_over_broadcasted_axes(
@@ -111,7 +114,7 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable):
                     )
                 )
             grad_shares.append(
-                (ancestor_bottom^, tensor_bottom_gradbox^, SubtractTensor)
+                (tensor_bottom^, tensor_bottom_gradbox^, SubtractTensor)
             )
 
         return grad_shares^

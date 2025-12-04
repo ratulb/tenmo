@@ -1,7 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_LOG
-from ancestry import Ancestor
 from gradbox import Gradbox
 from math import log
 from sys import simd_width_of
@@ -11,17 +10,17 @@ from sys import simd_width_of
 @register_passable
 struct LogBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_LOG
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         """Compute gradient: ∂log(x)/∂x = 1/x."""
         ref grad_output = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        ref shape = ancestor.shape()
-        ref parent = ancestor.tensor()
+        var parent = output.ancestry().get(0)
+        ref shape = parent.shape()
         var parent_gradbox = Gradbox[dtype].zeros(shape, share=False)
 
         if parent.is_contiguous():
@@ -50,11 +49,12 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
             var parent_gradbox_data = parent_gradbox.buffer.data_buffer().data
             var grad_output_data = grad_output.buffer.data_buffer().data
             for coord in shape:
-
                 var x = parent[coord]  # Original input
-                parent_gradbox_data[index] = grad_output_data[index] / x  # Correct
+                parent_gradbox_data[index] = (
+                    grad_output_data[index] / x
+                )  # Correct
 
-        return [(ancestor^, parent_gradbox^, AddTensor)]
+        return [(parent^, parent_gradbox^, AddTensor)]
 
 
 @fieldwise_init
@@ -104,14 +104,15 @@ struct Logarithm[dtype: DType]:
 
         return out^
 
+
 ## The Math
 # Forward:  y = log(x)
 # Backward: dy/dx = 1/x
 
 
 fn main() raises:
-    #x = 2.0
-    #y = log(2.0)  # ≈ 0.693
+    # x = 2.0
+    # y = log(2.0)  # ≈ 0.693
 
     # If grad_output = 1.0:
     # Correct gradient: 1.0 / 2.0 = 0.5
@@ -119,21 +120,22 @@ fn main() raises:
     test_log_backward()
     print("passes")
 
+
 fn test_log_backward():
     print("Testing log backward...")
 
     var x = Tensor[DType.float64]([2.0, 3.0, 4.0], requires_grad=True)
     var y = x.log()
-    print("y (log(x)):")  #// Should be [0.693, 1.099, 1.386]
+    print("y (log(x)):")  # // Should be [0.693, 1.099, 1.386]
     y.print()
     var loss = y.sum()
     loss.backward()
 
     print("x.grad:")
-    #// ✅ Should be [0.5, 0.333, 0.25] = [1/2, 1/3, 1/4]
-    #// ❌ NOT [1.44, 0.91, 0.72] = [1/log(2), 1/log(3), 1/log(4)]
+    # // ✅ Should be [0.5, 0.333, 0.25] = [1/2, 1/3, 1/4]
+    # // ❌ NOT [1.44, 0.91, 0.72] = [1/log(2), 1/log(3), 1/log(4)]
 
-    #// Numerical verification
+    # // Numerical verification
     x.grad().print()
     var expected = Tensor[DType.float64]([0.5, 0.333333, 0.25])
     print("Expected:", expected)

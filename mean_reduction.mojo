@@ -4,7 +4,6 @@ from operators import AddTensor
 from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_MEAN
 from validators import Validator
-from ancestry import Ancestor
 from gradbox import Gradbox
 from forwards import DivideByScalar
 
@@ -24,11 +23,11 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         self.keepdims = other.keepdims
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         gradbox_shape = gradbox.shape()
-        ancestor = output.ancestry().get(0)
+        var ancestor = output.ancestry().get(0)
         if gradbox_shape == Shape():
             scalar_grad = gradbox.item() / ancestor.shape().num_elements()
             grad_contrib = Gradbox[dtype].full(

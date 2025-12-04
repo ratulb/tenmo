@@ -6,17 +6,17 @@ from sys import simd_width_of
 from utils.numerics import min_finite
 from memory import memcpy, memset, memset_zero
 from shapes import Shape, ShapeIndexIterator
-from ancestry import Ancestors, Ancestor, Parents
+from ancestry import Ancestors
 from strides import Strides
 from common_utils_imports import *
-from common_utils import id as identity, log_warning
+from common_utils import IDGen, log_warning
 from operators import *
 
 from backpropagation import BackwardFn
 from forwards import *
 from buffers import Buffer
 from validators import Validator
-from collections import Set
+from collections import Set, Deque
 from gradbox import Gradbox
 from intarray import IntArray
 from broadcasthelper import ShapeBroadcaster
@@ -39,12 +39,11 @@ struct Tensor[dtype: DType = DType.float32](
     alias Rows = List[Self.Row]
     alias Block = List[Self.Rows]
     alias Blocks = List[Self.Block]
-
+    var _id: Int
     var buffer: NDBuffer[dtype]
     var requires_grad: Bool
     var gradbox: UnsafePointer[Gradbox[dtype]]
     var ancestors: Optional[Ancestors[dtype]]
-    var parents: Optional[Parents[dtype]]
     var backwardFn: Optional[BackwardFn[dtype]]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
@@ -55,11 +54,11 @@ struct Tensor[dtype: DType = DType.float32](
         self = Self.d1(row, requires_grad=requires_grad)
 
     fn __init__(out self, shape: Shape, requires_grad: Bool = False):
+        self._id = IDGen.generate_id()
         self.buffer = NDBuffer[dtype](shape)
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = None
-        self.parents = None
         self.backwardFn = None
         self.init_gradbox()
 
@@ -71,13 +70,13 @@ struct Tensor[dtype: DType = DType.float32](
         *,
         copy: Bool = True,
     ):
+        self._id = IDGen.generate_id()
         self.buffer = NDBuffer[dtype](
             Buffer[dtype](shape.num_elements(), ptr, copy=copy), shape
         )
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = None
-        self.parents = None
         self.backwardFn = None
         self.init_gradbox()
 
@@ -86,11 +85,11 @@ struct Tensor[dtype: DType = DType.float32](
         var buffer: NDBuffer[dtype],
         requires_grad: Bool = False,
     ):
+        self._id = IDGen.generate_id()
         self.buffer = buffer^
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = None
-        self.parents = None
         self.backwardFn = None
         self.init_gradbox()
 
@@ -111,14 +110,15 @@ struct Tensor[dtype: DType = DType.float32](
         return Gradbox[dtype](self^.buffer.contiguous(), share=share)
 
     fn __moveinit__(out self, deinit other: Self):
+        self._id = other._id
         self.buffer = other.buffer^
         self.requires_grad = other.requires_grad
         self.gradbox = other.gradbox
         self.ancestors = other.ancestors^
-        self.parents = other.parents^
         self.backwardFn = other.backwardFn^
 
     fn __copyinit__(out self, other: Self):
+        self._id = other._id
         self.buffer = other.buffer.copy()
         self.requires_grad = other.requires_grad
         if other.gradbox != UnsafePointer[Gradbox[dtype]]():
@@ -127,12 +127,11 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             self.gradbox = UnsafePointer[Gradbox[dtype]]()
         self.ancestors = other.ancestors.copy()
-        self.parents = other.parents.copy()
         self.backwardFn = other.backwardFn.copy()
 
     @always_inline
     fn id(self) -> Int:
-        return identity(self)
+        return self._id
 
     @always_inline
     fn init_gradbox(mut self):
@@ -212,7 +211,9 @@ struct Tensor[dtype: DType = DType.float32](
 
         return self.buffer[indices]
 
-    fn __getitem__[track_grad: Bool=True](self, *slices: Slice) -> Tensor[dtype]:
+    fn __getitem__[
+        track_grad: Bool = True
+    ](self, *slices: Slice) -> Tensor[dtype]:
         # Delegate shape/strides/offset computation
         shape, strides, offset = Validator.validate_and_compute_view_metadata(
             self.shape(),
@@ -228,7 +229,9 @@ struct Tensor[dtype: DType = DType.float32](
             validated=True,
         )
 
-    fn __getitem__[track_grad: Bool=True](self, *indices: Idx) -> Tensor[dtype]:
+    fn __getitem__[
+        track_grad: Bool = True
+    ](self, *indices: Idx) -> Tensor[dtype]:
         # Compute view metadata
         view_shape, view_strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
@@ -497,7 +500,7 @@ struct Tensor[dtype: DType = DType.float32](
 
         ref ancestors = self.ancestors.value()
         for parent in parents:
-            ancestors.append(Ancestor[dtype](parent.copy()))
+            ancestors.append(parent)
 
     fn has_ancestry(self) -> Bool:
         return self.ancestors != None
@@ -1482,13 +1485,92 @@ struct Tensor[dtype: DType = DType.float32](
         var squared = Multiplicator[dtype].forward[track_grad](diff, diff)
         return squared.mean[track_grad]()
 
-    fn backward(self, start_grad: Scalar[dtype] = 1.0):
-        output = Ancestor(self)
-        output.backward(start_grad)
-
-    fn backward(self, seed_tensor: Tensor[dtype]):
-        output = Ancestor(self)
+    fn backward(mut output: Tensor[dtype], start_grad: Scalar[dtype] = 1.0):
+        if not output.requires_grad:
+            return
+        var shape = output.shape()
+        var seed_tensor = Tensor[dtype].full(shape, start_grad)
         output.backward(seed_tensor)
+
+    fn backward(mut output, seed_tensor: Tensor[dtype]):
+        if not output.requires_grad:
+            return
+        output.seed_grad(seed_tensor)
+
+        try:
+            # Phase 1: Discovery
+            var visited = Set[Int]()
+            var topo_ids = List[Int]()
+            var fanin = Dict[Int, Int]()
+            var node_list = List[Tensor[dtype]]()  # Use List instead of Dict
+            var id_to_index = Dict[Int, Int]()  # Map ID to List index
+
+            var dfs_stack = List[Int]()
+            dfs_stack.append(output.id())
+
+            # Add to list and record index
+            node_list.append(output.copy())
+            id_to_index[output.id()] = 0
+
+            while len(dfs_stack) > 0:
+                var node_id = dfs_stack.pop()
+
+                if node_id in visited:
+                    continue
+
+                visited.add(node_id)
+                topo_ids.append(node_id)
+
+                var node_idx = id_to_index[node_id]
+                var node = node_list[node_idx]  # Access by index
+
+                if node.has_ancestry():
+                    for parent in node.ancestry():
+                        var parent_id = parent.id()
+                        fanin[parent_id] = fanin.get(parent_id, 0) + 1
+
+                        if parent_id not in id_to_index:
+                            var new_idx = len(node_list)
+                            node_list.append(parent.copy())
+                            id_to_index[parent_id] = new_idx
+                            dfs_stack.append(parent_id)
+
+            # Phase 2: Execute backward
+            var ready_queue = Deque[Int]()
+            ready_queue.append(output.id())
+
+            while len(ready_queue) > 0:
+                var node_id = ready_queue.popleft()
+                var node_idx = id_to_index[node_id]
+                var node = node_list[node_idx]  # Access by index
+
+                if node.has_backward_fn():
+                    for result in node.backward_fn()(node):
+                        var target_node = result[0]
+                        var grad = result[1].copy()
+                        var op_code = result[2]
+                        var target_id = target_node.id()
+
+                        if target_id in id_to_index:
+                            var target_idx = id_to_index[target_id]
+                            # Access by index each time (safe)
+                            if op_code == AddTensor:
+                                node_list[target_idx].update_grad[AddTensor](
+                                    grad^
+                                )
+                            else:
+                                node_list[target_idx].update_grad[
+                                    SubtractTensor
+                                ](grad^)
+
+                        if target_id in fanin:
+                            fanin[target_id] -= 1
+                            if fanin[target_id] == 0:
+                                var target_idx = id_to_index[target_id]
+                                if node_list[target_idx].has_backward_fn():
+                                    ready_queue.append(target_id)
+        except e:
+            print(e)
 
     fn requires_grad_(mut self, requires_grad: Bool = True):
         self.requires_grad = requires_grad
@@ -1994,7 +2076,7 @@ fn main():
     # test_bce()
     # test_gradients()
 
-    a = Tensor.arange(12)
+    _ = """a = Tensor.arange(12)
     b = a
     c = a.into_view()
 
@@ -2011,7 +2093,7 @@ fn main():
     x = r
     x[1, 1] = 89
     x.print()
-    a.print()
+    a.print()"""
     _ = """a.print()
     print()
     m_keep = a.mean(axes=[2], keepdims=True)

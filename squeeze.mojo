@@ -6,19 +6,19 @@ from common_utils import panic
 from shapes import Shape
 from strides import Strides
 from gradbox import Gradbox
-from ancestry import Ancestor
 
 
 @fieldwise_init
 @register_passable
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_SQUEEZE
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ancestor = output.ancestry().get(0)
         var gradbox = output.grad()
 
@@ -28,7 +28,7 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
         return [
             (ancestor^, gradbox_ancestor^, AddTensor),
             (
-                Ancestor(output),
+                output,
                 gradbox^,
                 ZeroGrad,
             ),  # Send out a signal to this output of squeeze op to zero out its grad(No accumulation of grad for view)

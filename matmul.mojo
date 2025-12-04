@@ -2,26 +2,32 @@ from tenmo import Tensor
 from algorithm import vectorize
 from sys import simd_width_of
 from matrixshapevalidator import MatrixShapeValidator
-from backpropagation import Delegate, BackwardFn, BACKWARD_MATMUL_ND, BACKWARD_MATMUL_2D
+from backpropagation import (
+    Delegate,
+    BackwardFn,
+    BACKWARD_MATMUL_ND,
+    BACKWARD_MATMUL_2D,
+)
 from operators import AddTensor, mm, vm, mv, dot, invalid
 from gradbox import Gradbox
-from ancestry import Ancestor
 from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
 from common_utils import il, s, panic, log_debug
+from vectormatrix import VectorMatmulNd
+from matrixvector import MatrixVectorMulNd
+
 
 @fieldwise_init
 @register_passable
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_MATMUL_2D
+
     @always_inline
     fn backward[
         simdwidth: Int = simd_width_of[dtype](), tile_size: Int = 32
-    ](self, output: Tensor[dtype]) -> List[
-        Tuple[Ancestor[dtype], Gradbox[dtype], Int]
+    ](self, read output: Tensor[dtype]) -> List[
+        Tuple[Tensor[dtype], Gradbox[dtype], Int]
     ]:
-
-
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
@@ -30,11 +36,11 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         var n = A.shape()[1]
         var p = B.shape()[1]
 
-        var result = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
+        var result = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]()
 
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
         # grad_A[i,j] = sum_k(grad_out[i,k] * B[j,k])  ← Reading B transposed!
-        if A.requires_grad():
+        if A.requires_grad:
             var grad_A = Gradbox[dtype].zeros(Shape([m, n]))
 
             # Hoist all metadata
@@ -42,12 +48,10 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             var grad_out_stride1 = grad_out.strides()[1]
             var grad_out_data = grad_out.buffer.buffer.data
 
-            # var B_tensor = B.tensor()
-            ref B_tensor = B.tensor()
-            var B_stride0 = B_tensor.buffer.strides[0]
-            var B_stride1 = B_tensor.buffer.strides[1]
-            var B_offset = B_tensor.buffer.offset
-            var B_data = B_tensor.buffer.buffer.data
+            var B_stride0 = B.buffer.strides[0]
+            var B_stride1 = B.buffer.strides[1]
+            var B_offset = B.buffer.offset
+            var B_data = B.buffer.buffer.data
 
             var grad_A_stride0 = grad_A.strides()[0]
             var grad_A_stride1 = grad_A.strides()[1]
@@ -62,12 +66,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                         var k_end = min(k_tile + tile_size, p)
 
                         for i in range(i_tile, i_end):
-                            var grad_out_row_base = (
-                                i * grad_out_stride0
-                            )
-                            var grad_A_row_base = (
-                                i * grad_A_stride0
-                            )
+                            var grad_out_row_base = i * grad_out_stride0
+                            var grad_A_row_base = i * grad_A_stride0
 
                             @parameter
                             fn process_columns_a[simd_width: Int](j_local: Int):
@@ -106,19 +106,18 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                 j_end - j_tile
                             )
 
-            result.append((A.copy(), grad_A^, AddTensor))
+            result.append((A, grad_A^, AddTensor))
 
         # Step 3: Compute grad_B (if needed)
         # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
         # grad_B[j,k] = sum_i(A[i,j] * grad_out[i,k])  ← Reading A transposed!
-        if B.requires_grad():
+        if B.requires_grad:
             var grad_B = Gradbox[dtype].zeros(Shape([n, p]))
 
-            ref A_tensor = A.tensor()
-            var A_stride0 = A_tensor.buffer.strides[0]
-            var A_stride1 = A_tensor.buffer.strides[1]
-            var A_offset = A_tensor.buffer.offset
-            var A_data = A_tensor.buffer.buffer.data
+            var A_stride0 = A.buffer.strides[0]
+            var A_stride1 = A.buffer.strides[1]
+            var A_offset = A.buffer.offset
+            var A_data = A.buffer.buffer.data
 
             var grad_out_stride0 = grad_out.strides()[0]
             var grad_out_stride1 = grad_out.strides()[1]
@@ -137,9 +136,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                         var i_end = min(i_tile + tile_size, m)
 
                         for j in range(j_tile, j_end):
-                            var grad_B_row_base = (
-                                j * grad_B_stride0
-                            )
+                            var grad_B_row_base = j * grad_B_stride0
 
                             @parameter
                             fn process_columns_b[simd_width: Int](k_local: Int):
@@ -360,9 +357,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                                 var a_addr = a_row_base + k * A_stride1
                                 var a_ik = A_data[a_addr]
 
-                                var b_addr = (
-                                    k * B_stride0  + j * B_stride1
-                                )
+                                var b_addr = k * B_stride0 + j * B_stride1
                                 var b_vec = B_data.load[width=simd_width](
                                     b_addr
                                 )
@@ -420,7 +415,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                             var a_row_base = i * A_stride0
                             var c_row_base = i * C_stride0
 
-
                             @parameter
                             fn process_columns[simd_width: Int](j_local: Int):
                                 var j = j_tile + j_local
@@ -474,7 +468,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                 var a_row_base = i * A_stride0
                 var c_row_base = i * C_stride0
 
-
                 for j in range(p):
                     var accumulator: Scalar[dtype] = 0
 
@@ -493,36 +486,30 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 @register_passable
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_MATMUL_ND
+
     fn backward[
         simdwidth: Int = simd_width_of[dtype]()
-    ](self, output: Tensor[dtype]) -> List[
-        Tuple[Ancestor[dtype], Gradbox[dtype], Int]
+    ](self, read output: Tensor[dtype]) -> List[
+        Tuple[Tensor[dtype], Gradbox[dtype], Int]
     ]:
-
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
-        ref A_tensor = A.tensor()
-        ref B_tensor = B.tensor()
 
-        ref A_shape = A_tensor.shape()
-        ref B_shape = B_tensor.shape()
-        var results = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
+        ref A_shape = A.shape()
+        ref B_shape = B.shape()
+        var results = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]()
 
-        if A.requires_grad():
-            var B_transposed = B_tensor.transpose[track_grad=False](
-                axes=[-1, -2]
-            )
+        if A.requires_grad:
+            var B_transposed = B.transpose[track_grad=False](axes=[-1, -2])
 
             var A_batch_grad = MatmulNd[dtype].forward(grad_out, B_transposed)
             var final_grad_A = A_batch_grad.sum_over_broadcasted_axes(A_shape)
 
-            results.append((A.copy(), final_grad_A^, AddTensor))
+            results.append((A, final_grad_A^, AddTensor))
 
-        if B.requires_grad():
-            var A_transposed = A_tensor.transpose[track_grad=False](
-                axes=[-1, -2]
-            )
+        if B.requires_grad:
+            var A_transposed = A.transpose[track_grad=False](axes=[-1, -2])
             var B_batch_grad = MatmulNd[dtype].forward(A_transposed, grad_out)
 
             var final_grad_B = B_batch_grad.sum_over_broadcasted_axes(B_shape)
@@ -686,10 +673,6 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             C_slice.buffer.copy_from_alike[overwrite=False](result.buffer)
 
         return C^
-
-
-from vectormatrix import VectorMatmulNd
-from matrixvector import MatrixVectorMulNd
 
 
 @fieldwise_init

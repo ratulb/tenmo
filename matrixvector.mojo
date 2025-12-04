@@ -2,7 +2,6 @@ from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_MATRIX_VECTOR_MUL
 from operators import AddTensor
 from gradbox import Gradbox
-from ancestry import Ancestor
 from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
 from common_utils import il, s, panic
@@ -114,11 +113,12 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
 @register_passable
 struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_MATRIX_VECTOR_MUL
-    fn backward[
-        simdwidth: Int = simd_width_of[dtype]()
-    ](self, output: Tensor[dtype]) -> List[
-        Tuple[Ancestor[dtype], Gradbox[dtype], Int]
-    ]:
+
+    fn backward(
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        alias simdwidth = simd_width_of[dtype]()
+
         ref grad_out = output.gradients()[]
         var M = output.ancestry().get(0)
         var v = output.ancestry().get(1)
@@ -135,21 +135,19 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
             M_batch_dims, v_batch_dims
         )
 
-        var results = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]()
+        var results = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]()
 
         # Gradient for M: dM[m, k] = grad_out[m] ⊗ v[k] (outer product)
-        if M.requires_grad():
+        if M.requires_grad:
             var grad_M = Gradbox[dtype].zeros(M_shape, share=True)
 
             # Hoist metadata
             var grad_out_stride = grad_out.strides()[-1]
-            var grad_out_offset = grad_out.offset()
             var grad_out_data = grad_out.buffer.buffer.data
 
-            ref v_tensor = v.tensor()
-            var v_stride = v_tensor.buffer.strides[-1]
-            var v_offset = v_tensor.buffer.offset
-            var v_data = v_tensor.buffer.buffer.data
+            var v_stride = v.buffer.strides[-1]
+            var v_offset = v.buffer.offset
+            var v_data = v.buffer.buffer.data
 
             var grad_M_stride0 = grad_M.strides()[-2]
             var grad_M_stride1 = grad_M.strides()[-1]
@@ -165,13 +163,13 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                     indices, batch_shape, v_batch_dims
                 )
 
-                var grad_out_base = grad_out_offset
+                var grad_out_base = 0
                 for i in range(indices.size()):
                     grad_out_base += indices[i] * grad_out.strides()[i]
 
                 var v_base = v_offset
                 for i in range(v_indices.size()):
-                    v_base += v_indices[i] * v_tensor.buffer.strides[i]
+                    v_base += v_indices[i] * v.buffer.strides[i]
 
                 var grad_M_base = grad_M_offset
                 for i in range(M_indices.size()):
@@ -215,22 +213,20 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                             )
                             grad_M_data[grad_M_addr] += grad_out_val * v_val
 
-            results.append((M.copy(), grad_M^, AddTensor))
+            results.append((M, grad_M^, AddTensor))
 
         # Gradient for v: dv[k] = M^T[k, m] @ grad_out[m]
         # This is: dv[k] = sum_i(M[i, k] * grad_out[i])
-        if v.requires_grad():
+        if v.requires_grad:
             var grad_v = Gradbox[dtype].zeros(v_shape, share=True)
 
             # Hoist metadata
-            ref M_tensor = M.tensor()
-            var M_stride0 = M_tensor.buffer.strides[-2]
-            var M_stride1 = M_tensor.buffer.strides[-1]
-            var M_offset = M_tensor.buffer.offset
-            var M_data = M_tensor.buffer.buffer.data
+            var M_stride0 = M.buffer.strides[-2]
+            var M_stride1 = M.buffer.strides[-1]
+            var M_offset = M.buffer.offset
+            var M_data = M.buffer.buffer.data
 
             var grad_out_stride = grad_out.strides()[-1]
-            var grad_out_offset = grad_out.offset()
             var grad_out_data = grad_out.buffer.buffer.data
 
             var grad_v_stride = grad_v.strides()[-1]
@@ -247,9 +243,9 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
 
                 var M_base = M_offset
                 for i in range(M_indices.size()):
-                    M_base += M_indices[i] * M_tensor.buffer.strides[i]
+                    M_base += M_indices[i] * M.buffer.strides[i]
 
-                var grad_out_base = grad_out_offset
+                var grad_out_base = 0
                 for i in range(indices.size()):
                     grad_out_base += indices[i] * grad_out.strides()[i]
 
@@ -273,7 +269,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                     var grad_v_addr = grad_v_base + j * grad_v_stride
                     grad_v_data[grad_v_addr] += accumulator
 
-            results.append((v^, grad_v^, AddTensor))
+            results.append((v, grad_v^, AddTensor))
 
         return results^
 
@@ -393,7 +389,6 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
 # dM = grad_out @ v^T → shape [..., m, k]
 
 # dv = M^T @ grad_out → shape [..., k]
-
 
 
 # Key Differences from VectorMatmulNd:

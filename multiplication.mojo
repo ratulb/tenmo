@@ -2,7 +2,6 @@ from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_MULTIPLY, BACKWARD_MULTIPLY_SCALAR, BACKWARD_MULTIPLY_BROADCAST
 from operators import AddTensor, Multiply
 from common_utils import panic, id
-from ancestry import Ancestor
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 
@@ -17,10 +16,11 @@ struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
     fn backward(
         self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        var gradbox = output.grad()
+        var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * self.factor
+
         return [
             (
                 ancestor^,
@@ -38,35 +38,34 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
-        ancestor_lhs = output.ancestry().get(0)
+        var ancestor_lhs = output.ancestry().get(0)
 
         if count == 1:  # B = A * A, A is the only ancestor of B
-            tensor_lhs = ancestor_lhs.tensor()
-            gradbox_prod = gradbox * tensor_lhs
+            gradbox_prod = ancestor_lhs * gradbox
             gradbox_prod = gradbox_prod * Scalar[dtype](2)
             return [(ancestor_lhs^, gradbox_prod^, AddTensor)]
 
-        var grad_shares: List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]] = []
+        var grad_shares = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]](capacity=2)
 
-        ancestor_rhs = output.ancestry().get(1)
+        var ancestor_rhs = output.ancestry().get(1)
 
-        if ancestor_lhs.requires_grad():
-            gradbox_prod = gradbox * ancestor_rhs.tensor()
+        if ancestor_lhs.requires_grad:
+            var gradbox_prod = gradbox * ancestor_rhs
 
             grad_shares.append(
                 (
-                    ancestor_lhs.copy(),
+                    ancestor_lhs,
                     gradbox_prod^,
                     AddTensor,
                 )
             )
 
-        if ancestor_rhs.requires_grad():
-            gradbox_prod = gradbox * ancestor_lhs.tensor()
+        if ancestor_rhs.requires_grad:
+            var gradbox_prod = gradbox * ancestor_lhs
             grad_shares.append(
                 (
                     ancestor_rhs^,

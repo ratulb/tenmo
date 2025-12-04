@@ -1,7 +1,6 @@
 from tenmo import Tensor
 from operators import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_VARIANCE
-from ancestry import Ancestor
 from gradbox import Gradbox
 from common_utils import panic
 
@@ -18,11 +17,10 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradbox = output.grad()  # Copying
-        var ancestor = output.ancestry().get(0)
-        ref input_tensor = ancestor.tensor()
+        var input_tensor = output.ancestry().get(0)
         ref input_shape = input_tensor.shape()
         # Compute mean of input (always with keepdims=True)
         var dim = List[Int]()
@@ -58,7 +56,7 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable):
         # Broadcast to input shape (automatic broadcasting will handle it)
         gradbox_ancestor = local_grad * gradbox_ancestor
 
-        return [(ancestor^, gradbox_ancestor^, AddTensor)]
+        return [(input_tensor^, gradbox_ancestor^, AddTensor)]
 
 
 @fieldwise_init

@@ -8,7 +8,6 @@ from division import Divider
 from minmax import MinMax
 from intarray import IntArray
 from gradbox import Gradbox
-from ancestry import Ancestor
 from shapes import Shape
 from buffers import Buffer
 from ndbuffer import NDBuffer
@@ -44,8 +43,8 @@ struct SoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradbox = output.grad()
 
         # Reconstruct softmax output efficiently from buffer
@@ -138,8 +137,8 @@ struct LogSoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradbox = output.grad()
 
         # Reconstruct softmax output efficiently

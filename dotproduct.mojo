@@ -3,44 +3,38 @@ from common_utils import panic
 from backpropagation import Delegate, BackwardFn, BACKWARD_DOT
 from operators import AddTensor
 from gradbox import Gradbox
-from ancestry import Ancestor
 
 
 @fieldwise_init
 @register_passable
 struct DotBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_DOT
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
         scalar_grad_value = gradbox.item()  # Scalar
-        var grad_shares: List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]] = []
-        ancestor_lhs = output.ancestry().get(0)
-        ancestor_rhs = output.ancestry().get(1)
+        var grad_shares: List[Tuple[Tensor[dtype], Gradbox[dtype], Int]] = []
+        tensor_lhs = output.ancestry().get(0)
+        tensor_rhs = output.ancestry().get(1)
 
-        if ancestor_lhs.requires_grad():
-            tensor_rhs = ancestor_rhs.tensor()
-            gradbox_lhs = Gradbox[dtype].zeros(
-                ancestor_lhs.shape(), share=False
-            )
+        if tensor_lhs.requires_grad:
+            gradbox_lhs = Gradbox[dtype].zeros(tensor_lhs.shape(), share=False)
             for index, value in tensor_rhs:
                 gradbox_lhs[index] = value * scalar_grad_value
 
-            grad_shares.append((ancestor_lhs.copy(), gradbox_lhs^, AddTensor))
+            grad_shares.append((tensor_lhs, gradbox_lhs^, AddTensor))
 
-        if ancestor_rhs.requires_grad():
-            tensor_lhs = ancestor_lhs.tensor()
-            gradbox_rhs = Gradbox[dtype].zeros(
-                ancestor_rhs.shape(), share=False
-            )
+        if tensor_rhs.requires_grad:
+            gradbox_rhs = Gradbox[dtype].zeros(tensor_rhs.shape(), share=False)
             for index, value in tensor_lhs:
                 gradbox_rhs[index] = value * scalar_grad_value
 
-            grad_shares.append((ancestor_rhs^, gradbox_rhs^, AddTensor))
+            grad_shares.append((tensor_rhs^, gradbox_rhs^, AddTensor))
 
         return grad_shares^
 
@@ -53,10 +47,7 @@ struct Dot[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](
-        lhs: Tensor[dtype],
-        rhs: Tensor[dtype],
-    ) -> Tensor[dtype]:
+    ](lhs: Tensor[dtype], rhs: Tensor[dtype],) -> Tensor[dtype]:
         rank_lhs = lhs.rank()
         rank_rhs = rhs.rank()
         if not rank_lhs == rank_rhs and not rank_lhs <= 1:
