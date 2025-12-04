@@ -19,8 +19,8 @@ t2.print()
 var y = t * 2.0
 y.backward()
 t.grad().print()
-
-📊 Core Features
+```
+**Core Features**
 
     Feature	                        Status	      Description
     N-dimensional Tensor	        ✅            Full Support for float64, float32, bool types
@@ -34,7 +34,7 @@ t.grad().print()
 
 Neural Network Examples
 XOR Problem (Classic Non-linear Learning)
-mojo
+```mojo
 from tenmo import Tensor
 from net import Sequential, Linear, Sigmoid, SGD, MSELoss
 
@@ -58,7 +58,7 @@ fn xor_classification():
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
+```
     # Achieves 100% accuracy in ~1 second
 
 Output:
@@ -68,8 +68,9 @@ Training time: 1.1964s
 Final loss: 0.000257
 Accuracy: 100.0%
 ✓ Success: Network learned XOR perfectly
+
 Spiral Dataset (Complex Non-linear Classification)
-mojo
+
 # 2D spiral classification with 2,817 parameters
 # 500 training samples, 250 validation
 # 3 hidden layers: 64 → 32 → 16 → 1
@@ -80,8 +81,11 @@ Epoch  4999 | Train Loss: 0.01113 Acc: 99.3% | Val Loss: 0.01822 Acc: 99.2%
 
 Total training time: 16.1 minutes
 Final Validation Accuracy: 99.2%
+
 ✓ Training successful! Model learned the spiral pattern.
-🏗️ Architecture
+
+**Architecture**
+
 Tensor System
 Memory Layout: Contiguous storage with stride-based views
 
@@ -100,13 +104,15 @@ Optimizers: SGD with momentum, learning rate scheduling
 
 Training Utilities: TensorDataset, DataLoader, train/eval modes
 
-⚡ Performance
+**Performance**
+
 Operation	Performance	Notes
 XOR Training	1.2 seconds	2000 epochs, 100% accuracy
 Spiral Training	16.1 minutes	5000 epochs, 99.2% accuracy
 Batch Processing	~6 ms/batch	32 samples per batch
 Matrix Multiplication	SIMD-optimized	Manual vectorization
-🧪 Testing
+
+**Testing**
 Run comprehensive tests:
 
 bash
@@ -123,7 +129,7 @@ Loss functions and optimizers
 
 Data loading utilities
 
-🎯 Why Mojo?
+**Why Mojo?**
 Mojo enables Python-like usability with C-level performance:
 
 SIMD intrinsics for vectorized operations
@@ -135,7 +141,9 @@ Memory control for efficient gradient storage
 Compile-time optimization for neural network kernels
 
 🚧 Development Status
+
 ⚠️ Active Development: API may change between Mojo versions. Breaking changes expected.
+
 
 Current Focus:
 
@@ -149,26 +157,8 @@ GPU acceleration support
 
 Distributed training utilities
 
-📚 Learning Resources
-Mojo Documentation
-
-PyTorch Internals
-
-Neural Networks from Scratch
 
 📄 License
 MIT License - free for educational and commercial use.
 
-Built with ❤️ to understand deep learning from the ground up.
-
-text
-
-This README:
-1. **Professional presentation** with clear sections and visual hierarchy
-2. **Concise but complete** - covers all important aspects without verbosity
-3. **Showcases capabilities** with real examples and outputs
-4. **Clear status indicators** showing what's complete vs planned
-5. **Ready for GitHub** with proper formatting and structure
-6. **Focuses on your achievements** - XOR solved in 1.2s, Spiral at 99.2% accuracy
-
-The examples are integrated naturally, showing both simple (XOR) and complex (Spiral) use cases to demonstrate the library's capabilities.
+Built with passion to understand deep learning from the ground up.
