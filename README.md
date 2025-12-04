@@ -1,8 +1,8 @@
-# 🧠 Tenmo: High-Performance Tensors in Mojo
+# Tenmo: High-Performance Tensors in Mojo
 
 A from-scratch **Tensor library** built in [Mojo](https://modular.com/mojo), featuring automatic differentiation, neural network training, and SIMD-optimized operations. Built for learning, optimized for performance.
 
-## 🚀 Quick Start
+## Quick Start
 
 ```mojo
 from tenmo import Tensor
@@ -19,17 +19,20 @@ t2.print()
 var y = t * 2.0
 y.backward()
 t.grad().print()
+
 📊 Core Features
-Feature	Status	Description
-N-dimensional Tensor	✅ Full	Support for float64, float32, bool types
-Automatic Differentiation	✅ Full	Graph-based backpropagation
-Elementwise Operations	✅ Full	+, -, *, /, pow, etc.
-SIMD Vectorization	✅ Full	Optimized CPU performance
-Slicing & Views	✅ Full	Zero-copy tensor views
-Broadcasting	✅ Full	Shape-compatible operations
-Neural Network Module	✅ Full	Linear, ReLU, Sigmoid, optimizers
-Data Loading	✅ Full	TensorDataset, DataLoader for batching
-🧠 Neural Network Examples
+
+    Feature	                        Status	      Description
+    N-dimensional Tensor	        ✅            Full Support for float64, float32, bool types
+    Automatic Differentiation	    ✅            Full	Graph-based backpropagation
+    Elementwise Operations        	✅            Full	+, -, *, /, pow, etc.
+    SIMD Vectorization	            ✅            Full	Optimized CPU performance
+    Slicing & Views	                ✅            Full	Zero-copy tensor views
+    Broadcasting	                ✅            Full	Shape-compatible operations
+    Neural Network Module	        ✅            Full	Linear, ReLU, Sigmoid, optimizers
+    Data Loading	                ✅            Full	TensorDataset, DataLoader for batching
+
+Neural Network Examples
 XOR Problem (Classic Non-linear Learning)
 mojo
 from tenmo import Tensor
@@ -57,6 +60,7 @@ fn xor_classification():
         optimizer.step()
 
     # Achieves 100% accuracy in ~1 second
+
 Output:
 
 text
@@ -130,20 +134,6 @@ Memory control for efficient gradient storage
 
 Compile-time optimization for neural network kernels
 
-📁 Project Structure
-text
-tenmo/
-├── tensor.mojo      # Core Tensor class with autograd
-├── net/             # Neural network components
-│   ├── layers.mojo  # Linear, ReLU, Sigmoid
-│   ├── loss.mojo    # Loss functions
-│   └── optim.mojo   # Optimizers (SGD)
-├── data/            # Data loading utilities
-│   ├── dataset.mojo # TensorDataset
-│   └── loader.mojo  # DataLoader
-└── examples/        # Example programs
-    ├── xor.mojo     # XOR problem demo
-    └── spiral.mojo  # Spiral classification demo
 🚧 Development Status
 ⚠️ Active Development: API may change between Mojo versions. Breaking changes expected.
 
