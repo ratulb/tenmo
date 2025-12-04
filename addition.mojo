@@ -1,31 +1,42 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_ADD, BACKWARD_ADD_SCALAR, BACKWARD_ADD_BROADCAST
+from backpropagation import (
+    Delegate,
+    BackwardFn,
+    BACKWARD_ADD,
+    BACKWARD_ADD_SCALAR,
+    BACKWARD_ADD_BROADCAST,
+)
 from operators import AddTensor, Add
-from common_utils import panic
+from common_utils import panic, id
 from gradbox import Gradbox
-from ancestry import Ancestor
 from broadcastbackward import BroadcastBackward
+
 
 @fieldwise_init
 @register_passable
 struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_ADD_SCALAR
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
+        var ancestor = output.ancestry().get(0)
         if ancestor.shape() != gradbox.shape():
             gradbox = gradbox.reshape(ancestor.shape())
         # Gradient of addition is 1 → just pass through incoming grad
-        return [(ancestor^, gradbox.copy(), AddTensor)]
+        return [(ancestor^, gradbox, AddTensor)]
 
 
 alias AddBroadcastBackward[dtype: DType] = BroadcastBackward[
-    dtype, augment=False, lhs_op=AddTensor, rhs_op=AddTensor, TAG=BACKWARD_ADD_BROADCAST
+    dtype,
+    augment=False,
+    lhs_op=AddTensor,
+    rhs_op=AddTensor,
+    TAG=BACKWARD_ADD_BROADCAST,
 ]
 
 
@@ -33,30 +44,31 @@ alias AddBroadcastBackward[dtype: DType] = BroadcastBackward[
 @register_passable
 struct AddBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_ADD
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[dtype]
+    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradbox = output.grad()
         count = len(output.ancestry())
 
-        var grad_shares = List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]](
+        var grad_shares = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]](
             capacity=UInt(count)
         )
 
         if count == 1:
-            ancestor = output.ancestry().get(0)
+            var ancestor = output.ancestry().get(0)
             grad_shares.append((ancestor^, gradbox^, AddTensor))
         else:
-            ancestor_lhs = output.ancestry().get(0)
-            ancestor_rhs = output.ancestry().get(1)
-            lhs_requires_grad = ancestor_lhs.requires_grad()
-            rhs_requires_grad = ancestor_rhs.requires_grad()
+            var ancestor_lhs = output.ancestry().get(0)
+            var ancestor_rhs = output.ancestry().get(1)
+            lhs_requires_grad = ancestor_lhs.requires_grad
+            rhs_requires_grad = ancestor_rhs.requires_grad
 
             if lhs_requires_grad and rhs_requires_grad:
-                grad_shares.append((ancestor_lhs^, gradbox.copy(), AddTensor))
+                grad_shares.append((ancestor_lhs^, gradbox, AddTensor))
                 grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))
 
             elif lhs_requires_grad and not rhs_requires_grad:
@@ -101,7 +113,7 @@ struct Adder[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
-        if self.address() == other.address():
+        if id(self) == id(other):
             return self.__mul__(Scalar[dtype](2))
         if not self.broadcastable(other):
             panic(
@@ -144,4 +156,3 @@ struct Adder[dtype: DType](Copyable):
 
 fn main():
     print("passes")
-

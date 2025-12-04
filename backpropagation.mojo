@@ -133,6 +133,10 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.tag == BACKWARD_MULTIPLY:
             return self.grad_fn[MultiplyBackward[dtype]].backward(output)
 
+        elif self.tag == BACKWARD_MULTIPLY_SCALAR:
+            return self.grad_fn[MultiplyBackwardScalar[dtype]].backward(output)
+
+
         elif self.tag == BACKWARD_RELU:
             return self.grad_fn[ReLUBackward[dtype]].backward(output)
 
@@ -161,21 +165,26 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.tag == BACKWARD_SOFTMAX:
             return self.grad_fn[SoftmaxBackward[dtype]].backward(output)
-
-        elif self.tag == BACKWARD_CROSS_ENTROPY:
-            return self.grad_fn[CrossEntropyBackward[dtype]].backward(output)
-
-        elif self.tag == BACKWARD_TANH:
-            return self.grad_fn[TanhBackward[dtype]].backward(output)
-
         elif self.tag == BACKWARD_SUB:
             return self.grad_fn[SubBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_ADD_SCALAR:
+            return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_SUB_SCALAR:
+            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward(output)
 
         elif self.tag == BACKWARD_RESHAPE:
             return self.grad_fn[ReshapeBackward[dtype]].backward(output)
 
         elif self.tag == BACKWARD_VIEW:
             return self.grad_fn[ViewBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_CROSS_ENTROPY:
+            return self.grad_fn[CrossEntropyBackward[dtype]].backward(output)
+
+        elif self.tag == BACKWARD_TANH:
+            return self.grad_fn[TanhBackward[dtype]].backward(output)
 
         elif self.tag == BACKWARD_MEAN:
             return self.grad_fn[MeanBackward[dtype]].backward(output)
@@ -212,15 +221,6 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[UnsqueezeBackward[dtype]].backward(output)
 
         # ========== TIER 5: SCALAR OPERATIONS ==========
-        elif self.tag == BACKWARD_ADD_SCALAR:
-            return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
-
-        elif self.tag == BACKWARD_MULTIPLY_SCALAR:
-            return self.grad_fn[MultiplyBackwardScalar[dtype]].backward(output)
-
-        elif self.tag == BACKWARD_SUB_SCALAR:
-            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward(output)
-
         elif self.tag == BACKWARD_DIV_SCALAR:
             return self.grad_fn[TrueDivBackwardScalar[dtype]].backward(output)
 

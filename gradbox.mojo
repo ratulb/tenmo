@@ -18,7 +18,7 @@ from utilities import Utils
 
 
 struct Gradbox[dtype: DType](
-    Copyable
+    ImplicitlyCopyable
     & Movable
     & Sized
     & Stringable

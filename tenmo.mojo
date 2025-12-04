@@ -366,7 +366,7 @@ struct Tensor[dtype: DType = DType.float32](
         if self.buffer.shared():
             s += ", strides: " + self.strides().__str__()
             s += ", offset: " + self.offset().__str__()
-        s += ", Type: " + dtype.__str__()
+        s += ", Type: " + Self.dtype.__str__()
         s += ", requires_grad: " + String(self.requires_grad)
         s += "]"
         return s
@@ -1485,31 +1485,31 @@ struct Tensor[dtype: DType = DType.float32](
         var squared = Multiplicator[dtype].forward[track_grad](diff, diff)
         return squared.mean[track_grad]()
 
-    fn backward(mut output: Tensor[dtype], start_grad: Scalar[dtype] = 1.0):
+    fn backward[graph_size: UInt=50](mut output: Tensor[dtype], start_grad: Scalar[dtype] = 1.0):
         if not output.requires_grad:
             return
         var shape = output.shape()
         var seed_tensor = Tensor[dtype].full(shape, start_grad)
-        output.backward(seed_tensor)
+        output.backward[graph_size](seed_tensor)
 
-    fn backward(mut output, seed_tensor: Tensor[dtype]):
+    fn backward[graph_size: UInt=50](mut output, seed_tensor: Tensor[dtype]):
         if not output.requires_grad:
             return
         output.seed_grad(seed_tensor)
 
         try:
             # Phase 1: Discovery
+            var topo_ids = List[Int](capacity=graph_size)
+            var dfs_stack = List[Int](capacity=graph_size)
+            var node_list = List[Tensor[dtype]](capacity=graph_size)
             var visited = Set[Int]()
-            var topo_ids = List[Int]()
             var fanin = Dict[Int, Int]()
-            var node_list = List[Tensor[dtype]]()  # Use List instead of Dict
             var id_to_index = Dict[Int, Int]()  # Map ID to List index
 
-            var dfs_stack = List[Int]()
             dfs_stack.append(output.id())
 
             # Add to list and record index
-            node_list.append(output.copy())
+            node_list.append(output)
             id_to_index[output.id()] = 0
 
             while len(dfs_stack) > 0:
@@ -1522,7 +1522,7 @@ struct Tensor[dtype: DType = DType.float32](
                 topo_ids.append(node_id)
 
                 var node_idx = id_to_index[node_id]
-                var node = node_list[node_idx]  # Access by index
+                ref node = node_list[node_idx]  # Access by index
 
                 if node.has_ancestry():
                     for parent in node.ancestry():
@@ -1531,23 +1531,23 @@ struct Tensor[dtype: DType = DType.float32](
 
                         if parent_id not in id_to_index:
                             var new_idx = len(node_list)
-                            node_list.append(parent.copy())
+                            node_list.append(parent)
                             id_to_index[parent_id] = new_idx
                             dfs_stack.append(parent_id)
 
             # Phase 2: Execute backward
-            var ready_queue = Deque[Int]()
+            var ready_queue = Deque[Int](capacity=graph_size)
             ready_queue.append(output.id())
 
             while len(ready_queue) > 0:
                 var node_id = ready_queue.popleft()
                 var node_idx = id_to_index[node_id]
-                var node = node_list[node_idx]  # Access by index
+                ref node = node_list[node_idx]  # Access by index
 
                 if node.has_backward_fn():
                     for result in node.backward_fn()(node):
-                        var target_node = result[0]
-                        var grad = result[1].copy()
+                        ref target_node = result[0]
+                        ref grad = result[1]
                         var op_code = result[2]
                         var target_id = target_node.id()
 
@@ -1556,12 +1556,12 @@ struct Tensor[dtype: DType = DType.float32](
                             # Access by index each time (safe)
                             if op_code == AddTensor:
                                 node_list[target_idx].update_grad[AddTensor](
-                                    grad^
+                                    grad
                                 )
                             else:
                                 node_list[target_idx].update_grad[
                                     SubtractTensor
-                                ](grad^)
+                                ](grad)
 
                         if target_id in fanin:
                             fanin[target_id] -= 1

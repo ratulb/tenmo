@@ -2222,7 +2222,7 @@ fn main():
     # test_hardest_spiral() # Not yet good
     # train_with_batches()# Working
     # train_deep_spiral() #This good too
-    # train_with_batches()
+    #train_with_batches()# Good
     # train_spiral_normalized() #No good as it is
     # train_deep_spiral_simple_arch_and_noise_increased()#very good
     # train_deep_spiral_simple_arch_and_noise_increased_2()
