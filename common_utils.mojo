@@ -1,48 +1,188 @@
 from shapes import Shape
-from tensors import Tensor
+from tenmo import Tensor
+from gradbox import Gradbox
 from sys.param_env import env_get_string
 from logger import Level, Logger
-from intlist import IntList
-from strides import Strides
+from layers import Sequential, Linear, ReLU
+from time import perf_counter_ns, monotonic
 from os import abort
 from utils import Variant
+from testing import assert_true
+from intarray import IntArray
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
 
+# Color codes
+alias RED: String = "\033[31m"
+alias CYAN: String = "\033[36m"
+alias MAGENTA: String = "\033[35m"
+alias BLUE: String = "\033[34m"  # Standard blue
+alias YELLOW: String = "\033[33m"  # Standard yellow
+alias RESET: String = "\033[0m"
+
+# Bright variants (more vibrant)
+alias BRIGHT_BLUE: String = "\033[94m"
+
+
+@always_inline("nodebug")
+fn now() -> Float64:
+    return perf_counter_ns() / 1e9
+
+
+fn accuracy[
+    dtype: DType, //, threshold: Scalar[dtype] = Scalar[dtype](0.5)
+](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[Int, Int]:
+    var total = pred.shape()[0]
+
+    var predictions = pred.gt(threshold).to_dtype[DType.int64]()
+    var targets_ints = target.to_dtype[DType.int64]()
+    var correct = predictions.eq(targets_ints).count(Scalar[DType.bool](True))
+    return correct, total
+
+
+@always_inline("nodebug")
+fn log_debug(msg: String, color: String = RED):
+    log.debug(color + msg + RESET.__str__())
+
+
+@always_inline("nodebug")
+fn log_info(msg: String, color: String = BRIGHT_BLUE):
+    log.info(color + msg + RESET.__str__())
+
+
+@always_inline("nodebug")
+fn log_warning(msg: String, color: String = YELLOW):
+    log.warning(color + msg + RESET.__str__())
+
+
+@always_inline("nodebug")
+fn panic(*s: String):
+    var message = String(capacity=len(s))
+    if len(s) > 0:
+        message += s[0].strip()
+        for i in range(1, len(s)):
+            message += " " + s[i].strip()
+    abort(RED + message + RESET.__str__())
+
 
 @always_inline
-fn is_power_of_two(x: Int) -> Bool:
-    return x > 0 and (x & (x - 1)) == 0
-
-
 fn id[type: AnyType, //](t: type) -> Int:
-    return Int(UnsafePointer(to=t))
+    # return Int(UnsafePointer(to=t))
+    return Int(addr(t))
+
+
+@always_inline
+fn addr[type: AnyType, //](t: type) -> UnsafePointer[type]:
+    return UnsafePointer(to=t)
+
+
+@always_inline
+fn addrs[type: AnyType, //](*ts: type) -> List[UnsafePointer[type]]:
+    l = List[UnsafePointer[type]](capacity=len(ts))
+    for t in ts:
+        l.append(UnsafePointer(to=t))
+    return l^
 
 
 fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
     return ptr.__as_bool__() == False
 
 
-fn panic(*s: String):
-    abrt = String(capacity=len(s))
-    abrt += s[0].strip()
-    for i in range(1, len(s)):
-        stripped = " " + s[i].strip()
-        abrt += stripped
-    abort(abrt)
+@register_passable
+struct IDGen:
+    @always_inline
+    @staticmethod
+    fn generate_id() -> Int:
+        # Use both perf_counter and monotonic for additional entropy
+        perf_time = perf_counter_ns()
+        mono_time = monotonic()
+
+        # Combine them in a way that preserves uniqueness
+        # Use XOR to mix the values
+        return perf_time ^ (mono_time << 32)
 
 
-fn log_debug(msg: String):
-    log.debug(msg)
+@always_inline("nodebug")
+fn inf[dtype: DType]() -> Scalar[dtype]:
+    """Gets a +inf value for the given dtype.
+
+    Constraints:
+        Can only be used for FP dtypes.
+
+    Parameters:
+        dtype: The value dtype.
+
+    Returns:
+        The +inf value of the given dtype.
+    """
+    constrained[
+        dtype.is_floating_point(),
+        "Only floating point dtypes support +inf.",
+    ]()
+
+    @parameter
+    if dtype is DType.bfloat16:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
+        )
+    elif dtype is DType.float16:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f16>`,
+        )
+    elif dtype is DType.float32:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f32>`,
+        )
+    elif dtype is DType.float64:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
+        )
+    else:
+        constrained[False, "unsupported float type"]()
+        return {}
 
 
-fn log_info(msg: String):
-    log.info(msg)
+@always_inline("nodebug")
+fn isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
+    return inf[dtype]() == value
 
 
-fn log_warning(msg: String):
-    log.warning(msg)
+@always_inline("nodebug")
+fn isnan[dtype: DType, //](value: Scalar[dtype]) -> Bool:
+    return nan[dtype]() == value
+
+
+@always_inline("nodebug")
+fn nan[dtype: DType]() -> Scalar[dtype]:
+    """Gets a NaN value for the given dtype.
+
+    Constraints:
+        Can only be used for FP dtypes.
+
+    Parameters:
+        dtype: The value dtype.
+
+    Returns:
+        The NaN value of the given dtype.
+    """
+    constrained[
+        dtype.is_floating_point(),
+        "Only floating point dtypes support NaN.",
+    ]()
+
+    @parameter
+    if dtype is DType.float32:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
+        )
+    elif dtype is DType.float64:
+        return rebind[Scalar[dtype]](
+            __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
+        )
+    else:
+        constrained[False, "unsupported float type"]()
+        return {}
 
 
 # Helper
@@ -52,9 +192,9 @@ def do_assert[
     shape_mismatch = String("{0}: shape mismatch {1} vs {2}")
     tensors_not_equal = String("{}: values mismatch")
     assert_true(
-        a.shape == b.shape, shape_mismatch.format(msg, a.shape, b.shape)
+        a.shape() == b.shape(), shape_mismatch.format(msg, a.shape(), b.shape())
     )
-    assert_true((a == b).all_true(), tensors_not_equal.format(msg))
+    assert_true((a == b), tensors_not_equal.format(msg))
 
 
 # Helper
@@ -62,27 +202,9 @@ def assert_grad[
     dtype: DType, //
 ](t: Tensor[dtype], expected: Tensor[dtype], label: String):
     assert_true(
-        (t.grad[] == expected).all_true(),
+        (t.grad() == expected),
         String("grad assertion failed for {0}").format(label),
     )
-
-
-fn variadiclist_as_str(list: VariadicList[Int]) -> String:
-    s = String("[")
-    for idx in range(len(list)):
-        s += list[idx].__str__()
-        if idx != len(list) - 1:
-            s += ", "
-    s += "]"
-    return s
-
-
-# Convert a VariadicList to List
-fn variadiclist_as_intlist(vlist: VariadicList[Int]) -> IntList:
-    list = IntList.with_capacity(capacity=len(vlist))
-    for each in vlist:
-        list.append(each)
-    return list^
 
 
 # Create a single or two element(s) VariadicList
@@ -100,28 +222,55 @@ struct NewAxis(Copyable & Movable):  # Empty struct as a sentinel
     pass
 
 
-alias Idx = Variant[Int, Slice, NewAxis]
+alias Idx = Variant[Int, IntArray, Slice, NewAxis]
 
 alias newaxis = Idx(NewAxis())
 
 
+@always_inline("nodebug")
 fn i(value: Int) -> Idx:
     return Idx(value)
 
 
+@always_inline("nodebug")
+fn il(index_list: IntArray) -> Idx:
+    return Idx(index_list)
+
+
+@always_inline("nodebug")
+fn il(*indices: Int) -> Idx:
+    intarray = IntArray.with_capacity(len(indices))
+    for i in range(len(indices)):
+        intarray.append(indices[i])
+    return Idx(intarray)
+
+
+@always_inline("nodebug")
 fn s() -> Idx:
     return s(None, None, None)
 
 
+@always_inline("nodebug")
+fn s(end: Int) -> Idx:
+    return Idx(slice(end))
+
+
+@always_inline("nodebug")
+fn s(start: Int, end: Int) -> Idx:
+    return Idx(slice(start, end))
+
+
+@always_inline("nodebug")
 fn s(start: Optional[Int], end: Optional[Int], step: Optional[Int]) -> Idx:
     return Idx(slice(start, end, step))
 
 
 struct Slicer:
     @staticmethod
+    @always_inline("nodebug")
     fn slice(
         slice: Slice, end: Int, start: Int = 0, step: Int = 1
-    ) -> (Int, Int, Int):
+    ) -> Tuple[Int, Int, Int]:
         _start, _end, _step = (
             slice.start.or_else(start),
             slice.end.or_else(end),
@@ -130,416 +279,299 @@ struct Slicer:
         return _start, _end, _step
 
 
-fn compute_output_shape(
-    original_shape: Shape, normalized_axes: IntList, keepdims: Bool
-) -> Shape:
-    """Compute the output shape after reduction along specified axes.
+fn print_gradbox_recursive[
+    dtype: DType
+](
+    grad_ptr: UnsafePointer[Gradbox[dtype]],
+    mut indices: List[Int],
+    level: Int,
+    num_first: Int = 10,
+    num_last: Int = 10,
+):
+    if grad_ptr[].rank() == 0:  # Tensor with Shape ()
+        print(grad_ptr[][[]])
+        return
+    current_dim = len(indices)
+    indent = " " * (level * 2)
 
-    Args:
-        original_shape: Shape of the tensor before reduction.
-        normalized_axes: Sorted list of axes to reduce over (must be valid for shape).
-        keepdims: Whether to keep reduced dimensions as size 1.
+    if current_dim >= grad_ptr[].rank():
+        print(
+            "ERROR: current_dim (",
+            current_dim,
+            ") >= ndim (",
+            grad_ptr[].rank(),
+            ")",
+        )
+        return
 
-    Returns:
-        Shape after reduction
+    size = grad_ptr[].shape()[current_dim]
 
-    Behavior:
-        - If reducing all axes and keepdims=False → returns Shape.Void (scalar)
-        - Otherwise:
-            - For reduced axes: keep as 1 if keepdims=True, else remove
-            - For non-reduced axes: keep original size.
-    """
-    rank = original_shape.rank()
+    if size < 0 or size > 1_000_000:
+        print(
+            "ERROR: suspicious size: ",
+            size,
+            "at dim ",
+            current_dim,
+            grad_ptr[].shape().__str__(),
+        )
+        return
 
-    # Full reduction case (return scalar shape if not keeping dims)
-    if rank == 0 or (len(normalized_axes) == rank and not keepdims):
-        return Shape.Void
+    # Base case: last dimension (print actual elements)
+    if current_dim == grad_ptr[].rank() - 1:
+        print(indent + "[", end="")
 
-    var spans = IntList.with_capacity(rank)
-    for dim in range(rank):
-        if dim in normalized_axes:
-            if keepdims:
-                spans.append(1)  # Keep reduced dim as size 1
-        else:
-            spans.append(original_shape[dim])  # Keep original size
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                print(grad_ptr[][indices], end="")
+                _ = indices.pop()
+                if i != size - 1:
+                    print(", ", end="")
+            elif i == num_first and size > num_first + num_last:
+                print("..., ", end="")
+            elif i >= size - num_last:
+                indices.append(i)
+                print(grad_ptr[][indices], end="")
+                _ = indices.pop()
+                if i != size - 1:
+                    print(", ", end="")
 
-    return Shape(spans)
+        print("]", end="")
 
-
-struct Validator:
-    @staticmethod
-    fn validate_dtype_consistency(
-        dtype: DType, requires_grad: Bool, label: String
-    ):
-        if requires_grad:
-            if not (dtype.is_floating_point()):
-                abort(
-                    "Tensor → "
-                    + label
-                    + " → requires_grad=True is only supported for floating"
-                    " point types. "
+    else:
+        print(indent + "[")
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                print_gradbox_recursive(
+                    grad_ptr, indices, level + 1, num_first, num_last
                 )
-
-    @staticmethod
-    fn validate_and_normalize_axes(shape: Shape, axes: IntList) -> IntList:
-        """Validate and normalize axes for reduction operations.
-        Args:
-            shape: Tensor shape to validate against
-            axes: Input axes to normalize
-        Returns:
-            Normalized, sorted, and deduplicated axes
-        Behavior:
-            - For scalar tensors (rank=0):
-                - `[-1]` → empty list (reduce all)
-                - Any other non-empty axes → error
-            - For non-scalar tensors:
-                - Empty list → reduce all axes (return 0..rank-1)
-                - Normalize negative indices
-                - Validate bounds
-                - Sort and deduplicate.
-        """
-        rank = shape.rank()
-        # Handle scalar case (rank=0)
-        if rank == 0:
-            if axes.is_empty() or axes == IntList(-1):
-                return (
-                    IntList()
-                )  # Special case: [-1] means reduce all/# Empty axes for scalar is valid
-            if len(axes) > 0:
-                abort(
-                    "Tensor → validate_and_normalize_axes - cannot reduce over"
-                    " axes "
-                    + axes.__str__()
-                    + " for scalar tensor with shape: "
-                    + shape.__str__()
+                _ = indices.pop()
+            elif i == num_first and size > num_first + num_last:
+                print(indent + "  ...,")
+            elif i >= size - num_last:
+                indices.append(i)
+                print_gradbox_recursive(
+                    grad_ptr, indices, level + 1, num_first, num_last
                 )
+                _ = indices.pop()
 
-        # Default case: reduce all axes
-        if len(axes) == 0:
-            return IntList.range_list(rank)
+            # Print comma and newline for all but last element
+            if i != size - 1 and (i < num_first or i >= size - num_last):
+                print(",")
+            # Special case: last element needs newline before closing bracket
+            elif i == size - 1:
+                print()  # Newline before closing bracket
 
-        # Normalize and validate axes
-        var normalized = IntList.with_capacity(len(axes))
-        for axis in axes:
-            normalized_axis = axis if axis >= 0 else axis + rank
-            if normalized_axis < 0 or normalized_axis >= rank:
-                abort(
-                    "Tensor → validate_and_normalize_axes - invalid axis: "
-                    + String(axis)
-                    + " for tensor shape: "
-                    + shape.__str__()
+        print(indent + "]", end="")
+
+
+fn print_tensor_recursive[
+    dtype: DType
+](
+    read tensor_ptr: Tensor[dtype],
+    mut indices: List[Int],
+    level: Int,
+    num_first: Int = 10,
+    num_last: Int = 10,
+):
+    if tensor_ptr.rank() == 0:  # Tensor with Shape ()
+        print(tensor_ptr[[]])
+        return
+    current_dim = len(indices)
+    indent = " " * (level * 2)
+
+    if current_dim >= tensor_ptr.rank():
+        print(
+            "ERROR: current_dim (",
+            current_dim,
+            ") >= ndim (",
+            tensor_ptr.rank(),
+            ")",
+        )
+        return
+
+    size = tensor_ptr.shape()[current_dim]
+
+    if size < 0 or size > 1_000_000:
+        print(
+            "ERROR: suspicious size: ",
+            size,
+            "at dim ",
+            current_dim,
+            tensor_ptr.shape().__str__(),
+        )
+        return
+
+    # Base case: last dimension (print actual elements)
+    if current_dim == tensor_ptr.rank() - 1:
+        print(indent + "[", end="")
+
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                print(tensor_ptr[indices], end="")
+                _ = indices.pop()
+                if i != size - 1:
+                    print(", ", end="")
+            elif i == num_first and size > num_first + num_last:
+                print("..., ", end="")
+            elif i >= size - num_last:
+                indices.append(i)
+                print(tensor_ptr[indices], end="")
+                _ = indices.pop()
+                if i != size - 1:
+                    print(", ", end="")
+
+        print("]", end="")
+
+    else:
+        print(indent + "[")
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                print_tensor_recursive(
+                    tensor_ptr, indices, level + 1, num_first, num_last
                 )
-            normalized.append(normalized_axis)
+                _ = indices.pop()
+            elif i == num_first and size > num_first + num_last:
+                print(indent + "  ...,")
+            elif i >= size - num_last:
+                indices.append(i)
+                print_tensor_recursive(
+                    tensor_ptr, indices, level + 1, num_first, num_last
+                )
+                _ = indices.pop()
 
-        # Ensure uniqueness and sorted order
-        normalized.sort_and_deduplicate()
-        return normalized
+            # Print comma and newline for all but last element
+            if i != size - 1 and (i < num_first or i >= size - num_last):
+                print(",")
+            # Special case: last element needs newline before closing bracket
+            elif i == size - 1:
+                print()  # Newline before closing bracket
 
-    @staticmethod
-    fn validate_axes(axes: IntList, shape: Shape) -> IntList:
-        rank = shape.rank()
-        var normalized_axes = IntList.with_capacity(rank)
-        if axes.len() != rank:
-            panic(
-                "Validator → validate_axes: transpose axes must have length",
-                String(rank) + ",",
-                "but got",
-                String(axes.len()),
+        print(indent + "]", end="")
+
+
+# Utility repeat function
+fn str_repeat(s: String, n: Int) -> String:
+    if n <= 0:
+        return ""
+    var parts = List[String]()
+    for _ in range(n):
+        parts.append(s)
+    return StringSlice("").join(parts)
+
+
+fn print_summary[
+    dtype: DType
+](mod: Sequential[dtype], sample_input: Optional[Tensor[dtype]] = None):
+    # Table headers
+    var headers = List[String]()
+    headers.append("Name")
+    headers.append("Type")
+    headers.append("Input Shape")
+    headers.append("Output Shape")
+    headers.append("Params")
+    headers.append("Trainable")
+
+    var rows = List[List[String]]()
+    rows.append(headers.copy())
+
+    var total_params = 0
+    var trainable_params = 0
+
+    # If sample_input is provided → run a dry forward pass to get shapes
+    var x = sample_input
+    var current_shape = "(?, ?)"
+
+    for i in range(len(mod.modules)):
+        m = mod.modules[i].copy()
+        var name = "Layer" + i.__str__()
+
+        if m.layer.isa[Linear[dtype]]():
+            var l = m.layer[Linear[dtype]].copy()
+
+            # Infer input/output shapes
+            var in_features = l.weights.shape()[0]
+            var out_features = l.weights.shape()[1]
+
+            var input_shape = "(?, " + in_features.__str__() + ")"
+            var output_shape = "(?, " + out_features.__str__() + ")"
+
+            if x:
+                input_shape = x.value().shape().__str__()
+                x = Optional(m(x.value()))
+                output_shape = x.value().shape().__str__()
+
+            current_shape = output_shape
+
+            # Params
+            var params = (
+                l.weights.shape().num_elements() + l.bias.shape().num_elements()
             )
-        var seen = IntList.filled(rank, 0)
-        # Normalize/validate/check duplicate
-        for axis in axes:
-            normalized_axis = axis if axis >= 0 else axis + rank
-            if normalized_axis < 0 or normalized_axis >= rank:
-                panic(
-                    "Validator → validate_axes: invalid axis",
-                    String(axis),
-                    "in transpose: must be in range [0,"
-                    + String(rank - 1)
-                    + "]",
-                )
+            total_params += params
+            if l.weights.requires_grad or l.bias.requires_grad:
+                trainable_params += params
 
-            if seen[normalized_axis] == 1:
-                panic(
-                    "Validator → validate_axes: duplicate axis",
-                    String(axis),
-                    "in transpose axes",
-                )
-
-            seen[normalized_axis] = 1
-            normalized_axes.append(normalized_axis)
-        return normalized_axes
-
-    @staticmethod
-    fn validate_indices(
-        indices: IntList,
-        shape: Shape,
-        prefix: String = "",
-        do_panic: Bool = True,
-    ) -> Bool:
-        # Check rank match
-        if len(indices) != shape.rank():
-            if do_panic:
-                panic(
-                    prefix + " →" if prefix else "",
-                    "Incorrect number of indices: expected "
-                    + String(shape.rank())
-                    + ", got "
-                    + String(len(indices)),
-                )
-            return False
-
-        # Check each index
-        for i in range(shape.rank()):
-            if indices[i] < 0:
-                if do_panic:
-                    panic(
-                        prefix + " →" if prefix else "",
-                        "Negative index at dimension "
-                        + String(i)
-                        + ": "
-                        + String(indices[i]),
-                    )
-                return False
-            if indices[i] >= shape[i]:
-                if do_panic:
-                    panic(
-                        prefix + " →" if prefix else "",
-                        "Index out of bounds at dimension "
-                        + String(i)
-                        + ": "
-                        + String(indices[i])
-                        + " >= "
-                        + String(shape[i]),
-                    )
-                return False
-
-        return True
-
-    @staticmethod
-    fn validate_new_shape(curr_dims: IntList, new_dims: IntList) -> Shape:
-        """
-
-        Validates if a tensor can be reshaped from `current_shape` to `new_shape`.
-
-        Args:
-            curr_dims: Original shape of the tensor (e.g., `3, 4, 5`).
-            new_dims: Requested new shape (e.g., `2, -1, 10`). May contain at most one `-1`.
-
-        Returns:
-            Shape: Validated concrete shape (e.g., `Shape(2, 6, 10)`).
-
-        """
-        var concrete_dims: IntList
-
-        # --- Step 1: Check for invalid values in `new_shape` ---
-        if new_dims.any(Self.invalid_dim):
-            panic(
-                "Shape dimensions must be positive or -1 got ",
-                new_dims.__str__(),
-            )
-
-        # --- Step 2: Count `-1` entries (only one allowed) ---
-        neg_one_count = new_dims.count(-1)
-        if neg_one_count > 1:
-            panic(
-                "At most one -1 allowed in new_shape got ", new_dims.__str__()
-            )
-
-        # Calculate concrete shape (replacing -1 if needed)
-        curr_product = curr_dims.product()
-        if neg_one_count == 1:
-            # Infer the dimension marked as -1
-            known_dims_product = 1
-            for dim in new_dims:
-                if dim != -1:
-                    known_dims_product *= dim
-            if curr_product % known_dims_product != 0:
-                panic(
-                    "Cannot infer -1:",
-                    String(curr_product),
-                    "elements not divisible by",
-                    String(known_dims_product),
-                )
-            inferred_dim = curr_product // known_dims_product
-            concrete_dims = IntList.new(
-                [inferred_dim if dim == -1 else dim for dim in new_dims]
-            )
-        else:
-            concrete_dims = new_dims.copy()
-
-        if concrete_dims.product() != curr_product:
-            panic(
-                "Shape mismatch: ",
-                String(curr_product),
-                " elements vs. ",
-                String(concrete_dims.product()),
-            )
-
-        return Shape(concrete_dims)
-
-    @always_inline
-    @staticmethod
-    fn invalid_dim(dim: Int) -> Bool:
-        return dim == 0 or dim < -1
-
-    @always_inline
-    @staticmethod
-    fn validate_and_compute_view_metadata(
-        original_shape: Shape,
-        original_strides: Strides,
-        slices: VariadicListMem[Slice],
-    ) -> Tuple[Shape, Strides, Int]:
-        """
-        Computes the new shape, strides, and offset for a tensor view after slicing.
-
-        Args:
-            original_shape: The shape of the original tensor.
-            original_strides: The strides of the original tensor.
-            slices: VariadicList of slice objects for each dimension.
-
-        Returns:
-            Tuple[Shape, Strides, int]: New shape, strides, and offset.
-
-        """
-        rank = original_shape.rank()
-        if len(slices) != rank:
-            abort("Number of slices must match tensor rank")
-
-        new_shape = IntList.with_capacity(rank)
-        new_strides = IntList.with_capacity(rank)
-        new_offset = 0
-
-        for i in range(rank):
-            axis = original_shape[i]
-            stride = original_strides[i]
-
-            start, end, step = Slicer.slice(slices[i], axis)
-
-            # Negative index adjustment
-            start = start + axis if start < 0 else start
-            end = end + axis if end < 0 else end
-
-            # Clamp to bounds
-            start = max(0, min(start, axis))
-            end = max(0, min(end, axis))
-
-            # Calculate length (ceil division)
-            span = end - start
-            length = (span + (step - 1)) // step
-
-            new_shape.append(length)
-            new_strides.append(stride * step)
-            new_offset += start * stride
-
-        return Shape(new_shape), Strides(new_strides), new_offset
-
-    @always_inline
-    @staticmethod
-    fn validate_and_compute_advanced_indexing_metadata(
-        original_shape: Shape,
-        original_strides: Strides,
-        indices: VariadicListMem[Idx],
-    ) -> Tuple[Shape, Strides, Int]:
-        """
-        Computes view metadata (shape, strides, offset) for advanced indexing operations.
-        Args:
-            original_shape: Shape of the original tensor.
-            original_strides: Strides of the original tensor.
-            indices: VariadicListMem of Idx variants (NewAxis/Int/Slice).
-        Returns:
-            Tuple[Shape, Strides, int]: New shape, strides, and offset.
-        """
-        # Validate rank vs non-newaxis indices count
-        var required_rank = 0
-        for idx in indices:
-            if not idx.isa[NewAxis]():  # Only count non-newaxis indices
-                required_rank += 1
-        if required_rank != original_shape.rank():
-            panic(
-                "Tensor indexing: axes count(",
-                String(original_shape.rank()),
-                ") and ",
-                "non-newaxis indices count(",
-                String(required_rank),
-                ") mismatch",
+            rows.append(
+                [
+                    name,
+                    "Linear",
+                    input_shape,
+                    output_shape,
+                    params.__str__(),
+                    (l.weights.requires_grad or l.bias.requires_grad).__str__(),
+                ]
             )
 
-        new_shape = IntList.with_capacity(len(indices))
-        new_strides = IntList.with_capacity(len(indices))
-        offset = 0
-        dim_counter = 0  # Tracks original tensor dimensions
+        elif m.layer.isa[ReLU[dtype]]():
+            var input_shape = current_shape
+            var output_shape = current_shape
 
-        for idx in indices:
-            if idx.isa[NewAxis]():
-                # Case 1: NewAxis insertion
-                new_shape.append(1)
-                new_strides.append(0)
-            elif idx.isa[Int]():
-                # Case 2: Integer indexing (dimension reduction)
-                axis = idx[Int]
-                shape_dim = original_shape[dim_counter]
-                stride_dim = original_strides[dim_counter]
-                dim_counter += 1
-                if axis < 0:
-                    axis += shape_dim
-                if not 0 <= axis < shape_dim:
-                    panic(
-                        "Index",
-                        String(axis),
-                        "out of bounds for dimension",
-                        String(shape_dim),
-                    )
-                offset += axis * stride_dim
-                # No shape/strides append (reduces rank)
-            elif idx.isa[Slice]():
-                # Case 3: Slicing
-                s = idx[Slice]
-                shape_dim = original_shape[dim_counter]
-                stride_dim = original_strides[dim_counter]
-                dim_counter += 1
-                start, end, step = Slicer.slice(s, shape_dim)
-                start = max(0, min(start, shape_dim))
-                end = max(0, min(end, shape_dim))
-                if step == 0:
-                    panic("Slice step cannot be zero")
-                if (step > 0 and start >= end) or (step < 0 and start <= end):
-                    panic(
-                        "Invalid slice range [",
-                        String(start),
-                        ":",
-                        String(end),
-                        ":",
-                        String(step),
-                        "]",
-                    )
+            if x:
+                input_shape = x.value().shape().__str__()
+                x = Optional(m(x.value()))
+                output_shape = x.value().shape().__str__()
+                current_shape = output_shape
 
-                new_length = (end - start + step - 1) // step
-                new_shape.append(new_length)
-                new_strides.append(stride_dim * step)
-                offset += start * stride_dim
+            rows.append([name, "ReLU", input_shape, output_shape, "0", "False"])
 
-        return Shape(new_shape), Strides(new_strides), offset
+    # Compute column widths
+    var widths = List[Int]()
+    for j in range(len(headers)):
+        var maxw = 0
+        for row in rows:
+            if len(row[j]) > maxw:
+                maxw = len(row[j])
+        widths.append(maxw)
 
+    # Print horizontal rule
+    fn print_rule(read widths: List[Int]):
+        var line = ""
+        for w in widths:
+            line += "+" + str_repeat("-", w + 2)
+        line += "+"
+        print(line)
 
-from testing import assert_true
+    # Print table
+    print_rule(widths)
+    for idx in range(len(rows)):
+        var line = ""
+        for j in range(len(rows[idx])):
+            var val = rows[idx][j]
+            line += "| " + val + str_repeat(" ", widths[j] - len(val)) + " "
+        line += "|"
+        print(line)
+        print_rule(widths)
 
-
-fn test_validate_new_shape() raises:
-    print("test_validate_new_shape")
-    curr_dims = IntList.new([3, 4, 5])
-    new_dims = IntList.new([2, -1, 10])
-    concrete_shape = Validator.validate_new_shape(curr_dims, new_dims)
-    assert_true(
-        concrete_shape == Shape.of(2, 3, 10),
-        "validate_new_shape assertion 1 failed",
-    )
-    new_dims = IntList.new([-1])
-    concrete_shape = Validator.validate_new_shape(curr_dims, new_dims)
-    assert_true(
-        concrete_shape == Shape.of(60), "validate_new_shape assertion 2 failed"
-    )
+    # Footer summary
+    var non_trainable_params = total_params - trainable_params
+    print("\nSummary:")
+    print("  Total params:        ", total_params)
+    print("  Trainable params:    ", trainable_params)
+    print("  Non-trainable params:", non_trainable_params)
 
 
 fn main() raises:
-    test_validate_new_shape()
+    pass

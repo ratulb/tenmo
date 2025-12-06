@@ -1,57 +1,316 @@
-from common_utils import variadiclist_as_intlist, log_debug
-from intlist import IntList
-from os import abort
-from memory import Pointer
+from common_utils import panic
+from intarray import IntArray
 
 
-fn main() raises:
-    test_negative_indices()
-    test_slice_shape()
+@register_passable
+struct Shape(
+    ImplicitlyCopyable, Movable, Representable, Sized, Stringable, Writable
+):
+    """Shape of a tensor."""
+
+    var dims: IntArray
+    var _numels: Int
+
+    @staticmethod
+    @always_inline
+    fn Void() -> Shape:
+        return Shape()
+
+    @staticmethod
+    @always_inline
+    fn Unit() -> Shape:
+        return Shape(1)
+
+    @always_inline("nodebug")
+    fn __init__(out self):
+        self.dims = IntArray()
+        self._numels = 1
+
+    @always_inline("nodebug")
+    fn __init__(out self, *values: Int):
+        self.dims = IntArray(values)
+        self._numels = 0
+        self._numels = self._compute_numels()
+
+    @always_inline("nodebug")
+    fn __init__(out self, values: VariadicList[Int]):
+        self.dims = IntArray(values)
+        self._numels = 0
+        self._numels = self._compute_numels()
+
+    @always_inline("nodebug")
+    fn __init__(out self, values: List[Int]):
+        self.dims = IntArray(values)
+        self._numels = 0
+        self._numels = self._compute_numels()
+
+    @always_inline("nodebug")
+    fn __init__(out self, values: IntArray):
+        self.dims = values
+        self._numels = 0
+        self._numels = self._compute_numels()
+
+    @always_inline("nodebug")
+    fn __copyinit__(out self, existing: Self):
+        self.dims = existing.dims
+        self._numels = existing._numels
+
+    @always_inline("nodebug")
+    fn _compute_numels(self) -> Int:
+        """Compute number of elements, validating dimensions."""
+        if len(self.dims) == 0:
+            return 1
+        var prod = 1
+        for i in range(len(self.dims)):
+            if self.dims[i] < 1:
+                panic(
+                    "Shape: dimension must be >= 1, got " + String(self.dims[i])
+                )
+            prod *= self.dims[i]
+        return prod
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        return len(self.dims)
+
+    @always_inline("nodebug")
+    fn rank(self) -> Int:
+        return len(self.dims)
+
+    @always_inline("nodebug")
+    fn ndim(self) -> Int:
+        return len(self.dims)
+
+    @always_inline("nodebug")
+    fn num_elements(self) -> Int:
+        return self._numels
+
+    @always_inline("nodebug")
+    fn numels(self) -> Int:
+        return self._numels
+
+    @always_inline("nodebug")
+    fn __getitem__(self, idx: Int) -> Int:
+        return self.dims[idx]
+
+    @always_inline
+    fn __getitem__(self, slice: Slice) -> Self:
+        s = self.dims[slice]
+        return Self(s)
+
+    @always_inline("nodebug")
+    fn __eq__(self, other: Self) -> Bool:
+        return self.dims == other.dims
+
+    @always_inline("nodebug")
+    fn __eq__(self, other: List[Int]) -> Bool:
+        return self.dims == other
+
+    @always_inline("nodebug")
+    fn __ne__(self, other: Self) -> Bool:
+        return not (self.dims == other.dims)
+
+    fn __str__(self) -> String:
+        return "(" + self.dims.__str__()[1:-1] + ")"
+
+    fn __repr__(self) -> String:
+        return self.__str__()
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(self.__str__())
+
+    @always_inline("nodebug")
+    fn __iter__(ref self) -> ShapeIndexIterator[origin_of(self)]:
+        return ShapeIndexIterator(Pointer(to=self))
+
+    @always_inline("nodebug")
+    fn tolist(self) -> List[Int]:
+        return self.dims.tolist()
+
+    @always_inline("nodebug")
+    fn intarray(self) -> IntArray:
+        return self.dims
+
+    # ========== Operations ==========
+
+    @always_inline("nodebug")
+    fn __add__(self, other: Shape) -> Shape:
+        """Concatenate shapes."""
+        # Use extend for bulk copy instead of loop
+        dims = self.dims + other.dims
+        return Shape(dims^)
+
+    @always_inline("nodebug")
+    fn __add__(self, other: List[Int]) -> Shape:
+        """Concatenate with list."""
+        dims = self.dims + other
+        return Shape(dims^)
+
+    @always_inline("nodebug")
+    fn __radd__(self, other: List[Int]) -> Shape:
+        """Concatenate list + shape."""
+        var from_list = IntArray(other)
+        dims = from_list + self.dims
+        return Shape(dims^)
+
+    @always_inline("nodebug")
+    fn __mul__(self, factor: Int) -> Shape:
+        """Repeat shape."""
+        if factor <= 0:
+            return Shape()
+        var result = self.dims
+        for _ in range(factor - 1):
+            result = result + self.dims
+        return Shape(result)
+
+    @always_inline("nodebug")
+    fn __rmul__(self, factor: Int) -> Shape:
+        return self.__mul__(factor)
+
+    @always_inline("nodebug")
+    fn reverse(self) -> Self:
+        """Return reversed shape."""
+        return Shape(self.dims.reversed())
+
+    @always_inline("nodebug")
+    fn replace(self, axis: Int, extent: Int) -> Shape:
+        """Replace dimension at axis."""
+        if axis < 0 or axis >= len(self):
+            panic("Shape: invalid axis " + String(axis))
+        if extent < 1:
+            panic("Shape: invalid extent " + String(extent))
+        var result = self.dims
+        result[axis] = extent
+        return Shape(result)
+
+    @always_inline("nodebug")
+    fn permute(self, axes: IntArray) -> Self:
+        """Reorder dimensions."""
+        var result = IntArray.with_capacity(len(axes))
+        result.reserve(len(axes))  # Guarantee no realloc
+        for i in range(len(axes)):
+            result.append(self[axes[i]])
+        return Shape(result)
+
+    @always_inline
+    fn count_axes_of_size(self, size: Int) -> Int:
+        """Count dimensions with given size."""
+        var count = 0
+        for i in range(len(self)):
+            if self[i] == size:
+                count += 1
+        return count
+
+    @always_inline("nodebug")
+    fn indices_of_axes_with_size(self, size: Int) -> IntArray:
+        """Get indices of dimensions with given size."""
+        var result = IntArray.with_capacity(len(self))
+        for i in range(len(self)):
+            if self[i] == size:
+                result.append(i)
+        return result^
+
+    @always_inline("nodebug")
+    fn first_index(self) -> IntArray:
+        """Get first index (all zeros)."""
+        return IntArray.filled(len(self), 0)
+
+    @always_inline("nodebug")
+    fn compute_output_shape(
+        self, normalized_axes: IntArray, keepdims: Bool, validated: Bool = False
+    ) -> Shape:
+        """Compute output shape after reduction.
+
+        Args:
+            normalized_axes: Sorted axes to reduce (empty = reduce all).
+            keepdims: Keep reduced dims as 1.
+            validated: Skip validation if True.
+        """
+        var rank = self.rank()
+
+        # Reduce all axes
+        if len(normalized_axes) == 0:
+            if keepdims:
+                return Shape(IntArray.filled(rank, 1))
+            else:
+                return Shape()
+
+        # Validate if needed
+        if not validated:
+            for i in range(len(normalized_axes)):
+                var axis = normalized_axes[i]
+                if axis < 0 or axis >= rank:
+                    panic("Shape: reduction axis out of bounds")
+                if i > 0 and axis <= normalized_axes[i - 1]:
+                    panic("Shape: reduction axes must be sorted and unique")
+
+        # Full reduction without keepdims
+        if len(normalized_axes) == rank and not keepdims:
+            return Shape()
+
+        # Build output shape
+        var expected_size = rank if keepdims else rank - len(normalized_axes)
+        var result = IntArray.with_capacity(expected_size)
+        result.reserve(expected_size)  # Guarantee no realloc
+        var axes_idx = 0
+
+        for dim in range(rank):
+            if (
+                axes_idx < len(normalized_axes)
+                and dim == normalized_axes[axes_idx]
+            ):
+                if keepdims:
+                    result.append(1)
+                axes_idx += 1
+            else:
+                result.append(self[dim])
+
+        return Shape(result)
+
+    @always_inline("nodebug")
+    fn reduced_shape(self, axes: IntArray) -> Shape:
+        if len(axes) > self.rank():
+            panic("Shape -> reduced_shape: axes greater that shape rank")
+        var reduced_axes = IntArray.with_capacity(len(axes))
+        for i in range(len(axes)):
+            reduced_axes.append(self[axes[i]])
+        return Shape(reduced_axes)
+
+    @staticmethod
+    fn of(*dims: Int) -> Shape:
+        return Shape(dims)
+
+    @always_inline
+    fn product(self) -> Int:
+        return self._numels
 
 
-from testing import assert_true
+@register_passable
+struct ShapeIndexIterator[origin: ImmutableOrigin](ImplicitlyCopyable):
+    """Iterator over IntArray coordinates of a shape."""
 
-
-fn test_slice_shape() raises:
-    shape = Shape([1, 2, 3, 4])
-    assert_true(
-        shape[:-1] == Shape.of(1, 2, 3)
-        and shape[:-2] == Shape.of(1, 2)
-        and shape[:-3] == Shape(1)
-        and shape[2::4] == Shape.of(3)
-        and shape[-1:] == Shape.of(4)
-        and shape[-2:] == Shape.of(3, 4),
-        "Shape slice assertion failed",
-    )
-
-
-fn test_negative_indices() raises:
-    shape = Shape([1, 2, 3])
-    assert_true(
-        shape[-1] == 3 and shape[-2] == 2 and shape[-3] == 1,
-        "Shape negative indices assertion failed",
-    )
-
-
-struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
     var shape: Pointer[Shape, origin]
-    var current: IntList
+    var current: IntArray
     var index: Int
 
     fn __init__(out self, shape: Pointer[Shape, origin]):
         self.shape = shape
-        self.current = IntList.with_capacity(shape[].ndim)
+        self.current = IntArray.filled(shape[].rank(), 0)
         self.index = 0
-        for _ in range(shape[].ndim):
-            self.current.append(0)
+
+    fn __copyinit__(out self, other: Self):
+        self.shape = other.shape
+        self.current = other.current
+        self.index = other.index
 
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(mut self) -> IntList:
-        result = self.current.copy()
+    fn __next__(mut self) -> IntArray:
+        var result = self.current
         self.index += 1
-        for i in range(self.shape[].ndim - 1, -1, -1):
+        # This loop is hot - uses __setitem__ which is already optimized
+        for i in range(self.shape[].rank() - 1, -1, -1):
             self.current[i] += 1
             if self.current[i] < self.shape[][i]:
                 break
@@ -62,381 +321,15 @@ struct ShapeIndexIter[origin: ImmutableOrigin](Copyable):
         return self.shape[].num_elements() - self.index
 
     fn __has_next__(self) -> Bool:
-        return self.shape[].num_elements() - self.index > 0
+        return self.index < self.shape[].num_elements()
 
 
-struct Shape(
-    Sized & Stringable & Writable & Representable & Copyable & Movable
-):
-    alias Unit = Shape.of(1)
-    alias Void = Shape(IntList.Empty)
-    var axes_spans: IntList
-    var ndim: Int
-    var numels: Int
+fn main():
+    A_shape = Shape(2, 3, 5, 4)
+    B_shape = Shape(4, 5)
 
-    fn __init__(out self):
-        self = Self.Void
-
-    fn __init__(out self, dims: VariadicList[Int]):
-        _dims = IntList.with_capacity(len(dims))
-        for each in dims:
-            _dims.append(each)
-        self = Self(_dims)
-
-    fn __init__(out self, dims: List[Int]):
-        self = Self(IntList.new(dims))
-
-    fn __init__(out self, dims: IntList):
-        _ = """if len(dims) < 1:
-            abort("Shape -> __init__: Shape dimension count should be > 0")"""
-        _ndims = len(dims)
-        # Allow scalar tensors (rank 0, i.e., Shape())
-        if _ndims == 0:
-            self.axes_spans = IntList.Empty
-            self.ndim = 0
-            self.numels = 1
-            return
-        for i in range(_ndims):
-            if dims[i] < 1:
-                abort(
-                    "Shape → __init__: negative or zero sized dimension(s) are"
-                    " not allowed →"
-                    + " dimension = "
-                    + String(dims[i])
-                    + " @index = "
-                    + String(i)
-                )
-        _numels = 1
-        for idx in range(_ndims):
-            _numels *= dims[idx]
-        self.axes_spans = dims
-        self.ndim = _ndims
-        self.numels = _numels
-
-    fn __iter__(ref self) -> ShapeIndexIter[__origin_of(self)]:
-        return ShapeIndexIter(Pointer(to=self))
-
-    fn slice_from(self, axis: Int) -> Shape:
-        if axis < 0 or axis > self.rank():
-            abort(
-                "Shape -> slice_from: axis "
-                + String(axis)
-                + " out of bounds for ndim "
-                + String(self.ndim)
-            )
-
-        new_axes_spans = self.axes_spans[axis:]
-        return Shape(new_axes_spans)
-
-    fn broadcastable(self, to: Shape) -> Bool:
-        dims1 = self.intlist()
-        dims2 = to.intlist()
-        zip_reversed = dims1.zip_reversed(dims2)
-        for dims in zip_reversed:
-            if dims[0] != dims[1]:
-                if dims[0] != 1 and dims[1] != 1:
-                    return False
-        return True
-
-    fn broadcast_mask(self, target_shape: Shape) -> IntList:
-        mask = IntList.with_capacity(target_shape.ndim)
-        offset = target_shape.ndim - self.ndim
-        if offset < 0:
-            abort(
-                "Shape → broadcast_mask → target_shape.ndim is smaller than"
-                " self.ndim: "
-                + String(target_shape.ndim)
-                + ", "
-                + String(self.ndim)
-            )
-
-        for i in range(target_shape.ndim):
-            if i < offset:
-                mask.append(1)  # self has no dimension here
-            else:
-                base_dim = self[i - offset]
-                target_dim = target_shape[i]
-                if base_dim == 1 and target_dim != 1:
-                    mask.append(1)  # self is being expanded
-                else:
-                    mask.append(0)  # match or both 1 → not broadcasted
-
-        return mask
-
-    fn reverse(self) -> Self:
-        dims = self.intlist()
-        dims.reverse()
-        return Shape(dims)
-
-    fn replace(self, axis: Int, extent: Int) -> Shape:
-        if axis < 0 or axis >= self.ndim:
-            abort(
-                "Shape → replace: Invalid axis: "
-                + String(axis)
-                + " for shape: "
-                + self.__str__()
-            )
-        if extent < 1:
-            abort("Shape → replace: Invalid extent: " + String(extent))
-        axes = self.intlist()
-        axes[axis] = extent
-        return Shape(axes)
-
-    fn drop_axis(self, axis: Int) -> Shape:
-        if axis < 0 or axis >= self.ndim:
-            abort(
-                "Shape → drop_axis: Invalid axis: "
-                + String(axis)
-                + " for shape: "
-                + self.__str__()
-            )
-        if self.ndim == 1:
-            shape = self
-            return shape
-        axes = self.intlist()[:axis] + self.intlist()[axis + 1 :]
-        return Shape(axes)
-
-    @staticmethod
-    fn pad_shapes(shape1: Shape, shape2: Shape) -> (Shape, Shape):
-        # Handle scalar cases first
-        if shape1 == Shape.Void and shape2 == Shape.Void:
-            return Shape.Void, Shape.Void
-        one = IntList(1)
-        if shape1 == Shape.Void:
-            # return Shape(1) * len(shape2), shape2  # Scalar becomes [1,1...] of matching rank
-            return (
-                Shape(one * len(shape2)),
-                shape2,
-            )  # Scalar becomes [1,1...] of matching rank
-        if shape2 == Shape.Void:
-            # return shape1, Shape(1) * len(shape1)  # Same for other side
-            return shape1, Shape(one * len(shape1))  # Same for other side
-
-        # Now handle empty tensor case explicitly
-        if 0 in shape1.intlist() or 0 in shape2.intlist():
-            abort("Cannot broadcast shapes with zero dimensions")
-        # Normal case for non-scalars
-        if shape1 == shape2:
-            return shape1, shape2
-
-        len1, len2 = len(shape1), len(shape2)
-        max_len = max(len1, len2)
-
-        # Pad with 1s (never 0s)
-        padded1 = one * (max_len - len1) + shape1.intlist()
-        padded2 = one * (max_len - len2) + shape2.intlist()
-
-        # Validate no zero dimensions
-        if 0 in padded1 or 0 in padded2:
-            abort("Invalid shape padding: resulted in zero dimension")
-
-        return Shape(padded1), Shape(padded2)
-
-    @staticmethod
-    fn broadcast_shape(this: Shape, that: Shape) -> Shape:
-        if not this.broadcastable(that):
-            abort(
-                "Shape → broadcast_shape - not broadcastable: "
-                + this.__str__()
-                + " <=> "
-                + that.__str__()
-            )
-        # Explicitly handle true scalars (Shape.Void)
-        if this == Shape.Void:
-            return that  # Scalar + Tensor -> Tensor's shape
-        if that == Shape.Void:
-            return this  # Tensor + Scalar -> Tensor's shape
-        shape1, shape2 = Self.pad_shapes(this, that)
-        result_shape = IntList.with_capacity(len(shape1))
-        s1 = shape1.intlist()
-        s2 = shape2.intlist()
-
-        for dims in s1.zip(s2):
-            if dims[0] == dims[1]:
-                result_shape.append(dims[0])
-            elif dims[0] == 1:
-                result_shape.append(dims[1])
-            elif dims[1] == 1:
-                result_shape.append(dims[0])
-            else:
-                abort(
-                    "Shape → broadcast_shape - cannot broadcast shapes: "
-                    + this.__str__()
-                    + ", "
-                    + that.__str__()
-                )
-
-        return Shape(result_shape)
-
-    @always_inline
-    fn __len__(self) -> Int:
-        return self.ndim
-
-    @always_inline
-    fn rank(self) -> Int:
-        return self.ndim
-
-    fn __getitem__(self, idx: Int) -> Int:
-        index = idx if idx >= 0 else idx + self.__len__()
-        if 0 <= index < self.ndim:
-            return self.axes_spans[index]
-        else:
-            return -1
-
-    fn __getitem__(self, slice: Slice) -> Self:
-        l = self.axes_spans[slice]
-        return Self(l)
-
-    fn permute(self, axes: IntList) -> Self:
-        if not len(axes) == len(self):
-            abort(
-                "Shape → permute: axes length not equal to shape's dimension"
-                " count"
-            )
-        result = IntList.with_capacity(len(axes))
-        for axis in axes:
-            result.append(self[axis])
-        return Shape(result)
-
-    fn __eq__(self, other: List[Int]) -> Bool:
-        shape = Self(other)
-        return self.__eq__(shape)
-
-    fn __eq__(self, other: Self) -> Bool:
-        if self.ndim != other.ndim:
-            return False
-        for idx in range(self.ndim):
-            if self.axes_spans[idx] != other.axes_spans[idx]:
-                return False
-        return True
-
-    fn __ne__(self, other: Self) -> Bool:
-        return not self.__eq__(other)
-
-    fn num_elements(self) -> Int:
-        return self.numels
-
-    fn flatten_index(self, indices: VariadicList[Int]) -> Int:
-        list = variadiclist_as_intlist(indices)
-        return self.flatten_index(list)
-
-    fn flatten_index(self, indices: IntList) -> Int:
-        if self.ndim == 0:
-            if len(indices) != 0:
-                abort(
-                    "Shape → flatten_index: scalar tensor should receive empty"
-                    " indices[IntList]"
-                )
-            return 0
-        if len(indices) != self.ndim:
-            print(
-                (
-                    "Shape → flatten_index: shape mismatch len(indices) !="
-                    " self.ndim -> "
-                ),
-                len(indices),
-                "<=>",
-                self.ndim,
-            )
-            return -1
-        var index = 0
-        var stride = 1
-        for i in reversed(range(self.ndim)):
-            idx = indices[i]
-            dim = self.axes_spans[i]
-            if idx < 0:
-                idx += dim  # Negative index
-            if idx >= dim or idx < 0:  # Negative index
-                print(
-                    (
-                        "Shape → flatten_index: invalid index >= dim span or"
-                        " negative: "
-                    ),
-                    idx,
-                    dim,
-                )
-                return -1
-            index += idx * stride
-            stride *= dim
-        return index
-
-    fn translate_index(
-        self, indices: IntList, mask: IntList, broadcast_shape: Shape
-    ) -> IntList:
-        """Translate broadcasted indices to original tensor indices.
-
-        Args:
-            indices: Position in broadcasted tensor.
-            mask: 1 for broadcasted dims, 0 for original.
-            broadcast_shape: Shape after broadcasting.
-
-        Returns:
-            Indices in original tensor's space.
-        """
-        if not self.ndim <= broadcast_shape.ndim:
-            abort("Original dims > broadcast dims")
-        if not mask.size == broadcast_shape.ndim:
-            abort("Mask/broadcast shape mismatch")
-        if not indices.size == broadcast_shape.ndim:
-            abort("Indices/broadcast shape mismatch")
-
-        translated = IntList.with_capacity(self.ndim)
-        offset = broadcast_shape.ndim - self.ndim
-
-        for i in range(self.ndim):
-            broadcast_axis = i + offset
-            if not broadcast_axis < mask.size:
-                abort("Invalid axis")
-
-            if mask[broadcast_axis] == 1:
-                translated.append(0)  # Broadcasted dim
-            else:
-                translated.append(indices[broadcast_axis])
-
-        return translated
-
-    fn __str__(self) -> String:
-        var s = String("(")
-        for i in range(self.ndim):
-            s += String(self.axes_spans[i])
-            if i < self.ndim - 1:
-                s += ", "
-        s += ")"
-        return s
-
-    fn __repr__(self) -> String:
-        return self.__str__()
-
-    fn write_to[W: Writer](self, mut writer: W):
-        writer.write(self.__str__())
-
-    fn __moveinit__(out self, owned other: Self):
-        self.axes_spans = other.axes_spans
-        self.ndim = other.ndim
-        self.numels = other.numels
-
-    fn __copyinit__(out self, other: Self):
-        self.axes_spans = other.axes_spans
-        self.ndim = other.ndim
-        self.numels = other.numels
-
-    fn free(owned self):
-        log_debug("Freeing Shape")
-        self.axes_spans.free()
-        _ = self^
-
-    @staticmethod
-    fn validate(shape: Shape):
-        for idx in range(shape.ndim):
-            if shape.axes_spans[idx] < 1:
-                abort(
-                    "Shape → validate: shape dimension not valid: "
-                    + String(shape.axes_spans[idx])
-                )
-
-    fn intlist(self) -> IntList:
-        return self.axes_spans.copy()
-
-    @staticmethod
-    fn of(*dims: Int) -> Shape:
-        return Shape(dims)
+    print(A_shape[-1], B_shape[-2], A_shape[0:-2], B_shape[0:-2])
+    _ = """for coord in shape:
+        print(coord)
+    shape = shape * 0
+    print(shape)"""

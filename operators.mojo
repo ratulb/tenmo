@@ -1,303 +1,37 @@
-from tensors import Tensor
-from common_utils import panic
-from algorithm import vectorize, parallelize
-from sys import simdwidthof
-from shapes import Shape
-from os import abort
-
-# from runtime.asyncrt import num_physical_cores
-from sys import num_logical_cores, num_physical_cores
-
 alias Noop = 0
-alias AddScalar = 1
-alias SubtractScalar = 2
-alias MulScalar = 3
-alias MulTensor = 4
-alias AddTensor = 5
-alias SubtractTensor = 6
-alias Power = 7
-alias Add = 8
-alias Subtract = 9
-alias Multiply = 10
-alias SubtractFromScalar = 11
-alias DivideByScalar = 12
-alias DivideScalar = 13
-alias Equal = 14
-alias NotEqual = 15
-alias LessThan = 16
-alias LessThanEqual = 17
-alias GreaterThan = 18
-alias GreaterThanEqual = 19
-
-
-@always_inline
-fn scalar_ops[
-    dtype: DType, op: Int
-](lhs: Scalar[dtype], rhs: Scalar[dtype]) -> Scalar[dtype]:
-    result = Scalar[dtype](0)
-    if op == Add:
-        result = lhs + rhs
-    elif op == Subtract:
-        result = lhs - rhs
-    elif op == Multiply:
-        result = lhs * rhs
-    else:
-        abort("operators -> scalar_ops: unsupported operation")
-    return result
-
-
-# Element wise operatorns
-fn __tensor_op_tensor__[
-    dtype: DType, op: Int
-](this: Tensor[dtype], that: Tensor[dtype]) -> Tensor[dtype]:
-    if this.shape != that.shape:
-        abort(
-            "operator -> __tensor_op__tensor("
-            + String(op)
-            + ")  -> Dimension mismatch: "
-            + this.shape.__str__()
-            + " != "
-            + that.shape.__str__()
-        )
-    requires_grad = this.requires_grad or that.requires_grad
-    out = Tensor[dtype](this.shape, requires_grad)
-
-    @parameter
-    fn mul_elems[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx,
-            (
-                this.data.load[width=simd_width, volatile=True](idx)
-                * that.data.load[width=simd_width, volatile=True](idx)
-            ),
-        )
-
-    @parameter
-    fn add_elems[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx,
-            (
-                this.data.load[width=simd_width, volatile=True](idx)
-                + that.data.load[width=simd_width, volatile=True](idx)
-            ),
-        )
-
-    @parameter
-    fn subtract_elems[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx,
-            (
-                this.data.load[width=simd_width, volatile=True](idx)
-                - that.data.load[width=simd_width, volatile=True](idx)
-            ),
-        )
-
-    if op == MulTensor:
-        vectorize[mul_elems, simdwidthof[dtype]()](out.numels())
-    elif op == AddTensor:
-        vectorize[add_elems, simdwidthof[dtype]()](out.numels())
-    elif op == SubtractTensor:
-        vectorize[subtract_elems, simdwidthof[dtype]()](out.numels())
-
-    return out
-
-
-# Tensor and scalar ops
-fn __tensor_op_scalar__[
-    dtype: DType, op: Int
-](this: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
-    var out = Tensor[dtype](this.shape, this.requires_grad)
-
-    @parameter
-    fn add_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx, this.data.load[width=simd_width, volatile=True](idx) + scalar
-        )
-
-    @parameter
-    fn subtract_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx, this.data.load[width=simd_width, volatile=True](idx) - scalar
-        )
-
-    @parameter
-    fn subtract_from_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx, scalar - this.data.load[width=simd_width, volatile=True](idx)
-        )
-
-    @parameter
-    fn mul_by_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx, this.data.load[width=simd_width, volatile=True](idx) * scalar
-        )
-
-    @parameter
-    fn powered_by_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width, volatile=True](
-            idx,
-            this.data.load[width=simd_width, volatile=True](idx).__pow__(
-                scalar
-            ),
-        )
-
-    @parameter
-    fn div_by_factor[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
-            idx,
-            this.data.load[width=simd_width, volatile=True](idx).__truediv__(
-                scalar
-            ),
-        )
-
-    @parameter
-    fn divide_scalar[simd_width: Int](idx: Int):
-        out.data.store[width=simd_width](
-            idx,
-            this.data.load[width=simd_width, volatile=True](idx).__rtruediv__(
-                scalar
-            ),
-        )
-
-    if op == MulScalar:
-        vectorize[mul_by_scalar, simdwidthof[dtype]()](out.numels())
-    elif op == AddScalar:
-        vectorize[add_scalar, simdwidthof[dtype]()](out.numels())
-    elif op == SubtractScalar:
-        vectorize[subtract_scalar, simdwidthof[dtype]()](out.numels())
-    elif op == SubtractFromScalar:
-        vectorize[subtract_from_scalar, simdwidthof[dtype]()](out.numels())
-    elif op == DivideByScalar:
-        vectorize[div_by_factor, simdwidthof[dtype]()](out.numels())
-    elif op == DivideScalar:
-        vectorize[divide_scalar, simdwidthof[dtype]()](out.numels())
-
-    elif op == Power:
-        vectorize[powered_by_scalar, simdwidthof[dtype]()](out.numels())
-
-    return out
-
-
-fn tensor_compare_scalar[
-    dtype: DType, //, op: Int
-](this: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[DType.bool]:
-    result = Tensor[DType.bool](this.shape, False)
-
-    @parameter
-    fn compare_elems[simd_width: Int](idx: Int):
-        if op == Equal:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx) == scalar,
-            )
-
-        if op == NotEqual:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx) != scalar,
-            )
-
-        if op == LessThan:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx) < scalar,
-            )
-
-        if op == LessThanEqual:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx) <= scalar,
-            )
-
-        if op == GreaterThan:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx) > scalar,
-            )
-
-        if op == GreaterThanEqual:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx) >= scalar,
-            )
-
-    vectorize[compare_elems, simdwidthof[DType.bool]()](result.numels())
-    return result
-
-
-fn tensor_compare[
-    dtype: DType, //, op: Int
-](this: Tensor[dtype], other: Tensor[dtype]) -> Tensor[DType.bool]:
-    if this.shape != other.shape:
-        panic(
-            "Tensor __eq__ → Dimension mismatch:",
-            this.shape.__str__(),
-            ",",
-            other.shape.__str__(),
-        )
-    result = Tensor[DType.bool](this.shape, False)
-
-    @parameter
-    fn compare_elems[simd_width: Int](idx: Int):
-        if op == Equal:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx)
-                == other.data.load[width=simd_width](idx),
-            )
-
-        if op == NotEqual:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx)
-                != other.data.load[width=simd_width](idx),
-            )
-
-        if op == LessThan:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx)
-                < other.data.load[width=simd_width](idx),
-            )
-
-        if op == LessThanEqual:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx)
-                <= other.data.load[width=simd_width](idx),
-            )
-
-        if op == GreaterThan:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx)
-                > other.data.load[width=simd_width](idx),
-            )
-
-        if op == GreaterThanEqual:
-            result.data.store[width=simd_width, volatile=True](
-                idx,
-                this.data.load[width=simd_width](idx)
-                >= other.data.load[width=simd_width](idx),
-            )
-
-    vectorize[compare_elems, simdwidthof[DType.bool]()](result.numels())
-    return result
-
-
-fn sum_all[dtype: DType, //](input: Tensor[dtype]) -> Scalar[dtype]:
-    constrained[
-        dtype.is_numeric(),
-        "operators → sumup is for numeric data types only",
-    ]()
-    summ = Scalar[dtype](0)
-
-    @parameter
-    fn sum_elems[simd_width: Int](idx: Int):
-        summ += input.data.load[width=simd_width](idx).reduce_add()
-
-    vectorize[sum_elems, simdwidthof[dtype]()](input.numels())
-    return summ
+alias MulTensor = 1
+alias AddTensor = 2
+alias SubtractTensor = 3
+alias ZeroGrad = 4
+alias Add = 5
+alias Subtract = 6
+alias ReverseSubtract = 7
+alias Multiply = 8
+alias Divide = 9
+alias ReverseDivide = 10
+alias Equal = 11
+alias NotEqual = 12
+alias LessThan = 13
+alias LessThanEqual = 14
+alias GreaterThan = 15
+alias GreaterThanEqual = 16
+alias Overwrite = 17
+alias SigmoidOp = 18
+alias Log = 19
+alias Exp = 20
+alias TanhForwardOp = 21
+alias TanhBackwardOp = 22
+alias ReLUForwardOp = 23
+alias ReLUBackwardOp = 24
+alias SqrtForwardOp=25
+alias SqrtBackwardOp=26
+###################
+### matul ###########
+alias dot = 27  # dot product
+alias vm = 28  # vector & tensor matmul
+alias mv = 29  # tensor & vector matmul
+alias mm = 30  # tensor & tensor matmul
+alias invalid = 31  # Invalid case
 
 
 fn main() raises:

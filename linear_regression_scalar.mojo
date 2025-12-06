@@ -28,12 +28,12 @@ fn main() raises:
             loss.print()
 
         # SGD update
-        w = w - learning_rate * w.grad[]
-        b = b - learning_rate * b.grad[]
+        w = w - learning_rate * w.grad()
+        b = b - learning_rate * b.grad()
 
         # Zero gradients for next step
-        w.grad[].fill(0.0)
-        b.grad[].fill(0.0)
+        w.zero_grad()
+        b.zero_grad()
 
     print()
     print()
