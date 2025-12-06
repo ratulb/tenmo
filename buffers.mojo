@@ -43,8 +43,10 @@ struct Buffer[dtype: DType = DType.float32](
     """
 
     var size: Int
-    var data: UnsafePointer[Scalar[dtype]]
-    var _refcount: UnsafePointer[Atomic[DType.uint64]]  # Null if not shared!
+    var data: UnsafePointer[Scalar[dtype], MutAnyOrigin]
+    var _refcount: UnsafePointer[
+        Atomic[DType.uint64], MutAnyOrigin
+    ]  # Null if not shared!
     var external: Bool
 
     # ========================================
@@ -53,8 +55,10 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn __init__(out self):
         self.size = 0
-        self.data = UnsafePointer[Scalar[dtype]]()
-        self._refcount = UnsafePointer[Atomic[DType.uint64]]()  # Null
+        self.data = UnsafePointer[Scalar[dtype], MutAnyOrigin]()
+        self._refcount = UnsafePointer[
+            Atomic[DType.uint64], MutAnyOrigin
+        ]()  # Null
         self.external = False
 
     fn __init__(out self, size: Int, external: Bool = False):
@@ -63,35 +67,39 @@ struct Buffer[dtype: DType = DType.float32](
         self.size = size
         self.external = external
         self._refcount = UnsafePointer[
-            Atomic[DType.uint64]
+            Atomic[DType.uint64], MutAnyOrigin
         ]()  # Null (not shared yet)
 
         if size == 0:
-            self.data = UnsafePointer[Scalar[dtype]]()
+            self.data = UnsafePointer[Scalar[dtype], MutAnyOrigin]()
         else:
             if external:
-                self.data = UnsafePointer[Scalar[dtype]]()
+                self.data = UnsafePointer[Scalar[dtype], MutAnyOrigin]()
             else:
-                self.data = UnsafePointer[Scalar[dtype]].alloc(size)
+                self.data = alloc[Scalar[dtype]](size)
 
     fn __init__(out self, elems: List[Scalar[dtype]]):
         var length = len(elems)
-        self.data = UnsafePointer[Scalar[dtype]].alloc(length)
+        self.data = alloc[Scalar[dtype]](length)
         self.size = length
         memcpy(dest=self.data, src=elems._data, count=length)
         self.external = False
-        self._refcount = UnsafePointer[Atomic[DType.uint64]]()  # Null
+        self._refcount = UnsafePointer[
+            Atomic[DType.uint64], MutAnyOrigin
+        ]()  # Null
 
     fn __init__(
         out self,
         size: Int,
-        data: UnsafePointer[Scalar[dtype]],
+        data: UnsafePointer[Scalar[dtype], MutAnyOrigin],
         copy: Bool = False,
     ):
         self.size = size
-        self._refcount = UnsafePointer[Atomic[DType.uint64]]()  # Null
+        self._refcount = UnsafePointer[
+            Atomic[DType.uint64], MutAnyOrigin
+        ]()  # Null
         if copy:
-            self.data = UnsafePointer[Scalar[dtype]].alloc(size)
+            self.data = alloc[Scalar[dtype]](size)
             memcpy(dest=self.data, src=data, count=size)
             self.external = False
         else:
@@ -104,7 +112,10 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn is_shared(self) -> Bool:
         """Check if this buffer has ref counting enabled."""
-        return self._refcount != UnsafePointer[Atomic[DType.uint64]]()
+        return (
+            self._refcount
+            != UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]()
+        )
 
     fn shared(mut self):
         """
@@ -127,7 +138,7 @@ struct Buffer[dtype: DType = DType.float32](
         var refcount_size = size_of[Atomic[DType.uint64]]()
         var data_size = self.size * size_of[Scalar[dtype]]()
         var total_size = refcount_size + data_size
-        var new_alloc = UnsafePointer[UInt8].alloc(total_size)
+        var new_alloc = alloc[UInt8](total_size)
 
         # Initialize refcount at start
         var refcount_ptr = new_alloc.bitcast[Atomic[DType.uint64]]()
@@ -171,7 +182,7 @@ struct Buffer[dtype: DType = DType.float32](
         else:
             # Not shared - deep copy data
             if self.size > 0 and not self.external:
-                self.data = UnsafePointer[Scalar[dtype]].alloc(self.size)
+                self.data = alloc[Scalar[dtype]](self.size)
                 memcpy(dest=self.data, src=other.data, count=self.size)
 
     fn __moveinit__(out self, deinit other: Self):
@@ -998,7 +1009,7 @@ struct Buffer[dtype: DType = DType.float32](
         delta = abs(end - start)
         step_abs = abs(step)
         est_size = ceil(delta / step_abs).__int__() + 2
-        var data = List[Scalar[dtype]](capacity=UInt(est_size))
+        var data = List[Scalar[dtype]](capacity=Int(est_size))
         var value = start
 
         if step > 0:
@@ -1632,7 +1643,7 @@ struct Buffer[dtype: DType = DType.float32](
         return total
 
     fn tolist(self: Buffer[dtype]) -> List[Scalar[dtype]]:
-        var result = List[Scalar[dtype]](capacity=UInt(len(self)))
+        var result = List[Scalar[dtype]](capacity=Int(len(self)))
         for i in range(len(self)):
             result.append(self[i])
         return result^
@@ -1812,7 +1823,7 @@ struct ElementIterator[
 
 fn main() raises:
     alias dtype = DType.float32
-    ll = List[Scalar[dtype]](10, 23, 0.9, 100)
+    ll: List[Scalar[dtype]] = [10, 23, 0.9, 100]
     buffer = Buffer[dtype](ll)
     result = buffer.unary_ops[TanhForwardOp]()
     print(result)

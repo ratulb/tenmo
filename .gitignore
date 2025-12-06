@@ -12,3 +12,6 @@ data/
 model_weights.npy
 *.copy.*
 *.copy
+# pixi environments
+.pixi/*
+!.pixi/config.toml

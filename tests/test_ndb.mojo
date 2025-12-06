@@ -1890,7 +1890,7 @@ fn test_buffer_sum() raises:
     print("test_buffer_sum")
     alias dtype = DType.int32
     size = 21
-    l = List[Scalar[dtype]](capacity=UInt(size))
+    l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
         l.append(i)
 
@@ -1917,7 +1917,7 @@ fn test_buffer_sum_all() raises:
     print("test_buffer_sum_all")
     alias dtype = DType.int32
     size = 21
-    l = List[Scalar[dtype]](capacity=UInt(size))
+    l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
         l.append(i)
 
@@ -1948,7 +1948,7 @@ fn test_buffer_sum_all() raises:
 fn test_buffer_overwrite() raises:
     alias dtype = DType.int32
     size = 21
-    l = List[Scalar[dtype]](capacity=UInt(size))
+    l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
         l.append(i)
 

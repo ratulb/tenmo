@@ -2621,7 +2621,7 @@ fn test_fill_segment() raises:
     print("test_fill_segment")
     alias dtype = DType.int32
     size = 21
-    l = List[Scalar[dtype]](capacity=UInt(size))
+    l = List[Scalar[dtype]](capacity=Int(size))
     for i in range(size):
         l.append(i)
 
@@ -2672,7 +2672,7 @@ fn test_overwrite_orig() raises:
     print("test_overwrite")
     alias dtype = DType.int32
     size = 21
-    l = List[Scalar[dtype]](capacity=UInt(size))
+    l = List[Scalar[dtype]](capacity=Int(size))
     for i in range(size):
         l.append(i)
 

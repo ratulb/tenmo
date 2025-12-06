@@ -286,7 +286,7 @@ struct Shape(
 
 
 @register_passable
-struct ShapeIndexIterator[origin: ImmutableOrigin](ImplicitlyCopyable):
+struct ShapeIndexIterator[origin: ImmutOrigin](ImplicitlyCopyable):
     """Iterator over IntArray coordinates of a shape."""
 
     var shape: Pointer[Shape, origin]

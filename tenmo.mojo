@@ -42,7 +42,7 @@ struct Tensor[dtype: DType = DType.float32](
     var _id: Int
     var buffer: NDBuffer[dtype]
     var requires_grad: Bool
-    var gradbox: UnsafePointer[Gradbox[dtype]]
+    var gradbox: UnsafePointer[Gradbox[dtype], MutAnyOrigin]
     var ancestors: Optional[Ancestors[dtype]]
     var backwardFn: Optional[BackwardFn[dtype]]
 
@@ -57,7 +57,7 @@ struct Tensor[dtype: DType = DType.float32](
         self._id = IDGen.generate_id()
         self.buffer = NDBuffer[dtype](shape)
         self.requires_grad = requires_grad
-        self.gradbox = UnsafePointer[Gradbox[dtype]]()
+        self.gradbox = UnsafePointer[Gradbox[dtype], MutAnyOrigin]()
         self.ancestors = None
         self.backwardFn = None
         self.init_gradbox()
@@ -65,17 +65,17 @@ struct Tensor[dtype: DType = DType.float32](
     fn __init__(
         out self,
         shape: Shape,
-        ptr: UnsafePointer[Scalar[dtype]],
+        ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin],
         requires_grad: Bool = False,
         *,
         copy: Bool = True,
     ):
         self._id = IDGen.generate_id()
         self.buffer = NDBuffer[dtype](
-            Buffer[dtype](shape.num_elements(), ptr, copy=copy), shape
+            Buffer[dtype](shape.num_elements(), ptr, copy), shape
         )
         self.requires_grad = requires_grad
-        self.gradbox = UnsafePointer[Gradbox[dtype]]()
+        self.gradbox = UnsafePointer[Gradbox[dtype], MutAnyOrigin]()
         self.ancestors = None
         self.backwardFn = None
         self.init_gradbox()
@@ -88,7 +88,7 @@ struct Tensor[dtype: DType = DType.float32](
         self._id = IDGen.generate_id()
         self.buffer = buffer^
         self.requires_grad = requires_grad
-        self.gradbox = UnsafePointer[Gradbox[dtype]]()
+        self.gradbox = UnsafePointer[Gradbox[dtype], MutAnyOrigin]()
         self.ancestors = None
         self.backwardFn = None
         self.init_gradbox()
@@ -103,7 +103,9 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[dtype]:
         ref src_buffer = source[].buffer
 
-        buffer = src_buffer.share(shape, strides, offset)
+        src_buffer.share(shape, strides, offset)
+	var buffer = src_buffer.copy()
+        #buffer = src_buffer.share(shape, strides, offset)
         return Tensor[dtype](buffer=buffer^, requires_grad=requires_grad)
 
     fn as_gradbox(deinit self, share: Bool = False) -> Gradbox[dtype]:
@@ -121,11 +123,11 @@ struct Tensor[dtype: DType = DType.float32](
         self._id = other._id
         self.buffer = other.buffer.copy()
         self.requires_grad = other.requires_grad
-        if other.gradbox != UnsafePointer[Gradbox[dtype]]():
-            self.gradbox = UnsafePointer[Gradbox[dtype]].alloc(1)
+        if other.gradbox != UnsafePointer[Gradbox[dtype], MutAnyOrigin]():
+            self.gradbox = alloc[Gradbox[dtype]](1)
             self.gradbox.init_pointee_copy(other.gradbox[])
         else:
-            self.gradbox = UnsafePointer[Gradbox[dtype]]()
+            self.gradbox = UnsafePointer[Gradbox[dtype], MutAnyOrigin]()
         self.ancestors = other.ancestors.copy()
         self.backwardFn = other.backwardFn.copy()
 
@@ -137,11 +139,11 @@ struct Tensor[dtype: DType = DType.float32](
     fn init_gradbox(mut self):
         if (
             self.requires_grad
-            and self.gradbox == UnsafePointer[Gradbox[dtype]]()
+            and self.gradbox == UnsafePointer[Gradbox[dtype], MutAnyOrigin]()
         ):
             gradbox = Gradbox[dtype](self.shape())
             gradbox.zero_grad()
-            self.gradbox = UnsafePointer[Gradbox[dtype]].alloc(1)
+            self.gradbox = alloc[Gradbox[dtype]](1)
             self.gradbox.init_pointee_move(gradbox^)
 
     @always_inline
@@ -396,7 +398,7 @@ struct Tensor[dtype: DType = DType.float32](
             self.gradbox[].zero_grad()
 
     @always_inline
-    fn gradients(self) -> UnsafePointer[Gradbox[dtype]]:
+    fn gradients(self) -> UnsafePointer[Gradbox[dtype], MutAnyOrigin]:
         if not self.requires_grad or not self.has_grad():
             panic(
                 "Tensor → grad(self): called on a tensor that does not require"
@@ -532,14 +534,14 @@ struct Tensor[dtype: DType = DType.float32](
     ](self, other: Self,) -> Bool:
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
-    fn address(self) -> UnsafePointer[Self,]:
+    fn address(self) -> UnsafePointer[Self, MutAnyOrigin]:
         return UnsafePointer(to=self)
 
     fn unsafe_address(
         ref self,
     ) -> UnsafePointer[
         Self,
-        mut = Origin(origin_of(self)).mut,
+        #mut = Origin(origin_of(self)).mut,
         origin = origin_of(self),
     ]:
         return UnsafePointer(to=self).mut_cast[Origin(origin_of(self)).mut]()
@@ -1341,7 +1343,7 @@ struct Tensor[dtype: DType = DType.float32](
         return Tensor[dtype](nd_buffer^, requires_grad=False)
 
     fn __neg__(self) -> Tensor[dtype]:
-        constrained[
+    	constrained[
             dtype.is_numeric(),
             "Tensor → __neg__ is for numeric data types only",
         ]()

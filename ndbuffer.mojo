@@ -603,7 +603,7 @@ struct NDBuffer[dtype: DType](
         else:
             for coord in self.shape:
                 uniques.add(self[coord])
-        var distincts = List[Scalar[dtype]](capacity=UInt(len(uniques)))
+        var distincts = List[Scalar[dtype]](capacity=Int(len(uniques)))
         for elem in uniques:
             distincts.append(elem)
         var unique_shape = Shape(len(distincts))

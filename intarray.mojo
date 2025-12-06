@@ -10,7 +10,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     Uses capacity-based growth to avoid frequent reallocations.
     """
 
-    var _data: UnsafePointer[Int]
+    var _data: UnsafePointer[Int, MutAnyOrigin]
     var _size: Int  # Current number of elements
     var _capacity: Int  # Allocated capacity
 
@@ -19,7 +19,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     @always_inline("nodebug")
     fn __init__(out self):
         """Create empty array."""
-        self._data = UnsafePointer[Int]()
+        self._data = UnsafePointer[Int, MutAnyOrigin]()
         self._size = 0
         self._capacity = 0
 
@@ -27,7 +27,8 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     fn __init__(out self, *values: Int):
         """Create from variadic args: IntArray(1, 2, 3)."""
         var n = len(values)
-        self._data = UnsafePointer[Int].alloc(n)
+        #self._data = UnsafePointer[Int].alloc(n)
+        self._data = alloc[Int](n)
         self._size = n
         self._capacity = n
         for i in range(n):
@@ -37,7 +38,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     fn __init__(out self, values: VariadicList[Int]):
         """Create from VariadicList : IntArray(1, 2, 3)."""
         var n = len(values)
-        self._data = UnsafePointer[Int].alloc(n)
+        self._data = alloc[Int](n)
         self._size = n
         self._capacity = n
         for i in range(n):
@@ -47,7 +48,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     fn __init__(out self, values: List[Int]):
         """Create from List[Int]."""
         var n = len(values)
-        self._data = UnsafePointer[Int].alloc(n)
+        self._data = alloc[Int](n)
         self._size = n
         self._capacity = n
         memcpy(dest=self._data, src=values._data, count=n)
@@ -58,10 +59,10 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
         self._size = existing._size
         self._capacity = existing._capacity
         if existing._capacity > 0:
-            self._data = UnsafePointer[Int].alloc(existing._capacity)
+            self._data = alloc[Int](existing._capacity)
             memcpy(dest=self._data, src=existing._data, count=existing._size)
         else:
-            self._data = UnsafePointer[Int]()
+            self._data = UnsafePointer[Int, MutAnyOrigin]()
 
     @always_inline("nodebug")
     fn __del__(deinit self):
@@ -113,7 +114,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
         """Create with capacity but zero size."""
         var result = Self()
         if capacity > 0:
-            result._data = UnsafePointer[Int].alloc(capacity)
+            result._data = alloc[Int](capacity)
             result._capacity = capacity
         return result^
 
@@ -226,7 +227,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
 
         # Grow by 1.5x or required, whichever is larger
         var new_cap = max(required, self._capacity * 3 // 2 + 1)
-        var new_data = UnsafePointer[Int].alloc(new_cap)
+        var new_data = alloc[Int](new_cap)
 
         # Copy existing
         if self._size > 0:
@@ -456,7 +457,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     @always_inline("nodebug")
     fn tolist(self) -> List[Int]:
         """Convert to List[Int]."""
-        var result = List[Int](capacity=UInt(self._size))
+        var result = List[Int](capacity=Int(self._size))
         for i in range(self._size):
             result.append(self._data[i])
         return result^
