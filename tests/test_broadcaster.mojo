@@ -2,7 +2,7 @@ from tenmo import Tensor
 from shapes import Shape
 from testing import assert_true, assert_raises
 from broadcasthelper import ShapeBroadcaster
-
+from intarray import IntArray
 
 fn test_empty_shape_broadcastable() raises:
     print("test_empty_shape_broadcastable")

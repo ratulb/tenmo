@@ -15,12 +15,12 @@ struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_UNSQUEEZE
     var axes: IntArray  # where axes were inserted
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
         # Remove the axis we had inserted
         var squeezed_gradbox = gradbox.squeeze(self.axes)
@@ -38,10 +38,10 @@ struct Unsqueeze[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        tensor: Tensor[dtype],
+        mut tensor: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         """Unsqueeze multiple axes by inserting dimensions of size 1."""
         rank = tensor.rank()
         original_shape = tensor.shape()
@@ -108,8 +108,8 @@ struct Unsqueeze[dtype: DType]:
         # Create the unsqueezed tensor
         shape = Shape(new_shape)
         strides = Strides(new_strides)
-        out = Tensor[dtype].build_view(
-            tensor.address(),
+        out = Tensor[Self.dtype].build_view(
+            tensor,
             shape,
             strides,
             tensor.offset(),
@@ -122,7 +122,7 @@ struct Unsqueeze[dtype: DType]:
 
             if grad_required:
                 out.requires_grad_(True)
-                bfn = UnsqueezeBackward[dtype](
+                bfn = UnsqueezeBackward[Self.dtype](
                     axes=normalized_axes
                 ).into_backward_fn()
                 out.backwardFn = Optional(bfn^)

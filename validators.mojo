@@ -701,7 +701,7 @@ struct Validator:
         if rank == 0:
             return True
 
-        var pairs = List[Tuple[Int, Int]](capacity=UInt(rank))
+        var pairs = List[Tuple[Int, Int]](capacity=rank)
         for i in range(rank):
             pairs.append((abs(strides[i]), i))
 

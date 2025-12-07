@@ -18,13 +18,13 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
     var strides: Strides
     var offset: Int
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward[
         simdwidth: Int = simd_width_of[dtype]()
-    ](self, read output: Tensor[dtype]) -> List[
-        Tuple[Tensor[dtype], Gradbox[dtype], Int]
+    ](self, read output: Tensor[Self.dtype]) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
         var parent = output.ancestry().get(0)
         ref gradbox = output.gradients()[]
@@ -33,7 +33,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
         ref parent_strides = parent.strides()
         var parent_offset = parent.offset()
         var parent_max_index = parent.max_index()
-        var parent_gradbox = Gradbox[dtype].zeros(parent_shape)
+        var parent_gradbox = Gradbox[Self.dtype].zeros(parent_shape)
 
         # Special case: scalar parent
         if parent_shape.rank() == 0:
@@ -131,42 +131,42 @@ struct View[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        mut tensor: Tensor[dtype],
         shape: Shape,
         strides: Strides,
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         var abs_offset: Int
         var abs_strides: Strides
 
         if not validated:
             (abs_offset, abs_strides) = Validator.validate_view_params(
-                self.buffer.size(), shape, strides, offset
+                tensor.buffer.size(), shape, strides, offset
             )
         else:
             abs_offset = offset
             abs_strides = strides
 
-        var out = Tensor[dtype].build_view(
-            self.unsafe_address(),
+        var out = Tensor[Self.dtype].build_view(
+            tensor,
             shape,
-            Optional(abs_strides),
+            abs_strides,
             abs_offset,
             requires_grad=False,
         )
 
         @parameter
         if track_grad:
-            var grad_required = requires_grad.or_else(self.requires_grad)
+            var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = ViewBackward[dtype](
+                var backward_fn = ViewBackward[Self.dtype](
                     shape, abs_strides, abs_offset
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
-                out.add_ancestry(self)
+                out.add_ancestry(tensor)
 
         return out^
 
