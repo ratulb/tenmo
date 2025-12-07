@@ -39,7 +39,7 @@ fn list_to_tuple(l: List[Int]) raises -> PythonObject:
 
 fn ndarray_ptr[
     dtype: DType
-](ndarray: PythonObject) raises -> UnsafePointer[Scalar[dtype]]:
+](ndarray: PythonObject) raises -> UnsafePointer[Scalar[dtype], MutAnyOrigin]:
     return ndarray.__array_interface__["data"][0].unsafe_get_as_pointer[dtype]()
 
 
@@ -111,7 +111,8 @@ fn main() raises:
 
 
 fn test_to_ndarray() raises:
-    a = Tensor.arange(10).reshape(2, 5)
+    o = Tensor.arange(10)
+    a = o.reshape(2, 5)
     py_obj = to_ndarray(a)
     py = Python.import_module("builtins")
     print(py_obj, py_obj.dtype, py.type(py_obj))

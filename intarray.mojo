@@ -10,7 +10,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     Uses capacity-based growth to avoid frequent reallocations.
     """
 
-    var _data: UnsafePointer[Int, MutAnyOrigin]
+    var _data: UnsafePointer[Int, MutOrigin.external]
     var _size: Int  # Current number of elements
     var _capacity: Int  # Allocated capacity
 
@@ -19,7 +19,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     @always_inline("nodebug")
     fn __init__(out self):
         """Create empty array."""
-        self._data = UnsafePointer[Int, MutAnyOrigin]()
+        self._data = UnsafePointer[Int, MutOrigin.external]()
         self._size = 0
         self._capacity = 0
 
@@ -27,7 +27,6 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     fn __init__(out self, *values: Int):
         """Create from variadic args: IntArray(1, 2, 3)."""
         var n = len(values)
-        #self._data = UnsafePointer[Int].alloc(n)
         self._data = alloc[Int](n)
         self._size = n
         self._capacity = n
@@ -62,7 +61,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
             self._data = alloc[Int](existing._capacity)
             memcpy(dest=self._data, src=existing._data, count=existing._size)
         else:
-            self._data = UnsafePointer[Int, MutAnyOrigin]()
+            self._data = UnsafePointer[Int, MutOrigin.external]()
 
     @always_inline("nodebug")
     fn __del__(deinit self):

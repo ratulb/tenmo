@@ -34,12 +34,12 @@ struct Batch[feature_dtype: DType, label_dtype: DType](
 ):
     """Container for a batch of data with different feature/label dtypes."""
 
-    var features: Tensor[feature_dtype]
-    var labels: Tensor[label_dtype]
+    var features: Tensor[Self.feature_dtype]
+    var labels: Tensor[Self.label_dtype]
     var batch_size: Int
 
     fn __init__(
-        out self, features: Tensor[feature_dtype], labels: Tensor[label_dtype]
+        out self, features: Tensor[Self.feature_dtype], labels: Tensor[Self.label_dtype]
     ):
         self.features = features
         self.labels = labels
@@ -75,7 +75,7 @@ struct DataLoader[DatasetSource: Dataset, //](Copyable & Movable & Sized):
         self._current_idx = 0
 
         var total_samples = len(self.dataset)
-        self._indices = List[Int](capacity=UInt(total_samples))
+        self._indices = List[Int](capacity=total_samples)
 
         if drop_last:
             self._num_batches = total_samples // batch_size
@@ -190,12 +190,12 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     alias _feature_dtype = feature_dtype
     alias _label_dtype = label_dtype
 
-    var _features: Tensor[feature_dtype]
-    var _labels: Tensor[label_dtype]
+    var _features: Tensor[Self.feature_dtype]
+    var _labels: Tensor[Self.label_dtype]
     var _size: Int
 
     fn __init__(
-        out self, features: Tensor[feature_dtype], labels: Tensor[label_dtype]
+        out self, features: Tensor[Self.feature_dtype], labels: Tensor[Self.label_dtype]
     ):
         """Create dataset from feature and label tensors.
 
@@ -224,7 +224,7 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 
     fn __getitem__(
         self, idx: Int
-    ) -> Tuple[Tensor[feature_dtype], Tensor[label_dtype]]:
+    ) -> Tuple[Tensor[Self.feature_dtype], Tensor[Self.label_dtype]]:
         """Get single sample."""
         if idx < 0 or idx >= self._size:
             panic("TensorDataset: index out of bounds")
@@ -232,22 +232,22 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         # Extract single row for features
         ref feature_shape = self._features.shape()
         var feature_dim = feature_shape[1] if feature_shape.rank() > 1 else 1
-        var sample_feature = Tensor[feature_dtype].zeros(feature_dim)
+        var sample_feature = Tensor[Self.feature_dtype].zeros(feature_dim)
 
         for j in range(feature_dim):
             sample_feature[j] = self._features[idx, j]
 
         # Extract single label
         var label_shape = self._labels.shape()
-        var sample_label: Tensor[label_dtype]
+        var sample_label: Tensor[Self.label_dtype]
 
         if label_shape.rank() == 1:
             # Labels are (N,) - return single scalar
-            sample_label = Tensor[label_dtype].d1([self._labels[idx]])
+            sample_label = Tensor[Self.label_dtype].d1([self._labels[idx]])
         else:
             # Labels are (N, label_dim)
             var label_dim = label_shape[1]
-            sample_label = Tensor[label_dtype].zeros(label_dim)
+            sample_label = Tensor[Self.label_dtype].zeros(label_dim)
             for j in range(label_dim):
                 sample_label[j] = self._labels[idx, j]
 
@@ -263,8 +263,8 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     alias _feature_dtype = feature_dtype
     alias _label_dtype = label_dtype
 
-    var _features: Tensor[feature_dtype]
-    var _labels: Tensor[label_dtype]
+    var _features: Tensor[Self.feature_dtype]
+    var _labels: Tensor[Self.label_dtype]
     var _size: Int
     var _owns_data: Bool
 
@@ -275,10 +275,10 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         copy: Bool = True,
     ) raises:
         """Create dataset from NumPy arrays."""
-        self._features = from_ndarray[feature_dtype](
+        self._features = from_ndarray[Self.feature_dtype](
             features_numpy, requires_grad=False, copy=copy
         )
-        self._labels = from_ndarray[label_dtype](
+        self._labels = from_ndarray[Self.label_dtype](
             labels_numpy, requires_grad=False, copy=copy
         )
         self._size = self._features.shape()[0]
@@ -291,7 +291,7 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
             )
 
     fn __init__(
-        out self, features: Tensor[feature_dtype], labels: Tensor[label_dtype]
+        out self, features: Tensor[Self.feature_dtype], labels: Tensor[Self.label_dtype]
     ):
         """Create dataset from existing Mojo tensors."""
         self._features = features
@@ -316,7 +316,7 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 
     fn __getitem__(
         self, idx: Int
-    ) -> Tuple[Tensor[feature_dtype], Tensor[label_dtype]]:
+    ) -> Tuple[Tensor[Self.feature_dtype], Tensor[Self.label_dtype]]:
         """Get single sample."""
         if idx < 0 or idx >= self._size:
             panic("NumpyDataset: index out of bounds")
@@ -324,7 +324,7 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         # Extract features
         ref feature_shape = self._features.shape()
         var feature_dim = feature_shape[1] if feature_shape.rank() > 1 else 1
-        var sample_feature = Tensor[feature_dtype].zeros(feature_dim)
+        var sample_feature = Tensor[Self.feature_dtype].zeros(feature_dim)
 
         if feature_shape.rank() == 1:
             sample_feature[0] = self._features[idx]
@@ -334,14 +334,14 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 
         # Extract label
         var label_shape = self._labels.shape()
-        var sample_label: Tensor[label_dtype]
+        var sample_label: Tensor[Self.label_dtype]
 
         if label_shape.rank() == 1:
             # Return single value
-            sample_label = Tensor[label_dtype].d1([self._labels[idx]])
+            sample_label = Tensor[Self.label_dtype].d1([self._labels[idx]])
         else:
             var label_dim = label_shape[1]
-            sample_label = Tensor[label_dtype].zeros(label_dim)
+            sample_label = Tensor[Self.label_dtype].zeros(label_dim)
             for j in range(label_dim):
                 sample_label[j] = self._labels[idx, j]
 

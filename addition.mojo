@@ -17,12 +17,12 @@ from broadcastbackward import BroadcastBackward
 struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_ADD_SCALAR
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         if ancestor.shape() != gradbox.shape():
@@ -45,17 +45,17 @@ alias AddBroadcastBackward[dtype: DType] = BroadcastBackward[
 struct AddBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_ADD
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
         count = len(output.ancestry())
 
-        var grad_shares = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]](
-            capacity=UInt(count)
+        var grad_shares = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]](
+            capacity=count
         )
 
         if count == 1:
@@ -89,8 +89,8 @@ struct AddScalar[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[dtype], scalar: Scalar[dtype]) -> Tensor[dtype]:
-        var out: Tensor[dtype] = Tensor[dtype](
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
             self.buffer.scalar_ops[Add](scalar), requires_grad=False
         )
 
@@ -98,7 +98,7 @@ struct AddScalar[dtype: DType](Copyable):
         if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                backward_fn = AddBackwardScalar[dtype]().into_backward_fn()
+                backward_fn = AddBackwardScalar[Self.dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
@@ -112,9 +112,9 @@ struct Adder[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         if id(self) == id(other):
-            return self.__mul__(Scalar[dtype](2))
+            return self.__mul__(Scalar[Self.dtype](2))
         if not self.broadcastable(other):
             panic(
                 "Tensor__add__(self, other): dimension mismatch: "
@@ -124,7 +124,7 @@ struct Adder[dtype: DType](Copyable):
                 "at Addition → forward",
             )
 
-        var out: Tensor[dtype] = Tensor[dtype](
+        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
             self.buffer.arithmetic_ops[Add](other.buffer),
             requires_grad=False,
         )
@@ -136,7 +136,7 @@ struct Adder[dtype: DType](Copyable):
                 out.requires_grad_(True)
                 # No broadcasting happened
                 if self.shape() == other.shape():
-                    backward_fn = AddBackward[dtype]().into_backward_fn()
+                    backward_fn = AddBackward[Self.dtype]().into_backward_fn()
                     out.backwardFn = Optional(backward_fn^)
                     if self.requires_grad:
                         out.add_ancestry(self)
@@ -145,7 +145,7 @@ struct Adder[dtype: DType](Copyable):
                 else:
                     # Broadcasting happened
                     backward_fn = AddBroadcastBackward[
-                        dtype
+                        Self.dtype
                     ]().into_backward_fn()
 
                     out.backwardFn = Optional(backward_fn^)

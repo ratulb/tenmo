@@ -67,7 +67,7 @@ struct Shuffle[dtype: DType](Copyable & Movable):
             permutation = perm.copy()
         else:
             seed()
-            permutation = List[Int](capacity=UInt(axis_length))
+            permutation = List[Int](capacity=axis_length)
             for i in range(axis_length):
                 permutation.append(i)
             shuffle(permutation)

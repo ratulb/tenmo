@@ -13,12 +13,12 @@ from gradbox import Gradbox
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_SQUEEZE
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ancestor = output.ancestry().get(0)
         var gradbox = output.grad()
 
@@ -41,10 +41,10 @@ struct Squeeze[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        tensor: Tensor[dtype],
+        mut tensor: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         """
         Squeeze dimensions of size 1.
 
@@ -61,7 +61,7 @@ struct Squeeze[dtype: DType]:
         """
         shape = tensor.shape()
         if shape.count_axes_of_size(1) == 0:
-            return tensor.copy()
+            return tensor
         rank = tensor.rank()
         # Determine which axes to squeeze
         var axes_to_squeeze: IntArray
@@ -95,7 +95,7 @@ struct Squeeze[dtype: DType]:
             axes_to_squeeze = shape.indices_of_axes_with_size(1)
 
         if len(axes_to_squeeze) == 0:
-            return tensor.copy()
+            return tensor
 
         new_size = rank - len(axes_to_squeeze)
         new_shape = IntArray.with_capacity(new_size)
@@ -110,8 +110,8 @@ struct Squeeze[dtype: DType]:
         strides = Strides(new_strides)
         offset = tensor.offset()
 
-        out = Tensor[dtype].build_view(
-            tensor.address(),
+        out = Tensor[Self.dtype].build_view(
+            tensor,
             squeezed_shape,
             strides,
             offset,
@@ -126,7 +126,7 @@ struct Squeeze[dtype: DType]:
 
             if grad_required:
                 out.requires_grad_(True)
-                bfn = SqueezeBackward[dtype]().into_backward_fn()
+                bfn = SqueezeBackward[Self.dtype]().into_backward_fn()
                 out.backwardFn = Optional(bfn^)
                 out.add_ancestry(tensor)
 

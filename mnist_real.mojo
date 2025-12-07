@@ -73,13 +73,13 @@ fn train_mnist() raises:
 
     # Create DataLoaders
     var train_loader = DataLoader(
-        train_dataset^, batch_size=512, reshuffle=True, drop_last=False
+        train_dataset^, batch_size=64, reshuffle=True, drop_last=False
     )
 
     var test_loader = DataLoader(
         test_dataset^,
         # batch_size=128,
-        batch_size=1024,
+        batch_size=64,
         reshuffle=False,
         drop_last=False,
     )

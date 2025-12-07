@@ -68,20 +68,25 @@ fn panic(*s: String):
 
 @always_inline
 fn id[type: AnyType, //](t: type) -> Int:
-    # return Int(UnsafePointer(to=t))
-    return Int(addr(t))
+    return Int(UnsafePointer(to=t).as_immutable())
 
 
 @always_inline
-fn addr[type: AnyType, //](t: type) -> UnsafePointer[type]:
-    return UnsafePointer(to=t)
+fn addr[
+    mut: Bool, origin: Origin[mut], type: AnyType, //
+](t: type) -> UnsafePointer[type, origin]:
+    return UnsafePointer(to=t).mut_cast[mut]().unsafe_origin_cast[origin]()
 
 
 @always_inline
-fn addrs[type: AnyType, //](*ts: type) -> List[UnsafePointer[type]]:
-    l = List[UnsafePointer[type]](capacity=len(ts))
+fn addrs[
+    mut: Bool, origin: Origin[mut], type: AnyType, //
+](*ts: type) -> List[UnsafePointer[type, origin]]:
+    l = List[UnsafePointer[type, origin]](capacity=len(ts))
     for t in ts:
-        l.append(UnsafePointer(to=t))
+        l.append(
+            UnsafePointer(to=t).mut_cast[mut]().unsafe_origin_cast[origin]()
+        )
     return l^
 
 
@@ -93,7 +98,7 @@ fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
 struct IDGen:
     @always_inline
     @staticmethod
-    fn generate_id() -> Int:
+    fn generate_id() -> UInt:
         # Use both perf_counter and monotonic for additional entropy
         perf_time = perf_counter_ns()
         mono_time = monotonic()

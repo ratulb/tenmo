@@ -12,12 +12,12 @@ from broadcasthelper import ShapeBroadcaster
 @register_passable
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_EXPAND
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         parent_shape = ancestor.shape()
@@ -32,10 +32,10 @@ struct Expand[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        tensor: Tensor[dtype],
+        mut tensor: Tensor[Self.dtype],
         target_shape: Shape,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         curr_shape = tensor.shape()
         shape_expanded = ShapeBroadcaster.broadcast_shape(
             curr_shape, target_shape
@@ -60,8 +60,8 @@ struct Expand[dtype: DType]:
 
         offset = tensor.offset()  # keep same as current tensor
 
-        out = Tensor[dtype].build_view(
-            tensor.address(),
+        out = Tensor[Self.dtype].build_view(
+            tensor,
             shape_expanded,
             strides,
             offset,
@@ -74,14 +74,24 @@ struct Expand[dtype: DType]:
 
             if grad_required:
                 out.requires_grad_()
-                var bfn = ExpandBackward[dtype]().into_backward_fn()
+                var bfn = ExpandBackward[Self.dtype]().into_backward_fn()
                 out.backwardFn = Optional(bfn^)
                 out.add_ancestry(tensor)
 
         return out^
 
 
+
+
+from testing import assert_true
+
+fn main_1() raises:
+    test_deep_view_chain_backward()
+    test_deep_view_chain_backward1()
+    test_expand_mixed_chain()
+
 fn test_expand_mixed_chain() raises:
+    print("test_expand_mixed_chain")
     a = Tensor.arange(12, requires_grad=True)
     r = a.reshape([3, 1, 4])
     expanded = r.expand(Shape(2, 3, 2, 4))
@@ -92,18 +102,8 @@ fn test_expand_mixed_chain() raises:
     assert_true(a.grad() == Tensor.full(Shape(12), 168))
     a.grad().print()
 
-
-from testing import assert_true
-
-
-fn main() raises:
-    test_deep_view_chain_backward()
-    test_expand_mixed_chain()
-    test_absolute_stride_offset_chain()
-
-
-fn test_deep_view_chain_backward() raises:
-    print("test_deep_view_chain_backward")
+fn test_deep_view_chain_backward1() raises:
+    print("test_deep_view_chain_backward1")
     alias dtype = DType.float32
 
     a = Tensor[dtype].d2(
@@ -132,82 +132,11 @@ fn test_deep_view_chain_backward() raises:
     assert_true(a.grad().as_tensor() == expected_grad)
     print("✓ Deep view chain backward pass works correctly!")
 
-
-fn test_absolute_stride_offset_chain() raises:
-    print("test_absolute_stride_offset_chain")
-
-    _ = """# Base tensor: 4×6, contiguous layout
-    var a = Tensor[DType.int32].arange(24).reshape((4, 6))
-    # Buffer indices:
-    # [[ 0,  1,  2,  3,  4,  5],
-    #  [ 6,  7,  8,  9, 10, 11],
-    #  [12, 13, 14, 15, 16, 17],
-    #  [18, 19, 20, 21, 22, 23]]
-
-    # --- v1 -------------------------------------------------------
-    # a[0:3, 1:5]
-    # → shape: (3,4), offset: 1, strides: (6,1)
-    # Absolute offset=1 means starting at a[0,1]
-    var v1 = a.slice(0..3, 1..5)
-    assert(v1.offset == 1)
-    assert(v1.strides == [6, 1])
-
-    # --- v2 -------------------------------------------------------
-    # v1[1:3, 0:3]  → base indices (in a):
-    # rows 1..2 of v1 → a[1..2, 1..4]
-    # → shape: (2,3), offset: 7, strides: (6,1)
-    var v2 = v1.slice(1..3, 0..3)
-    assert(v2.offset == 7)
-    assert(v2.strides == [6, 1])
-
-    # --- v3 -------------------------------------------------------
-    # v2[:, 0..3:3] → take columns 0 and 3rd in v2
-    # → shape: (2,2)
-    # stride along dim1 = 3 (skip 3 elements in base buffer)
-    # → absolute strides: (6, 3)
-    # → offset remains 7 (same starting element)
-    # → accesses: [[a[1,1], a[1,4]],
-    #              [a[2,1], a[2,4]]]
-    var v3 = v2.slice(:, 0..3:3)
-    assert(v3.offset == 7)
-    assert(v3.strides == [6, 3])
-
-    # --- v4 -------------------------------------------------------
-    # v3[::2, :] → take every 2nd row (so rows 0, 2 if existed)
-    # Here only 2 rows (0 and 1), step=2 collapses to first row?
-    # To make it meaningful, let's simulate a 2×2 with stride doubling in dim0
-    # → shape: (2,2)
-    # → absolute strides: (12, 3)
-    # → offset = 7
-    # → accesses:
-    #     (0,0) → a[1,1] =  7+0*12+0*3 = 7+0=7 → value=8
-    #     (0,1) → a[1,4] =  7+0*12+1*3 = 7+3=10 → value=11
-    #     (1,0) → a[3,1] =  7+1*12+0*3 = 19 → value=20
-    #     (1,1) → a[3,4] =  7+1*12+1*3 = 22 → value=23
-    # So v4.data = [[8,11],[20,23]]
-    var v4 = Tensor[DType.int32](a.buffer, (2, 2), [12, 3], 7)
-
-    # --- forward check -------------------------------------------
-    print("v4 =", v4)
-    assert(v4.data_equal(Tensor[DType.int32].d2([[8,11],[20,23]])))
-
-    # --- backward check ------------------------------------------
-    v4.backward_fill(42)
-
-    # gradient accumulates to the 4 accessed elements
-    # indices: (1,1), (1,4), (3,1), (3,4)
-    var expected_grad = Tensor[DType.int32].d2(
-        [[0, 0, 0, 0, 0, 0],
-         [0, 42, 0, 0, 42, 0],
-         [0, 0, 0, 0, 0, 0],
-         [0, 42, 0, 0, 42, 0]]
-    )
-
-    assert(a.grad[].data_equal(expected_grad))"""
-    print("✅ Passed absolute stride+offset chain test")
+fn test_deep_view_chain_backward() raises:
+    print("test_deep_view_chain_backward")
 
 
-fn test_deep_view_chain_backward1() raises:
+fn main() raises:
     print("test_deep_view_chain_backward")
     alias dtype = DType.float32
 
@@ -221,38 +150,11 @@ fn test_deep_view_chain_backward1() raises:
         ],
         requires_grad=True,
     )
-    print("\na\n")
 
-    a.print()
-
-    v1 = a.view(shape=Shape(3, 4), strides=Strides(6, 1), offset=1)
-
-    print("\nv1\n")
-
-    v1.print()
-
-    # v2 = v1.view(shape=Shape(2, 3), strides=Strides(4, 1), offset=7)
-    v2 = a.view(shape=Shape(2, 3), strides=Strides(6, 1), offset=7)
-    print("\nv2\n")
-
-    v2.print()
-
-    # v3 = v2.view(shape=Shape(2, 2), strides=Strides(1, 3), offset=5)
-    v3 = a.view(shape=Shape(2, 2), strides=Strides(6, 3), offset=7)
-
-    print("\nv3\n")
-
-    v3.print()
-
-    # v4 = v3.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=5)
-    v4 = a.view(shape=Shape(2, 2), strides=Strides(12, 3), offset=7)
-
-    print("\nv4\n")
-
-    v4.print()
-
+    v = a.view(shape=Shape(2, 2), strides=Strides(12, 3), offset=7)
+    v.print()
     # Final operation
-    result = v4.sum()
+    result = v.sum()
     result.backward(42)
 
     expected_grad = Tensor[dtype].d2(
@@ -264,6 +166,5 @@ fn test_deep_view_chain_backward1() raises:
         ]
     )
     a.grad().print()
-
     assert_true(a.grad().as_tensor() == expected_grad)
     print("✓ Deep view chain backward pass works correctly!")

@@ -15,12 +15,12 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_PERMUTE
     var permutation: IntArray  # forward permutation used
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
         parent = output.ancestry().get(0)
         # Compute inverse permutation
@@ -44,10 +44,10 @@ struct Permute[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        mut self: Tensor[dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         if len(axes) != self.rank():
             panic("Tensor → permute: number of axes must match tensor rank")
 
@@ -68,22 +68,28 @@ struct Permute[dtype: DType]:
             new_strides.append(self.strides()[axis])
 
         # Return new view with same base but reordered axes
-        out = View[dtype].forward[track_grad=False](
+        _="""out = View[dtype].forward[track_grad=False](
             self,
             shape=Shape(new_shape),
             strides=Strides(new_strides),
             offset=self.offset(),  # Permute doesn't change offset
             requires_grad=False,
             validated=True,
+        )"""
+        out = Tensor[Self.dtype].build_view(
+            self,
+            shape=Shape(new_shape),
+            strides=Strides(new_strides),
+            offset=self.offset(),  # Permute doesn't change offset
+            requires_grad=False,
         )
-
         @parameter
         if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
                 permutation = axes.copy()
-                backward_fn = PermuteBackward[dtype](
+                backward_fn = PermuteBackward[Self.dtype](
                     permutation
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)

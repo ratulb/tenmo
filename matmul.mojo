@@ -534,7 +534,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
-    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+    ](mut A: Tensor[dtype], mut B: Tensor[dtype]) -> Tensor[dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
 
@@ -590,7 +590,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
 
     @always_inline
     @staticmethod
-    fn forward(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
+    fn forward(mut A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
         # Short-circuit for 2D
@@ -638,7 +638,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     # Gradbox and Tensor matmul_nd - No backward fn needed
     @always_inline
     @staticmethod
-    fn forward(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
+    fn forward(A: Gradbox[dtype], mut B: Tensor[dtype]) -> Gradbox[dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
 
@@ -687,7 +687,7 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True, mode: Int = mm
-    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+    ](mut A: Tensor[dtype], mut B: Tensor[dtype]) -> Tensor[dtype]:
         @parameter
         if mode == mm:
             # Step 1: Pure analysis - get the opcode
@@ -726,12 +726,12 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
 
     @always_inline
     @staticmethod
-    fn forward(A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
+    fn forward(mut A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
         return MatmulNd[dtype].forward(A, B)
 
     @always_inline
     @staticmethod
-    fn forward(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
+    fn forward(A: Gradbox[dtype], mut B: Tensor[dtype]) -> Gradbox[dtype]:
         return MatmulNd[dtype].forward(A, B)
 
 

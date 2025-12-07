@@ -556,7 +556,7 @@ struct Gradbox[dtype: DType](
             self.buffer.arithmetic_ops[Multiply](other.buffer), share=False
         )
 
-    fn matmul(A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
+    fn matmul(A: Gradbox[dtype], mut B: Tensor[dtype]) -> Gradbox[dtype]:
         return Matmul[dtype].forward(A, B)
 
     fn __add__(self, other: Self) -> Gradbox[dtype]:
@@ -712,8 +712,9 @@ from common_utils import s, il
 
 fn main() raises:
     alias dtype = DType.float32
-    gb = Gradbox[dtype].arange(12).reshape(Shape([3, 4]))
-    r = gb[il(2), s()]
+    gb = Gradbox[dtype].arange(12)
+    reshaped = gb.reshape(Shape([3, 4]))
+    r = reshaped[il(2), s()]
     gb.print()
 
     print(gb.buffer)
@@ -723,8 +724,9 @@ fn main() raises:
 
     print(gb.buffer is r.buffer)
 
-    a = Tensor.arange(12).reshape(3, 4)
-    a_slice = a[il(1), s()]
+    a = Tensor.arange(12)
+    rr =a.reshape(3, 4)
+    a_slice = rr[il(1), s()]
 
     a_slice.print()
 

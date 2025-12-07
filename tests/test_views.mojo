@@ -282,15 +282,16 @@ fn test_view_offset_max_boundary() raises:
 
 fn test_view_2d_strides_valid() raises:
     print("test_view_2d_strides_valid")
-    var t = Tensor.arange(12).reshape(Shape.of(3, 4))  # 3x4 tensor
+    var t = Tensor.arange(12)
+    r = t.reshape(Shape.of(3, 4))  # 3x4 tensor
     var shape = Shape.of(2, 2)
     var strides = Strides(4, 1)  # row-major
     var offset = 4  # starts at row 1, col 0
 
-    var v = t.view(shape, strides, offset)
+    var v = r.view(shape, strides, offset)
     assert_true(v.shape() == shape, "2D view shape matches")
     v[1, 1] = 100
-    assert_equal(t[2, 1], 100.0, "Base tensor update failed via view")
+    assert_equal(r[2, 1], 100.0, "Base tensor update failed via view")
 
 
 fn test_view_2d_strides_overflow() raises:
@@ -306,18 +307,20 @@ fn test_view_2d_strides_overflow() raises:
 
 fn test_view_3d_valid() raises:
     print("test_view_3d_valid")
-    var t = Tensor.arange(60).reshape(Shape.of(3, 4, 5))  # 3x4x5
+    var t = Tensor.arange(60)
+    r = t.reshape(Shape.of(3, 4, 5))  # 3x4x5
     var shape = Shape.of(2, 2, 2)
     var strides = Strides(20, 5, 1)  # default strides for 3D contiguous
     var offset = 0
 
-    var v = t.view(shape, strides, offset)
+    var v = r.view(shape, strides, offset)
     assert_true(v.shape() == shape, "3D valid view shape matches")
 
 
 fn test_view_3d_invalid_strides() raises:
     print("test_view_3d_invalid_strides")
-    var t = Tensor.arange(60).reshape(Shape.of(3, 4, 5))
+    var t = Tensor.arange(60)
+    r = t.reshape(Shape.of(3, 4, 5))
     var shape = Shape.of(2, 2, 2)
     var _strides = Strides(40, 6, 3)  # artificially large strides
     var offset = 10
@@ -327,7 +330,7 @@ fn test_view_3d_invalid_strides() raises:
 
     var strides2 = Strides(41, 6, 3)  # now exceeds
     with assert_raises():
-        _ = t.view(shape, strides2, offset)
+        _ = r.view(shape, strides2, offset)
 
 
 fn test_view_default_strides() raises:
@@ -706,17 +709,18 @@ fn test_nested_views_grad_propagation() raises:
 
 fn test_edge_case_indexing() raises:
     print("test_edge_case_indexing")
-    var a = Tensor.arange(6).reshape([2, 3])
+    var a = Tensor.arange(6)
+    r = a.reshape([2, 3])
 
     # Empty slice
-    var empty = a[0:1, :]
+    var empty = r[0:1, :]
     assert_true(empty.shape() == [1, 3])
 
     # Stop > dim size
     # var oversized_slice = a[:, 0:100]
-    var oversized_slice = a[s(), s(None, 100, None)]
+    var oversized_slice = r[s(), s(None, 100, None)]
 
-    assert_true((oversized_slice == a))
+    assert_true((oversized_slice == r))
     assert_true(oversized_slice.buffer.size() == empty.buffer.size())
 
 

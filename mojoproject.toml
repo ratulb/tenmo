@@ -8,8 +8,6 @@ version = "0.1.0"
 [tasks]
 
 [dependencies]
-[pypi-dependencies]
-mnist-datasets = ">=0.14, <0.15"
 
 
 

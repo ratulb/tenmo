@@ -35,7 +35,7 @@ struct Reshape[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        tensor: Tensor[dtype],
+        mut tensor: Tensor[dtype],
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
@@ -50,7 +50,7 @@ struct Reshape[dtype: DType](Copyable):
             var new_strides = Strides.default(shape)
 
             out = Tensor[dtype].build_view(
-                tensor.address(),
+                tensor,
                 shape^,
                 Optional(new_strides^),
                 new_offset,

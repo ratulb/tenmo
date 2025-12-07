@@ -12,18 +12,17 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_TRANSPOSE
     var axes: IntArray
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
         self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         inverted_axes = IntArray.invert_permutation(self.axes)
-        gradbox_transposed_contiguous = gradbox.transpose(
-            inverted_axes
-        ).contiguous()
+        gradbox_transposed_contiguous = gradbox.transpose(inverted_axes)
+        # ).contiguous()#TODO why?
         return [
             (
                 ancestor^,
@@ -40,10 +39,10 @@ struct Transpose[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        mut self: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         shape = self.shape()
         normalized_axes = (
             Validator.validate_and_normalize_axes(
@@ -57,8 +56,8 @@ struct Transpose[dtype: DType](Copyable):
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides().permute(normalized_axes)
 
-        out = Tensor[dtype].build_view(
-            self.address(),
+        out = Tensor[Self.dtype].build_view(
+            self,
             new_shape,
             new_strides,
             self.offset(),
@@ -71,7 +70,7 @@ struct Transpose[dtype: DType](Copyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = TransposeBackward[dtype](
+                backward_fn = TransposeBackward[Self.dtype](
                     normalized_axes
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
