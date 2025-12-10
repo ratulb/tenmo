@@ -9,7 +9,7 @@ from shapes import Shape, ShapeIndexIterator
 from ancestry import Ancestors
 from strides import Strides
 from common_utils_imports import *
-from common_utils import IDGen, log_warning
+from common_utils import IDGen, log_warning, now
 from operators import *
 
 from backpropagation import BackwardFn
@@ -61,6 +61,14 @@ struct Tensor[dtype: DType = DType.float32](
         self.ancestors = None
         self.backwardFn = None
         self.init_gradbox()
+
+    fn __init__(out self):
+        self._id = 0
+        self.buffer = NDBuffer[Self.dtype].Empty()
+        self.requires_grad = False
+        self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
+        self.ancestors = None
+        self.backwardFn = None
 
     fn __init__(
         out self,
@@ -128,6 +136,12 @@ struct Tensor[dtype: DType = DType.float32](
             self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = other.ancestors.copy()
         self.backwardFn = other.backwardFn.copy()
+
+    fn shallow_copy(self) -> Tensor[Self.dtype]:
+        var out = Tensor[Self.dtype]()
+        out._id = IDGen.generate_id()
+        out.buffer = self.buffer.copy()
+        return out^
 
     @always_inline
     fn id(self) -> UInt:
@@ -489,11 +503,12 @@ struct Tensor[dtype: DType = DType.float32](
     fn float64(self) -> Tensor[DType.float64]:
         return self.to_dtype[DType.float64]()
 
-    fn to_dtype[NewType: DType](self) -> Tensor[NewType]:
+    fn to_dtype[
+        NewType: DType
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[NewType]:
         var new_type_buffer = self.buffer.to_dtype[NewType]()
-        return Tensor[NewType](
-            new_type_buffer^, requires_grad=self.requires_grad
-        )
+        var grad_required = requires_grad.or_else(self.requires_grad)
+        return Tensor[NewType](new_type_buffer^, requires_grad=grad_required)
 
     @always_inline
     fn add_ancestry(mut self, *parents: Tensor[Self.dtype]):
@@ -596,8 +611,8 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     @staticmethod
-    fn randn(
-        shape: List[Int],
+    fn rand(
+        *dims: Int,
         low: Scalar[Self.dtype] = 0,
         high: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
@@ -608,23 +623,23 @@ struct Tensor[dtype: DType = DType.float32](
             "Tensor → randint: is supported only for numeric type",
         ]()
 
-        return Self.rand(Shape(shape), low, high, init_seed, requires_grad)
+        return Self.rand(Shape(dims), low, high, init_seed, requires_grad)
 
     @staticmethod
     fn rand(
         shape: List[Int],
-        min: Scalar[Self.dtype] = 0,
-        max: Scalar[Self.dtype] = 1,
+        low: Scalar[Self.dtype] = 0,
+        high: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        return Self.rand(Shape(shape), min, max, init_seed, requires_grad)
+        return Self.rand(Shape(shape), low, high, init_seed, requires_grad)
 
     @staticmethod
     fn rand(
         shape: Shape,
-        min: Scalar[Self.dtype] = 0,
-        max: Scalar[Self.dtype] = 1,
+        low: Scalar[Self.dtype] = 0,
+        high: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
@@ -643,8 +658,8 @@ struct Tensor[dtype: DType = DType.float32](
         var numels = shape.num_elements()
         var buffer = Buffer[Self.dtype](numels)
 
-        var min_f64 = min.cast[DType.float64]()
-        var max_f64 = max.cast[DType.float64]()
+        var min_f64 = low.cast[DType.float64]()
+        var max_f64 = high.cast[DType.float64]()
 
         for i in range(numels):
             buffer[i] = random_float64(min_f64, max_f64).cast[Self.dtype]()
@@ -1547,6 +1562,7 @@ struct Tensor[dtype: DType = DType.float32](
         output.seed_grad(seed_tensor)
 
         try:
+            # start = now()
             # Phase 1: Discovery
             var topo_ids = List[UInt](capacity=graph_size)
             var dfs_stack = List[UInt](capacity=graph_size)
@@ -1587,7 +1603,7 @@ struct Tensor[dtype: DType = DType.float32](
             # Phase 2: Execute backward
             var ready_queue = Deque[UInt](capacity=graph_size)
             ready_queue.append(output.id())
-
+            # print("Graph preparation took: ", now() - start, "secs")
             while len(ready_queue) > 0:
                 var node_id = ready_queue.popleft()
                 var node_idx = id_to_index[node_id]
@@ -1822,6 +1838,19 @@ struct Tensor[dtype: DType = DType.float32](
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        return Squeeze[Self.dtype].forward[track_grad](
+            self, IntArray(axes), requires_grad
+        )
+
+    fn squeeze[
+        track_grad: Bool = True
+    ](
+        mut self,
+        *axes: Int,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[
+        Self.dtype
+    ]:
         return Squeeze[Self.dtype].forward[track_grad](
             self, IntArray(axes), requires_grad
         )
@@ -2066,7 +2095,3 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
 
     fn __has_next__(self) -> Bool:
         return self.index_itr.__has_next__()
-
-
-fn main():
-    pass

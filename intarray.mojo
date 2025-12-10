@@ -272,7 +272,9 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
         """Return new array with values of other IntArray added."""
         var result = Self.with_capacity(self._size + other._size)
         memcpy(dest=result._data, src=self._data, count=self._size)
-        memcpy(dest=result._data + self._size, src=other._data, count=other._size)
+        memcpy(
+            dest=result._data + self._size, src=other._data, count=other._size
+        )
         result._size = self._size + other._size
         return result^
 
@@ -499,7 +501,6 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
             s += self._data[i]
         return s
 
-
     # ========== Functional Operations ==========
 
     @always_inline("nodebug")
@@ -557,15 +558,16 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
             min(len(self), len(other)), Pointer(to=self), Pointer(to=other)
         )
 
+
 @register_passable
 struct IntArrayIterator[
     origin: Origin[False],
     forward: Bool = True,
 ](Sized & Copyable):
     var index: Int
-    var src: Pointer[IntArray, origin]
+    var src: Pointer[IntArray, Self.origin]
 
-    fn __init__(out self, idx: Int, src: Pointer[IntArray, origin]):
+    fn __init__(out self, idx: Int, src: Pointer[IntArray, Self.origin]):
         self.src = src
         self.index = idx
 
@@ -579,7 +581,7 @@ struct IntArrayIterator[
 
     fn __next__(mut self) -> Int:
         @parameter
-        if forward:
+        if Self.forward:
             self.index += 1
             return self.src[][self.index - 1]
         else:
@@ -592,7 +594,7 @@ struct IntArrayIterator[
 
     fn __len__(self) -> Int:
         @parameter
-        if forward:
+        if Self.forward:
             return len(self.src[]) - self.index
         else:
             return self.index
@@ -605,14 +607,14 @@ struct ZipIterator[
 ](Sized & Copyable):
     var index: Int
     var offset: Int
-    var src_this: Pointer[IntArray, origin_this]
-    var src_that: Pointer[IntArray, origin_that]
+    var src_this: Pointer[IntArray, Self.origin_this]
+    var src_that: Pointer[IntArray, Self.origin_that]
 
     fn __init__(
         out self,
         idx: Int,
-        src_this: Pointer[IntArray, origin_this],
-        src_that: Pointer[IntArray, origin_that],
+        src_this: Pointer[IntArray, Self.origin_this],
+        src_that: Pointer[IntArray, Self.origin_that],
     ):
         self.src_this = src_this
         self.src_that = src_that
@@ -631,7 +633,7 @@ struct ZipIterator[
 
     fn __next__(mut self) -> Tuple[Int, Int]:
         @parameter
-        if forward:
+        if Self.forward:
             self.index += 1
             return (
                 self.src_this[][self.index - 1],
@@ -656,10 +658,11 @@ struct ZipIterator[
 
     fn __len__(self) -> Int:
         @parameter
-        if forward:
+        if Self.forward:
             return min(len(self.src_this[]), len(self.src_that[])) - self.index
         else:
             return self.index
+
 
 fn main():
     ia = IntArray()

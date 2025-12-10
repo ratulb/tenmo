@@ -30,9 +30,17 @@ from operators import (
     GreaterThanEqual,
 )
 
+alias _volatile = False
+
 
 struct Buffer[dtype: DType = DType.float32](
-    Copyable & Movable & Sized & Stringable & Writable & Representable & Absable
+    ImplicitlyCopyable
+    & Movable
+    & Sized
+    & Stringable
+    & Writable
+    & Representable
+    & Absable
 ):
 
     """
@@ -43,7 +51,7 @@ struct Buffer[dtype: DType = DType.float32](
     """
 
     var size: Int
-    var data: UnsafePointer[Scalar[dtype], MutAnyOrigin]
+    var data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]
     var _refcount: UnsafePointer[
         Atomic[DType.uint64], MutAnyOrigin
     ]  # Null if not shared!
@@ -55,7 +63,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn __init__(out self):
         self.size = 0
-        self.data = UnsafePointer[Scalar[dtype], MutAnyOrigin]()
+        self.data = UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]()
         self._refcount = UnsafePointer[
             Atomic[DType.uint64], MutAnyOrigin
         ]()  # Null
@@ -71,16 +79,16 @@ struct Buffer[dtype: DType = DType.float32](
         ]()  # Null (not shared yet)
 
         if size == 0:
-            self.data = UnsafePointer[Scalar[dtype], MutAnyOrigin]()
+            self.data = UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]()
         else:
             if external:
-                self.data = UnsafePointer[Scalar[dtype], MutAnyOrigin]()
+                self.data = UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]()
             else:
-                self.data = alloc[Scalar[dtype]](size)
+                self.data = alloc[Scalar[Self.dtype]](size)
 
-    fn __init__(out self, elems: List[Scalar[dtype]]):
+    fn __init__(out self, elems: List[Scalar[Self.dtype]]):
         var length = len(elems)
-        self.data = alloc[Scalar[dtype]](length)
+        self.data = alloc[Scalar[Self.dtype]](length)
         self.size = length
         memcpy(dest=self.data, src=elems._data, count=length)
         self.external = False
@@ -91,7 +99,7 @@ struct Buffer[dtype: DType = DType.float32](
     fn __init__(
         out self,
         size: Int,
-        data: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+        data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         copy: Bool = False,
     ):
         self.size = size
@@ -99,7 +107,7 @@ struct Buffer[dtype: DType = DType.float32](
             Atomic[DType.uint64], MutAnyOrigin
         ]()  # Null
         if copy:
-            self.data = alloc[Scalar[dtype]](size)
+            self.data = alloc[Scalar[Self.dtype]](size)
             memcpy(dest=self.data, src=data, count=size)
             self.external = False
         else:
@@ -136,7 +144,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Allocate new memory: [refcount][data]
         var refcount_size = size_of[Atomic[DType.uint64]]()
-        var data_size = self.size * size_of[Scalar[dtype]]()
+        var data_size = self.size * size_of[Scalar[Self.dtype]]()
         var total_size = refcount_size + data_size
         var new_alloc = alloc[UInt8](total_size)
 
@@ -145,7 +153,9 @@ struct Buffer[dtype: DType = DType.float32](
         refcount_ptr[] = Atomic[DType.uint64](1)
 
         # Copy data after refcount
-        var new_data = new_alloc.offset(refcount_size).bitcast[Scalar[dtype]]()
+        var new_data = new_alloc.offset(refcount_size).bitcast[
+            Scalar[Self.dtype]
+        ]()
         memcpy(dest=new_data, src=self.data, count=self.size)
 
         # Free old allocation
@@ -182,7 +192,7 @@ struct Buffer[dtype: DType = DType.float32](
         else:
             # Not shared - deep copy data
             if self.size > 0 and not self.external:
-                self.data = alloc[Scalar[dtype]](self.size)
+                self.data = alloc[Scalar[Self.dtype]](self.size)
                 memcpy(dest=self.data, src=other.data, count=self.size)
 
     fn __moveinit__(out self, deinit other: Self):
@@ -194,7 +204,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn __del__(deinit self):
         """Destroy buffer - handle both shared and unshared cases."""
-        if self.size == 0 or not self.data.__as_bool__():
+        if self.size == 0 or not self.data.__bool__():
             return
 
         if self.external:
@@ -231,19 +241,19 @@ struct Buffer[dtype: DType = DType.float32](
     fn __len__(self) -> Int:
         return self.size
 
-    fn __iter__(ref self) -> ElementIterator[dtype, origin_of(self)]:
+    fn __iter__(ref self) -> ElementIterator[Self.dtype, origin_of(self)]:
         return ElementIterator(Pointer(to=self))
 
     @always_inline
-    fn __getitem__(self, slice: Slice) -> Buffer[dtype]:
+    fn __getitem__(self, slice: Slice) -> Buffer[Self.dtype]:
         var start, end, step = slice.indices(len(self))
         var spread = range(start, end, step)
         var result_size = len(spread)
 
         if result_size == 0:
-            return Buffer[dtype]()
+            return Buffer[Self.dtype]()
 
-        var result = Buffer[dtype](result_size)
+        var result = Buffer[Self.dtype](result_size)
 
         # Fast path: contiguous slice (step == 1)
         if step == 1:
@@ -256,27 +266,29 @@ struct Buffer[dtype: DType = DType.float32](
         return result^
 
     @always_inline
-    fn __getitem__(self, index: Int) -> Scalar[dtype]:
+    fn __getitem__(self, index: Int) -> Scalar[Self.dtype]:
         debug_assert(
             index >= 0 and index < self.size,
             "Buffer -> __getitem__: index out of bounds",
             self.size,
             index,
         )
-        return self.data.load[width=1](index)
+        return self.data.load[width=1, volatile=_volatile](index)
 
     @always_inline
-    fn __setitem__(self, index: Int, scalar: Scalar[dtype]):
+    fn __setitem__(self, index: Int, scalar: Scalar[Self.dtype]):
         debug_assert(
             index >= 0 and index < self.size,
             "Buffer -> __setitem__: index out of bounds",
             self.size,
             index,
         )
-        self.data.store[width=1](index, scalar)
+        self.data.store[width=1, volatile=_volatile](index, scalar)
 
     @always_inline
-    fn load[simdwidth: Int = 1](self, offset: Int) -> SIMD[dtype, simdwidth]:
+    fn load[
+        simdwidth: Int = 1
+    ](self, offset: Int) -> SIMD[Self.dtype, simdwidth]:
         debug_assert(
             offset >= 0 and offset + simdwidth <= self.size,
             "Buffer -> load : offset out of bounds",
@@ -284,12 +296,12 @@ struct Buffer[dtype: DType = DType.float32](
             offset,
             simdwidth,
         )
-        return self.data.load[width=simdwidth,](offset)
+        return self.data.load[width=simdwidth, volatile=_volatile](offset)
 
     @always_inline
     fn store[
         simdwidth: Int = 1
-    ](self, offset: Int, values: SIMD[dtype, simdwidth]):
+    ](self, offset: Int, values: SIMD[Self.dtype, simdwidth]):
         debug_assert(
             offset >= 0 and offset + simdwidth <= self.size,
             "Buffer -> store : offset out of bounds",
@@ -298,12 +310,14 @@ struct Buffer[dtype: DType = DType.float32](
             simdwidth,
         )
 
-        self.data.store[width=simdwidth](offset, values)
+        self.data.store[width=simdwidth, volatile=_volatile](offset, values)
 
     @always_inline
-    fn __add__(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[dtype]:
+    fn __add__(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __add__(other) is for numeric data types only",
         ]()
 
@@ -320,9 +334,9 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Add, False](other)
 
     @always_inline
-    fn __iadd__(self, other: Buffer[dtype]):
+    fn __iadd__(self, other: Buffer[Self.dtype]):
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __iadd__(other) is for numeric data types only",
         ]()
 
@@ -340,9 +354,9 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops[Add, False](other)
 
     @always_inline
-    fn __isub__(self, other: Buffer[dtype]):
+    fn __isub__(self, other: Buffer[Self.dtype]):
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __isub__(other) is for numeric data types only",
         ]()
 
@@ -360,9 +374,11 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops[Subtract, False](other)
 
     @always_inline
-    fn __sub__(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[dtype]:
+    fn __sub__(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __sub__(other) is for numeric data types only",
         ]()
 
@@ -379,8 +395,10 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Subtract, False](other)
 
     @always_inline
-    fn __mul__(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[dtype]:
-        # No constraint checking for dtype - DType.bool multplication allowed
+    fn __mul__(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[Self.dtype]:
+        # No constraint checking for Self.dtype - DType.bool multplication allowed
         if not self.size == other.size:
             panic(
                 "Buffer → __mul__(other): buffer size does not match -> self:",
@@ -394,12 +412,12 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Multiply, False](other)
 
     @always_inline
-    fn __imul__(self, other: Buffer[dtype]):
-        # No constraint checking for dtype - DType.bool multplication allowed
+    fn __imul__(self, other: Buffer[Self.dtype]):
+        # No constraint checking for Self.dtype - DType.bool multplication allowed
         if self.size != other.size:
             panic(
                 (
-                    "Buffer → __imul__(Buffer[dtype]: buffer size does not"
+                    "Buffer → __imul__(Buffer[Self.dtype]: buffer size does not"
                     " match -> self:"
                 ),
                 self.size.__str__(),
@@ -416,51 +434,78 @@ struct Buffer[dtype: DType = DType.float32](
     fn inplace_ops_scalar[
         op_code: Int
     ](
-        self: Buffer[dtype],
-        scalar: Scalar[dtype],
+        self: Buffer[Self.dtype],
+        scalar: Scalar[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ):
-        var extent = end_index.or_else(self.size) - start_index
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
+
         if self.size == 0 or extent <= 0:
             return
 
         @parameter
-        fn inplace_scalar_op[smdwidth: Int](idx: Int):
-            var op_result: SIMD[dtype, smdwidth]
+        if Self.dtype == DType.bool:
+            # Special handling for bool - process element by element
+            for i in range(start_index, actual_end):
+
+                @parameter
+                if op_code == Multiply:
+                    self[i] = self[i] * scalar
+                elif op_code == Add:
+                    self[i] = self[i] + scalar
+                elif op_code == Subtract:
+                    self[i] = self[i] - scalar
+                else:  # Divide
+                    self[i] = self[i] / scalar
+            return
+
+        # SIMD vectorization for non-bool types
+        alias simd_width = simd_width_of[Self.dtype]()
+
+        var idx = start_index
+        var remaining = extent
+
+        # Process full SIMD chunks
+        while remaining >= simd_width:
+            var block = self.load[simdwidth=simd_width](idx)
+            var op_result: SIMD[Self.dtype, simd_width]
 
             @parameter
             if op_code == Multiply:
-                op_result = (
-                    self.load[simdwidth=smdwidth](start_index + idx) * scalar
-                )
-
+                op_result = block * scalar
             elif op_code == Add:
-                op_result = (
-                    self.load[simdwidth=smdwidth](start_index + idx) + scalar
-                )
-
+                op_result = block + scalar
             elif op_code == Subtract:
-                op_result = (
-                    self.load[simdwidth=smdwidth](start_index + idx) - scalar
-                )
-
+                op_result = block - scalar
             else:  # Divide
-                op_result = (
-                    self.load[simdwidth=smdwidth](start_index + idx) / scalar
-                )
+                op_result = block / scalar
 
-            self.store[simdwidth=smdwidth](start_index + idx, op_result)
+            self.store[simdwidth=simd_width](idx, op_result)
 
-        alias smdwidth = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[inplace_scalar_op, smdwidth](extent)
+            idx += simd_width
+            remaining -= simd_width
+
+        # Process remaining elements (scalar tail)
+        for i in range(idx, actual_end):
+
+            @parameter
+            if op_code == Multiply:
+                self[i] = self[i] * scalar
+            elif op_code == Add:
+                self[i] = self[i] + scalar
+            elif op_code == Subtract:
+                self[i] = self[i] - scalar
+            else:  # Divide
+                self[i] = self[i] / scalar
 
     @always_inline
     fn inplace_ops[
         op_code: Int, validate: Bool = True
     ](
-        self: Buffer[dtype],
-        other: Buffer[dtype],
+        self: Buffer[Self.dtype],
+        other: Buffer[Self.dtype],
         self_start: Int = 0,
         self_end: Optional[Int] = None,
         other_start: Int = 0,
@@ -477,60 +522,103 @@ struct Buffer[dtype: DType = DType.float32](
                 or self_extent != other_extent
             ):
                 log_debug(
-                    "Buffer -> inplace_scalar_ops: range mismatch: self"
-                    " range -> "
+                    "Buffer -> inplace_ops: range mismatch: self range -> "
                     + self_extent.__str__()
-                    + ", other range: ",
-                    other_extent.__str__(),
+                    + ", other range: "
+                    + other_extent.__str__(),
                 )
                 return
 
+        # Determine SIMD width based on dtype
         @parameter
-        fn inplace_elems_op[smdwidth: Int](idx: Int):
-            var op_result: SIMD[dtype, smdwidth]
+        if Self.dtype == DType.bool:
+            # Special handling for bool (bit-packed)
 
-            @parameter
-            if op_code == Multiply:
-                op_result = self.load[simdwidth=smdwidth](
-                    self_start + idx
-                ) * other.load[simdwidth=smdwidth](other_start + idx)
+            # Scalar loop for booleans
+            for idx in range(self_extent):
+                var result: Scalar[Self.dtype]
 
-            elif op_code == Add:
-                op_result = self.load[simdwidth=smdwidth](
-                    self_start + idx
-                ) + other.load[simdwidth=smdwidth](other_start + idx)
+                @parameter
+                if op_code == Multiply:
+                    result = self[self_start + idx] * other[other_start + idx]
 
-            elif op_code == Subtract:
-                op_result = self.load[simdwidth=smdwidth](
-                    self_start + idx
-                ) - other.load[simdwidth=smdwidth](other_start + idx)
+                else:  # Overwrite
+                    result = other[other_start + idx]
 
-            elif op_code == Divide:
-                op_result = self.load[simdwidth=smdwidth](
-                    self_start + idx
-                ) / other.load[simdwidth=smdwidth](other_start + idx)
+                self[self_start + idx] = result
 
-            else:  # Overwrite
-                op_result = other.load[simdwidth=smdwidth](other_start + idx)
+        else:
+            # SIMD vectorization for non-bool types
+            alias simd_width = simd_width_of[Self.dtype]()
 
-            self.store[simdwidth=smdwidth](self_start + idx, op_result)
+            # Calculate loop bounds
+            var vectorized_end = (self_extent // simd_width) * simd_width
 
-        alias smdwidth = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[inplace_elems_op, smdwidth](self_extent)
+            # Vectorized loop (manual unrolling)
+            for idx in range(0, vectorized_end, simd_width):
+                var op_result: SIMD[Self.dtype, simd_width]
+
+                @parameter
+                if op_code == Multiply:
+                    op_result = self.load[simdwidth=simd_width](
+                        self_start + idx
+                    ) * other.load[simdwidth=simd_width](other_start + idx)
+
+                elif op_code == Add:
+                    op_result = self.load[simdwidth=simd_width](
+                        self_start + idx
+                    ) + other.load[simdwidth=simd_width](other_start + idx)
+
+                elif op_code == Subtract:
+                    op_result = self.load[simdwidth=simd_width](
+                        self_start + idx
+                    ) - other.load[simdwidth=simd_width](other_start + idx)
+
+                elif op_code == Divide:
+                    op_result = self.load[simdwidth=simd_width](
+                        self_start + idx
+                    ) / other.load[simdwidth=simd_width](other_start + idx)
+
+                else:  # Overwrite
+                    op_result = other.load[simdwidth=simd_width](
+                        other_start + idx
+                    )
+
+                self.store[simdwidth=simd_width](self_start + idx, op_result)
+
+            # Scalar tail loop for remaining elements
+            for idx in range(vectorized_end, self_extent):
+                var result: Scalar[Self.dtype]
+
+                @parameter
+                if op_code == Multiply:
+                    result = self[self_start + idx] * other[other_start + idx]
+                elif op_code == Add:
+                    result = self[self_start + idx] + other[other_start + idx]
+                elif op_code == Subtract:
+                    result = self[self_start + idx] - other[other_start + idx]
+                elif op_code == Divide:
+                    result = self[self_start + idx] / other[other_start + idx]
+                else:  # Overwrite
+                    result = other[other_start + idx]
+
+                self[self_start + idx] = result
 
     @always_inline
     fn arithmetic_ops[
         op_code: Int, validate: Bool = True
     ](
-        self: Buffer[dtype],
-        other: Buffer[dtype],
+        self: Buffer[Self.dtype],
+        other: Buffer[Self.dtype],
         self_start: Int = 0,
         self_end: Optional[Int] = None,
         other_start: Int = 0,
         other_end: Optional[Int] = None,
-    ) -> Buffer[dtype]:
-        var self_extent = self_end.or_else(self.size) - self_start
-        var other_extent = other_end.or_else(other.size) - other_start
+    ) -> Buffer[Self.dtype]:
+        var self_actual_end = self_end.or_else(self.size)
+        var other_actual_end = other_end.or_else(other.size)
+        var self_extent = self_actual_end - self_start
+        var other_extent = other_actual_end - other_start
 
         @parameter
         if validate:
@@ -542,41 +630,68 @@ struct Buffer[dtype: DType = DType.float32](
                 panic(
                     "Buffer -> arithmetic_ops: range mismatch: self range -> "
                     + self_extent.__str__()
-                    + ", other range: ",
-                    other_extent.__str__(),
+                    + ", other range: "
+                    + other_extent.__str__()
                 )
 
-        var out = Buffer[dtype](self_extent)
+        var out = Buffer[Self.dtype](self_extent)
 
         @parameter
-        fn arithmetic_op[smdwidth: Int](idx: Int):
-            var op_result: SIMD[dtype, smdwidth]
+        if Self.dtype == DType.bool:
+            # Special handling for bool - process element by element
+            for i in range(self_extent):
+
+                @parameter
+                if op_code == Multiply:
+                    out[i] = self[self_start + i] * other[other_start + i]
+                else:
+                    panic(
+                        "Buffer -> arithmetic_ops: invalid operation for"
+                        " DType.bool"
+                    )
+            return out^
+
+        # SIMD vectorization for non-bool types
+        alias simd_width = simd_width_of[Self.dtype]()
+
+        var idx = 0
+        var remaining = self_extent
+
+        # Process full SIMD chunks
+        while remaining >= simd_width:
+            var self_block = self.load[simdwidth=simd_width](self_start + idx)
+            var other_block = other.load[simdwidth=simd_width](
+                other_start + idx
+            )
+            var op_result: SIMD[Self.dtype, simd_width]
 
             @parameter
             if op_code == Multiply:
-                op_result = self.load[simdwidth=smdwidth](
-                    self_start + idx
-                ) * other.load[simdwidth=smdwidth](other_start + idx)
-
+                op_result = self_block * other_block
             elif op_code == Add:
-                op_result = self.load[simdwidth=smdwidth](
-                    self_start + idx
-                ) + other.load[simdwidth=smdwidth](other_start + idx)
-
+                op_result = self_block + other_block
             elif op_code == Subtract:
-                op_result = self.load[simdwidth=smdwidth](
-                    self_start + idx
-                ) - other.load[simdwidth=smdwidth](other_start + idx)
-
+                op_result = self_block - other_block
             else:  # Divide
-                op_result = self.load[simdwidth=smdwidth](
-                    self_start + idx
-                ) / other.load[simdwidth=smdwidth](other_start + idx)
+                op_result = self_block / other_block
 
-            out.store[simdwidth=smdwidth](idx, op_result)
+            out.store[simdwidth=simd_width](idx, op_result)
 
-        alias smdwidth = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[arithmetic_op, smdwidth](self_extent)
+            idx += simd_width
+            remaining -= simd_width
+
+        # Process remaining elements (scalar tail)
+        for i in range(idx, self_extent):
+
+            @parameter
+            if op_code == Multiply:
+                out[i] = self[self_start + i] * other[other_start + i]
+            elif op_code == Add:
+                out[i] = self[self_start + i] + other[other_start + i]
+            elif op_code == Subtract:
+                out[i] = self[self_start + i] - other[other_start + i]
+            else:  # Divide
+                out[i] = self[self_start + i] / other[other_start + i]
 
         return out^
 
@@ -584,116 +699,91 @@ struct Buffer[dtype: DType = DType.float32](
     fn arithmetic_ops_scalar[
         op_code: Int
     ](
-        self: Buffer[dtype],
-        scalar: Scalar[dtype],
+        self: Buffer[Self.dtype],
+        scalar: Scalar[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
-    ) -> Buffer[dtype]:
-        var extent = end_index.or_else(self.size) - start_index
+    ) -> Buffer[Self.dtype]:
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
+
         if self.size == 0 or extent <= 0:
             panic("Buffer -> arithmetic_ops_scalar: buffer size 0")
 
-        var out = Buffer[dtype](extent)
+        var out = Buffer[Self.dtype](extent)
 
         @parameter
-        fn arithmetic_op_scalar[smdwidth: Int](idx: Int):
-            var op_result: SIMD[dtype, smdwidth]
+        if Self.dtype == DType.bool:
+            # Special handling for bool - process element by element
+            for i in range(extent):
+
+                @parameter
+                if op_code == Multiply:
+                    out[i] = self[start_index + i] * scalar
+                else:
+                    out[i] = self[start_index + i].__rtruediv__(scalar)
+
+                    panic(
+                        "Buffer -> arithmetic_ops_scalar: invalid operation for"
+                        " DType.bool"
+                    )
+            return out^
+
+        # SIMD vectorization for non-bool types
+        alias simd_width = simd_width_of[Self.dtype]()
+
+        var idx = 0
+        var remaining = extent
+
+        # Process full SIMD chunks
+        while remaining >= simd_width:
+            var block = self.load[simdwidth=simd_width](start_index + idx)
+            var op_result: SIMD[Self.dtype, simd_width]
 
             @parameter
             if op_code == Multiply:
-                op_result = (
-                    self.load[simdwidth=smdwidth](start_index + idx) * scalar
-                )
-
+                op_result = block * scalar
             elif op_code == Add:
-                op_result = (
-                    self.load[simdwidth=smdwidth](start_index + idx) + scalar
-                )
-
+                op_result = block + scalar
             elif op_code == Subtract:
-                op_result = (
-                    self.load[simdwidth=smdwidth](start_index + idx) - scalar
-                )
-
+                op_result = block - scalar
             elif op_code == ReverseSubtract:
-                op_result = scalar - self.load[simdwidth=smdwidth](
-                    start_index + idx
-                )
+                op_result = scalar - block
             elif op_code == Divide:
-                op_result = (
-                    self.load[simdwidth=smdwidth](start_index + idx) / scalar
-                )
-
+                op_result = block / scalar
             else:  # ReverseDivide
-                op_result = self.load[simdwidth=smdwidth](
-                    start_index + idx
-                ).__rtruediv__(scalar)
+                op_result = block.__rtruediv__(scalar)
 
-            out.store[simdwidth=smdwidth](idx, op_result)
+            out.store[simdwidth=simd_width](idx, op_result)
 
-        alias smdwidth = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[arithmetic_op_scalar, smdwidth](extent)
+            idx += simd_width
+            remaining -= simd_width
 
-        return out^
-
-    @always_inline
-    fn select[
-        op_code: Int, validate: Bool = True
-    ](
-        self: Buffer[dtype],
-        other: Buffer[dtype],
-        self_start: Int = 0,
-        self_end: Optional[Int] = None,
-        other_start: Int = 0,
-        other_end: Optional[Int] = None,
-    ) -> Buffer[dtype]:
-        var self_extent = self_end.or_else(self.size) - self_start
-        var other_extent = other_end.or_else(other.size) - other_start
-
-        @parameter
-        if validate:
-            if (
-                self_extent <= 0
-                or other_extent <= 0
-                or self_extent != other_extent
-            ):
-                panic(
-                    "Buffer -> select: range mismatch: self range -> "
-                    + self_extent.__str__()
-                    + ", other range: ",
-                    other_extent.__str__(),
-                )
-
-        var out = Buffer[dtype].zeros(self_extent)
-        var zero = Scalar[dtype](0)
-
-        @parameter
-        fn select_op[smdwidth: Int](idx: Int):
-            var selected: SIMD[dtype, smdwidth]
+        # Process remaining elements (scalar tail)
+        for i in range(idx, extent):
 
             @parameter
-            if op_code == ReLUBackwardOp:
-                # Input buffer
-                var cond_block = self.load[simdwidth=smdwidth](self_start + idx)
-                var true_block = other.load[simdwidth=smdwidth](
-                    other_start + idx
-                )  # grad buffer
-                var false_block = out.load[simdwidth=smdwidth](idx)
-                selected = cond_block.gt(zero).select(true_block, false_block)
-            else:  # Bogus
-                selected = out.load[simdwidth=smdwidth](idx)
-
-            out.store[simdwidth=smdwidth](idx, selected)
-
-        alias smdwidth = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[select_op, smdwidth](self_extent)
+            if op_code == Multiply:
+                out[i] = self[start_index + i] * scalar
+            elif op_code == Add:
+                out[i] = self[start_index + i] + scalar
+            elif op_code == Subtract:
+                out[i] = self[start_index + i] - scalar
+            elif op_code == ReverseSubtract:
+                out[i] = scalar - self[start_index + i]
+            elif op_code == Divide:
+                out[i] = self[start_index + i] / scalar
+            else:  # ReverseDivide
+                out[i] = self[start_index + i].__rtruediv__(scalar)
 
         return out^
 
     @always_inline
-    fn __truediv__(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[dtype]:
+    fn __truediv__(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __truediv__(other) is for numeric data types only",
         ]()
 
@@ -714,9 +804,9 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Divide, False](other)
 
     @always_inline
-    fn __itruediv__(self: Buffer[dtype], other: Buffer[dtype]):
+    fn __itruediv__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]):
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __itruediv__(other) is for numeric data types only",
         ]()
 
@@ -736,44 +826,46 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops[Divide, False](other)
 
     @always_inline
-    fn __iadd__(self: Buffer[dtype], scalar: Scalar[dtype]):
+    fn __iadd__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __iadd__(scalar) is for numeric data types only",
         ]()
 
         self.inplace_ops_scalar[Add](scalar)
 
     @always_inline
-    fn __isub__(self: Buffer[dtype], scalar: Scalar[dtype]):
+    fn __isub__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __isub__(scalar) is for numeric data types only",
         ]()
 
         self.inplace_ops_scalar[Subtract](scalar)
 
     @always_inline
-    fn __imul__(self: Buffer[dtype], scalar: Scalar[dtype]):
-        # No constraint checking for dtype - DType.bool multplication allowed
+    fn __imul__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
+        # No constraint checking for Self.dtype - DType.bool multplication allowed
         self.inplace_ops_scalar[Multiply](scalar)
 
     @always_inline
-    fn __itruediv__(self: Buffer[dtype], scalar: Scalar[dtype]):
+    fn __itruediv__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __itruediv__(scalar) is for numeric data types only",
         ]()
 
-        if scalar == Scalar[dtype](0):
+        if scalar == Scalar[Self.dtype](0):
             panic("Buffer → __itruediv__(scalar): can not divide by zero")
 
         self.inplace_ops_scalar[Divide](scalar)
 
     @always_inline
-    fn __rsub__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype]:
+    fn __rsub__(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             (
                 "Buffer → __rsub__(scalar) -> Buffer is for numeric data types"
                 " only"
@@ -783,18 +875,22 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops_scalar[ReverseSubtract](scalar)
 
     @always_inline
-    fn __sub__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype]:
+    fn __sub__(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → __sub__(scalar) -> Buffer is for numeric data types only",
         ]()
 
         return self.arithmetic_ops_scalar[Subtract](scalar)
 
     @always_inline
-    fn __rmul__(self: Buffer[dtype], factor: Scalar[dtype]) -> Buffer[dtype]:
+    fn __rmul__(
+        self: Buffer[Self.dtype], factor: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             (
                 "Buffer → __rmul__(scalar) -> Buffer is for numeric data types"
                 " only"
@@ -804,14 +900,18 @@ struct Buffer[dtype: DType = DType.float32](
         return self.__mul__(factor)
 
     @always_inline
-    fn __mul__(self: Buffer[dtype], factor: Scalar[dtype]) -> Buffer[dtype]:
-        # No constraint checking for dtype - DType.bool multplication allowed
+    fn __mul__(
+        self: Buffer[Self.dtype], factor: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
+        # No constraint checking for Self.dtype - DType.bool multplication allowed
         return self.arithmetic_ops_scalar[Multiply](factor)
 
     @always_inline
-    fn __radd__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype]:
+    fn __radd__(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             (
                 "Buffer → __radd__(scalar) -> Buffer is for numeric data types"
                 " only"
@@ -821,9 +921,11 @@ struct Buffer[dtype: DType = DType.float32](
         return self.__add__(scalar)
 
     @always_inline
-    fn __add__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype]:
+    fn __add__(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             (
                 "Buffer → __add__(scalar) -> Buffer  is for numeric data types"
                 " only"
@@ -834,10 +936,10 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __truediv__(
-        self: Buffer[dtype], divisor: Scalar[dtype]
-    ) -> Buffer[dtype]:
+        self: Buffer[Self.dtype], divisor: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             (
                 "Buffer → __truediv__(scalar) -> Buffer  is for numeric data"
                 " types only"
@@ -848,10 +950,10 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __rtruediv__(
-        self: Buffer[dtype], scalar: Scalar[dtype]
-    ) -> Buffer[dtype]:
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             (
                 "Buffer → __rtruediv__(scalar) -> Buffer  is for numeric data"
                 " types only"
@@ -860,37 +962,14 @@ struct Buffer[dtype: DType = DType.float32](
 
         return self.arithmetic_ops_scalar[ReverseDivide](scalar)
 
-    @always_inline
-    fn unary_ops[
-        op_code: Int
-    ](
-        self: Buffer[dtype],
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
-    ) -> Buffer[dtype]:
-        var extent = end_index.or_else(self.size) - start_index
-        var out = Buffer[dtype](extent)
-
-        @parameter
-        fn unary_op[smdwidth: Int](idx: Int):
-            var block = self.load[simdwidth=smdwidth](start_index + idx)
-            var result = Self.unary_fn[op_code, smdwidth](
-                block
-            )  # Delegate to helper
-            out.store[simdwidth=smdwidth](idx, result)
-
-        alias simd_width = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[unary_op, simd_width](extent)
-        return out^
-
     # Helper for compile-time dispatch
     @always_inline
     @staticmethod
-    fn unary_fn[
+    fn unary_ops_helper[
         op_code: Int,
         smdwidth: Int,
-        epsilon: Scalar[dtype] = Scalar[dtype](1e-12),
-    ](block: SIMD[dtype, smdwidth]) -> SIMD[dtype, smdwidth]:
+        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
+    ](block: SIMD[Self.dtype, smdwidth]) -> SIMD[Self.dtype, smdwidth]:
         @parameter
         if op_code == SigmoidOp:
             return 1.0 / (1.0 + exp(-block))
@@ -914,47 +993,355 @@ struct Buffer[dtype: DType = DType.float32](
             return block
 
     @always_inline
-    fn __pow__(self: Buffer[dtype], exponent: Scalar[dtype]) -> Buffer[dtype]:
-        constrained[
-            dtype.is_numeric(),
-            (
-                "Buffer → __pow__(exponent) -> Buffer is for numeric data types"
-                " only"
-            ),
-        ]()
-
-        var out = Buffer[dtype](self.size)
-
-        @parameter
-        fn raise_to_power[smdwidth: Int](idx: Int):
-            out.store[simdwidth=smdwidth](
-                idx, self.load[simdwidth=smdwidth](idx).__pow__(exponent)
+    fn compare_buffer_full[
+        op_code: Int
+    ](self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Buffer[
+        DType.bool
+    ]:
+        if not self.size == other.size:
+            panic(
+                (
+                    "Buffer → compare_buffer_full: buffer size does not match"
+                    " -> self:"
+                ),
+                self.size.__str__(),
+                "vs. other:",
+                other.size.__str__(),
             )
 
-        vectorize[raise_to_power, simd_width_of[dtype]()](self.size)
+        var total = self.size
+        if total == 0:
+            panic("Buffer -> compare_buffer_full: buffer sizes are zero")
+
+        var out = Buffer[DType.bool](total)
+
+        alias smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
+            Self.dtype
+        ]()
+
+        # Manual vectorization: process chunks of smdwidth elements
+        var num_full_chunks = total // smdwidth
+        var remainder = total % smdwidth
+
+        # Process full SIMD chunks
+        for chunk in range(num_full_chunks):
+            var idx = chunk * smdwidth
+            var self_block = self.load[simdwidth=smdwidth](idx)
+            var other_block = other.load[simdwidth=smdwidth](idx)
+            var result: SIMD[DType.bool, smdwidth]
+
+            @parameter
+            if op_code == Equal:
+                result = self_block.eq(other_block)
+            elif op_code == NotEqual:
+                result = self_block.ne(other_block)
+            elif op_code == GreaterThan:
+                result = self_block.gt(other_block)
+            elif op_code == GreaterThanEqual:
+                result = self_block.ge(other_block)
+            elif op_code == LessThan:
+                result = self_block.lt(other_block)
+            else:  # LessThanEqual
+                result = self_block.le(other_block)
+
+            # Store results element-by-element (required for bool bit-packing)
+            for i in range(smdwidth):
+                out[idx + i] = result[i]
+
+        # Process remaining elements
+        if remainder > 0:
+            var start_idx = num_full_chunks * smdwidth
+            for i in range(remainder):
+                var idx = start_idx + i
+                var self_val = self[idx]
+                var other_val = other[idx]
+                var result: Bool
+
+                @parameter
+                if op_code == Equal:
+                    result = self_val == other_val
+                elif op_code == NotEqual:
+                    result = self_val != other_val
+                elif op_code == GreaterThan:
+                    result = self_val > other_val
+                elif op_code == GreaterThanEqual:
+                    result = self_val >= other_val
+                elif op_code == LessThan:
+                    result = self_val < other_val
+                else:  # LessThanEqual
+                    result = self_val <= other_val
+
+                out[idx] = result
+
         return out^
 
     @always_inline
-    fn __abs__(self) -> Buffer[dtype]:
+    fn compare_scalar_full[
+        op_code: Int
+    ](self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Buffer[
+        DType.bool
+    ]:
+        var total = self.size
+        if total == 0:
+            panic("Buffer -> compare_scalar_full: buffer size is zero")
+
+        var out = Buffer[DType.bool](total)
+
+        alias smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
+            Self.dtype
+        ]()
+
+        # Manual vectorization: process chunks of smdwidth elements
+        var num_full_chunks = total // smdwidth
+        var remainder = total % smdwidth
+
+        # Process full SIMD chunks
+        for chunk in range(num_full_chunks):
+            var idx = chunk * smdwidth
+            var block = self.load[simdwidth=smdwidth](idx)
+            var result: SIMD[DType.bool, smdwidth]
+
+            @parameter
+            if op_code == Equal:
+                result = block.eq(scalar)
+            elif op_code == NotEqual:
+                result = block.ne(scalar)
+            elif op_code == GreaterThan:
+                result = block.gt(scalar)
+            elif op_code == GreaterThanEqual:
+                result = block.ge(scalar)
+            elif op_code == LessThan:
+                result = block.lt(scalar)
+            else:  # LessThanEqual
+                result = block.le(scalar)
+
+            # Store results element-by-element (required for bool bit-packing)
+            for i in range(smdwidth):
+                out[idx + i] = result[i]
+
+        # Process remaining elements
+        if remainder > 0:
+            var start_idx = num_full_chunks * smdwidth
+            for i in range(remainder):
+                var idx = start_idx + i
+                var val = self[idx]
+                var result: Bool
+
+                @parameter
+                if op_code == Equal:
+                    result = val == scalar
+                elif op_code == NotEqual:
+                    result = val != scalar
+                elif op_code == GreaterThan:
+                    result = val > scalar
+                elif op_code == GreaterThanEqual:
+                    result = val >= scalar
+                elif op_code == LessThan:
+                    result = val < scalar
+                else:  # LessThanEqual
+                    result = val <= scalar
+
+                out[idx] = result
+
+        return out^
+
+    @always_inline
+    fn select[
+        op_code: Int, validate: Bool = True
+    ](
+        self: Buffer[Self.dtype],
+        other: Buffer[Self.dtype],
+        self_start: Int = 0,
+        self_end: Optional[Int] = None,
+        other_start: Int = 0,
+        other_end: Optional[Int] = None,
+    ) -> Buffer[Self.dtype]:
+        var self_extent = self_end.or_else(self.size) - self_start
+        var other_extent = other_end.or_else(other.size) - other_start
+
+        @parameter
+        if validate:
+            if (
+                self_extent <= 0
+                or other_extent <= 0
+                or self_extent != other_extent
+            ):
+                panic(
+                    "Buffer -> select: range mismatch: self range -> "
+                    + self_extent.__str__()
+                    + ", other range: ",
+                    other_extent.__str__(),
+                )
+
+        var out = Buffer[Self.dtype].zeros(self_extent)
+        var zero = Scalar[Self.dtype](0)
+
+        alias smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
+            Self.dtype
+        ]()
+
+        # Manual vectorization
+        var num_full_chunks = self_extent // smdwidth
+        var remainder = self_extent % smdwidth
+
+        # Process full SIMD chunks
+        for chunk in range(num_full_chunks):
+            var idx = chunk * smdwidth
+            var selected: SIMD[Self.dtype, smdwidth]
+
+            @parameter
+            if op_code == ReLUBackwardOp:
+                var cond_block = self.load[simdwidth=smdwidth](self_start + idx)
+                var true_block = other.load[simdwidth=smdwidth](
+                    other_start + idx
+                )
+                var false_block = out.load[simdwidth=smdwidth](idx)
+                selected = (cond_block.gt(zero)).select(true_block, false_block)
+            else:  # Bogus
+                selected = out.load[simdwidth=smdwidth](idx)
+
+            out.store[simdwidth=smdwidth](idx, selected)
+
+        # Process remaining elements
+        if remainder > 0:
+            var start_idx = num_full_chunks * smdwidth
+            for i in range(remainder):
+                var idx = start_idx + i
+                var selected: Scalar[Self.dtype]
+
+                @parameter
+                if op_code == ReLUBackwardOp:
+                    var cond_val = self[self_start + idx]
+                    var true_val = other[other_start + idx]
+                    var false_val = out[idx]
+                    selected = true_val if cond_val > zero else false_val
+                else:  # Bogus
+                    selected = out[idx]
+
+                out[idx] = selected
+
+        return out^
+
+    @always_inline
+    fn unary_ops[
+        op_code: Int
+    ](
+        self: Buffer[Self.dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ) -> Buffer[Self.dtype]:
+        var extent = end_index.or_else(self.size) - start_index
+        var out = Buffer[Self.dtype](extent)
+
+        alias smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
+            Self.dtype
+        ]()
+
+        # Manual vectorization
+        var num_full_chunks = extent // smdwidth
+        var remainder = extent % smdwidth
+
+        # Process full SIMD chunks
+        for chunk in range(num_full_chunks):
+            var idx = chunk * smdwidth
+            var block = self.load[simdwidth=smdwidth](start_index + idx)
+            var result = Self.unary_ops_helper[op_code, smdwidth](block)
+            out.store[simdwidth=smdwidth](idx, result)
+
+        # Process remaining elements
+        if remainder > 0:
+            var start_idx = num_full_chunks * smdwidth
+            for i in range(remainder):
+                var idx = start_idx + i
+                var val = self[start_index + idx]
+                var result = Self.unary_ops_helper[op_code, 1](val)
+                out[idx] = result
+
+        return out^
+
+    @always_inline
+    fn unary_ops_with_mask[
+        op_code: Int
+    ](
+        self: Buffer[Self.dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ) -> Tuple[Buffer[Self.dtype], Buffer[Self.dtype]]:
+        """Compute unary operation and mask simultaneously.
+
+        For ReLU: output = max(0, x), mask = (x > 0) ? 1.0 : 0.0
+
+        Returns:
+            Tuple of (output_buffer, mask_buffer).
+        """
+        var extent = end_index.or_else(self.size) - start_index
+        var out = Buffer[Self.dtype](extent)
+        var mask = Buffer[Self.dtype](extent)
+
+        alias simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
+            Self.dtype
+        ]()
+
+        # Manual vectorization
+        var num_full_chunks = extent // simd_width
+        var remainder = extent % simd_width
+        var zero = SIMD[Self.dtype, simd_width](0)
+        var one = SIMD[Self.dtype, simd_width](1)
+
+        # Process full SIMD chunks
+        for chunk in range(num_full_chunks):
+            var idx = chunk * simd_width
+            var block = self.load[simdwidth=simd_width](start_index + idx)
+
+            # Compute output
+            var result = Self.unary_ops_helper[op_code, simd_width](block)
+
+            # Compute mask based on operation
+            var mask_block: SIMD[Self.dtype, simd_width]
+
+            @parameter
+            if op_code == ReLUForwardOp:
+                # Mask is 1.0 where input > 0, else 0.0
+                mask_block = block.gt(SIMD[Self.dtype, simd_width](0)).select(
+                    one, zero
+                )
+            else:
+                # For other ops, no masking needed (can extend later)
+                mask_block = one
+
+            out.store[simdwidth=simd_width](idx, result)
+            mask.store[simdwidth=simd_width](idx, mask_block)
+
+        # Process remaining elements
+        if remainder > 0:
+            var start_idx = num_full_chunks * simd_width
+            var zero_scalar = Scalar[Self.dtype](0)
+            var one_scalar = Scalar[Self.dtype](1)
+
+            for i in range(remainder):
+                var idx = start_idx + i
+                var val = self.load[simdwidth=1](start_index + idx)
+                var result = Self.unary_ops_helper[op_code, 1](val)
+
+                var mask_val: Scalar[Self.dtype]
+
+                @parameter
+                if op_code == ReLUForwardOp:
+                    mask_val = (
+                        one_scalar if val[0] > zero_scalar else zero_scalar
+                    )
+                else:
+                    mask_val = one_scalar
+
+                out.store[simdwidth=1](idx, result)
+                mask.store[simdwidth=1](idx, SIMD[Self.dtype, 1](mask_val))
+
+        return (out^, mask^)
+
+    @always_inline
+    fn exp(self) -> Buffer[Self.dtype]:
         constrained[
             Self.dtype.is_numeric(),
-            "Buffer → __abs__ is for numeric data types only",
-        ]()
-        var out = Buffer[Self.dtype](self.size)
-
-        @parameter
-        fn absolute[smdwidth: Int](idx: Int):
-            out.store[simdwidth=smdwidth](
-                idx, self.load[simdwidth=smdwidth](idx).__abs__()
-            )
-
-        vectorize[absolute, simd_width_of[Self.dtype]()](self.size)
-        return out^
-
-    @always_inline
-    fn exp(self) -> Buffer[dtype]:
-        constrained[
-            dtype.is_numeric(),
             "Buffer → exp is for numeric data types only",
         ]()
 
@@ -962,8 +1349,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @staticmethod
     @always_inline
-    fn full(value: Scalar[dtype], size: Int) -> Buffer[dtype]:
-        buffer = Buffer[dtype](size)
+    fn full(value: Scalar[Self.dtype], size: Int) -> Buffer[Self.dtype]:
+        buffer = Buffer[Self.dtype](size)
         buffer.fill(value)
         return buffer^
 
@@ -971,22 +1358,22 @@ struct Buffer[dtype: DType = DType.float32](
     @staticmethod
     fn arange[
         max_arange_elements: Int = 1000000  # Safety limit to prevent infinite loops with very small steps
-    ](*args: Scalar[dtype]) -> Buffer[dtype]:
+    ](*args: Scalar[Self.dtype]) -> Buffer[Self.dtype]:
         return Self.arange[max_arange_elements](args)
 
     @always_inline
     @staticmethod
     fn arange[
         max_arange_elements: Int = 1000000  # Safety limit to prevent infinite loops with very small steps
-    ](args: VariadicList[Scalar[dtype]]) -> Buffer[dtype]:
+    ](args: VariadicList[Scalar[Self.dtype]]) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → arange is for numeric data types only",
         ]()
 
-        start: Scalar[dtype] = 0
-        end: Scalar[dtype] = max_finite[dtype]()
-        step: Scalar[dtype] = 1
+        start: Scalar[Self.dtype] = 0
+        end: Scalar[Self.dtype] = max_finite[Self.dtype]()
+        step: Scalar[Self.dtype] = 1
 
         n = len(args)
         if n == 1:
@@ -1009,7 +1396,7 @@ struct Buffer[dtype: DType = DType.float32](
         delta = abs(end - start)
         step_abs = abs(step)
         est_size = ceil(delta / step_abs).__int__() + 2
-        var data = List[Scalar[dtype]](capacity=Int(est_size))
+        var data = List[Scalar[Self.dtype]](capacity=Int(est_size))
         var value = start
 
         if step > 0:
@@ -1034,23 +1421,23 @@ struct Buffer[dtype: DType = DType.float32](
         if len(data) == 0:
             panic("Buffer → arange: computed arange size is zero")
 
-        return Buffer[dtype](data^)
+        return Buffer[Self.dtype](data^)
 
     @staticmethod
     @always_inline
-    fn zeros(size: Int) -> Buffer[dtype]:
-        buffer = Buffer[dtype](size)
+    fn zeros(size: Int) -> Buffer[Self.dtype]:
+        buffer = Buffer[Self.dtype](size)
         memset_zero(buffer.data, size)
         return buffer^
 
     @staticmethod
     fn linspace(
-        start: Scalar[dtype],
-        end: Scalar[dtype],
+        start: Scalar[Self.dtype],
+        end: Scalar[Self.dtype],
         steps: Int,
-    ) -> Buffer[dtype]:
+    ) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → linspace is for numeric data types only",
         ]()
 
@@ -1058,64 +1445,195 @@ struct Buffer[dtype: DType = DType.float32](
             panic("Buffer → linspace: steps must be at least 1")
 
         if steps == 1:
-            var buffer = Buffer[dtype](1)
+            var buffer = Buffer[Self.dtype](1)
             buffer[0] = start
             return buffer^
 
-        var step_size = (end - start) / Scalar[dtype](steps - 1)
-        var buffer = Buffer[dtype](steps)
+        var step_size = (end - start) / Scalar[Self.dtype](steps - 1)
+        var buffer = Buffer[Self.dtype](steps)
 
         for i in range(steps):
-            buffer[i] = start + Scalar[dtype](i) * step_size
+            buffer[i] = start + Scalar[Self.dtype](i) * step_size
 
         return buffer^
 
     @always_inline
+    fn zero(self: Buffer[Self.dtype]):
+        memset_zero(self.data, self.size)
+
+    @always_inline
+    fn sum(
+        self: Buffer[Self.dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ) -> Scalar[Self.dtype]:
+        constrained[
+            Self.dtype.is_numeric(),
+            "Buffer → sum is for numeric data types only",
+        ]()
+
+        var accum = Scalar[Self.dtype](0)
+        if self.size == 0:
+            return accum
+
+        var extent = end_index.or_else(self.size) - start_index
+        if extent <= 0:
+            return accum
+
+        alias simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (extent // simd_width) * simd_width
+
+        # Vectorized accumulation
+        for idx in range(0, vectorized_end, simd_width):
+            var chunk = self.load[simdwidth=simd_width](idx + start_index)
+            accum += chunk.reduce_add()
+
+        # Scalar tail
+        for idx in range(vectorized_end, extent):
+            accum += self[idx + start_index]
+
+        return accum
+
+    @always_inline
+    fn product(
+        self: Buffer[Self.dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    ) -> Scalar[Self.dtype]:
+        constrained[
+            Self.dtype.is_numeric(),
+            "Buffer → product is for numeric data types only",
+        ]()
+
+        var result = Scalar[Self.dtype](1)
+        var extent = end_index.or_else(self.size) - start_index
+
+        if extent <= 0:
+            return result  # Empty product = multiplicative identity
+
+        alias simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (extent // simd_width) * simd_width
+
+        # Vectorized multiplication
+        for idx in range(0, vectorized_end, simd_width):
+            var chunk = self.load[simdwidth=simd_width](idx + start_index)
+            result *= chunk.reduce_mul()
+
+        # Scalar tail
+        for idx in range(vectorized_end, extent):
+            result *= self[idx + start_index]
+
+        return result
+
+    @always_inline
+    fn __pow__(
+        self: Buffer[Self.dtype], exponent: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
+        constrained[
+            Self.dtype.is_numeric(),
+            (
+                "Buffer → __pow__(exponent) -> Buffer is for numeric data types"
+                " only"
+            ),
+        ]()
+
+        var out = Buffer[Self.dtype](self.size)
+
+        alias simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (self.size // simd_width) * simd_width
+
+        # Vectorized power
+        for idx in range(0, vectorized_end, simd_width):
+            var chunk = self.load[simdwidth=simd_width](idx)
+            out.store[simdwidth=simd_width](idx, chunk.__pow__(exponent))
+
+        # Scalar tail
+        for idx in range(vectorized_end, self.size):
+            out[idx] = self[idx].__pow__(exponent)
+
+        return out^
+
+    @always_inline
+    fn __abs__(self) -> Buffer[Self.dtype]:
+        constrained[
+            Self.dtype.is_numeric(),
+            "Buffer → __abs__ is for numeric data types only",
+        ]()
+
+        var out = Buffer[Self.dtype](self.size)
+
+        alias simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (self.size // simd_width) * simd_width
+
+        # Vectorized absolute value
+        for idx in range(0, vectorized_end, simd_width):
+            var chunk = self.load[simdwidth=simd_width](idx)
+            out.store[simdwidth=simd_width](idx, chunk.__abs__())
+
+        # Scalar tail
+        for idx in range(vectorized_end, self.size):
+            out[idx] = self[idx].__abs__()
+
+        return out^
+
+    @always_inline
     fn fill(
-        self: Buffer[dtype],
-        value: Scalar[dtype],
+        self: Buffer[Self.dtype],
+        value: Scalar[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ):
         """Fill a segment or the whole buffer with a value."""
-        extent = end_index.or_else(self.size) - start_index
+        var extent = end_index.or_else(self.size) - start_index
 
         # Safety checks
         if extent <= 0:
             panic("Buffer → fill: segment size must be greater than zero")
 
         @parameter
-        fn set_scalar[smdwidth: Int](idx: Int):
-            self.store[simdwidth=smdwidth](idx + start_index, value)
+        if Self.dtype == DType.bool:
+            # Scalar loop for booleans
+            for idx in range(extent):
+                self[idx + start_index] = value
+        else:
+            alias simd_width = simd_width_of[Self.dtype]()
+            var vectorized_end = (extent // simd_width) * simd_width
 
-        alias simd_width = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[set_scalar, simd_width](extent)
+            # Vectorized fill
+            for idx in range(0, vectorized_end, simd_width):
+                self.store[simdwidth=simd_width](idx + start_index, value)
+
+            # Scalar tail
+            for idx in range(vectorized_end, extent):
+                self[idx + start_index] = value
 
     @always_inline
-    fn zero(self: Buffer[dtype]):
-        memset_zero(self.data, self.size)
-
-    @always_inline
-    fn __neg__(self: Buffer[dtype]) -> Buffer[dtype]:
+    fn __neg__(self: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __neg__ is for numeric data types only",
         ]()
+
         var out = Buffer[Self.dtype](self.size)
 
-        @parameter
-        fn negate[smdwidth: Int](idx: Int):
-            out.store[simdwidth=smdwidth](
-                idx, self.load[simdwidth=smdwidth](idx).__neg__()
-            )
+        alias simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (self.size // simd_width) * simd_width
 
-        vectorize[negate, simd_width_of[Self.dtype]()](self.size)
+        # Vectorized negation
+        for idx in range(0, vectorized_end, simd_width):
+            var chunk = self.load[simdwidth=simd_width](idx)
+            out.store[simdwidth=simd_width](idx, chunk.__neg__())
+
+        # Scalar tail
+        for idx in range(vectorized_end, self.size):
+            out[idx] = self[idx].__neg__()
+
         return out^
 
     @always_inline
-    fn log(self: Buffer[dtype]) -> Buffer[dtype]:
+    fn log(self: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
         constrained[
-            dtype.is_numeric(),
+            Self.dtype.is_numeric(),
             "Buffer → log is for numeric data types only",
         ]()
 
@@ -1130,27 +1648,32 @@ struct Buffer[dtype: DType = DType.float32](
 
         var out = Buffer[Self.dtype](self.size)
 
-        @parameter
-        fn invert[smdwidth: Int](idx: Int):
-            out.store[simdwidth=smdwidth](
-                idx, self.load[simdwidth=smdwidth](idx).__invert__()
-            )
-
         alias simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
         ]()
-        vectorize[invert, simd_width](self.size)
+
+        var vectorized_end = (self.size // simd_width) * simd_width
+
+        # Vectorized invert
+        for idx in range(0, vectorized_end, simd_width):
+            var chunk = self.load[simdwidth=simd_width](idx)
+            out.store[simdwidth=simd_width](idx, chunk.__invert__())
+
+        # Scalar tail
+        for idx in range(vectorized_end, self.size):
+            out[idx] = self[idx].__invert__()
+
         return out^
 
     @always_inline
     fn compare_scalar[
         op_code: Int
-    ](self: Buffer[dtype], scalar: Scalar[dtype]) -> Bool:
+    ](self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         total = self.size
         if total == 0:
             return False
 
-        alias smdwidth = simd_width_of[dtype]()
+        alias smdwidth = simd_width_of[Self.dtype]()
 
         var simd_blocks = total // smdwidth
         for block in range(simd_blocks):
@@ -1210,169 +1733,105 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn __eq__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Bool:
+    fn __eq__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[Equal](scalar)
 
     @always_inline
-    fn __ne__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Bool:
+    fn __ne__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[NotEqual](scalar)
 
     @always_inline
-    fn __lt__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Bool:
+    fn __lt__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[LessThan](scalar)
 
     @always_inline
-    fn __le__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Bool:
+    fn __le__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[LessThanEqual](scalar)
 
     @always_inline
-    fn __gt__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Bool:
+    fn __gt__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[GreaterThan](scalar)
 
     @always_inline
-    fn __ge__(self: Buffer[dtype], scalar: Scalar[dtype]) -> Bool:
+    fn __ge__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
         return self.compare_scalar[GreaterThanEqual](scalar)
 
     @always_inline
-    fn compare_scalar_full[
-        op_code: Int
-    ](self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[DType.bool]:
-        total = self.size
-        if total == 0:
-            panic("Buffer -> compare_scalar_full: buffer size is zero")
-
-        var out = Buffer[DType.bool](total)
-
-        @parameter
-        fn compare[smdwidth: Int](idx: Int):
-            block = self.load[simdwidth=smdwidth](idx)
-            var result: SIMD[DType.bool, smdwidth]
-
-            @parameter
-            if op_code == Equal:
-                result = block.eq(scalar)
-            elif op_code == NotEqual:
-                result = block.ne(scalar)
-            elif op_code == GreaterThan:
-                result = block.gt(scalar)
-            elif op_code == GreaterThanEqual:
-                result = block.ge(scalar)
-            elif op_code == LessThan:
-                result = block.lt(scalar)
-            else:  # LessThanEqual
-                result = block.le(scalar)
-
-            # Store results element-by-element (required for bool bit-packing)
-            for i in range(smdwidth):
-                out.store(idx + i, result[i])
-
-        alias simd_width = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[compare, simd_width](total)
-
-        return out^
-
-    @always_inline
-    fn eq(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
+    fn eq(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[Equal](scalar)
 
     @always_inline
-    fn ne(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
+    fn ne(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[NotEqual](scalar)
 
     @always_inline
-    fn ge(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
+    fn ge(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[GreaterThanEqual](scalar)
 
     @always_inline
-    fn gt(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
+    fn gt(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[GreaterThan](scalar)
 
     @always_inline
-    fn le(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
+    fn le(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[LessThanEqual](scalar)
 
     @always_inline
-    fn lt(self: Buffer[dtype], scalar: Scalar[dtype]) -> Buffer[dtype.bool]:
+    fn lt(
+        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[LessThan](scalar)
 
     @always_inline
-    fn eq(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[DType.bool]:
+    fn eq(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[Equal](other)
 
     @always_inline
-    fn ne(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[DType.bool]:
+    fn ne(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[NotEqual](other)
 
     @always_inline
-    fn lt(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[DType.bool]:
+    fn lt(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[LessThan](other)
 
     @always_inline
-    fn le(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[DType.bool]:
+    fn le(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[LessThanEqual](other)
 
     @always_inline
-    fn gt(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[DType.bool]:
+    fn gt(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[GreaterThan](other)
 
     @always_inline
-    fn ge(self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[DType.bool]:
+    fn ge(
+        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+    ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[GreaterThanEqual](other)
-
-    @always_inline
-    fn compare_buffer_full[
-        op_code: Int
-    ](self: Buffer[dtype], other: Buffer[dtype]) -> Buffer[DType.bool]:
-        if not self.size == other.size:
-            panic(
-                (
-                    "Buffer → compare_buffer_full: buffer size does not match"
-                    " -> self:"
-                ),
-                self.size.__str__(),
-                "vs. other:",
-                other.size.__str__(),
-            )
-
-        total = self.size
-        if total == 0:
-            panic("Buffer -> compare_scalar_full: buffer sizes are zero")
-
-        var out = Buffer[DType.bool](total)
-
-        @parameter
-        fn compare[smdwidth: Int](idx: Int):
-            self_block = self.load[simdwidth=smdwidth](idx)
-            other_block = other.load[simdwidth=smdwidth](idx)
-            var result: SIMD[DType.bool, smdwidth]
-
-            @parameter
-            if op_code == Equal:
-                result = self_block.eq(other_block)
-            elif op_code == NotEqual:
-                result = self_block.ne(other_block)
-            elif op_code == GreaterThan:
-                result = self_block.gt(other_block)
-            elif op_code == GreaterThanEqual:
-                result = self_block.ge(other_block)
-            elif op_code == LessThan:
-                result = self_block.lt(other_block)
-            else:  # LessThanEqual
-                result = self_block.le(other_block)
-
-            # Store results element-by-element (required for bool bit-packing)
-            for i in range(smdwidth):
-                out.store(idx + i, result[i])
-
-        alias simd_width = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[compare, simd_width](total)
-
-        return out^
 
     @always_inline
     fn compare_buffer[
         op_code: Int
-    ](self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
+    ](self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
         if not self.size == other.size:
             panic(
                 "Buffer → compare_buffer: buffer sizes do not match -> self:",
@@ -1385,7 +1844,7 @@ struct Buffer[dtype: DType = DType.float32](
         if total == 0:
             return False
 
-        alias smdwidth = simd_width_of[dtype]()
+        alias smdwidth = simd_width_of[Self.dtype]()
 
         var simd_blocks = total // smdwidth
         for block in range(simd_blocks):
@@ -1445,34 +1904,34 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn __eq__(self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
+    fn __eq__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
         return self.compare_buffer[Equal](other)
 
     @always_inline
-    fn __ne__(self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
+    fn __ne__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
         return self.compare_buffer[NotEqual](other)
 
     @always_inline
-    fn __lt__(self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
+    fn __lt__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
         return self.compare_buffer[LessThan](other)
 
     @always_inline
-    fn __le__(self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
+    fn __le__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
         return self.compare_buffer[LessThanEqual](other)
 
     @always_inline
-    fn __gt__(self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
+    fn __gt__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
         return self.compare_buffer[GreaterThan](other)
 
     @always_inline
-    fn __ge__(self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
+    fn __ge__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
         return self.compare_buffer[GreaterThanEqual](other)
 
     @always_inline
     @staticmethod
     fn compare_pair[
         op_code: Int
-    ](left: Scalar[dtype], right: Scalar[dtype]) -> Bool:
+    ](left: Scalar[Self.dtype], right: Scalar[Self.dtype]) -> Bool:
         @parameter
         if op_code == Equal:
             return left == right
@@ -1504,8 +1963,8 @@ struct Buffer[dtype: DType = DType.float32](
 
         @parameter
         if (
-            (dtype == NewType)
-            or (dtype == DType.bool)
+            (Self.dtype == NewType)
+            or (Self.dtype == DType.bool)
             or (NewType == DType.bool)
         ):
             # Handle element-by-element cases:
@@ -1516,49 +1975,27 @@ struct Buffer[dtype: DType = DType.float32](
                 out[i] = self[i].cast[NewType]()
         else:
             # Both types are non-bool and different: use efficient SIMD vectorization
-            alias input_simd_width = simd_width_of[dtype]()
+            alias input_simd_width = simd_width_of[Self.dtype]()
 
             # Use the smaller of the two SIMD widths for safe vectorization
-            alias working_simd_width = input_simd_width if input_simd_width < simdwidth else simdwidth
+            alias min_simd_width = input_simd_width if input_simd_width < simdwidth else simdwidth
 
-            @parameter
-            fn cast_values[simd_width: Int](idx: Int):
-                out.store[simd_width](
-                    idx, self.load[simd_width](idx).cast[NewType]()
-                )
+            var vectorized_end = (self.size // min_simd_width) * min_simd_width
 
-            vectorize[cast_values, working_simd_width](self.size)
+            for idx in range(0, vectorized_end, min_simd_width):
+                var chunk = self.load[simdwidth=min_simd_width](idx)
+                out.store[simdwidth=min_simd_width](idx, chunk.cast[NewType]())
+
+            # Scalar tail
+            for idx in range(vectorized_end, self.size):
+                out[idx] = self[idx].cast[NewType]()
 
         return out^
 
     @always_inline
-    fn sum(
-        self: Buffer[dtype],
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
-    ) -> Scalar[dtype]:
-        constrained[
-            dtype.is_numeric(),
-            "Buffer → sum is for numeric data types only",
-        ]()
-        var accum = Scalar[dtype](0)
-        if self.size == 0:
-            return accum
-        extent = end_index.or_else(self.size) - start_index
-        if extent == 0:
-            return accum
-
-        @parameter
-        fn sum_up[smdwidth: Int](idx: Int):
-            accum += self.load[simdwidth=smdwidth](
-                idx + start_index
-            ).reduce_add()
-
-        vectorize[sum_up, simd_width_of[dtype]()](extent)
-        return accum
-
-    @always_inline
-    fn dot(lhs: Buffer[dtype], rhs: Buffer[dtype]) -> Scalar[dtype]:
+    fn dot(
+        lhs: Buffer[Self.dtype], rhs: Buffer[Self.dtype]
+    ) -> Scalar[Self.dtype]:
         if not lhs.size == rhs.size:
             panic(
                 "Buffer → dot: buffer size does not match -> lhs:",
@@ -1570,36 +2007,9 @@ struct Buffer[dtype: DType = DType.float32](
         return (lhs * rhs).sum()
 
     @always_inline
-    fn product(
-        self: Buffer[dtype],
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
-    ) -> Scalar[dtype]:
-        constrained[
-            dtype.is_numeric(),
-            "Buffer → product is for numeric data types only",
-        ]()
-
-        var result = Scalar[dtype](1)
-        extent = end_index.or_else(self.size) - start_index
-
-        if extent <= 0:
-            return result  # Empty product = multiplicative identity
-
-        @parameter
-        fn multiply[smdwidth: Int](idx: Int):
-            result *= self.load[simdwidth=smdwidth](
-                idx + start_index
-            ).reduce_mul()
-
-        vectorize[multiply, simd_width_of[dtype]()](extent)
-
-        return result
-
-    @always_inline
     fn overwrite(
         self,
-        other: Buffer[dtype],
+        other: Buffer[Self.dtype],
         self_start: Int = 0,
         self_end: Optional[Int] = None,
         other_start: Int = 0,
@@ -1609,54 +2019,78 @@ struct Buffer[dtype: DType = DType.float32](
             other, self_start, self_end, other_start, other_end
         )
 
-    @always_inline
     fn count(
-        self: Buffer[dtype],
-        key: Scalar[dtype],
+        self: Buffer[Self.dtype],
+        key: Scalar[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Int:
         if self.size == 0:
             return 0
-        extent = end_index.or_else(self.size) - start_index
-        total = 0
+
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
+
+        if extent <= 0:
+            return 0
+
+        var total = 0
 
         @parameter
-        fn matches[smdwidth: Int](idx: Int):
-            block = self.load[simdwidth=smdwidth](idx + start_index)
-            result = block.eq(key)
+        if Self.dtype == DType.bool:
+            # Special handling for bool due to bit packing
+            # Process element by element (no SIMD for packed bools)
+            for i in range(start_index, actual_end):
+                if self[i] == key:
+                    total += 1
+            return total
 
+        # SIMD vectorization for non-bool types
+        alias simd_width = simd_width_of[Self.dtype]()
+
+        var idx = start_index
+        var remaining = extent
+
+        # Process full SIMD chunks
+        while remaining >= simd_width:
+            var block = self.load[simdwidth=simd_width](idx)
+            var result = block.eq(key)
+
+            # Check if all match
             if result.reduce_and():
-                # All elements match
-                total += smdwidth
-            elif not result.reduce_or():
-                # No elements match - do nothing
-                pass
-            else:
-                # Some elements match - count individually
-                for i in range(smdwidth):
+                total += simd_width
+            elif result.reduce_or():
+                # Some match - count individually
+                for i in range(simd_width):
                     if result[i]:
                         total += 1
+            # If reduce_or() is false, no matches - skip
 
-        alias simd_width = 1 if dtype == DType.bool else simd_width_of[dtype]()
-        vectorize[matches, simd_width](extent)
+            idx += simd_width
+            remaining -= simd_width
+
+        # Process remaining elements (scalar tail)
+        for i in range(idx, actual_end):
+            if self[i] == key:
+                total += 1
+
         return total
 
-    fn tolist(self: Buffer[dtype]) -> List[Scalar[dtype]]:
-        var result = List[Scalar[dtype]](capacity=Int(len(self)))
+    fn tolist(self: Buffer[Self.dtype]) -> List[Scalar[Self.dtype]]:
+        var result = List[Scalar[Self.dtype]](capacity=Int(len(self)))
         for i in range(len(self)):
             result.append(self[i])
         return result^
 
     @always_inline
     fn all_close[
-        rtol: Scalar[dtype] = 1e-5,
-        atol: Scalar[dtype] = 1e-8,
-    ](self: Buffer[dtype], other: Buffer[dtype]) -> Bool:
+        rtol: Scalar[Self.dtype] = 1e-5,
+        atol: Scalar[Self.dtype] = 1e-8,
+    ](self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
         """Check if all elements are close within tolerance: |a - b| <= atol + rtol * |b|.
         """
         constrained[
-            dtype.is_floating_point(),
+            Self.dtype.is_floating_point(),
             "Buffer → all_close is for floating point data types only",
         ]()
 
@@ -1674,7 +2108,7 @@ struct Buffer[dtype: DType = DType.float32](
             tolerance = atol + rtol * abs(vec2)
             return diff.le(tolerance).reduce_and()
 
-        alias simd_width = simd_width_of[dtype]()
+        alias simd_width = simd_width_of[Self.dtype]()
         num_elems = self.size
         simd_blocks = num_elems // simd_width
 
@@ -1690,7 +2124,9 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn any(self: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Bool:
+    fn any(
+        self: Buffer[Self.dtype], pred: fn (Scalar[Self.dtype]) -> Bool
+    ) -> Bool:
         """Check if any element satisfies the predicate."""
         for i in range(self.size):
             if pred(self[i]):
@@ -1698,7 +2134,9 @@ struct Buffer[dtype: DType = DType.float32](
         return False
 
     @always_inline
-    fn all(self: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool) -> Bool:
+    fn all(
+        self: Buffer[Self.dtype], pred: fn (Scalar[Self.dtype]) -> Bool
+    ) -> Bool:
         """Check if all elements satisfy the predicate."""
         for i in range(self.size):
             if not pred(self[i]):
@@ -1707,7 +2145,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn map_to_bool(
-        self: Buffer[dtype], pred: fn (Scalar[dtype]) -> Bool
+        self: Buffer[Self.dtype], pred: fn (Scalar[Self.dtype]) -> Bool
     ) -> Buffer[DType.bool]:
         """Apply predicate to each element, returning a boolean buffer."""
         var out = Buffer[DType.bool](self.size)
@@ -1800,16 +2238,16 @@ struct ElementIterator[
     origin: Origin[False],
 ](Sized & Copyable):
     var index: Int
-    var src: Pointer[Buffer[dtype], origin]
+    var src: Pointer[Buffer[Self.dtype], Self.origin]
 
-    fn __init__(out self, src: Pointer[Buffer[dtype], origin]):
+    fn __init__(out self, src: Pointer[Buffer[Self.dtype], Self.origin]):
         self.src = src
         self.index = 0
 
     fn __iter__(self) -> Self:
         return self.copy()
 
-    fn __next__(mut self) -> Scalar[dtype]:
+    fn __next__(mut self) -> Scalar[Self.dtype]:
         self.index += 1
         return self.src[][self.index - 1]
 

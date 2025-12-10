@@ -5,10 +5,13 @@ from sys.param_env import env_get_string
 from logger import Level, Logger
 from layers import Sequential, Linear, ReLU
 from time import perf_counter_ns, monotonic
+from math import cos, sin, pi
 from os import abort
 from utils import Variant
 from testing import assert_true
 from intarray import IntArray
+from random import randn_float64
+
 
 alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 alias log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -30,15 +33,39 @@ fn now() -> Float64:
     return perf_counter_ns() / 1e9
 
 
-fn accuracy[
-    dtype: DType, //, threshold: Scalar[dtype] = Scalar[dtype](0.5)
-](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[Int, Int]:
-    var total = pred.shape()[0]
+@always_inline
+fn binary_accuracy[
+    dtype: DType, //,
+    threshold: Scalar[dtype] = Scalar[dtype](0.5),
+](pred: Tensor[dtype], target: Tensor[DType.int64]) -> Tuple[Int, Int]:
+    var batch_size = pred.shape()[0]
 
-    var predictions = pred.gt(threshold).to_dtype[DType.int64]()
-    var targets_ints = target.to_dtype[DType.int64]()
-    var correct = predictions.eq(targets_ints).count(Scalar[DType.bool](True))
-    return correct, total
+    var prediction = pred.gt(threshold).to_dtype[DType.int64](
+        requires_grad=False
+    )
+    var correct = prediction.eq(target).count(Scalar[DType.bool](True))
+    return correct, batch_size
+
+
+fn multiclass_accuracy[
+    dtype: DType, //
+](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int:
+    var correct = 0
+    var batch_size = pred.shape()[0]
+    var num_classes = pred.shape()[1]
+
+    for i in range(batch_size):
+        var max_idx = 0
+        var max_val = pred[i, 0]
+        for j in range(1, num_classes):
+            if pred[i, j] > max_val:
+                max_val = pred[i, j]
+                max_idx = j
+
+        if max_idx == Int(target[i]):
+            correct += 1
+
+    return correct
 
 
 @always_inline("nodebug")
@@ -106,6 +133,59 @@ struct IDGen:
         # Combine them in a way that preserves uniqueness
         # Use XOR to mix the values
         return perf_time ^ (mono_time << 32)
+
+
+struct SpiralDataGenerator:
+    @staticmethod
+    fn generate_data(
+        n_points: Int = 100, n_rotations: Float64 = 3.0, noise: Float64 = 0.1
+    ) -> Tuple[Tensor[DType.float64], Tensor[DType.float64]]:
+        """Generate two intertwined spirals.
+
+        Args:
+            n_points: Points per spiral.
+            n_rotations: Number of full rotations (higher = more complex).
+            noise: Random noise to add (makes it harder).
+
+        Returns:
+            (X, y) where:
+            - X: Shape (2*n_points, 2) - coordinates.
+            - y: Shape (2*n_points, 1) - labels (0 or 1).
+        """
+        var start = now()
+        var total_points = 2 * n_points
+        var X = Tensor[DType.float64].zeros(total_points, 2)
+        var y = Tensor[DType.float64].zeros(total_points, 1)
+
+        for i in range(n_points):
+            # Angle increases linearly
+            var theta = Float64(i) / Float64(n_points) * n_rotations * 2.0 * pi
+
+            # Radius increases with angle (spiral out)
+            var radius = Float64(i) / Float64(n_points)
+
+            # Spiral 1 (class 0)
+            var x1 = radius * cos(theta) + randn_float64() * noise
+            var y1 = radius * sin(theta) + randn_float64() * noise
+            X[i, 0] = x1
+            X[i, 1] = y1
+            y[i, 0] = 0.0
+
+            # Spiral 2 (class 1) - rotated 180 degrees
+            var x2 = radius * cos(theta + pi) + randn_float64() * noise
+            var y2 = radius * sin(theta + pi) + randn_float64() * noise
+            X[n_points + i, 0] = x2
+            X[n_points + i, 1] = y2
+            y[n_points + i, 0] = 1.0
+
+        var end = now()
+        log_debug(
+            "SpiralDataGenerator -> generate_spiral_data took: "
+            + (end - start).__str__()
+            + " secs"
+        )
+
+        return (X, y)
 
 
 @always_inline("nodebug")
@@ -374,29 +454,32 @@ fn print_gradbox_recursive[
 fn print_tensor_recursive[
     dtype: DType
 ](
-    read tensor_ptr: Tensor[dtype],
+    read tensor: Tensor[dtype],
     mut indices: List[Int],
     level: Int,
     num_first: Int = 10,
     num_last: Int = 10,
 ):
-    if tensor_ptr.rank() == 0:  # Tensor with Shape ()
-        print(tensor_ptr[[]])
+    if tensor._id == 0:
+        print("  Empty")
+        return
+    if tensor.rank() == 0:  # Tensor with Shape ()
+        print(tensor[[]])
         return
     current_dim = len(indices)
     indent = " " * (level * 2)
 
-    if current_dim >= tensor_ptr.rank():
+    if current_dim >= tensor.rank():
         print(
             "ERROR: current_dim (",
             current_dim,
             ") >= ndim (",
-            tensor_ptr.rank(),
+            tensor.rank(),
             ")",
         )
         return
 
-    size = tensor_ptr.shape()[current_dim]
+    size = tensor.shape()[current_dim]
 
     if size < 0 or size > 1_000_000:
         print(
@@ -404,18 +487,18 @@ fn print_tensor_recursive[
             size,
             "at dim ",
             current_dim,
-            tensor_ptr.shape().__str__(),
+            tensor.shape().__str__(),
         )
         return
 
     # Base case: last dimension (print actual elements)
-    if current_dim == tensor_ptr.rank() - 1:
+    if current_dim == tensor.rank() - 1:
         print(indent + "[", end="")
 
         for i in range(size):
             if i < num_first:
                 indices.append(i)
-                print(tensor_ptr[indices], end="")
+                print(tensor[indices], end="")
                 _ = indices.pop()
                 if i != size - 1:
                     print(", ", end="")
@@ -423,7 +506,7 @@ fn print_tensor_recursive[
                 print("..., ", end="")
             elif i >= size - num_last:
                 indices.append(i)
-                print(tensor_ptr[indices], end="")
+                print(tensor[indices], end="")
                 _ = indices.pop()
                 if i != size - 1:
                     print(", ", end="")
@@ -436,7 +519,7 @@ fn print_tensor_recursive[
             if i < num_first:
                 indices.append(i)
                 print_tensor_recursive(
-                    tensor_ptr, indices, level + 1, num_first, num_last
+                    tensor, indices, level + 1, num_first, num_last
                 )
                 _ = indices.pop()
             elif i == num_first and size > num_first + num_last:
@@ -444,7 +527,7 @@ fn print_tensor_recursive[
             elif i >= size - num_last:
                 indices.append(i)
                 print_tensor_recursive(
-                    tensor_ptr, indices, level + 1, num_first, num_last
+                    tensor, indices, level + 1, num_first, num_last
                 )
                 _ = indices.pop()
 

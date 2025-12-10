@@ -105,7 +105,3 @@ struct Strides(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     @always_inline
     fn with_capacity(capacity: Int) -> Strides:
         return Strides(IntArray.with_capacity(capacity))
-
-
-fn main():
-    pass

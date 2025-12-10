@@ -49,6 +49,7 @@ from time import perf_counter_ns
 from math import sqrt, cos, sin, pi
 from random import randn_float64
 from intarray import IntArray
+from common_utils import SpiralDataGenerator, binary_accuracy
 
 
 fn generate_spiral_data(
@@ -159,12 +160,14 @@ fn train_spiral_classifier():
     print("Generating spiral dataset...")
 
     # Generate training data
-    var (X_train, y_train) = generate_spiral_data(
+    # var (X_train, y_train) = generate_spiral_data(
+    var (X_train, y_train) = SpiralDataGenerator.generate_data(
         n_points=num_train_samples, n_rotations=2.0, noise=0.01
     )
 
     # Generate validation data
-    var (X_val, y_val) = generate_spiral_data(
+    # var (X_val, y_val) = generate_spiral_data(
+    var (X_val, y_val) = SpiralDataGenerator.generate_data(
         n_points=num_val_samples, noise=0.01, n_rotations=2.0
     )
 
@@ -180,14 +183,14 @@ fn train_spiral_classifier():
     var train_loader = DataLoader(
         train_dataset^,
         batch_size=train_batch_size,
-        reshuffle=True,  # Shuffle training data each epoch
+        shuffle=True,  # Shuffle training data each epoch
         drop_last=False,  # Use all samples
     )
 
     var val_loader = DataLoader(
         val_dataset^,
         batch_size=val_batch_size,
-        reshuffle=False,  # No shuffling for validation
+        shuffle=False,  # No shuffling for validation
         drop_last=False,
     )
 
@@ -286,7 +289,9 @@ fn train_spiral_classifier():
             epoch_train_loss += loss.item() * train_batch.batch_size
 
             var batch_correct_count, _ = accuracy(
-                predictions, train_batch.labels
+                # var batch_correct_count, _ = binary_accuracy(
+                predictions,
+                train_batch.labels,
             )
             epoch_train_correct += batch_correct_count
             epoch_train_total += train_batch.batch_size
@@ -312,7 +317,9 @@ fn train_spiral_classifier():
             epoch_val_loss += val_loss.item() * val_batch.batch_size
 
             var val_correct_count, _ = accuracy(
-                val_predictions, val_batch.labels
+                # var val_correct_count, _ = binary_accuracy(
+                val_predictions,
+                val_batch.labels,
             )
             epoch_val_correct += val_correct_count
             epoch_val_total += val_batch.batch_size
@@ -376,6 +383,7 @@ fn train_spiral_classifier():
         final_val_loss += val_loss.item() * val_batch.batch_size
 
         var val_correct_count, _ = accuracy(val_predictions, val_batch.labels)
+        # var val_correct_count, _ = binary_accuracy(val_predictions, val_batch.labels)
         final_val_correct += val_correct_count
         final_val_total += val_batch.batch_size
 

@@ -4,7 +4,13 @@ from intarray import IntArray
 
 @register_passable
 struct Shape(
-    ImplicitlyCopyable, Movable, Representable, Sized, Stringable, Writable
+    EqualityComparable,
+    ImplicitlyCopyable,
+    Movable,
+    Representable,
+    Sized,
+    Stringable,
+    Writable,
 ):
     """Shape of a tensor."""
 
@@ -289,11 +295,11 @@ struct Shape(
 struct ShapeIndexIterator[origin: ImmutOrigin](ImplicitlyCopyable):
     """Iterator over IntArray coordinates of a shape."""
 
-    var shape: Pointer[Shape, origin]
+    var shape: Pointer[Shape, Self.origin]
     var current: IntArray
     var index: Int
 
-    fn __init__(out self, shape: Pointer[Shape, origin]):
+    fn __init__(out self, shape: Pointer[Shape, Self.origin]):
         self.shape = shape
         self.current = IntArray.filled(shape[].rank(), 0)
         self.index = 0
@@ -333,3 +339,4 @@ fn main():
         print(coord)
     shape = shape * 0
     print(shape)"""
+    print(Shape(1).rank())

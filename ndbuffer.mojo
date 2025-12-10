@@ -4,7 +4,7 @@ from buffers import Buffer
 from intarray import IntArray
 from indexhelper import IndexCalculator
 from broadcasthelper import ShapeBroadcaster
-from common_utils import panic
+from common_utils import panic, log_warning
 from memory import memcpy
 from collections import Set
 from sys import simd_width_of
@@ -36,33 +36,41 @@ struct NDBuffer[dtype: DType](
     var shape: Shape
     var strides: Strides
     var offset: Int
-    var buffer: Buffer[dtype]
+    var buffer: Buffer[Self.dtype]
     var _contiguous: Bool
 
-    fn __init__(out self, *values: Scalar[dtype]):
-        buffer = Buffer[dtype](len(values))
+    fn __init__(out self, *values: Scalar[Self.dtype]):
+        buffer = Buffer[Self.dtype](len(values))
         for i in range(len(values)):
             buffer[i] = values[i]
-        self = NDBuffer[dtype](buffer^)
+        self = NDBuffer[Self.dtype](buffer^)
 
     fn __init__(
         out self,
-        var buffer: Buffer[dtype],
+        var buffer: Buffer[Self.dtype],
         shape: Optional[Shape] = None,
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ):
         if buffer.size == 0:
-            panic(
-                "NDBuffer →__init__(Buffer, ...): zero sized buffer not allowed"
+            log_warning(
+                "NDBuffer →__init__(Buffer, ...): zero sized buffer - potential"
+                " danger"
             )
-        _shape = shape.or_else(Shape(buffer.size))
-        self.shape = _shape.copy()
-        self.buffer = buffer^
-        self.strides = strides.or_else(Strides.default(_shape))
-        self.offset = offset
-        self._contiguous = False
-        self._contiguous = self.is_contiguous()
+            self.buffer = buffer^
+            self.shape = Shape()
+            self.strides = Strides.Zero()
+            self.offset = 0
+            self._contiguous = True
+
+        else:
+            _shape = shape.or_else(Shape(buffer.size))
+            self.shape = _shape.copy()
+            self.buffer = buffer^
+            self.strides = strides.or_else(Strides.default(_shape))
+            self.offset = offset
+            self._contiguous = False
+            self._contiguous = self.is_contiguous()
 
     fn __init__(
         out self,
@@ -70,7 +78,7 @@ struct NDBuffer[dtype: DType](
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ):
-        self.buffer = Buffer[dtype](shape.num_elements())
+        self.buffer = Buffer[Self.dtype](shape.num_elements())
         self.shape = shape
         self.strides = strides.or_else(Strides.default(shape))
         self.offset = offset
@@ -96,35 +104,39 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn zeros(shape: Shape) -> NDBuffer[dtype]:
-        var buffer = Buffer[dtype].zeros(shape.num_elements())
-        return NDBuffer[dtype](buffer^, shape)
+    fn zeros(shape: Shape) -> NDBuffer[Self.dtype]:
+        var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
+        return NDBuffer[Self.dtype](buffer^, shape)
 
     @staticmethod
     @always_inline
-    fn full(shape: Shape, scalar: Scalar[dtype]) -> NDBuffer[dtype]:
-        var buffer = Buffer[dtype].full(scalar, shape.num_elements())
-        return NDBuffer[dtype](buffer^, shape)
+    fn full(shape: Shape, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+        var buffer = Buffer[Self.dtype].full(scalar, shape.num_elements())
+        return NDBuffer[Self.dtype](buffer^, shape)
+
+    @staticmethod
+    fn Empty() -> NDBuffer[Self.dtype]:
+        return NDBuffer[Self.dtype](Buffer[Self.dtype]())
 
     @staticmethod
     @always_inline
     fn arange(
-        args: VariadicList[Scalar[dtype]],
-    ) -> NDBuffer[dtype]:
-        var buffer = Buffer[dtype].arange(args)
+        args: VariadicList[Scalar[Self.dtype]],
+    ) -> NDBuffer[Self.dtype]:
+        var buffer = Buffer[Self.dtype].arange(args)
         var shape = Shape(buffer.size)
-        return NDBuffer[dtype](buffer^, shape^)
+        return NDBuffer[Self.dtype](buffer^, shape^)
 
     @staticmethod
     @always_inline
     fn linspace(
-        start: Scalar[dtype],
-        end: Scalar[dtype],
+        start: Scalar[Self.dtype],
+        end: Scalar[Self.dtype],
         steps: Int,
-    ) -> NDBuffer[dtype]:
-        var buffer = Buffer[dtype].linspace(start, end, steps)
+    ) -> NDBuffer[Self.dtype]:
+        var buffer = Buffer[Self.dtype].linspace(start, end, steps)
         var shape = Shape(buffer.size)
-        return NDBuffer[dtype](buffer^, shape^)
+        return NDBuffer[Self.dtype](buffer^, shape^)
 
     @always_inline
     fn is_contiguous(self) -> Bool:
@@ -135,49 +147,49 @@ struct NDBuffer[dtype: DType](
         return self.buffer.size
 
     @always_inline
-    fn __getitem__(self, indices: IntArray) -> Scalar[dtype]:
+    fn __getitem__(self, indices: IntArray) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         return self.buffer[index]
 
     @always_inline
-    fn __setitem__(self, indices: IntArray, value: Scalar[dtype]):
+    fn __setitem__(self, indices: IntArray, value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         self.buffer[index] = value
 
     @always_inline
-    fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
+    fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         return self.buffer[index]
 
     @always_inline
-    fn __setitem__(self, indices: List[Int], value: Scalar[dtype]):
+    fn __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         self.buffer[index] = value
 
     @always_inline
-    fn __getitem__(self, indices: VariadicList[Int]) -> Scalar[dtype]:
+    fn __getitem__(self, indices: VariadicList[Int]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         return self.buffer[index]
 
     @always_inline
-    fn __setitem__(self, indices: VariadicList[Int], value: Scalar[dtype]):
+    fn __setitem__(self, indices: VariadicList[Int], value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         self.buffer[index] = value
 
     @always_inline
-    fn item(self) -> Scalar[dtype]:
+    fn item(self) -> Scalar[Self.dtype]:
         if self.shape != Shape(1) and self.shape != Shape():
             panic(
                 "NDBuffer → item(self): only valid for zero dim"
@@ -191,8 +203,8 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn load[
-        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
-    ](self, row: Int, col: Int) -> SIMD[dtype, simdwidth]:
+        simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
+    ](self, row: Int, col: Int) -> SIMD[Self.dtype, simdwidth]:
         """SIMD load of a row segment from a 2D NDBuffer."""
 
         constrained[
@@ -243,8 +255,8 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn store[
-        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
-    ](self, row: Int, col: Int, value: SIMD[dtype, simdwidth]):
+        simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
+    ](self, row: Int, col: Int, value: SIMD[Self.dtype, simdwidth]):
         """SIMD store of a row segment into a 2D NDBuffer."""
 
         constrained[
@@ -296,7 +308,7 @@ struct NDBuffer[dtype: DType](
     fn __str__(self) -> String:
         s = String("NDBuffer [")
         s += "Shape: " + self.shape.__str__()
-        s += ", Type: " + dtype.__str__()
+        s += ", Type: " + Self.dtype.__str__()
         s += ", Shared : " + self.shared().__str__()
         s += ", Strides : " + self.strides.__str__()
         s += ", Offset : " + self.offset.__str__()
@@ -311,7 +323,7 @@ struct NDBuffer[dtype: DType](
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn data_buffer(ref self) -> ref [self.buffer] Buffer[dtype]:
+    fn data_buffer(ref self) -> ref [self.buffer] Buffer[Self.dtype]:
         return self.buffer
 
     @always_inline
@@ -350,19 +362,19 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[NewType](new_buffer^, self.shape)
 
     @always_inline
-    fn __imul__(self, other: NDBuffer[dtype]):
+    fn __imul__(self, other: NDBuffer[Self.dtype]):
         self.inplace_ops[Multiply](other)
 
     @always_inline
-    fn __iadd__(self, other: NDBuffer[dtype]):
+    fn __iadd__(self, other: NDBuffer[Self.dtype]):
         self.inplace_ops[Add](other)
 
     @always_inline
-    fn __isub__(self, other: NDBuffer[dtype]):
+    fn __isub__(self, other: NDBuffer[Self.dtype]):
         self.inplace_ops[Subtract](other)
 
     @always_inline
-    fn __itruediv__(self, other: NDBuffer[dtype]):
+    fn __itruediv__(self, other: NDBuffer[Self.dtype]):
         self.inplace_ops[Divide](other)
 
     @always_inline
@@ -375,7 +387,7 @@ struct NDBuffer[dtype: DType](
         shape: Optional[Shape] = None,
         strides: Optional[Strides] = None,
         offset: Int = 0,
-    ) -> NDBuffer[dtype]:
+    ) -> NDBuffer[Self.dtype]:
         """
         Create shared view of this buffer.
         First call enables ref counting. Subsequent calls just create views.
@@ -386,7 +398,7 @@ struct NDBuffer[dtype: DType](
 
         new_shape = shape.or_else(self.shape)
         new_strides = strides.or_else(Strides.default(new_shape))
-        return NDBuffer[dtype](
+        return NDBuffer[Self.dtype](
             buffer=self.buffer.copy(),
             shape=new_shape,
             strides=new_strides,
@@ -394,15 +406,15 @@ struct NDBuffer[dtype: DType](
         )
 
     @always_inline
-    fn __is__(self, other: NDBuffer[dtype]) -> Bool:
+    fn __is__(self, other: NDBuffer[Self.dtype]) -> Bool:
         return self.buffer.data == other.buffer.data
 
     @always_inline
     fn zero(self):
-        self.fill(Scalar[dtype](0))
+        self.fill(Scalar[Self.dtype](0))
 
     @always_inline
-    fn fill(self, value: Scalar[dtype]):
+    fn fill(self, value: Scalar[Self.dtype]):
         if self.is_contiguous():
             self.buffer.fill(value, self.offset, self.offset + self.numels())
         else:
@@ -410,7 +422,9 @@ struct NDBuffer[dtype: DType](
                 self[coord] = value
 
     @always_inline
-    fn contiguous(self, new_shape: Optional[Shape] = None) -> NDBuffer[dtype]:
+    fn contiguous(
+        self, new_shape: Optional[Shape] = None
+    ) -> NDBuffer[Self.dtype]:
         target_shape = new_shape.or_else(self.shape)
         if (
             self.is_contiguous()
@@ -418,19 +432,19 @@ struct NDBuffer[dtype: DType](
             and target_shape == self.shape
         ):
             return self.copy()
-        return NDBuffer[dtype](self.contiguous_buffer(), target_shape)
+        return NDBuffer[Self.dtype](self.contiguous_buffer(), target_shape)
 
     @always_inline
     fn map[
-        map_buffer: fn (Buffer[dtype]) -> Buffer[dtype],
-        map_element: fn (Scalar[dtype]) -> Scalar[dtype],
-    ](self) -> Buffer[dtype]:
+        map_buffer: fn (Buffer[Self.dtype]) -> Buffer[Self.dtype],
+        map_element: fn (Scalar[Self.dtype]) -> Scalar[Self.dtype],
+    ](self) -> Buffer[Self.dtype]:
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
             return map_buffer(self.buffer[start:end])
         else:
-            var buffer = Buffer[dtype](self.numels())
+            var buffer = Buffer[Self.dtype](self.numels())
             var index = 0
             for coord in self.shape:
                 buffer[index] = map_element(self[coord])
@@ -439,33 +453,39 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn reduce[
-        reduce_buffer: fn (Buffer[dtype], Int, Optional[Int]) -> Scalar[dtype],
-        reduce_elements: fn (Scalar[dtype], Scalar[dtype]) -> Scalar[dtype],
-        unit: Scalar[dtype] = Scalar[dtype](0),
-    ](self) -> Scalar[dtype]:
+        reduce_buffer: fn (Buffer[Self.dtype], Int, Optional[Int]) -> Scalar[
+            Self.dtype
+        ],
+        reduce_elements: fn (Scalar[Self.dtype], Scalar[Self.dtype]) -> Scalar[
+            Self.dtype
+        ],
+        unit: Scalar[Self.dtype] = Scalar[Self.dtype](0),
+    ](self) -> Scalar[Self.dtype]:
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
             return reduce_buffer(self.buffer, start, end)
         else:
-            var accum: Scalar[dtype] = unit
+            var accum: Scalar[Self.dtype] = unit
             for coord in self.shape:
                 accum = reduce_elements(self[coord], accum)
             return accum
 
     @always_inline
-    fn sum_all(self) -> Scalar[dtype]:
+    fn sum_all(self) -> Scalar[Self.dtype]:
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
             return self.buffer.sum(start, end)
         else:
-            var accum_sum: Scalar[dtype] = Scalar[dtype](0)
+            var accum_sum: Scalar[Self.dtype] = Scalar[Self.dtype](0)
             for coord in self.shape:
                 accum_sum += self[coord]
             return accum_sum
 
-    fn sum(self, reduction_axes: IntArray, keepdims: Bool) -> NDBuffer[dtype]:
+    fn sum(
+        self, reduction_axes: IntArray, keepdims: Bool
+    ) -> NDBuffer[Self.dtype]:
         # Step 1: Normalize and validate reduction axes
         var normalized_axes = self._normalize_reduction_axes(reduction_axes)
 
@@ -474,7 +494,7 @@ struct NDBuffer[dtype: DType](
             normalized_axes, keepdims, validated=True
         )
 
-        var out = NDBuffer[dtype].zeros(out_shape)
+        var out = NDBuffer[Self.dtype].zeros(out_shape)
 
         # Step 3: Handle scalar output cases
         if out_shape == Shape():
@@ -485,7 +505,7 @@ struct NDBuffer[dtype: DType](
             reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
 
             for out_coord in out_shape:
-                var accum_sum = Scalar[dtype](0)
+                var accum_sum = Scalar[Self.dtype](0)
                 for red_coord in reduction_axes_shape:
                     # Use normalized_axes (sorted) for coordinate reconstruction
                     var self_coord = out_coord.replace(
@@ -537,7 +557,7 @@ struct NDBuffer[dtype: DType](
         self,
         start_dim: Int = 0,
         end_dim: Optional[Int] = None,
-    ) -> NDBuffer[dtype]:
+    ) -> NDBuffer[Self.dtype]:
         rank = self.rank()
         if rank == 0:
             return self.contiguous()
@@ -557,7 +577,7 @@ struct NDBuffer[dtype: DType](
         return self.contiguous(new_shape)
 
     @always_inline
-    fn contiguous_buffer(self) -> Buffer[dtype]:
+    fn contiguous_buffer(self) -> Buffer[Self.dtype]:
         """Returns a contiguous copy of the buffer with the same data."""
         # - same shape
         # - contiguous strides
@@ -568,14 +588,14 @@ struct NDBuffer[dtype: DType](
             var end = start + self.numels()
             return self.buffer[start:end]
         else:
-            var buffer = Buffer[dtype](self.numels())
+            var buffer = Buffer[Self.dtype](self.numels())
             var index = 0
             for coord in self.shape:
                 buffer[index] = self[coord]
                 index += 1
             return buffer^
 
-    fn count(self, key: Scalar[dtype]) -> Int:
+    fn count(self, key: Scalar[Self.dtype]) -> Int:
         """Count occurence of the key in the buffer."""
         if self.is_contiguous():
             var start = self.offset
@@ -588,9 +608,9 @@ struct NDBuffer[dtype: DType](
                     _count += 1
             return _count
 
-    fn unique(self) -> NDBuffer[dtype]:
+    fn unique(self) -> NDBuffer[Self.dtype]:
         """Get the unique values in the buffer."""
-        var uniques = Set[Scalar[dtype]]()
+        var uniques = Set[Scalar[Self.dtype]]()
         if self.is_contiguous():
             if not self.shared():
                 for i in range(self.numels()):
@@ -603,16 +623,16 @@ struct NDBuffer[dtype: DType](
         else:
             for coord in self.shape:
                 uniques.add(self[coord])
-        var distincts = List[Scalar[dtype]](capacity=Int(len(uniques)))
+        var distincts = List[Scalar[Self.dtype]](capacity=Int(len(uniques)))
         for elem in uniques:
             distincts.append(elem)
         var unique_shape = Shape(len(distincts))
-        return NDBuffer[dtype](Buffer[dtype](distincts), unique_shape)
+        return NDBuffer[Self.dtype](Buffer[Self.dtype](distincts), unique_shape)
 
     @always_inline
     fn copy_from_alike[
         overwrite: Bool = True, validate: Bool = True
-    ](self: NDBuffer[dtype], other: NDBuffer[dtype]):
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
         @parameter
         if validate:
             if not self.shape == other.shape:
@@ -675,7 +695,7 @@ struct NDBuffer[dtype: DType](
                     self[coord] += other[coord]
 
     @always_inline
-    fn fill(self, other: NDBuffer[dtype]):
+    fn fill(self, other: NDBuffer[Self.dtype]):
         if self.__is__(other):
             panic("NDBuffer → fill: cannot fill with self")
 
@@ -719,7 +739,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn inplace_ops[
         op_code: Int,
-    ](self: NDBuffer[dtype], other: NDBuffer[dtype]):
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
             panic(
@@ -785,10 +805,10 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn inplace_scalar_ops[
         op_code: Int,
-    ](self: NDBuffer[dtype], scalar: Scalar[dtype]):
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]):
         @parameter
         if op_code == Divide:
-            if scalar == Scalar[dtype](0):
+            if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
 
         if self.is_contiguous():
@@ -801,33 +821,35 @@ struct NDBuffer[dtype: DType](
                 self[coord] = Self.scalar_fn[op_code](self[coord], scalar)
 
     @always_inline
-    fn __add__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
+    fn __add__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.arithmetic_ops[Add](other)
 
     @always_inline
-    fn __mul__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
+    fn __mul__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.arithmetic_ops[Multiply](other)
 
     @always_inline
-    fn __mul__(self, scalar: Scalar[dtype]) -> NDBuffer[dtype]:
+    fn __mul__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.scalar_ops[Multiply](scalar)
 
     @always_inline
-    fn __rmul__(self, scalar: Scalar[dtype]) -> NDBuffer[dtype]:
+    fn __rmul__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.__mul__(scalar)
 
     @always_inline
-    fn __sub__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
+    fn __sub__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.arithmetic_ops[Subtract](other)
 
     @always_inline
-    fn __truediv__(self, other: NDBuffer[dtype]) -> NDBuffer[dtype]:
+    fn __truediv__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.arithmetic_ops[Divide](other)
 
     @always_inline
     fn arithmetic_ops[
         op_code: Int,
-    ](self: NDBuffer[dtype], other: NDBuffer[dtype]) -> NDBuffer[dtype]:
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ]:
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
             panic(
@@ -850,10 +872,10 @@ struct NDBuffer[dtype: DType](
             var result_buffer = self.buffer.arithmetic_ops[op_code](
                 other.buffer, self_start, self_end, other_start, other_end
             )
-            return NDBuffer[dtype](result_buffer^, self.shape)
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
         else:
-            var result_buffer = Buffer[dtype](self.numels())
+            var result_buffer = Buffer[Self.dtype](self.numels())
             var index = 0
 
             if self.is_contiguous() and not other.is_contiguous():
@@ -879,12 +901,14 @@ struct NDBuffer[dtype: DType](
                     )
                     index += 1
 
-            return NDBuffer[dtype](result_buffer^, self.shape)
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
     @always_inline
     fn broadcast_buffer[
         op_code: Int,
-    ](self: NDBuffer[dtype], other: NDBuffer[dtype]) -> NDBuffer[dtype]:
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ]:
         if self.shape.rank() == 0 or other.shape.rank() == 0:
             return self.broadcast_scalar_buffer[op_code](other)
         else:
@@ -893,9 +917,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn broadcast_scalar_buffer[
         op_code: Int
-    ](self: NDBuffer[dtype], other: NDBuffer[dtype]) -> NDBuffer[dtype]:
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ]:
         result_shape = other.shape if self.shape.rank() == 0 else self.shape
-        var buffer = Buffer[dtype](result_shape.num_elements())
+        var buffer = Buffer[Self.dtype](result_shape.num_elements())
         strides = Strides.default(result_shape)
 
         for coord in result_shape:
@@ -909,18 +935,20 @@ struct NDBuffer[dtype: DType](
 
             buffer[index] = Self.scalar_fn[op_code](self_val, other_val)
 
-        return NDBuffer[dtype](buffer^, result_shape)
+        return NDBuffer[Self.dtype](buffer^, result_shape)
 
     @always_inline
     fn broadcast_nd_buffer[
         op_code: Int
-    ](self: NDBuffer[dtype], other: NDBuffer[dtype]) -> NDBuffer[dtype]:
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ]:
         result_shape = ShapeBroadcaster.broadcast_shape(self.shape, other.shape)
 
         mask1 = ShapeBroadcaster.broadcast_mask(self.shape, result_shape)
         mask2 = ShapeBroadcaster.broadcast_mask(other.shape, result_shape)
 
-        var buffer = Buffer[dtype](result_shape.num_elements())
+        var buffer = Buffer[Self.dtype](result_shape.num_elements())
         strides = Strides.default(result_shape)
 
         for coord in result_shape:
@@ -937,10 +965,10 @@ struct NDBuffer[dtype: DType](
             buffer[index] = Self.scalar_fn[op_code](
                 self[self_coord], other[other_coord]
             )
-        return NDBuffer[dtype](buffer^, result_shape)
+        return NDBuffer[Self.dtype](buffer^, result_shape)
 
     @always_inline
-    fn broadcast_to(self, target_shape: Shape) -> NDBuffer[dtype]:
+    fn broadcast_to(self, target_shape: Shape) -> NDBuffer[Self.dtype]:
         own_shape = self.shape
         if not ShapeBroadcaster.broadcastable(own_shape, target_shape):
             panic(
@@ -951,7 +979,7 @@ struct NDBuffer[dtype: DType](
             )
 
         mask = ShapeBroadcaster.broadcast_mask(own_shape, target_shape)
-        out = NDBuffer[dtype].zeros(target_shape)
+        out = NDBuffer[Self.dtype].zeros(target_shape)
 
         for target_coord in target_shape:
             src_coord = ShapeBroadcaster.translate_index(
@@ -965,7 +993,7 @@ struct NDBuffer[dtype: DType](
     @staticmethod
     fn scalar_fn[
         op_code: Int
-    ](lhs: Scalar[dtype], rhs: Scalar[dtype]) -> Scalar[dtype]:
+    ](lhs: Scalar[Self.dtype], rhs: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
         @parameter
         if op_code == Add:
             return lhs + rhs
@@ -983,10 +1011,12 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn scalar_ops[
         op_code: Int,
-    ](self: NDBuffer[dtype], scalar: Scalar[dtype]) -> NDBuffer[dtype]:
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ]:
         @parameter
         if op_code == Divide:
-            if scalar == Scalar[dtype](0):
+            if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → scalar_ops: cannot divide by zero")
 
         if self.is_contiguous():
@@ -995,11 +1025,11 @@ struct NDBuffer[dtype: DType](
             var result_buffer = self.buffer.arithmetic_ops_scalar[op_code](
                 scalar, start, end
             )
-            return NDBuffer[dtype](result_buffer^, self.shape)
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
         else:
             var index = 0
-            var result_buffer = Buffer[dtype](self.numels())
+            var result_buffer = Buffer[Self.dtype](self.numels())
 
             for coord in self.shape:
                 result_buffer[index] = Self.scalar_fn[op_code](
@@ -1007,7 +1037,7 @@ struct NDBuffer[dtype: DType](
                 )
                 index += 1
 
-            return NDBuffer[dtype](result_buffer^, self.shape)
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
     fn __eq__(self, other: Self) -> Bool:
         return self.compare[Equal](other).buffer.all_true()
@@ -1017,7 +1047,9 @@ struct NDBuffer[dtype: DType](
 
     fn compare[
         op_code: Int,
-    ](self: NDBuffer[dtype], other: NDBuffer[dtype]) -> NDBuffer[DType.bool]:
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+        DType.bool
+    ]:
         if not self.shape == other.shape:
             panic(
                 "NDBuffer → compare(self, other): dimension mismatch: "
@@ -1063,7 +1095,9 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn compare_scalar[
         op_code: Int,
-    ](self: NDBuffer[dtype], scalar: Scalar[dtype]) -> NDBuffer[DType.bool]:
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
+        DType.bool
+    ]:
         if self.is_contiguous():
             var contiguous_data = self.contiguous_buffer()
             var result_buffer = contiguous_data.compare_scalar_full[op_code](
@@ -1098,11 +1132,11 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn all_close[
-        rtol: Scalar[dtype] = 1e-5,
-        atol: Scalar[dtype] = 1e-8,
+        rtol: Scalar[Self.dtype] = 1e-5,
+        atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Self) -> Bool:
         constrained[
-            dtype.is_floating_point(),
+            Self.dtype.is_floating_point(),
             "NDBuffer → all_close is for floating point data types only",
         ]()
 
@@ -1119,7 +1153,7 @@ struct NDBuffer[dtype: DType](
         )
 
     @always_inline
-    fn element_at(self, index: Int) -> Scalar[dtype]:
+    fn element_at(self, index: Int) -> Scalar[Self.dtype]:
         idx = index + self.max_index() if index < 0 else index
         if idx < 0 or idx > self.max_index():
             panic(
@@ -1133,8 +1167,8 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn sum_over_broadcasted_axes(
-        extended_buffer: NDBuffer[dtype], target_shape: Shape
-    ) -> NDBuffer[dtype]:
+        extended_buffer: NDBuffer[Self.dtype], target_shape: Shape
+    ) -> NDBuffer[Self.dtype]:
         result = extended_buffer.contiguous()
         current_shape = extended_buffer.shape
         # Sum over extra leading dimensions
@@ -1150,4 +1184,6 @@ struct NDBuffer[dtype: DType](
 
 
 fn main() raises:
+    ndb = NDBuffer[DType.bool].Empty()
+    print(ndb)
     pass

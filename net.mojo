@@ -38,8 +38,8 @@ struct Linear[dtype: DType, mode: Int = mm](
             self.weight = (
                 Tensor[Self.dtype].rand(
                     shape=Shape(in_features, out_features),
-                    min=-limit,
-                    max=limit,
+                    low=-limit,
+                    high=limit,
                     init_seed=init_seed,
                     requires_grad=True,
                 )
@@ -100,7 +100,9 @@ struct Linear[dtype: DType, mode: Int = mm](
                 matmul_out, self.bias
             )
 
-    fn parameters(ref self) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
         params.append(
             UnsafePointer(to=self.weight)
@@ -108,9 +110,7 @@ struct Linear[dtype: DType, mode: Int = mm](
             .as_any_origin()
         )
         params.append(
-            UnsafePointer(to=self.bias)
-            .unsafe_mut_cast[True]()
-            .as_any_origin()
+            UnsafePointer(to=self.bias).unsafe_mut_cast[True]().as_any_origin()
         )
 
         return params^
@@ -146,7 +146,9 @@ struct ReLU[dtype: DType](ImplicitlyCopyable):
         else:
             return x.relu[track_grad=False]()
 
-    fn parameters(ref self) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
     fn num_parameters(self) -> Int:
@@ -178,7 +180,9 @@ struct Sigmoid[dtype: DType](ImplicitlyCopyable):
         else:
             return x.sigmoid[track_grad=False]()
 
-    fn parameters(ref self) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
     fn num_parameters(self) -> Int:
@@ -210,7 +214,9 @@ struct Tanh[dtype: DType](ImplicitlyCopyable):
         else:
             return x.tanh[track_grad=False]()
 
-    fn parameters(ref self) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
     fn num_parameters(self) -> Int:
@@ -260,15 +266,13 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             panic("Unknown module type")
             return Tensor[Self.dtype].scalar(0)
 
-    fn parameters(ref self) -> List[
-        UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]
-    ]:
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         if self.layer.isa[Linear[Self.dtype]]():
             return self.layer[Linear[Self.dtype]].parameters()
         else:
-            return List[
-                UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]
-            ]()
+            return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
     fn num_parameters(self) -> Int:
         if self.layer.isa[Linear[Self.dtype, mm]]():
@@ -329,12 +333,10 @@ struct Sequential[dtype: DType](Copyable & Movable):
             out = m(out)
         return out
 
-    fn parameters(ref self) -> List[
-        UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]
-    ]:
-        var params = List[
-            UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]
-        ]()
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+        var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
         for module in self.modules:
             params.extend(module.parameters())
         return params^
@@ -388,7 +390,9 @@ struct BCELoss[dtype: DType = DType.float32]:
     var training: Bool
     var epsilon: Scalar[Self.dtype]
 
-    fn __init__(out self, epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9)):
+    fn __init__(
+        out self, epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9)
+    ):
         self.training = True
         self.epsilon = epsilon
 
@@ -454,7 +458,9 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32]:
     var training: Bool
     var epsilon: Scalar[Self.dtype]
 
-    fn __init__(out self, epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9)):
+    fn __init__(
+        out self, epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9)
+    ):
         self.training = True
         self.epsilon = epsilon
 

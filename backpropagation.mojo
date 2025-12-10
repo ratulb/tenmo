@@ -54,43 +54,43 @@ alias BACKWARD_SUBTRACT_BROADCAST = 42
 # ========== Delegate (Variant) ==========
 
 alias Delegate[dtype: DType] = Variant[
-    MatrixVectorMulNdBackward[dtype],
-    VectorMatmulNdBackward[dtype],
     MatmulNdBackward[dtype],
     Matmul2dBackward[dtype],
-    CrossEntropyBackward[dtype],
+    ReLUBackward[dtype],
     AddBackwardScalar[dtype],
     AddBackward[dtype],
-    SubBackward[dtype],
-    SubLeftRightBackwardScalar[dtype],
-    SubtractBroadcastBackward[dtype],
-    ReshapeBackward[dtype],
-    SumBackward[dtype],
     AddBroadcastBackward[dtype],
+    SubBackward[dtype],
+    SubtractBroadcastBackward[dtype],
+    SumBackward[dtype],
+    MeanBackward[dtype],
+    ReshapeBackward[dtype],
+    ViewBackward[dtype],
+    TransposeBackward[dtype],
+    CrossEntropyBackward[dtype],
+    ContiguousBackward[dtype],
     MultiplyBackwardScalar[dtype],
     MultiplyBackward[dtype],
     MultiplyBroadcastBackward[dtype],
+    SigmoidBackward[dtype],
+    VectorMatmulNdBackward[dtype],
+    MatrixVectorMulNdBackward[dtype],
+    SubLeftRightBackwardScalar[dtype],
     ExponientionBackward[dtype],
     TrueDivBackwardScalar[dtype],
     RightTrueDivBackwardScalar[dtype],
     DivideBackward[dtype],
-    MeanBackward[dtype],
-    ViewBackward[dtype],
-    TransposeBackward[dtype],
     DotBackward[dtype],
     ExpandBackward[dtype],
-    ContiguousBackward[dtype],
     FlattenBackward[dtype],
     SqueezeBackward[dtype],
     UnsqueezeBackward[dtype],
     PermuteBackward[dtype],
     ShuffleBackward[dtype],
-    ReLUBackward[dtype],
     MinMaxBackward[dtype],
     SoftmaxBackward[dtype],
     LogSoftmaxBackward[dtype],
     TileBackward[dtype],
-    SigmoidBackward[dtype],
     TanhBackward[dtype],
     LogBackward[dtype],
     ClipBackward[dtype],
@@ -101,11 +101,12 @@ alias Delegate[dtype: DType] = Variant[
 
 # ========== BackwardFn with Tag-Based Dispatch ==========
 
+
 struct BackwardFn[dtype: DType](Copyable & Movable):
-    var grad_fn: Delegate[dtype]
+    var grad_fn: Delegate[Self.dtype]
     var tag: Int  # O(1) lookup key
 
-    fn __init__(out self, grad_fn: Delegate[dtype], tag: Int):
+    fn __init__(out self, grad_fn: Delegate[Self.dtype], tag: Int):
         self.grad_fn = grad_fn
         self.tag = tag
 
@@ -118,8 +119,8 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         self.tag = other.tag
 
     fn __call__(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """O(1) dispatch using integer tag comparison.
 
         Compiler optimizes integer comparisons to jump table for true O(1).
@@ -128,143 +129,165 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         # ========== TIER 1: MOST COMMON ==========
         if self.tag == BACKWARD_ADD:
-            return self.grad_fn[AddBackward[dtype]].backward(output)
+            return self.grad_fn[AddBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_MULTIPLY:
-            return self.grad_fn[MultiplyBackward[dtype]].backward(output)
+            return self.grad_fn[MultiplyBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_MULTIPLY_SCALAR:
-            return self.grad_fn[MultiplyBackwardScalar[dtype]].backward(output)
-
+            return self.grad_fn[MultiplyBackwardScalar[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_RELU:
-            return self.grad_fn[ReLUBackward[dtype]].backward(output)
+            return self.grad_fn[ReLUBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_MATMUL_ND:
-            return self.grad_fn[MatmulNdBackward[dtype]].backward(output)
+            return self.grad_fn[MatmulNdBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_SIGMOID:
-            return self.grad_fn[SigmoidBackward[dtype]].backward(output)
+            return self.grad_fn[SigmoidBackward[Self.dtype]].backward(output)
 
         # ========== TIER 2: MATMUL CHAIN (Called by MatmulNd) ==========
         elif self.tag == BACKWARD_MATMUL_2D:
-            return self.grad_fn[Matmul2dBackward[dtype]].backward(output)
+            return self.grad_fn[Matmul2dBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_TRANSPOSE:
-            return self.grad_fn[TransposeBackward[dtype]].backward(output)
+            return self.grad_fn[TransposeBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_PERMUTE:
-            return self.grad_fn[PermuteBackward[dtype]].backward(output)
+            return self.grad_fn[PermuteBackward[Self.dtype]].backward(output)
 
         # ========== TIER 3: COMMON OPERATIONS ==========
         elif self.tag == BACKWARD_ADD_BROADCAST:
-            return self.grad_fn[AddBroadcastBackward[dtype]].backward(output)
+            return self.grad_fn[AddBroadcastBackward[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_MULTIPLY_BROADCAST:
-            return self.grad_fn[MultiplyBroadcastBackward[dtype]].backward(output)
+            return self.grad_fn[MultiplyBroadcastBackward[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_SOFTMAX:
-            return self.grad_fn[SoftmaxBackward[dtype]].backward(output)
+            return self.grad_fn[SoftmaxBackward[Self.dtype]].backward(output)
         elif self.tag == BACKWARD_SUB:
-            return self.grad_fn[SubBackward[dtype]].backward(output)
+            return self.grad_fn[SubBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_ADD_SCALAR:
-            return self.grad_fn[AddBackwardScalar[dtype]].backward(output)
+            return self.grad_fn[AddBackwardScalar[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_SUB_SCALAR:
-            return self.grad_fn[SubLeftRightBackwardScalar[dtype]].backward(output)
+            return self.grad_fn[
+                SubLeftRightBackwardScalar[Self.dtype]
+            ].backward(output)
 
         elif self.tag == BACKWARD_RESHAPE:
-            return self.grad_fn[ReshapeBackward[dtype]].backward(output)
+            return self.grad_fn[ReshapeBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_VIEW:
-            return self.grad_fn[ViewBackward[dtype]].backward(output)
+            return self.grad_fn[ViewBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_CROSS_ENTROPY:
-            return self.grad_fn[CrossEntropyBackward[dtype]].backward(output)
+            return self.grad_fn[CrossEntropyBackward[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_TANH:
-            return self.grad_fn[TanhBackward[dtype]].backward(output)
+            return self.grad_fn[TanhBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_MEAN:
-            return self.grad_fn[MeanBackward[dtype]].backward(output)
+            return self.grad_fn[MeanBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_SUM:
-            return self.grad_fn[SumBackward[dtype]].backward(output)
+            return self.grad_fn[SumBackward[Self.dtype]].backward(output)
 
         # ========== TIER 4: MODERATELY COMMON ==========
         elif self.tag == BACKWARD_LOG_SOFTMAX:
-            return self.grad_fn[LogSoftmaxBackward[dtype]].backward(output)
+            return self.grad_fn[LogSoftmaxBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_CONTIGUOUS:
-            return self.grad_fn[ContiguousBackward[dtype]].backward(output)
+            return self.grad_fn[ContiguousBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_DIVIDE:
-            return self.grad_fn[DivideBackward[dtype]].backward(output)
+            return self.grad_fn[DivideBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_MATRIX_VECTOR_MUL:
-            return self.grad_fn[MatrixVectorMulNdBackward[dtype]].backward(output)
+            return self.grad_fn[MatrixVectorMulNdBackward[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_VECTOR_MATMUL:
-            return self.grad_fn[VectorMatmulNdBackward[dtype]].backward(output)
+            return self.grad_fn[VectorMatmulNdBackward[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_EXPAND:
-            return self.grad_fn[ExpandBackward[dtype]].backward(output)
+            return self.grad_fn[ExpandBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_FLATTEN:
-            return self.grad_fn[FlattenBackward[dtype]].backward(output)
+            return self.grad_fn[FlattenBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_SQUEEZE:
-            return self.grad_fn[SqueezeBackward[dtype]].backward(output)
+            return self.grad_fn[SqueezeBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_UNSQUEEZE:
-            return self.grad_fn[UnsqueezeBackward[dtype]].backward(output)
+            return self.grad_fn[UnsqueezeBackward[Self.dtype]].backward(output)
 
         # ========== TIER 5: SCALAR OPERATIONS ==========
         elif self.tag == BACKWARD_DIV_SCALAR:
-            return self.grad_fn[TrueDivBackwardScalar[dtype]].backward(output)
+            return self.grad_fn[TrueDivBackwardScalar[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_RIGHT_DIV_SCALAR:
-            return self.grad_fn[RightTrueDivBackwardScalar[dtype]].backward(output)
+            return self.grad_fn[
+                RightTrueDivBackwardScalar[Self.dtype]
+            ].backward(output)
 
         # ========== TIER 6: SPECIALIZED OPERATIONS ==========
         elif self.tag == BACKWARD_EXPONENTIATION:
-            return self.grad_fn[ExponientionBackward[dtype]].backward(output)
+            return self.grad_fn[ExponientionBackward[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_DOT:
-            return self.grad_fn[DotBackward[dtype]].backward(output)
+            return self.grad_fn[DotBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_LOG:
-            return self.grad_fn[LogBackward[dtype]].backward(output)
+            return self.grad_fn[LogBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_SQRT:
-            return self.grad_fn[SqrtBackward[dtype]].backward(output)
+            return self.grad_fn[SqrtBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_CLIP:
-            return self.grad_fn[ClipBackward[dtype]].backward(output)
+            return self.grad_fn[ClipBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_SUBTRACT_BROADCAST:
-            return self.grad_fn[SubtractBroadcastBackward[dtype]].backward(output)
+            return self.grad_fn[SubtractBroadcastBackward[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_SHUFFLE:
-            return self.grad_fn[ShuffleBackward[dtype]].backward(output)
+            return self.grad_fn[ShuffleBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_MINMAX:
-            return self.grad_fn[MinMaxBackward[dtype]].backward(output)
+            return self.grad_fn[MinMaxBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_TILE:
-            return self.grad_fn[TileBackward[dtype]].backward(output)
+            return self.grad_fn[TileBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_VARIANCE:
-            return self.grad_fn[VarianceBackward[dtype]].backward(output)
+            return self.grad_fn[VarianceBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_STD:
-            return self.grad_fn[StdBackward[dtype]].backward(output)
+            return self.grad_fn[StdBackward[Self.dtype]].backward(output)
 
         else:
             panic("BackwardFn: Unknown backward tag: " + String(self.tag))
 
         return []
+
 
 fn main():
     print("passes")

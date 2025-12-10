@@ -33,7 +33,7 @@ fn test_ia2_variadic_construction() raises:
 
 fn test_ia2_list_construction() raises:
     """Test List[Int] constructor."""
-    var lst = List[Int](1, 2, 3, 4)
+    var lst: List[Int] = [1, 2, 3, 4]
     var ia = IntArray(lst)
     assert_equal(len(ia), 4)
     assert_equal(ia[0], 1)
@@ -428,7 +428,7 @@ fn test_ia2_equality() raises:
     assert_false(ia1 == ia4)
 
     # Test with List
-    var lst = List[Int](1, 2, 3)
+    var lst: List[Int] = [1, 2, 3]
     assert_true(ia1 == lst)
     print("✓ test_ia2_equality")
 

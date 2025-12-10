@@ -27,13 +27,13 @@ struct Gradbox[dtype: DType](
     & EqualityComparable
     & Absable
 ):
-    var buffer: NDBuffer[dtype]
+    var buffer: NDBuffer[Self.dtype]
 
     fn __init__(out self, shape: Shape, share: Bool = True):
-        buffer = NDBuffer[dtype](shape)
+        buffer = NDBuffer[Self.dtype](shape)
         self.buffer = buffer.share() if share else buffer^
 
-    fn __init__(out self, var buffer: NDBuffer[dtype], share: Bool = True):
+    fn __init__(out self, var buffer: NDBuffer[Self.dtype], share: Bool = True):
         self.buffer = buffer.share() if share else buffer^
 
     fn __moveinit__(out self, deinit other: Self):
@@ -43,13 +43,15 @@ struct Gradbox[dtype: DType](
         self.buffer = other.buffer.copy()
 
     @always_inline
-    fn as_tensor(deinit self, requires_grad: Bool = False) -> Tensor[dtype]:
-        return Tensor[dtype](
+    fn as_tensor(
+        deinit self, requires_grad: Bool = False
+    ) -> Tensor[Self.dtype]:
+        return Tensor[Self.dtype](
             self^.buffer.contiguous(), requires_grad=requires_grad
         )
 
     @always_inline
-    fn transpose(self, axes: IntArray) -> Gradbox[dtype]:
+    fn transpose(self, axes: IntArray) -> Gradbox[Self.dtype]:
         shape = self.shape()
         normalized_axes = (
             Validator.validate_and_normalize_axes(
@@ -63,37 +65,37 @@ struct Gradbox[dtype: DType](
         var new_strides = self.strides().permute(normalized_axes)
 
         buffer = self.buffer.contiguous_buffer()
-        nd_buffer = NDBuffer[dtype](
+        nd_buffer = NDBuffer[Self.dtype](
             buffer^, Optional(new_shape^), Optional(new_strides^), offset=0
         )
-        return Gradbox[dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
-    fn __abs__(self) -> Gradbox[dtype]:
+    fn __abs__(self) -> Gradbox[Self.dtype]:
         var buffer = self.buffer.map[
-            Utils[dtype].abs_buffer, Utils[dtype].abs_scalar
+            Utils[Self.dtype].abs_buffer, Utils[dtype].abs_scalar
         ]()
-        var nd_buffer = NDBuffer[dtype](buffer^, self.buffer.shape)
-        return Gradbox[dtype](nd_buffer^, share=False)
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, self.buffer.shape)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @staticmethod
     fn arange(
-        *args: Scalar[dtype],
-    ) -> Gradbox[dtype]:
-        nd_buffer = NDBuffer[dtype].arange(args)
-        return Gradbox[dtype](nd_buffer^, share=False)
+        *args: Scalar[Self.dtype],
+    ) -> Gradbox[Self.dtype]:
+        nd_buffer = NDBuffer[Self.dtype].arange(args)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     fn flatten(
         self, start_dim: Int = 0, end_dim: Optional[Int] = None
-    ) -> Gradbox[dtype]:
+    ) -> Gradbox[Self.dtype]:
         flattened_buffer = self.buffer.flatten(start_dim, end_dim)
-        return Gradbox[dtype](flattened_buffer^, share=False)
+        return Gradbox[Self.dtype](flattened_buffer^, share=False)
 
     @always_inline
-    fn squeeze(self, axes: List[Int] = []) -> Gradbox[dtype]:
+    fn squeeze(self, axes: List[Int] = []) -> Gradbox[Self.dtype]:
         return self.squeeze(IntArray(axes))
 
     @always_inline
-    fn squeeze(self, axes: IntArray) -> Gradbox[dtype]:
+    fn squeeze(self, axes: IntArray) -> Gradbox[Self.dtype]:
         shape = self.shape()
         rank = shape.rank()
 
@@ -128,9 +130,9 @@ struct Gradbox[dtype: DType](
 
         var new_shape = Shape(new_dims)
         var buffer = self.buffer.contiguous_buffer()
-        var nd_buffer = NDBuffer[dtype](buffer^, new_shape^)
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, new_shape^)
 
-        return Gradbox[dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     fn unsqueeze(self, axes: List[Int]) -> Self:
         return self.unsqueeze(IntArray(axes))
@@ -171,10 +173,10 @@ struct Gradbox[dtype: DType](
         # Unsqueeze doesn't change total number of elements.
         # So we can safely copy flattened contents.
         nd_buffer = self.buffer.contiguous(new_shape)
-        return Gradbox[dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @always_inline
-    fn permute(self, axes: IntArray) -> Gradbox[dtype]:
+    fn permute(self, axes: IntArray) -> Gradbox[Self.dtype]:
         # Validate rank / axis count
         var rank = self.rank()
         if len(axes) != rank:
@@ -212,7 +214,7 @@ struct Gradbox[dtype: DType](
 
         # Create a contiguous backing buffer (value semantics) and construct a new NDBuffer
         var buffer = self.buffer.contiguous_buffer()
-        var nd_buffer = NDBuffer[dtype](
+        var nd_buffer = NDBuffer[Self.dtype](
             buffer=buffer^,
             shape=Shape(new_shape^),
             strides=Optional(Strides(new_strides^)),
@@ -220,47 +222,49 @@ struct Gradbox[dtype: DType](
         )
 
         # Return a value-style Gradbox (share=False) — no ArcPointer, no autograd, no view-sharing
-        return Gradbox[dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @staticmethod
     @always_inline
     fn full(
-        shape: Shape, scalar: Scalar[dtype], share: Bool = False
-    ) -> Gradbox[dtype]:
-        return Gradbox[dtype](NDBuffer.full(shape, scalar), share=share)
+        shape: Shape, scalar: Scalar[Self.dtype], share: Bool = False
+    ) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](NDBuffer.full(shape, scalar), share=share)
 
     @staticmethod
     @always_inline
-    fn zeros(shape: Shape, share: Bool = False) -> Gradbox[dtype]:
-        return Gradbox[dtype](
-            NDBuffer.full(shape, Scalar[dtype](0)), share=share
+    fn zeros(shape: Shape, share: Bool = False) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
+            NDBuffer.full(shape, Scalar[Self.dtype](0)), share=share
         )
 
     @staticmethod
     fn rand(
         shape: Shape,
-        min: Scalar[dtype] = 0,
-        max: Scalar[dtype] = 1,
+        min: Scalar[Self.dtype] = 0,
+        max: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
         share: Bool = False,
-    ) -> Gradbox[dtype]:
+    ) -> Gradbox[Self.dtype]:
         if init_seed:
             seed(init_seed.value())
         else:
             seed()
         numels = shape.num_elements()
-        buffer = Buffer[dtype](numels)
+        buffer = Buffer[Self.dtype](numels)
         for i in range(numels):
             buffer[i] = random_float64(
-                min.cast[DType.float64](), max.cast[DType.float64]()
-            ).cast[dtype]()
+                min.cast[Self.dtype.float64](), max.cast[DType.float64]()
+            ).cast[Self.dtype]()
 
-        return Gradbox[dtype](NDBuffer[dtype](buffer^, shape), share=share)
+        return Gradbox[Self.dtype](
+            NDBuffer[Self.dtype](buffer^, shape), share=share
+        )
 
     @always_inline
-    fn unshared(self) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.contiguous(), share=False)
+    fn unshared(self) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](self.buffer.contiguous(), share=False)
 
     fn shared(self) -> Bool:
         return self.buffer.shared()
@@ -268,28 +272,28 @@ struct Gradbox[dtype: DType](
     @always_inline
     fn sum(
         self, axes: IntArray = IntArray(), keepdims: Bool = False
-    ) -> Gradbox[dtype]:
+    ) -> Gradbox[Self.dtype]:
         var nd_buffer = self.buffer.sum(reduction_axes=axes, keepdims=keepdims)
-        return Gradbox[dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @always_inline
     fn mean(
         self, axes: IntArray = IntArray(), keepdims: Bool = False
-    ) -> Gradbox[dtype]:
-        return Mean[dtype].forward(self, axes=axes, keepdims=keepdims)
+    ) -> Gradbox[Self.dtype]:
+        return Mean[Self.dtype].forward(self, axes=axes, keepdims=keepdims)
 
     @always_inline
     fn sum_over_broadcasted_axes(
-        extended_grad: Gradbox[dtype], target_shape: Shape
-    ) -> Gradbox[dtype]:
+        extended_grad: Gradbox[Self.dtype], target_shape: Shape
+    ) -> Gradbox[Self.dtype]:
         var nd_buffer = extended_grad.buffer.sum_over_broadcasted_axes(
             target_shape
         )
-        return Gradbox[dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     fn broadcast_to(
         self, target_shape: Shape, share: Bool = False
-    ) -> Gradbox[dtype]:
+    ) -> Gradbox[Self.dtype]:
         if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
             panic(
                 "Gradbox → broadcast_to: shape "
@@ -299,10 +303,10 @@ struct Gradbox[dtype: DType](
             )
 
         broadcasted_buffer = self.buffer.broadcast_to(target_shape)
-        out = Gradbox[dtype](broadcasted_buffer^, share=share)
+        out = Gradbox[Self.dtype](broadcasted_buffer^, share=share)
         return out^
 
-    fn __getitem__(self, *indices: Idx) -> Gradbox[dtype]:
+    fn __getitem__(self, *indices: Idx) -> Gradbox[Self.dtype]:
         if not self.shared():
             panic(
                 "Gradbox -> __getitem__(self, *indices: Idx): can not call on"
@@ -321,17 +325,17 @@ struct Gradbox[dtype: DType](
         strides = Strides() if is_scalar else view_strides
         abs_offset = self.offset() + relative_offset
         shared_buffer = self.buffer.buffer.copy()
-        ndb = NDBuffer[dtype](
+        ndb = NDBuffer[Self.dtype](
             shared_buffer^, shape=shape^, strides=strides^, offset=abs_offset
         )
 
-        return Gradbox[dtype](ndb^, share=False)
+        return Gradbox[Self.dtype](ndb^, share=False)
 
-    fn contiguous(self) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.contiguous(), share=False)
+    fn contiguous(self) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](self.buffer.contiguous(), share=False)
 
     @always_inline
-    fn __getitem__(self, indices: List[Int]) -> Scalar[dtype]:
+    fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
         if self.rank() == 0 and len(indices) != 0:
             panic(
                 "Gradbox → __getitem__(List): Scalar gradbox expects empty"
@@ -341,7 +345,7 @@ struct Gradbox[dtype: DType](
         return self.buffer[indices]
 
     @always_inline
-    fn __getitem__(self, indices: IntArray) -> Scalar[dtype]:
+    fn __getitem__(self, indices: IntArray) -> Scalar[Self.dtype]:
         if self.rank() == 0 and indices.size() != 0:
             panic(
                 "Gradbox → __getitem__(IntArray): Scalar gradbox expects empty"
@@ -351,7 +355,7 @@ struct Gradbox[dtype: DType](
         return self.buffer[indices]
 
     @always_inline
-    fn __getitem__(self, *indices: Int) -> Scalar[dtype]:
+    fn __getitem__(self, *indices: Int) -> Scalar[Self.dtype]:
         if self.rank() == 0 and len(indices) != 0:
             panic(
                 "Gradbox → __getitem__(*Int): Scalar gradbox expects empty"
@@ -361,7 +365,7 @@ struct Gradbox[dtype: DType](
         return self.buffer[indices]
 
     @always_inline
-    fn __setitem__(self, indices: List[Int], value: Scalar[dtype]):
+    fn __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
         if self.rank() == 0 and len(indices) != 0:
             panic(
                 "Gradbox → __setitem__(List[Int]): Scalar gradbox expects empty"
@@ -371,7 +375,7 @@ struct Gradbox[dtype: DType](
         self.buffer[indices] = value
 
     @always_inline
-    fn __setitem__(self, indices: IntArray, value: Scalar[dtype]):
+    fn __setitem__(self, indices: IntArray, value: Scalar[Self.dtype]):
         if self.rank() == 0 and indices.size() != 0:
             panic(
                 "Gradbox → __setitem__(IntArray): Scalar gradbox expects empty"
@@ -380,7 +384,7 @@ struct Gradbox[dtype: DType](
         self.buffer[indices] = value
 
     @always_inline
-    fn __setitem__(self, *indices: Int, value: Scalar[dtype]):
+    fn __setitem__(self, *indices: Int, value: Scalar[Self.dtype]):
         if self.rank() == 0 and len(indices) != 0:
             panic(
                 "Gradbox → __setitem__(*Int): Scalar gradbox expects empty"
@@ -390,8 +394,8 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn load[
-        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
-    ](self, row: Int, col: Int) -> SIMD[dtype, simdwidth]:
+        simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
+    ](self, row: Int, col: Int) -> SIMD[Self.dtype, simdwidth]:
         """SIMD load of a row segment from a 2D Gradbox.
 
         Preconditions:
@@ -403,8 +407,8 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn store[
-        simdwidth: Int = simd_width_of[dtype](), validated: Bool = False
-    ](self, row: Int, col: Int, value: SIMD[dtype, simdwidth]):
+        simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
+    ](self, row: Int, col: Int, value: SIMD[Self.dtype, simdwidth]):
         """SIMD store of a row segment into a 2D Gradbox.
 
         Preconditions:
@@ -414,7 +418,7 @@ struct Gradbox[dtype: DType](
         """
         self.buffer.store[simdwidth, validated](row, col, value)
 
-    fn item(self) -> Scalar[dtype]:
+    fn item(self) -> Scalar[Self.dtype]:
         return self.buffer.item()
 
     @always_inline
@@ -449,7 +453,7 @@ struct Gradbox[dtype: DType](
     fn strides(ref self) -> ref [self.buffer.strides] Strides:
         return self.buffer.strides
 
-    fn __eq__(self, other: Gradbox[dtype]) -> Bool:
+    fn __eq__(self, other: Gradbox[Self.dtype]) -> Bool:
         if self.shape() != other.shape():
             panic(
                 "Gradbox → __eq__(other): shape mismatch",
@@ -459,7 +463,7 @@ struct Gradbox[dtype: DType](
             )
         return self.buffer.compare[Equal](other.buffer).buffer.all_true()
 
-    fn __ne__(self, other: Gradbox[dtype]) -> Bool:
+    fn __ne__(self, other: Gradbox[Self.dtype]) -> Bool:
         if self.shape() != other.shape():
             panic(
                 "Gradbox → __ne__(other): shape mismatch",
@@ -485,7 +489,7 @@ struct Gradbox[dtype: DType](
         else:
             s += "Gradbox"
         s += self.shape().__str__()
-        s += ", Type: " + dtype.__str__()
+        s += ", Type: " + Self.dtype.__str__()
         s += ", Shared : " + self.shared().__str__()
         s += ", Strides : " + self.strides().__str__()
         s += ", Offset : " + self.offset().__str__()
@@ -499,129 +503,133 @@ struct Gradbox[dtype: DType](
         writer.write(self.__str__())
 
     @always_inline
-    fn seed_grad(self, value: Scalar[dtype]):
+    fn seed_grad(self, value: Scalar[Self.dtype]):
         self.buffer.fill(value)
 
     @always_inline
-    fn seed_grad(self, with_tensor: Tensor[dtype]):
+    fn seed_grad(self, with_tensor: Tensor[Self.dtype]):
         self.buffer.fill(with_tensor.buffer)
 
     @always_inline
     fn zero_grad(self):
         self.buffer.zero()
 
-    fn __mul__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __mul__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.scalar_ops[Multiply](scalar), share=False
         )
 
-    fn __rmul__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+    fn __rmul__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         return self.__mul__(scalar)
 
-    fn __add__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](self.buffer.scalar_ops[Add](scalar), share=False)
+    fn __add__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
+            self.buffer.scalar_ops[Add](scalar), share=False
+        )
 
-    fn __radd__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
+    fn __radd__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         return self.__add__(scalar)
 
-    fn __sub__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __sub__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.scalar_ops[Subtract](scalar), share=False
         )
 
-    fn __rsub__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __rsub__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.scalar_ops[ReverseSubtract](scalar), share=False
         )
 
-    fn __truediv__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        if scalar == Scalar[dtype](0):
+    fn __truediv__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+        if scalar == Scalar[Self.dtype](0):
             panic("Gradbox → __truediv__(scalar): can not divide by zero")
-        return Gradbox[dtype](
+        return Gradbox[Self.dtype](
             self.buffer.scalar_ops[Divide](scalar), share=False
         )
 
-    fn __rtruediv__(self, scalar: Scalar[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __rtruediv__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.scalar_ops[ReverseDivide](scalar), share=False
         )
 
-    fn __mul__(self, other: Self) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __mul__(self, other: Self) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.arithmetic_ops[Multiply](other.buffer), share=False
         )
 
-    fn __mul__(self, other: Tensor[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __mul__(self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.arithmetic_ops[Multiply](other.buffer), share=False
         )
 
-    fn matmul(A: Gradbox[dtype], mut B: Tensor[dtype]) -> Gradbox[dtype]:
-        return Matmul[dtype].forward(A, B)
+    fn matmul(
+        A: Gradbox[Self.dtype], mut B: Tensor[dtype]
+    ) -> Gradbox[Self.dtype]:
+        return Matmul[Self.dtype].forward(A, B)
 
-    fn __add__(self, other: Self) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __add__(self, other: Self) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.arithmetic_ops[Add](other.buffer), share=False
         )
 
-    fn __sub__(self, other: Self) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __sub__(self, other: Self) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.arithmetic_ops[Subtract](other.buffer), share=False
         )
 
-    fn __sub__(self, other: Tensor[dtype]) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __sub__(self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.arithmetic_ops[Subtract](other.buffer), share=False
         )
 
-    fn __truediv__(self, other: Self) -> Gradbox[dtype]:
-        return Gradbox[dtype](
+    fn __truediv__(self, other: Self) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
             self.buffer.arithmetic_ops[Divide](other.buffer), share=False
         )
 
-    fn __imul__(self, scalar: Scalar[dtype]):
+    fn __imul__(self, scalar: Scalar[Self.dtype]):
         self.buffer.inplace_scalar_ops[Multiply](scalar)
 
-    fn __iadd__(self, scalar: Scalar[dtype]):
+    fn __iadd__(self, scalar: Scalar[Self.dtype]):
         self.buffer.inplace_scalar_ops[Add](scalar)
 
-    fn __isub__(self, scalar: Scalar[dtype]):
+    fn __isub__(self, scalar: Scalar[Self.dtype]):
         self.buffer.inplace_scalar_ops[Subtract](scalar)
 
-    fn __itruediv__(self, scalar: Scalar[dtype]):
+    fn __itruediv__(self, scalar: Scalar[Self.dtype]):
         self.buffer.inplace_scalar_ops[Divide](scalar)
 
     @always_inline
-    fn __imul__(self, incoming: Gradbox[dtype]):
+    fn __imul__(self, incoming: Gradbox[Self.dtype]):
         # self.buffer.inplace_ops[Multiply](incoming.buffer)
         var multiplied = self.buffer.buffer * incoming.buffer.buffer
         var numels = self.buffer.buffer.size
         self.buffer.buffer.overwrite(multiplied, 0, numels)
 
     @always_inline
-    fn __iadd__(self, incoming: Gradbox[dtype]):
+    fn __iadd__(self, incoming: Gradbox[Self.dtype]):
         # self.buffer.inplace_ops[Add](incoming.buffer)
         var added = self.buffer.buffer + incoming.buffer.buffer
         var numels = self.buffer.buffer.size
         self.buffer.buffer.overwrite(added, 0, numels)
 
     @always_inline
-    fn __isub__(self, incoming: Gradbox[dtype]):
+    fn __isub__(self, incoming: Gradbox[Self.dtype]):
         # self.buffer.inplace_ops[Subtract](incoming.buffer)
         var subtracted = self.buffer.buffer - incoming.buffer.buffer
         var numels = self.buffer.buffer.size
         self.buffer.buffer.overwrite(subtracted, 0, numels)
 
     @always_inline
-    fn __itruediv__(self, incoming: Gradbox[dtype]):
+    fn __itruediv__(self, incoming: Gradbox[Self.dtype]):
         self.buffer.inplace_ops[Divide](incoming.buffer)
 
     fn all_close[
-        rtol: Scalar[dtype] = 1e-5,
-        atol: Scalar[dtype] = 1e-8,
+        rtol: Scalar[Self.dtype] = 1e-5,
+        atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Self) -> Bool:
         constrained[
-            dtype.is_floating_point(),
+            Self.dtype.is_floating_point(),
             "Gradbox → all_close(Self): is for floating point data types only",
         ]()
         if self.shape() != other.shape():
@@ -635,11 +643,11 @@ struct Gradbox[dtype: DType](
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
     fn all_close[
-        rtol: Scalar[dtype] = 1e-5,
-        atol: Scalar[dtype] = 1e-8,
-    ](self, other: Tensor[dtype]) -> Bool:
+        rtol: Scalar[Self.dtype] = 1e-5,
+        atol: Scalar[Self.dtype] = 1e-8,
+    ](self, other: Tensor[Self.dtype]) -> Bool:
         constrained[
-            dtype.is_floating_point(),
+            Self.dtype.is_floating_point(),
             (
                 "Gradbox → all_close(Tensor): is for floating point data types"
                 " only"
@@ -656,7 +664,7 @@ struct Gradbox[dtype: DType](
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
     @always_inline
-    fn reshape(self) -> Gradbox[dtype]:
+    fn reshape(self) -> Gradbox[Self.dtype]:
         if self.numels() != 1:
             panic(
                 "Gradbox → reshape: only gradbox with single element can be"
@@ -669,16 +677,16 @@ struct Gradbox[dtype: DType](
         self,
         new_shape: Shape,
         validated: Bool = False,
-    ) -> Gradbox[dtype]:
+    ) -> Gradbox[Self.dtype]:
         shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             self.shape(), new_shape.intarray()
         )
         buffer = self.buffer.contiguous_buffer()
-        nd_buffer = NDBuffer[dtype](buffer^, shape^)
+        nd_buffer = NDBuffer[Self.dtype](buffer^, shape^)
 
-        return Gradbox[dtype](nd_buffer^)
+        return Gradbox[Self.dtype](nd_buffer^)
 
-    fn __eq__(self, tensor: Tensor[dtype]) -> Bool:
+    fn __eq__(self, tensor: Tensor[Self.dtype]) -> Bool:
         if self.shape() != tensor.shape():
             panic(
                 "Gradbox __eq__(tensor) → dimension mismatch:",
@@ -695,7 +703,7 @@ struct Gradbox[dtype: DType](
             end="\n",
         )
         empty = List[Int]()
-        print_gradbox_recursive[dtype](
+        print_gradbox_recursive[Self.dtype](
             UnsafePointer(to=self),
             empty,
             1,
@@ -725,7 +733,7 @@ fn main() raises:
     print(gb.buffer is r.buffer)
 
     a = Tensor.arange(12)
-    rr =a.reshape(3, 4)
+    rr = a.reshape(3, 4)
     a_slice = rr[il(1), s()]
 
     a_slice.print()

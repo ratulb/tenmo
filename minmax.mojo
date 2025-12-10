@@ -8,6 +8,8 @@ from utils.numerics import min_finite, max_finite
 from intarray import IntArray
 from gradbox import Gradbox
 from indexhelper import IndexCalculator
+from algorithm import parallelize
+
 
 alias Gradbag[dtype: DType] = List[Tuple[IntArray, Scalar[dtype]]]
 
@@ -66,7 +68,7 @@ struct MinMaxBackward[dtype: DType = DType.float32](
             else:
                 gradbox_like_input = gradbox.broadcast_to(shape, share=False)
 
-            var grad_contrib = mask * gradbox_like_input
+            var grad_contrib = gradbox_like_input * mask
             return [(ancestor^, grad_contrib^, AddTensor)]
 
 
@@ -231,8 +233,6 @@ struct MinMax[dtype: DType = DType.float32]:
         var gradbag: Gradbag[dtype],
         requires_grad: Optional[Bool],
     ) -> Tensor[dtype]:
-        from algorithm import parallelize
-
         var reduced_shape = shape.reduced_shape(normalized_axes)
         var num_output_elements = out_shape.num_elements()
 
