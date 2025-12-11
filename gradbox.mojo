@@ -15,6 +15,7 @@ from random import seed, random_float64
 from buffers import Buffer
 from forwards import Mean
 from utilities import Utils
+from indexhelper import IndexIterator
 
 
 struct Gradbox[dtype: DType](
@@ -453,6 +454,14 @@ struct Gradbox[dtype: DType](
     fn strides(ref self) -> ref [self.buffer.strides] Strides:
         return self.buffer.strides
 
+    @always_inline
+    fn index_iterator(
+        self,
+    ) -> IndexIterator[
+        origin_of(self.buffer.shape), origin_of(self.buffer.strides)
+    ]:
+        return self.buffer.index_iterator()
+
     fn __eq__(self, other: Gradbox[Self.dtype]) -> Bool:
         if self.shape() != other.shape():
             panic(
@@ -713,43 +722,3 @@ struct Gradbox[dtype: DType](
 
     fn __del__(deinit self):
         _ = self.buffer^
-
-
-from common_utils import s, il
-
-
-fn main() raises:
-    alias dtype = DType.float32
-    gb = Gradbox[dtype].arange(12)
-    reshaped = gb.reshape(Shape([3, 4]))
-    r = reshaped[il(2), s()]
-    gb.print()
-
-    print(gb.buffer)
-    print(r.buffer)
-
-    r.print()
-
-    print(gb.buffer is r.buffer)
-
-    a = Tensor.arange(12)
-    rr = a.reshape(3, 4)
-    a_slice = rr[il(1), s()]
-
-    a_slice.print()
-
-    gg = Gradbox[dtype](Shape(3, 4), share=True)
-    gg.print()
-    gg_copied = gg.copy()
-    gg_copied.print()
-
-    x = Tensor.arange(12, requires_grad=True)
-    x.print()
-    y = x.copy()
-    y.print()
-
-    x.gradients()[].print()
-    y.gradients()[].print()
-
-
-from testing import assert_true

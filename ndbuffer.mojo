@@ -2,7 +2,7 @@ from shapes import Shape
 from strides import Strides
 from buffers import Buffer
 from intarray import IntArray
-from indexhelper import IndexCalculator
+from indexhelper import IndexCalculator, IndexIterator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic, log_warning
 from memory import memcpy
@@ -113,6 +113,16 @@ struct NDBuffer[dtype: DType](
     fn full(shape: Shape, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype].full(scalar, shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
+
+    @always_inline
+    fn index_iterator(
+        self,
+    ) -> IndexIterator[origin_of(self.shape), origin_of(self.strides)]:
+        return IndexIterator(
+            shape=Pointer(to=self.shape).get_immutable(),
+            strides=Pointer(to=self.strides).get_immutable(),
+            start_offset=self.offset,
+        )
 
     @staticmethod
     fn Empty() -> NDBuffer[Self.dtype]:

@@ -7,7 +7,6 @@ from buffers import Buffer
 
 
 @fieldwise_init
-# @register_passable
 struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
     alias TAG = BACKWARD_RELU
     var mask: Buffer[Self.dtype]  # Stores 0.0 or 1.0 in same dtype
@@ -22,11 +21,10 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var input_tensor = output.ancestry().get(0)
         ref shape = input_tensor.shape()
 
-        # Fast vectorized multiplication: grad * mask (using Buffer's multiply)
         var grad_buffer = gradbox.buffer.data_buffer()
         var result_buffer = (
             grad_buffer * self.mask
-        )  # Buffer already knows how to multiply!
+        )
 
         var ndb = NDBuffer[dtype](result_buffer^, shape)
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
