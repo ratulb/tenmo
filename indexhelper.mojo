@@ -114,14 +114,24 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
             self.current_index = target_index
             return
 
-        # Strided path: choose strategy
         if skip_distance < small_skip:
-            # Small skip: use incremental updates (faster for small n)
+            # Inline the strided increment logic
+            ref shape = self.shape[]
+            ref strides = self.strides[]
             for _ in range(skip_distance):
-                _ = self.__next__()
+                self.current_index += 1
+                for i in range(self.rank - 1, -1, -1):
+                    self.coords[i] += 1
+                    if self.coords[i] < shape[i]:
+                        self.current_offset += strides[i]
+                        break
+                    else:
+                        self.coords[i] = 0
+                        self.current_offset -= (shape[i] - 1) * strides[i]
+
         else:
             # Large skip: compute directly (faster for large n)
-            if target_index < 0 or target_index >= self.total_elements:
+            if target_index == self.total_elements:
                 self.current_index = self.total_elements
                 return
 

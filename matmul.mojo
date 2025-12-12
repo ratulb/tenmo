@@ -17,7 +17,7 @@ from vectormatrix import VectorMatmulNd
 from matrixvector import MatrixVectorMulNd
 
 
-alias TILE_SIZE = 32
+alias TILE_SIZE = 64
 
 
 @fieldwise_init
@@ -509,7 +509,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
             ).contiguous[track_grad=False]()
 
             var A_batch_grad = MatmulNd[dtype].forward(grad_out, B_transposed)
-            var final_grad_A = A_batch_grad.sum_over_broadcasted_axes(A_shape)
+            var final_grad_A = A_batch_grad^.sum_over_broadcasted_axes(A_shape)
 
             results.append((A, final_grad_A^, AddTensor))
 
@@ -517,7 +517,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
             var A_transposed = A.transpose[track_grad=False](axes=[-1, -2])
             var B_batch_grad = MatmulNd[dtype].forward(A_transposed, grad_out)
 
-            var final_grad_B = B_batch_grad.sum_over_broadcasted_axes(B_shape)
+            var final_grad_B = B_batch_grad^.sum_over_broadcasted_axes(B_shape)
 
             results.append((B^, final_grad_B^, AddTensor))
 
@@ -631,7 +631,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             var result = Matmul2d[dtype].forward(
                 A_slice, B_slice
             )  # Backward fn would not be attached
-            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer)
+            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer^)
 
         return C^
 
@@ -675,7 +675,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
 
             # Use 2D matmul for GradBox (no backward needed)
             var result = Matmul2d[dtype].forward(A_slice, B_slice)
-            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer)
+            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer^)
 
         return C^
 
