@@ -76,8 +76,8 @@ struct Sigmoid[dtype: DType]:
             out = Tensor[dtype].zeros(shape, requires_grad=False)
             var index = 0
             ref out_buffer = out.buffer.data_buffer()
-            for coord in shape:
-                sigmoid_value = 1 / (1 + exp(-self[coord]))
+            for idx in self.index_iterator():
+                sigmoid_value = 1 / (1 + exp(-self.buffer[idx]))
                 out_buffer[index] = sigmoid_value
                 index += 1
 
@@ -92,7 +92,3 @@ struct Sigmoid[dtype: DType]:
                 out.add_ancestry(self)
 
         return out^
-
-
-fn main() raises:
-    print("passes")

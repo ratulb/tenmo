@@ -527,6 +527,10 @@ fn test_dataloader_shuffle_quality() raises:
 
 
 fn main() raises:
+    # test_multi_epoch_no_memory_growth() #TBE
+    # test_shuffle_uses_two_buffers()#TBE
+    # test_no_memory_growth_with_shuffle()#TBE
+
     print("=" * 70)
     print("Running TensorDataset, Batch, and DataLoader Tests")
     print("=" * 70)

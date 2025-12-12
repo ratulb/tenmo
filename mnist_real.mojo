@@ -4,9 +4,7 @@ from crossentropy import CrossEntropyLoss
 from testing import assert_true
 from python import Python, PythonObject
 from numpy_interop import from_ndarray, numpy_dtype
-from common_utils import id
 
-# from data import *
 from dataloader import *
 from time import perf_counter_ns
 
@@ -37,13 +35,7 @@ fn train_mnist() raises:
     alias feature_dtype = DType.float32
     alias label_dtype = DType.int32
 
-    # ✅ KEY: Convert labels to int32, keep features as float32
-    _ = """train_images_np = train_images_np.astype(np.float32)
-    train_labels_np = train_labels_np.astype(np.int32)
-    test_images_np = test_images_np.astype(np.float32)
-    test_labels_np = test_labels_np.astype(np.int32)"""
-
-    # ✅ KEY: Convert labels to int32, keep features as float32
+    # Convert labels to int32, keep features as float32
     train_images_np = train_images_np.astype(numpy_dtype(feature_dtype))
     train_labels_np = train_labels_np.astype(numpy_dtype(label_dtype))
     test_images_np = test_images_np.astype(numpy_dtype(feature_dtype))
@@ -58,7 +50,7 @@ fn train_mnist() raises:
     X_train = X_train / 255.0
     X_test = X_test / 255.0
 
-    # ✅ KEY: Keep labels as (N,) NOT (N, 1) for CrossEntropyLoss
+    # Keep labels as (N,) NOT (N, 1) for CrossEntropyLoss
     # y_train and y_test already have shape (N,) from NumPy
 
     print("Data shapes:")
@@ -74,21 +66,12 @@ fn train_mnist() raises:
     var test_dataset = NumpyDataset[feature_dtype, label_dtype](X_test, y_test)
 
     # Create DataLoaders
-    _ = """var train_loader = DataLoader(
-        train_dataset^, batch_size=64, shuffle=True, drop_last=False
-    )"""
     var train_loader = train_dataset.into_loader(
-        batch_size=64, shuffle=True, drop_last=False
+        batch_size=128, shuffle=True, drop_last=False
     )
 
-    _ = """var test_loader = DataLoader(
-        test_dataset^,
-        batch_size=64,
-        shuffle=False,
-        drop_last=False,
-    )"""
     var test_loader = test_dataset.into_loader(
-        batch_size=64,
+        batch_size=256,
         shuffle=False,
         drop_last=False,
     )
@@ -100,13 +83,6 @@ fn train_mnist() raises:
     # Build model
     print("Building model...")
     var model = Sequential[feature_dtype]()
-    _ = """model.append(
-        Linear[feature_dtype](784, 128, xavier=True).into(),
-        ReLU[feature_dtype]().into(),
-        Linear[feature_dtype](128, 32, xavier=True).into(),
-        ReLU[feature_dtype]().into(),
-        Linear[feature_dtype](32, 10, xavier=True).into(),
-        )"""
     model.append(
         Linear[feature_dtype](784, 256, xavier=True).into(),
         ReLU[feature_dtype]().into(),
@@ -121,32 +97,29 @@ fn train_mnist() raises:
 
     print("Model architecture:")
     print("  Input: 784 (28x28 flattened)")
-    print("  Hidden: 128 -> 32")
+    print("  Hidden: 256 -> 128")
+    print("  Hidden: 128 -> 64")
+    print("  Hidden: 64 -> 32")
     print("  Output: 10 (digit classes)")
     print("  Total parameters:", model.num_parameters(), "\n")
 
     # Setup training
     var criterion = CrossEntropyLoss[feature_dtype]()
-    var optimizer = SGD(model.parameters(), lr=0.001, momentum=0.9)
-    var num_epochs = 20
+    var optimizer = SGD(model.parameters(), lr=0.00135, momentum=0.75)
+    var num_epochs = 30
 
     print("Training configuration:")
     print("  Epochs:", num_epochs)
-    # print("  Batch size: 256")
-    print("  Batch size: 512")
-    print("  Learning rate: 0.001")
-    print("  Momentum: 0.9\n")
+    print("  Train batch size: 128")
+    print("  Validation Batch size: 256")
+    print("  Learning rate: 0.00135")
+    print("  Momentum: 0.75\n")
 
     var start_training = perf_counter_ns()
 
     # Training loop
     for epoch in range(num_epochs):
         var epoch_start = perf_counter_ns()
-        if epoch == 10:
-            optimizer.set_lr(optimizer.lr / 10)
-        if epoch == 15:
-            optimizer.set_lr(optimizer.lr / 10)
-
         # Training phase
         model.train()
         criterion.train()
@@ -154,10 +127,13 @@ fn train_mnist() raises:
         var epoch_train_loss = Scalar[feature_dtype](0.0)
         var epoch_train_correct = 0
         var epoch_train_total = 0
-
-        for train_batch in train_loader:
+        train_loader.reset()
+        test_loader.reset()
+        # for train_batch in train_loader:
+        while train_loader.__has_next__():
+            ref train_batch = train_loader.__next__()
             var train_pred = model(train_batch.features)
-            # ✅ labels are already DType.int32 and shape (batch_size,)
+            # Labels are already DType.int32 and shape (batch_size,)
             var train_loss = criterion(train_pred, train_batch.labels)
 
             optimizer.zero_grad()
@@ -179,7 +155,9 @@ fn train_mnist() raises:
         var epoch_val_correct = 0
         var epoch_val_total = 0
 
-        for val_batch in test_loader:
+        # for val_batch in test_loader:
+        while test_loader.__has_next__():
+            ref val_batch = test_loader.__next__()
             var val_pred = model(val_batch.features)
             var val_loss = criterion(val_pred, val_batch.labels)
 
@@ -243,7 +221,7 @@ fn compute_accuracy_multiclass[
                 max_val = pred[i, j]
                 max_idx = j
 
-        # ✅ target is shape (batch_size,) not (batch_size, 1)
+        # Target is shape (batch_size,) not (batch_size, 1)
         var true_label = Int(target[i])
 
         if max_idx == true_label:

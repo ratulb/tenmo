@@ -7,6 +7,11 @@ from utils import Variant
 from forwards import Matmul, Adder, Multiplicator, Subtractor, Clip
 from operators import mm, mv, vm, dot
 
+alias LINEAR = 0
+alias RELU = 1
+alias SIGMOID = 2
+alias TANH = 3
+
 
 @fieldwise_init
 struct Linear[dtype: DType, mode: Int = mm](
@@ -19,6 +24,7 @@ struct Linear[dtype: DType, mode: Int = mm](
     var in_features: Int
     var out_features: Int
     var training: Bool  # Training mode flag
+    alias TAG = LINEAR
 
     fn __init__(
         out self,
@@ -127,12 +133,13 @@ struct Linear[dtype: DType, mode: Int = mm](
         self.training = False
 
     fn into(self) -> Module[Self.dtype]:
-        return Module[Self.dtype](Layer[Self.dtype](self))
+        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 
 @register_passable
 struct ReLU[dtype: DType](ImplicitlyCopyable):
     var training: Bool
+    alias TAG = RELU
 
     fn __init__(out self):
         self.training = True
@@ -161,12 +168,13 @@ struct ReLU[dtype: DType](ImplicitlyCopyable):
         self.training = False
 
     fn into(self) -> Module[Self.dtype]:
-        return Module[Self.dtype](Layer[Self.dtype](self))
+        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 
 @register_passable
 struct Sigmoid[dtype: DType](ImplicitlyCopyable):
     var training: Bool
+    alias TAG = SIGMOID
 
     fn __init__(out self):
         self.training = True
@@ -195,12 +203,13 @@ struct Sigmoid[dtype: DType](ImplicitlyCopyable):
         self.training = False
 
     fn into(self) -> Module[Self.dtype]:
-        return Module[Self.dtype](Layer[Self.dtype](self))
+        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 
 @register_passable
 struct Tanh[dtype: DType](ImplicitlyCopyable):
     var training: Bool
+    alias TAG = TANH
 
     fn __init__(out self):
         self.training = True
@@ -229,7 +238,7 @@ struct Tanh[dtype: DType](ImplicitlyCopyable):
         self.training = False
 
     fn into(self) -> Module[Self.dtype]:
-        return Module[Self.dtype](Layer[Self.dtype](self))
+        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 
 # Refer to operators & matmul
@@ -251,15 +260,16 @@ alias Layer[dtype: DType] = Variant[
 @fieldwise_init
 struct Module[dtype: DType](ImplicitlyCopyable & Movable):
     var layer: Layer[Self.dtype]
+    var tag: Int
 
     fn __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        if self.layer.isa[Linear[Self.dtype, mm]]():
+        if self.tag == LINEAR:
             return self.layer[Linear[Self.dtype, mm]](xs)
-        elif self.layer.isa[ReLU[Self.dtype]]():
+        elif self.tag == RELU:
             return self.layer[ReLU[Self.dtype]](xs)
-        elif self.layer.isa[Sigmoid[Self.dtype]]():
+        elif self.tag == SIGMOID:
             return self.layer[Sigmoid[Self.dtype]](xs)
-        elif self.layer.isa[Tanh[Self.dtype]]():
+        elif self.tag == TANH:
             return self.layer[Tanh[Self.dtype]](xs)
 
         else:
@@ -269,19 +279,19 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
     fn parameters(
         ref self,
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
-        if self.layer.isa[Linear[Self.dtype]]():
+        if self.tag == LINEAR:
             return self.layer[Linear[Self.dtype]].parameters()
         else:
             return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
     fn num_parameters(self) -> Int:
-        if self.layer.isa[Linear[Self.dtype, mm]]():
+        if self.tag == LINEAR:
             return self.layer[Linear[Self.dtype, mm]].num_parameters()
-        elif self.layer.isa[ReLU[Self.dtype]]():
+        elif self.tag == RELU:
             return self.layer[ReLU[Self.dtype]].num_parameters()
-        elif self.layer.isa[Sigmoid[Self.dtype]]():
+        elif self.tag == SIGMOID:
             return self.layer[Sigmoid[Self.dtype]].num_parameters()
-        elif self.layer.isa[Tanh[Self.dtype]]():
+        elif self.tag == TANH:
             return self.layer[Tanh[Self.dtype]].num_parameters()
 
         else:
@@ -294,24 +304,24 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
 
     fn train(mut self):
         """Set module to training mode."""
-        if self.layer.isa[Linear[Self.dtype, mm]]():
+        if self.tag == LINEAR:
             self.layer[Linear[Self.dtype, mm]].train()
-        elif self.layer.isa[ReLU[Self.dtype]]():
+        elif self.tag == RELU:
             self.layer[ReLU[Self.dtype]].train()
-        elif self.layer.isa[Sigmoid[Self.dtype]]():
+        elif self.tag == SIGMOID:
             self.layer[Sigmoid[Self.dtype]].train()
-        elif self.layer.isa[Tanh[Self.dtype]]():
+        elif self.tag == TANH:
             self.layer[Tanh[Self.dtype]].train()
 
     fn eval(mut self):
         """Set module to evaluation mode."""
-        if self.layer.isa[Linear[Self.dtype]]():
+        if self.tag == LINEAR:
             self.layer[Linear[Self.dtype]].eval()
-        elif self.layer.isa[ReLU[Self.dtype]]():
+        elif self.tag == RELU:
             self.layer[ReLU[Self.dtype]].eval()
-        elif self.layer.isa[Sigmoid[Self.dtype]]():
+        elif self.tag == SIGMOID:
             self.layer[Sigmoid[Self.dtype]].eval()
-        elif self.layer.isa[Tanh[Self.dtype]]():
+        elif self.tag == TANH:
             self.layer[Tanh[Self.dtype]].eval()
 
 
@@ -584,7 +594,3 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
     fn set_lr(mut self, lr: Scalar[Self.dtype]):
         self.lr = lr
-
-
-fn main():
-    pass

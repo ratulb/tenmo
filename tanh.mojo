@@ -10,6 +10,7 @@ from ndbuffer import NDBuffer
 @register_passable
 struct TanhBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_TANH
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
@@ -36,8 +37,10 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable):
             var index = 0
             ref gradbox_buffer = gradbox.buffer.data_buffer()
             ref ancestor_gradbox_buffer = gradbox_ancestor.buffer.data_buffer()
-            for coord in shape:
-                var tanh_value = 1 - Tanh[dtype].tanh_stable(input_tensor[coord]) ** 2
+            for idx in input_tensor.index_iterator():
+                var tanh_value = (
+                    1 - Tanh[dtype].tanh_stable(input_tensor.buffer[idx]) ** 2
+                )
                 ancestor_gradbox_buffer[index] = (
                     gradbox_buffer[index] * tanh_value
                 )
@@ -96,23 +99,6 @@ struct Tanh[dtype: DType]:
         More numerically stable tanh implementation.
         """
         if x > 0:
-            return (1 - exp(-2*x)) / (1 + exp(-2*x))
+            return (1 - exp(-2 * x)) / (1 + exp(-2 * x))
         else:
-            return (exp(2*x) - 1) / (exp(2*x) + 1)
-
-
-
-fn main() raises:
-    #a = Tensor.arange(10, requires_grad=True)
-    alias dtype = DType.float32
-    a = Tensor[dtype].arange([1.0, 0.4199743, 0.070650816, 0.009866101, 0.0013411314, 0.0001816667, 2.479538e-05, 3.3378574e-06, 4.768371e-07, 0.0], requires_grad=True)
-
-    c = a.tanh()
-    c.backward()
-    a.grad().print()
-    print("passes")
-
-    ll = List[Scalar[dtype]](1.0, 0.4199743, 0.070650816, 0.009866101, 0.0013411314, 0.0001816667, 2.479538e-05, 3.3378574e-06, 4.768371e-07, 0.0)
-
-    for i in range(len(ll)):
-        print(tanh(ll[i]), Tanh[dtype].tanh_stable(ll[i]))
+            return (exp(2 * x) - 1) / (exp(2 * x) + 1)

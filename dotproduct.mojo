@@ -76,7 +76,3 @@ struct Dot[dtype: DType](Copyable):
                 out.add_ancestry(lhs, rhs)
 
         return out^
-
-
-fn main():
-    print("passes")

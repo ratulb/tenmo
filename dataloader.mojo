@@ -77,7 +77,7 @@ trait Dataset(Sized & Copyable & Movable):
 
 @fieldwise_init
 struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
-    Copyable & Movable & Sized
+    ImplicitlyCopyable & Movable & Sized
 ):
     """Zero-copy batched data loading with optimized bulk memcpy."""
 
@@ -103,6 +103,21 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     ]
     var _last_batch_size: Int
 
+    fn __copyinit__(out self, other: Self):
+        self.dataset = other.dataset
+        self.batch_size = other.batch_size
+        self.shuffle_data = other.shuffle_data
+        self.drop_last = other.drop_last
+        self._current_idx = other._current_idx
+        self._indices = other._indices.copy()
+        self._num_batches = other._num_batches
+        self._feature_dim = other._feature_dim
+        self._label_dim = other._label_dim
+        self._labels_scalar = other._labels_scalar
+        self._batch = other._batch
+        self._last_batch = other._last_batch
+        self._last_batch_size = other._last_batch_size
+
     fn __init__(
         out self,
         dataset: Pointer[DatasetSource, Self.origin],
@@ -124,7 +139,8 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 
         # Shuffle if needed (first epoch)
         if self.shuffle_data:
-            reshuffle(self._indices)
+            # reshuffle(self._indices)
+            pass
 
         # Calculate number of batches
         if drop_last:
@@ -133,9 +149,10 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             self._num_batches = (total_samples + batch_size - 1) // batch_size
 
         # Cache dataset metadata
-        self._feature_dim = dataset[].get_feature_dim()
-        self._label_dim = dataset[].get_label_dim()
-        self._labels_scalar = dataset[].is_labels_scalar()
+        ref dataset_ref = dataset[]
+        self._feature_dim = dataset_ref.get_feature_dim()
+        self._label_dim = dataset_ref.get_label_dim()
+        self._labels_scalar = dataset_ref.is_labels_scalar()
 
         # Pre-allocate full-size batch
         var batch_features = Tensor[DatasetSource._feature_dtype].zeros(
@@ -183,15 +200,17 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             self._last_batch_size = 0
             self._last_batch = None
 
-    fn __iter__(mut self) -> Self:
+    fn __iter__(mut self) -> ref [self] Self:
         self._current_idx = 0
         if self.shuffle_data:
             reshuffle(self._indices)
-        return self.copy()
+        return self
 
     fn __next__(
         mut self,
-    ) -> Batch[DatasetSource._feature_dtype, DatasetSource._label_dtype]:
+    ) -> ref [self._batch, self._last_batch.value()] Batch[
+        DatasetSource._feature_dtype, DatasetSource._label_dtype
+    ]:
         """Get next batch with optimized bulk memcpy for sequential access."""
         var start_idx = self._current_idx
         var end_idx = min(start_idx + self.batch_size, len(self._indices))
@@ -199,14 +218,14 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 
         # Determine which batch to use
         var is_last_batch = actual_batch_size < self.batch_size
-
+        ref dataset_ref = self.dataset[]
         # Get appropriate batch reference
         if is_last_batch and self._last_batch:
             ref current_batch = self._last_batch.value()
 
             # Get pointers
-            var dataset_features_ptr = self.dataset[].get_features_ptr()
-            var dataset_labels_ptr = self.dataset[].get_labels_ptr()
+            var dataset_features_ptr = dataset_ref.get_features_ptr()
+            var dataset_labels_ptr = dataset_ref.get_labels_ptr()
             var batch_features_ptr = (
                 current_batch.features.buffer.data_buffer().data
             )
@@ -247,8 +266,8 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             ref current_batch = self._batch
 
             # Get pointers
-            var dataset_features_ptr = self.dataset[].get_features_ptr()
-            var dataset_labels_ptr = self.dataset[].get_labels_ptr()
+            var dataset_features_ptr = dataset_ref.get_features_ptr()
+            var dataset_labels_ptr = dataset_ref.get_labels_ptr()
             var batch_features_ptr = (
                 current_batch.features.buffer.data_buffer().data
             )
@@ -326,6 +345,12 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 
     fn __len__(self) -> Int:
         return self._num_batches
+
+    fn reset(mut self):
+        """Reset for new epoch."""
+        self._current_idx = 0
+        if self.shuffle_data:
+            reshuffle(self._indices)
 
 
 # ==============================================================================

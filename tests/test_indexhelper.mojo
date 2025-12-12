@@ -3,7 +3,10 @@ from strides import Strides
 from common_utils import now
 from buffers import Buffer
 from testing import assert_equal, assert_true, assert_false
-from indexhelper import IndexIterator, IndexCalculator
+from indexhelper import IndexIterator
+from indexhelper import IndexCalculator
+
+# from inline_index_iterator import IndexIterator
 
 # ========== INDEX ITERATOR BENCHMARKS ==========
 

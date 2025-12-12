@@ -11,7 +11,7 @@ from strides import Strides
 from common_utils_imports import *
 from common_utils import IDGen, log_warning, now
 from operators import *
-
+from indexhelper import IndexIterator
 from backpropagation import BackwardFn
 from forwards import *
 from buffers import Buffer
@@ -197,6 +197,14 @@ struct Tensor[dtype: DType = DType.float32](
     @always_inline
     fn max_index(self) -> Int:
         return self.buffer.max_index()
+
+    @always_inline
+    fn index_iterator(
+        self,
+    ) -> IndexIterator[
+        origin_of(self.buffer.shape), origin_of(self.buffer.strides)
+    ]:
+        return self.buffer.index_iterator()
 
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:

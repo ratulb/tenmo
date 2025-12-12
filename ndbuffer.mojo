@@ -425,11 +425,12 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn fill(self, value: Scalar[Self.dtype]):
+        ref buffer = self.data_buffer()
         if self.is_contiguous():
-            self.buffer.fill(value, self.offset, self.offset + self.numels())
+            buffer.fill(value, self.offset, self.offset + self.numels())
         else:
-            for coord in self.shape:
-                self[coord] = value
+            for index in self.index_iterator():
+                buffer[index] = value
 
     @always_inline
     fn contiguous(
@@ -456,8 +457,8 @@ struct NDBuffer[dtype: DType](
         else:
             var buffer = Buffer[Self.dtype](self.numels())
             var index = 0
-            for coord in self.shape:
-                buffer[index] = map_element(self[coord])
+            for idx in self.index_iterator():
+                buffer[index] = map_element(self.buffer[idx])
                 index += 1
             return buffer^
 
@@ -477,8 +478,8 @@ struct NDBuffer[dtype: DType](
             return reduce_buffer(self.buffer, start, end)
         else:
             var accum: Scalar[Self.dtype] = unit
-            for coord in self.shape:
-                accum = reduce_elements(self[coord], accum)
+            for index in self.index_iterator():
+                accum = reduce_elements(self.buffer[index], accum)
             return accum
 
     @always_inline
@@ -489,8 +490,8 @@ struct NDBuffer[dtype: DType](
             return self.buffer.sum(start, end)
         else:
             var accum_sum: Scalar[Self.dtype] = Scalar[Self.dtype](0)
-            for coord in self.shape:
-                accum_sum += self[coord]
+            for index in self.index_iterator():
+                accum_sum += self.buffer[index]
             return accum_sum
 
     fn sum(
@@ -600,8 +601,8 @@ struct NDBuffer[dtype: DType](
         else:
             var buffer = Buffer[Self.dtype](self.numels())
             var index = 0
-            for coord in self.shape:
-                buffer[index] = self[coord]
+            for idx in self.index_iterator():
+                buffer[index] = self.buffer[idx]
                 index += 1
             return buffer^
 
@@ -613,8 +614,8 @@ struct NDBuffer[dtype: DType](
             return self.buffer.count(key, start, end)
         else:
             var _count = 0
-            for coord in self.shape:
-                if self[coord] == key:
+            for index in self.index_iterator():
+                if self.buffer[index] == key:
                     _count += 1
             return _count
 
@@ -631,8 +632,8 @@ struct NDBuffer[dtype: DType](
                 for i in range(start, end):
                     uniques.add(self.buffer[i])
         else:
-            for coord in self.shape:
-                uniques.add(self[coord])
+            for index in self.index_iterator():
+                uniques.add(self.buffer[index])
         var distincts = List[Scalar[Self.dtype]](capacity=Int(len(uniques)))
         for elem in uniques:
             distincts.append(elem)
@@ -675,34 +676,35 @@ struct NDBuffer[dtype: DType](
 
         elif self.is_contiguous() and not other.is_contiguous():
             var index = self.offset
-            for coord in other.shape:
+            for idx in other.index_iterator():
 
                 @parameter
                 if overwrite:
-                    self.buffer[index] = other[coord]
+                    self.buffer[index] = other.buffer[idx]
                 else:
-                    self.buffer[index] += other[coord]
+                    self.buffer[index] += other.buffer[idx]
                 index += 1
 
         elif not self.is_contiguous() and other.is_contiguous():
             var index = other.offset
-            for coord in self.shape:
+            for idx in self.index_iterator():
 
                 @parameter
                 if overwrite:
-                    self[coord] = other.buffer[index]
+                    self.buffer[idx] = other.buffer[index]
                 else:
-                    self[coord] += other.buffer[index]
+                    self.buffer[idx] += other.buffer[index]
                 index += 1
 
         else:
-            for coord in self.shape:
+            var iterator = other.index_iterator()
+            for index in self.index_iterator():
 
                 @parameter
                 if overwrite:
-                    self[coord] = other[coord]
+                    self.buffer[index] = other.buffer[iterator.__next__()]
                 else:
-                    self[coord] += other[coord]
+                    self.buffer[index] += other.buffer[iterator.__next__()]
 
     @always_inline
     fn fill(self, other: NDBuffer[Self.dtype]):
@@ -793,23 +795,24 @@ struct NDBuffer[dtype: DType](
 
             elif self.is_contiguous() and not other.is_contiguous():
                 var index = self.offset
-                for coord in other.shape:
+                for idx in other.index_iterator():
                     self.buffer[index] = Self.scalar_fn[op_code](
-                        self.buffer[index], other[coord]
+                        self.buffer[index], other.buffer[idx]
                     )
                     index += 1
 
             elif not self.is_contiguous() and other.is_contiguous():
                 var index = other.offset
-                for coord in self.shape:
-                    self[coord] = Self.scalar_fn[op_code](
-                        self[coord], other.buffer[index]
+                for idx in self.index_iterator():
+                    self.buffer[idx] = Self.scalar_fn[op_code](
+                        self.buffer[idx], other.buffer[index]
                     )
                     index += 1
             else:
-                for coord in self.shape:
-                    self[coord] = Self.scalar_fn[op_code](
-                        self[coord], other[coord]
+                var iterator = other.index_iterator()
+                for index in self.index_iterator():
+                    self.buffer[index] = Self.scalar_fn[op_code](
+                        self.buffer[index], other.buffer[iterator.__next__()]
                     )
 
     @always_inline
@@ -827,8 +830,10 @@ struct NDBuffer[dtype: DType](
             self.buffer.inplace_ops_scalar[op_code](scalar, start, end)
 
         else:
-            for coord in self.shape:
-                self[coord] = Self.scalar_fn[op_code](self[coord], scalar)
+            for index in self.index_iterator():
+                self.buffer[index] = Self.scalar_fn[op_code](
+                    self.buffer[index], scalar
+                )
 
     @always_inline
     fn __add__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
@@ -890,24 +895,25 @@ struct NDBuffer[dtype: DType](
 
             if self.is_contiguous() and not other.is_contiguous():
                 var offset = self.offset
-                for coord in other.shape:
+                for idx in other.index_iterator():
                     result_buffer[index] = Self.scalar_fn[op_code](
-                        self.buffer[offset + index], other[coord]
+                        self.buffer[offset + index], other.buffer[idx]
                     )
                     index += 1
 
             elif not self.is_contiguous() and other.is_contiguous():
                 var offset = other.offset
-                for coord in self.shape:
+                for idx in self.index_iterator():
                     result_buffer[index] = Self.scalar_fn[op_code](
-                        self[coord], other.buffer[offset + index]
+                        self.buffer[idx], other.buffer[offset + index]
                     )
                     index += 1
 
             else:
-                for coord in self.shape:
+                var iterator = other.index_iterator()
+                for idx in self.index_iterator():
                     result_buffer[index] = Self.scalar_fn[op_code](
-                        self[coord], other[coord]
+                        self.buffer[idx], other.buffer[iterator.__next__()]
                     )
                     index += 1
 
@@ -1041,9 +1047,9 @@ struct NDBuffer[dtype: DType](
             var index = 0
             var result_buffer = Buffer[Self.dtype](self.numels())
 
-            for coord in self.shape:
+            for idx in self.index_iterator():
                 result_buffer[index] = Self.scalar_fn[op_code](
-                    self[coord], scalar
+                    self.buffer[idx], scalar
                 )
                 index += 1
 
@@ -1079,10 +1085,10 @@ struct NDBuffer[dtype: DType](
         else:
             var index = 0
             var buffer = Buffer[DType.bool](self.numels())
-
-            for coord in self.shape:
-                var self_val = self[coord]
-                var other_val = other[coord]
+            var iterator = other.index_iterator()
+            for idx in self.index_iterator():
+                var self_val = self.buffer[idx]
+                var other_val = other.buffer[iterator.__next__()]
 
                 @parameter
                 if op_code == Equal:
@@ -1119,8 +1125,8 @@ struct NDBuffer[dtype: DType](
             var index = 0
             var buffer = Buffer[DType.bool](self.numels())
 
-            for coord in self.shape:
-                var value = self[coord]
+            for idx in self.index_iterator():
+                var value = self.buffer[idx]
 
                 @parameter
                 if op_code == Equal:
@@ -1176,6 +1182,19 @@ struct NDBuffer[dtype: DType](
         return self.buffer[idx]
 
     @always_inline
+    fn set_element_at(self, index: Int, value: Scalar[Self.dtype]):
+        idx = index + self.max_index() if index < 0 else index
+        if idx < 0 or idx > self.max_index():
+            panic(
+                "NDBuffer → set_element_at: index out of bounds.",
+                "NDBuffer max index",
+                self.max_index().__str__(),
+                ", provided index",
+                index.__str__(),
+            )
+        self.buffer[idx] = value
+
+    @always_inline
     fn sum_over_broadcasted_axes(
         extended_buffer: NDBuffer[Self.dtype], target_shape: Shape
     ) -> NDBuffer[Self.dtype]:
@@ -1191,9 +1210,3 @@ struct NDBuffer[dtype: DType](
                 result = result.sum(reduction_axes=IntArray(i), keepdims=True)
                 current_shape = result.shape
         return result^
-
-
-fn main() raises:
-    ndb = NDBuffer[DType.bool].Empty()
-    print(ndb)
-    pass
