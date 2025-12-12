@@ -28,37 +28,5 @@ Fast, type-safe tensor operations and neural network training in pure Mojo.
 [Guidelines]
 
 ## 📄 License
-```
 
-#### **B. Create `examples/` Directory:**
-```
-examples/
-├── 01_xor.mojo              # Simple 2D classification
-├── 02_spiral.mojo            # Non-linear dataset
-├── 03_mnist_basic.mojo       # MNIST with defaults
-├── 04_mnist_custom.mojo      # Custom training loop
-├── 05_dataloader_usage.mojo  # DataLoader examples
-└── 06_custom_layers.mojo     # Extending the library
-```
 
-Each example should:
-- Run in **< 1 minute**
-- Be **< 100 lines**
-- Show **one clear concept**
-- Include **comments explaining why**
-
-#### **C. API Documentation:**
-
-Create `docs/api/`:
-```
-docs/
-├── api/
-│   ├── tensor.md           # Tensor operations
-│   ├── layers.md           # Available layers
-│   ├── losses.md           # Loss functions
-│   ├── optimizers.md       # SGD, Adam, etc.
-│   └── data.md             # Dataset, DataLoader
-└── guides/
-    ├── quickstart.md
-    ├── training_loop.md
-    └── performance.md
