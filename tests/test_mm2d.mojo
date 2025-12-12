@@ -36,7 +36,7 @@ fn matmul_naive[
 
 fn validate_matmul_2d_grads[
     dtype: DType, //
-](A: Tensor[dtype], B: Tensor[dtype], C: Tensor[dtype]) raises:
+](mut A: Tensor[dtype], mut B: Tensor[dtype], C: Tensor[dtype]) raises:
     print("validate_matmul_2d_grads")
 
     # --- Early exit if no gradients were tracked ---

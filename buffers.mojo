@@ -2322,5 +2322,5 @@ fn main() raises:
         tanh(Scalar[dtype](0.9)),
         tanh(Scalar[dtype](100)),
     )
-
+    print(buffer, buffer[::])
     pass

@@ -723,9 +723,8 @@ fn test_matrix_vector_multiple_backward_calls() raises:
     var loss1 = r1.sum()
     loss1.backward()
 
-    var v_grad_after_first = v.grad().contiguous()
-    var M_grad_after_first = M.grad().contiguous()
-    # Second backward pass (should accumulate)
+    var v_grad_after_first = v.grad()
+    var M_grad_after_first = M.grad()
     var r2 = M.matmul[mode=mv](v)
     var loss2 = r2.sum()
     loss2.backward()

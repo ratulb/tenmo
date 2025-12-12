@@ -19,11 +19,10 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
         self, read output: Tensor[dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
-        inverted_axes = IntArray.invert_permutation(self.axes)
-        gradbox_transposed_contiguous = gradbox.transpose(
-            inverted_axes
-        ).contiguous()  # TODO why?
+        var ancestor = output.ancestry().get(0)
+        var inverted_axes = IntArray.invert_permutation(self.axes)
+        var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes)
+
         return [
             (
                 ancestor^,

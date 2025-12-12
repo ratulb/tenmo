@@ -2103,3 +2103,6 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
 
     fn __has_next__(self) -> Bool:
         return self.index_itr.__has_next__()
+
+fn main():
+    pass

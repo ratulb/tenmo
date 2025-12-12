@@ -76,15 +76,11 @@ fn test_vector_matrix_no_batch() raises:
     var loss = r.sum()  # loss = 22 + 28 = 50
     loss.backward()
 
-    print("Forward:")
-    r.print()
     assert_true(r.all_close(Tensor[dtype].d1([22.0, 28.0])))
 
     # grad_out = [1, 1]
     # grad_v[i] = sum_j(M[i,j] * grad_out[j])
     # grad_v = [1*1+2*1, 3*1+4*1, 5*1+6*1] = [3, 7, 11]
-    print("grad_v:")
-    v.grad().print()
     assert_true(v.grad().all_close(Tensor[dtype].d1([3.0, 7.0, 11.0])))
 
     # grad_M[i,j] = v[i] * grad_out[j]
@@ -127,8 +123,6 @@ fn test_vector_matrix_batch_M_only() raises:
     var loss = r.sum()  # loss = 9+12+15+27+30+33 = 126
     loss.backward()
 
-    print("Forward:")
-    r.print()
     assert_true(
         r.all_close(Tensor[dtype].d2([[9.0, 12.0, 15.0], [27.0, 30.0, 33.0]]))
     )
@@ -181,8 +175,6 @@ fn test_vector_matrix_batch_v_only() raises:
     var loss = r.sum()  # loss = 1+2+3+4 = 10
     loss.backward()
 
-    print("Forward:")
-    r.print()
     assert_true(r.all_close(Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])))
 
     # grad_out = [[1, 1],
@@ -190,8 +182,6 @@ fn test_vector_matrix_batch_v_only() raises:
     # grad_v[b,i] = sum_j(M[i,j] * grad_out[b,j])
     # For batch 0: grad_v[0] = [1*1+2*1, 3*1+4*1] = [3, 7]
     # For batch 1: grad_v[1] = [1*1+2*1, 3*1+4*1] = [3, 7]
-    print("grad_v:")
-    v.grad().print()
     assert_true(v.grad().all_close(Tensor[dtype].d2([[3.0, 7.0], [3.0, 7.0]])))
 
     # grad_M[i,j] = sum over batches of (v[b,i] * grad_out[b,j])
@@ -231,8 +221,6 @@ fn test_vector_matrix_both_batched() raises:
     var loss = r.sum()  # loss = 9+12+15+61+68+75 = 240
     loss.backward()
 
-    print("Forward:")
-    r.print()
     assert_true(
         r.all_close(Tensor[dtype].d2([[9.0, 12.0, 15.0], [61.0, 68.0, 75.0]]))
     )
@@ -242,8 +230,6 @@ fn test_vector_matrix_both_batched() raises:
     # grad_v[b,i] = sum_j(M[b,i,j] * grad_out[b,j])
     # For batch 0: grad_v[0] = [1*1+2*1+3*1, 4*1+5*1+6*1] = [6, 15]
     # For batch 1: grad_v[1] = [7*1+8*1+9*1, 10*1+11*1+12*1] = [24, 33]
-    print("grad_v:")
-    v.grad().print()
     assert_true(
         v.grad().all_close(Tensor[dtype].d2([[6.0, 15.0], [24.0, 33.0]]))
     )
@@ -319,8 +305,6 @@ fn test_vector_matrix_broadcast_batch() raises:
     var loss = r.sum()  # loss = 1+2+4+5+8+10+4+5+7+8+14+16 = 84
     loss.backward()
 
-    print("Forward:")
-    r.print()
     assert_true(
         r.all_close(
             Tensor[dtype].d3(
@@ -416,8 +400,6 @@ fn test_vector_matrix_asymmetric_shapes() raises:
     var loss = r.sum()  # loss = 22+28+139+154 = 343
     loss.backward()
 
-    print("Forward:")
-    r.print()
     assert_true(r.all_close(Tensor[dtype].d2([[22.0, 28.0], [139.0, 154.0]])))
 
     # grad_out = [[1, 1],
@@ -425,8 +407,6 @@ fn test_vector_matrix_asymmetric_shapes() raises:
     # grad_v[b,i] = sum_j(M[b,i,j] * grad_out[b,j])
     # For batch 0: grad_v[0] = [1*1+2*1, 3*1+4*1, 5*1+6*1] = [3, 7, 11]
     # For batch 1: grad_v[1] = [7*1+8*1, 9*1+10*1, 11*1+12*1] = [15, 19, 23]
-    print("grad_v:")
-    v.grad().print()
     assert_true(
         v.grad().all_close(
             Tensor[dtype].d2([[3.0, 7.0, 11.0], [15.0, 19.0, 23.0]])
@@ -472,19 +452,13 @@ fn test_vector_matrix_single_element() raises:
     var loss = r.sum()  # loss = 20
     loss.backward()
 
-    print("Forward:")
-    r.print()
     assert_true(r.all_close(Tensor[dtype].d1([20.0])))
 
     # grad_out = [1]
     # grad_v = [1*1, 2*1, 3*1] = [1, 2, 3]
-    print("grad_v:")
-    v.grad().print()
     assert_true(v.grad().all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
 
     # grad_M = [[2*1], [3*1], [4*1]] = [[2], [3], [4]]
-    print("grad_M:")
-    M.grad().print()
     assert_true(M.grad().all_close(Tensor[dtype].d2([[2.0], [3.0], [4.0]])))
     print("✓ PASSED\n")
 
@@ -812,7 +786,9 @@ fn test_matrix_vector_basic_forward_backward() raises:
     var M = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     var v = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     # Matrix @ Vector
-    var r = M.matmul[mode=vm](v.unsqueeze([-1])).squeeze([-1])  # [2]
+    v_unsqueezed = v.unsqueeze([-1])
+    var result = M.matmul[mode=vm](v_unsqueezed)
+    r = result.squeeze([-1])  # [2]
 
     # Expected: [1*1+2*2+3*3, 4*1+5*2+6*3] = [14, 32]
     assert_true(r.all_close(Tensor.d1([14.0, 32.0])))

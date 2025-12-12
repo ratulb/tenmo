@@ -53,6 +53,7 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn transpose(self, axes: IntArray) -> Gradbox[Self.dtype]:
+        """Fused transpose and then contiguous."""
         shape = self.shape()
         normalized_axes = (
             Validator.validate_and_normalize_axes(
@@ -61,14 +62,18 @@ struct Gradbox[dtype: DType](
             > 0 else IntArray.range(0, shape.rank()).reversed()
         )
 
-        # Permute shape and create default strides and permute
+        # Permute shape and strides
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides().permute(normalized_axes)
-
-        buffer = self.buffer.contiguous_buffer()
-        nd_buffer = NDBuffer[Self.dtype](
-            buffer^, Optional(new_shape^), Optional(new_strides^), offset=0
+        var iterator = IndexIterator(
+            Pointer(to=new_shape), Pointer(to=new_strides), start_offset=0
         )
+        var buffer = Buffer[Self.dtype](self.numels())
+        var index = 0
+        for idx in iterator:
+            buffer[index] = self.buffer.buffer[idx]
+            index += 1
+        nd_buffer = NDBuffer[Self.dtype](buffer^, new_shape^, None, offset=0)
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     fn __abs__(self) -> Gradbox[Self.dtype]:
@@ -331,9 +336,6 @@ struct Gradbox[dtype: DType](
         )
 
         return Gradbox[Self.dtype](ndb^, share=False)
-
-    fn contiguous(self) -> Gradbox[Self.dtype]:
-        return Gradbox[Self.dtype](self.buffer.contiguous(), share=False)
 
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
@@ -722,3 +724,7 @@ struct Gradbox[dtype: DType](
 
     fn __del__(deinit self):
         _ = self.buffer^
+
+
+fn main():
+    pass

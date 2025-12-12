@@ -316,9 +316,12 @@ struct ShapeIndexIterator[origin: ImmutOrigin](ImplicitlyCopyable):
         var result = self.current
         self.index += 1
         # This loop is hot - uses __setitem__ which is already optimized
-        for i in range(self.shape[].rank() - 1, -1, -1):
+        ref shape = self.shape[]
+        var rank = shape.rank()
+
+        for i in range(rank - 1, -1, -1):
             self.current[i] += 1
-            if self.current[i] < self.shape[][i]:
+            if self.current[i] < shape[i]:
                 break
             self.current[i] = 0
         return result
@@ -335,8 +338,8 @@ fn main():
     B_shape = Shape(4, 5)
 
     print(A_shape[-1], B_shape[-2], A_shape[0:-2], B_shape[0:-2])
-    _ = """for coord in shape:
+    for coord in A_shape:
         print(coord)
-    shape = shape * 0
-    print(shape)"""
+    shape = A_shape * 0
+    print(shape)
     print(Shape(1).rank())
