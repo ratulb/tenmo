@@ -21,8 +21,9 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         inverted_axes = IntArray.invert_permutation(self.axes)
-        gradbox_transposed_contiguous = gradbox.transpose(inverted_axes)
-        # ).contiguous()#TODO why?
+        gradbox_transposed_contiguous = gradbox.transpose(
+            inverted_axes
+        ).contiguous()  # TODO why?
         return [
             (
                 ancestor^,
