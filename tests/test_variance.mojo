@@ -3,6 +3,7 @@ from math import sqrt
 from testing import assert_true
 from common_utils import isnan, isinf
 
+
 fn test_sqrt_backward() raises:
     print("test_sqrt_backward")
     var x = Tensor.d1([4.0, 9.0, 16.0, 25.0], requires_grad=True)
@@ -17,6 +18,7 @@ fn test_sqrt_backward() raises:
     var expected_grad = Tensor.d1([0.25, 0.16666667, 0.125, 0.1])
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
+
 fn test_sqrt_backward_zero_handling() raises:
     print("test_sqrt_backward_zero_handling")
     # Test near-zero values (numerical stability)
@@ -30,6 +32,7 @@ fn test_sqrt_backward_zero_handling() raises:
     # Gradient at 1.0: 1/(2*1.0) = 0.5
     var expected_grad = Tensor.d1([5.0, 2.5, 0.5])
     assert_true(x.grad().all_close(expected_grad))
+
 
 fn test_var_backward_global_variance() raises:
     print("test_var_backward_global_variance")
@@ -99,12 +102,14 @@ fn test_std_backward_unbiased_std() raises:
     # = (1/(2.582*3)) * (x - 5)
     var std_val = 2.5819889  # sqrt(20/3)
     var factor = 1.0 / (std_val * 3.0)
-    var expected_grad = Tensor.d1([
-        factor * -3.0,  # (2-5)
-        factor * -1.0,  # (4-5)
-        factor * 1.0,   # (6-5)
-        factor * 3.0    # (8-5)
-    ])
+    var expected_grad = Tensor.d1(
+        [
+            factor * -3.0,  # (2-5)
+            factor * -1.0,  # (4-5)
+            factor * 1.0,  # (6-5)
+            factor * 3.0,  # (8-5)
+        ]
+    )
     assert_true(x.grad().all_close[atol=1e-3](expected_grad))
 
 
@@ -127,7 +132,7 @@ fn test_std_backward_chain_rule() raises:
     print("test_std_backward_chain_rule")
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var s = x.std(unbiased=False)
-    var y = s ** 2  # Square the std (should give variance)
+    var y = s**2  # Square the std (should give variance)
     y.backward()
 
     # This should match variance gradient!
@@ -182,7 +187,7 @@ fn test_std_backward_numerical_stability() raises:
     s.backward()
 
     # Should not crash or produce NaN/Inf
-    _="""var grad = x.grad()
+    _ = """var grad = x.grad()
     assert_true(not grad.isnan().any())
     assert_true(not grad.isinf().any())"""
 
@@ -209,9 +214,11 @@ fn run_all_var_std_tests() raises:
 
     print("\n=== All Variance & Std Tests Passed! ===\n")
 
+
 # ============================================================================
 # Variance Backward Tests
 # ============================================================================
+
 
 fn test_var_backward_global_variance_vs() raises:
     """Test variance backward pass for global variance (no axis)."""
@@ -319,7 +326,9 @@ fn test_var_backward_chain_rule_vs() raises:
 fn test_var_backward_3d_tensor_vs() raises:
     """Test variance backward on 3D tensor."""
     print("test_var_backward_3d_tensor_vs")
-    var x = Tensor.d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)  # (1, 2, 2)
+    var x = Tensor.d3(
+        [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
+    )  # (1, 2, 2)
     var v = x.variance(axis=2, keepdims=False, unbiased=False)  # Shape: (1, 2)
     var s = v.sum()
     s.backward()
@@ -357,6 +366,7 @@ fn test_var_backward_large_values_vs() raises:
 # Std Backward Tests
 # ============================================================================
 
+
 fn test_std_backward_global_std_vs() raises:
     """Test std backward for global std (no axis)."""
     print("test_std_backward_global_std_vs")
@@ -370,13 +380,9 @@ fn test_std_backward_global_std_vs() raises:
     # ≈ 0.141421 * (x - 3)
     var std_val = 1.4142135  # sqrt(2)
     var factor = 1.0 / (std_val * 5.0)
-    var expected_grad = Tensor.d1([
-        factor * -2.0,
-        factor * -1.0,
-        0.0,
-        factor * 1.0,
-        factor * 2.0
-    ])
+    var expected_grad = Tensor.d1(
+        [factor * -2.0, factor * -1.0, 0.0, factor * 1.0, factor * 2.0]
+    )
     assert_true(x.grad().all_close[atol=1e-5](expected_grad))
 
 
@@ -392,12 +398,14 @@ fn test_std_backward_unbiased_std_vs() raises:
     # Gradient: (1/(std*(n-1))) * (x - mean)
     var std_val = 2.5819889  # sqrt(20/3)
     var factor = 1.0 / (std_val * 3.0)
-    var expected_grad = Tensor.d1([
-        factor * -3.0,  # (2-5)
-        factor * -1.0,  # (4-5)
-        factor * 1.0,   # (6-5)
-        factor * 3.0    # (8-5)
-    ])
+    var expected_grad = Tensor.d1(
+        [
+            factor * -3.0,  # (2-5)
+            factor * -1.0,  # (4-5)
+            factor * 1.0,  # (6-5)
+            factor * 3.0,  # (8-5)
+        ]
+    )
     assert_true(x.grad().all_close[atol=1e-4](expected_grad))
 
 
@@ -430,6 +438,7 @@ fn test_std_backward_axis_1_keepdims_false_vs() raises:
     var expected_grad = Tensor.d2([[-0.5, 0.5], [-0.5, 0.5]])
     assert_true(x.grad().all_close[atol=1e-6](expected_grad))
 
+
 fn test_std_backward_axis_0_keepdims_true_vs() raises:
     """Test std backward along axis 0 with keepdims."""
     print("test_std_backward_axis_0_keepdims_true_vs")
@@ -449,7 +458,9 @@ fn test_std_backward_chain_rule_vs() raises:
     print("test_std_backward_chain_rule_vs")
     var x = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var s = x.std(unbiased=False)
-    var y = s.__mul__[track_grad=True](s)  # Square the std (should approximate variance grad)
+    var y = s.__mul__[track_grad=True](
+        s
+    )  # Square the std (should approximate variance grad)
     y.backward()
 
     # s = std(x), y = s²
@@ -491,7 +502,9 @@ fn test_std_no_grad_tracking_vs() raises:
 fn test_std_backward_3d_tensor_vs() raises:
     """Test std backward on 3D tensor."""
     print("test_std_backward_3d_tensor_vs")
-    var x = Tensor.d3([[[1.0, 3.0], [2.0, 4.0]]], requires_grad=True)  # (1, 2, 2)
+    var x = Tensor.d3(
+        [[[1.0, 3.0], [2.0, 4.0]]], requires_grad=True
+    )  # (1, 2, 2)
     var s = x.std(axis=2, keepdims=False, unbiased=False)  # Shape: (1, 2)
     var total = s.sum()
     total.backward()
@@ -520,6 +533,7 @@ fn test_std_backward_epsilon_effect_vs() raises:
 # Combined Variance and Std Tests
 # ============================================================================
 
+
 fn test_var_std_relationship_vs() raises:
     """Test that std² ≈ var in terms of values (not gradients)."""
     print("test_var_std_relationship_vs")
@@ -528,7 +542,7 @@ fn test_var_std_relationship_vs() raises:
     var s = x.std[track_grad=False](unbiased=False)
     var s_squared = s.__mul__[track_grad=False](s)
 
-    assert_true(v.all_close[atol=1e-6](s_squared))
+    assert_true(v.all_close[atol=1e-6](s_squared.reshape[False]()))
 
 
 fn test_var_std_unbiased_vs_biased_vs() raises:
@@ -541,7 +555,7 @@ fn test_var_std_unbiased_vs_biased_vs() raises:
     # Unbiased variance should be larger (divide by n-1 instead of n)
     # v_unbiased = v_biased * (n / (n-1)) = v_biased * (4/3)
     var ratio = v_unbiased.__truediv__[track_grad=False](v_biased)
-    var expected_ratio = Tensor.d1([4.0 / 3.0])
+    var expected_ratio = Tensor.scalar([4.0 / 3.0])
     assert_true(ratio.all_close[atol=1e-6](expected_ratio))
 
 
@@ -573,6 +587,7 @@ fn test_std_backward_two_elements_vs() raises:
 # ============================================================================
 # Consolidated Test Runner
 # ============================================================================
+
 
 fn run_all_variance_std_tests() raises:
     """Run all variance and std tests."""
@@ -610,8 +625,110 @@ fn run_all_variance_std_tests() raises:
 
     print("\n=== All Variance & Std Tests Passed! ===\n")
 
+
+fn test_variance_comprehensive() raises:
+    print("\n" + "=" * 80)
+    print("VARIANCE IMPLEMENTATION CORRECTNESS TEST")
+    print("=" * 80 + "\n")
+
+    # Test 1: Simple 1D case
+    print("Test 1: Simple 1D variance")
+    var x1 = Tensor.d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
+    var v1 = x1.variance(unbiased=False)
+    print("  Variance:", v1.item(), "(expected: 2.0)")
+    assert_true(abs(v1.item() - 2.0) < 1e-5, "1D variance value mismatch")
+
+    v1.backward()
+    print("  Gradient[0]:", x1.grad()[0], "(expected: -0.8)")
+    assert_true(abs(x1.grad()[0] - (-0.8)) < 1e-5, "1D gradient mismatch")
+    print("  ✓ Passed\n")
+
+    # Test 2: 2D with axis reduction
+    print("Test 2: 2D variance with axis=1")
+    var x2 = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var v2 = x2.variance(axis=1, keepdims=False, unbiased=False)
+    print("  Variance shape:", v2.shape())
+    assert_true(v2.shape().rank() == 1, "Should reduce to 1D")
+
+    var s2 = v2.sum()
+    s2.backward()
+    print("  Gradient[0,0]:", x2.grad()[0, 0], "(expected: ~-0.667)")
+    assert_true(abs(x2.grad()[0, 0] - (-0.667)) < 1e-2, "2D gradient mismatch")
+    print("  ✓ Passed\n")
+
+    # Test 3: Keepdims=True
+    print("Test 3: Variance with keepdims=True")
+    var x3 = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v3 = x3.variance(axis=1, keepdims=True, unbiased=False)
+    print("  Output shape:", v3.shape())
+    assert_true(v3.shape()[1] == 1, "Should keep dimension")
+
+    summ = v3.sum()
+    summ.backward()
+    print("  Gradient computed successfully")
+    print("  ✓ Passed\n")
+
+    # Test 4: Unbiased vs Biased
+    print("Test 4: Unbiased vs Biased variance")
+    var x4 = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
+    var v_biased = x4.variance(unbiased=False)
+    var v_unbiased = x4.variance(unbiased=True)
+
+    print("  Biased (n=4):", v_biased.item())
+    print("  Unbiased (n=4):", v_unbiased.item())
+    # Biased: 10/4 = 2.5, Unbiased: 10/3 = 3.333
+    assert_true(
+        v_unbiased.item() > v_biased.item(), "Unbiased should be larger"
+    )
+    print("  ✓ Passed\n")
+
+    print("=" * 80)
+    print("ALL VARIANCE TESTS PASSED ✓")
+    print("Your implementation is CORRECT!")
+    print("=" * 80 + "\n")
+
+
+fn test_variance_global() raises:
+    print("Test 5: Global variance")
+
+    var x5 = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+
+    # Test with keepdims=False (should be scalar)
+    var v5 = x5.variance(axis=-100, keepdims=False, unbiased=False)
+    print("  Output shape:", v5.shape())
+    assert_true(v5.shape().rank() == 0, "Should be scalar (rank 0)")
+
+    print("  Global variance:", v5.item(), "(expected: 1.25)")
+    assert_true(abs(v5.item() - 1.25) < 1e-5, "Global variance mismatch")
+
+    v5.backward()
+    print("  Gradient computed successfully")
+    print("  Gradient[0,0]:", x5.grad()[0, 0])
+    # Expected: (2/4) * (1 - 2.5) = 0.5 * (-1.5) = -0.75
+    assert_true(
+        abs(x5.grad()[0, 0] - (-0.75)) < 1e-5,
+        "Global variance gradient mismatch",
+    )
+    print("  ✓ Passed\n")
+
+    # Test with keepdims=True
+    print("Test 5b: Global variance with keepdims=True")
+    var x5b = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var v5b = x5b.variance(axis=-100, keepdims=True, unbiased=False)
+    print("  Output shape:", v5b.shape(), "(expected: (1,1))")
+    assert_true(v5b.shape().rank() == 2, "Should keep all dimensions")
+
+    s = v5b.sum()
+    s.backward()  # Need sum since it's not scalar
+    print("  Gradient[0,0]:", x5b.grad()[0, 0])
+    assert_true(abs(x5b.grad()[0, 0] - (-0.75)) < 1e-5, "Gradient mismatch")
+    print("  ✓ Passed\n")
+
+
 fn main() raises:
     test_sqrt_backward()
     test_sqrt_backward_zero_handling()
     run_all_var_std_tests()
     run_all_variance_std_tests()
+    test_variance_comprehensive()
+    test_variance_global()

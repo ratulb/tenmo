@@ -6,6 +6,22 @@ from numpy_interop import from_ndarray, numpy_dtype
 from memory import memcpy, Pointer
 from shapes import Shape
 
+# MNIST
+alias MNIST_MEAN = 0.1307
+alias MNIST_STD = 0.3081
+
+# Fashion-MNIST
+alias FASHION_MNIST_MEAN = 0.2860
+alias FASHION_MNIST_STD = 0.3530
+
+# CIFAR-10 (per-channel)
+alias CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
+alias CIFAR10_STD = (0.2470, 0.2435, 0.2616)
+
+# ImageNet (per-channel)
+alias IMAGENET_MEAN = (0.485, 0.456, 0.406)
+alias IMAGENET_STD = (0.229, 0.224, 0.225)
+
 
 @fieldwise_init
 struct Batch[feature_dtype: DType, label_dtype: DType](

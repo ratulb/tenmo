@@ -44,7 +44,7 @@ from net import (
     SGD,
     BCELoss,
 )
-from data import TensorDataset, DataLoader, Batch
+from dataloader import TensorDataset, DataLoader, Batch
 from time import perf_counter_ns
 from math import sqrt, cos, sin, pi
 from random import randn_float64
@@ -138,9 +138,9 @@ fn train_spiral_classifier():
     var num_val_samples = 250
     var train_batch_size = 32
     var val_batch_size = 64
-    var num_epochs = 5000
-    var learning_rate = 0.05
-    var momentum = 0.1
+    var num_epochs = 3000
+    var learning_rate = 0.01
+    var momentum = 0.9
     var log_interval = 1000
 
     print("Configuration:")
@@ -180,15 +180,13 @@ fn train_spiral_classifier():
     var val_dataset = TensorDataset[dtype](X_val, y_val)
 
     # Create data loaders
-    var train_loader = DataLoader(
-        train_dataset^,
+    var train_loader = train_dataset^.into_loader(
         batch_size=train_batch_size,
         shuffle=True,  # Shuffle training data each epoch
         drop_last=False,  # Use all samples
     )
 
-    var val_loader = DataLoader(
-        val_dataset^,
+    var val_loader = val_dataset^.into_loader(
         batch_size=val_batch_size,
         shuffle=False,  # No shuffling for validation
         drop_last=False,

@@ -646,8 +646,8 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn rand(
         shape: Shape,
-        low: Scalar[Self.dtype] = 0,
-        high: Scalar[Self.dtype] = 1,
+        min: Scalar[Self.dtype] = 0,
+        max: Scalar[Self.dtype] = 1,
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
@@ -656,18 +656,16 @@ struct Tensor[dtype: DType = DType.float32](
             "Tensor → rand: is supported only for numeric type",
         ]()
 
-        # Set seed if provided
         if init_seed:
             seed(init_seed.value())
         else:
             seed()
-        # let it use whatever seed state exists
 
         var numels = shape.num_elements()
         var buffer = Buffer[Self.dtype](numels)
 
-        var min_f64 = low.cast[DType.float64]()
-        var max_f64 = high.cast[DType.float64]()
+        var min_f64 = min.cast[DType.float64]()
+        var max_f64 = max.cast[DType.float64]()
 
         for i in range(numels):
             buffer[i] = random_float64(min_f64, max_f64).cast[Self.dtype]()
@@ -688,26 +686,22 @@ struct Tensor[dtype: DType = DType.float32](
             "Tensor → randn: is supported only for numeric type",
         ]()
 
-        # Set seed if provided
         if init_seed:
             seed(init_seed.value())
         else:
-            # let it use whatever seed state exists
             seed()
+
         var numels = shape.num_elements()
         var buffer = Buffer[Self.dtype](numels)
 
-        # Box-Muller transform generates pairs
         var i = 0
         while i < numels:
             var u1 = random_float64(0.0, 1.0)
             var u2 = random_float64(0.0, 1.0)
 
-            # Avoid log(0)
             if u1 < 1e-10:
                 u1 = 1e-10
 
-            # Box-Muller transform
             var mag = std * sqrt(-2.0 * log(u1))
             var z0 = mag * cos(2.0 * pi * u2) + mean
             var z1 = mag * sin(2.0 * pi * u2) + mean
@@ -2104,5 +2098,10 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
     fn __has_next__(self) -> Bool:
         return self.index_itr.__has_next__()
 
+
 fn main():
-    pass
+    a = Tensor.arange(10)
+    m = a.mean()
+    a.print()
+    m.print()
+    a.std[False]().print()

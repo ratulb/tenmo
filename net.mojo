@@ -14,16 +14,14 @@ alias TANH = 3
 
 
 @fieldwise_init
-struct Linear[dtype: DType, mode: Int = mm](
-    ImplicitlyCopyable & Movable
-):  # alias mode = mm  # tensor & tensor matmul
+struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     """Fully connected layer: y = xW + b."""
 
     var weight: Tensor[Self.dtype]
     var bias: Tensor[Self.dtype]
     var in_features: Int
     var out_features: Int
-    var training: Bool  # Training mode flag
+    var training: Bool
     alias TAG = LINEAR
 
     fn __init__(
@@ -32,45 +30,69 @@ struct Linear[dtype: DType, mode: Int = mm](
         out_features: Int,
         init_seed: Optional[Int] = None,
         xavier: Bool = True,
-        bias_noise: Scalar[Self.dtype] = Scalar[Self.dtype](0),
+        bias_zero: Bool = True,  # Control bias initialization
         weight_factor: Scalar[Self.dtype] = Scalar[Self.dtype](1),
     ):
         self.in_features = in_features
         self.out_features = out_features
-        self.training = True  # Default to training mode
+        self.training = True
 
         if xavier:
-            limit = Scalar[Self.dtype](sqrt(6.0 / (in_features + out_features)))
+            # Xavier/Glorot uniform initialization
+            var limit = Scalar[Self.dtype](
+                sqrt(6.0 / (in_features + out_features))
+            )
+
             self.weight = (
                 Tensor[Self.dtype].rand(
                     shape=Shape(in_features, out_features),
-                    low=-limit,
-                    high=limit,
+                    min=-limit,
+                    max=limit,
                     init_seed=init_seed,
                     requires_grad=True,
                 )
                 * weight_factor
             )
-            self.bias = (
-                Tensor[Self.dtype].rand(Shape(out_features), requires_grad=True)
-                * bias_noise
-            )
-        else:
-            var std = Scalar[Self.dtype](sqrt(2.0 / in_features))
-            self.weight = (
-                Tensor[Self.dtype].randn(
-                    shape=Shape(in_features, out_features),
+
+            # Consistent bias initialization
+            if bias_zero:
+                self.bias = Tensor[Self.dtype].zeros(
+                    Shape(out_features), requires_grad=True
+                )
+            else:
+                self.bias = Tensor[Self.dtype].rand(
+                    Shape(out_features),
+                    min=-limit,
+                    max=limit,
                     init_seed=init_seed,
                     requires_grad=True,
                 )
-                * std
+        else:
+            # He initialization (for ReLU)
+            var std = sqrt(2.0 / Float64(in_features))
+
+            self.weight = Tensor[Self.dtype].randn(
+                shape=Shape(in_features, out_features),
+                mean=0.0,
+                std=std,
+                init_seed=init_seed,
+                requires_grad=True,
             )
-            self.bias = (
-                Tensor[Self.dtype].randn(
-                    Shape(out_features), init_seed=init_seed, requires_grad=True
+
+            # Consistent bias initialization
+            if bias_zero:
+                self.bias = Tensor[Self.dtype].zeros(
+                    Shape(out_features), requires_grad=True
                 )
-                * bias_noise
-            )
+            else:
+                # Small random bias matching weight scale
+                self.bias = Tensor[Self.dtype].randn(
+                    Shape(out_features),
+                    mean=0.0,
+                    std=std * 0.01,  # Much smaller than weights
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
 
     fn __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref xs_shape = xs.shape()
@@ -594,3 +616,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
     fn set_lr(mut self, lr: Scalar[Self.dtype]):
         self.lr = lr
+
+
+fn main():
+    pass
