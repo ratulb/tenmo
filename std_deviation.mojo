@@ -62,8 +62,14 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable):
 
         # Handle keepdims
         var gradbox_ancestor: Gradbox[dtype]
-        if not self.keepdims and self.axis != -100:
-            gradbox_ancestor = gradbox.unsqueeze([self.axis])
+        if not self.keepdims:
+            if self.axis != -100:
+                gradbox_ancestor = gradbox.unsqueeze([self.axis])
+            else:
+                var scalar_grad = gradbox.item()
+                gradbox_ancestor = Gradbox[dtype].full(
+                    input_shape, scalar_grad, share=False
+                )
         else:
             gradbox_ancestor = gradbox^
 
@@ -89,16 +95,16 @@ struct StdDev[dtype: DType]:
     ) -> Tensor[dtype]:
         if axis != -100 and (axis < 0 or axis >= self.rank()):
             panic("axis is not valid for standard deviation")
-        _ = """var var_result = Variance[dtype].forward[False](  # Don't track for var
-            self, axis, keepdims=True, unbiased, requires_grad=None
-        )"""
         var var_result = self.variance[track_grad=False](
             axis, keepdims=True, unbiased=unbiased
         )
         var result = var_result.sqrt[track_grad=False](epsilon=epsilon)
 
-        if not keepdims and axis != -100:
-            result = result.squeeze([axis])
+        if not keepdims:
+            if axis != -100:
+                result = result.squeeze[track_grad=False]([axis])
+            else:
+                result = result.squeeze[track_grad=False]()
 
         @parameter
         if track_grad:
