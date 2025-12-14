@@ -141,8 +141,8 @@ Total: 181s (10 epochs)
 ## 🔧 Installation
 
 ### Prerequisites
-- Mojo 24.5 or later
-- Python 3.8+ (for NumPy interop)
+- Mojo 0.25.7.0
+- Python 3.10, <3.13 (for NumPy interop)
 
 ### Usage
 ```bash
@@ -150,8 +150,10 @@ git clone https://github.com/yourusername/tenmo.git
 cd tenmo
 
 # Run examples
-mojo examples/xor.mojo
-mojo examples/mnist.mojo
+./example xor
+./example mnist
+./example spiral
+
 ```
 
 ---
@@ -205,7 +207,7 @@ Linear(10)
 2. **Move semantics**: Efficient memory management with explicit ownership
 3. **Memory efficiency**: Pre-allocated buffers and zero-copy operations
 4. **Type safety**: Leverages Mojo's strong type system for correctness
-5. **PyTorch compatibility**: Familiar API for easy adoption
+
 
 ### Key Components
 ```
@@ -368,7 +370,7 @@ Built with ❤️ using [Mojo](https://www.modular.com/mojo) by Modular.
 
 Inspired by PyTorch's elegant API and Mojo's performance potential.
 
-Special thanks to the Mojo community for feedback and support.
+Special thanks to the [Mojo community](https://forum.modular.com/) for promt responses.
 
 ---
 
@@ -380,12 +382,3 @@ Questions? Suggestions? Open an issue or reach out!
 
 ---
 
-## 📈 Benchmark History
-
-| Version | Optimization | Epoch Time | Speedup |
-|---------|-------------|------------|---------|
-| v0.1 | Manual batching | 10.0s | baseline |
-| v0.2 | Xavier init | 11.3s | 0.88x |
-| **v0.3** | **He init + optimizations** | **8.4s** | **1.19x** |
-
-**Total improvement: 19% faster than manual batching baseline** 🚀
