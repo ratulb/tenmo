@@ -29,20 +29,33 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         in_features: Int,
         out_features: Int,
         init_seed: Optional[Int] = None,
-        xavier: Bool = True,
-        bias_zero: Bool = True,  # Control bias initialization
+        init_method: String = "standard",  # "standard", "xavier", "he"
+        bias_zero: Bool = True,
         weight_factor: Scalar[Self.dtype] = Scalar[Self.dtype](1),
     ):
+        """
+        Initialize Linear layer with configurable weight initialization.
+
+        Args:
+            in_features: Number of input features.
+            out_features: Number of output features.
+            init_seed: Random seed for reproducibility.
+            init_method: Weight initialization method:
+                - "standard": Uniform[-0.1, 0.1] (good for [0,1] normalized inputs).
+                - "xavier": Xavier/Glorot uniform (good for tanh/sigmoid).
+                - "he": He/Kaiming normal (good for ReLU with standardized inputs).
+            bias_zero: If True, initialize bias to zeros.
+            weight_factor: Scaling factor for weight initialization.
+        """
         self.in_features = in_features
         self.out_features = out_features
         self.training = True
 
-        if xavier:
+        if init_method == "xavier":
             # Xavier/Glorot uniform initialization
             var limit = Scalar[Self.dtype](
                 sqrt(6.0 / (in_features + out_features))
             )
-
             self.weight = (
                 Tensor[Self.dtype].rand(
                     shape=Shape(in_features, out_features),
@@ -53,13 +66,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                 )
                 * weight_factor
             )
-
-            # Consistent bias initialization
-            if bias_zero:
-                self.bias = Tensor[Self.dtype].zeros(
-                    Shape(out_features), requires_grad=True
-                )
-            else:
+            if not bias_zero:
                 self.bias = Tensor[Self.dtype].rand(
                     Shape(out_features),
                     min=-limit,
@@ -67,31 +74,61 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
                     init_seed=init_seed,
                     requires_grad=True,
                 )
-        else:
-            # He initialization (for ReLU)
-            var std = sqrt(2.0 / Float64(in_features))
-
-            self.weight = Tensor[Self.dtype].randn(
-                shape=Shape(in_features, out_features),
-                mean=0.0,
-                std=std,
-                init_seed=init_seed,
-                requires_grad=True,
-            )
-
-            # Consistent bias initialization
-            if bias_zero:
+            else:
                 self.bias = Tensor[Self.dtype].zeros(
                     Shape(out_features), requires_grad=True
                 )
-            else:
-                # Small random bias matching weight scale
+
+        elif init_method == "he":
+            # He/Kaiming normal initialization (for ReLU)
+            var std = sqrt(2.0 / Float64(in_features))
+            self.weight = (
+                Tensor[Self.dtype].randn(
+                    shape=Shape(in_features, out_features),
+                    mean=0.0,
+                    std=std,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+                * weight_factor
+            )
+            if not bias_zero:
                 self.bias = Tensor[Self.dtype].randn(
                     Shape(out_features),
                     mean=0.0,
-                    std=std * 0.01,  # Much smaller than weights
+                    std=std * 0.01,
                     init_seed=init_seed,
                     requires_grad=True,
+                )
+            else:
+                self.bias = Tensor[Self.dtype].zeros(
+                    Shape(out_features), requires_grad=True
+                )
+
+        else:  # "standard" or default
+            # Simple uniform initialization (good for [0,1] normalized inputs)
+            var limit = Scalar[Self.dtype](0.1)
+            self.weight = (
+                Tensor[Self.dtype].rand(
+                    shape=Shape(in_features, out_features),
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+                * weight_factor
+            )
+            if not bias_zero:
+                self.bias = Tensor[Self.dtype].rand(
+                    Shape(out_features),
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+            else:
+                self.bias = Tensor[Self.dtype].zeros(
+                    Shape(out_features), requires_grad=True
                 )
 
     fn __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:

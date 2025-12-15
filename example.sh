@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No example specified"
-    echo "Usage: $0 [mnist|xor|spiral|all]"
+    echo "Usage: $0 [mnist|xor|spiral|cifar_10|all]"
     exit 1
 fi
 
@@ -26,6 +26,10 @@ case $1 in
         echo "Running mojo spiral training loop"
         mojo -I . $DEBUG_MODE examples/spiral.mojo
         ;;
+    cifar_10)
+        echo "Running mojo cifar_10 training loop"
+        mojo -I . $DEBUG_MODE examples/cifar_10.mojo
+        ;;
 
     all)
         echo "Running mnist training loop"
@@ -34,12 +38,15 @@ case $1 in
         echo "Running xor training loop"
         mojo -I . $DEBUG_MODE examples/xor.mojo
 
-        echo "Running mojo spiral training loop"
+        echo "Running spiral training loop"
         mojo -I . $DEBUG_MODE examples/spiral.mojo
+
+        echo "Running cifar_10 training loop"
+        mojo -I . $DEBUG_MODE examples/cifar_10.mojo
         ;;
     *)
-        echo "Error: Unknown test '$1'"
-        echo "Available training loops: mnist, xor, spiral, all"
-        exit 1
-        ;;
+       echo "Error: Unknown test '$1'"
+       echo "Available training loops: mnist, xor, spiral, cifar_10, all"
+       exit 1
+    ;;
 esac
