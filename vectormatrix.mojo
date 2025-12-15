@@ -15,8 +15,8 @@ from algorithm import vectorize
 struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
-        track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
-    ](v: Tensor[dtype], M: Tensor[dtype]) -> Tensor[dtype]:
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
+    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         var v_shape = v.shape()
         var M_shape = M.shape()
 
@@ -41,7 +41,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
         )
 
         var out_shape = batch_shape + [n]
-        var result = Tensor[dtype].zeros(out_shape)
+        var result = Tensor[Self.dtype].zeros(out_shape)
 
         # Hoist metadata for vector and matrix
         var v_stride = v.buffer.strides[-1]
@@ -85,7 +85,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
                 # Fast path: M has contiguous rows
                 @parameter
                 fn compute_output[simd_width: Int](j: Int):
-                    var accumulator = SIMD[dtype, simd_width](0)
+                    var accumulator = SIMD[Self.dtype, simd_width](0)
 
                     # Dot product: sum over k
                     for i in range(k):
@@ -103,7 +103,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
             else:
                 # Slow path: non-contiguous M
                 for j in range(n):
-                    var accumulator: Scalar[dtype] = 0
+                    var accumulator: Scalar[Self.dtype] = 0
 
                     for i in range(k):
                         var v_val = v_data[v_base + i * v_stride]
@@ -121,7 +121,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
             if requires_grad:
                 result.requires_grad_(True)
                 var backward_fn = VectorMatmulNdBackward[
-                    dtype
+                    Self.dtype
                 ]().into_backward_fn()
                 result.backwardFn = Optional(backward_fn^)
                 result.add_ancestry(v)
@@ -136,9 +136,9 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_VECTOR_MATMUL
 
     fn backward[
-        simdwidth: Int = simd_width_of[dtype]()
-    ](self, read output: Tensor[dtype]) -> List[
-        Tuple[Tensor[dtype], Gradbox[dtype], Int]
+        simdwidth: Int = simd_width_of[Self.dtype]()
+    ](self, read output: Tensor[Self.dtype]) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
         ref grad_out = output.gradients()[]
         var v = output.ancestry().get(0)
@@ -156,12 +156,14 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
             v_batch_dims, M_batch_dims
         )
 
-        var results = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]()
+        var results = List[
+            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
 
         # Gradient for v: dv[k] = grad_out[n] @ M^T[n, k]
         # This is equivalent to: dv[k] = sum_j(grad_out[j] * M[k, j])
         if v.requires_grad:
-            var grad_v = Gradbox[dtype].zeros(v_shape, share=True)
+            var grad_v = Gradbox[Self.dtype].zeros(v_shape, share=True)
 
             # Hoist metadata
             var grad_out_stride = grad_out.strides()[-1]
@@ -199,7 +201,7 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
                 # Compute: grad_v[k] = sum_j(grad_out[j] * M[k, j])
                 for i in range(k):
-                    var accumulator: Scalar[dtype] = 0
+                    var accumulator: Scalar[Self.dtype] = 0
 
                     for j in range(n):
                         var grad_val = grad_out_data[
@@ -217,7 +219,7 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
         # Gradient for M: dM[k, n] = v[k] ⊗ grad_out[n] (outer product)
         if M.requires_grad:
-            var grad_M = Gradbox[dtype].zeros(M_shape, share=True)
+            var grad_M = Gradbox[Self.dtype].zeros(M_shape, share=True)
 
             # Hoist metadata
             var v_stride = v.buffer.strides[-1]
@@ -299,8 +301,8 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
         return results^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 fn main() raises:
