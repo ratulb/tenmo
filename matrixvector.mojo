@@ -15,8 +15,8 @@ from algorithm import vectorize
 struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
-        track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
-    ](M: Tensor[dtype], v: Tensor[dtype]) -> Tensor[dtype]:
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
+    ](M: Tensor[Self.dtype], v: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         var M_shape = M.shape()
         var v_shape = v.shape()
 
@@ -41,7 +41,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
         )
 
         var out_shape = batch_shape + [m]
-        var result = Tensor[dtype].zeros(out_shape)
+        var result = Tensor[Self.dtype].zeros(out_shape)
 
         # Hoist metadata
         var M_stride0 = M.buffer.strides[-2]
@@ -82,7 +82,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
             # Optimized matrix-vector multiply: result[m] = M[m, k] @ v[k]
             # For each output element: result[i] = sum_j(M[i,j] * v[j])
             for i in range(m):
-                var accumulator: Scalar[dtype] = 0
+                var accumulator: Scalar[Self.dtype] = 0
                 var M_row_base = M_base + i * M_stride0
 
                 # Dot product over k dimension
@@ -100,7 +100,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
             if requires_grad:
                 result.requires_grad_(True)
                 var backward_fn = MatrixVectorMulNdBackward[
-                    dtype
+                    Self.dtype
                 ]().into_backward_fn()
                 result.backwardFn = Optional(backward_fn^)
                 result.add_ancestry(M)
@@ -115,9 +115,9 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_MATRIX_VECTOR_MUL
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
-        alias simdwidth = simd_width_of[dtype]()
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        alias simdwidth = simd_width_of[Self.dtype]()
 
         ref grad_out = output.gradients()[]
         var M = output.ancestry().get(0)
@@ -135,11 +135,13 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
             M_batch_dims, v_batch_dims
         )
 
-        var results = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]()
+        var results = List[
+            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
 
         # Gradient for M: dM[m, k] = grad_out[m] ⊗ v[k] (outer product)
         if M.requires_grad:
-            var grad_M = Gradbox[dtype].zeros(M_shape, share=True)
+            var grad_M = Gradbox[Self.dtype].zeros(M_shape, share=True)
 
             # Hoist metadata
             var grad_out_stride = grad_out.strides()[-1]
@@ -218,7 +220,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
         # Gradient for v: dv[k] = M^T[k, m] @ grad_out[m]
         # This is: dv[k] = sum_i(M[i, k] * grad_out[i])
         if v.requires_grad:
-            var grad_v = Gradbox[dtype].zeros(v_shape, share=True)
+            var grad_v = Gradbox[Self.dtype].zeros(v_shape, share=True)
 
             # Hoist metadata
             var M_stride0 = M.buffer.strides[-2]
@@ -255,7 +257,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
 
                 # Compute: grad_v[k] = sum_i(M[i, k] * grad_out[i])
                 for j in range(k):
-                    var accumulator: Scalar[dtype] = 0
+                    var accumulator: Scalar[Self.dtype] = 0
 
                     for i in range(m):
                         var m_val = M_data[
@@ -273,8 +275,8 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
 
         return results^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 # ---
