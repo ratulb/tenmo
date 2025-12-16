@@ -7,7 +7,6 @@ from broadcasthelper import ShapeBroadcaster
 from common_utils import il, s, panic
 from matmul import Matmul2d
 from sys import simd_width_of
-from algorithm import vectorize
 
 
 @fieldwise_init
@@ -82,9 +81,14 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
 
             # Optimized vector-matrix multiply: result[n] = v[k] @ M[k, n]
             if M_contiguous:
-                # Fast path: M has contiguous rows
-                @parameter
-                fn compute_output[simd_width: Int](j: Int):
+                # Fast path: M has contiguous rows - MANUAL VECTORIZATION
+                alias simd_width = simdwidth
+                var num_full_vectors = n // simd_width
+                var remainder = n % simd_width
+
+                # Process full SIMD vectors
+                for vec_idx in range(num_full_vectors):
+                    var j = vec_idx * simd_width
                     var accumulator = SIMD[Self.dtype, simd_width](0)
 
                     # Dot product: sum over k
@@ -99,7 +103,24 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
                         result_addr, accumulator
                     )
 
-                vectorize[compute_output, simdwidth](n)
+                # Process remaining elements
+                if remainder > 0:
+                    var j = num_full_vectors * simd_width
+                    for offset in range(remainder):
+                        var accumulator: Scalar[Self.dtype] = 0
+
+                        for i in range(k):
+                            var v_val = v_data[v_base + i * v_stride]
+                            var m_val = M_data[
+                                M_base
+                                + i * M_stride0
+                                + (j + offset) * M_stride1
+                            ]
+                            accumulator += v_val * m_val
+
+                        result_data[
+                            result_base + (j + offset) * result_stride
+                        ] = accumulator
             else:
                 # Slow path: non-contiguous M
                 for j in range(n):
@@ -259,12 +280,18 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
                 # Outer product: grad_M[k, n] = v[k] * grad_out[n]
                 if grad_M_contiguous:
+                    # MANUAL VECTORIZATION for outer product
+                    alias simd_width = simdwidth
+                    var num_full_vectors = n // simd_width
+                    var remainder = n % simd_width
+
                     for i in range(k):
                         var v_val = v_data[v_base + i * v_stride]
                         var grad_M_row_base = grad_M_base + i * grad_M_stride0
 
-                        @parameter
-                        fn compute_row[simd_width: Int](j: Int):
+                        # Process full SIMD vectors
+                        for vec_idx in range(num_full_vectors):
+                            var j = vec_idx * simd_width
                             var grad_out_addr = (
                                 grad_out_base + j * grad_out_stride
                             )
@@ -282,7 +309,19 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
                                 grad_M_addr, current + v_val * grad_out_vec
                             )
 
-                        vectorize[compute_row, simdwidth](n)
+                        # Process remaining elements
+                        if remainder > 0:
+                            var j = num_full_vectors * simd_width
+                            for offset in range(remainder):
+                                var grad_out_val = grad_out_data[
+                                    grad_out_base
+                                    + (j + offset) * grad_out_stride
+                                ]
+                                var grad_M_addr = (
+                                    grad_M_row_base
+                                    + (j + offset) * grad_M_stride1
+                                )
+                                grad_M_data[grad_M_addr] += v_val * grad_out_val
                 else:
                     for i in range(k):
                         var v_val = v_data[v_base + i * v_stride]
@@ -305,5 +344,5 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
-fn main() raises:
+fn main():
     pass

@@ -569,15 +569,6 @@ struct Tensor[dtype: DType = DType.float32](
             UnsafePointer(to=self).mut_cast[mut]().unsafe_origin_cast[origin]()
         )
 
-    fn unsafe_address(
-        ref self,
-    ) -> UnsafePointer[
-        Self,
-        # mut = Origin(origin_of(self)).mut,
-        origin = origin_of(self),
-    ]:
-        return UnsafePointer(to=self).mut_cast[Origin(origin_of(self)).mut]()
-
     fn seed_grad(mut self, with_tensor: Tensor[Self.dtype]):
         if not self.requires_grad:
             return

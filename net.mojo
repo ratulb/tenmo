@@ -11,6 +11,7 @@ alias LINEAR = 0
 alias RELU = 1
 alias SIGMOID = 2
 alias TANH = 3
+alias DROPOUT = 4
 
 
 @fieldwise_init
@@ -211,6 +212,69 @@ struct ReLU[dtype: DType](ImplicitlyCopyable):
             return x.relu[track_grad=True]()
         else:
             return x.relu[track_grad=False]()
+
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+        return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+
+    fn num_parameters(self) -> Int:
+        return 0
+
+    fn train(mut self):
+        self.training = True
+
+    fn eval(mut self):
+        self.training = False
+
+    fn into(self) -> Module[Self.dtype]:
+        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
+
+
+@register_passable
+struct Dropout[dtype: DType](ImplicitlyCopyable):
+    """
+    Dropout layer: randomly zeros elements during training with probability p.
+    During inference, scales outputs by (1-p) to maintain expected values.
+    """
+
+    var training: Bool
+    var p: Scalar[Self.dtype]  # Dropout probability
+    var scale: Scalar[Self.dtype]  # 1 / (1 - p) for training scaling
+    alias TAG = DROPOUT
+
+    fn __init__(out self, p: Scalar[Self.dtype] = Scalar[Self.dtype](0.5)):
+        """
+        Initialize Dropout layer.
+
+        Args:
+            p: Probability of dropping an element (default: 0.5).
+        """
+        self.training = True
+        self.p = p
+        self.scale = Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) - p)
+
+    fn __copyinit__(out self, other: Self):
+        self.training = other.training
+        self.p = other.p
+        self.scale = other.scale
+
+    fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        if self.training:
+            # Generate random mask: 1 where we keep, 0 where we drop
+            var mask = Tensor[Self.dtype].rand(
+                shape=x.shape(),
+                min=Scalar[Self.dtype](0.0),
+                max=Scalar[Self.dtype](1.0),
+            )
+            # Keep elements where mask > p
+            var keep_mask = mask.gt(self.p).to_dtype[Self.dtype]()
+            var combined_mask = keep_mask^.__mul__[track_grad=False](self.scale)
+            return x.__mul__[track_grad=True](combined_mask^)
+
+        else:
+            # During inference: pass through unchanged (inverted dropout)
+            return x
 
     fn parameters(
         ref self,

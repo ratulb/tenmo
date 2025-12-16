@@ -1,5 +1,4 @@
 from tenmo import Tensor
-from algorithm import vectorize
 from sys import simd_width_of
 from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import (
@@ -72,17 +71,16 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                             var grad_out_row_base = i * grad_out_stride0
                             var grad_A_row_base = i * grad_A_stride0
 
-                            @parameter
-                            fn process_columns_a[simd_width: Int](j_local: Int):
-                                var j = j_tile + j_local
-                                if j >= j_end:
-                                    return
+                            # Manual SIMD vectorization
+                            var j = j_tile
 
+                            # Main vectorized loop
+                            while j + simdwidth <= j_end:
                                 var grad_A_addr = (
                                     grad_A_row_base + j * grad_A_stride1
                                 )
                                 var accumulator = grad_A_data.load[
-                                    width=simd_width
+                                    width=simdwidth
                                 ](grad_A_addr)
 
                                 for k in range(k_tile, k_end):
@@ -91,27 +89,45 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                     )
                                     var grad_ik = grad_out_data[grad_addr]
 
-                                    # B[j,k] - reading B transposed without creating transpose view
+                                    # B[j,k] - reading B transposed
                                     var b_addr = (
                                         j * B_stride0 + B_offset + k * B_stride1
                                     )
-                                    var b_vec = B_data.load[width=simd_width](
+                                    var b_vec = B_data.load[width=simdwidth](
                                         b_addr
                                     )
 
                                     accumulator += grad_ik * b_vec
 
-                                grad_A_data.store[width=simd_width](
+                                grad_A_data.store[width=simdwidth](
                                     grad_A_addr, accumulator
                                 )
+                                j += simdwidth
 
-                            vectorize[process_columns_a, simdwidth](
-                                j_end - j_tile
-                            )
+                            # Tail handling
+                            while j < j_end:
+                                var grad_A_addr = (
+                                    grad_A_row_base + j * grad_A_stride1
+                                )
+                                var accumulator = grad_A_data[grad_A_addr]
+
+                                for k in range(k_tile, k_end):
+                                    var grad_addr = (
+                                        grad_out_row_base + k * grad_out_stride1
+                                    )
+                                    var b_addr = (
+                                        j * B_stride0 + B_offset + k * B_stride1
+                                    )
+                                    accumulator += (
+                                        grad_out_data[grad_addr]
+                                        * B_data[b_addr]
+                                    )
+
+                                grad_A_data[grad_A_addr] = accumulator
+                                j += 1
 
             result.append((A, grad_A^, AddTensor))
 
-        # Step 3: Compute grad_B (if needed)
         # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
         # grad_B[j,k] = sum_i(A[i,j] * grad_out[i,k])  ← Reading A transposed!
         if B.requires_grad:
@@ -141,17 +157,16 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                         for j in range(j_tile, j_end):
                             var grad_B_row_base = j * grad_B_stride0
 
-                            @parameter
-                            fn process_columns_b[simd_width: Int](k_local: Int):
-                                var k = k_tile + k_local
-                                if k >= k_end:
-                                    return
+                            # Manual SIMD vectorization
+                            var k = k_tile
 
+                            # Main vectorized loop
+                            while k + simdwidth <= k_end:
                                 var grad_B_addr = (
                                     grad_B_row_base + k * grad_B_stride1
                                 )
                                 var accumulator = grad_B_data.load[
-                                    width=simd_width
+                                    width=simdwidth
                                 ](grad_B_addr)
 
                                 for i in range(i_tile, i_end):
@@ -167,18 +182,38 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                         + k * grad_out_stride1
                                     )
                                     var grad_vec = grad_out_data.load[
-                                        width=simd_width
+                                        width=simdwidth
                                     ](grad_addr)
 
                                     accumulator += a_ij * grad_vec
 
-                                grad_B_data.store[width=simd_width](
+                                grad_B_data.store[width=simdwidth](
                                     grad_B_addr, accumulator
                                 )
+                                k += simdwidth
 
-                            vectorize[process_columns_b, simdwidth](
-                                k_end - k_tile
-                            )
+                            # Tail handling
+                            while k < k_end:
+                                var grad_B_addr = (
+                                    grad_B_row_base + k * grad_B_stride1
+                                )
+                                var accumulator = grad_B_data[grad_B_addr]
+
+                                for i in range(i_tile, i_end):
+                                    var a_addr = (
+                                        i * A_stride0 + A_offset + j * A_stride1
+                                    )
+                                    var grad_addr = (
+                                        i * grad_out_stride0
+                                        + k * grad_out_stride1
+                                    )
+                                    accumulator += (
+                                        A_data[a_addr]
+                                        * grad_out_data[grad_addr]
+                                    )
+
+                                grad_B_data[grad_B_addr] = accumulator
+                                k += 1
 
             result.append((B^, grad_B^, AddTensor))
 
@@ -226,9 +261,8 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
         if B_contiguous:
             # ========================================
-            # TILED/BLOCKED MATMUL
+            # TILED/BLOCKED MATMUL with Manual SIMD
             # ========================================
-            # Tile the outer loops to keep data in cache
             for i_tile in range(0, m, tile_size):
                 for j_tile in range(0, p, tile_size):
                     for k_tile in range(0, n, tile_size):
@@ -242,14 +276,14 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                             var a_row_base = i * A_stride0 + A_offset
                             var c_row_base = i * C_stride0 + C_offset
 
-                            @parameter
-                            fn process_columns[simd_width: Int](j_local: Int):
-                                var j = j_tile + j_local
-                                if j >= j_end:
-                                    return
+                            # Manual SIMD vectorization for columns
+                            var j = j_tile
+                            var cols_remaining = j_end - j_tile
 
+                            # Main vectorized loop (process simdwidth columns at a time)
+                            while j + simdwidth <= j_end:
                                 var c_addr = c_row_base + j * C_stride1
-                                var accumulator = C_data.load[width=simd_width](
+                                var accumulator = C_data.load[width=simdwidth](
                                     c_addr
                                 )
 
@@ -260,21 +294,35 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                                     var b_addr = (
                                         k * B_stride0 + B_offset + j * B_stride1
                                     )
-                                    var b_vec = B_data.load[width=simd_width](
+                                    var b_vec = B_data.load[width=simdwidth](
                                         b_addr
                                     )
 
                                     accumulator += a_ik * b_vec
 
-                                C_data.store[width=simd_width](
+                                C_data.store[width=simdwidth](
                                     c_addr, accumulator
                                 )
+                                j += simdwidth
 
-                            vectorize[process_columns, simdwidth](
-                                j_end - j_tile
-                            )
+                            # Tail handling: process remaining columns one at a time
+                            while j < j_end:
+                                var c_addr = c_row_base + j * C_stride1
+                                var accumulator = C_data[c_addr]
+
+                                for k in range(k_tile, k_end):
+                                    var a_addr = a_row_base + k * A_stride1
+                                    var b_addr = (
+                                        k * B_stride0 + B_offset + j * B_stride1
+                                    )
+                                    accumulator += (
+                                        A_data[a_addr] * B_data[b_addr]
+                                    )
+
+                                C_data[c_addr] = accumulator
+                                j += 1
         else:
-            # Non-contiguous path (keep your existing code)
+            # Non-contiguous path (scalar)
             for i in range(m):
                 var a_row_base = i * A_stride0 + A_offset
                 var c_row_base = i * C_stride0 + C_offset
@@ -295,7 +343,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var backward_fn = Matmul2dBackward[dtype]().into_backward_fn()
+                var backward_fn = Matmul2dBackward[
+                    Self.dtype
+                ]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
@@ -332,7 +382,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
         var C_data = C.buffer.buffer.data
 
         # ========================================
-        # TILED MATMUL
+        # TILED MATMUL with Manual SIMD
         # ========================================
         for i_tile in range(0, m, tile_size):
             for j_tile in range(0, p, tile_size):
@@ -345,14 +395,13 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                         var a_row_base = i * A_stride0 + A_offset
                         var c_row_base = i * C_stride0 + C_offset
 
-                        @parameter
-                        fn process_columns[simd_width: Int](j_local: Int):
-                            var j = j_tile + j_local
-                            if j >= j_end:
-                                return
+                        # Manual SIMD vectorization
+                        var j = j_tile
 
+                        # Main vectorized loop
+                        while j + simdwidth <= j_end:
                             var c_addr = c_row_base + j * C_stride1
-                            var accumulator = C_data.load[width=simd_width](
+                            var accumulator = C_data.load[width=simdwidth](
                                 c_addr
                             )
 
@@ -361,15 +410,25 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                                 var a_ik = A_data[a_addr]
 
                                 var b_addr = k * B_stride0 + j * B_stride1
-                                var b_vec = B_data.load[width=simd_width](
-                                    b_addr
-                                )
+                                var b_vec = B_data.load[width=simdwidth](b_addr)
 
                                 accumulator += a_ik * b_vec
 
-                            C_data.store[width=simd_width](c_addr, accumulator)
+                            C_data.store[width=simdwidth](c_addr, accumulator)
+                            j += simdwidth
 
-                        vectorize[process_columns, simdwidth](j_end - j_tile)
+                        # Tail handling: remaining columns
+                        while j < j_end:
+                            var c_addr = c_row_base + j * C_stride1
+                            var accumulator = C_data[c_addr]
+
+                            for k in range(k_tile, k_end):
+                                var a_addr = a_row_base + k * A_stride1
+                                var b_addr = k * B_stride0 + j * B_stride1
+                                accumulator += A_data[a_addr] * B_data[b_addr]
+
+                            C_data[c_addr] = accumulator
+                            j += 1
 
         return C^
 
@@ -404,7 +463,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             var C_data = C.buffer.buffer.data
 
             # ========================================
-            # TILED MATMUL - i-j-k tiling order
+            # TILED MATMUL with Manual SIMD
             # ========================================
             for i_tile in range(0, m, tile_size):
                 for j_tile in range(0, p, tile_size):
@@ -418,14 +477,13 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                             var a_row_base = i * A_stride0
                             var c_row_base = i * C_stride0
 
-                            @parameter
-                            fn process_columns[simd_width: Int](j_local: Int):
-                                var j = j_tile + j_local
-                                if j >= j_end:
-                                    return
+                            # Manual SIMD vectorization
+                            var j = j_tile
 
+                            # Main vectorized loop
+                            while j + simdwidth <= j_end:
                                 var c_addr = c_row_base + j * C_stride1
-                                var accumulator = C_data.load[width=simd_width](
+                                var accumulator = C_data.load[width=simdwidth](
                                     c_addr
                                 )
 
@@ -436,21 +494,35 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                                     var b_addr = (
                                         k * B_stride0 + B_offset + j * B_stride1
                                     )
-                                    var b_vec = B_data.load[width=simd_width](
+                                    var b_vec = B_data.load[width=simdwidth](
                                         b_addr
                                     )
 
                                     accumulator += a_ik * b_vec
 
-                                C_data.store[width=simd_width](
+                                C_data.store[width=simdwidth](
                                     c_addr, accumulator
                                 )
+                                j += simdwidth
 
-                            vectorize[process_columns, simdwidth](
-                                j_end - j_tile
-                            )
+                            # Tail handling: remaining columns
+                            while j < j_end:
+                                var c_addr = c_row_base + j * C_stride1
+                                var accumulator = C_data[c_addr]
+
+                                for k in range(k_tile, k_end):
+                                    var a_addr = a_row_base + k * A_stride1
+                                    var b_addr = (
+                                        k * B_stride0 + B_offset + j * B_stride1
+                                    )
+                                    accumulator += (
+                                        A_data[a_addr] * B_data[b_addr]
+                                    )
+
+                                C_data[c_addr] = accumulator
+                                j += 1
         else:
-            # Non-contiguous fallback (keep existing code with tiling)
+            # Non-contiguous fallback (scalar path)
             ref A_strides = A.strides()
             var A_stride0 = A_strides[0]
             var A_stride1 = A_strides[1]

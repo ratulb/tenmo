@@ -179,14 +179,20 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
 
                 # Outer product: grad_M[m, k] = grad_out[m] * v[k]
                 if grad_M_contiguous:
+                    # MANUAL VECTORIZATION for outer product
+                    alias simd_width = simdwidth
+                    var num_full_vectors = k // simd_width
+                    var remainder = k % simd_width
+
                     for i in range(m):
                         var grad_out_val = grad_out_data[
                             grad_out_base + i * grad_out_stride
                         ]
                         var grad_M_row_base = grad_M_base + i * grad_M_stride0
 
-                        @parameter
-                        fn compute_row[simd_width: Int](j: Int):
+                        # Process full SIMD vectors
+                        for vec_idx in range(num_full_vectors):
+                            var j = vec_idx * simd_width
                             var v_addr = v_base + j * v_stride
                             var v_vec = v_data.load[width=simd_width](v_addr)
 
@@ -200,7 +206,18 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                                 grad_M_addr, current + grad_out_val * v_vec
                             )
 
-                        vectorize[compute_row, simdwidth](k)
+                        # Process remaining elements
+                        if remainder > 0:
+                            var j = num_full_vectors * simd_width
+                            for offset in range(remainder):
+                                var v_val = v_data[
+                                    v_base + (j + offset) * v_stride
+                                ]
+                                var grad_M_addr = (
+                                    grad_M_row_base
+                                    + (j + offset) * grad_M_stride1
+                                )
+                                grad_M_data[grad_M_addr] += grad_out_val * v_val
                 else:
                     for i in range(m):
                         var grad_out_val = grad_out_data[
