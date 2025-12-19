@@ -1055,6 +1055,50 @@ struct NDBuffer[dtype: DType](
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
+    @always_inline
+    fn clamp(
+        self: NDBuffer[Self.dtype],
+        lower_bound: Scalar[Self.dtype],
+        upper_bound: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        if self.is_contiguous():
+            var start = self.offset
+            var end = start + self.numels()
+            var result_buffer = self.buffer.clamp(
+                lower_bound, upper_bound
+            ) if start == 0 else self.buffer[start:end].clamp(
+                lower_bound, upper_bound
+            )
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+        else:
+            var index = 0
+            var result_buffer = Buffer[Self.dtype](self.numels())
+
+            for idx in self.index_iterator():
+                result_buffer[index] = self.buffer[idx].clamp(
+                    lower_bound, upper_bound
+                )
+                index += 1
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    @always_inline
+    fn clamp_in_place(
+        self: NDBuffer[Self.dtype],
+        lower_bound: Scalar[Self.dtype],
+        upper_bound: Scalar[Self.dtype],
+    ):
+        if (
+            self.is_contiguous()
+        ):  # Use only when whole underlying buffer(Buffer) is contiguous - for example Gradbox buffer
+            self.buffer.clamp_in_place(lower_bound, upper_bound)
+        else:
+            for idx in self.index_iterator():
+                self.buffer[idx] = self.buffer[idx].clamp(
+                    lower_bound, upper_bound
+                )
+
     fn __eq__(self, other: Self) -> Bool:
         return self.compare[Equal](other).buffer.all_true()
 
@@ -1210,3 +1254,11 @@ struct NDBuffer[dtype: DType](
                 result = result.sum(reduction_axes=IntArray(i), keepdims=True)
                 current_shape = result.shape
         return result^
+
+
+fn main():
+    alias dtype = DType.float32
+    b = NDBuffer[dtype](-10, -3, 0, 1, 2, 4, -10, 9, 21)
+    print(b.clamp(-3, 8).buffer)
+    b.clamp_in_place(-3, 8)
+    print(b.buffer)

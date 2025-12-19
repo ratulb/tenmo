@@ -13,7 +13,7 @@ from sys import simd_width_of
 from matmul import Matmul
 from random import seed, random_float64
 from buffers import Buffer
-from forwards import Mean
+from forwards import Mean, Sqrt
 from utilities import Utils
 from indexhelper import IndexIterator
 
@@ -82,6 +82,29 @@ struct Gradbox[dtype: DType](
         ]()
         var nd_buffer = NDBuffer[Self.dtype](buffer^, self.buffer.shape)
         return Gradbox[Self.dtype](nd_buffer^, share=False)
+
+    fn sqrt(
+        self,
+        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
+    ) -> Gradbox[Self.dtype]:
+        return Sqrt[Self.dtype].forward(self, epsilon)
+
+    fn norm(
+        self,
+        p: Float64 = 2.0,
+        axis: Optional[Int] = None,
+        keepdims: Bool = False,
+    ) -> Gradbox[Self.dtype]:
+        """Compute Lp norm. Supports L2 (p=2) only."""
+        if p == 2.0:
+            # L2 norm: sqrt(sum(x²))
+            var squared = self.__mul__(self)
+            var dim = IntArray(axis.value()) if axis else IntArray()
+            var sum_sq = squared.sum(dim, keepdims=keepdims)
+            return sum_sq.sqrt()
+        else:
+            panic("Only L2 norm (p=2) currently supported")
+            return Gradbox[Self.dtype](Shape(), share=False)
 
     @staticmethod
     fn arange(
@@ -525,6 +548,12 @@ struct Gradbox[dtype: DType](
     fn zero_grad(self):
         self.buffer.zero()
 
+    @always_inline
+    fn clamp_in_place(
+        self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
+    ):
+        self.buffer.clamp_in_place(lower_bound, upper_bound)
+
     fn __mul__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         return Gradbox[Self.dtype](
             self.buffer.scalar_ops[Multiply](scalar), share=False
@@ -579,6 +608,11 @@ struct Gradbox[dtype: DType](
         return Matmul[Self.dtype].forward(A, B)
 
     fn __add__(self, other: Self) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
+            self.buffer.arithmetic_ops[Add](other.buffer), share=False
+        )
+
+    fn __add__(self, other: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
         return Gradbox[Self.dtype](
             self.buffer.arithmetic_ops[Add](other.buffer), share=False
         )
@@ -727,4 +761,8 @@ struct Gradbox[dtype: DType](
 
 
 fn main():
-    pass
+    alias dtype = DType.float32
+    g = Gradbox[dtype].arange(-10, 20)
+    g.print()
+    g.clamp_in_place(-5, 8)
+    g.print()

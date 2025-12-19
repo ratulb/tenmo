@@ -4,7 +4,8 @@ A simple neural network implementation for MNIST digit classification.
 """
 
 from tenmo import Tensor
-from net import Linear, ReLU, Sequential, SGD
+from sgd import SGD
+from net import Linear, ReLU, Sequential
 from crossentropy import CrossEntropyLoss
 from python import Python
 from numpy_interop import from_ndarray, numpy_dtype
@@ -62,7 +63,9 @@ fn train_mnist() raises:
     var train_batch_size = 64
     var test_batch_size = 64
 
-    var train_dataset = NumpyDataset[FEATURE_DTYPE, LABEL_DTYPE](X_train, y_train)
+    var train_dataset = NumpyDataset[FEATURE_DTYPE, LABEL_DTYPE](
+        X_train, y_train
+    )
     var test_dataset = NumpyDataset[FEATURE_DTYPE, LABEL_DTYPE](X_test, y_test)
 
     var train_loader = train_dataset.into_loader(
@@ -80,25 +83,34 @@ fn train_mnist() raises:
     print("Building model...")
     var model = Sequential[FEATURE_DTYPE]()
     model.append(
-        #Linear[FEATURE_DTYPE](784, 128, init_method="he", bias_zero=True, profile_samples=0).into(),
-        Linear[FEATURE_DTYPE](784, 128, init_method="he", bias_zero=True).into(),
+        Linear[FEATURE_DTYPE](
+            784, 128, init_method="he", bias_zero=True
+        ).into(),
         ReLU[FEATURE_DTYPE]().into(),
-        #Linear[FEATURE_DTYPE](128, 32, init_method="he", bias_zero=True, profile_samples=0).into(),
         Linear[FEATURE_DTYPE](128, 32, init_method="he", bias_zero=True).into(),
         ReLU[FEATURE_DTYPE]().into(),
-        #Linear[FEATURE_DTYPE](32, 10, init_method="he", bias_zero=True, profile_samples=0).into(),
         Linear[FEATURE_DTYPE](32, 10, init_method="he", bias_zero=True).into(),
     )
     print("  Architecture: 784 -> 128 -> 32 -> 10")
     print("  Total parameters:", model.num_parameters(), "\n")
 
     # ========== Training Setup ==========
-    var num_epochs = 10
+    var num_epochs = 20
     var learning_rate = Scalar[FEATURE_DTYPE](0.01)
     var momentum = Scalar[FEATURE_DTYPE](0.9)
+    var weight_decay = Scalar[FEATURE_DTYPE](1e-4)
+    var clip_norm = Scalar[FEATURE_DTYPE](1)
+    var clip_value = Scalar[FEATURE_DTYPE](0.5)
 
     var criterion = CrossEntropyLoss[FEATURE_DTYPE]()
-    var optimizer = SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+    var optimizer = SGD(
+        model.parameters(),
+        lr=learning_rate,
+        momentum=momentum,
+        weight_decay=weight_decay,
+        clip_norm=clip_norm,
+        clip_value=clip_value,
+    )
 
     print("Training configuration:")
     print("  Epochs:", num_epochs)
@@ -114,8 +126,10 @@ fn train_mnist() raises:
         var epoch_start = perf_counter_ns()
 
         # Learning rate decay at epoch 5
-        if epoch == 5:
-            optimizer.set_lr(optimizer.lr / 5)
+        if epoch == 10:
+            optimizer.set_lr(optimizer.lr / 10)
+        if epoch == 15:
+            optimizer.set_lr(optimizer.lr / 10)
 
         # --- Training Phase ---
         model.train()
@@ -163,10 +177,23 @@ fn train_mnist() raises:
         var val_acc = 100.0 * val_correct / val_total
 
         print(
-            "Epoch", epoch + 1, "/", num_epochs,
-            "| Time:", epoch_time, "s",
-            "| Train Loss:", avg_train_loss, "Acc:", train_acc, "%",
-            "| Val Loss:", avg_val_loss, "Acc:", val_acc, "%"
+            "Epoch",
+            epoch + 1,
+            "/",
+            num_epochs,
+            "| Time:",
+            epoch_time,
+            "s",
+            "| Train Loss:",
+            avg_train_loss,
+            "Acc:",
+            train_acc,
+            "%",
+            "| Val Loss:",
+            avg_val_loss,
+            "Acc:",
+            val_acc,
+            "%",
         )
 
     var total_time = (perf_counter_ns() - training_start) / 1e9
@@ -175,10 +202,11 @@ fn train_mnist() raises:
     print("=" * 80)
 
 
-fn compute_accuracy[dtype: DType](
-    pred: Tensor[dtype], target: Tensor[DType.int32]
-) -> Int:
-    """Compute classification accuracy by comparing argmax predictions to targets."""
+fn compute_accuracy[
+    dtype: DType
+](pred: Tensor[dtype], target: Tensor[DType.int32]) -> Int:
+    """Compute classification accuracy by comparing argmax predictions to targets.
+    """
     var correct = 0
     var batch_size = pred.shape()[0]
     var num_classes = pred.shape()[1]

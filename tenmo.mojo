@@ -544,6 +544,12 @@ struct Tensor[dtype: DType = DType.float32](
     fn all(self, pred: fn (Scalar[Self.dtype]) -> Bool) -> Bool:
         return self.buffer.buffer.map_to_bool(pred).all_true()
 
+    fn all_true(self: Tensor[DType.bool]) -> Bool:
+        fn all_holds(scalar: Scalar[DType.bool]) -> Bool:
+            return scalar == Scalar[DType.bool](True)
+
+        return self.all(all_holds)
+
     fn any(self, pred: fn (Scalar[Self.dtype]) -> Bool) -> Bool:
         return self.buffer.buffer.any(pred)
 

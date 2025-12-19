@@ -26,9 +26,9 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
     @always_inline
     fn backward[
-        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = TILE_SIZE
-    ](self, read output: Tensor[dtype]) -> List[
-        Tuple[Tensor[dtype], Gradbox[dtype], Int]
+        simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
+    ](self, output: Tensor[Self.dtype]) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
@@ -38,12 +38,12 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         var n = A.shape()[1]
         var p = B.shape()[1]
 
-        var result = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]()
+        var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
 
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
         # grad_A[i,j] = sum_k(grad_out[i,k] * B[j,k])  ← Reading B transposed!
         if A.requires_grad:
-            var grad_A = Gradbox[dtype].zeros(Shape([m, n]))
+            var grad_A = Gradbox[Self.dtype].zeros(Shape([m, n]))
 
             # Hoist all metadata
             var grad_out_stride0 = grad_out.strides()[0]
@@ -131,7 +131,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
         # grad_B[j,k] = sum_i(A[i,j] * grad_out[i,k])  ← Reading A transposed!
         if B.requires_grad:
-            var grad_B = Gradbox[dtype].zeros(Shape([n, p]))
+            var grad_B = Gradbox[Self.dtype].zeros(Shape([n, p]))
 
             var A_stride0 = A.buffer.strides[0]
             var A_stride1 = A.buffer.strides[1]
@@ -219,8 +219,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
         return result^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -230,9 +230,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     @always_inline
     fn forward[
         track_grad: Bool = True,
-        simdwidth: Int = simd_width_of[dtype](),
+        simdwidth: Int = simd_width_of[Self.dtype](),
         tile_size: Int = TILE_SIZE,  # Tune this: 32, 64, or 128
-    ](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
         var m = A_shape[0]
@@ -240,7 +240,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
         var p = B_shape[1]
 
         MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
-        var C = Tensor[dtype].zeros(Shape([m, p]))
+        var C = Tensor[Self.dtype].zeros(Shape([m, p]))
 
         # Hoist metadata
         var A_stride0 = A.buffer.strides[0]
@@ -355,13 +355,13 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     @always_inline
     fn forward[
-        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = TILE_SIZE
-    ](A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
+        simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
+    ](A: Tensor[Self.dtype], B: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
         var m = A.shape()[0]
         var n = A.shape()[1]
         var p = B.shape()[1]
 
-        var C = Gradbox[dtype].zeros(Shape([m, p]))
+        var C = Gradbox[Self.dtype].zeros(Shape([m, p]))
 
         # Hoist metadata
         ref A_strides = A.strides()
@@ -435,13 +435,13 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     @always_inline
     fn forward[
-        simdwidth: Int = simd_width_of[dtype](), tile_size: Int = TILE_SIZE
-    ](A: Gradbox[dtype], B: Tensor[dtype]) -> Gradbox[dtype]:
+        simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
+    ](A: Gradbox[Self.dtype], B: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
         var m = A.shape()[0]
         var n = A.shape()[1]
         var p = B.shape()[1]
 
-        var C = Gradbox[dtype].zeros(Shape([m, p]))
+        var C = Gradbox[Self.dtype].zeros(Shape([m, p]))
         var contiguous = B.is_contiguous()
 
         if contiguous:
@@ -563,9 +563,9 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_MATMUL_ND
 
     fn backward[
-        simdwidth: Int = simd_width_of[dtype]()
-    ](self, read output: Tensor[dtype]) -> List[
-        Tuple[Tensor[dtype], Gradbox[dtype], Int]
+        simdwidth: Int = simd_width_of[Self.dtype]()
+    ](self, output: Tensor[Self.dtype]) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
@@ -573,21 +573,27 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
         ref A_shape = A.shape()
         ref B_shape = B.shape()
-        var results = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]()
+        var results = List[
+            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
 
         if A.requires_grad:
             var B_transposed = B.transpose[track_grad=False](
                 axes=[-1, -2]
             ).contiguous[track_grad=False]()
 
-            var A_batch_grad = MatmulNd[dtype].forward(grad_out, B_transposed)
+            var A_batch_grad = MatmulNd[Self.dtype].forward(
+                grad_out, B_transposed
+            )
             var final_grad_A = A_batch_grad^.sum_over_broadcasted_axes(A_shape)
 
             results.append((A, final_grad_A^, AddTensor))
 
         if B.requires_grad:
             var A_transposed = A.transpose[track_grad=False](axes=[-1, -2])
-            var B_batch_grad = MatmulNd[dtype].forward(A_transposed, grad_out)
+            var B_batch_grad = MatmulNd[Self.dtype].forward(
+                A_transposed, grad_out
+            )
 
             var final_grad_B = B_batch_grad^.sum_over_broadcasted_axes(B_shape)
 
@@ -595,8 +601,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
         return results^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -605,14 +611,16 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
-        track_grad: Bool = True, simdwidth: Int = simd_width_of[dtype]()
-    ](mut A: Tensor[dtype], mut B: Tensor[dtype]) -> Tensor[dtype]:
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
+    ](mut A: Tensor[Self.dtype], mut B: Tensor[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
 
         # Short-circuit for pure 2D case
         if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[dtype].forward[track_grad](A, B)
+            return Matmul2d[Self.dtype].forward[track_grad](A, B)
 
         MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
         # shapes: batch + [m, k], batch + [k, n]
@@ -641,7 +649,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             B_slice = B.__getitem__[track_grad=False](il(B_indices), s(), s())
             C_slice = C.__getitem__[track_grad=False](il(indices), s(), s())
 
-            result = Matmul2d[dtype].forward[track_grad=False](
+            result = Matmul2d[Self.dtype].forward[track_grad=False](
                 A_slice,
                 B_slice,
             )
@@ -653,7 +661,9 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var backward_fn = MatmulNdBackward[dtype]().into_backward_fn()
+                var backward_fn = MatmulNdBackward[
+                    Self.dtype
+                ]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
@@ -662,12 +672,14 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
 
     @always_inline
     @staticmethod
-    fn forward(mut A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
+    fn forward(
+        mut A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
         # Short-circuit for 2D
         if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[dtype].forward(A, B)
+            return Matmul2d[Self.dtype].forward(A, B)
 
         MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
 
@@ -700,7 +712,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             var C_slice = C[il(indices), s(), s()]
 
             # Use 2D matmul for GradBox (no backward needed)
-            var result = Matmul2d[dtype].forward(
+            var result = Matmul2d[Self.dtype].forward(
                 A_slice, B_slice
             )  # Backward fn would not be attached
             C_slice.buffer.copy_from_alike[overwrite=False](result.buffer^)
@@ -710,13 +722,15 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     # Gradbox and Tensor matmul_nd - No backward fn needed
     @always_inline
     @staticmethod
-    fn forward(A: Gradbox[dtype], mut B: Tensor[dtype]) -> Gradbox[dtype]:
+    fn forward(
+        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
 
         # Short-circuit for 2D
         if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[dtype].forward(A, B)
+            return Matmul2d[Self.dtype].forward(A, B)
 
         MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
 
@@ -746,7 +760,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             var C_slice = C[il(indices), s(), s()]
 
             # Use 2D matmul for GradBox (no backward needed)
-            var result = Matmul2d[dtype].forward(A_slice, B_slice)
+            var result = Matmul2d[Self.dtype].forward(A_slice, B_slice)
             C_slice.buffer.copy_from_alike[overwrite=False](result.buffer^)
 
         return C^
@@ -759,7 +773,9 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True, mode: Int = mm
-    ](mut A: Tensor[dtype], mut B: Tensor[dtype]) -> Tensor[dtype]:
+    ](mut A: Tensor[Self.dtype], mut B: Tensor[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         @parameter
         if mode == mm:
             # Step 1: Pure analysis - get the opcode
@@ -771,40 +787,44 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
                 return A.dot[track_grad](B)
 
             if vm == opcode:
-                return VectorMatmulNd[dtype].forward[track_grad](A, B)
+                return VectorMatmulNd[Self.dtype].forward[track_grad](A, B)
 
             if mv == opcode:
-                return MatrixVectorMulNd[dtype].forward[track_grad](A, B)
+                return MatrixVectorMulNd[Self.dtype].forward[track_grad](A, B)
 
             if mm == opcode:
-                return MatmulNd[dtype].forward[track_grad](A, B)
+                return MatmulNd[Self.dtype].forward[track_grad](A, B)
 
             # Invalid case
             panic("Matmul: incompatible shapes")
-            return Tensor[dtype].scalar(0)
+            return Tensor[Self.dtype].scalar(0)
 
         elif mode == dot:
             return A.dot[track_grad](B)
 
         elif mode == vm:
-            return VectorMatmulNd[dtype].forward[track_grad](A, B)
+            return VectorMatmulNd[Self.dtype].forward[track_grad](A, B)
 
         elif mode == mv:
-            return MatrixVectorMulNd[dtype].forward[track_grad](A, B)
+            return MatrixVectorMulNd[Self.dtype].forward[track_grad](A, B)
         else:
             # Invalid case
             panic("Matmul: incompatible shapes")
-            return Tensor[dtype].scalar(0)
+            return Tensor[Self.dtype].scalar(0)
 
     @always_inline
     @staticmethod
-    fn forward(mut A: Tensor[dtype], B: Gradbox[dtype]) -> Gradbox[dtype]:
-        return MatmulNd[dtype].forward(A, B)
+    fn forward(
+        mut A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
+        return MatmulNd[Self.dtype].forward(A, B)
 
     @always_inline
     @staticmethod
-    fn forward(A: Gradbox[dtype], mut B: Tensor[dtype]) -> Gradbox[dtype]:
-        return MatmulNd[dtype].forward(A, B)
+    fn forward(
+        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
+        return MatmulNd[Self.dtype].forward(A, B)
 
 
 # alias dot = 0  # dot product

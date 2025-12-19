@@ -1628,6 +1628,56 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
+    fn clamp(
+        self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype]:
+        constrained[
+            Self.dtype.is_numeric(),
+            "Buffer → clamp is for numeric data types only",
+        ]()
+
+        var out = Buffer[Self.dtype](self.size)
+
+        alias simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (self.size // simd_width) * simd_width
+
+        # Vectorized absolute value
+        for idx in range(0, vectorized_end, simd_width):
+            var chunk = self.load[simdwidth=simd_width](idx)
+            out.store[simdwidth=simd_width](
+                idx, chunk.clamp(lower_bound, upper_bound)
+            )
+
+        # Scalar tail
+        for idx in range(vectorized_end, self.size):
+            out[idx] = self[idx].clamp(lower_bound, upper_bound)
+
+        return out^
+
+    @always_inline
+    fn clamp_in_place(
+        self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
+    ):
+        constrained[
+            Self.dtype.is_numeric(),
+            "Buffer → clamp is for numeric data types only",
+        ]()
+
+        alias simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (self.size // simd_width) * simd_width
+
+        # Vectorized absolute value
+        for idx in range(0, vectorized_end, simd_width):
+            var chunk = self.load[simdwidth=simd_width](idx)
+            self.store[simdwidth=simd_width](
+                idx, chunk.clamp(lower_bound, upper_bound)
+            )
+
+        # Scalar tail
+        for idx in range(vectorized_end, self.size):
+            self[idx] = self[idx].clamp(lower_bound, upper_bound)
+
+    @always_inline
     fn fill(
         self: Buffer[Self.dtype],
         value: Scalar[Self.dtype],

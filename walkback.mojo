@@ -46,3 +46,4 @@ from bce import BCEBackward
 from squareroot import SqrtBackward
 from variance import VarianceBackward
 from std_deviation import StdBackward
+from blashandle import BLASMatmul2dBackward

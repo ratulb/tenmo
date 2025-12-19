@@ -50,12 +50,13 @@ alias BACKWARD_CLIP = 39
 alias BACKWARD_VARIANCE = 40
 alias BACKWARD_STD = 41
 alias BACKWARD_SUBTRACT_BROADCAST = 42
-
+alias BLAS_BACKWARD_MATMUL_2D = 43
 # ========== Delegate (Variant) ==========
 
 alias Delegate[dtype: DType] = Variant[
     MatmulNdBackward[dtype],
     Matmul2dBackward[dtype],
+    BLASMatmul2dBackward[dtype],
     ReLUBackward[dtype],
     AddBackwardScalar[dtype],
     AddBackward[dtype],
@@ -144,6 +145,11 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.tag == BACKWARD_MATMUL_ND:
             return self.grad_fn[MatmulNdBackward[Self.dtype]].backward(output)
+
+        elif self.tag == BLAS_BACKWARD_MATMUL_2D:
+            return self.grad_fn[BLASMatmul2dBackward[Self.dtype]].backward(
+                output
+            )
 
         elif self.tag == BACKWARD_SIGMOID:
             return self.grad_fn[SigmoidBackward[Self.dtype]].backward(output)
