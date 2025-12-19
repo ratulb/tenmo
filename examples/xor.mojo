@@ -27,9 +27,9 @@ fn xor_classification() -> None:
     # Model
     var model = Sequential[dtype]()
     model.append(
-        Linear[dtype](2, 4, xavier=True).into(),
+        Linear[dtype](2, 4, init_method="xavier").into(),
         Sigmoid[dtype]().into(),
-        Linear[dtype](4, 1, xavier=True).into(),
+        Linear[dtype](4, 1, init_method="xavier").into(),
         Sigmoid[dtype]().into(),
     )
 
