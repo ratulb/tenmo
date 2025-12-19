@@ -2,15 +2,18 @@ from tenmo import Tensor
 from shapes import Shape
 from gradbox import Gradbox
 from math import sqrt
-from common_utils import addr, panic
+from common_utils import panic, now
 from utils import Variant
 from forwards import Matmul, Adder, Multiplicator, Subtractor, Clip
 from operators import mm, mv, vm, dot
+from blashandle import BLASHandle, BLASHandleLite
+
 
 alias LINEAR = 0
-alias RELU = 1
-alias SIGMOID = 2
-alias TANH = 3
+alias LINEAR_BLAS = 1
+alias RELU = 2
+alias SIGMOID = 3
+alias TANH = 4
 alias DROPOUT = 4
 
 
@@ -18,12 +21,13 @@ alias DROPOUT = 4
 struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     """Fully connected layer: y = xW + b."""
 
+    alias TAG = LINEAR
+
     var weight: Tensor[Self.dtype]
     var bias: Tensor[Self.dtype]
     var in_features: Int
     var out_features: Int
     var training: Bool
-    alias TAG = LINEAR
 
     fn __init__(
         out self,
@@ -138,33 +142,371 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         if xs_shape[-1] != weight_shape[0]:
             panic(
-                "Linear forward: input dim mismatch: input shape → ",
+                "LinearBLAS forward: input dim mismatch: input shape → ",
+                xs_shape.__str__(),
+                "and  weights shape → ",
+                weight_shape.__str__(),
+            )
+        var result: Tensor[Self.dtype]
+
+        if self.training:
+            var matmul_out = Matmul[Self.dtype].forward[
+                track_grad=True, mode=mode
+            ](xs, self.weight)
+            result = Adder[Self.dtype].forward[track_grad=True](
+                matmul_out^, self.bias
+            )
+
+        else:
+            var matmul_out = Matmul[Self.dtype].forward[
+                track_grad=False, mode=mode
+            ](xs, self.weight)
+            result = Adder[Self.dtype].forward[track_grad=False](
+                matmul_out^, self.bias
+            )
+
+        return result^
+
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+        var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+        params.append(
+            UnsafePointer(to=self.weight)
+            .unsafe_mut_cast[True]()
+            .as_any_origin()
+        )
+        params.append(
+            UnsafePointer(to=self.bias).unsafe_mut_cast[True]().as_any_origin()
+        )
+
+        return params^
+
+    fn num_parameters(self) -> Int:
+        return self.weight.numels() + self.bias.numels()
+
+    fn train(mut self):
+        """Set to training mode - enables gradient tracking."""
+        self.training = True
+
+    fn eval(mut self):
+        """Set to evaluation mode - disables gradient tracking."""
+        self.training = False
+
+    fn into(self) -> Module[Self.dtype]:
+        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
+
+
+@fieldwise_init
+@register_passable
+struct Profile(ImplicitlyCopyable):
+    """Profile for a specific batch size."""
+
+    var use_blas: Bool
+    var profiled: Bool
+    var call_count: Int
+    var time_native: Float64
+    var time_blas: Float64
+    var profile_samples: Int  # Samples per method
+
+    fn __init__(out self, profile_samples: Int = 10):
+        self.use_blas = False
+        self.profiled = False
+        self.call_count = 0
+        self.time_native = 0.0
+        self.time_blas = 0.0
+        self.profile_samples = profile_samples
+
+
+@fieldwise_init
+struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
+    """Fully connected layer: y = xW + b."""
+
+    alias TAG = LINEAR_BLAS
+
+    var weight: Tensor[Self.dtype]
+    var bias: Tensor[Self.dtype]
+    var in_features: Int
+    var out_features: Int
+    var training: Bool
+    var blas_lite: Optional[BLASHandleLite[Self.dtype]]
+    var train_profile: Profile
+    var validation_profile: Profile
+
+    fn __init__(
+        out self,
+        in_features: Int,
+        out_features: Int,
+        init_seed: Optional[Int] = None,
+        init_method: String = "standard",  # "standard", "xavier", "he"
+        bias_zero: Bool = True,
+        weight_factor: Scalar[Self.dtype] = Scalar[Self.dtype](1),
+        profile_samples: Int = 10,
+    ):
+        """
+        Initialize LinearBLAS layer with configurable weight initialization.
+
+        Args:
+            in_features: Number of input features.
+            out_features: Number of output features.
+            init_seed: Random seed for reproducibility.
+            init_method: Weight initialization method:
+                - "standard": Uniform[-0.1, 0.1] (good for [0,1] normalized inputs).
+                - "xavier": Xavier/Glorot uniform (good for tanh/sigmoid).
+                - "he": He/Kaiming normal (good for ReLU with standardized inputs).
+            bias_zero: If True, initialize bias to zeros.
+            weight_factor: Scaling factor for weight initialization.
+            profile_samples: Samples per method for profiling:
+                - 0: Skip profiling, always use native
+                - 1-3: Fast profiling (may be noisy)
+                - 5-10: Recommended (default: 10)
+                - >10: Extra stable, slower startup.
+        """
+        self.in_features = in_features
+        self.out_features = out_features
+        self.training = True
+        self.blas_lite = None
+        self.train_profile = Profile(profile_samples)
+        self.validation_profile = Profile(profile_samples)
+
+        # If profiling disabled, skip directly to native
+        if profile_samples == 0:
+            self.train_profile.profiled = True
+            self.train_profile.use_blas = False
+            self.validation_profile.profiled = True
+            self.validation_profile.use_blas = False
+
+        if init_method == "xavier":
+            # Xavier/Glorot uniform initialization
+            var limit = Scalar[Self.dtype](
+                sqrt(6.0 / (in_features + out_features))
+            )
+            self.weight = (
+                Tensor[Self.dtype].rand(
+                    shape=Shape(in_features, out_features),
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+                * weight_factor
+            )
+            if not bias_zero:
+                self.bias = Tensor[Self.dtype].rand(
+                    Shape(out_features),
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+            else:
+                self.bias = Tensor[Self.dtype].zeros(
+                    Shape(out_features), requires_grad=True
+                )
+
+        elif init_method == "he":
+            # He/Kaiming normal initialization (for ReLU)
+            var std = sqrt(2.0 / Float64(in_features))
+            self.weight = (
+                Tensor[Self.dtype].randn(
+                    shape=Shape(in_features, out_features),
+                    mean=0.0,
+                    std=std,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+                * weight_factor
+            )
+            if not bias_zero:
+                self.bias = Tensor[Self.dtype].randn(
+                    Shape(out_features),
+                    mean=0.0,
+                    std=std * 0.01,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+            else:
+                self.bias = Tensor[Self.dtype].zeros(
+                    Shape(out_features), requires_grad=True
+                )
+
+        else:  # "standard" or default
+            # Simple uniform initialization (good for [0,1] normalized inputs)
+            var limit = Scalar[Self.dtype](0.1)
+            self.weight = (
+                Tensor[Self.dtype].rand(
+                    shape=Shape(in_features, out_features),
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+                * weight_factor
+            )
+            if not bias_zero:
+                self.bias = Tensor[Self.dtype].rand(
+                    Shape(out_features),
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+            else:
+                self.bias = Tensor[Self.dtype].zeros(
+                    Shape(out_features), requires_grad=True
+                )
+
+    fn __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        ref xs_shape = xs.shape()
+        ref weight_shape = self.weight.shape()
+
+        if xs_shape[-1] != weight_shape[0]:
+            panic(
+                "LinearBLAS forward: input dim mismatch: input shape → ",
                 xs_shape.__str__(),
                 "and  weights shape → ",
                 weight_shape.__str__(),
             )
 
-        # Branch on training mode - compiler will optimize each path separately
+        ref profile = (
+            self.train_profile if self.training else self.validation_profile
+        )
+        if profile.profiled:
+            if profile.use_blas:
+                return self.matmul_blas(xs)
+            else:
+                return self.matmul(xs)
+
+        else:  # We are still in profiling phase
+            var curr_profile = profile.copy()
+            # Check if we can/should profile
+            var can_profile = (
+                self.blas_lite  # BLAS is available
+                and self.weight.is_contiguous()
+                and xs.is_contiguous()
+            )
+
+            if not can_profile:
+                # Skip profiling - just use native and mark as profiled
+                curr_profile.profiled = True
+                curr_profile.use_blas = False
+
+                if self.training:
+                    self.train_profile = curr_profile^
+
+                else:
+                    self.validation_profile = curr_profile^
+
+                return self.matmul(xs)
+
+            # Perform profiling
+            elif curr_profile.call_count < curr_profile.profile_samples:
+                # First Profile -> profile_samples: measure native matmul
+                var start = now()
+                var result = self.matmul(xs)
+                curr_profile.time_native += now() - start
+                curr_profile.call_count += 1
+
+                if self.training:
+                    self.train_profile = curr_profile^
+                else:
+                    self.validation_profile = curr_profile^
+
+                return result^
+
+            else:  # curr_profile.call_count < curr_profile.profile_samples * 2:
+                # Next 'profile_samples' calls: measure BLAS matmul
+                var start = now()
+                var result = self.matmul_blas(xs)
+                curr_profile.time_blas += now() - start
+                curr_profile.call_count += 1
+
+                # After profile_samples * 2 call, finalize decision
+                if curr_profile.call_count == curr_profile.profile_samples * 2:
+                    curr_profile.use_blas = (
+                        curr_profile.time_blas < curr_profile.time_native
+                    )
+                    curr_profile.profiled = True
+
+                    print(
+                        "LinearBLAS layer profiling complete.",
+                        "Profiled samples: ",
+                        curr_profile.profile_samples,
+                        "Training: ",
+                        self.training,
+                    )
+                    print(
+                        "  in_features: ",
+                        self.in_features,
+                        "out_features: ",
+                        self.out_features,
+                        "batch_size: ",
+                        xs_shape[0],
+                    )
+                    print(
+                        "  Native matmul calls):",
+                        curr_profile.time_native,
+                        "sec",
+                    )
+                    print(
+                        "  BLAS matmul calls:",
+                        curr_profile.time_blas,
+                        "sec",
+                    )
+                    print(
+                        "  Selected:",
+                        "BLAS" if curr_profile.use_blas else "Native",
+                    )
+                if self.training:
+                    self.train_profile = curr_profile^
+                else:
+                    self.validation_profile = curr_profile^
+
+                return result^
+
+    @always_inline
+    fn matmul(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        var result: Tensor[Self.dtype]
+
         if self.training:
-            # Training mode: build computational graph
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=True, mode=mode
-            ](  # mode == mm matrix mul
-                xs, self.weight
+            ](xs, self.weight)
+            result = Adder[Self.dtype].forward[track_grad=True](
+                matmul_out^, self.bias
             )
-            return Adder[Self.dtype].forward[track_grad=True](
-                matmul_out, self.bias
-            )
+
         else:
-            # Eval mode: no graph building - pure computation
             var matmul_out = Matmul[Self.dtype].forward[
                 track_grad=False, mode=mode
-            ](  # mode == mm matrix mul
-                xs, self.weight
+            ](xs, self.weight)
+            result = Adder[Self.dtype].forward[track_grad=False](
+                matmul_out^, self.bias
             )
-            return Adder[Self.dtype].forward[track_grad=False](
-                matmul_out, self.bias
+
+        return result^
+
+    @always_inline
+    fn matmul_blas(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        var result: Tensor[Self.dtype]
+
+        if self.training:
+            var matmul_out = self.blas_lite.value().matmul[track_grad=True](
+                xs, self.weight, transpose_A=False, transpose_B=False
             )
+            result = Adder[Self.dtype].forward[track_grad=True](
+                matmul_out^, self.bias
+            )
+
+        else:
+            var matmul_out = self.blas_lite.value().matmul[track_grad=False](
+                xs, self.weight, transpose_A=False, transpose_B=False
+            )
+            result = Adder[Self.dtype].forward[track_grad=False](
+                matmul_out^, self.bias
+            )
+
+        return result^
 
     fn parameters(
         ref self,
@@ -374,9 +716,11 @@ struct Tanh[dtype: DType](ImplicitlyCopyable):
 
 alias Layer[dtype: DType] = Variant[
     Linear[dtype, mm],
+    LinearBLAS[dtype, mm],
     ReLU[dtype],
     Sigmoid[dtype],
     Tanh[dtype],
+    Dropout[dtype],
 ]
 
 
@@ -388,12 +732,16 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
     fn __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         if self.tag == LINEAR:
             return self.layer[Linear[Self.dtype, mm]](xs)
+        if self.tag == LINEAR_BLAS:
+            return self.layer[LinearBLAS[Self.dtype, mm]](xs)
         elif self.tag == RELU:
             return self.layer[ReLU[Self.dtype]](xs)
         elif self.tag == SIGMOID:
             return self.layer[Sigmoid[Self.dtype]](xs)
         elif self.tag == TANH:
             return self.layer[Tanh[Self.dtype]](xs)
+        elif self.tag == DROPOUT:
+            return self.layer[Dropout[Self.dtype]](xs)
 
         else:
             panic("Unknown module type")
@@ -404,18 +752,24 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
     ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
         if self.tag == LINEAR:
             return self.layer[Linear[Self.dtype]].parameters()
+        elif self.tag == LINEAR_BLAS:
+            return self.layer[LinearBLAS[Self.dtype]].parameters()
         else:
             return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
     fn num_parameters(self) -> Int:
         if self.tag == LINEAR:
             return self.layer[Linear[Self.dtype, mm]].num_parameters()
+        if self.tag == LINEAR_BLAS:
+            return self.layer[LinearBLAS[Self.dtype, mm]].num_parameters()
         elif self.tag == RELU:
             return self.layer[ReLU[Self.dtype]].num_parameters()
         elif self.tag == SIGMOID:
             return self.layer[Sigmoid[Self.dtype]].num_parameters()
         elif self.tag == TANH:
             return self.layer[Tanh[Self.dtype]].num_parameters()
+        elif self.tag == DROPOUT:
+            return self.layer[Dropout[Self.dtype]].num_parameters()
 
         else:
             return 0
@@ -429,23 +783,31 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         """Set module to training mode."""
         if self.tag == LINEAR:
             self.layer[Linear[Self.dtype, mm]].train()
+        if self.tag == LINEAR_BLAS:
+            self.layer[LinearBLAS[Self.dtype, mm]].train()
         elif self.tag == RELU:
             self.layer[ReLU[Self.dtype]].train()
         elif self.tag == SIGMOID:
             self.layer[Sigmoid[Self.dtype]].train()
         elif self.tag == TANH:
             self.layer[Tanh[Self.dtype]].train()
+        elif self.tag == DROPOUT:
+            self.layer[Dropout[Self.dtype]].train()
 
     fn eval(mut self):
         """Set module to evaluation mode."""
         if self.tag == LINEAR:
             self.layer[Linear[Self.dtype]].eval()
+        elif self.tag == LINEAR_BLAS:
+            self.layer[LinearBLAS[Self.dtype]].eval()
         elif self.tag == RELU:
             self.layer[ReLU[Self.dtype]].eval()
         elif self.tag == SIGMOID:
             self.layer[Sigmoid[Self.dtype]].eval()
         elif self.tag == TANH:
             self.layer[Tanh[Self.dtype]].eval()
+        elif self.tag == DROPOUT:
+            self.layer[Dropout[Self.dtype]].eval()
 
 
 @fieldwise_init
@@ -457,6 +819,68 @@ struct Sequential[dtype: DType](Copyable & Movable):
 
     fn append(mut self, *ms: Module[Self.dtype]):
         for m in ms:
+            if m.tag == LINEAR_BLAS:
+                panic("LinearBLAS layer can not be added to Sequential. Use SequentialBLAS")
+            self.modules.append(m)
+
+    fn __call__(mut self, xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        var out = xs
+        for i in range(len(self.modules)):
+            var ref m = self.modules[i]
+            out = m(out)
+        return out
+
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+        var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+        for module in self.modules:
+            params.extend(module.parameters())
+        return params^
+
+    fn num_parameters(self) -> Int:
+        var total: Int = 0
+        for parameter in self.parameters():
+            total += parameter[].numels()
+        return total
+
+    fn train(mut self):
+        """Set all modules to training mode."""
+        for i in range(len(self.modules)):
+            self.modules[i].train()
+
+    fn eval(mut self):
+        """Set all modules to evaluation mode."""
+        for i in range(len(self.modules)):
+            self.modules[i].eval()
+
+
+@fieldwise_init
+struct SequentialBLAS[dtype: DType](Copyable & Movable):
+    var modules: List[Module[Self.dtype]]
+    var blas_handle: BLASHandle[Self.dtype]
+
+    fn __init__(out self):
+        self.modules = List[Module[Self.dtype]]()
+        self.blas_handle = BLASHandle[Self.dtype]()
+
+        # BLAS status
+        if self.blas_handle.is_initialized():
+            print("SequeentialBLAS: BLAS acceleration enabled")
+        else:
+            print(
+                "SequeentialBLAS: BLAS not available -",
+                self.blas_handle.get_error(),
+            )
+
+    fn append(mut self, *ms: Module[Self.dtype]):
+        for m in ms:
+            if self.blas_handle.is_initialized() and m.tag == LINEAR_BLAS:
+                var linear = m.layer[LinearBLAS[Self.dtype, mm]]
+                linear.blas_lite = self.blas_handle.lite_handle()
+                self.modules.append(linear^.into())
+                continue
+
             self.modules.append(m)
 
     fn __call__(mut self, xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:

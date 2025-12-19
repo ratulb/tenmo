@@ -80,11 +80,14 @@ fn train_mnist() raises:
     print("Building model...")
     var model = Sequential[FEATURE_DTYPE]()
     model.append(
-        Linear[FEATURE_DTYPE](784, 128, xavier=False, bias_zero=True).into(),
+        #Linear[FEATURE_DTYPE](784, 128, init_method="he", bias_zero=True, profile_samples=0).into(),
+        Linear[FEATURE_DTYPE](784, 128, init_method="he", bias_zero=True).into(),
         ReLU[FEATURE_DTYPE]().into(),
-        Linear[FEATURE_DTYPE](128, 32, xavier=False, bias_zero=True).into(),
+        #Linear[FEATURE_DTYPE](128, 32, init_method="he", bias_zero=True, profile_samples=0).into(),
+        Linear[FEATURE_DTYPE](128, 32, init_method="he", bias_zero=True).into(),
         ReLU[FEATURE_DTYPE]().into(),
-        Linear[FEATURE_DTYPE](32, 10, xavier=False, bias_zero=True).into(),
+        #Linear[FEATURE_DTYPE](32, 10, init_method="he", bias_zero=True, profile_samples=0).into(),
+        Linear[FEATURE_DTYPE](32, 10, init_method="he", bias_zero=True).into(),
     )
     print("  Architecture: 784 -> 128 -> 32 -> 10")
     print("  Total parameters:", model.num_parameters(), "\n")
