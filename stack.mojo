@@ -151,8 +151,8 @@ struct Stack[dtype: DType](ImplicitlyCopyable):
         for i in range(len(tensors)):
             var to_be_expanded = tensors[i]
             grad_required = grad_required or to_be_expanded.requires_grad
-            # expanded = to_be_expanded.unsqueeze[track_grad=False]([stack_axis])
-            expanded = to_be_expanded.unsqueeze([stack_axis])
+            expanded = to_be_expanded.unsqueeze[track_grad=False]([stack_axis])
+            #expanded = to_be_expanded.unsqueeze([stack_axis])
             expanded_tensors.append(expanded^)
 
         # ===== 3. CONCATENATE: Along the new dimension =====
@@ -216,7 +216,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable):
             for i in range(len(tensors)):
                 var tensor = tensors[i]
                 var size = tensor.shape()[0]
-                # var reshaped_tensor = tensor.reshape[track_grad=False](1, size)
+                #var reshaped_tensor = tensor.reshape[track_grad=False](1, size)
                 var reshaped_tensor = tensor.reshape(1, size)
                 reshaped.append(reshaped_tensor^)
 
