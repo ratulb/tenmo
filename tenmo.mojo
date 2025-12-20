@@ -721,6 +721,48 @@ struct Tensor[dtype: DType = DType.float32](
         return tensor^
 
     @staticmethod
+    fn concat[
+        track_grad: Bool = True
+    ](
+        tensors: List[Tensor[Self.dtype]],
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        return Concate[Self.dtype].forward[track_grad](
+            tensors, axis, requires_grad
+        )
+
+    @staticmethod
+    fn stack[
+        track_grad: Bool = True
+    ](
+        tensors: List[Tensor[Self.dtype]],
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        return Stack[Self.dtype].forward[track_grad](
+            tensors, axis, requires_grad
+        )
+
+    @staticmethod
+    fn vstack[
+        track_grad: Bool = True
+    ](
+        tensors: List[Tensor[Self.dtype]],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        return Stack[Self.dtype].vstack[track_grad](tensors, requires_grad)
+
+    @staticmethod
+    fn hstack[
+        track_grad: Bool = True
+    ](
+        tensors: List[Tensor[Self.dtype]],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        return Stack[Self.dtype].hstack[track_grad](tensors, requires_grad)
+
+    @staticmethod
     fn linspace(
         start: Scalar[Self.dtype],
         end: Scalar[Self.dtype],

@@ -32,6 +32,8 @@ from net import BCELoss, BCEWithLogitsLoss
 from squareroot import Sqrt
 from variance import Variance
 from std_deviation import StdDev
+from concate import Concate
+from stack import Stack
 
 
 fn main():
