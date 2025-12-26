@@ -34,6 +34,7 @@ from variance import Variance
 from std_deviation import StdDev
 from concate import Concate
 from stack import Stack
+from pad import Pad
 
 
 fn main():

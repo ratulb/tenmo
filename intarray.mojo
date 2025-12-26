@@ -255,6 +255,22 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
         self._size += 1
 
     @always_inline("nodebug")
+    fn __iadd__(mut self, other: Self):
+        """Inplace add with other."""
+        if len(self) != len(other):
+            panic("IntArray -> __iadd__(other): ", "unequal lengths")
+        for i in range(len(self)):
+            self[i] += other[i]
+
+    @always_inline("nodebug")
+    fn __iadd__(mut self, other: List[Int]):
+        """Inplace add with other list."""
+        if len(self) != len(other):
+            panic("IntArray -> __iadd__(other[List]): ", "unequal lengths")
+        for i in range(len(self)):
+            self[i] += other[i]
+
+    @always_inline("nodebug")
     fn __radd__(self, value: Int) -> Self:
         return IntArray(value).__add__(self)
 
@@ -667,6 +683,6 @@ struct ZipIterator[
 fn main():
     ia = IntArray()
     ia.append(99)
-    ia2 = IntArray()
-    print(ia == ia2, ia2 == IntArray())
+    ia2 = IntArray(100)
+    ia += ia2
     print(ia)

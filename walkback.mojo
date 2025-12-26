@@ -49,3 +49,4 @@ from std_deviation import StdBackward
 from blashandle import BLASMatmul2dBackward
 from concate import ConcatBackward
 from stack import StackBackward
+from pad import PadBackward

@@ -11,17 +11,19 @@ from sys import simd_width_of
 struct LogBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_LOG
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    var epsilon: Scalar[dtype]  # Runtime epsilon value
+
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """Compute gradient: ∂log(x)/∂x = 1/x."""
         ref grad_output = output.gradients()[]
         var parent = output.ancestry().get(0)
         ref shape = parent.shape()
-        var parent_gradbox = Gradbox[dtype].zeros(shape, share=False)
+        var parent_gradbox = Gradbox[Self.dtype].zeros(shape, share=False)
 
         if parent.is_contiguous():
             var src = parent.buffer.data_buffer().data
@@ -30,19 +32,21 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
             var offset = parent.offset()
             var numels = parent.numels()
 
-            alias simd_width = simd_width_of[dtype]()
+            alias simd_width = simd_width_of[Self.dtype]()
 
             for i in range(0, numels - simd_width + 1, simd_width):
                 var x = src.load[width=simd_width](offset + i)  # Original input
                 var grad_out = grad_output_data.load[width=simd_width](i)
 
-                # Correct: grad_out / x
-                dest.store[width=simd_width](i, grad_out / x)
+                # Apply epsilon: max(x, epsilon) to avoid division by zero
+                var x_safe = max(x, self.epsilon)
+                dest.store[width=simd_width](i, grad_out / x_safe)
 
             # Handle remainder
             for i in range(numels - numels % simd_width, numels):
                 var x = src[offset + i]  # Original input
-                dest[i] = grad_output_data[i] / x  # Correct formula
+                var x_safe = max(x, self.epsilon)
+                dest[i] = grad_output_data[i] / x_safe
         else:
             # Non-contiguous fallback
             var index = 0
@@ -50,9 +54,9 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
             var grad_output_data = grad_output.buffer.data_buffer().data
             for coord in shape:
                 var x = parent[coord]  # Original input
-                parent_gradbox_data[index] = (
-                    grad_output_data[index] / x
-                )  # Correct
+                var x_safe = max(x, self.epsilon)
+                parent_gradbox_data[index] = grad_output_data[index] / x_safe
+                index += 1
 
         return [(parent^, parent_gradbox^, AddTensor)]
 
@@ -64,14 +68,26 @@ struct Logarithm[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[
-        dtype
-    ]:
-        """Natural logarithm: y = log(x)."""
+        epsilon: Scalar[Self.dtype] = 1e-12,  # Default epsilon
+    ) -> Tensor[Self.dtype]:
+        """
+        Natural logarithm: y = log(x).
+
+        Args:
+            self: Input tensor.
+            requires_grad: Whether to track gradients.
+            epsilon: Small value to avoid log(0) and division by zero (default: 1e-12).
+
+        Returns:
+            Logarithm of input tensor.
+
+        Note:
+            Values less than epsilon are clamped to epsilon before taking log.
+        """
         var shape = self.shape()
-        var out = Tensor[dtype].zeros(shape, requires_grad=False)
+        var out = Tensor[Self.dtype].zeros(shape, requires_grad=False)
 
         if self.is_contiguous():
             var src = self.buffer.data_buffer().data
@@ -79,69 +95,38 @@ struct Logarithm[dtype: DType]:
             var offset = self.offset()
             var numels = self.numels()
 
-            alias simd_width = simd_width_of[dtype]()
+            alias simd_width = simd_width_of[Self.dtype]()
 
             for i in range(0, numels - simd_width + 1, simd_width):
                 var chunk = src.load[width=simd_width](offset + i)
-                dest.store[width=simd_width](i, log(chunk))
+                # Clamp to epsilon to avoid log(0)
+                var chunk_safe = max(chunk, epsilon)
+                dest.store[width=simd_width](i, log(chunk_safe))
 
             # Handle remainder
             for i in range(numels - numels % simd_width, numels):
-                dest[i] = log(src[offset + i])
+                var val = src[offset + i]
+                var val_safe = max(val, epsilon)
+                dest[i] = log(val_safe)
         else:
             # Non-contiguous fallback
-            for coord in shape:
-                out[coord] = log(self[coord])
+            var index = 0
+            ref out_buffer = out.buffer.data_buffer()
+            for idx in self.index_iterator():
+                var val = self.element_at(idx)
+                var val_safe = max(val, epsilon)
+                out_buffer[index] = log(val_safe)
+                index += 1
 
         @parameter
         if track_grad:
-            grad_required = requires_grad.or_else(self.requires_grad)
+            var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = LogBackward[dtype]().into_backward_fn()
+                var backward_fn = LogBackward[Self.dtype](
+                    epsilon
+                ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
         return out^
-
-
-## The Math
-# Forward:  y = log(x)
-# Backward: dy/dx = 1/x
-
-
-fn main() raises:
-    # x = 2.0
-    # y = log(2.0)  # ≈ 0.693
-
-    # If grad_output = 1.0:
-    # Correct gradient: 1.0 / 2.0 = 0.5
-    # gradient: 1.0 / log(2.0) ≈ 1.44
-    test_log_backward()
-    print("passes")
-
-
-fn test_log_backward():
-    print("Testing log backward...")
-
-    var x = Tensor[DType.float64]([2.0, 3.0, 4.0], requires_grad=True)
-    var y = x.log()
-    print("y (log(x)):")  # // Should be [0.693, 1.099, 1.386]
-    y.print()
-    var loss = y.sum()
-    loss.backward()
-
-    print("x.grad:")
-    # // ✅ Should be [0.5, 0.333, 0.25] = [1/2, 1/3, 1/4]
-    # // ❌ NOT [1.44, 0.91, 0.72] = [1/log(2), 1/log(3), 1/log(4)]
-
-    # // Numerical verification
-    x.grad().print()
-    var expected = Tensor[DType.float64]([0.5, 0.333333, 0.25])
-    print("Expected:", expected)
-
-    var diff = (x.grad() - expected).sum().item()
-    if diff < 1e-5:
-        print("✅ PASS: Gradients correct!")
-    else:
-        print("❌ FAIL: Gradients incorrect!")

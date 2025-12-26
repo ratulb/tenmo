@@ -252,6 +252,44 @@ struct Tensor[dtype: DType = DType.float32](
             validated=True,
         )
 
+    fn chunk(
+        self, *indices: Idx, requires_grad: Bool = False
+    ) -> Tensor[Self.dtype]:
+        """
+        Get allocated independent chunks. Gradients would not flow back to the original chunk source.
+        """
+
+        # Delegate shape/strides/offset computation
+        shape, strides, offset = (
+            Validator.validate_and_compute_advanced_indexing_metadata(
+                self.shape(),
+                self.strides(),
+                indices,
+            )
+        )
+        var result = Tensor[Self.dtype](shape, requires_grad=requires_grad)
+        if strides.is_contiguous(shape):
+            memcpy(
+                dest=result.buffer.buffer.data,
+                src=self.buffer.buffer.data + offset,
+                count=shape.num_elements(),
+            )
+        else:
+            var index = 0
+            var index_iterator = IndexIterator(
+                shape=Pointer(to=shape),
+                strides=Pointer(to=strides),
+                start_offset=offset,
+            )
+            ref result_buffer = result.buffer.data_buffer()
+            ref src_buffer = self.buffer.data_buffer()
+
+            for idx in index_iterator:
+                result_buffer[index] = src_buffer[idx]
+                index += 1
+
+        return result^
+
     fn __getitem__[
         track_grad: Bool = True
     ](mut self, *indices: Idx) -> Tensor[Self.dtype]:
@@ -470,6 +508,11 @@ struct Tensor[dtype: DType = DType.float32](
             self.buffer.compare_scalar[GreaterThan](scalar)
         )
 
+    fn __gt__(self, scalar: Scalar[Self.dtype]) -> Tensor[DType.bool]:
+        return Tensor[DType.bool](
+            self.buffer.compare_scalar[GreaterThan](scalar)
+        )
+
     fn __ge__(self, scalar: Scalar[Self.dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](
             self.buffer.compare_scalar[GreaterThanEqual](scalar)
@@ -555,8 +598,14 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn log[
         track_grad: Bool = True
-    ](self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
-        return Logarithm[Self.dtype].forward[track_grad](self, requires_grad)
+    ](
+        self,
+        requires_grad: Optional[Bool] = None,
+        epsilon: Scalar[Self.dtype] = 1e-12,
+    ) -> Tensor[Self.dtype]:
+        return Logarithm[Self.dtype].forward[track_grad](
+            self, requires_grad, epsilon
+        )
 
     fn all_close[
         rtol: Scalar[Self.dtype] = 1e-5,
@@ -669,6 +718,16 @@ struct Tensor[dtype: DType = DType.float32](
 
         var nd_buffer = NDBuffer[dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
+
+    @staticmethod
+    fn randn(
+        *dims: Int,
+        mean: Float64 = 0.0,
+        std: Float64 = 1.0,
+        init_seed: Optional[Int] = None,
+        requires_grad: Bool = False,
+    ) -> Tensor[Self.dtype]:
+        return Self.randn(Shape(dims), mean, std, init_seed, requires_grad)
 
     @staticmethod
     fn randn(
@@ -810,9 +869,7 @@ struct Tensor[dtype: DType = DType.float32](
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
-    fn onehot(
-        self: Tensor[DType.int32], num_classes: Int
-    ) -> Tensor[Self.dtype]:
+    fn onehot(self: Tensor[Self.dtype], num_classes: Int) -> Tensor[Self.dtype]:
         """Convert tensor of class indices to one-hot encoding.
         Args:
             self: Tensor of shape (...,) containing class indices.
@@ -2112,6 +2169,77 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Gradbox[Self.dtype]:
         return Matmul[Self.dtype].forward(A, B)
 
+    @staticmethod
+    fn pad[
+        track_grad: Bool = True
+    ](
+        x: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        mode: String = "constant",
+        value: Scalar[Self.dtype] = 0.0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        return Pad[Self.dtype].forward[track_grad](
+            x, pad, mode, value, requires_grad
+        )
+
+    @staticmethod
+    fn pad_constant[
+        track_grad: Bool = True
+    ](
+        x: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        value: Scalar[Self.dtype] = 0.0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        return Pad[Self.dtype].forward[track_grad](
+            x, pad, "constant", value, requires_grad
+        )
+
+    @staticmethod
+    fn pad2d[
+        track_grad: Bool = True
+    ](
+        x: Tensor[Self.dtype],
+        pad_left: Int,
+        pad_right: Int,
+        pad_top: Int,
+        pad_bottom: Int,
+        mode: String = "constant",
+        value: Scalar[Self.dtype] = 0.0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        # Convenience for 2D padding
+        var pad = List[Tuple[Int, Int]]()
+        pad.append((pad_top, pad_bottom))
+        pad.append((pad_left, pad_right))
+        return Pad[Self.dtype].forward[track_grad](
+            x, pad, mode, value, requires_grad
+        )
+
+    @staticmethod
+    fn pad_for_conv[
+        track_grad: Bool = True
+    ](
+        x: Tensor[Self.dtype],
+        pad: Int,  # Same padding on all spatial sides
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        # For 4D tensors (N, C, H, W) - common in CNNs
+        var x_shape = x.shape()
+        if x_shape.rank() != 4:
+            panic("pad_for_conv: expected 4D tensor")
+
+        var pad_spec = List[Tuple[Int, Int]]()
+        pad_spec.append((0, 0))  # No padding on batch
+        pad_spec.append((0, 0))  # No padding on channels
+        pad_spec.append((pad, pad))  # Pad height
+        pad_spec.append((pad, pad))  # Pad width
+
+        return Pad[Self.dtype].forward[track_grad](
+            x, pad_spec, "constant", 0.0, requires_grad
+        )
+
 
 @register_passable
 struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
@@ -2140,7 +2268,7 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
 
 fn main():
     a = Tensor.arange(10)
-    m = a.mean()
-    a.print()
-    m.print()
-    a.std[False]().print()
+    b = a.chunk(s(2, 3), requires_grad=True)
+    c = a[2:3]
+    b.print()
+    c.print()

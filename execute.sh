@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [stack|concat|std_variance|blas|dropout|indexhelper|utils|variance|tanh|losses|data|intarray|tensors|mmnd|mm2d|mv|vm|argminmax|minmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|shapes|strides|ancestry|bench|validators|ce|synth_smoke|synth_mnist|shapebroadcast|all]"
+    echo "Usage: $0 [pad|logarithm|stack|concat|std_variance|blas|dropout|indexhelper|utils|variance|tanh|losses|data|intarray|tensors|mmnd|mm2d|mv|vm|argminmax|minmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|shapes|strides|ancestry|bench|validators|ce|synth_smoke|synth_mnist|shapebroadcast|all]"
     exit 1
 fi
 
@@ -17,6 +17,10 @@ case $1 in
     tensors)
         echo "Running mojo -I . tests/test_tensors.mojo"
         mojo -I . $DEBUG_MODE tests/test_tensors.mojo
+        ;;
+    pad)
+        echo "Running mojo -I . tests/test_pad.mojo"
+        mojo -I . $DEBUG_MODE tests/test_pad.mojo
         ;;
     blas)
         echo "Running mojo -I . tests/test_blas.mojo"
@@ -33,6 +37,10 @@ case $1 in
     stack)
         echo "Running mojo -I . tests/test_stack.mojo"
         mojo -I . $DEBUG_MODE tests/test_stack.mojo
+        ;;
+    logarithm)
+        echo "Running mojo -I . tests/test_logarithm.mojo"
+        mojo -I . $DEBUG_MODE tests/test_logarithm.mojo
         ;;
 
     concat)
@@ -220,6 +228,12 @@ case $1 in
         ;;
 
     all)
+        echo "Running tests/test_pad.mojo"
+        mojo -I . tests/test_pad.mojo
+
+        echo "Running tests/test_logarithm.mojo"
+        mojo -I . tests/test_logarithm.mojo
+
         echo "Running tests/test_stack.mojo"
         mojo -I . tests/test_stack.mojo
 
@@ -339,7 +353,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: stack, concat, std_variance, dropout, blas, indexhelper, utils, variance, tanh, losses, data, intarray, mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax permute, shuffle, argminmax, minmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, strides, ancestry, shapebroadcast, bench, validators, ce, synth_smoke, synth_mnist, all"
+        echo "Available tests: pad, logarithm, stack, concat, std_variance, dropout, blas, indexhelper, utils, variance, tanh, losses, data, intarray, mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax permute, shuffle, argminmax, minmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, strides, ancestry, shapebroadcast, bench, validators, ce, synth_smoke, synth_mnist, all"
         exit 1
         ;;
 esac
