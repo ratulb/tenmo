@@ -22,6 +22,7 @@ from intarray import IntArray
 from broadcasthelper import ShapeBroadcaster
 from ndbuffer import NDBuffer
 from utilities import Utils
+from filler import Filler
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -333,77 +334,20 @@ struct Tensor[dtype: DType = DType.float32](
         self.buffer[indices] = value
 
     @always_inline
-    fn __setitem__(self, indices: IntArray, value: Scalar[Self.dtype]):
-        if self.rank() == 0 and indices.size() != 0:  # Tensor with Shape ()
+    fn __setitem__(self, coord: IntArray, value: Scalar[Self.dtype]):
+        if self.rank() == 0 and coord.size() != 0:  # Tensor with Shape ()
             panic(
                 "Tensor → __setitem__(IntArray): Scalar tensor expects no"
                 " indices"
             )
 
-        self.buffer[indices] = value
+        self.buffer[coord] = value
 
-    fn set(mut self, value: Scalar[Self.dtype], *indices: Idx):
-        # Compute view metadata
-        shape, strides, offset = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                self.shape(), self.strides(), indices
-            )
-        )
-        if len(shape) == 0:
-            self.buffer.buffer[self.offset() + offset] = value
-        else:
-            sliced = self.view[track_grad=False](
-                shape=shape, strides=strides, offset=self.offset() + offset
-            )
-            for coord in shape:
-                sliced[coord] = value
+    fn fill(self, value: Scalar[Self.dtype], *indices: Idx):
+        Filler[Self.dtype].fill(Pointer(to=self), value, indices)
 
-    fn set(mut self, mut tensor: Tensor[Self.dtype], *indices: Idx):
-        shape, strides, offset = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                self.shape(), self.strides(), indices
-            )
-        )
-        if len(shape) == 0:
-            if not tensor.numels() == 1:
-                panic(
-                    (
-                        "Tensor → set: expected single element tensor. Received"
-                        " tensor with"
-                    ),
-                    tensor.numels().__str__(),
-                    "elements tensor",
-                )
-
-            else:
-                elem = (
-                    tensor.item() if tensor.shape()
-                    == Shape() else (tensor.squeeze[track_grad=False]([]))[
-                        IntArray()
-                    ]
-                )
-                self.buffer.buffer[self.offset() + offset] = elem
-        else:
-            tensor_shape = tensor.shape()
-            if not ShapeBroadcaster.broadcastable(tensor_shape, shape):
-                panic(
-                    "Tensor → set: input tensor not broadcastable to shape",
-                    shape.__str__(),
-                )
-            else:
-                sliced = self.view[track_grad=False](
-                    shape=shape, strides=strides, offset=self.offset() + offset
-                )
-                if tensor_shape == shape:
-                    for coord in shape:
-                        sliced[coord] = tensor[coord]
-                else:
-                    mask = ShapeBroadcaster.broadcast_mask(tensor_shape, shape)
-                    for coord in shape:
-                        tensor_coord = ShapeBroadcaster.translate_index(
-                            tensor_shape, coord, mask, shape
-                        )
-                        sliced[coord] = tensor[tensor_coord]
+    fn fill(self, tensor: Tensor[Self.dtype], *indices: Idx):
+        Filler[Self.dtype].fill(Pointer(to=self), tensor, indices)
 
     fn item(self) -> Scalar[Self.dtype]:
         return self.buffer.item()
@@ -2268,7 +2212,20 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
 
 fn main():
     a = Tensor.arange(10)
-    b = a.chunk(s(2, 3), requires_grad=True)
-    c = a[2:3]
-    b.print()
+    c = a.reshape(2, 5)  # View of a
     c.print()
+    c.fill(1919, i(1), i(2))
+
+    a.print()
+    d = Tensor.scalar(0)
+    d.fill(999, il(IntArray()))
+    a.fill(-42, Idx(9))
+
+    a.print()
+    d.print()
+
+    x = Tensor.rand(2, 3)
+    y = Tensor.ones(3)
+    x.fill(y, i(1), s())  # x being filled - y is being broadcasted
+
+    x.print()

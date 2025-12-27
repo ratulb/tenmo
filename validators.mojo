@@ -602,6 +602,10 @@ struct Validator:
                 stride_dim = original_strides[dim_counter]
                 dim_counter += 1
                 start, end, step = Slicer.slice(s, shape_dim)
+                if step > 0 and end > start and end < 0:
+                    start += shape_dim
+                    end += shape_dim
+                print(start, end, step)
                 start = max(0, min(start, shape_dim))
                 end = max(0, min(end, shape_dim))
                 if step == 0:
