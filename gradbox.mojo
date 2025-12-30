@@ -16,6 +16,7 @@ from buffers import Buffer
 from forwards import Mean, Sqrt
 from utilities import Utils
 from indexhelper import IndexIterator
+from filler import Filler
 
 
 struct Gradbox[dtype: DType](
@@ -241,7 +242,6 @@ struct Gradbox[dtype: DType](
             new_shape.append(self.shape()[axis])
             new_strides.append(self.strides()[axis])
 
-        # Create a contiguous backing buffer (value semantics) and construct a new NDBuffer
         var buffer = self.buffer.contiguous_buffer()
         var nd_buffer = NDBuffer[Self.dtype](
             buffer=buffer^,
@@ -250,7 +250,6 @@ struct Gradbox[dtype: DType](
             offset=0,
         )
 
-        # Return a value-style Gradbox (share=False) — no ArcPointer, no autograd, no view-sharing
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @staticmethod
@@ -547,6 +546,15 @@ struct Gradbox[dtype: DType](
     @always_inline
     fn zero_grad(self):
         self.buffer.zero()
+
+    fn fill(self, value: Scalar[Self.dtype], *indices: Idx):
+        Filler[Self.dtype].fill(self.buffer, value, indices)
+
+    fn fill(self, tensor: Tensor[Self.dtype], *indices: Idx):
+        Filler[Self.dtype].fill(self.buffer, tensor.buffer, indices)
+
+    fn fill(self, gradbox: Gradbox[Self.dtype], *indices: Idx):
+        Filler[Self.dtype].fill(self.buffer, gradbox.buffer, indices)
 
     @always_inline
     fn clamp_in_place(

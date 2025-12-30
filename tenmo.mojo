@@ -344,10 +344,13 @@ struct Tensor[dtype: DType = DType.float32](
         self.buffer[coord] = value
 
     fn fill(self, value: Scalar[Self.dtype], *indices: Idx):
-        Filler[Self.dtype].fill(Pointer(to=self), value, indices)
+        Filler[Self.dtype].fill(self.buffer, value, indices)
 
     fn fill(self, tensor: Tensor[Self.dtype], *indices: Idx):
-        Filler[Self.dtype].fill(Pointer(to=self), tensor, indices)
+        Filler[Self.dtype].fill(self.buffer, tensor.buffer, indices)
+
+    fn fill(self, gradbox: Gradbox[Self.dtype], *indices: Idx):
+        Filler[Self.dtype].fill(self.buffer, gradbox.buffer, indices)
 
     fn item(self) -> Scalar[Self.dtype]:
         return self.buffer.item()
