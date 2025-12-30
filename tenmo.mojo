@@ -269,10 +269,11 @@ struct Tensor[dtype: DType = DType.float32](
             )
         )
         var result = Tensor[Self.dtype](shape, requires_grad=requires_grad)
+        var absolute_offset = self.offset() + offset
         if strides.is_contiguous(shape):
             memcpy(
                 dest=result.buffer.buffer.data,
-                src=self.buffer.buffer.data + offset,
+                src=self.buffer.buffer.data + absolute_offset,
                 count=shape.num_elements(),
             )
         else:
@@ -280,7 +281,7 @@ struct Tensor[dtype: DType = DType.float32](
             var index_iterator = IndexIterator(
                 shape=Pointer(to=shape),
                 strides=Pointer(to=strides),
-                start_offset=offset,
+                start_offset=absolute_offset,
             )
             ref result_buffer = result.buffer.data_buffer()
             ref src_buffer = self.buffer.data_buffer()
@@ -2214,7 +2215,11 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
 
 
 fn main():
-    a = Tensor.arange(10)
+    alias dtype = DType.float64
+
+    s = Tensor[dtype].scalar(49, requires_grad=True)
+    s.print()
+    _="""a = Tensor.arange(10)
     c = a.reshape(2, 5)  # View of a
     c.print()
     c.fill(1919, i(1), i(2))
@@ -2231,4 +2236,4 @@ fn main():
     y = Tensor.ones(3)
     x.fill(y, i(1), s())  # x being filled - y is being broadcasted
 
-    x.print()
+    x.print()"""

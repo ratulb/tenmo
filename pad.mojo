@@ -20,6 +20,7 @@ Examples:
   - Pad H with 1 on each side
   - Pad W with 2 on each side
 """
+
 from tenmo import Tensor
 from shapes import Shape
 from gradbox import Gradbox
@@ -27,6 +28,191 @@ from backpropagation import BackwardFn, Delegate, BACKWARD_PAD
 from operators import AddTensor
 from common_utils import panic
 from intarray import IntArray
+
+
+@fieldwise_init
+struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
+    """Backward pass for padding operation - handles all modes."""
+
+    alias TAG = BACKWARD_PAD
+
+    var pad: List[Tuple[Int, Int]]
+    var mode: String
+
+    fn __copyinit__(out self, other: Self):
+        self.pad = other.pad.copy()
+        self.mode = other.mode
+
+    fn backward(
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        """
+        Backward pass: Accumulate gradients based on padding mode.
+        """
+        ref grad_out = output.gradients()[]
+        var parent = output.ancestry().get(0)
+
+        var results = List[
+            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
+
+        if parent.requires_grad:
+            ref parent_shape = parent.shape()
+            var grad_parent = Gradbox[Self.dtype].zeros(
+                parent_shape, share=False
+            )
+
+            # Different backward pass based on mode
+            if self.mode == "constant":
+                Self._extract_constant(
+                    grad_out, grad_parent, self.pad, parent_shape
+                )
+            elif self.mode == "circular":
+                Self._extract_circular(
+                    grad_out, grad_parent, self.pad, parent_shape
+                )
+            elif self.mode == "replicate":
+                Self._extract_replicate(
+                    grad_out, grad_parent, self.pad, parent_shape
+                )
+            elif self.mode == "reflect":
+                Self._extract_reflect(
+                    grad_out, grad_parent, self.pad, parent_shape
+                )
+
+            results.append((parent^, grad_parent^, AddTensor))
+
+        return results^
+
+    @staticmethod
+    fn _extract_constant(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """Extract gradients for constant padding - simple extraction from center.
+        """
+        var ndim = parent_shape.rank()
+
+        # Calculate offset where input data starts in padded output
+        var offset_list = List[Int]()
+        for i in range(ndim):
+            offset_list.append(pad[i][0])
+
+        # Iterate over parent's shape and extract gradients
+        for coord in parent_shape:
+            var grad_out_coord = coord
+            grad_out_coord += offset_list
+            grad_parent[coord] += grad_out[grad_out_coord^]
+
+    @staticmethod
+    fn _extract_circular(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """Extract gradients for circular padding - accumulate from all wrapped positions.
+        """
+        var ndim = parent_shape.rank()
+        var grad_out_shape = grad_out.shape()
+
+        # Iterate over ALL output positions and accumulate gradients
+        for out_coord in grad_out_shape:
+            # Map output coordinate back to input coordinate (same logic as forward)
+            var in_coord = IntArray.with_capacity(ndim)
+
+            for i in range(ndim):
+                var before = pad[i][0]
+                var out_idx = out_coord[i]
+                var in_size = parent_shape[i]
+
+                # Same wrapping logic as forward pass
+                var in_idx = (out_idx - before) % in_size
+                if in_idx < 0:
+                    in_idx += in_size
+                in_coord.append(in_idx)
+
+            # ACCUMULATE gradient (not replace!)
+            grad_parent[in_coord] += grad_out[out_coord]
+
+    @staticmethod
+    fn _extract_replicate(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """Extract gradients for replicate padding - accumulate from all replicated positions.
+        """
+        var ndim = parent_shape.rank()
+        var grad_out_shape = grad_out.shape()
+
+        # Iterate over ALL output positions and accumulate gradients
+        for out_coord in grad_out_shape:
+            # Map output coordinate back to input coordinate (same logic as forward)
+            var in_coord = IntArray.with_capacity(ndim)
+
+            for i in range(ndim):
+                var before = pad[i][0]
+                var out_idx = out_coord[i]
+                var in_size = parent_shape[i]
+
+                # Same clamping logic as forward pass (replicate edges)
+                var in_idx = out_idx - before
+                in_idx = max(0, min(in_size - 1, in_idx))
+                in_coord.append(in_idx)
+
+            # ACCUMULATE gradient
+            grad_parent[in_coord] += grad_out[out_coord]
+
+    @staticmethod
+    fn _extract_reflect(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """Extract gradients for reflect padding - accumulate from all reflected positions.
+        """
+        var ndim = parent_shape.rank()
+        var grad_out_shape = grad_out.shape()
+
+        # Iterate over ALL output positions and accumulate gradients
+        for out_coord in grad_out_shape:
+            # Map output coordinate back to input coordinate (same logic as forward)
+            var in_coord = IntArray.with_capacity(ndim)
+
+            for i in range(ndim):
+                var before = pad[i][0]
+                var out_idx = out_coord[i]
+                var in_size = parent_shape[i]
+
+                # Same reflection logic as forward pass
+                var in_idx: Int
+                if out_idx < before:
+                    # Reflect from left border
+                    in_idx = before - out_idx
+                    in_idx = min(in_idx, in_size - 1)
+                elif out_idx >= before + in_size:
+                    # Reflect from right border
+                    var offset = out_idx - (before + in_size)
+                    in_idx = in_size - 2 - offset
+                    in_idx = max(0, in_idx)
+                else:
+                    # Inside original region
+                    in_idx = out_idx - before
+
+                # Final clamp
+                in_idx = max(0, min(in_size - 1, in_idx))
+                in_coord.append(in_idx)
+
+            # ACCUMULATE gradient
+            grad_parent[in_coord] += grad_out[out_coord]
+
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -233,191 +419,6 @@ struct Pad[dtype: DType](ImplicitlyCopyable):
                 in_coord.append(in_idx)
 
             result[out_coord] = x[in_coord]
-
-
-@fieldwise_init
-struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    """Backward pass for padding operation - handles all modes."""
-
-    alias TAG = BACKWARD_PAD
-
-    var pad: List[Tuple[Int, Int]]
-    var mode: String
-
-    fn __copyinit__(out self, other: Self):
-        self.pad = other.pad.copy()
-        self.mode = other.mode
-
-    fn backward(
-        self, read output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        """
-        Backward pass: Accumulate gradients based on padding mode.
-        """
-        ref grad_out = output.gradients()[]
-        var parent = output.ancestry().get(0)
-
-        var results = List[
-            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
-
-        if parent.requires_grad:
-            ref parent_shape = parent.shape()
-            var grad_parent = Gradbox[Self.dtype].zeros(
-                parent_shape, share=False
-            )
-
-            # Different backward pass based on mode
-            if self.mode == "constant":
-                Self._extract_constant(
-                    grad_out, grad_parent, self.pad, parent_shape
-                )
-            elif self.mode == "circular":
-                Self._extract_circular(
-                    grad_out, grad_parent, self.pad, parent_shape
-                )
-            elif self.mode == "replicate":
-                Self._extract_replicate(
-                    grad_out, grad_parent, self.pad, parent_shape
-                )
-            elif self.mode == "reflect":
-                Self._extract_reflect(
-                    grad_out, grad_parent, self.pad, parent_shape
-                )
-
-            results.append((parent^, grad_parent^, AddTensor))
-
-        return results^
-
-    @staticmethod
-    fn _extract_constant(
-        grad_out: Gradbox[Self.dtype],
-        grad_parent: Gradbox[Self.dtype],
-        pad: List[Tuple[Int, Int]],
-        parent_shape: Shape,
-    ):
-        """Extract gradients for constant padding - simple extraction from center.
-        """
-        var ndim = parent_shape.rank()
-
-        # Calculate offset where input data starts in padded output
-        var offset_list = List[Int]()
-        for i in range(ndim):
-            offset_list.append(pad[i][0])
-
-        # Iterate over parent's shape and extract gradients
-        for coord in parent_shape:
-            var grad_out_coord = coord
-            grad_out_coord += offset_list
-            grad_parent[coord] += grad_out[grad_out_coord^]
-
-    @staticmethod
-    fn _extract_circular(
-        grad_out: Gradbox[Self.dtype],
-        grad_parent: Gradbox[Self.dtype],
-        pad: List[Tuple[Int, Int]],
-        parent_shape: Shape,
-    ):
-        """Extract gradients for circular padding - accumulate from all wrapped positions.
-        """
-        var ndim = parent_shape.rank()
-        var grad_out_shape = grad_out.shape()
-
-        # Iterate over ALL output positions and accumulate gradients
-        for out_coord in grad_out_shape:
-            # Map output coordinate back to input coordinate (same logic as forward)
-            var in_coord = IntArray.with_capacity(ndim)
-
-            for i in range(ndim):
-                var before = pad[i][0]
-                var out_idx = out_coord[i]
-                var in_size = parent_shape[i]
-
-                # Same wrapping logic as forward pass
-                var in_idx = (out_idx - before) % in_size
-                if in_idx < 0:
-                    in_idx += in_size
-                in_coord.append(in_idx)
-
-            # ACCUMULATE gradient (not replace!)
-            grad_parent[in_coord] += grad_out[out_coord]
-
-    @staticmethod
-    fn _extract_replicate(
-        grad_out: Gradbox[Self.dtype],
-        grad_parent: Gradbox[Self.dtype],
-        pad: List[Tuple[Int, Int]],
-        parent_shape: Shape,
-    ):
-        """Extract gradients for replicate padding - accumulate from all replicated positions.
-        """
-        var ndim = parent_shape.rank()
-        var grad_out_shape = grad_out.shape()
-
-        # Iterate over ALL output positions and accumulate gradients
-        for out_coord in grad_out_shape:
-            # Map output coordinate back to input coordinate (same logic as forward)
-            var in_coord = IntArray.with_capacity(ndim)
-
-            for i in range(ndim):
-                var before = pad[i][0]
-                var out_idx = out_coord[i]
-                var in_size = parent_shape[i]
-
-                # Same clamping logic as forward pass (replicate edges)
-                var in_idx = out_idx - before
-                in_idx = max(0, min(in_size - 1, in_idx))
-                in_coord.append(in_idx)
-
-            # ACCUMULATE gradient
-            grad_parent[in_coord] += grad_out[out_coord]
-
-    @staticmethod
-    fn _extract_reflect(
-        grad_out: Gradbox[Self.dtype],
-        grad_parent: Gradbox[Self.dtype],
-        pad: List[Tuple[Int, Int]],
-        parent_shape: Shape,
-    ):
-        """Extract gradients for reflect padding - accumulate from all reflected positions.
-        """
-        var ndim = parent_shape.rank()
-        var grad_out_shape = grad_out.shape()
-
-        # Iterate over ALL output positions and accumulate gradients
-        for out_coord in grad_out_shape:
-            # Map output coordinate back to input coordinate (same logic as forward)
-            var in_coord = IntArray.with_capacity(ndim)
-
-            for i in range(ndim):
-                var before = pad[i][0]
-                var out_idx = out_coord[i]
-                var in_size = parent_shape[i]
-
-                # Same reflection logic as forward pass
-                var in_idx: Int
-                if out_idx < before:
-                    # Reflect from left border
-                    in_idx = before - out_idx
-                    in_idx = min(in_idx, in_size - 1)
-                elif out_idx >= before + in_size:
-                    # Reflect from right border
-                    var offset = out_idx - (before + in_size)
-                    in_idx = in_size - 2 - offset
-                    in_idx = max(0, in_idx)
-                else:
-                    # Inside original region
-                    in_idx = out_idx - before
-
-                # Final clamp
-                in_idx = max(0, min(in_size - 1, in_idx))
-                in_coord.append(in_idx)
-
-            # ACCUMULATE gradient
-            grad_parent[in_coord] += grad_out[out_coord]
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 fn main() raises:

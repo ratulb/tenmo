@@ -50,3 +50,4 @@ from blashandle import BLASMatmul2dBackward
 from concate import ConcatBackward
 from stack import StackBackward
 from pad import PadBackward
+from cnn import Col2ImBackward
