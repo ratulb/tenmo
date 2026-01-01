@@ -55,6 +55,7 @@ alias BACKWARD_CONCAT = 44
 alias BACKWARD_STACK = 45
 alias BACKWARD_PAD = 46
 alias BACKWARD_COL2IM = 47
+alias BACKWARD_CONV2D = 48
 # ========== Delegate (Variant) ==========
 
 alias Delegate[dtype: DType] = Variant[
@@ -106,6 +107,7 @@ alias Delegate[dtype: DType] = Variant[
     StackBackward[dtype],
     PadBackward[dtype],
     Col2ImBackward[dtype],
+    Conv2DBackward[dtype],
 ]
 
 # ========== BackwardFn with Tag-Based Dispatch ==========
@@ -308,6 +310,10 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.tag == BACKWARD_COL2IM:
             return self.grad_fn[Col2ImBackward[Self.dtype]].backward(output)
+
+        elif self.tag == BACKWARD_CONV2D:
+            return self.grad_fn[Conv2DBackward[Self.dtype]].backward(output)
+
 
         else:
             panic("BackwardFn: Unknown backward tag: " + String(self.tag))

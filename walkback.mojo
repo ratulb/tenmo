@@ -51,3 +51,4 @@ from concate import ConcatBackward
 from stack import StackBackward
 from pad import PadBackward
 from cnn import Col2ImBackward
+from convolution import Conv2DBackward

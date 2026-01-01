@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [chunk|fill|pad|logarithm|stack|concat|std_variance|blas|dropout|indexhelper|utils|variance|tanh|losses|data|intarray|tensors|mmnd|mm2d|mv|vm|argminmax|minmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|shapes|strides|ancestry|bench|validators|ce|synth_smoke|synth_mnist|shapebroadcast|all]"
+    echo "Usage: $0 [cnn|chunk|fill|pad|logarithm|stack|concat|std_variance|blas|dropout|indexhelper|utils|variance|tanh|losses|data|intarray|tensors|mmnd|mm2d|mv|vm|argminmax|minmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|shapes|strides|ancestry|bench|validators|ce|synth_smoke|synth_mnist|shapebroadcast|all]"
     exit 1
 fi
 
@@ -25,6 +25,10 @@ case $1 in
     chunk)
         echo "Running mojo -I . tests/test_chunk.mojo"
         mojo -I . $DEBUG_MODE tests/test_chunk.mojo
+        ;;
+    cnn)
+        echo "Running mojo -I . tests/test_cnn.mojo"
+        mojo -I . $DEBUG_MODE tests/test_cnn.mojo
         ;;
 
     pad)
@@ -237,6 +241,9 @@ case $1 in
         ;;
 
     all)
+        echo "Running tests/test_cnn.mojo"
+        mojo -I . tests/test_cnn.mojo
+
         echo "Running tests/test_chunk.mojo"
         mojo -I . tests/test_chunk.mojo
 
@@ -368,7 +375,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: chunk, fill, pad, logarithm, stack, concat, std_variance, dropout, blas, indexhelper, utils, variance, tanh, losses, data, intarray, mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax permute, shuffle, argminmax, minmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, strides, ancestry, shapebroadcast, bench, validators, ce, synth_smoke, synth_mnist, all"
+        echo "Available tests: cnn, chunk, fill, pad, logarithm, stack, concat, std_variance, dropout, blas, indexhelper, utils, variance, tanh, losses, data, intarray, mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax permute, shuffle, argminmax, minmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, strides, ancestry, shapebroadcast, bench, validators, ce, synth_smoke, synth_mnist, all"
         exit 1
         ;;
 esac
