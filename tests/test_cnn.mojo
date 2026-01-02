@@ -12,7 +12,7 @@ from random import  seed
 from gradbox import Gradbox
 from shapes import Shape
 from common_utils import i, s
-
+from forwards import Padding
 
 
 # Assume these are imported from your actual implementation
@@ -36,7 +36,7 @@ fn test_basic_forward() raises:
     kernel[0, 0, 1, 0] = 0.0
     kernel[0, 0, 1, 1] = 1.0
 
-    var result = Conv2D[DType.float32].forward(image, kernel, stride=1, padding="valid")
+    var result = Conv2dForward[DType.float32].forward(image, kernel, stride=1, padding="valid")
 
     # Expected: [1*1 + 4*1, 2*1 + 0*1] = [5, 2] for first row
     assert_almost_equal(result[0, 0, 0, 0], 5.0, atol=1e-5)
@@ -55,12 +55,12 @@ fn test_stride() raises:
     var kernel = Tensor[DType.float32].ones(1, 1, 2, 2)
 
     # Stride 1: should give 3x3 output
-    var result1 = Conv2D[DType.float32].forward(image, kernel, stride=1, padding="valid")
+    var result1 = Conv2dForward[DType.float32].forward(image, kernel, stride=1, padding="valid")
     assert_equal(result1.shape()[2], 3)
     assert_equal(result1.shape()[3], 3)
 
     # Stride 2: should give 2x2 output
-    var result2 = Conv2D[DType.float32].forward(image, kernel, stride=2, padding="valid")
+    var result2 = Conv2dForward[DType.float32].forward(image, kernel, stride=2, padding="valid")
     assert_equal(result2.shape()[2], 2)
     assert_equal(result2.shape()[3], 2)
 
@@ -79,10 +79,10 @@ fn test_dilation() raises:
     var kernel = Tensor[DType.float32].ones(1, 1, 2, 2)
 
     # Dilation 1: normal 2x2 kernel
-    var _result1 = Conv2D[DType.float32].forward(image, kernel, dilation=1, padding="valid")
+    var _result1 = Conv2dForward[DType.float32].forward(image, kernel, dilation=1, padding="valid")
 
     # Dilation 2: effective 3x3 kernel with gaps
-    var result2 = Conv2D[DType.float32].forward(image, kernel, dilation=2, padding="valid")
+    var result2 = Conv2dForward[DType.float32].forward(image, kernel, dilation=2, padding="valid")
 
     # With dilation=2, effective kernel size is 3x3, so output is 3x3
     assert_equal(result2.shape()[2], 3)
@@ -99,7 +99,7 @@ fn test_padding_same() raises:
     var kernel = Tensor[DType.float32].ones(1, 1, 3, 3)
 
     # With same padding and stride=1, output shape should equal input shape
-    var result = Conv2D[DType.float32].forward(image, kernel, stride=1, padding="same")
+    var result = Conv2dForward[DType.float32].forward(image, kernel, stride=1, padding="same")
 
     assert_equal(result.shape()[2], 4)
     assert_equal(result.shape()[3], 4)
@@ -115,12 +115,12 @@ fn test_padding_explicit() raises:
     var kernel = Tensor[DType.float32].ones(1, 1, 3, 3)
 
     # Test int padding
-    var result1 = Conv2D[DType.float32].forward(image, kernel, padding=Padding(1))
+    var result1 = Conv2dForward[DType.float32].forward(image, kernel, padding=Padding(1))
     assert_equal(result1.shape()[2], 4)
     assert_equal(result1.shape()[3], 4)
 
     # Test tuple padding
-    var result2 = Conv2D[DType.float32].forward(
+    var result2 = Conv2dForward[DType.float32].forward(
         image, kernel, padding=Padding((1, 2))
     )
     assert_equal(result2.shape()[2], 4)  # (4 + 2 - 3) + 1
@@ -140,7 +140,7 @@ fn test_bias() raises:
     bias[0] = 5.0
     bias[1] = 10.0
 
-    var result = Conv2D[DType.float32].forward(
+    var result = Conv2dForward[DType.float32].forward(
         image, kernel, bias=bias, padding="valid"
     )
 
@@ -161,7 +161,7 @@ fn test_multi_channel() raises:
     var image = Tensor[DType.float32].ones(1, 2, 4, 4)
     var kernel = Tensor[DType.float32].ones(3, 2, 2, 2)
 
-    var result = Conv2D[DType.float32].forward(image, kernel, padding="valid")
+    var result = Conv2dForward[DType.float32].forward(image, kernel, padding="valid")
 
     assert_equal(result.shape()[0], 1)  # Batch
     assert_equal(result.shape()[1], 3)  # Output channels
@@ -186,7 +186,7 @@ fn test_batch() raises:
                 image[b, 0, i, j] = Float32(b + 1)
 
     var kernel = Tensor[DType.float32].ones(1, 1, 2, 2)
-    var result = Conv2D[DType.float32].forward(image, kernel, padding="valid")
+    var result = Conv2dForward[DType.float32].forward(image, kernel, padding="valid")
 
     assert_equal(result.shape()[0], 4)
 
@@ -205,7 +205,7 @@ fn test_gradient_input() raises:
     var image = Tensor[DType.float32].ones(1, 1, 3, 3, requires_grad=True)
     var kernel = Tensor[DType.float32].ones(1, 1, 2, 2, requires_grad=False)
 
-    var output = Conv2D[DType.float32].forward(image, kernel, padding="valid")
+    var output = Conv2dForward[DType.float32].forward(image, kernel, padding="valid")
 
     # Backward pass
     var grad_output = Tensor[DType.float32].ones(output.shape())
@@ -220,13 +220,13 @@ fn test_gradient_input() raises:
 
     # Forward with +epsilon
     image[0, 0, 1, 1] = original + epsilon
-    var out_plus = Conv2D[DType.float32].forward[track_grad=False](
+    var out_plus = Conv2dForward[DType.float32].forward[track_grad=False](
         image, kernel, padding="valid"
     )
 
     # Forward with -epsilon
     image[0, 0, 1, 1] = original - epsilon
-    var out_minus = Conv2D[DType.float32].forward[track_grad=False](
+    var out_minus = Conv2dForward[DType.float32].forward[track_grad=False](
         image, kernel, padding="valid"
     )
 
@@ -258,7 +258,7 @@ fn test_gradient_kernel() raises:
         for j in range(3):
             image[0, 0, i, j] = Float32(i * 3 + j)
 
-    var output = Conv2D[DType.float32].forward(image, kernel, padding="valid")
+    var output = Conv2dForward[DType.float32].forward(image, kernel, padding="valid")
 
     # Backward pass
     var grad_output = Tensor[DType.float32].ones(output.shape())
@@ -271,12 +271,12 @@ fn test_gradient_kernel() raises:
     var original = kernel[0, 0, 0, 0]
 
     kernel[0, 0, 0, 0] = original + epsilon
-    var out_plus = Conv2D[DType.float32].forward[track_grad=False](
+    var out_plus = Conv2dForward[DType.float32].forward[track_grad=False](
         image, kernel, padding="valid"
     )
 
     kernel[0, 0, 0, 0] = original - epsilon
-    var out_minus = Conv2D[DType.float32].forward[track_grad=False](
+    var out_minus = Conv2dForward[DType.float32].forward[track_grad=False](
         image, kernel, padding="valid"
     )
 
@@ -301,7 +301,7 @@ fn test_gradient_bias() raises:
     var kernel = Tensor[DType.float32].ones(2, 1, 2, 2, requires_grad=False)
     var bias = Tensor[DType.float32].zeros(2, requires_grad=True)
 
-    var output = Conv2D[DType.float32].forward(image, kernel, bias=bias, padding="valid")
+    var output = Conv2dForward[DType.float32].forward(image, kernel, bias=bias, padding="valid")
 
     # Backward with uniform gradient
     var grad_output = Tensor[DType.float32].ones(output.shape())
@@ -327,8 +327,8 @@ fn test_gradient_flow() raises:
     var kernel2 = Tensor[DType.float32].ones(8, 4, 3, 3, requires_grad=True)
 
     # Two-layer convolution
-    var out1 = Conv2D[DType.float32].forward(image, kernel1, padding="same")
-    var out2 = Conv2D[DType.float32].forward(out1, kernel2, padding="same")
+    var out1 = Conv2dForward[DType.float32].forward(image, kernel1, padding="same")
+    var out2 = Conv2dForward[DType.float32].forward(out1, kernel2, padding="same")
 
     # Backward
     var grad_output = Tensor[DType.float32].ones(out2.shape())
@@ -349,14 +349,14 @@ fn test_edge_cases() raises:
     # Test 1x1 convolution
     var image = Tensor[DType.float32].ones(1, 3, 4, 4)
     var kernel_1x1 = Tensor[DType.float32].ones(5, 3, 1, 1)
-    var result = Conv2D[DType.float32].forward(image, kernel_1x1)
+    var result = Conv2dForward[DType.float32].forward(image, kernel_1x1)
     assert_equal(result.shape()[2], 4)
     assert_equal(result.shape()[3], 4)
 
     # Test large kernel relative to image
     var small_image = Tensor[DType.float32].ones(1, 1, 3, 3)
     var large_kernel = Tensor[DType.float32].ones(1, 1, 3, 3)
-    var result2 = Conv2D[DType.float32].forward(small_image, large_kernel, padding="valid")
+    var result2 = Conv2dForward[DType.float32].forward(small_image, large_kernel, padding="valid")
     assert_equal(result2.shape()[2], 1)
     assert_equal(result2.shape()[3], 1)
 
@@ -371,7 +371,7 @@ fn test_performance_batch() raises:
     var kernel = Tensor[DType.float32].randn(64, 3, 3, 3, requires_grad=True)
     var bias = Tensor[DType.float32].randn(64, requires_grad=True)
 
-    var output = Conv2D[DType.float32].forward(
+    var output = Conv2dForward[DType.float32].forward(
         image, kernel, bias=bias, padding="same"
     )
 
@@ -392,12 +392,12 @@ fn test_numerical_stability() raises:
     # Very small values
     var image_small = Tensor[DType.float32].full([1, 1, 3, 3], 1e-8)
     var kernel_small = Tensor[DType.float32].full([1, 1, 2, 2], 1e-8)
-    var result_small = Conv2D[DType.float32].forward(image_small, kernel_small)
+    var result_small = Conv2dForward[DType.float32].forward(image_small, kernel_small)
 
     # Very large values
     var image_large = Tensor[DType.float32].full([1, 1, 3, 3], 1e8)
     var kernel_large = Tensor[DType.float32].full([1, 1, 2, 2], 1e-8)
-    var result_large = Conv2D[DType.float32].forward(image_large, kernel_large)
+    var result_large = Conv2dForward[DType.float32].forward(image_large, kernel_large)
 
     # Should not produce NaN or Inf
     for i in range(result_small.shape()[2]):
@@ -572,15 +572,15 @@ fn compute_numerical_gradient(
 
         var out_plus: Tensor[DType.float32]
         if param_type == "image":
-            out_plus = Conv2D[DType.float32].forward[track_grad=False](
+            out_plus = Conv2dForward[DType.float32].forward[track_grad=False](
                 param_plus, kernel, bias, stride, dilation, padding
             )
         elif param_type == "kernel":
-            out_plus = Conv2D[DType.float32].forward[track_grad=False](
+            out_plus = Conv2dForward[DType.float32].forward[track_grad=False](
                 image, param_plus, bias, stride, dilation, padding
             )
         else:
-            out_plus = Conv2D[DType.float32].forward[track_grad=False](
+            out_plus = Conv2dForward[DType.float32].forward[track_grad=False](
                 image, kernel, param_plus, stride, dilation, padding
             )
 
@@ -600,15 +600,15 @@ fn compute_numerical_gradient(
 
         var out_minus: Tensor[DType.float32]
         if param_type == "image":
-            out_minus = Conv2D[DType.float32].forward[track_grad=False](
+            out_minus = Conv2dForward[DType.float32].forward[track_grad=False](
                 param_minus, kernel, bias, stride, dilation, padding
             )
         elif param_type == "kernel":
-            out_minus = Conv2D[DType.float32].forward[track_grad=False](
+            out_minus = Conv2dForward[DType.float32].forward[track_grad=False](
                 image, param_minus, bias, stride, dilation, padding
             )
         else:
-            out_minus = Conv2D[DType.float32].forward[track_grad=False](
+            out_minus = Conv2dForward[DType.float32].forward[track_grad=False](
                 image, kernel, param_minus, stride, dilation, padding
             )
 
@@ -632,25 +632,25 @@ fn test_basic_shapes() raises:
     # Test 1.1: Single channel, single filter
     var img1 = Tensor[DType.float32].randn(1, 1, 5, 5)
     var kernel1 = Tensor[DType.float32].randn(1, 1, 3, 3)
-    var out1 = Conv2D[DType.float32].forward[track_grad=False](img1, kernel1)
+    var out1 = Conv2dForward[DType.float32].forward[track_grad=False](img1, kernel1)
     assert_shape_equal(out1, [1, 1, 3, 3], "Single channel, 3x3 kernel")
 
     # Test 1.2: RGB image, multiple filters
     var img2 = Tensor[DType.float32].randn(2, 3, 8, 8)  # Batch=2
     var kernel2 = Tensor[DType.float32].randn(16, 3, 3, 3)  # 16 filters
-    var out2 = Conv2D[DType.float32].forward[track_grad=False](img2, kernel2)
+    var out2 = Conv2dForward[DType.float32].forward[track_grad=False](img2, kernel2)
     assert_shape_equal(out2, [2, 16, 6, 6], "RGB, 16 filters, batch=2")
 
     # Test 1.3: Large kernel
     var img3 = Tensor[DType.float32].randn(1, 1, 10, 10)
     var kernel3 = Tensor[DType.float32].randn(1, 1, 5, 5)
-    var out3 = Conv2D[DType.float32].forward[track_grad=False](img3, kernel3)
+    var out3 = Conv2dForward[DType.float32].forward[track_grad=False](img3, kernel3)
     assert_shape_equal(out3, [1, 1, 6, 6], "5x5 kernel on 10x10 image")
 
     # Test 1.4: Non-square image
     var img4 = Tensor[DType.float32].randn(1, 1, 7, 10)
     var kernel4 = Tensor[DType.float32].randn(1, 1, 3, 3)
-    var out4 = Conv2D[DType.float32].forward[track_grad=False](img4, kernel4)
+    var out4 = Conv2dForward[DType.float32].forward[track_grad=False](img4, kernel4)
     assert_shape_equal(out4, [1, 1, 5, 8], "Non-square image (7x10)")
 
     print("\n All basic shape tests passed!\n")
@@ -669,25 +669,25 @@ fn test_padding_modes() raises:
     var kernel = Tensor[DType.float32].randn(1, 1, 3, 3)
 
     # Test 2.1: Valid padding (no padding)
-    var out_valid = Conv2D[DType.float32].forward[track_grad=False](
+    var out_valid = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding("valid")
     )
     assert_shape_equal(out_valid, List[Int](1, 1, 6, 6), "Valid padding")
 
     # Test 2.2: Same padding (preserve dimensions)
-    var out_same = Conv2D[DType.float32].forward[track_grad=False](
+    var out_same = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding("same")
     )
     assert_shape_equal(out_same, List[Int](1, 1, 8, 8), "Same padding")
 
     # Test 2.3: Uniform integer padding
-    var out_pad1 = Conv2D[DType.float32].forward[track_grad=False](
+    var out_pad1 = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding(1)
     )
     assert_shape_equal(out_pad1, List[Int](1, 1, 8, 8), "Uniform padding=1")
 
     # Test 2.4: Tuple padding (height, width)
-    var out_pad_tuple = Conv2D[DType.float32].forward[track_grad=False](
+    var out_pad_tuple = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding((1, 2))
     )
     assert_shape_equal(out_pad_tuple, List[Int](1, 1, 8, 10), "Tuple padding (1,2)")
@@ -696,7 +696,7 @@ fn test_padding_modes() raises:
     var pad_list = List[Tuple[Int, Int]]()
     pad_list.append((1, 2))  # top=1, bottom=2
     pad_list.append((2, 1))  # left=2, right=1
-    var out_asym = Conv2D[DType.float32].forward[track_grad=False](
+    var out_asym = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding(pad_list.copy())
     )
     assert_shape_equal(out_asym, List[Int](1, 1, 9, 9), "Asymmetric padding")
@@ -717,25 +717,25 @@ fn test_stride_2() raises:
     var kernel = Tensor[DType.float32].randn(1, 1, 3, 3)
 
     # Test 3.1: Stride = 1 (default)
-    var out_s1 = Conv2D[DType.float32].forward[track_grad=False](
+    var out_s1 = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, stride=1
     )
     assert_shape_equal(out_s1, List[Int](1, 1, 6, 6), "Stride=1")
 
     # Test 3.2: Stride = 2
-    var out_s2 = Conv2D[DType.float32].forward[track_grad=False](
+    var out_s2 = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, stride=2
     )
     assert_shape_equal(out_s2, List[Int](1, 1, 3, 3), "Stride=2")
 
     # Test 3.3: Stride = 3
-    var out_s3 = Conv2D[DType.float32].forward[track_grad=False](
+    var out_s3 = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, stride=3
     )
     assert_shape_equal(out_s3, List[Int](1, 1, 2, 2), "Stride=3")
 
     # Test 3.4: Stride with padding
-    var out_s2_pad = Conv2D[DType.float32].forward[track_grad=False](
+    var out_s2_pad = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, stride=2, padding=Padding("same")
     )
     assert_shape_equal(out_s2_pad, List[Int](1, 1, 4, 4), "Stride=2 with same padding")
@@ -756,13 +756,13 @@ fn test_dilation_2() raises:
     var kernel = Tensor[DType.float32].randn(1, 1, 3, 3)
 
     # Test 4.1: Dilation = 1 (standard convolution)
-    var out_d1 = Conv2D[DType.float32].forward[track_grad=False](
+    var out_d1 = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, dilation=1
     )
     assert_shape_equal(out_d1, List[Int](1, 1, 8, 8), "Dilation=1")
 
     # Test 4.2: Dilation = 2 (effective kernel 5x5)
-    var out_d2 = Conv2D[DType.float32].forward[track_grad=False](
+    var out_d2 = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, dilation=2
     )
     # Effective kernel: 3 + (3-1)*1 = 5
@@ -770,7 +770,7 @@ fn test_dilation_2() raises:
     assert_shape_equal(out_d2, List[Int](1, 1, 6, 6), "Dilation=2")
 
     # Test 4.3: Dilation = 3 (effective kernel 7x7)
-    var out_d3 = Conv2D[DType.float32].forward[track_grad=False](
+    var out_d3 = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, dilation=3
     )
     # Effective kernel: 3 + (3-1)*2 = 7
@@ -793,7 +793,7 @@ fn test_bias_2() raises:
     var kernel = Tensor[DType.float32].ones(2, 1, 2, 2)  # 2 filters
 
     # Test 5.1: No bias (should use zeros)
-    var out_no_bias = Conv2D[DType.float32].forward[track_grad=False](
+    var out_no_bias = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel
     )
     # Each output position: sum of 2x2 ones = 4.0
@@ -804,7 +804,7 @@ fn test_bias_2() raises:
 
     # Test 5.2: With bias
     var bias = Tensor[DType.float32].full(Shape(2), 10.0)  # bias=10 for both filters
-    var out_with_bias = Conv2D[DType.float32].forward[track_grad=False](
+    var out_with_bias = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, bias=bias
     )
     # Each output: 4.0 + 10.0 = 14.0
@@ -817,7 +817,7 @@ fn test_bias_2() raises:
     var bias_diff = Tensor[DType.float32](Shape(2))
     bias_diff[0] = 5.0
     bias_diff[1] = 15.0
-    var out_diff_bias = Conv2D[DType.float32].forward[track_grad=False](
+    var out_diff_bias = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, bias=bias_diff
     )
     # Channel 0: 4.0 + 5.0 = 9.0
@@ -854,7 +854,7 @@ fn test_known_values() raises:
     kernel[0, 0, 0, 0] = 1.0; kernel[0, 0, 0, 1] = 0.0
     kernel[0, 0, 1, 0] = 0.0; kernel[0, 0, 1, 1] = 1.0
 
-    var out = Conv2D[DType.float32].forward[track_grad=False](img, kernel)
+    var out = Conv2dForward[DType.float32].forward[track_grad=False](img, kernel)
 
     # Manual computation:
     # Position (0,0): 1*1 + 2*0 + 4*0 + 5*1 = 6
@@ -892,7 +892,7 @@ fn test_gradient_shapes() raises:
     bias.requires_grad_(True)
 
     # Forward pass
-    var out = Conv2D[DType.float32].forward(img, kernel, bias=bias)
+    var out = Conv2dForward[DType.float32].forward(img, kernel, bias=bias)
 
     # Backward pass
     var loss = out.sum()
@@ -932,7 +932,7 @@ fn test_gradient_correctness() raises:
 
     # Test 8.1: Image gradient
     print("\nTesting image gradient...")
-    var out1 = Conv2D[DType.float32].forward(img, kernel, bias=bias)
+    var out1 = Conv2dForward[DType.float32].forward(img, kernel, bias=bias)
     var loss1 = out1.sum()
     loss1.backward()
 
@@ -952,7 +952,7 @@ fn test_gradient_correctness() raises:
     kernel.zero_grad()
     bias.zero_grad()
 
-    var out2 = Conv2D[DType.float32].forward(img, kernel, bias=bias)
+    var out2 = Conv2dForward[DType.float32].forward(img, kernel, bias=bias)
     var loss2 = out2.sum()
     loss2.backward()
 
@@ -972,7 +972,7 @@ fn test_gradient_correctness() raises:
     kernel.zero_grad()
     bias.zero_grad()
 
-    var out3 = Conv2D[DType.float32].forward(img, kernel, bias=bias)
+    var out3 = Conv2dForward[DType.float32].forward(img, kernel, bias=bias)
     var loss3 = out3.sum()
     loss3.backward()
 
@@ -1007,7 +1007,7 @@ fn test_gradient_stride_dilation() raises:
     var kernel_s2 = Tensor[DType.float32].randn(1, 1, 2, 2)
     kernel_s2.requires_grad_(True)
 
-    var out_s2 = Conv2D[DType.float32].forward(img_s2, kernel_s2, stride=2)
+    var out_s2 = Conv2dForward[DType.float32].forward(img_s2, kernel_s2, stride=2)
     var loss_s2 = out_s2.sum()
     loss_s2.backward()
 
@@ -1028,7 +1028,7 @@ fn test_gradient_stride_dilation() raises:
     var kernel_d2 = Tensor[DType.float32].randn(1, 1, 2, 2)
     kernel_d2.requires_grad_(True)
 
-    var out_d2 = Conv2D[DType.float32].forward(img_d2, kernel_d2, dilation=2)
+    var out_d2 = Conv2dForward[DType.float32].forward(img_d2, kernel_d2, dilation=2)
     var loss_d2 = out_d2.sum()
     loss_d2.backward()
 
@@ -1060,7 +1060,7 @@ fn test_gradient_accumulation() raises:
     kernel.requires_grad_(True)
 
     # First backward pass
-    var out1 = Conv2D[DType.float32].forward(img, kernel)
+    var out1 = Conv2dForward[DType.float32].forward(img, kernel)
     var loss1 = out1.sum()
     loss1.backward()
 
@@ -1068,7 +1068,7 @@ fn test_gradient_accumulation() raises:
     var grad_after_first = img.grad()
 
     # Second backward pass (should accumulate)
-    var out2 = Conv2D[DType.float32].forward(img, kernel)
+    var out2 = Conv2dForward[DType.float32].forward(img, kernel)
     var loss2 = out2.sum() * 2.0
     loss2.backward()
 
@@ -1097,14 +1097,14 @@ fn test_batch_processing() raises:
 
     # Process batch of 4
     var img_batch = Tensor[DType.float32].randn(4, 1, 6, 6)
-    var out_batch = Conv2D[DType.float32].forward[track_grad=False](img_batch, kernel)
+    var out_batch = Conv2dForward[DType.float32].forward[track_grad=False](img_batch, kernel)
 
 
     # Process individually
     var out_individual_list = List[Tensor[DType.float32]]()
     for i in range(4):
         var img_single = img_batch[i:i+1, :, :, :]  # Extract single image
-        var out_single = Conv2D[DType.float32].forward[track_grad=False](img_single, kernel)
+        var out_single = Conv2dForward[DType.float32].forward[track_grad=False](img_single, kernel)
         out_individual_list.append(out_single)
 
     # Compare results
@@ -1126,25 +1126,25 @@ fn test_edge_cases_2() raises:
    # Test 12.1: Kernel same size as image (output 1x1)
    var img_small = Tensor[DType.float32].randn(1, 1, 3, 3)
    var kernel_large = Tensor[DType.float32].randn(1, 1, 3, 3)
-   var out_1x1 = Conv2D[DType.float32].forward[track_grad=False](img_small, kernel_large)
+   var out_1x1 = Conv2dForward[DType.float32].forward[track_grad=False](img_small, kernel_large)
    assert_shape_equal(out_1x1, List[Int](1, 1, 1, 1), "Kernel size = image size")
 
    # Test 12.2: 1x1 kernel (pointwise convolution)
    var img_pw = Tensor[DType.float32].randn(1, 3, 5, 5)
    var kernel_1x1 = Tensor[DType.float32].randn(16, 3, 1, 1)
-   var out_pw = Conv2D[DType.float32].forward[track_grad=False](img_pw, kernel_1x1)
+   var out_pw = Conv2dForward[DType.float32].forward[track_grad=False](img_pw, kernel_1x1)
    assert_shape_equal(out_pw, List[Int](1, 16, 5, 5), "1x1 kernel (pointwise)")
 
    # Test 12.3: Large batch
    var img_large_batch = Tensor[DType.float32].randn(32, 3, 8, 8)
    var kernel_lb = Tensor[DType.float32].randn(8, 3, 3, 3)
-   var out_lb = Conv2D[DType.float32].forward[track_grad=False](img_large_batch, kernel_lb)
+   var out_lb = Conv2dForward[DType.float32].forward[track_grad=False](img_large_batch, kernel_lb)
    assert_shape_equal(out_lb, List[Int](32, 8, 6, 6), "Large batch (32)")
 
    # Test 12.4: Many channels
    var img_many_ch = Tensor[DType.float32].randn(1, 64, 4, 4)
    var kernel_many = Tensor[DType.float32].randn(128, 64, 2, 2)
-   var out_many = Conv2D[DType.float32].forward[track_grad=False](img_many_ch, kernel_many)
+   var out_many = Conv2dForward[DType.float32].forward[track_grad=False](img_many_ch, kernel_many)
    assert_shape_equal(out_many, List[Int](1, 128, 3, 3), "Many channels (64128)")
 
    print("\n All edge case tests passed!\n")
@@ -1173,7 +1173,7 @@ fn test_conv2d_forward_single_batch_single_channel() raises:
     var kernel = Tensor[dtype].d4([[[[1.0, 0.0], [0.0, 1.0]]]])
 
     # No padding, stride=1
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
 
@@ -1198,7 +1198,7 @@ fn test_conv2d_forward_with_bias() raises:
 
     var bias = Tensor[dtype].d1([10.0])
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, bias=bias, stride=1, padding=Padding("valid")
     )
 
@@ -1221,7 +1221,7 @@ fn test_conv2d_forward_multiple_channels() raises:
     var kernel = Tensor[dtype].zeros(1, 3, 2, 2)
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
 
@@ -1249,7 +1249,7 @@ fn test_conv2d_forward_multiple_filters() raises:
         for j in range(4):
             kernel.buffer.data_buffer()[i * 4 + j] = Float32(i + 1)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
     # Output shape: (1, 3, 3, 3)
@@ -1283,7 +1283,7 @@ fn test_conv2d_forward_batch_processing() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 2, 2)
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
 
@@ -1313,7 +1313,7 @@ fn test_conv2d_stride_2() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 2, 2)
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=2, padding=Padding("valid")
     )
 
@@ -1338,7 +1338,7 @@ fn test_conv2d_stride_3() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 2, 2)
     kernel.fill(0.5)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=3, padding=Padding("valid")
     )
 
@@ -1367,7 +1367,7 @@ fn test_conv2d_padding_valid() raises:
     var kernel = Tensor[dtype](Shape(1, 1, 3, 3))
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
 
@@ -1388,7 +1388,7 @@ fn test_conv2d_padding_same() raises:
     var kernel = Tensor[dtype](Shape(1, 1, 3, 3))
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("same")
     )
 
@@ -1409,7 +1409,7 @@ fn test_conv2d_padding_int() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 2, 2)
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x,
         kernel=kernel,
         stride=1,
@@ -1433,7 +1433,7 @@ fn test_conv2d_padding_tuple() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 2, 2)
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x,
         kernel=kernel,
         stride=1,
@@ -1461,7 +1461,7 @@ fn test_conv2d_padding_list_asymmetric() raises:
     pad_list.append((1, 2))  # top=1, bottom=2
     pad_list.append((3, 0))  # left=3, right=0
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding(pad_list^)
     )
 
@@ -1488,7 +1488,7 @@ fn test_conv2d_dilation_2() raises:
 
     var kernel = Tensor[dtype].ones(1, 1, 3, 3)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x,
         kernel=kernel,
         stride=1,
@@ -1517,7 +1517,7 @@ fn test_conv2d_dilation_3() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 2, 2)
     kernel.fill(0.5)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x,
         kernel=kernel,
         stride=1,
@@ -1546,7 +1546,7 @@ fn test_conv2d_stride_and_padding() raises:
 
     var kernel = Tensor[dtype].ones(1, 1, 3, 3)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=2, padding=Padding(1)
     )
 
@@ -1565,7 +1565,7 @@ fn test_conv2d_stride_padding_dilation() raises:
 
     var kernel = Tensor[dtype].ones(1, 1, 3, 3)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=2, dilation=2, padding=Padding(2)
     )
     # Should produce valid output
@@ -1611,7 +1611,7 @@ fn test_conv2d_all_parameters() raises:
     for i in range(4):
         bias[i] = Float32(i)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x,
         kernel=kernel,
         bias=bias,
@@ -1725,7 +1725,7 @@ fn test_conv2d_backward_simple() raises:
 
     var bias = Tensor[dtype].d1([0.0], requires_grad=True)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, bias=bias, stride=1, padding=Padding("valid")
     )
 
@@ -1752,7 +1752,7 @@ fn test_conv2d_backward_input_gradient() raises:
 
     var kernel = Tensor[dtype].ones(1, 1, 2, 2, requires_grad=True)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
 
@@ -1780,7 +1780,7 @@ fn test_conv2d_backward_kernel_gradient() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 2, 2, requires_grad=True)
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
 
@@ -1805,7 +1805,7 @@ fn test_conv2d_backward_with_stride() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=True)
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=2, padding=Padding("valid")
     )
 
@@ -1834,7 +1834,7 @@ fn test_conv2d_edge_1x1_kernel() raises:
     var kernel = Tensor[dtype].zeros(2, 3, 1, 1)  # Pointwise
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
 
@@ -1855,7 +1855,7 @@ fn test_conv2d_edge_large_kernel() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 7, 7)
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
 
@@ -1876,7 +1876,7 @@ fn test_conv2d_edge_output_size_1() raises:
     var kernel = Tensor[dtype].zeros(1, 1, 3, 3)
     kernel.fill(1.0)
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x, kernel=kernel, stride=1, padding=Padding("valid")
     )
 

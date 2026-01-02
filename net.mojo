@@ -4,7 +4,15 @@ from gradbox import Gradbox
 from math import sqrt
 from common_utils import panic, now
 from utils import Variant
-from forwards import Matmul, Adder, Multiplicator, Subtractor, Clip
+from forwards import (
+    Matmul,
+    Adder,
+    Multiplicator,
+    Subtractor,
+    Clip,
+    Conv2dForward,
+    Padding,
+)
 from operators import mm, mv, vm, dot
 from blashandle import BLASHandle, BLASHandleLite
 
@@ -14,8 +22,9 @@ alias LINEAR_BLAS = 1
 alias RELU = 2
 alias SIGMOID = 3
 alias TANH = 4
-alias DROPOUT = 4
-
+alias DROPOUT = 5
+alias CONV2D = 6
+alias FLATTEN = 7
 
 @fieldwise_init
 struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
@@ -721,6 +730,8 @@ alias Layer[dtype: DType] = Variant[
     Sigmoid[dtype],
     Tanh[dtype],
     Dropout[dtype],
+    Conv2D[dtype],
+    Flatten[dtype],
 ]
 
 
@@ -742,6 +753,11 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Tanh[Self.dtype]](xs)
         elif self.tag == DROPOUT:
             return self.layer[Dropout[Self.dtype]](xs)
+        elif self.tag == CONV2D:
+            return self.layer[Conv2D[Self.dtype]](xs)
+        elif self.tag == FLATTEN:
+            return self.layer[Flatten[Self.dtype]](xs)
+
 
         else:
             panic("Unknown module type")
@@ -754,6 +770,9 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Linear[Self.dtype]].parameters()
         elif self.tag == LINEAR_BLAS:
             return self.layer[LinearBLAS[Self.dtype]].parameters()
+        elif self.tag == CONV2D:
+            return self.layer[Conv2D[Self.dtype]].parameters()
+
         else:
             return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
 
@@ -770,6 +789,10 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             return self.layer[Tanh[Self.dtype]].num_parameters()
         elif self.tag == DROPOUT:
             return self.layer[Dropout[Self.dtype]].num_parameters()
+        elif self.tag == CONV2D:
+            return self.layer[Conv2D[Self.dtype]].num_parameters()
+        elif self.tag == FLATTEN:
+            return self.layer[Flatten[Self.dtype]].num_parameters()
 
         else:
             return 0
@@ -793,6 +816,12 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             self.layer[Tanh[Self.dtype]].train()
         elif self.tag == DROPOUT:
             self.layer[Dropout[Self.dtype]].train()
+        elif self.tag == CONV2D:
+            self.layer[Conv2D[Self.dtype]].train()
+        elif self.tag == FLATTEN:
+            self.layer[Flatten[Self.dtype]].train()
+
+
 
     fn eval(mut self):
         """Set module to evaluation mode."""
@@ -808,6 +837,10 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             self.layer[Tanh[Self.dtype]].eval()
         elif self.tag == DROPOUT:
             self.layer[Dropout[Self.dtype]].eval()
+        elif self.tag == CONV2D:
+            self.layer[Conv2D[Self.dtype]].eval()
+        elif self.tag == FLATTEN:
+            self.layer[Flatten[Self.dtype]].eval()
 
 
 @fieldwise_init
@@ -820,7 +853,10 @@ struct Sequential[dtype: DType](Copyable & Movable):
     fn append(mut self, *ms: Module[Self.dtype]):
         for m in ms:
             if m.tag == LINEAR_BLAS:
-                panic("LinearBLAS layer can not be added to Sequential. Use SequentialBLAS")
+                panic(
+                    "LinearBLAS layer can not be added to Sequential. Use"
+                    " SequentialBLAS"
+                )
             self.modules.append(m)
 
     fn __call__(mut self, xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
@@ -1142,6 +1178,293 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
     fn set_lr(mut self, lr: Scalar[Self.dtype]):
         self.lr = lr
 
+
+@fieldwise_init
+struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
+    """
+    Conv2D layer wrapper for Sequential integration.
+
+    Stores weights and bias as trainable parameters.
+    """
+
+    alias TAG = CONV2D
+
+    var weight: Tensor[Self.dtype]  # (out_channels, in_channels, KH, KW)
+    var bias: Tensor[Self.dtype]  # (out_channels,)
+    var in_channels: Int
+    var out_channels: Int
+    var kernel_size: Int
+    var stride: Int
+    var dilation: Int
+    var padding: Padding
+    var training: Bool
+
+    fn __init__(
+        out self,
+        in_channels: Int,
+        out_channels: Int,
+        kernel_size: Int,
+        stride: Int = 1,
+        dilation: Int = 1,
+        padding: Padding = Padding("valid"),
+        bias: Bool = True,
+        init_seed: Optional[Int] = None,
+        init_method: String = "he",  # "he" for ReLU, "xavier" for tanh/sigmoid
+        weight_factor: Scalar[Self.dtype] = Scalar[Self.dtype](1),
+    ):
+        """
+        Initialize Conv2D layer.
+
+        Args:
+            in_channels: Number of input channels (e.g., 3 for RGB).
+            out_channels: Number of output feature maps/filters.
+            kernel_size: Size of square kernel (kernel_h = kernel_w).
+            stride: Stride for convolution.
+            dilation: Dilation factor.
+            padding: "valid", "same", int, or custom.
+            bias: Whether to include bias term.
+            init_seed: Optional seed.
+            init_method: Weight initialization ("xavier", "he", "standard").
+            weight_factor: Scaling factor for weight initialization.
+        """
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.dilation = dilation
+        self.padding = padding
+        self.training = True
+
+        # Initialize weights: (out_channels, in_channels, kernel_size, kernel_size)
+        var weight_shape = Shape(
+            out_channels, in_channels, kernel_size, kernel_size
+        )
+        var fan_in = in_channels * kernel_size * kernel_size
+        if init_method == "xavier":
+            # Xavier/Glorot uniform initialization
+            var fan_out = out_channels * kernel_size * kernel_size
+            var limit = Scalar[Self.dtype](sqrt(6.0 / (fan_in + fan_out)))
+            self.weight = (
+                Tensor[Self.dtype].rand(
+                    shape=weight_shape,
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+                * weight_factor
+            )
+            if bias:
+                self.bias = Tensor[Self.dtype].rand(
+                    Shape(out_channels),
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+            else:
+                # Create a dummy bias - would not be used
+                self.bias = Tensor[Self.dtype].scalar(0)
+
+        elif init_method == "he":
+            # He/Kaiming normal initialization (for ReLU)
+            var std = sqrt(2.0 / Float64(fan_in))
+            self.weight = (
+                Tensor[Self.dtype].randn(
+                    shape=weight_shape,
+                    mean=0.0,
+                    std=std,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+                * weight_factor
+            )
+            if bias:
+                self.bias = Tensor[Self.dtype].randn(
+                    Shape(out_channels),
+                    mean=0.0,
+                    std=std * 0.01,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+            else:
+                # Create a dummy bias - would not be used
+                self.bias = Tensor[Self.dtype].scalar(0)
+
+        else:  # "standard" or default
+            # Simple uniform initialization (good for [0,1] normalized inputs)
+            var limit = Scalar[Self.dtype](0.1)
+            self.weight = (
+                Tensor[Self.dtype].rand(
+                    shape=weight_shape,
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+                * weight_factor
+            )
+            if bias:
+                self.bias = Tensor[Self.dtype].rand(
+                    Shape(out_channels),
+                    min=-limit,
+                    max=limit,
+                    init_seed=init_seed,
+                    requires_grad=True,
+                )
+            else:
+                self.bias = Tensor[Self.dtype].scalar(0)
+
+        print("Conv2D initialized:")
+        print("  Shape:", weight_shape)
+        print("  In channels:", in_channels)
+        print("  Out channels:", out_channels)
+        print("  Kernel size:", kernel_size, "×", kernel_size)
+        print("  Parameters:", self.num_parameters())
+
+    fn __call__(mut self, image: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        """
+        Forward pass.
+
+        Args:
+            image: (batch_size, in_channels, height, width).
+
+        Returns:
+            Output: (batch_size, out_channels, out_height, out_width).
+        """
+        ref img_shape = image.shape()
+
+        # Validate input
+        if img_shape.rank() != 4:
+            panic(
+                "Conv2D input must be 4D: (N, C, H, W), got shape: ",
+                img_shape.__str__(),
+            )
+
+        if img_shape[1] != self.in_channels:
+            panic(
+                "Conv2D input channels mismatch: expected ",
+                self.in_channels.__str__(),
+                ", got ",
+                img_shape[1].__str__(),
+            )
+
+        # Forward pass
+        if self.training:
+            return Conv2dForward[Self.dtype].forward[track_grad=True](
+                image,
+                self.weight,
+                bias=Optional(self.bias) if self.bias.requires_grad else None,
+                stride=self.stride,
+                dilation=self.dilation,
+                padding=self.padding,
+                requires_grad=True,
+            )
+        else:
+            return Conv2dForward[Self.dtype].forward[track_grad=False](
+                image,
+                self.weight,
+                bias=Optional(self.bias) if self.bias.requires_grad else None,
+                stride=self.stride,
+                dilation=self.dilation,
+                padding=self.padding,
+                requires_grad=False,
+            )
+
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+        """Return trainable parameters for optimizer."""
+        var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+
+        params.append(
+            UnsafePointer(to=self.weight)
+            .unsafe_mut_cast[True]()
+            .as_any_origin()
+        )
+
+        if self.bias.shape().rank() > 0:  # Has actual bias
+            params.append(
+                UnsafePointer(to=self.bias)
+                .unsafe_mut_cast[True]()
+                .as_any_origin()
+            )
+
+        return params^
+
+    fn num_parameters(self) -> Int:
+        """Count total parameters."""
+        var count = self.weight.numels()
+        if self.bias.shape().rank() > 0:
+            count += self.bias.numels()
+        return count
+
+    fn train(mut self):
+        """Set to training mode."""
+        self.training = True
+
+    fn eval(mut self):
+        """Set to evaluation mode."""
+        self.training = False
+
+    fn into(self) -> Module[Self.dtype]:
+        """Convert to Module for Sequential."""
+        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
+
+
+@register_passable
+struct Flatten[dtype: DType](ImplicitlyCopyable):
+    """
+        Flatten spatial dimensions: (N, C, H, W) → (N, C*H*W).
+    """
+    alias TAG = FLATTEN
+    var training: Bool
+
+    fn __init__(out self):
+        self.training = True
+
+    fn __copyinit__(out self, other: Self):
+        self.training = other.training
+
+    fn __call__(self, mut x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        ref shape = x.shape()
+
+        _="""if shape.rank() != 4:
+            panic("Flatten expects 4D input: (N, C, H, W)")
+
+        var batch_size = shape[0]
+        var flattened_size = shape[1] * shape[2] * shape[3]"""
+        if shape.rank() < 2:
+            panic("Flatten expects at least 2D input")
+
+        var batch_size = shape[0]
+
+        # Calculate flattened size (all dimensions except batch)
+        var flattened_size = 1
+        for i in range(1, shape.rank()):
+            flattened_size *= shape[i]
+
+        if self.training:
+            return x.reshape[track_grad=True](batch_size, flattened_size)
+        else:
+            return x.reshape[track_grad=False](batch_size, flattened_size)
+
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+        return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+
+    fn num_parameters(self) -> Int:
+        return 0
+
+    fn train(mut self):
+        self.training = True
+
+    fn eval(mut self):
+        self.training = False
+
+    fn into(self) -> Module[Self.dtype]:
+        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 fn main():
     pass

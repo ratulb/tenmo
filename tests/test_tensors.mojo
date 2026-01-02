@@ -4380,7 +4380,7 @@ fn test_fill() raises:
     )
     b = Tensor.d1([1919, 1919])
 
-    v2.set(b, s())
+    v2.fill(b, s())
 
     assert_true(
         (a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 1919, 42, 1919])),

@@ -1112,7 +1112,7 @@ struct Tensor[dtype: DType = DType.float32](
         end_dim: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        return Flatten[Self.dtype].forward[track_grad](
+        return FlattenForward[Self.dtype].forward[track_grad](
             self, start_dim, end_dim, requires_grad
         )
 

@@ -27,7 +27,7 @@ struct FlattenBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @register_passable
-struct Flatten[dtype: DType]:
+struct FlattenForward[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True

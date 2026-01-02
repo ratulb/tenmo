@@ -66,26 +66,26 @@ fn from_ndarray[
     ndarray: PythonObject, requires_grad: Bool = False, copy: Bool = True
 ) raises -> Tensor[dtype]:
     # Convert Python shape -> Mojo Shape
-    shape_list = ndarray.shape
-    mojo_list = List[Int](capacity=len(shape_list))
+    var shape_list = ndarray.shape
+    var mojo_list = List[Int](capacity=len(shape_list))
     for elem in shape_list:
         mojo_list.append(Int(elem))
-    shape = Shape(mojo_list)
+    var shape = Shape(mojo_list)
 
-    numels = shape.product()
+    var numels = shape.product()
 
     if copy:
-        src_ptr = ndarray_ptr[dtype](ndarray)
-        buffer = Buffer[dtype](numels)
+        var src_ptr = ndarray_ptr[dtype](ndarray)
+        var buffer = Buffer[dtype](numels)
         memcpy(dest=buffer.data, src=src_ptr, count=numels)
-        ndb = NDBuffer[dtype](buffer^, shape)
-        result = Tensor[dtype](ndb^, requires_grad=requires_grad)
-        return result
+        var ndb = NDBuffer[dtype](buffer^, shape)
+        var result = Tensor[dtype](ndb^, requires_grad=requires_grad)
+        return result^
     else:
-        # Wrap external NumPy buffer (⚠️ lifetime must be managed externally)
-        data_ptr = ndarray_ptr[dtype](ndarray)
+        # Wrap external NumPy buffer (lifetime must be managed externally!)
+        var data_ptr = ndarray_ptr[dtype](ndarray)
         return Tensor[dtype](
-            shape, data_ptr, requires_grad=requires_grad, copy=False
+            shape^, data_ptr, requires_grad=requires_grad, copy=False
         )
 
 

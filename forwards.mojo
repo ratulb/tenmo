@@ -14,7 +14,7 @@ from mean_reduction import Mean
 from transpose import Transpose
 from dotproduct import Dot
 from expand import Expand
-from flatten import Flatten
+from flatten import FlattenForward
 from squeeze import Squeeze
 from unsqueeze import Unsqueeze
 from shuffle import Shuffle
@@ -34,8 +34,8 @@ from variance import Variance
 from std_deviation import StdDev
 from concate import Concate
 from stack import Stack
-from pad import Pad
-
+from pad import Pad, Padding
+from convolution import Conv2dForward
 
 fn main():
     pass

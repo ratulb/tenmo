@@ -28,7 +28,9 @@ from backpropagation import BackwardFn, Delegate, BACKWARD_PAD
 from operators import AddTensor
 from common_utils import panic
 from intarray import IntArray
+from utils import Variant
 
+alias Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
 
 @fieldwise_init
 struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
