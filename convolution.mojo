@@ -7,15 +7,13 @@ from utils import Variant
 from shapes import Shape
 from algorithm import parallelize, vectorize
 from sys import simd_width_of
-
-alias Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
-
+from forwards import Padding
 
 @fieldwise_init
 @register_passable
 struct Conv2DBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """
-    Custom backward for batched, multi-channel, multi-filter Conv2D.
+    Custom backward for batched, multi-channel, multi-filter Conv2dForward.
     Correctly computes gradients for input, kernel, and bias.
     Optimized with SIMD vectorization where beneficial.
     """
@@ -227,7 +225,7 @@ struct Conv2DBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
 @fieldwise_init
 @register_passable
-struct Conv2D[dtype: DType](ImplicitlyCopyable):
+struct Conv2dForward[dtype: DType](ImplicitlyCopyable):
     """
     Batched, multi-channel, multi-filter 2D convolution with optimized loops.
 
@@ -553,7 +551,7 @@ fn main() raises:
         [1.2818, -1.5952, -1.0648, 0.1055], requires_grad=True
     )
 
-    var output = Conv2D[dtype].forward(
+    var output = Conv2dForward[dtype].forward(
         image=x,
         kernel=kernel,
         bias=bias,
@@ -585,30 +583,30 @@ fn simple_2by2_conv() raises:
     # 1. Simple 2x2 convolution
     var img = Tensor[DType.float32].randn(1, 1, 4, 4)  # Single channel
     var kernel = Tensor[DType.float32].randn(1, 1, 2, 2)
-    var out = Conv2D[DType.float32].forward(img, kernel)
+    var out = Conv2dForward[DType.float32].forward(img, kernel)
     print(out.shape())  # Should be (1, 1, 3, 3)
 
     # 2. Multi-channel
     var img_rgb = Tensor[DType.float32].randn(2, 3, 8, 8)  # Batch=2, RGB
     var kernel_multi = Tensor[DType.float32].randn(16, 3, 3, 3)  # 16 filters
-    var out_multi = Conv2D[DType.float32].forward(img_rgb, kernel_multi)
+    var out_multi = Conv2dForward[DType.float32].forward(img_rgb, kernel_multi)
     print(out_multi.shape())  # Should be (2, 16, 6, 6)
 
     # 3. Valid padding (default)
-    var out_valid = Conv2D[DType.float32].forward(img, kernel, padding=Padding("valid"))
+    var out_valid = Conv2dForward[DType.float32].forward(img, kernel, padding=Padding("valid"))
 
     # 4. Same padding
-    var out_same = Conv2D[DType.float32].forward(img, kernel, padding=Padding("same"))
+    var out_same = Conv2dForward[DType.float32].forward(img, kernel, padding=Padding("same"))
     print(out_same.shape())  # Should preserve spatial dimensions
 
     # 5. Custom padding
-    var out_custom = Conv2D[DType.float32].forward(img, kernel, padding=Padding(2))
+    var out_custom = Conv2dForward[DType.float32].forward(img, kernel, padding=Padding(2))
 
     # 6. Stride = 2
-    var out_stride = Conv2D[DType.float32].forward(img, kernel, stride=2)
+    var out_stride = Conv2dForward[DType.float32].forward(img, kernel, stride=2)
 
     # 7. Dilation = 2 (atrous convolution)
-    var out_dil = Conv2D[DType.float32].forward(img, kernel, dilation=2)
+    var out_dil = Conv2dForward[DType.float32].forward(img, kernel, dilation=2)
 
     # 8. Gradient flow
     img.requires_grad_(True)
@@ -616,7 +614,7 @@ fn simple_2by2_conv() raises:
     var bias_t = Tensor[DType.float32].randn(16)
     bias_t.requires_grad_(True)
 
-    out = Conv2D[DType.float32].forward(img_rgb, kernel_multi, bias=bias_t)
+    out = Conv2dForward[DType.float32].forward(img_rgb, kernel_multi, bias=bias_t)
     var loss = out.sum()
     loss.backward()
 
