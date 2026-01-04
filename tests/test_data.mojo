@@ -59,20 +59,20 @@ fn test_tensor_dataset_2d_labels() raises:
     )
     print("✓ Passed")
 
-
 fn test_tensor_dataset_getitem_1d_labels() raises:
     print("test_tensor_dataset_getitem_1d_labels")
+
     alias dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
     var labels = Tensor[dtype].d1([10, 20, 30])
 
     var dataset = TensorDataset(features, labels)
     var (feat, lab) = dataset[1]
-
     assert_true(feat.shape()[0] == 2, "Feature should have 2 elements")
     assert_true(feat[0] == 3, "First feature element should be 3")
     assert_true(feat[1] == 4, "Second feature element should be 4")
-    assert_true(lab[0] == 20, "Label should be 20")
+    #assert_true(lab[0] == 20, "Label should be 20")
+    assert_true(lab[[]] == 20, "Label should be 20")
     print("✓ Passed")
 
 
@@ -115,7 +115,7 @@ fn test_tensor_dataset_getitem_all_indices() raises:
             "Feature mismatch at index " + i.__str__(),
         )
         assert_true(
-            lab[0] == expected_label, "Label mismatch at index " + i.__str__()
+            lab[[]] == expected_label, "Label mismatch at index " + i.__str__()
         )
     print("✓ Passed")
 
@@ -626,7 +626,7 @@ fn test_dataset_1d_labels_dl() raises:
 
     var (feat, label) = dataset[1]
     var expected_feat = Tensor.d1([3.0, 4.0]).float()
-    var expected_label = Tensor.d1([1.0]).float()
+    var expected_label = Tensor.scalar(1.0).float()
     assert_true(feat.all_close(expected_feat))
     assert_true(label.all_close(expected_label))
 
@@ -2009,8 +2009,6 @@ fn test_feature_label_correspondence() raises:
 # ==============================================================================
 # NUMPY DATASET TESTS
 # ==============================================================================
-
-
 fn test_numpy_dataset_integration() raises:
     """Test NumpyDataset with DataLoader."""
     print("test_numpy_dataset_integration")
@@ -2025,7 +2023,7 @@ fn test_numpy_dataset_integration() raises:
     var labels_np = np.array(Python.list(10, 20, 30), dtype=np.int32)
 
     var dataset = NumpyDataset[DType.float32, DType.int32](
-        features_np, labels_np, copy=True
+        features_np, labels_np, copy=False
     )
 
     var loader = dataset.into_loader(
