@@ -1,13 +1,14 @@
 from tenmo import Tensor
 from backpropagation import BackwardFn, Delegate, BACKWARD_CONV2D
 from operators import AddTensor
-from common_utils import panic
+from common_utils import panic, now
 from gradbox import Gradbox
 from utils import Variant
 from shapes import Shape
 from algorithm import parallelize, vectorize
 from sys import simd_width_of
 from forwards import Padding
+
 
 @fieldwise_init
 @register_passable
@@ -33,7 +34,7 @@ struct Conv2DBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var results = List[
             Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
-
+        start = now()
         # Ancestry: 0=input, 1=kernel, 2=bias (bias may not exist if None)
         var image = output.ancestry().get(0)
         var kernel = output.ancestry().get(1)
@@ -217,6 +218,12 @@ struct Conv2DBackward[dtype: DType](ImplicitlyCopyable & Movable):
             parallelize[compute_input_batch](N)
             results.append((image^, grad_input^, AddTensor))
 
+        end = now()
+        print(
+            "Conv2DBackward(convolution) backward took: ",
+            end * 1000 - start * 1000,
+            "ms",
+        )
         return results^
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -253,6 +260,8 @@ struct Conv2dForward[dtype: DType](ImplicitlyCopyable):
         padding: Padding = Padding("valid"),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        start = now()
+
         ref input_shape = image.shape()
         ref kernel_shape = kernel.shape()
 
@@ -359,9 +368,7 @@ struct Conv2dForward[dtype: DType](ImplicitlyCopyable):
         @parameter
         fn compute_output_batch(n: Int):
             for o in range(C_out):
-                var bias_val = bias_tensor[
-                    o
-                ]
+                var bias_val = bias_tensor[o]
 
                 for y in range(H_out):
                     for x in range(W_out):
@@ -414,6 +421,12 @@ struct Conv2dForward[dtype: DType](ImplicitlyCopyable):
                 if bias:
                     output.add_ancestry(bias_tensor)
 
+        end = now()
+        print(
+            "Conv2dForward(convolution) forward took: ",
+            end * 1000 - start * 1000,
+            "ms",
+        )
         return output^
 
 
@@ -575,52 +588,3 @@ fn main() raises:
     kernel.grad().print()
     print()
     bias.grad().print()
-
-    simple_2by2_conv()
-
-fn simple_2by2_conv() raises:
-
-    # 1. Simple 2x2 convolution
-    var img = Tensor[DType.float32].randn(1, 1, 4, 4)  # Single channel
-    var kernel = Tensor[DType.float32].randn(1, 1, 2, 2)
-    var out = Conv2dForward[DType.float32].forward(img, kernel)
-    print(out.shape())  # Should be (1, 1, 3, 3)
-
-    # 2. Multi-channel
-    var img_rgb = Tensor[DType.float32].randn(2, 3, 8, 8)  # Batch=2, RGB
-    var kernel_multi = Tensor[DType.float32].randn(16, 3, 3, 3)  # 16 filters
-    var out_multi = Conv2dForward[DType.float32].forward(img_rgb, kernel_multi)
-    print(out_multi.shape())  # Should be (2, 16, 6, 6)
-
-    # 3. Valid padding (default)
-    var out_valid = Conv2dForward[DType.float32].forward(img, kernel, padding=Padding("valid"))
-
-    # 4. Same padding
-    var out_same = Conv2dForward[DType.float32].forward(img, kernel, padding=Padding("same"))
-    print(out_same.shape())  # Should preserve spatial dimensions
-
-    # 5. Custom padding
-    var out_custom = Conv2dForward[DType.float32].forward(img, kernel, padding=Padding(2))
-
-    # 6. Stride = 2
-    var out_stride = Conv2dForward[DType.float32].forward(img, kernel, stride=2)
-
-    # 7. Dilation = 2 (atrous convolution)
-    var out_dil = Conv2dForward[DType.float32].forward(img, kernel, dilation=2)
-
-    # 8. Gradient flow
-    img.requires_grad_(True)
-    kernel.requires_grad_(True)
-    var bias_t = Tensor[DType.float32].randn(16)
-    bias_t.requires_grad_(True)
-
-    out = Conv2dForward[DType.float32].forward(img_rgb, kernel_multi, bias=bias_t)
-    var loss = out.sum()
-    loss.backward()
-
-    print("Image grad:", img.gradients()[].shape())
-    print("Kernel grad:", kernel.gradients()[].shape())
-    print("Bias grad:", bias_t.gradients()[].shape())
-
-
-

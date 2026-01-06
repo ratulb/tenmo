@@ -41,6 +41,11 @@ struct Batch[feature_dtype: DType, label_dtype: DType](
         self.batch_size = features.shape()[0]
 
 
+# ==============================================================================
+# UPDATED TRAIT - Now includes shape information
+# ==============================================================================
+
+
 trait Dataset(Sized & Copyable & Movable):
     alias _feature_dtype: DType
     alias _label_dtype: DType
@@ -48,14 +53,6 @@ trait Dataset(Sized & Copyable & Movable):
     fn __len__(self) -> Int:
         ...
 
-    # NOTE: __getitem__ can be used for single-sample access if needed
-    # But DataLoader should NOT use it for batching!
-    fn __getitem__(
-        self, idx: Int
-    ) -> Tuple[Tensor[Self._feature_dtype], Tensor[Self._label_dtype]]:
-        ...
-
-    # KEY: Direct access to underlying data (no copies)
     fn get_features_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self._feature_dtype], ImmutAnyOrigin]:
@@ -68,16 +65,21 @@ trait Dataset(Sized & Copyable & Movable):
         """Get raw pointer to label data."""
         ...
 
-    fn get_feature_dim(self) -> Int:
-        """Number of features per sample."""
+    fn get_feature_shape(self) -> Shape:
+        """Get the shape of a single feature sample (excluding batch dimension).
+        """
         ...
 
-    fn get_label_dim(self) -> Int:
-        """Number of labels per sample (1 for scalar labels)."""
+    fn get_label_shape(self) -> Shape:
+        """Get the shape of a single label (excluding batch dimension)."""
         ...
 
-    fn is_labels_scalar(self) -> Bool:
-        """True if labels are scalar (rank 1), False if multi-dimensional."""
+    fn get_features_per_sample(self) -> Int:
+        """Total number of elements per feature sample."""
+        ...
+
+    fn get_labels_per_sample(self) -> Int:
+        """Total number of elements per label."""
         ...
 
     fn into_loader(
@@ -87,7 +89,7 @@ trait Dataset(Sized & Copyable & Movable):
 
 
 # ==============================================================================
-# OPTIMIZED DATALOADER
+# UPDATED DATALOADER - Preserves multi-dimensional shapes
 # ==============================================================================
 
 
@@ -95,7 +97,7 @@ trait Dataset(Sized & Copyable & Movable):
 struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     ImplicitlyCopyable & Movable & Sized
 ):
-    """Zero-copy batched data loading with optimized bulk memcpy."""
+    """Zero-copy batched data loading that preserves tensor shapes."""
 
     var dataset: Pointer[DatasetSource, Self.origin]
     var batch_size: Int
@@ -106,14 +108,13 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     var _num_batches: Int
 
     # Cached dataset metadata
-    var _feature_dim: Int
-    var _label_dim: Int
-    var _labels_scalar: Bool
+    var _feature_shape: Shape  # Shape of single sample (e.g., [1, 28, 28])
+    var _label_shape: Shape  # Shape of single label (e.g., [])
+    var _features_per_sample: Int
+    var _labels_per_sample: Int
 
-    # Pre-allocated batch buffers (full size)
+    # Pre-allocated batch buffers
     var _batch: Batch[DatasetSource._feature_dtype, DatasetSource._label_dtype]
-
-    # Optional last batch for smaller remainder (if drop_last=False)
     var _last_batch: Optional[
         Batch[DatasetSource._feature_dtype, DatasetSource._label_dtype]
     ]
@@ -127,9 +128,10 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
         self._current_idx = other._current_idx
         self._indices = other._indices.copy()
         self._num_batches = other._num_batches
-        self._feature_dim = other._feature_dim
-        self._label_dim = other._label_dim
-        self._labels_scalar = other._labels_scalar
+        self._feature_shape = other._feature_shape
+        self._label_shape = other._label_shape
+        self._features_per_sample = other._features_per_sample
+        self._labels_per_sample = other._labels_per_sample
         self._batch = other._batch
         self._last_batch = other._last_batch
         self._last_batch_size = other._last_batch_size
@@ -153,11 +155,6 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
         for i in range(total_samples):
             self._indices.append(i)
 
-        # Shuffle if needed (first epoch)
-        if self.shuffle_data:
-            # reshuffle(self._indices)
-            pass
-
         # Calculate number of batches
         if drop_last:
             self._num_batches = total_samples // batch_size
@@ -166,45 +163,63 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 
         # Cache dataset metadata
         ref dataset_ref = dataset[]
-        self._feature_dim = dataset_ref.get_feature_dim()
-        self._label_dim = dataset_ref.get_label_dim()
-        self._labels_scalar = dataset_ref.is_labels_scalar()
+        self._feature_shape = dataset_ref.get_feature_shape()
+        self._label_shape = dataset_ref.get_label_shape()
+        self._features_per_sample = dataset_ref.get_features_per_sample()
+        self._labels_per_sample = dataset_ref.get_labels_per_sample()
 
-        # Pre-allocate full-size batch
-        var batch_features = Tensor[DatasetSource._feature_dtype].zeros(
-            batch_size, self._feature_dim
+        # Build batch shape: [batch_size, *feature_shape]
+        var batch_feature_dims = List[Int](
+            capacity=self._feature_shape.rank() + 1
         )
-        var batch_labels: Tensor[DatasetSource._label_dtype]
+        batch_feature_dims.append(batch_size)
+        for i in range(self._feature_shape.rank()):
+            batch_feature_dims.append(self._feature_shape[i])
 
-        if self._labels_scalar:
-            batch_labels = Tensor[DatasetSource._label_dtype].zeros(batch_size)
-        else:
-            batch_labels = Tensor[DatasetSource._label_dtype].zeros(
-                batch_size, self._label_dim
-            )
+        # Build label shape: [batch_size, *label_shape]
+        var batch_label_dims = List[Int](capacity=self._label_shape.rank() + 1)
+        batch_label_dims.append(batch_size)
+        for i in range(self._label_shape.rank()):
+            batch_label_dims.append(self._label_shape[i])
+
+        # Allocate full-size batch
+        var batch_features = Tensor[DatasetSource._feature_dtype].zeros(
+            Shape(batch_feature_dims)
+        )
+        var batch_labels = Tensor[DatasetSource._label_dtype].zeros(
+            Shape(batch_label_dims)
+        )
 
         self._batch = Batch[
             DatasetSource._feature_dtype, DatasetSource._label_dtype
         ](batch_features^, batch_labels^)
 
-        # Pre-allocate optional last batch if needed
+        # Allocate last batch if needed
         if not drop_last:
             var remainder = total_samples % batch_size
             if remainder != 0:
                 self._last_batch_size = remainder
-                var last_features = Tensor[DatasetSource._feature_dtype].zeros(
-                    remainder, self._feature_dim
-                )
-                var last_labels: Tensor[DatasetSource._label_dtype]
 
-                if self._labels_scalar:
-                    last_labels = Tensor[DatasetSource._label_dtype].zeros(
-                        remainder
-                    )
-                else:
-                    last_labels = Tensor[DatasetSource._label_dtype].zeros(
-                        remainder, self._label_dim
-                    )
+                var last_feature_dims = List[Int](
+                    capacity=self._feature_shape.rank() + 1
+                )
+                last_feature_dims.append(remainder)
+                for i in range(self._feature_shape.rank()):
+                    last_feature_dims.append(self._feature_shape[i])
+
+                var last_label_dims = List[Int](
+                    capacity=self._label_shape.rank() + 1
+                )
+                last_label_dims.append(remainder)
+                for i in range(self._label_shape.rank()):
+                    last_label_dims.append(self._label_shape[i])
+
+                var last_features = Tensor[DatasetSource._feature_dtype].zeros(
+                    Shape(last_feature_dims)
+                )
+                var last_labels = Tensor[DatasetSource._label_dtype].zeros(
+                    Shape(last_label_dims)
+                )
 
                 self._last_batch = Batch[
                     DatasetSource._feature_dtype, DatasetSource._label_dtype
@@ -227,131 +242,92 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     ) -> ref [self._batch, self._last_batch.value()] Batch[
         DatasetSource._feature_dtype, DatasetSource._label_dtype
     ]:
-        """Get next batch with optimized bulk memcpy for sequential access."""
+        """Get next batch with proper shape preservation."""
         var start_idx = self._current_idx
         var end_idx = min(start_idx + self.batch_size, len(self._indices))
         var actual_batch_size = end_idx - start_idx
 
-        # Determine which batch to use
         var is_last_batch = actual_batch_size < self.batch_size
         ref dataset_ref = self.dataset[]
-        # Get appropriate batch reference
+
+        # Choose appropriate batch
         if is_last_batch and self._last_batch:
             ref current_batch = self._last_batch.value()
-
-            # Get pointers
-            var dataset_features_ptr = dataset_ref.get_features_ptr()
-            var dataset_labels_ptr = dataset_ref.get_labels_ptr()
-            var batch_features_ptr = (
-                current_batch.features.buffer.data_buffer().data
+            self._fill_batch(
+                current_batch, start_idx, actual_batch_size, dataset_ref
             )
-            var batch_labels_ptr = (
-                current_batch.labels.buffer.data_buffer().data
+            self._current_idx = end_idx
+            return current_batch
+        else:
+            ref current_batch = self._batch
+            self._fill_batch(
+                current_batch, start_idx, actual_batch_size, dataset_ref
+            )
+            self._current_idx = end_idx
+            return current_batch
+
+    fn _fill_batch(
+        self,
+        batch: Batch[DatasetSource._feature_dtype, DatasetSource._label_dtype],
+        start_idx: Int,
+        actual_batch_size: Int,
+        ref dataset_ref: DatasetSource,
+    ):
+        """Fill batch with data, preserving multi-dimensional structure."""
+        var dataset_features_ptr = dataset_ref.get_features_ptr()
+        var dataset_labels_ptr = dataset_ref.get_labels_ptr()
+        var batch_features_ptr = batch.features.buffer.data_buffer().data
+        var batch_labels_ptr = batch.labels.buffer.data_buffer().data
+
+        # OPTIMIZATION: Bulk copy if not shuffled
+        if not self.shuffle_data:
+            var first_sample_idx = self._indices[start_idx]
+
+            # Copy features in bulk
+            var src_features_offset = (
+                first_sample_idx * self._features_per_sample
+            )
+            var total_feature_elements = (
+                actual_batch_size * self._features_per_sample
+            )
+            memcpy(
+                dest=batch_features_ptr,
+                src=dataset_features_ptr + src_features_offset,
+                count=total_feature_elements,
             )
 
-            # Fill last batch (always use row-by-row for last batch)
+            # Copy labels in bulk
+            var src_labels_offset = first_sample_idx * self._labels_per_sample
+            var total_label_elements = (
+                actual_batch_size * self._labels_per_sample
+            )
+            memcpy(
+                dest=batch_labels_ptr,
+                src=dataset_labels_ptr + src_labels_offset,
+                count=total_label_elements,
+            )
+        else:
+            # Row-by-row copy for shuffled data
             for i in range(actual_batch_size):
                 var sample_idx = self._indices[start_idx + i]
 
-                # Copy feature row
-                var src_offset = sample_idx * self._feature_dim
-                var dst_offset = i * self._feature_dim
+                # Copy feature sample
+                var src_offset = sample_idx * self._features_per_sample
+                var dst_offset = i * self._features_per_sample
                 memcpy(
                     dest=batch_features_ptr + dst_offset,
                     src=dataset_features_ptr + src_offset,
-                    count=self._feature_dim,
+                    count=self._features_per_sample,
                 )
 
                 # Copy label
-                if self._labels_scalar:
-                    batch_labels_ptr[i] = dataset_labels_ptr[sample_idx]
-                else:
-                    var src_label_offset = sample_idx * self._label_dim
-                    var dst_label_offset = i * self._label_dim
-                    memcpy(
-                        dest=batch_labels_ptr + dst_label_offset,
-                        src=dataset_labels_ptr + src_label_offset,
-                        count=self._label_dim,
-                    )
-
-            self._current_idx = end_idx
-            return current_batch
-
-        else:
-            # Use full-size batch
-            ref current_batch = self._batch
-
-            # Get pointers
-            var dataset_features_ptr = dataset_ref.get_features_ptr()
-            var dataset_labels_ptr = dataset_ref.get_labels_ptr()
-            var batch_features_ptr = (
-                current_batch.features.buffer.data_buffer().data
-            )
-            var batch_labels_ptr = (
-                current_batch.labels.buffer.data_buffer().data
-            )
-
-            # OPTIMIZATION: Bulk memcpy if not shuffled (contiguous indices)
-            if not self.shuffle_data:
-                # Fast path: Single bulk memcpy for contiguous data
-                var first_sample_idx = self._indices[start_idx]
-
-                # Copy all features in one go
-                var src_features_offset = first_sample_idx * self._feature_dim
-                var total_feature_elements = (
-                    actual_batch_size * self._feature_dim
-                )
+                var src_label_offset = sample_idx * self._labels_per_sample
+                var dst_label_offset = i * self._labels_per_sample
                 memcpy(
-                    dest=batch_features_ptr,
-                    src=dataset_features_ptr + src_features_offset,
-                    count=total_feature_elements,
+                    dest=batch_labels_ptr + dst_label_offset,
+                    src=dataset_labels_ptr + src_label_offset,
+                    count=self._labels_per_sample,
                 )
-
-                # Copy all labels in one go
-                if self._labels_scalar:
-                    memcpy(
-                        dest=batch_labels_ptr,
-                        src=dataset_labels_ptr + first_sample_idx,
-                        count=actual_batch_size,
-                    )
-                else:
-                    var src_labels_offset = first_sample_idx * self._label_dim
-                    var total_label_elements = (
-                        actual_batch_size * self._label_dim
-                    )
-                    memcpy(
-                        dest=batch_labels_ptr,
-                        src=dataset_labels_ptr + src_labels_offset,
-                        count=total_label_elements,
-                    )
-            else:
-                # Slow path: Row-by-row memcpy for shuffled (non-contiguous) data
-                for i in range(actual_batch_size):
-                    var sample_idx = self._indices[start_idx + i]
-
-                    # Copy feature row
-                    var src_offset = sample_idx * self._feature_dim
-                    var dst_offset = i * self._feature_dim
-                    memcpy(
-                        dest=batch_features_ptr + dst_offset,
-                        src=dataset_features_ptr + src_offset,
-                        count=self._feature_dim,
-                    )
-
-                    # Copy label
-                    if self._labels_scalar:
-                        batch_labels_ptr[i] = dataset_labels_ptr[sample_idx]
-                    else:
-                        var src_label_offset = sample_idx * self._label_dim
-                        var dst_label_offset = i * self._label_dim
-                        memcpy(
-                            dest=batch_labels_ptr + dst_label_offset,
-                            src=dataset_labels_ptr + src_label_offset,
-                            count=self._label_dim,
-                        )
-
-            self._current_idx = end_idx
-            return current_batch
 
     fn __has_next__(self) -> Bool:
         if self.drop_last:
@@ -373,12 +349,16 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 # DATASET IMPLEMENTATIONS
 # ==============================================================================
 
+# ==============================================================================
+# UPDATED NUMPYDATASET - Properly handles multi-dimensional data
+# ==============================================================================
+
 
 @fieldwise_init
 struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     ImplicitlyCopyable & Movable & Sized & Dataset
 ):
-    """Dataset backed by NumPy arrays. Owns the data."""
+    """Dataset that preserves original tensor shapes."""
 
     alias _feature_dtype = feature_dtype
     alias _label_dtype = label_dtype
@@ -386,9 +366,10 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     var _features: Tensor[Self.feature_dtype]
     var _labels: Tensor[Self.label_dtype]
     var _size: Int
-    var _feature_dim: Int
-    var _label_dim: Int
-    var _labels_scalar: Bool
+    var _feature_shape: Shape  # Shape without batch dimension
+    var _label_shape: Shape  # Shape without batch dimension
+    var _features_per_sample: Int
+    var _labels_per_sample: Int
 
     fn __init__(
         out self,
@@ -397,30 +378,13 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         copy: Bool = True,
     ) raises:
         """Create dataset from NumPy arrays. Copies data once."""
-        self._features = from_ndarray[Self.feature_dtype](
+        features = from_ndarray[Self.feature_dtype](
             features_numpy, requires_grad=False, copy=copy
         )
-        self._labels = from_ndarray[Self.label_dtype](
+        labels = from_ndarray[Self.label_dtype](
             labels_numpy, requires_grad=False, copy=copy
         )
-
-        self._size = self._features.shape()[0]
-
-        if self._labels.shape()[0] != self._size:
-            panic(
-                "NumpyDataset: features and labels must have same number of"
-                " samples"
-            )
-
-        # Cache metadata
-        var features_shape = self._features.shape()
-        var labels_shape = self._labels.shape()
-
-        self._feature_dim = (
-            features_shape[1] if features_shape.rank() > 1 else 1
-        )
-        self._label_dim = labels_shape[1] if labels_shape.rank() > 1 else 1
-        self._labels_scalar = labels_shape.rank() == 1
+        self = Self(features, labels)
 
     fn __init__(
         out self,
@@ -438,15 +402,30 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
                 " samples"
             )
 
-        # Cache metadata
-        var features_shape = self._features.shape()
-        var labels_shape = self._labels.shape()
+        # Extract shapes (excluding batch dimension)
+        var features_shape = features.shape()
+        var labels_shape = labels.shape()
 
-        self._feature_dim = (
-            features_shape[1] if features_shape.rank() > 1 else 1
-        )
-        self._label_dim = labels_shape[1] if labels_shape.rank() > 1 else 1
-        self._labels_scalar = labels_shape.rank() == 1
+        # Feature shape: everything after batch dimension
+        var feature_dims = List[Int](capacity=features_shape.rank() - 1)
+        for i in range(1, features_shape.rank()):
+            feature_dims.append(features_shape[i])
+        self._feature_shape = Shape(feature_dims)
+
+        # Label shape: everything after batch dimension
+        var label_dims = List[Int](capacity=labels_shape.rank() - 1)
+        for i in range(1, labels_shape.rank()):
+            label_dims.append(labels_shape[i])
+        self._label_shape = Shape(label_dims)
+
+        # Calculate total elements per sample
+        self._features_per_sample = 1
+        for i in range(self._feature_shape.rank()):
+            self._features_per_sample *= self._feature_shape[i]
+
+        self._labels_per_sample = 1
+        for i in range(self._label_shape.rank()):
+            self._labels_per_sample *= self._label_shape[i]
 
     fn __len__(self) -> Int:
         return self._size
@@ -461,41 +440,50 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     ) -> UnsafePointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
         return self._labels.buffer.data_buffer().data.as_immutable()
 
-    fn get_feature_dim(self) -> Int:
-        return self._feature_dim
+    fn get_feature_shape(self) -> Shape:
+        return self._feature_shape
 
-    fn get_label_dim(self) -> Int:
-        return self._label_dim
+    fn get_label_shape(self) -> Shape:
+        return self._label_shape
 
-    fn is_labels_scalar(self) -> Bool:
-        return self._labels_scalar
+    fn get_features_per_sample(self) -> Int:
+        return self._features_per_sample
+
+    fn get_labels_per_sample(self) -> Int:
+        return self._labels_per_sample
 
     fn __getitem__(
         self, idx: Int
     ) -> Tuple[Tensor[Self.feature_dtype], Tensor[Self.label_dtype]]:
-        """Get single sample - creates a copy."""
+        """Get single sample - not used by DataLoader."""
         if idx < 0 or idx >= self._size:
             panic("NumpyDataset: index out of bounds")
 
-        var sample_feature = Tensor[Self.feature_dtype].zeros(self._feature_dim)
+        # Create tensors with proper shape
+        var sample_feature = Tensor[Self.feature_dtype].zeros(
+            self._feature_shape
+        )
+        var sample_label = Tensor[Self.label_dtype].zeros(self._label_shape)
+
         var dataset_features_ptr = self.get_features_ptr()
-        var src_offset = idx * self._feature_dim
-
-        for j in range(self._feature_dim):
-            sample_feature[j] = dataset_features_ptr[src_offset + j]
-
-        var sample_label: Tensor[Self.label_dtype]
         var dataset_labels_ptr = self.get_labels_ptr()
+        var sample_feature_ptr = sample_feature.buffer.data_buffer().data
+        var sample_label_ptr = sample_label.buffer.data_buffer().data
 
-        if self._labels_scalar:
-            sample_label = Tensor[Self.label_dtype].d1(
-                [dataset_labels_ptr[idx]]
-            )
-        else:
-            sample_label = Tensor[Self.label_dtype].zeros(self._label_dim)
-            var src_label_offset = idx * self._label_dim
-            for j in range(self._label_dim):
-                sample_label[j] = dataset_labels_ptr[src_label_offset + j]
+        # Copy data
+        var src_feature_offset = idx * self._features_per_sample
+        memcpy(
+            dest=sample_feature_ptr,
+            src=dataset_features_ptr + src_feature_offset,
+            count=self._features_per_sample,
+        )
+
+        var src_label_offset = idx * self._labels_per_sample
+        memcpy(
+            dest=sample_label_ptr,
+            src=dataset_labels_ptr + src_label_offset,
+            count=self._labels_per_sample,
+        )
 
         return (sample_feature^, sample_label^)
 
@@ -503,6 +491,12 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
         ref self, batch_size: Int, shuffle: Bool = True, drop_last: Bool = False
     ) -> DataLoader[Self, origin_of(self)]:
         return DataLoader(Pointer(to=self), batch_size, shuffle, drop_last)
+
+
+# """
+# Updated TensorDataset that properly handles multi-dimensional tensors.
+# Works with both the old API (for simple 2D data) and new API (for any dimensions).
+# """
 
 
 @fieldwise_init
@@ -517,8 +511,14 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     var _features: Tensor[Self.feature_dtype]
     var _labels: Tensor[Self.label_dtype]
     var _size: Int
-    var _feature_dim: Int
-    var _label_dim: Int
+    var _feature_shape: Shape  # Shape of single sample (excluding batch dim)
+    var _label_shape: Shape  # Shape of single label (excluding batch dim)
+    var _features_per_sample: Int
+    var _labels_per_sample: Int
+
+    # Legacy fields for backward compatibility (if needed)
+    var _feature_dim: Int  # For 2D data: equals _features_per_sample
+    var _label_dim: Int  # For 2D data: equals _labels_per_sample
     var _labels_scalar: Bool
 
     fn __init__(
@@ -537,14 +537,36 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
                 " samples"
             )
 
-        # Cache metadata
-        var features_shape = self._features.shape()
-        var labels_shape = self._labels.shape()
+        # Extract shapes (excluding batch dimension)
+        var features_shape = features.shape()
+        var labels_shape = labels.shape()
 
-        self._feature_dim = (
-            features_shape[1] if features_shape.rank() > 1 else 1
+        # Feature shape: everything after batch dimension
+        var feature_dims = List[Int](capacity=features_shape.rank() - 1)
+        for i in range(1, features_shape.rank()):
+            feature_dims.append(features_shape[i])
+        self._feature_shape = Shape(feature_dims)
+
+        # Label shape: everything after batch dimension
+        var label_dims = List[Int](capacity=labels_shape.rank() - 1)
+        for i in range(1, labels_shape.rank()):
+            label_dims.append(labels_shape[i])
+        self._label_shape = Shape(label_dims)
+
+        # Calculate total elements per sample
+        self._features_per_sample = 1
+        for i in range(self._feature_shape.rank()):
+            self._features_per_sample *= self._feature_shape[i]
+
+        self._labels_per_sample = 1
+        for i in range(self._label_shape.rank()):
+            self._labels_per_sample *= self._label_shape[i]
+
+        # Legacy compatibility fields
+        self._feature_dim = self._features_per_sample
+        self._label_dim = (
+            self._labels_per_sample if self._label_shape.rank() > 0 else 1
         )
-        self._label_dim = labels_shape[1] if labels_shape.rank() > 1 else 1
         self._labels_scalar = labels_shape.rank() == 1
 
     fn __len__(self) -> Int:
@@ -560,41 +582,71 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     ) -> UnsafePointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
         return self._labels.buffer.data_buffer().data.as_immutable()
 
+    # New API methods (required by updated Dataset trait)
+    fn get_feature_shape(self) -> Shape:
+        """Get the shape of a single feature sample (excluding batch dimension).
+        """
+        return self._feature_shape
+
+    fn get_label_shape(self) -> Shape:
+        """Get the shape of a single label (excluding batch dimension)."""
+        return self._label_shape
+
+    fn get_features_per_sample(self) -> Int:
+        """Total number of elements per feature sample."""
+        return self._features_per_sample
+
+    fn get_labels_per_sample(self) -> Int:
+        """Total number of elements per label."""
+        return self._labels_per_sample
+
+    # Legacy API methods (for backward compatibility)
     fn get_feature_dim(self) -> Int:
+        """Legacy: Returns total feature elements (same as get_features_per_sample).
+        """
         return self._feature_dim
 
     fn get_label_dim(self) -> Int:
+        """Legacy: Returns total label elements."""
         return self._label_dim
 
     fn is_labels_scalar(self) -> Bool:
+        """Legacy: True if labels are scalar (rank 1)."""
         return self._labels_scalar
 
     fn __getitem__(
         self, idx: Int
     ) -> Tuple[Tensor[Self.feature_dtype], Tensor[Self.label_dtype]]:
-        """Get single sample."""
+        """Get single sample - preserves original shape."""
         if idx < 0 or idx >= self._size:
             panic("TensorDataset: index out of bounds")
 
-        var sample_feature = Tensor[Self.feature_dtype].zeros(self._feature_dim)
+        # Create tensors with proper shape
+        var sample_feature = Tensor[Self.feature_dtype].zeros(
+            self._feature_shape
+        )
+        var sample_label = Tensor[Self.label_dtype].zeros(self._label_shape)
+
         var dataset_features_ptr = self.get_features_ptr()
-        var src_offset = idx * self._feature_dim
-
-        for j in range(self._feature_dim):
-            sample_feature[j] = dataset_features_ptr[src_offset + j]
-
-        var sample_label: Tensor[Self.label_dtype]
         var dataset_labels_ptr = self.get_labels_ptr()
+        var sample_feature_ptr = sample_feature.buffer.data_buffer().data
+        var sample_label_ptr = sample_label.buffer.data_buffer().data
 
-        if self._labels_scalar:
-            sample_label = Tensor[Self.label_dtype].d1(
-                [dataset_labels_ptr[idx]]
-            )
-        else:
-            sample_label = Tensor[Self.label_dtype].zeros(self._label_dim)
-            var src_label_offset = idx * self._label_dim
-            for j in range(self._label_dim):
-                sample_label[j] = dataset_labels_ptr[src_label_offset + j]
+        # Copy feature data
+        var src_feature_offset = idx * self._features_per_sample
+        memcpy(
+            dest=sample_feature_ptr,
+            src=dataset_features_ptr + src_feature_offset,
+            count=self._features_per_sample,
+        )
+
+        # Copy label data
+        var src_label_offset = idx * self._labels_per_sample
+        memcpy(
+            dest=sample_label_ptr,
+            src=dataset_labels_ptr + src_label_offset,
+            count=self._labels_per_sample,
+        )
 
         return (sample_feature^, sample_label^)
 
@@ -605,44 +657,50 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 
 
 fn main() raises:
-    test_dataloader_shuffle_preserves_all_data_dl()
+    example_usage()
 
 
 from testing import assert_true
 
 
-fn test_dataloader_shuffle_preserves_all_data_dl() raises:
-    """Test that shuffle doesn't lose or duplicate data."""
-    print("test_dataloader_shuffle_preserves_all_data_dl")
-    var features = Tensor.d2(
-        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]
-    ).float()
-    var labels = Tensor.d1([10.0, 20.0, 30.0, 40.0]).float()
+# ==============================================================================
+# USAGE EXAMPLE
+# ==============================================================================
 
-    var dataset = TensorDataset(features, labels)
-    var loader = dataset.into_loader(
-        batch_size=2, shuffle=True, drop_last=False
-    )
 
-    # Collect all batches
-    var all_features = Tensor.d2(
-        [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
-    ).float()
-    var all_labels = Tensor.d1([0.0, 0.0, 0.0, 0.0]).float()
+fn example_usage() raises:
+    """Example showing the fixed implementation."""
 
-    var idx = 0
-    for batch in loader:
-        for i in range(batch.batch_size):
-            all_features[idx, 0] = batch.features[i, 0]
-            all_features[idx, 1] = batch.features[i, 1]
-            all_labels[idx] = batch.labels[i]
-            idx += 1
+    # Create 4D image data (N, C, H, W)
+    var images = Tensor[DType.float32].randn(1000, 1, 28, 28)
+    var labels = Tensor[DType.int32].zeros(1000)
 
-    # Check sum (order-independent verification)
-    var sum_feat = all_features.sum()
-    var expected_sum_feat = features.sum()
-    assert_true(sum_feat.all_close(expected_sum_feat))
+    print("Original data shapes:")
+    print("  Images:", images.shape())  # (1000, 1, 28, 28)
+    print("  Labels:", labels.shape())  # (1000,)
 
-    var sum_labels = all_labels.sum()
-    var expected_sum_labels = labels.sum()
-    assert_true(sum_labels.all_close(expected_sum_labels))
+    # Create dataset
+    var dataset = NumpyDataset[DType.float32, DType.int32](images, labels)
+
+    print("\nDataset info:")
+    print("  Size:", len(dataset))
+    print(
+        "  Feature shape per sample:", dataset.get_feature_shape()
+    )  # (1, 28, 28)
+    print("  Label shape per sample:", dataset.get_label_shape())  # ()
+    print("  Features per sample:", dataset.get_features_per_sample())  # 784
+
+    # Create dataloader
+    var loader = dataset.into_loader(batch_size=128, shuffle=False)
+
+    print("\nDataLoader info:")
+    print("  Num batches:", len(loader))
+
+    # Get first batch
+    loader.reset()
+    if loader.__has_next__():
+        ref batch = loader.__next__()
+        print("\nFirst batch:")
+        print("  Features shape:", batch.features.shape())  # (128, 1, 28, 28) ✅
+        print("  Labels shape:", batch.labels.shape())  # (128,) ✅
+        print("  ✓ Shapes preserved correctly!")

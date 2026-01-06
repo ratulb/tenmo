@@ -4,11 +4,13 @@ Tests forward pass, backward pass, edge cases, and numerical gradients.
 """
 from tenmo import Tensor
 from convolution import *
+
+# from cnn import Conv2dMM as Conv2dForward
 from testing import assert_almost_equal, assert_equal, assert_true, assert_false
 from math import sqrt
 from common_utils import isnan, isinf
 from math import sqrt
-from random import  seed
+from random import seed
 from gradbox import Gradbox
 from shapes import Shape
 from common_utils import i, s
@@ -17,6 +19,7 @@ from forwards import Padding
 
 # Assume these are imported from your actual implementation
 # from your_module import Conv2D, Tensor, Shape
+
 
 fn test_basic_forward() raises:
     """Test basic forward pass with known values."""
@@ -36,7 +39,9 @@ fn test_basic_forward() raises:
     kernel[0, 0, 1, 0] = 0.0
     kernel[0, 0, 1, 1] = 1.0
 
-    var result = Conv2dForward[DType.float32].forward(image, kernel, stride=1, padding="valid")
+    var result = Conv2dForward[DType.float32].forward(
+        image, kernel, stride=1, padding="valid"
+    )
 
     # Expected: [1*1 + 4*1, 2*1 + 0*1] = [5, 2] for first row
     assert_almost_equal(result[0, 0, 0, 0], 5.0, atol=1e-5)
@@ -55,12 +60,16 @@ fn test_stride() raises:
     var kernel = Tensor[DType.float32].ones(1, 1, 2, 2)
 
     # Stride 1: should give 3x3 output
-    var result1 = Conv2dForward[DType.float32].forward(image, kernel, stride=1, padding="valid")
+    var result1 = Conv2dForward[DType.float32].forward(
+        image, kernel, stride=1, padding="valid"
+    )
     assert_equal(result1.shape()[2], 3)
     assert_equal(result1.shape()[3], 3)
 
     # Stride 2: should give 2x2 output
-    var result2 = Conv2dForward[DType.float32].forward(image, kernel, stride=2, padding="valid")
+    var result2 = Conv2dForward[DType.float32].forward(
+        image, kernel, stride=2, padding="valid"
+    )
     assert_equal(result2.shape()[2], 2)
     assert_equal(result2.shape()[3], 2)
 
@@ -79,10 +88,14 @@ fn test_dilation() raises:
     var kernel = Tensor[DType.float32].ones(1, 1, 2, 2)
 
     # Dilation 1: normal 2x2 kernel
-    var _result1 = Conv2dForward[DType.float32].forward(image, kernel, dilation=1, padding="valid")
+    var _result1 = Conv2dForward[DType.float32].forward(
+        image, kernel, dilation=1, padding="valid"
+    )
 
     # Dilation 2: effective 3x3 kernel with gaps
-    var result2 = Conv2dForward[DType.float32].forward(image, kernel, dilation=2, padding="valid")
+    var result2 = Conv2dForward[DType.float32].forward(
+        image, kernel, dilation=2, padding="valid"
+    )
 
     # With dilation=2, effective kernel size is 3x3, so output is 3x3
     assert_equal(result2.shape()[2], 3)
@@ -99,7 +112,9 @@ fn test_padding_same() raises:
     var kernel = Tensor[DType.float32].ones(1, 1, 3, 3)
 
     # With same padding and stride=1, output shape should equal input shape
-    var result = Conv2dForward[DType.float32].forward(image, kernel, stride=1, padding="same")
+    var result = Conv2dForward[DType.float32].forward(
+        image, kernel, stride=1, padding="same"
+    )
 
     assert_equal(result.shape()[2], 4)
     assert_equal(result.shape()[3], 4)
@@ -115,7 +130,9 @@ fn test_padding_explicit() raises:
     var kernel = Tensor[DType.float32].ones(1, 1, 3, 3)
 
     # Test int padding
-    var result1 = Conv2dForward[DType.float32].forward(image, kernel, padding=Padding(1))
+    var result1 = Conv2dForward[DType.float32].forward(
+        image, kernel, padding=Padding(1)
+    )
     assert_equal(result1.shape()[2], 4)
     assert_equal(result1.shape()[3], 4)
 
@@ -161,14 +178,16 @@ fn test_multi_channel() raises:
     var image = Tensor[DType.float32].ones(1, 2, 4, 4)
     var kernel = Tensor[DType.float32].ones(3, 2, 2, 2)
 
-    var result = Conv2dForward[DType.float32].forward(image, kernel, padding="valid")
+    var result = Conv2dForward[DType.float32].forward(
+        image, kernel, padding="valid"
+    )
 
     assert_equal(result.shape()[0], 1)  # Batch
     assert_equal(result.shape()[1], 3)  # Output channels
     assert_equal(result.shape()[2], 3)  # Height
     assert_equal(result.shape()[3], 3)  # Width
 
-    # Each output pixel should be sum over 2 input channels × 2×2 kernel = 8.0
+    # Each output pixel should be sum over 2 input channels x 2x2 kernel = 8.0
     assert_almost_equal(result[0, 0, 0, 0], 8.0, atol=1e-5)
 
     print("Multi-channel correct")
@@ -186,7 +205,9 @@ fn test_batch() raises:
                 image[b, 0, i, j] = Float32(b + 1)
 
     var kernel = Tensor[DType.float32].ones(1, 1, 2, 2)
-    var result = Conv2dForward[DType.float32].forward(image, kernel, padding="valid")
+    var result = Conv2dForward[DType.float32].forward(
+        image, kernel, padding="valid"
+    )
 
     assert_equal(result.shape()[0], 4)
 
@@ -205,7 +226,9 @@ fn test_gradient_input() raises:
     var image = Tensor[DType.float32].ones(1, 1, 3, 3, requires_grad=True)
     var kernel = Tensor[DType.float32].ones(1, 1, 2, 2, requires_grad=False)
 
-    var output = Conv2dForward[DType.float32].forward(image, kernel, padding="valid")
+    var output = Conv2dForward[DType.float32].forward(
+        image, kernel, padding="valid"
+    )
 
     # Backward pass
     var grad_output = Tensor[DType.float32].ones(output.shape())
@@ -234,7 +257,9 @@ fn test_gradient_input() raises:
     var numerical_grad: Float32 = 0.0
     for i in range(out_plus.shape()[2]):
         for j in range(out_plus.shape()[3]):
-            numerical_grad += (out_plus[0, 0, i, j] - out_minus[0, 0, i, j]) / (2 * epsilon)
+            numerical_grad += (out_plus[0, 0, i, j] - out_minus[0, 0, i, j]) / (
+                2 * epsilon
+            )
 
     # Restore original
     image[0, 0, 1, 1] = original
@@ -258,7 +283,9 @@ fn test_gradient_kernel() raises:
         for j in range(3):
             image[0, 0, i, j] = Float32(i * 3 + j)
 
-    var output = Conv2dForward[DType.float32].forward(image, kernel, padding="valid")
+    var output = Conv2dForward[DType.float32].forward(
+        image, kernel, padding="valid"
+    )
 
     # Backward pass
     var grad_output = Tensor[DType.float32].ones(output.shape())
@@ -283,7 +310,9 @@ fn test_gradient_kernel() raises:
     var numerical_grad: Float32 = 0.0
     for i in range(out_plus.shape()[2]):
         for j in range(out_plus.shape()[3]):
-            numerical_grad += (out_plus[0, 0, i, j] - out_minus[0, 0, i, j]) / (2 * epsilon)
+            numerical_grad += (out_plus[0, 0, i, j] - out_minus[0, 0, i, j]) / (
+                2 * epsilon
+            )
 
     kernel[0, 0, 0, 0] = original
 
@@ -301,7 +330,9 @@ fn test_gradient_bias() raises:
     var kernel = Tensor[DType.float32].ones(2, 1, 2, 2, requires_grad=False)
     var bias = Tensor[DType.float32].zeros(2, requires_grad=True)
 
-    var output = Conv2dForward[DType.float32].forward(image, kernel, bias=bias, padding="valid")
+    var output = Conv2dForward[DType.float32].forward(
+        image, kernel, bias=bias, padding="valid"
+    )
 
     # Backward with uniform gradient
     var grad_output = Tensor[DType.float32].ones(output.shape())
@@ -309,8 +340,8 @@ fn test_gradient_bias() raises:
 
     var grad_bias = bias.gradients()[]
 
-    # Bias gradient should equal number of spatial positions × batch size
-    # Output is 2×2 spatial, 2 batch ? 2*2*2 = 8
+    # Bias gradient should equal number of spatial positions x batch size
+    # Output is 2x2 spatial, 2 batch ? 2*2*2 = 8
     var expected = Float32(2 * 2 * 2)  # H_out * W_out * N
     assert_almost_equal(grad_bias[0], expected, atol=1e-5)
     assert_almost_equal(grad_bias[1], expected, atol=1e-5)
@@ -327,8 +358,12 @@ fn test_gradient_flow() raises:
     var kernel2 = Tensor[DType.float32].ones(8, 4, 3, 3, requires_grad=True)
 
     # Two-layer convolution
-    var out1 = Conv2dForward[DType.float32].forward(image, kernel1, padding="same")
-    var out2 = Conv2dForward[DType.float32].forward(out1, kernel2, padding="same")
+    var out1 = Conv2dForward[DType.float32].forward(
+        image, kernel1, padding="same"
+    )
+    var out2 = Conv2dForward[DType.float32].forward(
+        out1, kernel2, padding="same"
+    )
 
     # Backward
     var grad_output = Tensor[DType.float32].ones(out2.shape())
@@ -356,7 +391,9 @@ fn test_edge_cases() raises:
     # Test large kernel relative to image
     var small_image = Tensor[DType.float32].ones(1, 1, 3, 3)
     var large_kernel = Tensor[DType.float32].ones(1, 1, 3, 3)
-    var result2 = Conv2dForward[DType.float32].forward(small_image, large_kernel, padding="valid")
+    var result2 = Conv2dForward[DType.float32].forward(
+        small_image, large_kernel, padding="valid"
+    )
     assert_equal(result2.shape()[2], 1)
     assert_equal(result2.shape()[3], 1)
 
@@ -392,12 +429,16 @@ fn test_numerical_stability() raises:
     # Very small values
     var image_small = Tensor[DType.float32].full([1, 1, 3, 3], 1e-8)
     var kernel_small = Tensor[DType.float32].full([1, 1, 2, 2], 1e-8)
-    var result_small = Conv2dForward[DType.float32].forward(image_small, kernel_small)
+    var result_small = Conv2dForward[DType.float32].forward(
+        image_small, kernel_small
+    )
 
     # Very large values
     var image_large = Tensor[DType.float32].full([1, 1, 3, 3], 1e8)
     var kernel_large = Tensor[DType.float32].full([1, 1, 2, 2], 1e-8)
-    var result_large = Conv2dForward[DType.float32].forward(image_large, kernel_large)
+    var result_large = Conv2dForward[DType.float32].forward(
+        image_large, kernel_large
+    )
 
     # Should not produce NaN or Inf
     for i in range(result_small.shape()[2]):
@@ -446,9 +487,9 @@ fn main() raises:
     test_batch_processing()
     test_edge_cases_2()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("ALL TESTS PASSED!")
-    print("="*60)
+    print("=" * 60)
 
     print("\n--- FORWARD: Basic Functionality ---")
     test_conv2d_forward_single_batch_single_channel()
@@ -487,21 +528,38 @@ fn main() raises:
     test_conv2d_edge_1x1_kernel()
     test_conv2d_edge_large_kernel()
     test_conv2d_edge_output_size_1()
+
+
 # -------------------------------------------------------------------
 # HELPER FUNCTIONS
 # -------------------------------------------------------------------
 
-fn assert_shape_equal[dtype: DType, //](tensor: Tensor[dtype], expected: List[Int], test_name: String) raises:
+
+fn assert_shape_equal[
+    dtype: DType, //
+](tensor: Tensor[dtype], expected: List[Int], test_name: String) raises:
     """Assert tensor has expected shape."""
     var actual = tensor.shape()
     if actual.rank() != len(expected):
-        raise Error(test_name + " FAILED: Shape rank mismatch. Expected " +
-                   len(expected).__str__() + " got " + actual.rank().__str__())
+        raise Error(
+            test_name
+            + " FAILED: Shape rank mismatch. Expected "
+            + len(expected).__str__()
+            + " got "
+            + actual.rank().__str__()
+        )
 
     for i in range(len(expected)):
         if actual[i] != expected[i]:
-            raise Error(test_name + " FAILED: Shape mismatch at dim " + i.__str__() +
-                       ". Expected " + expected[i].__str__() + " got " + actual[i].__str__())
+            raise Error(
+                test_name
+                + " FAILED: Shape mismatch at dim "
+                + i.__str__()
+                + ". Expected "
+                + expected[i].__str__()
+                + " got "
+                + actual[i].__str__()
+            )
 
     print(test_name + " - Shape correct:", actual.__str__())
 
@@ -511,7 +569,7 @@ fn assert_tensor_close(
     b: Gradbox[DType.float32],
     test_name: String,
     rtol: Float32 = 1e-4,
-    atol: Float32 = 1e-6
+    atol: Float32 = 1e-6,
 ) raises:
     """Assert two tensors are element-wise close."""
     if a.shape() != b.shape():
@@ -527,22 +585,31 @@ fn assert_tensor_close(
         if diff > threshold:
             max_diff = max(max_diff, diff)
             if max_diff > 10 * threshold:  # Only fail if really off
-                raise Error(test_name + " FAILED: Value mismatch at index " + i.__str__() +
-                           ". Expected " + b.buffer.data_buffer()[i].__str__()  + " got " + a.buffer.data_buffer()[i].__str__()  +
-                           " (diff: " + diff.__str__()  + ")")
+                raise Error(
+                    test_name
+                    + " FAILED: Value mismatch at index "
+                    + i.__str__()
+                    + ". Expected "
+                    + b.buffer.data_buffer()[i].__str__()
+                    + " got "
+                    + a.buffer.data_buffer()[i].__str__()
+                    + " (diff: "
+                    + diff.__str__()
+                    + ")"
+                )
 
-    print(test_name + " - Values close (max_diff: " + max_diff.__str__()  + ")")
+    print(test_name + " - Values close (max_diff: " + max_diff.__str__() + ")")
 
 
 fn compute_numerical_gradient(
     image: Tensor[DType.float32],
-    kernel: Tensor[DType.float32],
+    mut kernel: Tensor[DType.float32],
     bias: Optional[Tensor[DType.float32]],
     stride: Int,
     dilation: Int,
     padding: Padding,
     param_type: String,  # "image", "kernel", or "bias"
-    eps: Float32 = 1e-4
+    eps: Float32 = 1e-4,
 ) -> Tensor[DType.float32]:
     """Compute numerical gradient using finite differences."""
 
@@ -615,7 +682,9 @@ fn compute_numerical_gradient(
         var loss_minus = out_minus.sum()
 
         # Compute gradient
-        numerical_grad.buffer.data_buffer()[idx] = Scalar[DType.float32]((loss_plus - loss_minus).item() / (2.0 * eps))
+        numerical_grad.buffer.data_buffer()[idx] = Scalar[DType.float32](
+            (loss_plus - loss_minus).item() / (2.0 * eps)
+        )
 
     return numerical_grad^
 
@@ -624,33 +693,42 @@ fn compute_numerical_gradient(
 # TEST 1: BASIC OUTPUT SHAPES
 # -------------------------------------------------------------------
 
+
 fn test_basic_shapes() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 1: BASIC OUTPUT SHAPES")
-    print("="*60)
+    print("=" * 60)
 
     # Test 1.1: Single channel, single filter
     var img1 = Tensor[DType.float32].randn(1, 1, 5, 5)
     var kernel1 = Tensor[DType.float32].randn(1, 1, 3, 3)
-    var out1 = Conv2dForward[DType.float32].forward[track_grad=False](img1, kernel1)
+    var out1 = Conv2dForward[DType.float32].forward[track_grad=False](
+        img1, kernel1
+    )
     assert_shape_equal(out1, [1, 1, 3, 3], "Single channel, 3x3 kernel")
 
     # Test 1.2: RGB image, multiple filters
     var img2 = Tensor[DType.float32].randn(2, 3, 8, 8)  # Batch=2
     var kernel2 = Tensor[DType.float32].randn(16, 3, 3, 3)  # 16 filters
-    var out2 = Conv2dForward[DType.float32].forward[track_grad=False](img2, kernel2)
+    var out2 = Conv2dForward[DType.float32].forward[track_grad=False](
+        img2, kernel2
+    )
     assert_shape_equal(out2, [2, 16, 6, 6], "RGB, 16 filters, batch=2")
 
     # Test 1.3: Large kernel
     var img3 = Tensor[DType.float32].randn(1, 1, 10, 10)
     var kernel3 = Tensor[DType.float32].randn(1, 1, 5, 5)
-    var out3 = Conv2dForward[DType.float32].forward[track_grad=False](img3, kernel3)
+    var out3 = Conv2dForward[DType.float32].forward[track_grad=False](
+        img3, kernel3
+    )
     assert_shape_equal(out3, [1, 1, 6, 6], "5x5 kernel on 10x10 image")
 
     # Test 1.4: Non-square image
     var img4 = Tensor[DType.float32].randn(1, 1, 7, 10)
     var kernel4 = Tensor[DType.float32].randn(1, 1, 3, 3)
-    var out4 = Conv2dForward[DType.float32].forward[track_grad=False](img4, kernel4)
+    var out4 = Conv2dForward[DType.float32].forward[track_grad=False](
+        img4, kernel4
+    )
     assert_shape_equal(out4, [1, 1, 5, 8], "Non-square image (7x10)")
 
     print("\n All basic shape tests passed!\n")
@@ -660,10 +738,11 @@ fn test_basic_shapes() raises:
 # TEST 2: PADDING MODES
 # -------------------------------------------------------------------
 
+
 fn test_padding_modes() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 2: PADDING MODES")
-    print("="*60)
+    print("=" * 60)
 
     var img = Tensor[DType.float32].randn(1, 1, 8, 8)
     var kernel = Tensor[DType.float32].randn(1, 1, 3, 3)
@@ -690,7 +769,9 @@ fn test_padding_modes() raises:
     var out_pad_tuple = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding((1, 2))
     )
-    assert_shape_equal(out_pad_tuple, List[Int](1, 1, 8, 10), "Tuple padding (1,2)")
+    assert_shape_equal(
+        out_pad_tuple, List[Int](1, 1, 8, 10), "Tuple padding (1,2)"
+    )
 
     # Test 2.5: Asymmetric padding
     var pad_list = List[Tuple[Int, Int]]()
@@ -708,10 +789,11 @@ fn test_padding_modes() raises:
 # TEST 3: STRIDE
 # -------------------------------------------------------------------
 
+
 fn test_stride_2() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 3: STRIDE")
-    print("="*60)
+    print("=" * 60)
 
     var img = Tensor[DType.float32].randn(1, 1, 8, 8)
     var kernel = Tensor[DType.float32].randn(1, 1, 3, 3)
@@ -738,7 +820,9 @@ fn test_stride_2() raises:
     var out_s2_pad = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, stride=2, padding=Padding("same")
     )
-    assert_shape_equal(out_s2_pad, List[Int](1, 1, 4, 4), "Stride=2 with same padding")
+    assert_shape_equal(
+        out_s2_pad, List[Int](1, 1, 4, 4), "Stride=2 with same padding"
+    )
 
     print("\n All stride tests passed!\n")
 
@@ -747,10 +831,11 @@ fn test_stride_2() raises:
 # TEST 4: DILATION (ATROUS CONVOLUTION)
 # -------------------------------------------------------------------
 
+
 fn test_dilation_2() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 4: DILATION")
-    print("="*60)
+    print("=" * 60)
 
     var img = Tensor[DType.float32].randn(1, 1, 10, 10)
     var kernel = Tensor[DType.float32].randn(1, 1, 3, 3)
@@ -784,10 +869,11 @@ fn test_dilation_2() raises:
 # TEST 5: BIAS
 # -------------------------------------------------------------------
 
+
 fn test_bias_2() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 5: BIAS")
-    print("="*60)
+    print("=" * 60)
 
     var img = Tensor[DType.float32].ones(1, 1, 3, 3)
     var kernel = Tensor[DType.float32].ones(2, 1, 2, 2)  # 2 filters
@@ -803,7 +889,9 @@ fn test_bias_2() raises:
     print(" No bias - correct zero initialization")
 
     # Test 5.2: With bias
-    var bias = Tensor[DType.float32].full(Shape(2), 10.0)  # bias=10 for both filters
+    var bias = Tensor[DType.float32].full(
+        Shape(2), 10.0
+    )  # bias=10 for both filters
     var out_with_bias = Conv2dForward[DType.float32].forward[track_grad=False](
         img, kernel, bias=bias
     )
@@ -839,22 +927,33 @@ fn test_bias_2() raises:
 # TEST 6: KNOWN VALUES (MANUAL COMPUTATION)
 # -------------------------------------------------------------------
 
+
 fn test_known_values() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 6: KNOWN VALUES")
-    print("="*60)
+    print("=" * 60)
 
     # Test 6.1: Simple 3x3 image, 2x2 kernel
     var img = Tensor[DType.float32](Shape(1, 1, 3, 3))
-    img[0, 0, 0, 0] = 1.0; img[0, 0, 0, 1] = 2.0; img[0, 0, 0, 2] = 3.0
-    img[0, 0, 1, 0] = 4.0; img[0, 0, 1, 1] = 5.0; img[0, 0, 1, 2] = 6.0
-    img[0, 0, 2, 0] = 7.0; img[0, 0, 2, 1] = 8.0; img[0, 0, 2, 2] = 9.0
+    img[0, 0, 0, 0] = 1.0
+    img[0, 0, 0, 1] = 2.0
+    img[0, 0, 0, 2] = 3.0
+    img[0, 0, 1, 0] = 4.0
+    img[0, 0, 1, 1] = 5.0
+    img[0, 0, 1, 2] = 6.0
+    img[0, 0, 2, 0] = 7.0
+    img[0, 0, 2, 1] = 8.0
+    img[0, 0, 2, 2] = 9.0
 
     var kernel = Tensor[DType.float32](Shape(1, 1, 2, 2))
-    kernel[0, 0, 0, 0] = 1.0; kernel[0, 0, 0, 1] = 0.0
-    kernel[0, 0, 1, 0] = 0.0; kernel[0, 0, 1, 1] = 1.0
+    kernel[0, 0, 0, 0] = 1.0
+    kernel[0, 0, 0, 1] = 0.0
+    kernel[0, 0, 1, 0] = 0.0
+    kernel[0, 0, 1, 1] = 1.0
 
-    var out = Conv2dForward[DType.float32].forward[track_grad=False](img, kernel)
+    var out = Conv2dForward[DType.float32].forward[track_grad=False](
+        img, kernel
+    )
 
     # Manual computation:
     # Position (0,0): 1*1 + 2*0 + 4*0 + 5*1 = 6
@@ -868,7 +967,9 @@ fn test_known_values() raises:
     expected[0, 0, 1, 0] = 12.0
     expected[0, 0, 1, 1] = 14.0
 
-    assert_tensor_close(out.as_gradbox(), expected.as_gradbox(), "Known 3x3 convolution")
+    assert_tensor_close(
+        out.as_gradbox(), expected.as_gradbox(), "Known 3x3 convolution"
+    )
 
     print("\n All known value tests passed!\n")
 
@@ -877,10 +978,11 @@ fn test_known_values() raises:
 # TEST 7: GRADIENT SHAPES
 # -------------------------------------------------------------------
 
+
 fn test_gradient_shapes() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 7: GRADIENT SHAPES")
-    print("="*60)
+    print("=" * 60)
 
     var img = Tensor[DType.float32].randn(2, 3, 8, 8)
     img.requires_grad_(True)
@@ -903,7 +1005,9 @@ fn test_gradient_shapes() raises:
     var list2: List[Int] = [16, 3, 3, 3]
     var list3: List[Int] = [16]
     assert_shape_equal(img.grad().as_tensor(), list1, "Image gradient shape")
-    assert_shape_equal(kernel.grad().as_tensor(), list2, "Kernel gradient shape")
+    assert_shape_equal(
+        kernel.grad().as_tensor(), list2, "Kernel gradient shape"
+    )
     assert_shape_equal(bias.grad().as_tensor(), list3, "Bias gradient shape")
 
     print("\nAll gradient shape tests passed!\n")
@@ -913,10 +1017,11 @@ fn test_gradient_shapes() raises:
 # TEST 8: GRADIENT CORRECTNESS (NUMERICAL CHECK)
 # -------------------------------------------------------------------
 
+
 fn test_gradient_correctness() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 8: GRADIENT CORRECTNESS (NUMERICAL)")
-    print("="*60)
+    print("=" * 60)
 
     seed(42)
 
@@ -938,12 +1043,21 @@ fn test_gradient_correctness() raises:
 
     var analytical_img_grad = img.gradients()[].copy()
     var numerical_img_grad = compute_numerical_gradient(
-        img, kernel, bias, stride=1, dilation=1, padding=Padding("valid"), param_type="image"
+        img,
+        kernel,
+        bias,
+        stride=1,
+        dilation=1,
+        padding=Padding("valid"),
+        param_type="image",
     )
 
     assert_tensor_close(
-        analytical_img_grad, numerical_img_grad.as_gradbox(),
-        "Image gradient numerical check", rtol=1e-2, atol=1e-2
+        analytical_img_grad,
+        numerical_img_grad.as_gradbox(),
+        "Image gradient numerical check",
+        rtol=1e-2,
+        atol=1e-2,
     )
 
     # Test 8.2: Kernel gradient
@@ -958,12 +1072,21 @@ fn test_gradient_correctness() raises:
 
     var analytical_kernel_grad = kernel.gradients()[].copy()
     var numerical_kernel_grad = compute_numerical_gradient(
-        img, kernel, bias, stride=1, dilation=1, padding=Padding("valid"), param_type="kernel"
+        img,
+        kernel,
+        bias,
+        stride=1,
+        dilation=1,
+        padding=Padding("valid"),
+        param_type="kernel",
     )
 
     assert_tensor_close(
-        analytical_kernel_grad, numerical_kernel_grad.as_gradbox(),
-        "Kernel gradient numerical check", rtol=1e-2, atol=1e-2
+        analytical_kernel_grad,
+        numerical_kernel_grad.as_gradbox(),
+        "Kernel gradient numerical check",
+        rtol=1e-2,
+        atol=1e-2,
     )
 
     # Test 8.3: Bias gradient
@@ -978,12 +1101,21 @@ fn test_gradient_correctness() raises:
 
     var analytical_bias_grad = bias.gradients()[].copy()
     var numerical_bias_grad = compute_numerical_gradient(
-        img, kernel, bias, stride=1, dilation=1, padding=Padding("valid"), param_type="bias"
+        img,
+        kernel,
+        bias,
+        stride=1,
+        dilation=1,
+        padding=Padding("valid"),
+        param_type="bias",
     )
 
     assert_tensor_close(
-        analytical_bias_grad, numerical_bias_grad.as_gradbox(),
-        "Bias gradient numerical check", rtol=1e-2, atol=1e-2
+        analytical_bias_grad,
+        numerical_bias_grad.as_gradbox(),
+        "Bias gradient numerical check",
+        rtol=1e-2,
+        atol=1e-2,
     )
 
     print("\n All gradient correctness tests passed!\n")
@@ -993,10 +1125,11 @@ fn test_gradient_correctness() raises:
 # TEST 9: GRADIENT WITH STRIDE AND DILATION
 # -------------------------------------------------------------------
 
+
 fn test_gradient_stride_dilation() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 9: GRADIENTS WITH STRIDE & DILATION")
-    print("="*60)
+    print("=" * 60)
 
     seed(123)
 
@@ -1007,18 +1140,28 @@ fn test_gradient_stride_dilation() raises:
     var kernel_s2 = Tensor[DType.float32].randn(1, 1, 2, 2)
     kernel_s2.requires_grad_(True)
 
-    var out_s2 = Conv2dForward[DType.float32].forward(img_s2, kernel_s2, stride=2)
+    var out_s2 = Conv2dForward[DType.float32].forward(
+        img_s2, kernel_s2, stride=2
+    )
     var loss_s2 = out_s2.sum()
     loss_s2.backward()
 
     var numerical_s2 = compute_numerical_gradient(
-        img_s2, kernel_s2, None, stride=2, dilation=1,
-        padding=Padding("valid"), param_type="image"
+        img_s2,
+        kernel_s2,
+        None,
+        stride=2,
+        dilation=1,
+        padding=Padding("valid"),
+        param_type="image",
     )
 
     assert_tensor_close(
-        img_s2.gradients()[], numerical_s2.as_gradbox(),
-        "Stride=2 image gradient", rtol=1e-1, atol=1e-2
+        img_s2.gradients()[],
+        numerical_s2.as_gradbox(),
+        "Stride=2 image gradient",
+        rtol=1e-1,
+        atol=1e-2,
     )
 
     # Test 9.2: Dilation = 2
@@ -1028,18 +1171,28 @@ fn test_gradient_stride_dilation() raises:
     var kernel_d2 = Tensor[DType.float32].randn(1, 1, 2, 2)
     kernel_d2.requires_grad_(True)
 
-    var out_d2 = Conv2dForward[DType.float32].forward(img_d2, kernel_d2, dilation=2)
+    var out_d2 = Conv2dForward[DType.float32].forward(
+        img_d2, kernel_d2, dilation=2
+    )
     var loss_d2 = out_d2.sum()
     loss_d2.backward()
 
     var numerical_d2 = compute_numerical_gradient(
-        img_d2, kernel_d2, None, stride=1, dilation=2,
-        padding=Padding("valid"), param_type="kernel"
+        img_d2,
+        kernel_d2,
+        None,
+        stride=1,
+        dilation=2,
+        padding=Padding("valid"),
+        param_type="kernel",
     )
 
     assert_tensor_close(
-        kernel_d2.gradients()[], numerical_d2.as_gradbox(),
-        "Dilation=2 kernel gradient", rtol=1e-3, atol=1e-4
+        kernel_d2.gradients()[],
+        numerical_d2.as_gradbox(),
+        "Dilation=2 kernel gradient",
+        rtol=1e-3,
+        atol=1e-4,
     )
 
     print("\n All stride/dilation gradient tests passed!\n")
@@ -1049,10 +1202,11 @@ fn test_gradient_stride_dilation() raises:
 # TEST 10: GRADIENT ACCUMULATION
 # -------------------------------------------------------------------
 
+
 fn test_gradient_accumulation() raises:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 10: GRADIENT ACCUMULATION")
-    print("="*60)
+    print("=" * 60)
 
     var img = Tensor[DType.float32].randn(1, 1, 5, 5)
     img.requires_grad_(True)
@@ -1064,7 +1218,7 @@ fn test_gradient_accumulation() raises:
     var loss1 = out1.sum()
     loss1.backward()
 
-    #var grad_after_first = img.gradients()[].copy()
+    # var grad_after_first = img.gradients()[].copy()
     var grad_after_first = img.grad()
 
     # Second backward pass (should accumulate)
@@ -1081,7 +1235,9 @@ fn test_gradient_accumulation() raises:
         var expected = grad_after_first.buffer.data_buffer()[i] * 3.0
         var actual = grad_after_second.buffer.data_buffer()[i]
         if abs(actual - expected) > 1e-3:
-            raise Error("Gradient accumulation test failed at index " + i.__str__())
+            raise Error(
+                "Gradient accumulation test failed at index " + i.__str__()
+            )
 
     print(" Gradients correctly accumulated across multiple backward passes")
     print("\n Gradient accumulation test passed!\n")
@@ -1091,29 +1247,39 @@ fn test_gradient_accumulation() raises:
 # TEST 11: BATCH PROCESSING
 # -------------------------------------------------------------------
 
+
 fn test_batch_processing() raises:
     print("test_batch_processing")
     var kernel = Tensor[DType.float32].randn(2, 1, 3, 3)
 
     # Process batch of 4
     var img_batch = Tensor[DType.float32].randn(4, 1, 6, 6)
-    var out_batch = Conv2dForward[DType.float32].forward[track_grad=False](img_batch, kernel)
-
+    var out_batch = Conv2dForward[DType.float32].forward[track_grad=False](
+        img_batch, kernel
+    )
 
     # Process individually
     var out_individual_list = List[Tensor[DType.float32]]()
     for i in range(4):
-        var img_single = img_batch[i:i+1, :, :, :]  # Extract single image
-        var out_single = Conv2dForward[DType.float32].forward[track_grad=False](img_single, kernel)
+        var img_single = img_batch[i : i + 1, :, :, :]  # Extract single image
+        var out_single = Conv2dForward[DType.float32].forward[track_grad=False](
+            img_single, kernel
+        )
         out_individual_list.append(out_single)
 
     # Compare results
     var batch = 0
     for i in range(4):
-        var batch_slice = out_batch[i:i+1, :, :, :]
+        var batch_slice = out_batch[i : i + 1, :, :, :]
         var individual = out_individual_list[i]
         for j in range(individual.numels()):
-            if abs(batch_slice.buffer.data_buffer()[batch *32 + j] - individual.buffer.data_buffer()[j]) > 1e-3:
+            if (
+                abs(
+                    batch_slice.buffer.data_buffer()[batch * 32 + j]
+                    - individual.buffer.data_buffer()[j]
+                )
+                > 1e-3
+            ):
                 raise Error("Batch processing mismatch at batch " + i.__str__())
         batch += 1
 
@@ -1122,35 +1288,47 @@ fn test_batch_processing() raises:
 
 
 fn test_edge_cases_2() raises:
-   print("test_edge_cases")
-   # Test 12.1: Kernel same size as image (output 1x1)
-   var img_small = Tensor[DType.float32].randn(1, 1, 3, 3)
-   var kernel_large = Tensor[DType.float32].randn(1, 1, 3, 3)
-   var out_1x1 = Conv2dForward[DType.float32].forward[track_grad=False](img_small, kernel_large)
-   assert_shape_equal(out_1x1, List[Int](1, 1, 1, 1), "Kernel size = image size")
+    print("test_edge_cases")
+    # Test 12.1: Kernel same size as image (output 1x1)
+    var img_small = Tensor[DType.float32].randn(1, 1, 3, 3)
+    var kernel_large = Tensor[DType.float32].randn(1, 1, 3, 3)
+    var out_1x1 = Conv2dForward[DType.float32].forward[track_grad=False](
+        img_small, kernel_large
+    )
+    assert_shape_equal(
+        out_1x1, List[Int](1, 1, 1, 1), "Kernel size = image size"
+    )
 
-   # Test 12.2: 1x1 kernel (pointwise convolution)
-   var img_pw = Tensor[DType.float32].randn(1, 3, 5, 5)
-   var kernel_1x1 = Tensor[DType.float32].randn(16, 3, 1, 1)
-   var out_pw = Conv2dForward[DType.float32].forward[track_grad=False](img_pw, kernel_1x1)
-   assert_shape_equal(out_pw, List[Int](1, 16, 5, 5), "1x1 kernel (pointwise)")
+    # Test 12.2: 1x1 kernel (pointwise convolution)
+    var img_pw = Tensor[DType.float32].randn(1, 3, 5, 5)
+    var kernel_1x1 = Tensor[DType.float32].randn(16, 3, 1, 1)
+    var out_pw = Conv2dForward[DType.float32].forward[track_grad=False](
+        img_pw, kernel_1x1
+    )
+    assert_shape_equal(out_pw, List[Int](1, 16, 5, 5), "1x1 kernel (pointwise)")
 
-   # Test 12.3: Large batch
-   var img_large_batch = Tensor[DType.float32].randn(32, 3, 8, 8)
-   var kernel_lb = Tensor[DType.float32].randn(8, 3, 3, 3)
-   var out_lb = Conv2dForward[DType.float32].forward[track_grad=False](img_large_batch, kernel_lb)
-   assert_shape_equal(out_lb, List[Int](32, 8, 6, 6), "Large batch (32)")
+    # Test 12.3: Large batch
+    var img_large_batch = Tensor[DType.float32].randn(32, 3, 8, 8)
+    var kernel_lb = Tensor[DType.float32].randn(8, 3, 3, 3)
+    var out_lb = Conv2dForward[DType.float32].forward[track_grad=False](
+        img_large_batch, kernel_lb
+    )
+    assert_shape_equal(out_lb, List[Int](32, 8, 6, 6), "Large batch (32)")
 
-   # Test 12.4: Many channels
-   var img_many_ch = Tensor[DType.float32].randn(1, 64, 4, 4)
-   var kernel_many = Tensor[DType.float32].randn(128, 64, 2, 2)
-   var out_many = Conv2dForward[DType.float32].forward[track_grad=False](img_many_ch, kernel_many)
-   assert_shape_equal(out_many, List[Int](1, 128, 3, 3), "Many channels (64128)")
+    # Test 12.4: Many channels
+    var img_many_ch = Tensor[DType.float32].randn(1, 64, 4, 4)
+    var kernel_many = Tensor[DType.float32].randn(128, 64, 2, 2)
+    var out_many = Conv2dForward[DType.float32].forward[track_grad=False](
+        img_many_ch, kernel_many
+    )
+    assert_shape_equal(
+        out_many, List[Int](1, 128, 3, 3), "Many channels (64128)"
+    )
 
-   print("\n All edge case tests passed!\n")
+    print("\n All edge case tests passed!\n")
 
-#====================================================
 
+# ====================================================
 
 
 # ============================================================================
@@ -1771,7 +1949,6 @@ fn test_conv2d_backward_kernel_gradient() raises:
     """Test kernel gradient computation."""
     print("test_conv2d_backward_kernel_gradient")
 
-
     alias dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 4, 4, requires_grad=True)
@@ -1814,7 +1991,6 @@ fn test_conv2d_backward_with_stride() raises:
     # Gradients should exist and be reasonable
     assert_true(x.grad().shape()[2] == 5)
     assert_true(kernel.grad().shape()[2] == 3)
-
 
 
 # ============================================================================

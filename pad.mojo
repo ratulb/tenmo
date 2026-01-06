@@ -32,6 +32,7 @@ from utils import Variant
 
 alias Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
 
+
 @fieldwise_init
 struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """Backward pass for padding operation - handles all modes."""
@@ -424,4 +425,23 @@ struct Pad[dtype: DType](ImplicitlyCopyable):
 
 
 fn main() raises:
-    pass
+    alias dtype = DType.float32
+
+    # var input_image: Tensor[dtype]  # Shape: (2, 3, 28, 28)
+    # 2 images, 3 channels, 28×28 pixels
+
+    var input_image = Tensor[dtype].arange(1 * 2 * 3 * 3)
+    input_image = input_image.reshape(1, 2, 3, 3)
+    print("Is image contiguous: ", input_image.is_contiguous())
+    input_image.print()
+
+    var pad_spec = List[Tuple[Int, Int]]()
+    pad_spec.append((0, 0))  # Batch: DON'T pad
+    pad_spec.append((0, 0))  # Channels: DON'T pad
+    pad_spec.append((1, 1))  # Height: pad by 1
+    pad_spec.append((1, 1))  # Width: pad by 1
+
+    var padded = Pad.forward(input_image, pad_spec, mode="constant", value=-9)
+
+    print()
+    padded.print()

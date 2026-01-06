@@ -115,8 +115,13 @@ struct Tensor[dtype: DType = DType.float32](
         buffer = tensor_buffer.share(shape, strides, offset)
         return Tensor[Self.dtype](buffer=buffer^, requires_grad=requires_grad)
 
-    fn as_gradbox(deinit self, share: Bool = False) -> Gradbox[Self.dtype]:
-        return Gradbox[Self.dtype](self^.buffer.contiguous(), share=share)
+    fn as_gradbox(
+        deinit self, share: Bool = False, *, contiguous: Bool = True
+    ) -> Gradbox[Self.dtype]:
+        if contiguous:
+            return Gradbox[Self.dtype](self^.buffer.contiguous(), share=share)
+        else:
+            return Gradbox[Self.dtype](self^.buffer^, share=share)
 
     fn __moveinit__(out self, deinit other: Self):
         self._id = other._id
@@ -2219,7 +2224,7 @@ fn main():
 
     s = Tensor[dtype].scalar(49, requires_grad=True)
     s.print()
-    _="""a = Tensor.arange(10)
+    _ = """a = Tensor.arange(10)
     c = a.reshape(2, 5)  # View of a
     c.print()
     c.fill(1919, i(1), i(2))

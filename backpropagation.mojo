@@ -56,6 +56,9 @@ alias BACKWARD_STACK = 45
 alias BACKWARD_PAD = 46
 alias BACKWARD_COL2IM = 47
 alias BACKWARD_CONV2D = 48
+alias BACKWARD_CONV2DMM = 49
+alias BACKWARD_FUSED_CONV = 50
+alias BACKWARD_MAXPOOL2D = 51
 # ========== Delegate (Variant) ==========
 
 alias Delegate[dtype: DType] = Variant[
@@ -108,6 +111,9 @@ alias Delegate[dtype: DType] = Variant[
     PadBackward[dtype],
     Col2ImBackward[dtype],
     Conv2DBackward[dtype],
+    Conv2dMMBackward[dtype],
+    FusedCol2ImBackward[dtype],
+    MaxPool2dBackward[dtype],
 ]
 
 # ========== BackwardFn with Tag-Based Dispatch ==========
@@ -314,6 +320,16 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.tag == BACKWARD_CONV2D:
             return self.grad_fn[Conv2DBackward[Self.dtype]].backward(output)
 
+        elif self.tag == BACKWARD_CONV2DMM:
+            return self.grad_fn[Conv2dMMBackward[Self.dtype]].backward(output)
+
+        elif self.tag == BACKWARD_FUSED_CONV:
+            return self.grad_fn[FusedCol2ImBackward[Self.dtype]].backward(
+                output
+            )
+
+        elif self.tag == BACKWARD_MAXPOOL2D:
+            return self.grad_fn[MaxPool2dBackward[Self.dtype]].backward(output)
 
         else:
             panic("BackwardFn: Unknown backward tag: " + String(self.tag))

@@ -774,3 +774,5 @@ fn main():
     g.print()
     g.clamp_in_place(-5, 8)
     g.print()
+    g = Gradbox[dtype].zeros(Shape(), share=False)
+    g.print()
