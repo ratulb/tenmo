@@ -2,24 +2,21 @@ from tenmo import Tensor
 from backpropagation import (
     BackwardFn,
     Delegate,
-    BACKWARD_COL2IM,
-    BACKWARD_CONV2DMM,
     BACKWARD_FUSED_CONV,
     BACKWARD_MAXPOOL2D,
 )
 from operators import AddTensor
 from common_utils import panic, now
 from forwards import Pad
-from common_utils import s, i
 from shapes import Shape
 from gradbox import Gradbox
 from forwards import Padding
-from intarray import IntArray
 from algorithm import parallelize
+from sys import simd_width_of
+from ndbuffer import NDBuffer
 
 
 @fieldwise_init
-@register_passable
 struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """
     Backward for batched, multi-channel MaxPool2d.
@@ -32,6 +29,9 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
     var stride: Int
     var padding: Int
     var input_shape: Shape  # (N, C, H_in, W_in)
+    var argmax_mask: NDBuffer[
+        DType.int64
+    ]  # (N, C, H_out, W_out) - stores flattened
 
     fn backward(
         self,
@@ -45,9 +45,6 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
         ]()
 
         var input_tensor = output.ancestry().get(0)
-        var argmax_mask = output.ancestry().get(
-            1
-        )  # (N, C, H_out, W_out) - stores flattened input indices
 
         if input_tensor.requires_grad:
             var N = self.input_shape[0]
@@ -75,7 +72,9 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
                 for out_y in range(H_out):
                     for out_x in range(W_out):
                         # Get the flattened index of the max element from forward pass
-                        var max_idx = Int(argmax_mask[n, c, out_y, out_x])
+                        var max_idx = Int(
+                            self.argmax_mask[[n, c, out_y, out_x]]
+                        )
 
                         if max_idx >= 0:  # Valid index (not from padding)
                             # Decode flattened index back to (in_y, in_x)
@@ -103,325 +102,6 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-
-@fieldwise_init
-@register_passable
-struct Col2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    """
-    Backward for batched, multi-channel im2col.
-    Parallelized over batch dimension (N).
-    """
-
-    alias TAG = BACKWARD_COL2IM
-    var kernel_shape: Shape  # (C_out, C_in, KH, KW)
-    var stride: Int
-    var dilation: Int
-
-    fn backward(
-        self,
-        output: Tensor[Self.dtype],  # im2_cols: (N, C_in*KH*KW, num_patches)
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        start = now()
-
-        ref grad_im2_cols = output.gradients()[]
-        var results = List[
-            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
-
-        var padded_image = output.ancestry().get(0)
-        ref padded_shape = padded_image.shape()
-        if padded_image.requires_grad:
-            var N = padded_shape[0]
-            var C_in = padded_shape[1]
-            var H_pad = padded_shape[2]
-            var W_pad = padded_shape[3]
-            var KH = self.kernel_shape[2]
-            var KW = self.kernel_shape[3]
-            var dil = self.dilation
-            var dilated_KH = KH + (KH - 1) * (dil - 1)
-            var dilated_KW = KW + (KW - 1) * (dil - 1)
-            var H_out = (H_pad - dilated_KH) // self.stride + 1
-            var W_out = (W_pad - dilated_KW) // self.stride + 1
-
-            # Initialize full gradient tensor
-            var grad_padded_image = Gradbox[Self.dtype].zeros(
-                Shape(N, C_in, H_pad, W_pad), share=False
-            )
-
-            # Define per-batch work function
-            @parameter
-            fn scatter_gradients_for_batch(n: Int):
-                var col_idx = 0
-                for out_y in range(0, H_pad - dilated_KH + 1, self.stride):
-                    for out_x in range(0, W_pad - dilated_KW + 1, self.stride):
-                        var elem_idx = 0
-                        for c in range(C_in):
-                            for ky in range(KH):
-                                for kx in range(KW):
-                                    var img_y = out_y + ky * dil
-                                    var img_x = out_x + kx * dil
-                                    grad_padded_image[
-                                        n, c, img_y, img_x
-                                    ] += grad_im2_cols[n, elem_idx, col_idx]
-                                    elem_idx += 1
-                        col_idx += 1
-
-            # Parallelize over batch
-            parallelize[scatter_gradients_for_batch](N)
-
-            results.append((padded_image^, grad_padded_image^, AddTensor))
-
-        end = now()  # Time in seconds
-        print(
-            "Col2ImBackward (parallelized over batch) -> backward took: ",
-            (end - start) * 1000,
-            " ms",
-        )
-        return results^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-
-@fieldwise_init
-@register_passable
-struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    alias TAG = BACKWARD_FUSED_CONV
-    var N: Int  # Batch size
-    var C_in: Int  # Channel in
-    var H_pad: Int
-    var W_pad: Int
-    var C_out: Int  # Channel out
-    var KH: Int
-    var KW: Int
-    var dilated_KH: Int
-    var dilated_KW: Int
-    # var H_out: Int
-    # var W_out: Int
-    var num_patches: Int
-    var stride: Int
-    var dilation: Int
-
-    fn backward(
-        self,
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        start = now()
-        ref grad_output = output.gradients()[]
-        var results = List[
-            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
-
-        var padded_image = output.ancestry().get(0)
-        ref padded_image_shape = padded_image.shape()
-        var kernel = output.ancestry().get(1)
-        ref kernel_shape = kernel.shape()  # (C_out, C_in, KH, KW)
-        var bias = output.ancestry().get(2)
-
-        _ = """var N = padded_image_shape[0]  # batch
-        var C_in = padded_image_shape[1]  # C_in
-        var H_pad = padded_image_shape[2]
-        var W_pad = padded_image_shape[3]
-
-        var C_out = kernel_shape[0]
-        var KH = kernel_shape[2]
-        var KW = kernel_shape[3]
-        var dil = self.dilation
-
-        var dilated_KH = KH + (KH - 1) * (dil - 1)
-        var dilated_KW = KW + (KW - 1) * (dil - 1)
-        var H_out = (H_pad - dilated_KH) // self.stride + 1
-        var W_out = (W_pad - dilated_KW) // self.stride + 1
-        var num_patches = H_out * W_out"""
-
-        var grad_out_flat = grad_output.reshape(
-            Shape(self.N, self.C_out, self.num_patches), validated=True
-        )
-
-        # 1. Bias gradient — always simple and separate
-        if bias.requires_grad:
-            var grad_bias = grad_out_flat.sum(axes=IntArray(0, 2))
-            results.append((bias^, grad_bias^, AddTensor))
-
-        # Prepare gradients only if needed
-        var grad_kernel = (
-            Gradbox[Self.dtype]
-            .zeros(
-                kernel_shape, share=False
-            ) if kernel.requires_grad else Gradbox[dtype]
-            .zeros(Shape(), share=False)
-        )
-        var grad_padded = (
-            Gradbox[Self.dtype]
-            .zeros(
-                padded_image_shape, share=False
-            ) if padded_image.requires_grad else Gradbox[dtype]
-            .zeros(Shape(), share=False)
-        )
-
-        # Main fused accumulation loop
-        @parameter
-        fn accum_gradients(n: Int):
-            var patch_idx = 0
-            for out_y in range(
-                0, self.H_pad - self.dilated_KH + 1, self.stride
-            ):
-                for out_x in range(
-                    0, self.W_pad - self.dilated_KW + 1, self.stride
-                ):
-                    for co in range(self.C_out):
-                        var g = grad_out_flat[n, co, patch_idx]
-                        if g == Scalar[Self.dtype](0):
-                            continue  # Skip zero gradients early
-                        for c in range(self.C_in):
-                            for ky in range(self.KH):
-                                for kx in range(self.KW):
-                                    var img_y = out_y + ky * self.dilation
-                                    var img_x = out_x + kx * self.dilation
-                                    var input_val = padded_image[
-                                        n, c, img_y, img_x
-                                    ]
-                                    var kernel_val = kernel[co, c, ky, kx]
-
-                                    if kernel.requires_grad:
-                                        grad_kernel[co, c, ky, kx] += (
-                                            g * input_val
-                                        )
-                                    if padded_image.requires_grad:
-                                        grad_padded[n, c, img_y, img_x] += (
-                                            g * kernel_val
-                                        )
-                    patch_idx += 1
-
-        parallelize[accum_gradients](self.N)
-
-        # Append results
-        if kernel.requires_grad:
-            results.append((kernel^, grad_kernel^, AddTensor))
-        if padded_image.requires_grad:
-            results.append((padded_image^, grad_padded^, AddTensor))
-
-        end = now()
-        print(
-            "FusedCol2ImBackward (fused kernel+input grads) -> backward took: ",
-            (end - start) * 1000,
-            " ms",
-        )
-        return results^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-
-@fieldwise_init
-@register_passable
-struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
-    @staticmethod
-    fn forward[
-        track_grad: Bool = True
-    ](
-        mut padded_image: Tensor[Self.dtype],  # (N, C_in, H_pad, W_pad)
-        kernel: Tensor[Self.dtype],  # (C_out, C_in, KH, KW)
-        bias: Tensor[Self.dtype],  # (C_out,)
-        stride: Int = 1,
-        dilation: Int = 1,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
-        """
-        Fused multi-channel, batched im2col + matmul + bias.
-        Input: (N, C_in, H_pad, W_pad).
-        Returns: (N, C_out, num_patches)  # Flattened output features.
-        """
-        start = now()
-        ref padded_shape = padded_image.shape()
-        if padded_shape.rank() != 4:
-            panic("FusedIm2Col expects 4D input: (N, C_in, H_pad, W_pad)")
-
-        var N = padded_shape[0]
-        var C_in = padded_shape[1]
-        var H_pad = padded_shape[2]
-        var W_pad = padded_shape[3]
-
-        ref kernel_shape = kernel.shape()
-        if kernel_shape.rank() != 4:
-            panic("Kernel expects 4D: (C_out, C_in, KH, KW)")
-        var C_out = kernel_shape[0]
-        if kernel_shape[1] != C_in:
-            panic("Kernel input channels must match input channels")
-        var KH = kernel_shape[2]
-        var KW = kernel_shape[3]
-
-        var dil = dilation
-        var dilated_KH = KH + (KH - 1) * (dil - 1)
-        var dilated_KW = KW + (KW - 1) * (dil - 1)
-
-        var H_out = (H_pad - dilated_KH) // stride + 1
-        var W_out = (W_pad - dilated_KW) // stride + 1
-        var num_patches = H_out * W_out
-
-        # Output: (N, C_out, num_patches)
-        var output_flat = Tensor[Self.dtype].zeros(N, C_out, num_patches)
-
-        # Parallelize over batch N
-        @parameter
-        fn compute_for_batch(n: Int):
-            var patch_idx = 0
-            for out_y in range(0, H_pad - dilated_KH + 1, stride):
-                for out_x in range(0, W_pad - dilated_KW + 1, stride):
-                    # Parallelize over output channels C_out
-                    @parameter
-                    fn compute_for_channel(co: Int):  # Output channel
-                        var accum = bias[co]
-                        for c in range(C_in):
-                            for ky in range(KH):
-                                for kx in range(KW):
-                                    var img_y = out_y + ky * dil
-                                    var img_x = out_x + kx * dil
-                                    accum += (
-                                        padded_image[n, c, img_y, img_x]
-                                        * kernel[co, c, ky, kx]
-                                    )
-                        output_flat[n, co, patch_idx] = accum
-
-                    parallelize[compute_for_channel](C_out)
-                    patch_idx += 1
-
-        parallelize[compute_for_batch](N)
-
-        @parameter
-        if track_grad:
-            var grad_required = requires_grad.or_else(
-                padded_image.requires_grad
-                or kernel.requires_grad
-                or bias.requires_grad
-            )
-            if grad_required:
-                output_flat.requires_grad_(True)
-                var backward_fn = FusedCol2ImBackward[Self.dtype](
-                    N=N,
-                    C_in=C_in,
-                    H_pad=H_pad,
-                    W_pad=W_pad,
-                    C_out=C_out,
-                    KH=KH,
-                    KW=KW,
-                    dilated_KH=dilated_KH,
-                    dilated_KW=dilated_KW,
-                    # H_out = H_out,
-                    # W_out = W_out,
-                    num_patches=num_patches,
-                    stride=stride,
-                    dilation=dilation,
-                ).into_backward_fn()
-                output_flat.backwardFn = Optional(backward_fn^)
-                output_flat.add_ancestry(padded_image)
-                output_flat.add_ancestry(kernel)
-                output_flat.add_ancestry(bias)
-
-        end = now()
-        print("FusedIm2Col - forward took: ", (end - start) * 1000, " ms")
-        return output_flat^
 
 
 @fieldwise_init
@@ -461,7 +141,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
             panic("Image must be 4D: (N, C_in, H_in, W_in)")
         if kernel_shape.rank() != 4:
             panic("Kernel must be 4D: (C_out, C_in, KH, KW)")
-        var N = image_shape[0]
+        # var N = image_shape[0]
         var C_in = image_shape[1]
         if kernel_shape[1] != C_in:
             panic("Kernel input channels must match input channels")
@@ -552,9 +232,8 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
             )
 
         # Fused forward
-        var output_flat = FusedIm2Col[Self.dtype].forward[
-            track_grad=track_grad
-        ](
+
+        var output = FusedIm2Col[Self.dtype].forward[track_grad=track_grad](
             padded_image,
             kernel,
             bias_tensor,
@@ -563,427 +242,705 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
             requires_grad=requires_grad,
         )
 
-        # Reshape to spatial
-        var output = output_flat.reshape[track_grad=track_grad](
-            N, C_out, H_out, W_out
-        )
-
         end = now()
         print("Conv2dFused -> forward took: ", (end - start) * 1000, " ms")
         return output^
 
 
+
 @fieldwise_init
 @register_passable
-struct Im2Col[dtype: DType](ImplicitlyCopyable):
+struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
+    """
+    Production-grade fused Im2Col + Conv + Bias operation.
+
+    Combines patch extraction, matrix multiplication, and bias addition
+    into a single optimized kernel.
+
+    Key optimizations:
+    1. Direct buffer access (no tensor indexing overhead)
+    2. SIMD vectorization over output channels
+    3. Optimal parallelization strategy (N × spatial positions)
+    4. Cache-friendly memory access patterns
+    5. Precomputed strides and offsets
+
+    Returns (N, C_out, H_out, W_out) - ready for next layer.
+    """
+
     @staticmethod
     fn forward[
         track_grad: Bool = True
     ](
-        mut padded_image: Tensor[Self.dtype],  # (N, C_in, H_pad, W_pad)
-        kernel_shape: Shape,  # (C_out, C_in, KH, KW) — we only use [2],[3]
+        padded_image: Tensor[Self.dtype],  # (N, C_in, H_pad, W_pad)
+        kernel: Tensor[Self.dtype],  # (C_out, C_in, KH, KW)
+        bias: Tensor[Self.dtype],  # (C_out,)
         stride: Int = 1,
         dilation: Int = 1,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """
+        Fused convolution forward pass.
+
+        Args:
+            padded_image: Input tensor (N, C_in, H_pad, W_pad).
+            kernel: Convolution weights (C_out, C_in, KH, KW).
+            bias: Bias terms (C_out,).
+            stride: Convolution stride.
+            dilation: Dilation factor for atrous convolution.
+            requires_grad: Override gradient tracking.
+
+        Returns:
+            Output tensor (N, C_out, H_out, W_out).
+        """
         start = now()
 
+        # ═══════════════════════════════════════════════════════════
+        # STEP 1: Validate inputs and extract dimensions
+        # ═══════════════════════════════════════════════════════════
         ref padded_shape = padded_image.shape()
+        ref kernel_shape = kernel.shape()
+
         if padded_shape.rank() != 4:
-            panic("Im2Col expects 4D input: (N, C_in, H_pad, W_pad)")
+            panic("FusedIm2Col expects 4D input: (N, C_in, H_pad, W_pad)")
+        if kernel_shape.rank() != 4:
+            panic("Kernel must be 4D: (C_out, C_in, KH, KW)")
 
         var N = padded_shape[0]
         var C_in = padded_shape[1]
         var H_pad = padded_shape[2]
         var W_pad = padded_shape[3]
 
-        var KH = kernel_shape[2]
-        var KW = kernel_shape[3]
-        var dil = dilation
-
-        var dilated_KH = KH + (KH - 1) * (dil - 1)
-        var dilated_KW = KW + (KW - 1) * (dil - 1)
-
-        var H_out = (H_pad - dilated_KH) // stride + 1
-        var W_out = (W_pad - dilated_KW) // stride + 1
-        var num_patches = H_out * W_out
-        var patch_size = C_in * KH * KW
-
-        var im2_cols = Tensor[Self.dtype].zeros(N, patch_size, num_patches)
-
-        # Parallelize over batch dimension
-        @parameter
-        fn extract_patches_for_batch(n: Int):
-            var col_idx = 0
-            for out_y in range(0, H_pad - dilated_KH + 1, stride):
-                for out_x in range(0, W_pad - dilated_KW + 1, stride):
-                    var elem_idx = 0
-                    for c in range(C_in):
-                        for ky in range(KH):
-                            for kx in range(KW):
-                                var img_y = out_y + ky * dil
-                                var img_x = out_x + kx * dil
-                                im2_cols[n, elem_idx, col_idx] = padded_image[
-                                    n, c, img_y, img_x
-                                ]
-                                elem_idx += 1
-                    col_idx += 1
-
-        parallelize[extract_patches_for_batch](N)  # Uses all available cores
-
-        @parameter
-        if track_grad:
-            var grad_required = requires_grad.or_else(
-                padded_image.requires_grad
-            )
-            if grad_required:
-                im2_cols.requires_grad_(True)
-                var backward_fn = Col2ImBackward[Self.dtype](
-                    kernel_shape=kernel_shape,
-                    stride=stride,
-                    dilation=dilation,
-                ).into_backward_fn()
-                im2_cols.backwardFn = Optional(backward_fn^)
-                im2_cols.add_ancestry(padded_image)
-
-        end = now()
-        print(
-            "Im2Col (parallelized over batch) - forward took: ",
-            (end - start) * 1000,
-            " ms",
-        )
-        return im2_cols^
-
-
-@fieldwise_init
-@register_passable
-struct Conv2dMM[dtype: DType](ImplicitlyCopyable):
-    """
-    Batched, multi-channel, multi-filter 2D convolution with optimized loops.
-
-    Args:
-        image:  (N, C_in, H_in, W_in)
-        kernel: (C_out, C_in, KH, KW)
-        bias:   Optional (C_out,)
-        stride: Stride for spatial dimensions
-        dilation: Dilation factor for atrous convolution
-        padding: 'valid', 'same', int, tuple, or list of tuples
-
-    Returns:
-        output: (N, C_out, H_out, W_out)
-    """
-
-    @staticmethod
-    fn forward[
-        track_grad: Bool = True
-    ](
-        image: Tensor[Self.dtype],
-        mut kernel: Tensor[Self.dtype],
-        bias: Optional[Tensor[Self.dtype]] = None,
-        stride: Int = 1,
-        dilation: Int = 1,
-        padding: Padding = Padding("valid"),
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
-        start = now()
-        ref input_shape = image.shape()
-        ref kernel_shape = kernel.shape()
-
-        # ═══════════════════════════════════════════════════════════
-        # Validation
-        # ═══════════════════════════════════════════════════════════
-        if input_shape.rank() != 4:
-            panic("Image must be 4D: (N, C_in, H_in, W_in)")
-        if kernel_shape.rank() != 4:
-            panic("Kernel must be 4D: (C_out, C_in, KH, KW)")
-
-        var N = input_shape[0]
-        var C_in = input_shape[1]
-
-        if kernel_shape[1] != C_in:
-            panic("Kernel input channels must match input channels")
-
-        var H_in = input_shape[2]
-        var W_in = input_shape[3]
-
         var C_out = kernel_shape[0]
         var KH = kernel_shape[2]
         var KW = kernel_shape[3]
 
-        var dil = dilation
-        var dilated_KH = KH + (KH - 1) * (dil - 1)
-        var dilated_KW = KW + (KW - 1) * (dil - 1)
+        if kernel_shape[1] != C_in:
+            panic("Kernel input channels must match image channels")
 
         # ═══════════════════════════════════════════════════════════
-        # Parse Padding
+        # STEP 2: Compute output dimensions
         # ═══════════════════════════════════════════════════════════
-        var pad_top: Int = 0
-        var pad_bottom: Int = 0
-        var pad_left: Int = 0
-        var pad_right: Int = 0
+        var dilated_KH = KH + (KH - 1) * (dilation - 1)
+        var dilated_KW = KW + (KW - 1) * (dilation - 1)
 
-        if padding.isa[String]():
-            var mode = padding[String]
-            if mode == "valid":
-                pass
-            elif mode == "same":
-                var H_out_target = (H_in + stride - 1) // stride
-                var W_out_target = (W_in + stride - 1) // stride
-                var pad_h_total = (
-                    (H_out_target - 1) * stride + dilated_KH - H_in
-                )
-                var pad_w_total = (
-                    (W_out_target - 1) * stride + dilated_KW - W_in
-                )
-                pad_top = pad_h_total // 2
-                pad_bottom = pad_h_total - pad_top
-                pad_left = pad_w_total // 2
-                pad_right = pad_w_total - pad_left
-            else:
-                panic("Unsupported padding mode: use 'valid' or 'same'")
-        elif padding.isa[Int]():
-            var p = padding[Int]
-            pad_top = pad_bottom = pad_left = pad_right = p
-        elif padding.isa[Tuple[Int, Int]]():
-            var t = padding[Tuple[Int, Int]]
-            pad_top = pad_bottom = t[0]
-            pad_left = pad_right = t[1]
-        elif padding.isa[List[Tuple[Int, Int]]]():
-            var lst = padding[List[Tuple[Int, Int]]].copy()
-            if len(lst) != 2:
-                panic("Padding list must contain exactly 2 tuples")
-            pad_top = lst[0][0]
-            pad_bottom = lst[0][1]
-            pad_left = lst[1][0]
-            pad_right = lst[1][1]
-        else:
-            panic("Invalid padding type")
-
-        # ═══════════════════════════════════════════════════════════
-        # Pad
-        # ═══════════════════════════════════════════════════════════
-
-        var pad_spec = List[Tuple[Int, Int]]()
-        pad_spec.append((0, 0))  # No padding on batch
-        pad_spec.append((0, 0))  # No padding on channels
-        pad_spec.append((pad_top, pad_bottom))  # Pad height
-        pad_spec.append((pad_left, pad_right))  # Pad width
-
-        var padded_image = Pad[Self.dtype].forward[track_grad=track_grad](
-            image,
-            pad_spec^,
-            mode="constant",
-            value=0.0,
-            requires_grad=requires_grad.or_else(image.requires_grad),
-        )
-
-        # ═══════════════════════════════════════════════════════════
-        # im2col
-        # ═══════════════════════════════════════════════════════════
-
-        var im2_cols = Im2Col[Self.dtype].forward[track_grad=track_grad](
-            padded_image,
-            kernel_shape,
-            stride,
-            dilation,
-            requires_grad=requires_grad,
-        )
-        # num_patches = H_out * W_out
-        # im2_cols shape: (N, C_in * KH * KW, num_patches)
-        # kernel shape: (C_out, C_in, KH, KW)
-        # output shape: (N, C_out, H_out, W_out)
-
-        # ═══════════════════════════════════════════════════════════
-        # Compute Output Shape
-        # ═══════════════════════════════════════════════════════════
-        var H_out = (H_in + pad_top + pad_bottom - dilated_KH) // stride + 1
-        var W_out = (W_in + pad_left + pad_right - dilated_KW) // stride + 1
+        var H_out = (H_pad - dilated_KH) // stride + 1
+        var W_out = (W_pad - dilated_KW) // stride + 1
 
         if H_out <= 0 or W_out <= 0:
-            panic(
-                "Invalid convolution parameters lead to non-positive output"
-                " size"
-            )
+            panic("Invalid output dimensions")
 
         # ═══════════════════════════════════════════════════════════
-        # Setup Bias
+        # STEP 3: Allocate output tensor
         # ═══════════════════════════════════════════════════════════
-        var expected_bias_shape = Shape(C_out)
-        var bias_tensor = bias.or_else(
-            Tensor[Self.dtype].zeros(expected_bias_shape, requires_grad=False)
-        )
-        if not bias_tensor.shape() == expected_bias_shape:
-            panic(
-                "Invalid bias tensor shape: ",
-                bias_tensor.shape().__str__(),
-                ". Should be (C_out,)",
-            )
-
-        var patch_size = C_in * KH * KW
-        var kernel_2d = kernel.reshape[track_grad=False](C_out, patch_size)
-        # Shape: (C_out, patch_size)
-
-        # Matmul with broadcasting!
-        var output_flat = kernel_2d.matmul[track_grad=False](im2_cols)
-        # (C_out, patch_size) @ (N, patch_size, num_patches)
-        # → (N, C_out, num_patches)
-
-        if bias:
-            var bias_broadcast = bias_tensor.reshape[track_grad=False](
-                1, C_out, 1
-            )
-            output_flat = output_flat.__add__[track_grad=False](bias_broadcast)
+        var output = Tensor[Self.dtype].zeros(N, C_out, H_out, W_out)
 
         # ═══════════════════════════════════════════════════════════
-        # Reshape to spatial
+        # STEP 4: Get raw pointers for direct access
         # ═══════════════════════════════════════════════════════════
-        var output = output_flat.reshape[track_grad=False](
-            N, C_out, H_out, W_out
-        )
+        var img_ptr = padded_image.buffer.data_buffer().data
+        var kernel_ptr = kernel.buffer.data_buffer().data
+        var bias_ptr = bias.buffer.data_buffer().data
+        var out_ptr = output.buffer.data_buffer().data
 
         # ═══════════════════════════════════════════════════════════
-        # Gradient Setup
+        # STEP 5: Precompute strides
+        # ═══════════════════════════════════════════════════════════
+        var img_stride_N = C_in * H_pad * W_pad
+        var img_stride_C = H_pad * W_pad
+        var img_stride_H = W_pad
+
+        var kernel_stride_Co = C_in * KH * KW
+        var kernel_stride_Ci = KH * KW
+        var kernel_stride_H = KW
+
+        var out_stride_N = C_out * H_out * W_out
+        var out_stride_Co = H_out * W_out
+        var out_stride_H = W_out
+
+        alias simd_w = simd_width_of[Self.dtype]()
+
+        # ═══════════════════════════════════════════════════════════
+        # STEP 6: Parallel computation
+        # ═══════════════════════════════════════════════════════════
+        # Strategy: Parallelize over (N, output spatial positions)
+        # Each thread computes all C_out channels for one position
+        # This allows vectorization over C_out dimension
+
+        var total_work = N * H_out * W_out
+
+        @parameter
+        fn compute_position(work_idx: Int):
+            """
+            Compute convolution for one output spatial position.
+            Processes all output channels with SIMD vectorization.
+            """
+            # Decode spatial position
+            var n = work_idx // (H_out * W_out)
+            var spatial = work_idx % (H_out * W_out)
+            var out_y = spatial // W_out
+            var out_x = spatial % W_out
+
+            # Input window starting position
+            var img_y_base = out_y * stride
+            var img_x_base = out_x * stride
+
+            # Base offsets
+            var img_n_base = n * img_stride_N
+            var out_n_base = n * out_stride_N + out_y * out_stride_H + out_x
+
+            # ───────────────────────────────────────────────────────
+            # Vectorized loop over output channels
+            # ───────────────────────────────────────────────────────
+            var co = 0
+            var vec_end = (C_out // simd_w) * simd_w
+
+            # Process simd_w output channels at once
+            for _ in range(vec_end // simd_w):
+                # Initialize accumulator with bias
+                var accum = bias_ptr.load[width=simd_w](co)
+
+                # Accumulate over input channels
+                for ci in range(C_in):
+                    var img_ci_base = img_n_base + ci * img_stride_C
+
+                    # Kernel base for these output channels
+                    # We need kernel[co:co+simd_w, ci, ky, kx]
+                    var kernel_ci_base = ci * kernel_stride_Ci
+
+                    # Loop over kernel spatial dimensions
+                    for ky in range(KH):
+                        var img_y = img_y_base + ky * dilation
+                        var img_y_base_idx = img_ci_base + img_y * img_stride_H
+
+                        for kx in range(KW):
+                            var img_x = img_x_base + kx * dilation
+
+                            # Load input value (same for all output channels)
+                            var img_val = img_ptr[img_y_base_idx + img_x]
+
+                            # Load kernel weights for simd_w output channels
+                            # kernel[co:co+simd_w, ci, ky, kx]
+                            var kernel_base = (
+                                kernel_ci_base + ky * kernel_stride_H + kx
+                            )
+                            var kernel_vec = SIMD[Self.dtype, simd_w](0)
+
+                            @parameter
+                            for v in range(simd_w):
+                                var k_idx = (
+                                    co + v
+                                ) * kernel_stride_Co + kernel_base
+                                kernel_vec[v] = kernel_ptr[k_idx]
+
+                            # Accumulate: accum += img_val * kernel_vec
+                            accum += img_val * kernel_vec
+
+                # Store results for simd_w output channels
+                @parameter
+                for v in range(simd_w):
+                    var out_idx = out_n_base + (co + v) * out_stride_Co
+                    out_ptr[out_idx] = accum[v]
+
+                co += simd_w
+
+            # ───────────────────────────────────────────────────────
+            # Scalar tail for remaining output channels
+            # ───────────────────────────────────────────────────────
+            for co_tail in range(vec_end, C_out):
+                var accum = bias_ptr[co_tail]
+
+                for ci in range(C_in):
+                    var img_ci_base = img_n_base + ci * img_stride_C
+                    var kernel_co_ci_base = (
+                        co_tail * kernel_stride_Co + ci * kernel_stride_Ci
+                    )
+
+                    for ky in range(KH):
+                        var img_y = img_y_base + ky * dilation
+                        var img_y_base_idx = img_ci_base + img_y * img_stride_H
+                        var kernel_ky_base = (
+                            kernel_co_ci_base + ky * kernel_stride_H
+                        )
+
+                        for kx in range(KW):
+                            var img_x = img_x_base + kx * dilation
+                            var img_val = img_ptr[img_y_base_idx + img_x]
+                            var kernel_val = kernel_ptr[kernel_ky_base + kx]
+                            accum += img_val * kernel_val
+
+                var out_idx = out_n_base + co_tail * out_stride_Co
+                out_ptr[out_idx] = accum
+
+        parallelize[compute_position](total_work)
+
+        # ═══════════════════════════════════════════════════════════
+        # STEP 7: Setup gradient tracking
         # ═══════════════════════════════════════════════════════════
         @parameter
         if track_grad:
             var grad_required = requires_grad.or_else(
-                im2_cols.requires_grad
+                padded_image.requires_grad
                 or kernel.requires_grad
-                or bias_tensor.requires_grad
+                or bias.requires_grad
             )
+
             if grad_required:
                 output.requires_grad_(True)
-                var backward_fn = Conv2dMMBackward[
-                    Self.dtype
-                ]().into_backward_fn()
-                output.backwardFn = Optional(backward_fn^)
-                output.add_ancestry(im2_cols)
-                output.add_ancestry(kernel)
-                if bias:
-                    output.add_ancestry(bias_tensor)
 
+                var backward_fn = FusedCol2ImBackward[Self.dtype](
+                    N=N,
+                    C_in=C_in,
+                    H_pad=H_pad,
+                    W_pad=W_pad,
+                    C_out=C_out,
+                    KH=KH,
+                    KW=KW,
+                    H_out=H_out,
+                    W_out=W_out,
+                    stride=stride,
+                    dilation=dilation,
+                ).into_backward_fn()
+
+                output.backwardFn = Optional(backward_fn^)
+                output.add_ancestry(padded_image)
+                output.add_ancestry(kernel)
+                output.add_ancestry(bias)
         end = now()
-        print(
-            "Conv2dMM -> forward took: ",
-            end * 1000 - start * 1000,
-            "ms",
-            "Output shape: ",
-            output.shape(),
-        )
+        print("FusedIm2Col forward:", (end - start) * 1000, "ms")
         return output^
 
 
 @fieldwise_init
 @register_passable
-struct Conv2dMMBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    alias TAG = BACKWARD_CONV2DMM
+struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
+    """
+    Highly optimized convolution backward pass.
+
+    Key optimizations:
+    1. Direct buffer access (no repeated indexing)
+    2. SIMD vectorization on innermost loops
+    3. Separate kernel/input gradients (no race conditions)
+    4. Work with 4D directly (no reshape overhead)
+    5. Cache-friendly access patterns
+
+    Parallelization strategy:
+    - Bias grad: Over C_out (each thread owns one channel)
+    - Kernel grad: Over C_out (each thread owns grad_kernel[co, :, :, :])
+    - Input grad: Over N (each thread owns grad_padded[n, :, :, :])
+    """
+
+    alias TAG = BACKWARD_FUSED_CONV
+    var N: Int
+    var C_in: Int
+    var H_pad: Int
+    var W_pad: Int
+    var C_out: Int
+    var KH: Int
+    var KW: Int
+    var H_out: Int
+    var W_out: Int
+    var stride: Int
+    var dilation: Int
 
     fn backward(
-        self, output: Tensor[Self.dtype]  # (N, C_out, H_out, W_out)
+        self,
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         start = now()
         ref grad_output = output.gradients()[]
-        var results = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]](
-            capacity=3
-        )
+        var results = List[
+            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
 
-        var im2_cols = output.ancestry().get(0)
-        var kernel_tensor = output.ancestry().get(1)
-        ref kernel_shape = kernel_tensor.shape()
-        var has_bias = len(output.ancestry()) > 2
-        ref grad_shape = grad_output.shape()
-        var N = grad_output.shape()[0]
-        var C_out = grad_shape[1]
-        var H_out = grad_shape[2]
-        var W_out = grad_shape[3]
-        var num_patches = H_out * W_out
-
-        var C_in = kernel_shape[1]
-        var KH = kernel_shape[2]
-        var KW = kernel_shape[3]
-        var patch_size = C_in * KH * KW
+        var padded_image = output.ancestry().get(0)
+        var kernel = output.ancestry().get(1)
+        var bias = output.ancestry().get(2)
 
         # ═══════════════════════════════════════════════════════════
-        # Gradient 1: BIAS (ONE LINE!)
+        # 1. BIAS GRADIENT - Vectorized
         # ═══════════════════════════════════════════════════════════
-
-        if has_bias:
-            var bias_tensor = output.ancestry().get(2)
-            if bias_tensor.requires_grad:
-                # Sum across batch (0), height (2), width (3) dimensions
-                var grad_bias = grad_output.sum(
-                    axes=IntArray(0, 2, 3)
-                )  # → (C_out,)
-                results.append((bias_tensor^, grad_bias^, AddTensor))
-
-        # ═══════════════════════════════════════════════════════════
-        # Gradient 2: KERNEL (using cached im2_cols)
-        # ═══════════════════════════════════════════════════════════
-
-        # Flatten grad_output upfront - it is potentially being in 2 places
-        var grad_output_flat = grad_output.reshape(
-            Shape(N, C_out, num_patches), validated=True
-        )
-        if kernel_tensor.requires_grad:
-            # Flatten grad_output: (N, C_out, H_out, W_out) → (N, C_out, num_patches)
-
-            # Transpose im2_cols for matmul
-            var im2_cols_T = im2_cols.transpose[track_grad=False](-1, -2)
-            # (N, patch_size, num_patches) → (N, num_patches, patch_size)
-
-            # Matmul: (N, C_out, num_patches) @ (N, num_patches, patch_size)
-            var grad_kernel_batched = grad_output_flat.matmul(im2_cols_T)
-            # → (N, C_out, patch_size)
-
-            # Sum across batch dimension
-            var grad_kernel_flat = grad_kernel_batched.sum(
-                axes=IntArray(0)
-            )  # → (C_out, patch_size)
-
-            # Reshape to kernel shape
-            var grad_kernel = grad_kernel_flat.reshape(
-                kernel_shape, validated=True
+        if bias.requires_grad:
+            bias_start = now()
+            var grad_bias = Self.compute_bias_gradient(
+                grad_output, self.N, self.C_out, self.H_out, self.W_out
             )
-            results.append((kernel_tensor, grad_kernel^, AddTensor))
+            bias_end = now()
+            results.append((bias^, grad_bias^, AddTensor))
+            print("Bias grad:", (bias_end - bias_start) * 1000, "ms")
 
         # ═══════════════════════════════════════════════════════════
-        # Gradient 3: INPUT (broadcasting matmul)
+        # 2. KERNEL GRADIENT - Vectorized
         # ═══════════════════════════════════════════════════════════
-
-        if im2_cols.requires_grad:
-            # Reshape kernel
-
-            # var kernel_2d = kernel_tensor.reshape[track_grad=False](C_out, patch_size)
-            # var kernel_T = kernel_2d.transpose[track_grad=False]()  # (patch_size, C_out)
-
-            kernel_T = kernel_tensor.reshape[track_grad=False](
-                patch_size, C_out
+        if kernel.requires_grad:
+            kernel_start = now()
+            var grad_kernel = Self.compute_kernel_gradient(
+                grad_output,
+                padded_image,
+                self.N,
+                self.C_in,
+                self.C_out,
+                self.H_pad,
+                self.W_pad,
+                self.H_out,
+                self.W_out,
+                self.KH,
+                self.KW,
+                self.stride,
+                self.dilation,
             )
-            # Broadcasting matmul
-            var grad_im2_cols = kernel_T.matmul(grad_output_flat)
-            # (patch_size, C_out) @ (N, C_out, num_patches) → (N, patch_size, num_patches)
+            kernel_end = now()
+            results.append((kernel, grad_kernel^, AddTensor))
+            print("Kernel grad:", (kernel_end - kernel_start) * 1000, "ms")
 
-            # This flows to im2_cols which has Col2ImBackward
-            # which converts to grad_padded_image
-            # which flows through Pad.backward to grad_input
-            results.append((im2_cols^, grad_im2_cols^, AddTensor))
+        # ═══════════════════════════════════════════════════════════
+        # 3. INPUT GRADIENT
+        # ═══════════════════════════════════════════════════════════
+        if padded_image.requires_grad:
+            input_start = now()
+            var grad_padded = Self.compute_input_gradient(
+                grad_output,
+                kernel,
+                self.N,
+                self.C_in,
+                self.C_out,
+                self.H_pad,
+                self.W_pad,
+                self.H_out,
+                self.W_out,
+                self.KH,
+                self.KW,
+                self.stride,
+                self.dilation,
+            )
+            input_end = now()
+            results.append((padded_image^, grad_padded^, AddTensor))
+            print("Input grad:", (input_end - input_start) * 1000, "ms")
 
         end = now()
-        print(
-            "Conv2dMMBackward -> backward took: ",
-            end * 1000 - start * 1000,
-            "ms",
+        print("Total backward FusedCol2ImBackward:", (end - start) * 1000, "ms")
+        return results^
+
+    # ═══════════════════════════════════════════════════════════════════
+    # BIAS GRADIENT
+    # ═══════════════════════════════════════════════════════════════════
+    @always_inline
+    @staticmethod
+    fn compute_bias_gradient(
+        grad_output: Gradbox[dtype], N: Int, C_out: Int, H_out: Int, W_out: Int
+    ) -> Gradbox[dtype]:
+        """
+        Vectorized bias gradient: sum over (N, H_out, W_out) for each C_out.
+
+        Memory layout: grad_output is contiguous (N, C_out, H_out, W_out).
+        For each channel co, data is at indices:
+          [n*C_out*H_out*W_out + co*H_out*W_out + spatial_pos]
+        """
+        var grad_bias = Gradbox[dtype].zeros(Shape(C_out), share=False)
+        var grad_ptr = grad_output.buffer.data_buffer().data
+        var bias_ptr = grad_bias.buffer.data_buffer().data
+
+        alias simd_w = simd_width_of[dtype]()
+
+        var stride_N = C_out * H_out * W_out
+        var stride_C = H_out * W_out
+        var num_spatial = H_out * W_out
+
+        @parameter
+        fn accumulate_bias(co: Int):
+            var accum_vec = SIMD[dtype, simd_w](0)
+            var accum_scalar: Scalar[dtype] = 0
+            var base_co = co * stride_C
+
+            for n in range(N):
+                var base = n * stride_N + base_co
+
+                # Vectorized accumulation over spatial dimensions
+                var idx = 0
+                var vec_end = (num_spatial // simd_w) * simd_w
+
+                for _ in range(vec_end // simd_w):
+                    accum_vec += grad_ptr.load[width=simd_w](base + idx)
+                    idx += simd_w
+
+                # Scalar tail
+                for i in range(vec_end, num_spatial):
+                    accum_scalar += grad_ptr[base + i]
+
+            bias_ptr[co] = accum_vec.reduce_add() + accum_scalar
+
+        parallelize[accumulate_bias](C_out)
+        return grad_bias^
+
+    # ═══════════════════════════════════════════════════════════════════
+    # KERNEL GRADIENT - SIMD Vectorized
+    # ═══════════════════════════════════════════════════════════════════
+    @always_inline
+    @staticmethod
+    fn compute_kernel_gradient(
+        grad_output: Gradbox[dtype],
+        padded_image: Tensor[dtype],
+        N: Int,
+        C_in: Int,
+        C_out: Int,
+        H_pad: Int,
+        W_pad: Int,
+        H_out: Int,
+        W_out: Int,
+        KH: Int,
+        KW: Int,
+        stride: Int,
+        dilation: Int,
+    ) -> Gradbox[dtype]:
+        """
+        Vectorized kernel gradient.
+
+        Parallelized over C_out (no race - each co owns grad_kernel[co, :, :, :]).
+        Vectorize innermost loop (W_out) using SIMD.
+
+        Formula:
+          grad_kernel[co, ci, ky, kx] = sum_{n, oy, ox}
+            grad_output[n, co, oy, ox] * input[n, ci, oy*s + ky*d, ox*s + kx*d]
+        """
+        var grad_kernel = Gradbox[dtype].zeros(
+            Shape(C_out, C_in, KH, KW), share=False
         )
 
-        return results^
+        var grad_ptr = grad_output.buffer.data_buffer().data
+        var input_ptr = padded_image.buffer.data_buffer().data
+        var grad_k_ptr = grad_kernel.buffer.data_buffer().data
+
+        alias simd_w = simd_width_of[dtype]()
+
+        # Strides
+        var grad_stride_N = C_out * H_out * W_out
+        var grad_stride_C = H_out * W_out
+
+        var input_stride_N = C_in * H_pad * W_pad
+        var input_stride_C = H_pad * W_pad
+
+        var kernel_stride_Co = C_in * KH * KW
+        var kernel_stride_Ci = KH * KW
+
+        @parameter
+        fn compute_kernel_for_co(co: Int):
+            var kernel_co_base = co * kernel_stride_Co
+
+            for ci in range(C_in):
+                var kernel_ci_base = kernel_co_base + ci * kernel_stride_Ci
+
+                for ky in range(KH):
+                    var kernel_ky_base = kernel_ci_base + ky * KW
+
+                    for kx in range(KW):
+                        var kernel_idx = kernel_ky_base + kx
+                        var accum_vec = SIMD[dtype, simd_w](0)
+                        var accum_scalar: Scalar[dtype] = 0
+
+                        # Accumulate over all batches and spatial positions
+                        for n in range(N):
+                            var grad_n_base = (
+                                n * grad_stride_N + co * grad_stride_C
+                            )
+                            var input_n_base = (
+                                n * input_stride_N + ci * input_stride_C
+                            )
+
+                            for oy in range(H_out):
+                                var img_y = oy * stride + ky * dilation
+                                var grad_oy_base = grad_n_base + oy * W_out
+                                var input_y_base = input_n_base + img_y * W_pad
+
+                                # Vectorize over W_out
+                                var ox = 0
+                                var vec_end = (W_out // simd_w) * simd_w
+
+                                for _ in range(vec_end // simd_w):
+                                    # Load grad_output values
+                                    var grad_vec = grad_ptr.load[width=simd_w](
+                                        grad_oy_base + ox
+                                    )
+
+                                    # Load corresponding input values
+                                    # input indices: img_x = ox*stride + kx*dilation
+                                    var input_vec = SIMD[dtype, simd_w](0)
+
+                                    @parameter
+                                    for v in range(simd_w):
+                                        var img_x = (
+                                            ox + v
+                                        ) * stride + kx * dilation
+                                        input_vec[v] = input_ptr[
+                                            input_y_base + img_x
+                                        ]
+
+                                    accum_vec += grad_vec * input_vec
+                                    ox += simd_w
+
+                                # Scalar tail
+                                for ox_tail in range(vec_end, W_out):
+                                    var img_x = ox_tail * stride + kx * dilation
+                                    accum_scalar += (
+                                        grad_ptr[grad_oy_base + ox_tail]
+                                        * input_ptr[input_y_base + img_x]
+                                    )
+
+                        grad_k_ptr[kernel_idx] = (
+                            accum_vec.reduce_add() + accum_scalar
+                        )
+
+        parallelize[compute_kernel_for_co](C_out)
+        return grad_kernel^
+
+    # ═══════════════════════════════════════════════════════════════════
+    # INPUT GRADIENT - SIMD Vectorized
+    # ═══════════════════════════════════════════════════════════════════
+    @always_inline
+    @staticmethod
+    fn compute_input_gradient(
+        grad_output: Gradbox[dtype],
+        kernel: Tensor[dtype],
+        N: Int,
+        C_in: Int,
+        C_out: Int,
+        H_pad: Int,
+        W_pad: Int,
+        H_out: Int,
+        W_out: Int,
+        KH: Int,
+        KW: Int,
+        stride: Int,
+        dilation: Int,
+    ) -> Gradbox[dtype]:
+        """
+        Vectorized input gradient.
+
+        Parallelized over N (no race - each n owns grad_padded[n, :, :, :]).
+
+        Formula:
+          grad_input[n, ci, y, x] += sum_{co, ky, kx | y=oy*s+ky*d, x=ox*s+kx*d}
+            kernel[co, ci, ky, kx] * grad_output[n, co, oy, ox]
+
+        Note: Hard to vectorize due to scatter pattern. Focus on cache optimization.
+        """
+        var grad_padded = Gradbox[dtype].zeros(
+            Shape(N, C_in, H_pad, W_pad), share=False
+        )
+
+        var grad_ptr = grad_output.buffer.data_buffer().data
+        var kernel_ptr = kernel.buffer.data_buffer().data
+        var grad_in_ptr = grad_padded.buffer.data_buffer().data
+
+        # Strides
+        var grad_stride_N = C_out * H_out * W_out
+        var grad_stride_C = H_out * W_out
+
+        var kernel_stride_Co = C_in * KH * KW
+        var kernel_stride_Ci = KH * KW
+
+        var input_stride_N = C_in * H_pad * W_pad
+        var input_stride_C = H_pad * W_pad
+
+        @parameter
+        fn compute_input_for_n(n: Int):
+            var grad_n_base = n * grad_stride_N
+            var input_n_base = n * input_stride_N
+
+            # Iterate over output spatial positions
+            for oy in range(H_out):
+                var grad_oy_base = grad_n_base + oy * W_out
+
+                for ox in range(W_out):
+                    var grad_spatial_idx = grad_oy_base + ox
+
+                    # For each output channel
+                    for co in range(C_out):
+                        var grad_val = grad_ptr[
+                            grad_spatial_idx + co * grad_stride_C
+                        ]
+
+                        # Early skip for zeros
+                        if grad_val == Scalar[dtype](0):
+                            continue
+
+                        var kernel_co_base = co * kernel_stride_Co
+
+                        # Scatter to input
+                        for ci in range(C_in):
+                            var kernel_ci_base = (
+                                kernel_co_base + ci * kernel_stride_Ci
+                            )
+                            var input_ci_base = (
+                                input_n_base + ci * input_stride_C
+                            )
+
+                            # Inner loops: can potentially vectorize over KW
+                            for ky in range(KH):
+                                var img_y = oy * stride + ky * dilation
+                                var kernel_ky_base = kernel_ci_base + ky * KW
+                                var input_y_base = input_ci_base + img_y * W_pad
+
+                                # Vectorize over KW if it's large enough
+                                # @parameter
+                                if KW >= 4:  # Worth vectorizing
+                                    alias kw_simd_w = min(
+                                        4, simd_width_of[dtype]()
+                                    )
+                                    var kx = 0
+                                    var vec_end = (KW // kw_simd_w) * kw_simd_w
+
+                                    for _ in range(vec_end // kw_simd_w):
+                                        # Load kernel weights
+                                        var kernel_vec = kernel_ptr.load[
+                                            width=kw_simd_w
+                                        ](kernel_ky_base + kx)
+
+                                        # Compute contributions
+                                        var contrib_vec = grad_val * kernel_vec
+
+                                        # Scatter (can't vectorize scatter, but at least vectorize multiply)
+                                        @parameter
+                                        for v in range(kw_simd_w):
+                                            var img_x = (
+                                                ox * stride
+                                                + (kx + v) * dilation
+                                            )
+                                            grad_in_ptr[
+                                                input_y_base + img_x
+                                            ] += contrib_vec[v]
+
+                                        kx += kw_simd_w
+
+                                    # Scalar tail
+                                    for kx_tail in range(vec_end, KW):
+                                        var img_x = (
+                                            ox * stride + kx_tail * dilation
+                                        )
+                                        var kernel_val = kernel_ptr[
+                                            kernel_ky_base + kx_tail
+                                        ]
+                                        grad_in_ptr[input_y_base + img_x] += (
+                                            grad_val * kernel_val
+                                        )
+                                else:
+                                    # Small KW - just use scalar
+                                    for kx in range(KW):
+                                        var img_x = ox * stride + kx * dilation
+                                        var kernel_val = kernel_ptr[
+                                            kernel_ky_base + kx
+                                        ]
+                                        grad_in_ptr[input_y_base + img_x] += (
+                                            grad_val * kernel_val
+                                        )
+
+        parallelize[compute_input_for_n](N)
+        return grad_padded^
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
-fn main() raises:
+ fn main() raises:
     alias dtype = DType.float32
-
     # Batch of 2, 3 input channels, 4x5 image
     # var x = Tensor[dtype].rand(2, 3, 4, 5, requires_grad=True)
     var x = Tensor[dtype].d4(
@@ -1115,7 +1072,7 @@ fn main() raises:
     )
 
     # var output = Conv2dMM[dtype].forward(
-    var output = Conv2dMM[dtype].forward(
+    var output = Conv2dFused[dtype].forward(
         image=x,
         kernel=kernel,
         bias=bias,
@@ -1139,3 +1096,5 @@ fn main() raises:
     kernel.grad().print()
     print()
     bias.grad().print()
+
+
