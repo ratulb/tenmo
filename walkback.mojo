@@ -42,7 +42,8 @@ from contiguous import ContiguousBackward
 from sigmoid import SigmoidBackward
 from tanh import TanhBackward
 from clip import ClipBackward
-from bce import BCEBackward
+
+# from bce import BCEBackward
 from squareroot import SqrtBackward
 from variance import VarianceBackward
 from std_deviation import StdBackward
@@ -51,8 +52,6 @@ from concate import ConcatBackward
 from stack import StackBackward
 from pad import PadBackward
 from cnn import (
-    Col2ImBackward,
-    Conv2dMMBackward,
     FusedCol2ImBackward,
     MaxPool2dBackward,
 )

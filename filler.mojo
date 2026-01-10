@@ -42,6 +42,15 @@ struct Filler[dtype: DType](ImplicitlyCopyable & Movable):
 
     @always_inline
     @staticmethod
+    fn fill_up(
+        target: NDBuffer[Self.dtype],
+        source: NDBuffer[Self.dtype],
+        *indices: Idx,
+    ):
+        Self.fill(target, source, indices)
+
+    @always_inline
+    @staticmethod
     fn fill(
         target: NDBuffer[Self.dtype],
         source: NDBuffer[Self.dtype],
@@ -107,6 +116,7 @@ struct Filler[dtype: DType](ImplicitlyCopyable & Movable):
             var broadcast_shape = ShapeBroadcaster.broadcast_shape[
                 validated=True
             ](source_shape, shape)
+            print("shapes: ", source_shape, shape)
             if broadcast_shape != shape:
                 panic(
                     "Filler → set: broadcast shape",

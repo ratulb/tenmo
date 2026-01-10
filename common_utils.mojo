@@ -74,7 +74,7 @@ fn log_debug(msg: String, color: String = RED):
 
 
 @always_inline("nodebug")
-fn log_info(msg: String, color: String = BRIGHT_BLUE):
+fn log_info(msg: String, color: String = BLUE):
     log.info(color + msg + RESET.__str__())
 
 

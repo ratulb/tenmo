@@ -20,6 +20,7 @@ from blashandle import BLASHandle, BLASHandleLite
 from utils.numerics import neg_inf
 from walkback import MaxPool2dBackward
 from algorithm import parallelize
+from ndbuffer import NDBuffer
 
 alias LINEAR = 0
 alias LINEAR_BLAS = 1
@@ -1362,8 +1363,8 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         # Forward pass
         if self.training:
             # return Conv2dForward[Self.dtype].forward[track_grad=True](
-            return Conv2dMM[Self.dtype].forward[track_grad=True](
-                # return Conv2dFused[Self.dtype].forward[track_grad=True](
+            # return Conv2dMM[Self.dtype].forward[track_grad=True](
+            return Conv2dFused[Self.dtype].forward[track_grad=True](
                 image,
                 self.weight,
                 bias=Optional(self.bias) if self.bias.requires_grad else None,
@@ -1374,8 +1375,8 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
             )
         else:
             # return Conv2dForward[Self.dtype].forward[track_grad=False](
-            return Conv2dMM[Self.dtype].forward[track_grad=False](
-                # return Conv2dFused[Self.dtype].forward[track_grad=False](
+            # return Conv2dMM[Self.dtype].forward[track_grad=False](
+            return Conv2dFused[Self.dtype].forward[track_grad=False](
                 image,
                 self.weight,
                 bias=Optional(self.bias) if self.bias.requires_grad else None,
@@ -1586,7 +1587,7 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
 
         # Output tensor and argmax mask for gradient routing
         var output = Tensor[Self.dtype].zeros(N, C, H_out, W_out)
-        var argmax_mask = Tensor[Self.dtype].zeros(N, C, H_out, W_out)
+        var argmax_mask = NDBuffer[DType.int64].zeros(Shape(N, C, H_out, W_out))
 
         # Parallelize over (N * C) for better load balancing
         @parameter
@@ -1627,9 +1628,7 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
 
                     # Store results
                     output[n, c, out_y, out_x] = max_val
-                    argmax_mask[n, c, out_y, out_x] = Scalar[Self.dtype](
-                        max_idx
-                    )
+                    argmax_mask[[n, c, out_y, out_x]] = max_idx
 
         # Parallelize over all (batch, channel) combinations
         parallelize[pool_for_batch_channel](N * C)
@@ -1647,10 +1646,10 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
                     stride=s,
                     padding=pad,
                     input_shape=input_shape,
+                    argmax_mask=argmax_mask,
                 ).into_backward_fn()
                 output.backwardFn = Optional(backward_fn^)
                 output.add_ancestry(input_tensor)
-                output.add_ancestry(argmax_mask)  # Store mask for backward pass
 
         end = now()
         print(

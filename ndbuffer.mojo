@@ -26,7 +26,7 @@ from operators import (
 
 
 struct NDBuffer[dtype: DType](
-    Copyable
+    ImplicitlyCopyable
     & Movable
     & EqualityComparable
     & Stringable
@@ -442,7 +442,7 @@ struct NDBuffer[dtype: DType](
             and not self.shared()
             and target_shape == self.shape
         ):
-            return self.copy()
+            return self
         return NDBuffer[Self.dtype](self.contiguous_buffer(), target_shape)
 
     @always_inline

@@ -54,11 +54,9 @@ alias BLAS_BACKWARD_MATMUL_2D = 43
 alias BACKWARD_CONCAT = 44
 alias BACKWARD_STACK = 45
 alias BACKWARD_PAD = 46
-alias BACKWARD_COL2IM = 47
-alias BACKWARD_CONV2D = 48
-alias BACKWARD_CONV2DMM = 49
-alias BACKWARD_FUSED_CONV = 50
-alias BACKWARD_MAXPOOL2D = 51
+alias BACKWARD_CONV2D = 47
+alias BACKWARD_FUSED_CONV = 48
+alias BACKWARD_MAXPOOL2D = 49
 # ========== Delegate (Variant) ==========
 
 alias Delegate[dtype: DType] = Variant[
@@ -109,9 +107,9 @@ alias Delegate[dtype: DType] = Variant[
     ConcatBackward[dtype],
     StackBackward[dtype],
     PadBackward[dtype],
-    Col2ImBackward[dtype],
+    # Col2ImBackward[dtype],
     Conv2DBackward[dtype],
-    Conv2dMMBackward[dtype],
+    # Conv2dMMBackward[dtype],
     FusedCol2ImBackward[dtype],
     MaxPool2dBackward[dtype],
 ]
@@ -314,14 +312,8 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.tag == BACKWARD_PAD:
             return self.grad_fn[PadBackward[Self.dtype]].backward(output)
 
-        elif self.tag == BACKWARD_COL2IM:
-            return self.grad_fn[Col2ImBackward[Self.dtype]].backward(output)
-
         elif self.tag == BACKWARD_CONV2D:
             return self.grad_fn[Conv2DBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_CONV2DMM:
-            return self.grad_fn[Conv2dMMBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_FUSED_CONV:
             return self.grad_fn[FusedCol2ImBackward[Self.dtype]].backward(

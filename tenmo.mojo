@@ -22,7 +22,6 @@ from intarray import IntArray
 from broadcasthelper import ShapeBroadcaster
 from ndbuffer import NDBuffer
 from utilities import Utils
-from filler import Filler
 
 
 struct Tensor[dtype: DType = DType.float32](

@@ -8,6 +8,7 @@ from shapes import Shape
 from algorithm import parallelize, vectorize
 from sys import simd_width_of
 from forwards import Padding
+from os import Atomic
 
 
 @fieldwise_init

@@ -37,6 +37,7 @@ from stack import Stack
 from pad import Pad, Padding
 from convolution import Conv2dForward
 from cnn import Conv2dMM, Conv2dFused
+from filler import Filler
 
 
 fn main():
