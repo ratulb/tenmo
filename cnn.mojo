@@ -939,7 +939,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
- fn main() raises:
+fn main() raises:
     alias dtype = DType.float32
     # Batch of 2, 3 input channels, 4x5 image
     # var x = Tensor[dtype].rand(2, 3, 4, 5, requires_grad=True)

@@ -2,12 +2,10 @@ from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_MATRIX_VECTOR_MUL
 from operators import AddTensor
 from gradbox import Gradbox
-from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
-from common_utils import il, s, panic
+from common_utils import panic
 from matmul import Matmul2d, MatmulNd
 from sys import simd_width_of
-from algorithm import vectorize
 
 
 @fieldwise_init
@@ -458,7 +456,3 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
 # VectorMatmulNd: vector first, then matrix
 # result.add_ancestry(v)
 # result.add_ancestry(M)
-
-
-fn main() raises:
-    pass
