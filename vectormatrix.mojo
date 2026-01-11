@@ -2,10 +2,8 @@ from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_VECTOR_MATMUL
 from operators import AddTensor
 from gradbox import Gradbox
-from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
-from common_utils import il, s, panic
-from matmul import Matmul2d
+from common_utils import panic
 from sys import simd_width_of
 
 
@@ -342,7 +340,3 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-
-fn main():
-    pass
