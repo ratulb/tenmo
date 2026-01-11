@@ -1554,7 +1554,6 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
         padding: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        start = now()
 
         ref input_shape = input_tensor.shape()
         if input_shape.rank() != 4:
@@ -1651,14 +1650,6 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
                 output.backwardFn = Optional(backward_fn^)
                 output.add_ancestry(input_tensor)
 
-        end = now()
-        print(
-            "MaxPool2d (parallelized over N*C) - forward took: ",
-            (end - start) * 1000,
-            " ms",
-            " | Output shape: ",
-            output.shape(),
-        )
         return output^
 
     fn parameters(

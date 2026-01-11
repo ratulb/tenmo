@@ -1,10 +1,11 @@
 from tenmo import Tensor
-from testing import assert_true
+from testing import assert_true, assert_equal, assert_almost_equal
 from shapes import Shape
 
 # ============================================================================
 # FORWARD PASS TESTS - CONSTANT PADDING
 # ============================================================================
+from forwards import Conv2dFused, Padding
 
 
 fn test_pad_constant_2d_symmetric() raises:
@@ -491,6 +492,7 @@ fn main() raises:
     print("=" * 80)
 
     print("\n--- FORWARD PASS TESTS: CONSTANT PADDING ---")
+    run_all_padding_tests()
     test_pad_constant_2d_symmetric()
     test_pad_constant_2d_asymmetric()
     test_pad_constant_1d()
@@ -1036,5 +1038,648 @@ fn test_circular_periodic_signal() raises:
             -1.0,  # Wrapped from original
         ]
     )
+    assert_true(expected == result)
 
-    assert_true(result.all_close[atol=1e-6](expected))
+
+fn test_pad_symmetric_padding_forward() raises:
+    """Test symmetric padding forward pass."""
+    print("\n" + "=" * 80)
+    print("TEST: Symmetric Padding Forward")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=True)
+
+    # Set known values: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    for i in range(3):
+        for j in range(3):
+            image[0, 0, i, j] = Float32(i * 3 + j + 1)
+
+    var kernel = Tensor[dtype].ones(1, 1, 2, 2, requires_grad=True)
+
+    # Symmetric padding: pad=1 on all sides
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(1), stride=1
+    )
+    # Expected output shape: (3 + 1 + 1 - 2) // 1 + 1 = 3
+    assert_true(output.shape() == Shape(1, 1, 4, 4), "Output shape mismatch")
+
+    # Manual calculation for output[0, 0, 0, 0]:
+    # Padded image at (0,0) to (1,1):
+    # [0, 0]    kernel: [1, 1]
+    # [0, 1]            [1, 1]
+    # Result: 0*1 + 0*1 + 0*1 + 1*1 = 1
+    assert_almost_equal(
+        output[0, 0, 0, 0], 1.0, atol=1e-5, msg="Corner value incorrect"
+    )
+
+    # Center position output[0, 0, 1, 1]:
+    # Padded image at (1,1) to (2,2):
+    # [1, 2]
+    # [4, 5]
+    # Result: 1 + 2 + 4 + 5 = 12
+    assert_almost_equal(
+        output[0, 0, 1, 1], 12.0, atol=1e-5, msg="Center value incorrect"
+    )
+
+    print("✓ Symmetric padding forward pass correct")
+
+
+fn test_pad_symmetric_padding_backward() raises:
+    """Test symmetric padding backward pass."""
+    print("\n" + "=" * 80)
+    print("TEST: Symmetric Padding Backward")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=True)
+
+    for i in range(3):
+        for j in range(3):
+            image[0, 0, i, j] = Float32(i * 3 + j + 1)
+
+    var kernel = Tensor[dtype].ones(1, 1, 2, 2, requires_grad=True)
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(1), stride=1
+    )
+
+    # Uniform gradient
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+
+    # Each pixel in input affects 4 output positions (2x2 kernel)
+    # Corner pixels affect fewer positions due to padding
+    # All interior pixels should have gradient = 4.0
+    assert_almost_equal(
+        grad_image[0, 0, 0, 0], 4.0, atol=1e-5, msg="Top-left corner grad"
+    )
+    assert_almost_equal(
+        grad_image[0, 0, 1, 1], 4.0, atol=1e-5, msg="Center grad"
+    )
+    assert_almost_equal(
+        grad_image[0, 0, 2, 2], 4.0, atol=1e-5, msg="Bottom-right grad"
+    )
+
+    print("✓ Symmetric padding backward pass correct")
+
+
+fn test_pad_asymmetric_padding_forward() raises:
+    """Test asymmetric padding forward pass."""
+    print("\n" + "=" * 80)
+    print("TEST: Asymmetric Padding Forward")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=True)
+
+    for i in range(3):
+        for j in range(3):
+            image[0, 0, i, j] = Float32(i * 3 + j + 1)
+
+    var kernel = Tensor[dtype].ones(1, 1, 2, 2, requires_grad=True)
+
+    # Asymmetric: top=1, bottom=2, left=2, right=1
+    var pad_spec = List[Tuple[Int, Int]]()
+    pad_spec.append((1, 2))
+    pad_spec.append((2, 1))
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(pad_spec^), stride=1
+    )
+
+    # Height: 3 + 1 + 2 - 2 + 1 = 5
+    # Width: 3 + 2 + 1 - 2 + 1 = 5
+    assert_true(
+        output.shape() == Shape(1, 1, 5, 5), "Asymmetric output shape mismatch"
+    )
+
+    # Top-left corner: padded positions (0,0) to (1,1)
+    # All zeros in padded region
+    # [0, 0]
+    # [0, 0]
+    assert_almost_equal(
+        output[0, 0, 0, 0], 0.0, atol=1e-5, msg="Top-left asymmetric"
+    )
+
+    # Position (2, 2) should access actual data
+    # Padded coordinates: (2+0, 2+0) to (2+1, 2+1) in padded image
+    # Which maps to input (2-1, 2-2) to (3-1, 3-2) → (1, 0) to (2, 1)
+    # Input values at those positions:
+    # [4, 5]
+    # [7, 8]
+    # Sum: 4 + 5 + 7 + 8 = 24
+    assert_almost_equal(
+        output[0, 0, 2, 2], 24.0, atol=1e-5, msg="Center asymmetric"
+    )
+
+    print("✓ Asymmetric padding forward pass correct")
+
+
+fn test_pad_asymmetric_padding_backward() raises:
+    """Test asymmetric padding backward pass."""
+    print("\n" + "=" * 80)
+    print("TEST: Asymmetric Padding Backward")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=True)
+
+    for i in range(3):
+        for j in range(3):
+            image[0, 0, i, j] = Float32(i * 3 + j + 1)
+
+    var kernel = Tensor[dtype].ones(1, 1, 2, 2, requires_grad=True)
+
+    var pad_spec = List[Tuple[Int, Int]]()
+    pad_spec.append((1, 2))
+    pad_spec.append((2, 1))
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(pad_spec^), stride=1
+    )
+
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+
+    # Verify gradient shape matches input
+    assert_true(
+        grad_image.shape() == Shape(1, 1, 3, 3), "Gradient shape mismatch"
+    )
+
+    # All gradients should be 4.0 (each pixel contributes to 4 outputs with 2x2 kernel)
+    for i in range(3):
+        for j in range(3):
+            assert_almost_equal(
+                grad_image[0, 0, i, j],
+                4.0,
+                atol=1e-5,
+                msg="Gradient at " + i.__str__() + "," + j.__str__(),
+            )
+
+    print("✓ Asymmetric padding backward pass correct")
+
+
+fn test_pad_no_padding() raises:
+    """Test valid padding (no padding)."""
+    print("\n" + "=" * 80)
+    print("TEST: No Padding (Valid)")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].zeros(1, 1, 5, 5, requires_grad=True)
+
+    for i in range(5):
+        for j in range(5):
+            image[0, 0, i, j] = Float32(i * 5 + j + 1)
+
+    var kernel = Tensor[dtype].ones(1, 1, 3, 3, requires_grad=True)
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding("valid"), stride=1
+    )
+
+    # No padding: (5 - 3) // 1 + 1 = 3
+    assert_true(output.shape() == Shape(1, 1, 3, 3), "Valid padding shape")
+
+    # Top-left: sum of image[0:3, 0:3]
+    # [1, 2, 3]
+    # [6, 7, 8]
+    # [11, 12, 13]
+    # Sum: 1+2+3+6+7+8+11+12+13 = 63
+    var expected = Float32(1 + 2 + 3 + 6 + 7 + 8 + 11 + 12 + 13)
+    assert_almost_equal(
+        output[0, 0, 0, 0], expected, atol=1e-5, msg="Valid conv value"
+    )
+
+    # Backward
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+
+    # Corner pixels contribute to 1 output
+    assert_almost_equal(
+        grad_image[0, 0, 0, 0], 1.0, atol=1e-5, msg="Corner grad no pad"
+    )
+
+    # Edge pixels contribute to 2 outputs
+    assert_almost_equal(
+        grad_image[0, 0, 0, 1], 2.0, atol=1e-5, msg="Edge grad no pad"
+    )
+
+    # Center of 3x3 region contributes to 9 outputs
+    assert_almost_equal(
+        grad_image[0, 0, 2, 2], 9.0, atol=1e-5, msg="Center grad no pad"
+    )
+
+    print("✓ No padding test correct")
+
+
+fn test_pad_same_padding() raises:
+    """Test 'same' padding mode."""
+    print("\n" + "=" * 80)
+    print("TEST: Same Padding")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].randn(1, 1, 7, 7, requires_grad=True)
+    var kernel = Tensor[dtype].ones(1, 1, 3, 3, requires_grad=True)
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding("same"), stride=1
+    )
+
+    # Same padding with stride=1 should maintain size
+    assert_true(output.shape() == Shape(1, 1, 7, 7), "Same padding shape")
+
+    # Backward
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+    assert_true(
+        grad_image.shape() == Shape(1, 1, 7, 7), "Same padding grad shape"
+    )
+
+    print("✓ Same padding test correct")
+
+
+fn test_pad_multi_channel() raises:
+    """Test padding with multiple channels."""
+    print("\n" + "=" * 80)
+    print("TEST: Multi-Channel Padding")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].randn(2, 3, 8, 8, requires_grad=True)
+    var kernel = Tensor[dtype].randn(16, 3, 3, 3, requires_grad=True)
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(1), stride=1
+    )
+
+    # Check shape
+    assert_true(output.shape() == Shape(2, 16, 8, 8), "Multi-channel shape")
+
+    # Backward
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+    var grad_kernel = kernel.grad()
+
+    assert_true(
+        grad_image.shape() == Shape(2, 3, 8, 8),
+        "Multi-channel grad input shape",
+    )
+    assert_true(
+        grad_kernel.shape() == Shape(16, 3, 3, 3),
+        "Multi-channel grad kernel shape",
+    )
+
+    print("✓ Multi-channel padding test correct")
+
+
+fn test_pad_with_stride() raises:
+    """Test padding with stride > 1."""
+    print("\n" + "=" * 80)
+    print("TEST: Padding with Stride")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].randn(1, 1, 8, 8, requires_grad=True)
+    var kernel = Tensor[dtype].ones(1, 1, 3, 3, requires_grad=True)
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(1), stride=2
+    )
+
+    # With stride=2: (8 + 2 - 3) // 2 + 1 = 4
+    assert_true(output.shape() == Shape(1, 1, 4, 4), "Stride=2 output shape")
+
+    # Backward
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+    assert_true(grad_image.shape() == Shape(1, 1, 8, 8), "Stride=2 grad shape")
+
+    # With stride=2, not all pixels contribute equally
+    # Pixels on stride grid contribute more
+    print("✓ Stride with padding test correct")
+
+
+fn test_pad_with_dilation() raises:
+    """Test padding with dilation."""
+    print("\n" + "=" * 80)
+    print("TEST: Padding with Dilation")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].randn(1, 1, 10, 10, requires_grad=True)
+    var kernel = Tensor[dtype].ones(1, 1, 3, 3, requires_grad=True)
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(2), stride=1, dilation=2
+    )
+
+    # Dilated kernel size: 3 + (3-1)*(2-1) = 5
+    # Output: (10 + 4 - 5) // 1 + 1 = 10
+    assert_true(output.shape() == Shape(1, 1, 10, 10), "Dilation output shape")
+
+    # Backward
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+    assert_true(
+        grad_image.shape() == Shape(1, 1, 10, 10), "Dilation grad shape"
+    )
+
+    print("✓ Dilation with padding test correct")
+
+
+fn test_pad_tuple_padding() raises:
+    """Test tuple padding specification."""
+    print("\n" + "=" * 80)
+    print("TEST: Tuple Padding")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].randn(1, 1, 8, 8, requires_grad=True)
+    var kernel = Tensor[dtype].ones(1, 1, 3, 3, requires_grad=True)
+
+    # Tuple: (height_pad, width_pad)
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding((2, 1)), stride=1
+    )
+
+    # Height: 8 + 4 - 3 + 1 = 10
+    # Width: 8 + 2 - 3 + 1 = 8
+    assert_true(output.shape() == Shape(1, 1, 10, 8), "Tuple padding shape")
+
+    # Backward
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+    assert_true(
+        grad_image.shape() == Shape(1, 1, 8, 8), "Tuple padding grad shape"
+    )
+
+    print("✓ Tuple padding test correct")
+
+
+fn test_pad_numerical_gradient_check() raises:
+    """Numerical gradient verification for padding."""
+    print("\n" + "=" * 80)
+    print("TEST: Numerical Gradient Check")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].randn(1, 1, 4, 4, requires_grad=True)
+    var kernel = Tensor[dtype].randn(1, 1, 2, 2, requires_grad=True)
+
+    # Forward with padding
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(1), stride=1
+    )
+
+    # Backward
+    var grad_out = Tensor[dtype].randn(output.shape())
+    output.backward(grad_out)
+
+    var grad_analytical = image.grad()[0, 0, 1, 1]
+
+    # Numerical gradient
+    var epsilon: Float32 = 1e-4
+    var original = image[0, 0, 1, 1]
+
+    # f(x + eps)
+    image[0, 0, 1, 1] = original + epsilon
+    var out_plus = Conv2dFused[dtype].forward[track_grad=False](
+        image, kernel, padding=Padding(1), stride=1
+    )
+    var loss_plus: Float32 = 0.0
+    for i in range(out_plus.shape()[2]):
+        for j in range(out_plus.shape()[3]):
+            loss_plus += out_plus[0, 0, i, j] * grad_out[0, 0, i, j]
+
+    # f(x - eps)
+    image[0, 0, 1, 1] = original - epsilon
+    var out_minus = Conv2dFused[dtype].forward[track_grad=False](
+        image, kernel, padding=Padding(1), stride=1
+    )
+    var loss_minus: Float32 = 0.0
+    for i in range(out_minus.shape()[2]):
+        for j in range(out_minus.shape()[3]):
+            loss_minus += out_minus[0, 0, i, j] * grad_out[0, 0, i, j]
+
+    var grad_numerical = (loss_plus - loss_minus) / (2 * epsilon)
+
+    # Restore
+    image[0, 0, 1, 1] = original
+
+    var rel_error = abs(grad_analytical - grad_numerical) / (
+        abs(grad_numerical) + 1e-8
+    )
+
+    print("Analytical gradient: ", grad_analytical)
+    print("Numerical gradient: ", grad_numerical)
+    print("Relative error:", rel_error)
+
+    assert_true(rel_error < 0.01, "Numerical gradient mismatch")
+    print("✓ Numerical gradient check passed")
+
+
+fn test_pad_kernel_gradient() raises:
+    """Test kernel gradients with padding."""
+    print("\n" + "=" * 80)
+    print("TEST: Kernel Gradient with Padding")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].zeros(1, 1, 3, 3, requires_grad=False)
+
+    # Known input
+    for i in range(3):
+        for j in range(3):
+            image[0, 0, i, j] = Float32(i * 3 + j + 1)
+
+    var kernel = Tensor[dtype].zeros(1, 1, 2, 2, requires_grad=True)
+    kernel[0, 0, 0, 0] = 1.0
+    kernel[0, 0, 0, 1] = 1.0
+    kernel[0, 0, 1, 0] = 1.0
+    kernel[0, 0, 1, 1] = 1.0
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(1), stride=1
+    )
+
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_kernel = kernel.grad()
+
+    # Each kernel weight is used across all valid positions
+    # Verify gradient accumulation is correct
+    assert_true(grad_kernel.shape() == Shape(1, 1, 2, 2), "Kernel grad shape")
+
+    # All kernel gradients should be positive (summing input values)
+    for i in range(2):
+        for j in range(2):
+            assert_true(
+                grad_kernel[0, 0, i, j] > 0,
+                "Kernel grad :" + i.__str__() + "," + j.__str__() + "positive",
+            )
+
+    print("✓ Kernel gradient test correct")
+
+
+fn test_pad_bias_gradient() raises:
+    """Test bias gradients with padding."""
+    print("\n" + "=" * 80)
+    print("TEST: Bias Gradient with Padding")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].randn(2, 3, 8, 8, requires_grad=False)
+    var kernel = Tensor[dtype].randn(16, 3, 3, 3, requires_grad=False)
+    var bias = Tensor[dtype].zeros(16, requires_grad=True)
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, bias=bias, padding=Padding(1), stride=1
+    )
+
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_bias = bias.grad()
+
+    # Bias gradient should equal number of spatial positions × batch size
+    # Output: (2, 16, 8, 8)
+    # Each bias[i] contributes to 2 * 8 * 8 = 128 positions
+    var expected: Float32 = 128.0
+
+    for i in range(16):
+        assert_almost_equal(
+            grad_bias[i], expected, atol=1e-4, msg="Bias grad " + i.__str__()
+        )
+
+    print("✓ Bias gradient test correct")
+
+
+fn test_pad_large_asymmetric() raises:
+    """Test large asymmetric padding values."""
+    print("\n" + "=" * 80)
+    print("TEST: Large Asymmetric Padding")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].randn(1, 2, 5, 5, requires_grad=True)
+    var kernel = Tensor[dtype].ones(8, 2, 3, 3, requires_grad=True)
+
+    # Large asymmetric: top=3, bottom=5, left=4, right=2
+    var pad_spec = List[Tuple[Int, Int]]()
+    pad_spec.append((3, 5))
+    pad_spec.append((4, 2))
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(pad_spec^), stride=1
+    )
+
+    # Height: 5 + 3 + 5 - 3 + 1 = 11
+    # Width: 5 + 4 + 2 - 3 + 1 = 9
+    assert_true(output.shape() == Shape(1, 8, 11, 9), "Large asymmetric shape")
+
+    # Backward
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+    var grad_kernel = kernel.grad()
+
+    assert_true(
+        grad_image.shape() == Shape(1, 2, 5, 5), "Large asym grad input"
+    )
+    assert_true(
+        grad_kernel.shape() == Shape(8, 2, 3, 3), "Large asym grad kernel"
+    )
+    # All gradients should be 9.0 (3x3 kernel, all positions contribute)
+    for c in range(2):
+        for i in range(5):
+            for j in range(5):
+                assert_almost_equal(
+                    grad_image[0, c, i, j],
+                    72.0,
+                    atol=1e-4,
+                    msg="Large asym grad at "
+                    + c.__str__()
+                    + ","
+                    + i.__str__()
+                    + ","
+                    + j.__str__(),
+                )
+
+    print("✓ Large asymmetric padding test correct")
+
+
+fn test_pad_zero_padding_one_side() raises:
+    """Test zero padding on one side, non-zero on other."""
+    print("\n" + "=" * 80)
+    print("TEST: Zero Padding One Side")
+    print("=" * 80)
+
+    alias dtype = DType.float32
+    var image = Tensor[dtype].randn(1, 1, 6, 6, requires_grad=True)
+    var kernel = Tensor[dtype].ones(1, 1, 3, 3, requires_grad=True)
+
+    # Zero top/left, non-zero bottom/right
+    var pad_spec = List[Tuple[Int, Int]]()
+    pad_spec.append((0, 3))  # No top padding, 3 bottom
+    pad_spec.append((0, 2))  # No left padding, 2 right
+
+    var output = Conv2dFused[dtype].forward(
+        image, kernel, padding=Padding(pad_spec^), stride=1
+    )
+
+    # Height: 6 + 0 + 3 - 3 + 1 = 7
+    # Width: 6 + 0 + 2 - 3 + 1 = 6
+    assert_true(output.shape() == Shape(1, 1, 7, 6), "Zero one side shape")
+
+    # Backward
+    var grad_out = Tensor[dtype].ones(output.shape())
+    output.backward(grad_out)
+
+    var grad_image = image.grad()
+    assert_true(
+        grad_image.shape() == Shape(1, 1, 6, 6), "Zero one side grad shape"
+    )
+
+    print("✓ Zero padding one side test correct")
+
+
+fn run_all_padding_tests() raises:
+    """Run all padding tests."""
+
+    test_pad_symmetric_padding_forward()
+    test_pad_symmetric_padding_backward()
+    test_pad_asymmetric_padding_forward()
+    test_pad_asymmetric_padding_backward()
+    test_pad_no_padding()
+    test_pad_same_padding()
+    test_pad_multi_channel()
+    test_pad_with_stride()
+    test_pad_with_dilation()
+    test_pad_tuple_padding()
+    test_pad_numerical_gradient_check()
+    test_pad_kernel_gradient()
+    test_pad_bias_gradient()
+    test_pad_large_asymmetric()
+    test_pad_zero_padding_one_side()
+    test_pad_backward_asymmetric()

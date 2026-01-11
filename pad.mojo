@@ -29,6 +29,8 @@ from operators import AddTensor
 from common_utils import panic
 from intarray import IntArray
 from utils import Variant
+from sys import simd_width_of
+from algorithm import parallelize
 
 alias Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
 
@@ -67,9 +69,14 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
             # Different backward pass based on mode
             if self.mode == "constant":
-                Self._extract_constant(
-                    grad_out, grad_parent, self.pad, parent_shape
-                )
+                if parent_shape.rank() == 4:
+                    Self._extract_4d_constant_simd(
+                        grad_out, grad_parent, self.pad, parent_shape
+                    )
+                else:
+                    Self._extract_constant(
+                        grad_out, grad_parent, self.pad, parent_shape
+                    )
             elif self.mode == "circular":
                 Self._extract_circular(
                     grad_out, grad_parent, self.pad, parent_shape
@@ -105,9 +112,97 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         # Iterate over parent's shape and extract gradients
         for coord in parent_shape:
-            var grad_out_coord = coord
+            var grad_out_coord = coord  # Copy it
             grad_out_coord += offset_list
             grad_parent[coord] += grad_out[grad_out_coord^]
+
+    @staticmethod
+    fn _extract_4d_constant_simd(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """
+        Highly optimized 4D extraction for Conv2D.
+
+        Input: (N, C, H_in, W_in)
+        Padded: (N, C, H_pad, W_pad)
+
+        Assumes: pad[0] = (0, 0) and pad[1] = (0, 0) (no batch/channel padding)
+        Handles: Asymmetric height/width padding:
+                 pad[2] = (pad_top, pad_bottom)   # Can be different!
+                 pad[3] = (pad_left, pad_right)   # Can be different!
+
+        Strategy: Extract row-by-row using SIMD from correct offsets
+        """
+        var N = parent_shape[0]
+        var C = parent_shape[1]
+        var H_in = parent_shape[2]
+        var W_in = parent_shape[3]
+
+        # Extract padding amounts (only height/width)
+        var pad_top = pad[2][0]
+        var pad_left = pad[3][0]
+
+        ref grad_out_shape = grad_out.shape()
+        var H_pad = grad_out_shape[2]
+        var W_pad = grad_out_shape[3]
+
+        var grad_out_ptr = grad_out.buffer.data_buffer().data
+        var grad_in_ptr = grad_parent.buffer.data_buffer().data
+
+        alias simd_w = simd_width_of[dtype]()
+        # Strides
+        var out_stride_N = C * H_pad * W_pad
+        var out_stride_C = H_pad * W_pad
+        var out_stride_H = W_pad
+
+        var in_stride_N = C * H_in * W_in
+        var in_stride_C = H_in * W_in
+        var in_stride_H = W_in
+
+        # Parallelize over N×C
+        var total_slices = N * C
+
+        @parameter
+        fn extract_slice(slice_idx: Int):
+            var n = slice_idx // C
+            var c = slice_idx % C
+
+            # Source position in padded gradient (no batch/channel offset!)
+            var out_nc_base = n * out_stride_N + c * out_stride_C
+
+            # Destination position in input gradient
+            var in_nc_base = n * in_stride_N + c * in_stride_C
+
+            # Extract each row
+            for h in range(H_in):
+                # Source row in padded gradient (account for height and width padding)
+                var out_row_start = (
+                    out_nc_base + (h + pad_top) * out_stride_H + pad_left
+                )
+
+                # Destination row in input gradient
+                var in_row_start = in_nc_base + h * in_stride_H
+
+                # Copy entire row (SIMD vectorized)
+                var w = 0
+                var vec_end = (W_in // simd_w) * simd_w
+
+                # Vectorized copy
+                for _ in range(vec_end // simd_w):
+                    var vec = grad_out_ptr.load[width=simd_w](out_row_start + w)
+                    grad_in_ptr.store[width=simd_w](in_row_start + w, vec)
+                    w += simd_w
+
+                # Scalar tail
+                for w_tail in range(vec_end, W_in):
+                    grad_in_ptr[in_row_start + w_tail] = grad_out_ptr[
+                        out_row_start + w_tail
+                    ]
+
+        parallelize[extract_slice](total_slices)
 
     @staticmethod
     fn _extract_circular(
@@ -259,7 +354,11 @@ struct Pad[dtype: DType](ImplicitlyCopyable):
 
         # Apply padding based on mode
         if mode == "constant":
-            Self._pad_constant(x, result, pad, value)
+            # Use optimized path for 4D
+            if ndim == 4:
+                Self._pad_4d_constant_simd(x, result, pad, value)
+            else:
+                Self._pad_constant(x, result, pad, value)
         elif mode == "reflect":
             Self._pad_reflect(x, result, pad)
         elif mode == "replicate":
@@ -317,9 +416,115 @@ struct Pad[dtype: DType](ImplicitlyCopyable):
 
         # Iterate over all elements of input
         for coord in x_shape:
-            var result_indices = coord
+            var result_indices = coord  # Copy it
             result_indices += offset_list
             result[result_indices] = x[coord]
+
+    @staticmethod
+    fn _pad_4d_constant_simd(
+        x: Tensor[Self.dtype],
+        mut result: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        value: Scalar[Self.dtype],
+    ):
+        """
+        Highly optimized 4D constant padding for Conv2D.
+
+        Assumes: pad[0] = (0, 0) and pad[1] = (0, 0) (no batch/channel padding)
+        Handles: Asymmetric height/width padding:
+                 pad[2] = (pad_top, pad_bottom)   # Can be different!
+                 pad[3] = (pad_left, pad_right)   # Can be different!
+
+        Strategy:
+        1. Fill entire output with pad value (SIMD vectorized)
+        2. Copy input data row-by-row to correct offset
+        3. Parallelize over N×C slices
+        """
+        var x_shape = x.shape()
+        var result_shape = result.shape()
+
+        var N = x_shape[0]
+        var C = x_shape[1]
+        var H_in = x_shape[2]
+        var W_in = x_shape[3]
+
+        var H_out = result_shape[2]
+        var W_out = result_shape[3]
+
+        # Extract padding amounts (only height/width can be asymmetric)
+        var pad_top = pad[2][0]
+        var pad_left = pad[3][0]
+        # Note: pad[0] and pad[1] are assumed to be (0,0) for Conv2D
+
+        var x_ptr = x.buffer.data_buffer().data
+        var result_ptr = result.buffer.data_buffer().data
+
+        alias simd_w = simd_width_of[Self.dtype]()
+        # ═══════════════════════════════════════════════════════════
+        # Step 1: Fill with pad value (SIMD vectorized)
+        # ═══════════════════════════════════════════════════════════
+        var total_elements = N * C * H_out * W_out
+        var fill_vec = SIMD[Self.dtype, simd_w](value)
+
+        var i = 0
+        var vec_end = (total_elements // simd_w) * simd_w
+
+        for _ in range(vec_end // simd_w):
+            result_ptr.store[width=simd_w](i, fill_vec)
+            i += simd_w
+
+        for j in range(vec_end, total_elements):
+            result_ptr[j] = value
+
+        # ═══════════════════════════════════════════════════════════
+        # Step 2: Copy input data (simplified - no batch/channel offset!)
+        # ═══════════════════════════════════════════════════════════
+        var x_stride_N = C * H_in * W_in
+        var x_stride_C = H_in * W_in
+        var x_stride_H = W_in
+
+        var result_stride_N = C * H_out * W_out
+        var result_stride_C = H_out * W_out
+        var result_stride_H = W_out
+
+        var total_slices = N * C
+
+        @parameter
+        fn copy_slice(slice_idx: Int):
+            var n = slice_idx // C
+            var c = slice_idx % C
+
+            # Source position in input
+            var x_nc_base = n * x_stride_N + c * x_stride_C
+
+            # Destination position in output (no batch/channel offset needed!)
+            var result_nc_base = n * result_stride_N + c * result_stride_C
+
+            # Copy each row
+            for h in range(H_in):
+                var x_row_start = x_nc_base + h * x_stride_H
+
+                # Destination row (account for height and width padding)
+                var result_row_start = (
+                    result_nc_base + (h + pad_top) * result_stride_H + pad_left
+                )
+
+                # SIMD-vectorized row copy
+                var w = 0
+                var vec_end = (W_in // simd_w) * simd_w
+
+                for _ in range(vec_end // simd_w):
+                    var vec = x_ptr.load[width=simd_w](x_row_start + w)
+                    result_ptr.store[width=simd_w](result_row_start + w, vec)
+                    w += simd_w
+
+                # Scalar tail
+                for w_tail in range(vec_end, W_in):
+                    result_ptr[result_row_start + w_tail] = x_ptr[
+                        x_row_start + w_tail
+                    ]
+
+        parallelize[copy_slice](total_slices)
 
     @staticmethod
     fn _pad_replicate(
@@ -425,23 +630,4 @@ struct Pad[dtype: DType](ImplicitlyCopyable):
 
 
 fn main() raises:
-    alias dtype = DType.float32
-
-    # var input_image: Tensor[dtype]  # Shape: (2, 3, 28, 28)
-    # 2 images, 3 channels, 28×28 pixels
-
-    var input_image = Tensor[dtype].arange(1 * 2 * 3 * 3)
-    input_image = input_image.reshape(1, 2, 3, 3)
-    print("Is image contiguous: ", input_image.is_contiguous())
-    input_image.print()
-
-    var pad_spec = List[Tuple[Int, Int]]()
-    pad_spec.append((0, 0))  # Batch: DON'T pad
-    pad_spec.append((0, 0))  # Channels: DON'T pad
-    pad_spec.append((1, 1))  # Height: pad by 1
-    pad_spec.append((1, 1))  # Width: pad by 1
-
-    var padded = Pad.forward(input_image, pad_spec, mode="constant", value=-9)
-
-    print()
-    padded.print()
+    pass

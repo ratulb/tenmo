@@ -6,7 +6,7 @@ from backpropagation import (
     BACKWARD_MAXPOOL2D,
 )
 from operators import AddTensor
-from common_utils import panic, now
+from common_utils import panic
 from forwards import Pad
 from shapes import Shape
 from gradbox import Gradbox
@@ -37,7 +37,6 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
         self,
         output: Tensor[Self.dtype],  # (N, C, H_out, W_out)
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        start = now()
 
         ref grad_output = output.gradients()[]
         var results = List[
@@ -91,13 +90,6 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             parallelize[scatter_gradients_for_batch_channel](N * C)
 
             results.append((input_tensor^, grad_input^, AddTensor))
-
-        end = now()
-        print(
-            "MaxPool2dBackward (parallelized over N*C) -> backward took: ",
-            (end - start) * 1000,
-            " ms",
-        )
         return results^
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -132,7 +124,6 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         padding: Padding = Padding("valid"),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        start = now()
         ref image_shape = image.shape()
         ref kernel_shape = kernel.shape()
 
@@ -186,9 +177,9 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
             pad_top = pad_bottom = t[0]
             pad_left = pad_right = t[1]
         elif padding.isa[List[Tuple[Int, Int]]]():
-            var lst = padding[List[Tuple[Int, Int]]].copy()
-            if len(lst) != 2:
+            if len(padding[List[Tuple[Int, Int]]]) != 2:
                 panic("Padding list must contain exactly 2 tuples")
+            var lst = padding[List[Tuple[Int, Int]]].copy()
             pad_top = lst[0][0]
             pad_bottom = lst[0][1]
             pad_left = lst[1][0]
@@ -241,9 +232,6 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
             dilation,
             requires_grad=requires_grad,
         )
-
-        end = now()
-        print("Conv2dFused -> forward took: ", (end - start) * 1000, " ms")
         return output^
 
 
@@ -292,7 +280,6 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
         Returns:
             Output tensor (N, C_out, H_out, W_out).
         """
-        start = now()
 
         # ═══════════════════════════════════════════════════════════
         # STEP 1: Validate inputs and extract dimensions
@@ -505,8 +492,6 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
                 output.add_ancestry(padded_image)
                 output.add_ancestry(kernel)
                 output.add_ancestry(bias)
-        end = now()
-        print("FusedIm2Col forward:", (end - start) * 1000, "ms")
         return output^
 
 
@@ -546,7 +531,6 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         self,
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        start = now()
         ref grad_output = output.gradients()[]
         var results = List[
             Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -560,19 +544,15 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         # 1. BIAS GRADIENT - Vectorized
         # ═══════════════════════════════════════════════════════════
         if bias.requires_grad:
-            bias_start = now()
             var grad_bias = Self.compute_bias_gradient(
                 grad_output, self.N, self.C_out, self.H_out, self.W_out
             )
-            bias_end = now()
             results.append((bias^, grad_bias^, AddTensor))
-            print("Bias grad:", (bias_end - bias_start) * 1000, "ms")
 
         # ═══════════════════════════════════════════════════════════
         # 2. KERNEL GRADIENT - Vectorized
         # ═══════════════════════════════════════════════════════════
         if kernel.requires_grad:
-            kernel_start = now()
             var grad_kernel = Self.compute_kernel_gradient(
                 grad_output,
                 padded_image,
@@ -588,15 +568,12 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
                 self.stride,
                 self.dilation,
             )
-            kernel_end = now()
             results.append((kernel, grad_kernel^, AddTensor))
-            print("Kernel grad:", (kernel_end - kernel_start) * 1000, "ms")
 
         # ═══════════════════════════════════════════════════════════
         # 3. INPUT GRADIENT
         # ═══════════════════════════════════════════════════════════
         if padded_image.requires_grad:
-            input_start = now()
             var grad_padded = Self.compute_input_gradient(
                 grad_output,
                 kernel,
@@ -612,12 +589,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
                 self.stride,
                 self.dilation,
             )
-            input_end = now()
             results.append((padded_image^, grad_padded^, AddTensor))
-            print("Input grad:", (input_end - input_start) * 1000, "ms")
 
-        end = now()
-        print("Total backward FusedCol2ImBackward:", (end - start) * 1000, "ms")
         return results^
 
     # ═══════════════════════════════════════════════════════════════════
@@ -943,6 +916,7 @@ fn main() raises:
     alias dtype = DType.float32
     # Batch of 2, 3 input channels, 4x5 image
     # var x = Tensor[dtype].rand(2, 3, 4, 5, requires_grad=True)
+    return
     var x = Tensor[dtype].d4(
         [
             [
