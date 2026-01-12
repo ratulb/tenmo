@@ -51,8 +51,7 @@ from blashandle import BLASMatmul2dBackward
 from concate import ConcatBackward
 from stack import StackBackward
 from pad import PadBackward
-from cnn import (
-    FusedCol2ImBackward,
-    MaxPool2dBackward,
-)
+from cnn import FusedCol2ImBackward
 from convolution import Conv2DBackward
+from pooling import MaxPool2dBackward
+

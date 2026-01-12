@@ -6,7 +6,7 @@ from backpropagation import (
     BACKWARD_MAXPOOL2D,
 )
 from operators import AddTensor
-from common_utils import panic
+from common_utils import panic, now
 from forwards import Pad
 from shapes import Shape
 from gradbox import Gradbox
@@ -37,7 +37,6 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
         self,
         output: Tensor[Self.dtype],  # (N, C, H_out, W_out)
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-
         ref grad_output = output.gradients()[]
         var results = List[
             Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -97,7 +96,6 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 @fieldwise_init
-@register_passable
 struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
     """
     Batched, multi-channel, multi-filter 2D convolution using fused im2col + matmul + bias.
@@ -112,6 +110,60 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         output: (N, C_out, H_out, W_out).
     """
 
+    var initialized: Bool
+    var pad_spec: List[Tuple[Int, Int]]
+
+    fn __copyinit__(out self, other: Self):
+        self.initialized = other.initialized
+        self.pad_spec = other.pad_spec.copy()
+
+    fn __init__(out self):
+        self.initialized = False
+        self.pad_spec = List[Tuple[Int, Int]]()
+
+    fn __call__[
+        track_grad: Bool
+    ](
+        mut self,
+        image: Tensor[Self.dtype],
+        mut kernel: Tensor[Self.dtype],
+        bias: Optional[Tensor[Self.dtype]] = None,
+        stride: Int = 1,
+        dilation: Int = 1,
+        padding: Padding = Padding("valid"),
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        start = now()
+        var out: Tensor[Self.dtype]
+        if self.initialized:
+            var output = Self.invoke[track_grad=track_grad](
+                image=image,
+                kernel=kernel,
+                bias=bias,
+                stride=stride,
+                dilation=dilation,
+                pad_spec=self.pad_spec.copy(),
+                requires_grad=requires_grad,
+            )
+            print("Returning from here")
+            out = output^
+        else:
+            var result = Self.invoke[track_grad=track_grad](
+                image=image,
+                kernel=kernel,
+                bias=bias,
+                stride=stride,
+                dilation=dilation,
+                padding=padding,
+                requires_grad=requires_grad,
+            )
+            self.pad_spec = result[1].copy()
+            self.initialized = True
+            print("Pac spec initialized")
+            out = result[0]
+        print("Conv2dFused forward took: ", (now() - start) * 1000, "ms")
+        return out^
+
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -124,6 +176,74 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         padding: Padding = Padding("valid"),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        var output, _ = Self.invoke[track_grad=track_grad](
+            image=image,
+            kernel=kernel,
+            bias=bias,
+            stride=stride,
+            dilation=dilation,
+            padding=padding,
+            requires_grad=requires_grad,
+        )
+        return output^
+
+    @staticmethod
+    fn invoke[
+        track_grad: Bool = True
+    ](
+        image: Tensor[Self.dtype],
+        mut kernel: Tensor[Self.dtype],
+        bias: Optional[Tensor[Self.dtype]] = None,
+        stride: Int = 1,
+        dilation: Int = 1,
+        pad_spec: List[Tuple[Int, Int]] = [],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        var C_out = kernel.shape()[0]
+        var padded_image = Pad[Self.dtype].forward[track_grad=track_grad](
+            image,
+            pad_spec.copy(),
+            mode="constant",
+            value=0.0,
+            requires_grad=requires_grad.or_else(image.requires_grad),
+        )
+
+        # Setup bias
+        var expected_bias_shape = Shape(C_out)
+        var bias_tensor = bias.or_else(
+            Tensor[Self.dtype].zeros(expected_bias_shape, requires_grad=False)
+        )
+        if not bias_tensor.shape() == expected_bias_shape:
+            panic(
+                "Invalid bias tensor shape: ",
+                bias_tensor.shape().__str__(),
+                ". Should be (C_out,)",
+            )
+
+        # Fused forward
+
+        var output = FusedIm2Col[Self.dtype].forward[track_grad=track_grad](
+            padded_image^,
+            kernel,
+            bias_tensor^,
+            stride,
+            dilation,
+            requires_grad=requires_grad,
+        )
+        return output^
+
+    @staticmethod
+    fn invoke[
+        track_grad: Bool = True
+    ](
+        image: Tensor[Self.dtype],
+        mut kernel: Tensor[Self.dtype],
+        bias: Optional[Tensor[Self.dtype]] = None,
+        stride: Int = 1,
+        dilation: Int = 1,
+        padding: Padding = Padding("valid"),
+        requires_grad: Optional[Bool] = None,
+    ) -> Tuple[Tensor[Self.dtype], List[Tuple[Int, Int]]]:
         ref image_shape = image.shape()
         ref kernel_shape = kernel.shape()
 
@@ -195,7 +315,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         pad_spec.append((pad_left, pad_right))  # Pad width
         var padded_image = Pad[Self.dtype].forward[track_grad=track_grad](
             image,
-            pad_spec^,
+            pad_spec.copy(),
             mode="constant",
             value=0.0,
             requires_grad=requires_grad.or_else(image.requires_grad),
@@ -232,8 +352,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
             dilation,
             requires_grad=requires_grad,
         )
-        return output^
-
+        return output^, pad_spec^
 
 
 @fieldwise_init
@@ -280,7 +399,7 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
         Returns:
             Output tensor (N, C_out, H_out, W_out).
         """
-
+        start = now()
         # ═══════════════════════════════════════════════════════════
         # STEP 1: Validate inputs and extract dimensions
         # ═══════════════════════════════════════════════════════════
@@ -492,6 +611,8 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
                 output.add_ancestry(padded_image)
                 output.add_ancestry(kernel)
                 output.add_ancestry(bias)
+
+        print("FusedIm2Col forward took: ", (now() - start) * 1000, "ms")
         return output^
 
 
@@ -535,7 +656,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var results = List[
             Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
-
+        start = now()
         var padded_image = output.ancestry().get(0)
         var kernel = output.ancestry().get(1)
         var bias = output.ancestry().get(2)
@@ -590,6 +711,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
                 self.dilation,
             )
             results.append((padded_image^, grad_padded^, AddTensor))
+
+        print("FusedCol2ImBackward took: ", (now() - start) * 1000, "ms")
 
         return results^
 
@@ -1070,5 +1193,3 @@ fn main() raises:
     kernel.grad().print()
     print()
     bias.grad().print()
-
-
