@@ -455,6 +455,10 @@ struct Gradbox[dtype: DType](
         return self.buffer.numels()
 
     @always_inline
+    fn num_elements(self) -> Int:
+        return self.buffer.numels()
+
+    @always_inline
     fn __len__(self) -> Int:
         return self.buffer.numels()
 

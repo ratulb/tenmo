@@ -196,6 +196,10 @@ struct Tensor[dtype: DType = DType.float32](
         return self.buffer.numels()
 
     @always_inline
+    fn num_elements(self) -> Int:
+        return self.buffer.numels()
+
+    @always_inline
     fn rank(self) -> Int:
         return self.buffer.rank()
 
