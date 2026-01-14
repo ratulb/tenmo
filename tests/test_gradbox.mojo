@@ -322,7 +322,7 @@ fn test_gradbox_reverse_division() raises:
     gradbox = Gradbox[dtype](ndb^)
     result = 2 / gradbox
     assert_true(
-        result.buffer.data()
+        result.buffer.data_buffer()
         == Buffer[dtype]([2.0, 1.0, 0.6666667, 0.5, 0.4, 0.33333334])
     )
 
@@ -334,7 +334,9 @@ fn test_gradbox_reverse_subtract() raises:
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
     result = 2 - gradbox
-    assert_true(result.buffer.data() == Buffer[dtype]([1, 0, -1, -2, -3, -4]))
+    assert_true(
+        result.buffer.data_buffer() == Buffer[dtype]([1, 0, -1, -2, -3, -4])
+    )
 
 
 fn test_gradbox_reshape() raises:
@@ -363,13 +365,11 @@ fn test_gradbox_inplace_add() raises:
 
     gradbox += gradbox2
     assert_true(
-        gradbox.buffer.data() == Buffer[dtype]([12, 14, 16, 18, 20, 22])
+        gradbox.buffer.buffer == Buffer[dtype]([12, 14, 16, 18, 20, 22])
     )
     assert_true(
-        gradbox.buffer.shared_buffer.value()[]
-        == Buffer[dtype]([12, 14, 16, 18, 20, 22])
+        gradbox.buffer.buffer == Buffer[dtype]([12, 14, 16, 18, 20, 22])
     )
-    assert_true(gradbox.buffer.buffer == None)
 
 
 fn test_gradbox_is_shared() raises:
@@ -389,12 +389,8 @@ fn test_seed_gradbox() raises:
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
-    assert_true(
-        gradbox.buffer.shared_buffer.value()[]
-        == Buffer[dtype]([1, 2, 3, 4, 5, 6])
-    )
+    assert_true(gradbox.buffer.buffer == Buffer[dtype]([1, 2, 3, 4, 5, 6]))
     gradbox.seed_grad(42)
     assert_true(
-        gradbox.buffer.shared_buffer.value()[]
-        == Buffer[dtype]([42, 42, 42, 42, 42, 42])
+        gradbox.buffer.buffer == Buffer[dtype]([42, 42, 42, 42, 42, 42])
     )

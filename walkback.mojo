@@ -43,7 +43,6 @@ from sigmoid import SigmoidBackward
 from tanh import TanhBackward
 from clip import ClipBackward
 
-# from bce import BCEBackward
 from squareroot import SqrtBackward
 from variance import VarianceBackward
 from std_deviation import StdBackward
@@ -52,6 +51,4 @@ from concate import ConcatBackward
 from stack import StackBackward
 from pad import PadBackward
 from cnn import FusedCol2ImBackward
-from convolution import Conv2DBackward
 from pooling import MaxPool2dBackward
-

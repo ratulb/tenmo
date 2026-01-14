@@ -48,9 +48,14 @@ struct Gradbox[dtype: DType](
     fn as_tensor(
         deinit self, requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
-        return Tensor[Self.dtype](
-            self^.buffer.contiguous(), requires_grad=requires_grad
-        )
+        if self.is_contiguous():
+            return Tensor[Self.dtype](
+                self^.buffer^, requires_grad=requires_grad
+            )
+        else:
+            return Tensor[Self.dtype](
+                self^.buffer.contiguous(), requires_grad=requires_grad
+            )
 
     @always_inline
     fn transpose(self, axes: IntArray) -> Gradbox[Self.dtype]:
@@ -721,19 +726,17 @@ struct Gradbox[dtype: DType](
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
     @always_inline
-    fn reshape(self) -> Gradbox[Self.dtype]:
+    fn reshape(self, share: Bool = True) -> Gradbox[Self.dtype]:
         if self.numels() != 1:
             panic(
                 "Gradbox → reshape: only gradbox with single element can be"
                 " reshaped to scalar gradbox"
             )
-        return self.reshape(Shape(), validated=True)
+        return self.reshape(Shape(), validated=True, share=share)
 
     @always_inline
     fn reshape(
-        self,
-        new_shape: Shape,
-        validated: Bool = False,
+        self, new_shape: Shape, validated: Bool = False, share: Bool = True
     ) -> Gradbox[Self.dtype]:
         shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             self.shape(), new_shape.intarray()
@@ -741,7 +744,7 @@ struct Gradbox[dtype: DType](
         buffer = self.buffer.contiguous_buffer()
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape^)
 
-        return Gradbox[Self.dtype](nd_buffer^)
+        return Gradbox[Self.dtype](nd_buffer^, share=share)
 
     fn __eq__(self, tensor: Tensor[Self.dtype]) -> Bool:
         if self.shape() != tensor.shape():

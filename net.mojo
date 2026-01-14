@@ -588,6 +588,7 @@ struct ReLU[dtype: DType](ImplicitlyCopyable):
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
+
 @fieldwise_init
 @register_passable
 struct Dropout[dtype: DType](ImplicitlyCopyable):
@@ -720,6 +721,7 @@ struct Dropout[dtype: DType](ImplicitlyCopyable):
 
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
+
 
 @register_passable
 struct Sigmoid[dtype: DType](ImplicitlyCopyable):
@@ -1197,69 +1199,6 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32]:
 
 
 @fieldwise_init
-struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
-    """Stochastic Gradient Descent."""
-
-    var parameters: List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]
-    var lr: Scalar[Self.dtype]
-    var momentum: Scalar[Self.dtype]
-    var velocities: List[Gradbox[Self.dtype]]  # For momentum
-
-    fn __init__(
-        out self,
-        parameters: List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]],
-        lr: Scalar[Self.dtype] = 0.01,
-        momentum: Scalar[Self.dtype] = 0.0,
-    ):
-        self.parameters = parameters.copy()
-        self.lr = lr
-        self.momentum = momentum
-        self.velocities = List[Gradbox[Self.dtype]]()
-
-        # Initialize velocities
-        if momentum > 0:
-            for parameter in self.parameters:
-                self.velocities.append(
-                    Gradbox[Self.dtype].zeros(parameter[].shape(), share=False)
-                )
-
-    fn __copyinit__(out self, existing: Self):
-        self.parameters = existing.parameters.copy()
-        self.lr = existing.lr
-        self.momentum = existing.momentum
-        self.velocities = existing.velocities.copy()
-
-    fn __moveinit__(out self, deinit existing: Self):
-        self.parameters = existing.parameters^
-        self.lr = existing.lr
-        self.momentum = existing.momentum
-        self.velocities = existing.velocities^
-
-    fn step(mut self):
-        for i in range(len(self.parameters)):
-            ref parameter = self.parameters[i][]
-            if parameter.requires_grad and parameter.has_grad():
-                ref grad = parameter.gradients()[]
-                if self.momentum > 0:
-                    # v = momentum * v + grad
-                    self.velocities[i] = (
-                        self.velocities[i] * self.momentum + grad
-                    )
-                    # param -= lr * v
-                    parameter -= self.velocities[i] * self.lr
-                else:
-                    # param -= lr * grad
-                    parameter -= grad * self.lr
-
-    fn zero_grad(self):
-        for parameter in self.parameters:
-            parameter[].zero_grad()
-
-    fn set_lr(mut self, lr: Scalar[Self.dtype]):
-        self.lr = lr
-
-
-@fieldwise_init
 struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
     """
     Conv2D layer wrapper for Sequential integration.
@@ -1531,192 +1470,6 @@ struct Flatten[dtype: DType](ImplicitlyCopyable):
             return x.reshape[track_grad=True](batch_size, flattened_size)
         else:
             return x.reshape[track_grad=False](batch_size, flattened_size)
-
-    fn parameters(
-        ref self,
-    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
-        return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
-
-    fn num_parameters(self) -> Int:
-        return 0
-
-    fn train(mut self):
-        self.training = True
-
-    fn eval(mut self):
-        self.training = False
-
-    fn into(self) -> Module[Self.dtype]:
-        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
-
-
-@fieldwise_init
-@register_passable
-struct MaxPool2d_old[dtype: DType](ImplicitlyCopyable):
-    """
-    Batched, multi-channel 2D Max Pooling.
-
-    Supports:
-    - Arbitrary kernel size and stride
-    - Optional padding
-    - Overlapping and non-overlapping pooling
-    - Full gradient tracking
-
-    Args:
-        input: (N, C, H_in, W_in)
-        kernel_size: Size of the pooling window
-        stride: Stride for pooling (defaults to kernel_size for non-overlapping)
-        padding: Zero-padding added to input
-
-    Returns:
-        output: (N, C, H_out, W_out)
-
-    Note:
-        - H_out = (H_in + 2*padding - kernel_size) // stride + 1
-        - W_out = (W_in + 2*padding - kernel_size) // stride + 1
-    """
-
-    alias TAG = MAXPOOL2D
-    var training: Bool
-    var kernel_size: Int
-    var stride: Int
-    var padding: Int
-
-    fn __init__(
-        out self,
-        kernel_size: Int = 2,
-        stride: Optional[Int] = None,
-        padding: Int = 0,
-    ):
-        self.training = True
-        self.kernel_size = kernel_size
-        self.stride = stride.or_else(kernel_size)
-        self.padding = padding
-
-    fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        if self.training:
-            return Self.forward[track_grad=True](
-                x,
-                self.kernel_size,
-                self.stride,
-                self.padding,
-                requires_grad=True,
-            )
-        else:
-            return Self.forward[track_grad=False](
-                x,
-                self.kernel_size,
-                self.stride,
-                self.padding,
-                requires_grad=False,
-            )
-
-    @staticmethod
-    fn forward[
-        track_grad: Bool = True
-    ](
-        input_tensor: Tensor[Self.dtype],
-        kernel_size: Int = 2,
-        stride: Optional[Int] = None,
-        padding: Int = 0,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
-        ref input_shape = input_tensor.shape()
-        if input_shape.rank() != 4:
-            panic("MaxPool2d expects 4D input: (N, C, H_in, W_in)")
-
-        var N = input_shape[0]
-        var C = input_shape[1]
-        var H_in = input_shape[2]
-        var W_in = input_shape[3]
-
-        var KH = kernel_size
-        var KW = kernel_size
-        var s = stride.or_else(
-            kernel_size
-        )  # Default stride = kernel_size (non-overlapping)
-        var pad = padding
-
-        # Calculate output dimensions
-        var H_out = (H_in + 2 * pad - KH) // s + 1
-        var W_out = (W_in + 2 * pad - KW) // s + 1
-
-        if H_out <= 0 or W_out <= 0:
-            panic(
-                "Invalid MaxPool2d parameters lead to non-positive output size."
-                " H_out="
-                + String(H_out)
-                + ", W_out="
-                + String(W_out)
-            )
-
-        # Output tensor and argmax mask for gradient routing
-        var output = Tensor[Self.dtype].zeros(N, C, H_out, W_out)
-        var argmax_mask = NDBuffer[DType.int64].zeros(Shape(N, C, H_out, W_out))
-
-        # Parallelize over (N * C) for better load balancing
-        @parameter
-        fn pool_for_batch_channel(idx: Int):
-            var n = idx // C
-            var c = idx % C
-
-            # Process all output spatial positions for this (n, c)
-            for out_y in range(H_out):
-                for out_x in range(W_out):
-                    # Calculate input window start (accounting for padding)
-                    var in_y_start = out_y * s - pad
-                    var in_x_start = out_x * s - pad
-
-                    # Find max in the pooling window
-                    var max_val = neg_inf[Self.dtype]()  # Large negative value
-                    var max_idx = -1  # -1 indicates invalid (all padding)
-
-                    # Scan the pooling window
-                    for ky in range(KH):
-                        for kx in range(KW):
-                            var in_y = in_y_start + ky
-                            var in_x = in_x_start + kx
-
-                            # Check if within valid input bounds (not in padding region)
-                            if (
-                                in_y >= 0
-                                and in_y < H_in
-                                and in_x >= 0
-                                and in_x < W_in
-                            ):
-                                var val = input_tensor[n, c, in_y, in_x]
-                                if val > max_val:
-                                    max_val = val
-                                    max_idx = (
-                                        in_y * W_in + in_x
-                                    )  # Flatten to single index
-
-                    # Store results
-                    output[n, c, out_y, out_x] = max_val
-                    argmax_mask[[n, c, out_y, out_x]] = max_idx
-
-        # Parallelize over all (batch, channel) combinations
-        parallelize[pool_for_batch_channel](N * C)
-
-        # Setup gradient tracking
-        @parameter
-        if track_grad:
-            var grad_required = requires_grad.or_else(
-                input_tensor.requires_grad
-            )
-            if grad_required:
-                output.requires_grad_(True)
-                _ = """var backward_fn = MaxPool2dBackward[Self.dtype](
-                    kernel_size=kernel_size,
-                    stride=s,
-                    padding=pad,
-                    input_shape=input_shape,
-                    argmax_mask=argmax_mask,
-                ).into_backward_fn()
-                output.backwardFn = Optional(backward_fn^)"""
-                output.add_ancestry(input_tensor)
-
-        return output^
 
     fn parameters(
         ref self,

@@ -36,12 +36,12 @@ Performance:
 """
 
 from tenmo import Tensor
+from sgd import SGD
 from net import (
     Sequential,
     Linear,
     ReLU,
     Sigmoid,
-    SGD,
     BCELoss,
 )
 from dataloader import TensorDataset, DataLoader, Batch
@@ -204,16 +204,16 @@ fn train_spiral_classifier():
     var model = Sequential[dtype]()
     model.append(
         # Layer 1: 2 → 64 with ReLU
-        Linear[dtype](in_features=2, out_features=64, xavier=False).into(),
+        Linear[dtype](in_features=2, out_features=64, init_method="he").into(),
         ReLU[dtype]().into(),
         # Layer 2: 64 → 32 with ReLU
-        Linear[dtype](in_features=64, out_features=32, xavier=False).into(),
+        Linear[dtype](in_features=64, out_features=32, init_method="he").into(),
         ReLU[dtype]().into(),
         # Layer 3: 32 → 16 with ReLU
-        Linear[dtype](in_features=32, out_features=16, xavier=False).into(),
+        Linear[dtype](in_features=32, out_features=16, init_method="he").into(),
         ReLU[dtype]().into(),
         # Output Layer: 16 → 1 with Sigmoid
-        Linear[dtype](in_features=16, out_features=1, xavier=False).into(),
+        Linear[dtype](in_features=16, out_features=1, init_method="he").into(),
         Sigmoid[dtype]().into(),
     )
 

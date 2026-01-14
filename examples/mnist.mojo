@@ -60,8 +60,8 @@ fn train_mnist() raises:
     print("  y_test:", y_test.shape(), "\n")
 
     # ========== DataLoaders ==========
-    var train_batch_size = 64
-    var test_batch_size = 64
+    var train_batch_size = 128
+    var test_batch_size = 128
 
     var train_dataset = NumpyDataset[FEATURE_DTYPE, LABEL_DTYPE](
         X_train, y_train
