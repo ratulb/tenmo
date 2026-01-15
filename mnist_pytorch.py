@@ -135,7 +135,7 @@ def test(model, device, test_loader, criterion):
     return avg_loss, accuracy
 
 # Training loop
-num_epochs = 20
+num_epochs = 15
 print(f"\nStarting training for {num_epochs} epochs...")
 print("="*60)
 
@@ -181,70 +181,3 @@ print(f"Final Testing Accuracy: {test_accs[-1]:.2f}%")
 print(f"Average epoch time: {np.mean(epoch_times):.2f} seconds")
 print(f"Total training time: {np.sum(epoch_times):.2f} seconds")
 
-# Plot results
-fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-
-# Loss curves
-axes[0, 0].plot(range(1, num_epochs + 1), train_losses, label='Training Loss')
-axes[0, 0].plot(range(1, num_epochs + 1), test_losses, label='Testing Loss')
-axes[0, 0].set_xlabel('Epoch')
-axes[0, 0].set_ylabel('Loss')
-axes[0, 0].set_title('Loss Curves')
-axes[0, 0].legend()
-axes[0, 0].grid(True)
-
-# Accuracy curves
-axes[0, 1].plot(range(1, num_epochs + 1), train_accs, label='Training Accuracy')
-axes[0, 1].plot(range(1, num_epochs + 1), test_accs, label='Testing Accuracy')
-axes[0, 1].set_xlabel('Epoch')
-axes[0, 1].set_ylabel('Accuracy (%)')
-axes[0, 1].set_title('Accuracy Curves')
-axes[0, 1].legend()
-axes[0, 1].grid(True)
-
-# Epoch times
-axes[1, 0].bar(range(1, num_epochs + 1), epoch_times)
-axes[1, 0].set_xlabel('Epoch')
-axes[1, 0].set_ylabel('Time (seconds)')
-axes[1, 0].set_title('Epoch Training Times')
-axes[1, 0].grid(True, axis='y')
-
-# Final accuracy comparison
-epochs = range(1, num_epochs + 1)
-axes[1, 1].bar([e - 0.2 for e in epochs], train_accs, width=0.4, label='Training', alpha=0.8)
-axes[1, 1].bar([e + 0.2 for e in epochs], test_accs, width=0.4, label='Testing', alpha=0.8)
-axes[1, 1].set_xlabel('Epoch')
-axes[1, 1].set_ylabel('Accuracy (%)')
-axes[1, 1].set_title('Training vs Testing Accuracy by Epoch')
-axes[1, 1].legend()
-axes[1, 1].grid(True, axis='y')
-
-plt.tight_layout()
-plt.savefig('mnist_training_results.png', dpi=150, bbox_inches='tight')
-plt.show()
-
-# Print model summary with parameter counts
-print("\nModel Parameter Summary:")
-total_params = 0
-for name, param in model.named_parameters():
-    if param.requires_grad:
-        param_count = param.numel()
-        total_params += param_count
-        print(f"  {name}: {param_count:,} parameters")
-print(f"Total trainable parameters: {total_params:,}")
-
-# Test on a few sample images
-print("\nTesting on sample images...")
-model.eval()
-with torch.no_grad():
-    # Get a batch of test data
-    data, targets = next(iter(test_loader))
-    data, targets = data[:5].to(device), targets[:5].to(device)
-
-    # Get predictions
-    outputs = model(data)
-    _, predictions = outputs.max(1)
-
-    print("\nSample predictions:")
-    for i in range(5):
-        print(f"  Image {i+1}: Target={targets[i].item()}, Prediction={predictions[i].item()}, {'✓' if predictions[i] == targets[i] else '✗'}")
