@@ -1,6 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
-from net import Linear, ReLU, Sequential, SGD
+from net import Linear, ReLU, Sequential
+from sgd import SGD
 from crossentropy import CrossEntropyLoss
 from testing import assert_true
 from utils.numerics import max_finite
@@ -71,7 +72,7 @@ fn make_synthetic_mnist_dataset(
 
         # Flatten into X
         img_flattened = img.flatten[track_grad=False]()
-        X.set(img_flattened, Row(i), s())
+        X.fill(img_flattened, Row(i), s())
 
     return (X, y)
 
@@ -120,17 +121,13 @@ fn main():
         var total: Int = 0
         batches = get_batches(train_x, train_y, batch_size)
         for xb, yb in batches:
-            # Forward
             var logits = model(xb)
             var loss = criterion(logits, yb)
 
-            # Backward
             loss.backward()
 
-            # Step
             optimizer.step()
 
-            # Track loss
             epoch_loss += loss.item()
             preds = logits.argmax(axis=1)
             result = preds.eq(yb)

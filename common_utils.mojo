@@ -3,7 +3,7 @@ from tenmo import Tensor
 from gradbox import Gradbox
 from sys.param_env import env_get_string
 from logger import Level, Logger
-from layers import Sequential, Linear, ReLU
+from net import Sequential, Linear, ReLU
 from time import perf_counter_ns, monotonic
 from math import cos, sin, pi
 from os import abort
@@ -133,59 +133,6 @@ struct IDGen:
         # Combine them in a way that preserves uniqueness
         # Use XOR to mix the values
         return perf_time ^ (mono_time << 32)
-
-
-struct SpiralDataGenerator:
-    @staticmethod
-    fn generate_data(
-        n_points: Int = 100, n_rotations: Float64 = 3.0, noise: Float64 = 0.1
-    ) -> Tuple[Tensor[DType.float64], Tensor[DType.float64]]:
-        """Generate two intertwined spirals.
-
-        Args:
-            n_points: Points per spiral.
-            n_rotations: Number of full rotations (higher = more complex).
-            noise: Random noise to add (makes it harder).
-
-        Returns:
-            (X, y) where:
-            - X: Shape (2*n_points, 2) - coordinates.
-            - y: Shape (2*n_points, 1) - labels (0 or 1).
-        """
-        var start = now()
-        var total_points = 2 * n_points
-        var X = Tensor[DType.float64].zeros(total_points, 2)
-        var y = Tensor[DType.float64].zeros(total_points, 1)
-
-        for i in range(n_points):
-            # Angle increases linearly
-            var theta = Float64(i) / Float64(n_points) * n_rotations * 2.0 * pi
-
-            # Radius increases with angle (spiral out)
-            var radius = Float64(i) / Float64(n_points)
-
-            # Spiral 1 (class 0)
-            var x1 = radius * cos(theta) + randn_float64() * noise
-            var y1 = radius * sin(theta) + randn_float64() * noise
-            X[i, 0] = x1
-            X[i, 1] = y1
-            y[i, 0] = 0.0
-
-            # Spiral 2 (class 1) - rotated 180 degrees
-            var x2 = radius * cos(theta + pi) + randn_float64() * noise
-            var y2 = radius * sin(theta + pi) + randn_float64() * noise
-            X[n_points + i, 0] = x2
-            X[n_points + i, 1] = y2
-            y[n_points + i, 0] = 1.0
-
-        var end = now()
-        log_debug(
-            "SpiralDataGenerator -> generate_spiral_data took: "
-            + (end - start).__str__()
-            + " secs"
-        )
-
-        return (X, y)
 
 
 @always_inline("nodebug")
@@ -581,8 +528,8 @@ fn print_summary[
             var l = m.layer[Linear[dtype]].copy()
 
             # Infer input/output shapes
-            var in_features = l.weights.shape()[0]
-            var out_features = l.weights.shape()[1]
+            var in_features = l.weight.shape()[0]
+            var out_features = l.weight.shape()[1]
 
             var input_shape = "(?, " + in_features.__str__() + ")"
             var output_shape = "(?, " + out_features.__str__() + ")"
@@ -596,10 +543,10 @@ fn print_summary[
 
             # Params
             var params = (
-                l.weights.shape().num_elements() + l.bias.shape().num_elements()
+                l.weight.shape().num_elements() + l.bias.shape().num_elements()
             )
             total_params += params
-            if l.weights.requires_grad or l.bias.requires_grad:
+            if l.weight.requires_grad or l.bias.requires_grad:
                 trainable_params += params
 
             rows.append(
@@ -609,7 +556,7 @@ fn print_summary[
                     input_shape,
                     output_shape,
                     params.__str__(),
-                    (l.weights.requires_grad or l.bias.requires_grad).__str__(),
+                    (l.weight.requires_grad or l.bias.requires_grad).__str__(),
                 ]
             )
 
@@ -659,7 +606,3 @@ fn print_summary[
     print("  Total params:        ", total_params)
     print("  Trainable params:    ", trainable_params)
     print("  Non-trainable params:", non_trainable_params)
-
-
-fn main() raises:
-    pass

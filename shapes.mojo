@@ -331,15 +331,3 @@ struct ShapeIndexIterator[origin: ImmutOrigin](ImplicitlyCopyable):
 
     fn __has_next__(self) -> Bool:
         return self.index < self.shape[].num_elements()
-
-
-fn main():
-    A_shape = Shape(2, 3, 5, 4)
-    B_shape = Shape(4, 5)
-
-    print(A_shape[-1], B_shape[-2], A_shape[0:-2], B_shape[0:-2])
-    for coord in A_shape:
-        print(coord)
-    shape = A_shape * 0
-    print(shape)
-    print(Shape(1).rank())

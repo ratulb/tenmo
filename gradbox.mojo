@@ -1,7 +1,5 @@
 ### Mojo Tensor Gradbox
-### Implement tensor library in mojo from first principles
 from shapes import Shape
-from common_utils_imports import *
 from operators import *
 from validators import Validator
 from tenmo import Tensor
@@ -17,6 +15,7 @@ from forwards import Mean, Sqrt
 from utilities import Utils
 from indexhelper import IndexIterator
 from filler import Filler
+from common_utils import Idx, panic, print_gradbox_recursive
 
 
 struct Gradbox[dtype: DType](
@@ -773,13 +772,3 @@ struct Gradbox[dtype: DType](
 
     fn __del__(deinit self):
         _ = self.buffer^
-
-
-fn main():
-    alias dtype = DType.float32
-    g = Gradbox[dtype].arange(-10, 20)
-    g.print()
-    g.clamp_in_place(-5, 8)
-    g.print()
-    g = Gradbox[dtype].zeros(Shape(), share=False)
-    g.print()

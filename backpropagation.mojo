@@ -133,8 +133,6 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """O(1) dispatch using integer tag comparison.
-
-        Compiler optimizes integer comparisons to jump table for true O(1).
         Order: Most common operations first for branch prediction.
         """
 
@@ -320,7 +318,3 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             panic("BackwardFn: Unknown backward tag: " + String(self.tag))
 
         return []
-
-
-fn main():
-    print("passes")

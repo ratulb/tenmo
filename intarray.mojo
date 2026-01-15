@@ -678,11 +678,3 @@ struct ZipIterator[
             return min(len(self.src_this[]), len(self.src_that[])) - self.index
         else:
             return self.index
-
-
-fn main():
-    ia = IntArray()
-    ia.append(99)
-    ia2 = IntArray(100)
-    ia += ia2
-    print(ia)

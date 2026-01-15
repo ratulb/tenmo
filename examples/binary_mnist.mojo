@@ -28,7 +28,6 @@ fn train_mnist_binary() raises:
     var filtered_labels = train_labels_np[mask]
 
     filtered_images = filtered_images.astype(np.float32)
-    # filtered_labels = filtered_labels.astype(np.float32)
     filtered_labels = filtered_labels.astype(np.float32)
 
     print("Filtered to", len(filtered_labels), "samples (0s and 1s only)\n")
@@ -86,8 +85,7 @@ fn train_mnist_binary() raises:
 
         var epoch_time = now() - epoch_start
         print("\n" + "=" * 80)
-        print("EPOCH", epoch, "COMPLETED")
-        print("Batches processed:", batch_num)
+        print("EPOCH", epoch+1, "COMPLETED")
         print("Total epoch time:", epoch_time, "seconds")
         print("Avg time per batch:", epoch_time / batch_num, "seconds")
         print(

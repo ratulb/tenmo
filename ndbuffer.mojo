@@ -1254,11 +1254,3 @@ struct NDBuffer[dtype: DType](
                 result = result.sum(reduction_axes=IntArray(i), keepdims=True)
                 current_shape = result.shape
         return result^
-
-
-fn main():
-    alias dtype = DType.float32
-    b = NDBuffer[dtype](-10, -3, 0, 1, 2, 4, -10, 9, 21)
-    print(b.clamp(-3, 8).buffer)
-    b.clamp_in_place(-3, 8)
-    print(b.buffer)

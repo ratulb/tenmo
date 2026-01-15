@@ -39,6 +39,3 @@ from convolution import Conv2dForward
 from cnn import Conv2dFused
 from filler import Filler
 from pooling import MaxPool2d
-
-fn main():
-    pass

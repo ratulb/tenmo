@@ -46,7 +46,7 @@ struct Buffer[dtype: DType = DType.float32](
     """
     Unified buffer with optional reference counting built-in.
 
-    When unshared: Just manages data pointer (like before).
+    When unshared: Just manages data pointer.
     When shared: Adds atomic refcount in same allocation as data.
     """
 
@@ -56,10 +56,6 @@ struct Buffer[dtype: DType = DType.float32](
         Atomic[DType.uint64], MutAnyOrigin
     ]  # Null if not shared!
     var external: Bool
-
-    # ========================================
-    # Constructors
-    # ========================================
 
     fn __init__(out self):
         self.size = 0
@@ -114,9 +110,7 @@ struct Buffer[dtype: DType = DType.float32](
             self.data = data
             self.external = True
 
-    # ========================================
-    # Shared state management (NEW!)
-    # ========================================
+    # Shared state management
 
     fn is_shared(self) -> Bool:
         """Check if this buffer has ref counting enabled."""
@@ -2358,19 +2352,3 @@ struct ElementIterator[
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index
-
-
-fn main() raises:
-    alias dtype = DType.float32
-    ll: List[Scalar[dtype]] = [10, 23, 0.9, 100]
-    buffer = Buffer[dtype](ll)
-    result = buffer.unary_ops[TanhForwardOp]()
-    print(result)
-    print(
-        tanh(Scalar[dtype](10)),
-        tanh(Scalar[dtype](23)),
-        tanh(Scalar[dtype](0.9)),
-        tanh(Scalar[dtype](100)),
-    )
-    print(buffer, buffer[::])
-    pass

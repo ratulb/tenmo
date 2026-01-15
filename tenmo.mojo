@@ -8,8 +8,15 @@ from memory import memcpy, memset, memset_zero
 from shapes import Shape, ShapeIndexIterator
 from ancestry import Ancestors
 from strides import Strides
-from common_utils_imports import *
-from common_utils import IDGen, log_warning, now
+from common_utils import (
+    IDGen,
+    log_warning,
+    now,
+    Idx,
+    print_tensor_recursive,
+    panic,
+    variadic1or2,
+)
 from operators import *
 from indexhelper import IndexIterator
 from backpropagation import BackwardFn
@@ -2214,7 +2221,3 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
 
     fn __has_next__(self) -> Bool:
         return self.index_itr.__has_next__()
-
-
-fn main():
-    pass
