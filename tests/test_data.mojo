@@ -2360,7 +2360,46 @@ fn run_all_dl_tests() raises:
     var total_time = end - start
 
     print("\n" + "=" * 70)
-    print("ALL TESTS PASSED! ✅")
+    print("ALL TESTS PASSED! ")
     print("=" * 70)
     print("Total test time:", total_time, "seconds")
     print("=" * 70 + "\n")
+
+
+# HOW TO USE
+fn example_usage() raises:
+    """Example showing the fixed implementation."""
+
+    # Create 4D image data (N, C, H, W)
+    var images = Tensor[DType.float32].randn(1000, 1, 28, 28)
+    var labels = Tensor[DType.int32].zeros(1000)
+
+    print("Original data shapes:")
+    print("  Images:", images.shape())  # (1000, 1, 28, 28)
+    print("  Labels:", labels.shape())  # (1000,)
+
+    # Create dataset
+    var dataset = NumpyDataset[DType.float32, DType.int32](images, labels)
+
+    print("\nDataset info:")
+    print("  Size:", len(dataset))
+    print(
+        "  Feature shape per sample:", dataset.get_feature_shape()
+    )  # (1, 28, 28)
+    print("  Label shape per sample:", dataset.get_label_shape())  # ()
+    print("  Features per sample:", dataset.get_features_per_sample())  # 784
+
+    # Create dataloader
+    var loader = dataset.into_loader(batch_size=128, shuffle=False)
+
+    print("\nDataLoader info:")
+    print("  Num batches:", len(loader))
+
+    # Get first batch
+    loader.reset()
+    if loader.__has_next__():
+        ref batch = loader.__next__()
+        print("\nFirst batch:")
+        print("Features shape:", batch.features.shape())  # (128, 1, 28, 28)
+        print("Labels shape:", batch.labels.shape())  # (128,)
+        print("Shapes preserved correctly!")
