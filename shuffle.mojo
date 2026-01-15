@@ -93,7 +93,3 @@ struct Shuffle[dtype: DType](Copyable & Movable):
                 out.add_ancestry(self)
 
         return out^
-
-
-fn main() raises:
-    print("passes")

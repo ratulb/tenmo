@@ -1,7 +1,12 @@
 from tenmo import Tensor
 from operators import AddTensor
 from validators import Validator
-from backpropagation import Delegate, BackwardFn, BACKWARD_SOFTMAX, BACKWARD_LOG_SOFTMAX
+from backpropagation import (
+    Delegate,
+    BackwardFn,
+    BACKWARD_SOFTMAX,
+    BACKWARD_LOG_SOFTMAX,
+)
 from summation import Summer
 from subtraction import Subtractor
 from division import Divider
@@ -12,21 +17,14 @@ from shapes import Shape
 from buffers import Buffer
 from ndbuffer import NDBuffer
 
-# """
-# Optimized Softmax and LogSoftmax implementation with efficient memory usage
-# and faster backward pass computation.
-# """
-
-# ============================================================================
 # Softmax Implementation
-# ============================================================================
 
 
 @fieldwise_init
 struct SoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     alias TAG = BACKWARD_SOFTMAX
     var axes: IntArray
-    var softmax_out_buffer: Buffer[dtype]  # Store raw buffer instead of tensor
+    var softmax_out_buffer: Buffer[dtype]  # Store raw buffer
     var softmax_out_shape: Shape
 
     fn __copyinit__(out self, other: Self):
@@ -47,7 +45,7 @@ struct SoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradbox = output.grad()
 
-        # Reconstruct softmax output efficiently from buffer
+        # Reconstruct softmax output from buffer
         var ndb = NDBuffer[dtype](
             self.softmax_out_buffer.copy(), self.softmax_out_shape.copy()
         )
@@ -111,9 +109,7 @@ struct Softmax[dtype: DType]:
         return out^
 
 
-# ============================================================================
 # LogSoftmax Implementation
-# ============================================================================
 
 
 @fieldwise_init
@@ -141,7 +137,7 @@ struct LogSoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
         var gradbox = output.grad()
 
-        # Reconstruct softmax output efficiently
+        # Reconstruct softmax
         var ndb = NDBuffer[dtype](
             self.softmax_out_buffer.copy(), self.softmax_out_shape.copy()
         )
@@ -211,55 +207,3 @@ struct LogSoftmax[dtype: DType]:
                 out.add_ancestry(this)
 
         return out^
-
-
-
-# ============================================================================
-# Usage Examples and Performance Notes
-# ============================================================================
-
-# """
-# PERFORMANCE COMPARISON:
-
-# Original Implementation (coordinate-value pairs):
-# - Memory: O(N * (sizeof(IntArray) + sizeof(Scalar))) ≈ 40-80 bytes per element
-# - Backward: O(N) element-wise assignments + O(N) computation
-# - For 1M elements: ~40-80 MB storage
-
-# Optimized Implementation (buffer storage):
-# - Memory: O(N * sizeof(Scalar)) ≈ 4-8 bytes per element
-# - Backward: O(1) buffer copy + O(N) computation
-# - For 1M elements: ~4-8 MB storage
-
-# Recompute Implementation (no storage):
-# - Memory: O(1) - only stores axes
-# - Backward: 2x forward computation + O(N) gradient computation
-# - For 1M elements: ~few bytes storage
-
-# RECOMMENDATIONS:
-# 1. Use buffer storage version for most cases (good balance)
-# 2. Use recompute version if memory is extremely constrained
-# 3. Never use coordinate-value pairs (too much memory overhead)
-
-# EXAMPLE USAGE:
-
-# Standard softmax
-# var logits = Tensor.randn(Shape([32, 1000]), requires_grad=True)
-# var probs = Softmax[DType.float32].forward(logits, IntArray(1))
-
-# Log softmax (more numerically stable for cross entropy)
-# var log_probs = LogSoftmax[DType.float32].forward(logits, IntArray(1))
-
-# Multi-axis softmax
-# var spatial_logits = Tensor.randn(Shape([32, 10, 28, 28]), requires_grad=True)
-# var probs_2d = Softmax[DType.float32].forward(
-#    spatial_logits,
-#    IntArray(1)  # Softmax over classes
-# )
-# """
-
-# =======================
-
-
-fn main() raises:
-    print("passes")

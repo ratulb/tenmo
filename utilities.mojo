@@ -1,10 +1,10 @@
 from math import log, exp
 from buffers import Buffer
 
+
 @fieldwise_init
 @register_passable
 struct Utils[dtype: DType](ImplicitlyCopyable):
-
     @staticmethod
     @always_inline
     fn log_scalar(s: Scalar[dtype]) -> Scalar[dtype]:
@@ -26,9 +26,7 @@ struct Utils[dtype: DType](ImplicitlyCopyable):
 
     @staticmethod
     @always_inline
-    fn sum_scalars(
-        this: Scalar[dtype], that: Scalar[dtype]
-    ) -> Scalar[dtype]:
+    fn sum_scalars(this: Scalar[dtype], that: Scalar[dtype]) -> Scalar[dtype]:
         return this + that
 
     @staticmethod

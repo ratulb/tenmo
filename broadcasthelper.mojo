@@ -126,7 +126,7 @@ struct ShapeBroadcaster:
                 translated.append(0)  # Broadcasted dim
             else:
                 var original_index = indices[broadcast_axis]
-                # CRITICAL: Check if the index is valid for the original shape
+                # Check if the index is valid for the original shape
                 if original_index >= original_shape[i]:
                     panic(
                         "ShapeBroadcaster → translate_index: index out of"

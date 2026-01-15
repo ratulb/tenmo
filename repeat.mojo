@@ -24,7 +24,3 @@ struct Repeat[dtype: DType]:
                 + ")"
             )
         return Tile[dtype].forward[track_grad](self, repeat, requires_grad)
-
-
-fn main() raises:
-    pass

@@ -627,7 +627,3 @@ struct Pad[dtype: DType](ImplicitlyCopyable):
                 in_coord.append(in_idx)
 
             result[out_coord] = x[in_coord]
-
-
-fn main() raises:
-    pass

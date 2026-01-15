@@ -115,10 +115,3 @@ struct Argmax[dtype: DType]:
                 out[out_idx] = max_pos
 
         return out^
-
-
-fn main() raises:
-    print("passes")
-
-
-from testing import assert_true

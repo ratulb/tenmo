@@ -72,7 +72,3 @@ struct Reshape[dtype: DType](Copyable):
                 out.add_ancestry(tensor)
 
         return out^
-
-
-fn main():
-    print("passes")

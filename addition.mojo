@@ -54,9 +54,9 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
         var gradbox = output.grad()
         count = len(output.ancestry())
 
-        var grad_shares = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]](
-            capacity=count
-        )
+        var grad_shares = List[
+            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+        ](capacity=count)
 
         if count == 1:
             var ancestor = output.ancestry().get(0)
@@ -89,7 +89,9 @@ struct AddScalar[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         var out: Tensor[Self.dtype] = Tensor[Self.dtype](
             self.buffer.scalar_ops[Add](scalar), requires_grad=False
         )
@@ -112,7 +114,9 @@ struct Adder[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         if id(self) == id(other):
             return self.__mul__(Scalar[Self.dtype](2))
         if not self.broadcastable(other):
@@ -152,7 +156,3 @@ struct Adder[dtype: DType](Copyable):
                     out.add_ancestry(self, other)
 
         return out^
-
-
-fn main():
-    print("passes")

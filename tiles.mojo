@@ -187,7 +187,3 @@ struct Tile[dtype: DType]:
                 out.add_ancestry(self)
 
         return out^
-
-
-fn main() raises:
-    pass

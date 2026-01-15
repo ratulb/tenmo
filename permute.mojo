@@ -68,7 +68,7 @@ struct Permute[dtype: DType]:
             new_strides.append(self.strides()[axis])
 
         # Return new view with same base but reordered axes
-        _="""out = View[dtype].forward[track_grad=False](
+        _ = """out = View[dtype].forward[track_grad=False](
             self,
             shape=Shape(new_shape),
             strides=Strides(new_strides),
@@ -83,6 +83,7 @@ struct Permute[dtype: DType]:
             offset=self.offset(),  # Permute doesn't change offset
             requires_grad=False,
         )
+
         @parameter
         if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
@@ -96,10 +97,3 @@ struct Permute[dtype: DType]:
                 out.add_ancestry(self)
 
         return out^
-
-
-fn main() raises:
-    pass
-
-
-from testing import assert_true

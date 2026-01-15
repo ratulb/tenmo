@@ -35,7 +35,6 @@ from std_deviation import StdDev
 from concate import Concate
 from stack import Stack
 from pad import Pad, Padding
-from convolution import Conv2dForward
 from cnn import Conv2dFused
 from filler import Filler
 from pooling import MaxPool2d

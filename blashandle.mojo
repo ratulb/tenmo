@@ -186,8 +186,9 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
     fn is_initialized(self) -> Bool:
         return not self._handle_ptr == None
 
-    fn get_error(ref self) -> ref[self._error_msg] String:
+    fn get_error(ref self) -> ref [self._error_msg] String:
         return self._error_msg
+
     # ========== FIXED: REQUIRED PARAMS BEFORE OPTIONAL ==========
     fn matmul_f32(
         self,

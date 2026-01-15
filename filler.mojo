@@ -138,7 +138,3 @@ struct Filler[dtype: DType](ImplicitlyCopyable & Movable):
                     source_shape, coord, mask, shape
                 )
                 dest_buffer[index] = source[source_coord]
-
-
-fn main() raises:
-    pass

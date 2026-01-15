@@ -77,7 +77,3 @@ struct Transpose[dtype: DType](Copyable):
                 out.add_ancestry(self)
 
         return out^
-
-
-fn main():
-    pass

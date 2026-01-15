@@ -1,9 +1,16 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_MULTIPLY, BACKWARD_MULTIPLY_SCALAR, BACKWARD_MULTIPLY_BROADCAST
+from backpropagation import (
+    Delegate,
+    BackwardFn,
+    BACKWARD_MULTIPLY,
+    BACKWARD_MULTIPLY_SCALAR,
+    BACKWARD_MULTIPLY_BROADCAST,
+)
 from operators import AddTensor, Multiply
 from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
+
 
 @fieldwise_init
 @register_passable
@@ -34,13 +41,14 @@ struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
 @register_passable
 struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_MULTIPLY
+
     fn into_backward_fn(self) -> BackwardFn[dtype]:
         return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
 
     fn backward(
         self, read output: Tensor[dtype]
     ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
-        #ref gradbox = output.gradients()[]
+        # ref gradbox = output.gradients()[]
         var gradbox = output.grad()
         count = len(output.ancestry())
         var ancestor_lhs = output.ancestry().get(0)
@@ -50,7 +58,9 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
             gradbox_prod = gradbox_prod * Scalar[dtype](2)
             return [(ancestor_lhs^, gradbox_prod^, AddTensor)]
 
-        var grad_shares = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]](capacity=2)
+        var grad_shares = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]](
+            capacity=2
+        )
 
         var ancestor_rhs = output.ancestry().get(1)
 
@@ -79,7 +89,11 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
 
 
 alias MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
-    dtype, augment=True, lhs_op=AddTensor, rhs_op=AddTensor, TAG=BACKWARD_MULTIPLY_BROADCAST
+    dtype,
+    augment=True,
+    lhs_op=AddTensor,
+    rhs_op=AddTensor,
+    TAG=BACKWARD_MULTIPLY_BROADCAST,
 ]
 
 
@@ -155,7 +169,3 @@ struct Multiplicator[dtype: DType]:
     fn forward(self: Tensor[dtype], other: Gradbox[dtype]) -> Gradbox[dtype]:
         var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer)
         return Gradbox[dtype](nd_buffer^, share=False)
-
-
-fn main():
-    print("passes")

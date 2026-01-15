@@ -910,7 +910,3 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-
-fn main() raises:
-    pass

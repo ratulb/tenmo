@@ -23,8 +23,8 @@ alias TanhForwardOp = 21
 alias TanhBackwardOp = 22
 alias ReLUForwardOp = 23
 alias ReLUBackwardOp = 24
-alias SqrtForwardOp=25
-alias SqrtBackwardOp=26
+alias SqrtForwardOp = 25
+alias SqrtBackwardOp = 26
 ###################
 ### matul ###########
 alias dot = 27  # dot product

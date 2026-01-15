@@ -90,7 +90,9 @@ struct SubtractScalar[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         var out = Tensor[Self.dtype](
             self.buffer.scalar_ops[Subtract](scalar), requires_grad=False
         )
@@ -113,7 +115,9 @@ struct SubtractFromScalar[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         var out = Tensor[Self.dtype](
             self.buffer.scalar_ops[ReverseSubtract](scalar), requires_grad=False
         )
@@ -136,7 +140,9 @@ struct Subtractor[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         if not self.broadcastable(other):
             panic(
                 "Tensor →__sub__(self, other): dimension mismatch: "
@@ -178,7 +184,3 @@ struct Subtractor[dtype: DType]:
                     out.add_ancestry(self, other)
 
         return out^
-
-
-fn main():
-    print("passes")

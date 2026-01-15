@@ -112,7 +112,3 @@ struct Sqrt[dtype: DType]:
         )
 
         return out^
-
-
-fn main() raises:
-    pass

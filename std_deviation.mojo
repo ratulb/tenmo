@@ -121,7 +121,3 @@ struct StdDev[dtype: DType]:
                 result.add_ancestry(self)
 
         return result^
-
-
-fn main() raises:
-    pass

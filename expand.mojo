@@ -12,6 +12,7 @@ from broadcasthelper import ShapeBroadcaster
 @register_passable
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable):
     alias TAG = BACKWARD_EXPAND
+
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
@@ -79,92 +80,3 @@ struct Expand[dtype: DType]:
                 out.add_ancestry(tensor)
 
         return out^
-
-
-
-
-from testing import assert_true
-
-fn main_1() raises:
-    test_deep_view_chain_backward()
-    test_deep_view_chain_backward1()
-    test_expand_mixed_chain()
-
-fn test_expand_mixed_chain() raises:
-    print("test_expand_mixed_chain")
-    a = Tensor.arange(12, requires_grad=True)
-    r = a.reshape([3, 1, 4])
-    expanded = r.expand(Shape(2, 3, 2, 4))
-    expanded.print()
-    c = expanded.contiguous()
-    c.print()
-    c.backward(42)
-    assert_true(a.grad() == Tensor.full(Shape(12), 168))
-    a.grad().print()
-
-fn test_deep_view_chain_backward1() raises:
-    print("test_deep_view_chain_backward1")
-    alias dtype = DType.float32
-
-    a = Tensor[dtype].d2(
-        [
-            [1, 2, 3, 4, 5, 6],
-            [7, 8, 9, 10, 11, 12],
-            [13, 14, 15, 16, 17, 18],
-            [19, 20, 21, 22, 23, 24],
-        ],
-        requires_grad=True,
-    )
-
-    v4 = a.view(shape=Shape(2, 2), strides=Strides(12, 3), offset=7)
-    result = v4.sum()
-    result.backward(42)
-
-    expected_grad = Tensor[dtype].d2(
-        [
-            [0, 0, 0, 0, 0, 0],
-            [0, 42, 0, 0, 42, 0],
-            [0, 0, 0, 0, 0, 0],
-            [0, 42, 0, 0, 42, 0],
-        ]
-    )
-
-    assert_true(a.grad().as_tensor() == expected_grad)
-    print("✓ Deep view chain backward pass works correctly!")
-
-fn test_deep_view_chain_backward() raises:
-    print("test_deep_view_chain_backward")
-
-
-fn main() raises:
-    print("test_deep_view_chain_backward")
-    alias dtype = DType.float32
-
-    # Create base tensor
-    a = Tensor[dtype].d2(
-        [
-            [1, 2, 3, 4, 5, 6],
-            [7, 8, 9, 10, 11, 12],
-            [13, 14, 15, 16, 17, 18],
-            [19, 20, 21, 22, 23, 24],
-        ],
-        requires_grad=True,
-    )
-
-    v = a.view(shape=Shape(2, 2), strides=Strides(12, 3), offset=7)
-    v.print()
-    # Final operation
-    result = v.sum()
-    result.backward(42)
-
-    expected_grad = Tensor[dtype].d2(
-        [
-            [0, 0, 0, 0, 0, 0],
-            [0, 42, 42, 0, 0, 0],
-            [0, 42, 42, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0],
-        ]
-    )
-    a.grad().print()
-    assert_true(a.grad().as_tensor() == expected_grad)
-    print("✓ Deep view chain backward pass works correctly!")

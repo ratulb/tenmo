@@ -131,10 +131,3 @@ struct Squeeze[dtype: DType]:
                 out.add_ancestry(tensor)
 
         return out^
-
-
-from testing import assert_true
-
-
-fn main() raises:
-    print("passes")

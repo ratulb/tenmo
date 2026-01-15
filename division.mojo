@@ -209,7 +209,3 @@ struct Divider[dtype: DType]:
                 out.add_ancestry(self, other)
 
         return out^
-
-
-fn main():
-    print("passes")

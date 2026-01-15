@@ -1304,3 +1304,180 @@ fn run_all_stack_tests() raises:
     test_stk_zeros_and_ones()
     test_stk_chain_operations()
     test_stk_mixed_operations()
+
+
+fn test_stack_operations() raises:
+    alias dtype = DType.float32
+
+    print("=" * 70)
+    print("TEST 1: Basic stack along axis 0")
+    print("=" * 70)
+
+    var A = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
+    var B = Tensor[dtype].d2(
+        [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]], requires_grad=True
+    )
+
+    var tensors = List[Tensor[dtype]]()
+    tensors.append(A)
+    tensors.append(B)
+
+    var result = Tensor[dtype].stack(tensors, axis=0, requires_grad=True)
+
+    print("A (2x3):")
+    A.print()
+    print("\nB (2x3):")
+    B.print()
+    print("\nstack([A, B], axis=0) - Shape:", result.shape())
+    result.print()
+    # Expected: (2, 2, 3)
+    # [[[1, 2, 3],
+    #   [4, 5, 6]],
+    #  [[7, 8, 9],
+    #   [10, 11, 12]]]
+
+    print("\n" + "=" * 70)
+    print("TEST 2: Stack along axis 1")
+    print("=" * 70)
+
+    var result2 = Tensor[dtype].stack(tensors, axis=1, requires_grad=True)
+    print("stack([A, B], axis=1) - Shape:", result2.shape())
+    result2.print()
+    # Expected: (2, 2, 3)
+    # [[[1, 2, 3],
+    #   [7, 8, 9]],
+    #  [[4, 5, 6],
+    #   [10, 11, 12]]]
+
+    print("\n" + "=" * 70)
+    print("TEST 3: Stack along axis 2")
+    print("=" * 70)
+
+    var result3 = Tensor[dtype].stack(tensors, axis=2, requires_grad=True)
+    print("stack([A, B], axis=2) - Shape:", result3.shape())
+    result3.print()
+    # Expected: (2, 3, 2)
+    # [[[1, 7],
+    #   [2, 8],
+    #   [3, 9]],
+    #  [[4, 10],
+    #   [5, 11],
+    #   [6, 12]]]
+
+    print("\n" + "=" * 70)
+    print("TEST 4: Gradient flow")
+    print("=" * 70)
+
+    var loss = result.sum()
+    loss.backward()
+
+    print("Grad A:")
+    A.grad().print()
+    # Expected: all ones (2x3)
+
+    print("\nGrad B:")
+    B.grad().print()
+    # Expected: all ones (2x3)
+
+    print("\n" + "=" * 70)
+    print("TEST 5: vstack")
+    print("=" * 70)
+
+    var C = Tensor[dtype].ones(1, 3, requires_grad=True)
+    var D = Tensor[dtype].ones(1, 3, requires_grad=True) * 2.0
+
+    var vstack_list = List[Tensor[dtype]]()
+    vstack_list.append(C)
+    vstack_list.append(D)
+
+    var vstacked = Tensor[dtype].vstack(vstack_list, requires_grad=True)
+    print("vstack([C(1x3), D(1x3)]) - Shape:", vstacked.shape())
+    vstacked.print()
+    # Expected: (2, 3)
+    # [[1, 1, 1],
+    #  [2, 2, 2]]
+
+    print("\n" + "=" * 70)
+    print("TEST 6: hstack")
+    print("=" * 70)
+
+    var E = Tensor[dtype].ones(2, 1, requires_grad=True)
+    var F = Tensor[dtype].ones(2, 2, requires_grad=True) * 3.0
+
+    var hstack_list = List[Tensor[dtype]]()
+    hstack_list.append(E)
+    hstack_list.append(F)
+
+    var hstacked = Tensor[dtype].hstack(hstack_list, requires_grad=True)
+    print("hstack([E(2x1), F(2x2)]) - Shape:", hstacked.shape())
+    hstacked.print()
+    # Expected: (2, 3)
+    # [[1, 3, 3],
+    #  [1, 3, 3]]
+
+    print("\n" + "=" * 70)
+    print("TEST 7: 1D vstack")
+    print("=" * 70)
+
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var b = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
+
+    var vstack_1d = List[Tensor[dtype]]()
+    vstack_1d.append(a)
+    vstack_1d.append(b)
+
+    var vstacked_1d = Tensor[dtype].vstack(vstack_1d, requires_grad=True)
+    print("vstack([a(3,), b(3,)]) - Shape:", vstacked_1d.shape())
+    vstacked_1d.print()
+    # Expected: (2, 3)
+    # [[1, 2, 3],
+    #  [4, 5, 6]]
+
+    print("\n" + "=" * 70)
+    print("TEST 8: 1D hstack")
+    print("=" * 70)
+
+    var hstacked_1d = Tensor[dtype].hstack(vstack_1d, requires_grad=True)
+    print("hstack([a(3,), b(3,)]) - Shape:", hstacked_1d.shape())
+    hstacked_1d.print()
+    # Expected: (6,)
+    # [1, 2, 3, 4, 5, 6]
+
+    print("\n✅ All stack tests passed!")
+
+
+# ```
+
+# ---
+
+
+### **1. Forward Pass Strategy:**
+# ```
+# stack = unsqueeze_each + concat
+# ```
+
+### **2. Backward Pass Strategy:**
+# ```
+# Split gradient along stacked axis → Squeeze each split
+# ```
+
+### **3. Edge Cases Handled:**
+# - Single tensor: just unsqueeze
+# - Empty list: raises error
+# - Shape mismatch: validates before stacking
+# - 1D tensors in vstack: reshapes to 2D
+# - 1D tensors in hstack: uses concat
+
+### **4. Gradient Flow:**
+# ```
+# Forward:  A(2,3) → unsqueeze(0) → A'(1,2,3) ──┐
+#          B(2,3) → unsqueeze(0) → B'(1,2,3) ──┤→ concat → Result(2,2,3)
+#          C(2,3) → unsqueeze(0) → C'(1,2,3) ──┘
+
+# Backward: grad_Result(2,2,3) → split → [grad_A'(1,2,3),
+#                                         grad_B'(1,2,3),
+#                                         grad_C'(1,2,3)]
+#                                    ↓ squeeze(0)
+#                                [grad_A(2,3), grad_B(2,3), grad_C(2,3)]

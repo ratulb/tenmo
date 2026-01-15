@@ -1487,7 +1487,3 @@ struct Flatten[dtype: DType](ImplicitlyCopyable):
 
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
-
-
-fn main():
-    pass

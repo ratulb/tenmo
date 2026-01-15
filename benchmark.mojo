@@ -3,12 +3,13 @@ from random import random_float64
 from tenmo import Tensor
 from shapes import Shape
 
+
 # ============================================
 # NAIVE MATMUL - Pure scalar loops, no SIMD
 # ============================================
-fn matmul_naive[dtype: DType](
-    A: Tensor[dtype], B: Tensor[dtype]
-) -> Tensor[dtype]:
+fn matmul_naive[
+    dtype: DType
+](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
     """Naive triple-loop matmul with no optimizations."""
     var m = A.shape()[0]
     var n = A.shape()[1]
@@ -225,4 +226,3 @@ fn main():
     benchmark_memory_bandwidth()
 
     print("\n✓ All benchmarks complete!")
-

@@ -129,7 +129,3 @@ struct Mean[dtype: DType](Copyable):
         ](count)
 
         return out^
-
-
-fn main():
-    print("passes")

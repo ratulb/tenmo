@@ -347,7 +347,3 @@ struct MinMax[dtype: DType = DType.float32]:
                 result.add_ancestry(self)
 
         return result^
-
-
-fn main() raises:
-    pass

@@ -45,9 +45,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         """
         Return next memory offset and advance iterator.
 
-        Optimization: Incrementally update coordinates like an odometer.
-        Most iterations only increment the last coordinate (O(1)).
-        Carries propagate left only when needed (rare).
+        Incrementally update coordinates like an odometer.
 
         Returns:
             Physical memory offset for current logical element.
@@ -379,7 +377,3 @@ struct IndexCalculator:
             remaining //= dim
 
         return indices^
-
-
-fn main() raises:
-    pass

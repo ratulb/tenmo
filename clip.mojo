@@ -117,11 +117,3 @@ struct Clip[dtype: DType]:
                 out.add_ancestry(self)
 
         return out^
-
-
-fn main():
-    a = Tensor.d1([4, 1, 3, 9, 7, 0, 10], requires_grad=True)
-    b = a.clip(2, 5)
-    b.backward()
-    a.grad().print()
-    pass
