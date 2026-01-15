@@ -1,13 +1,14 @@
 """
-XOR Problem Demonstration
+XOR Problem
 =========================
 Classic non-linearly separable problem requiring hidden layers.
 """
 
 from tenmo import Tensor
-from net import Sequential, Linear, Sigmoid, SGD, MSELoss
+from net import Sequential, Linear, Sigmoid, MSELoss
 from time import perf_counter_ns
 from math import sqrt
+from sgd import SGD
 
 
 fn xor_classification() -> None:

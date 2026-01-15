@@ -1,5 +1,5 @@
 ### Mojo Tensor
-### Implement tensor library in mojo from first principles
+### Implement tensor library in mojo
 from math import exp, floor, log, cos, sin, sqrt, pi
 from random import seed, random_float64
 from sys import simd_width_of
@@ -1590,8 +1590,6 @@ struct Tensor[dtype: DType = DType.float32](
         _ = self.ancestors^
         _ = self.backwardFn^
 
-        log_debug("Tensor freed: " + self.id().__str__())
-
     fn mse[
         track_grad: Bool = True
     ](self, target: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
@@ -1616,8 +1614,6 @@ struct Tensor[dtype: DType = DType.float32](
         output.seed_grad(seed_tensor)
 
         try:
-            # start = now()
-            # Phase 1: Discovery
             var topo_ids = List[UInt](capacity=graph_size)
             var dfs_stack = List[UInt](capacity=graph_size)
             var node_list = List[Tensor[Self.dtype]](capacity=graph_size)
@@ -1654,14 +1650,13 @@ struct Tensor[dtype: DType = DType.float32](
                             id_to_index[parent_id] = new_idx
                             dfs_stack.append(parent_id)
 
-            # Phase 2: Execute backward
+            # Execute backward
             var ready_queue = Deque[UInt](capacity=graph_size)
             ready_queue.append(output.id())
-            # print("Graph preparation took: ", now() - start, "secs")
             while len(ready_queue) > 0:
                 var node_id = ready_queue.popleft()
                 var node_idx = id_to_index[node_id]
-                ref node = node_list[node_idx]  # Access by index
+                ref node = node_list[node_idx]
 
                 if node.has_backward_fn():
                     for result in node.backward_fn()(node):
@@ -1672,7 +1667,6 @@ struct Tensor[dtype: DType = DType.float32](
 
                         if target_id in id_to_index:
                             var target_idx = id_to_index[target_id]
-                            # Access by index each time (safe)
                             if op_code == AddTensor:
                                 node_list[target_idx].update_grad[AddTensor](
                                     grad
@@ -2223,25 +2217,4 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
 
 
 fn main():
-    alias dtype = DType.float64
-
-    s = Tensor[dtype].scalar(49, requires_grad=True)
-    s.print()
-    _ = """a = Tensor.arange(10)
-    c = a.reshape(2, 5)  # View of a
-    c.print()
-    c.fill(1919, i(1), i(2))
-
-    a.print()
-    d = Tensor.scalar(0)
-    d.fill(999, il(IntArray()))
-    a.fill(-42, Idx(9))
-
-    a.print()
-    d.print()
-
-    x = Tensor.rand(2, 3)
-    y = Tensor.ones(3)
-    x.fill(y, i(1), s())  # x being filled - y is being broadcasted
-
-    x.print()"""
+    pass

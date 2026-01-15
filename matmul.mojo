@@ -14,9 +14,11 @@ from broadcasthelper import ShapeBroadcaster
 from common_utils import il, s, panic, log_debug
 from vectormatrix import VectorMatmulNd
 from matrixvector import MatrixVectorMulNd
+from algorithm import parallelize
+from sys.info import num_logical_cores as num_physical_cores
 
 
-alias TILE_SIZE = 64
+alias TILE_SIZE = 32
 
 
 @fieldwise_init
@@ -41,7 +43,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
 
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
-        # grad_A[i,j] = sum_k(grad_out[i,k] * B[j,k])  ← Reading B transposed!
         if A.requires_grad:
             var grad_A = Gradbox[Self.dtype].zeros(Shape([m, n]))
 
@@ -59,11 +60,16 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             var grad_A_stride1 = grad_A.strides()[1]
             var grad_A_data = grad_A.buffer.buffer.data
 
-            # TILED computation - accessing B in transposed order
-            for i_tile in range(0, m, tile_size):
+            # PARALLELIZED TILED computation
+            var num_tiles_i = (m + tile_size - 1) // tile_size
+
+            @parameter
+            fn process_row_tile_A(tile_idx: Int):
+                var i_tile = tile_idx * tile_size
+                var i_end = min(i_tile + tile_size, m)
+
                 for j_tile in range(0, n, tile_size):
                     for k_tile in range(0, p, tile_size):
-                        var i_end = min(i_tile + tile_size, m)
                         var j_end = min(j_tile + tile_size, n)
                         var k_end = min(k_tile + tile_size, p)
 
@@ -71,7 +77,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                             var grad_out_row_base = i * grad_out_stride0
                             var grad_A_row_base = i * grad_A_stride0
 
-                            # Manual SIMD vectorization
                             var j = j_tile
 
                             # Main vectorized loop
@@ -89,7 +94,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                     )
                                     var grad_ik = grad_out_data[grad_addr]
 
-                                    # B[j,k] - reading B transposed
                                     var b_addr = (
                                         j * B_stride0 + B_offset + k * B_stride1
                                     )
@@ -126,10 +130,11 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                 grad_A_data[grad_A_addr] = accumulator
                                 j += 1
 
+            parallelize[process_row_tile_A](num_tiles_i, num_physical_cores())
+
             result.append((A, grad_A^, AddTensor))
 
         # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
-        # grad_B[j,k] = sum_i(A[i,j] * grad_out[i,k])  ← Reading A transposed!
         if B.requires_grad:
             var grad_B = Gradbox[Self.dtype].zeros(Shape([n, p]))
 
@@ -146,18 +151,22 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             var grad_B_stride1 = grad_B.strides()[1]
             var grad_B_data = grad_B.buffer.buffer.data
 
-            # TILED computation
-            for j_tile in range(0, n, tile_size):
+            # PARALLELIZED TILED computation
+            var num_tiles_j = (n + tile_size - 1) // tile_size
+
+            @parameter
+            fn process_row_tile_B(tile_idx: Int):
+                var j_tile = tile_idx * tile_size
+                var j_end = min(j_tile + tile_size, n)
+
                 for k_tile in range(0, p, tile_size):
                     for i_tile in range(0, m, tile_size):
-                        var j_end = min(j_tile + tile_size, n)
                         var k_end = min(k_tile + tile_size, p)
                         var i_end = min(i_tile + tile_size, m)
 
                         for j in range(j_tile, j_end):
                             var grad_B_row_base = j * grad_B_stride0
 
-                            # Manual SIMD vectorization
                             var k = k_tile
 
                             # Main vectorized loop
@@ -170,13 +179,11 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                 ](grad_B_addr)
 
                                 for i in range(i_tile, i_end):
-                                    # A[i,j] - reading A transposed
                                     var a_addr = (
                                         i * A_stride0 + A_offset + j * A_stride1
                                     )
                                     var a_ij = A_data[a_addr]
 
-                                    # grad_out[i,k] - contiguous access
                                     var grad_addr = (
                                         i * grad_out_stride0
                                         + k * grad_out_stride1
@@ -215,6 +222,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                                 grad_B_data[grad_B_addr] = accumulator
                                 k += 1
 
+            parallelize[process_row_tile_B](num_tiles_j, num_physical_cores())
+
             result.append((B^, grad_B^, AddTensor))
 
         return result^
@@ -231,7 +240,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     fn forward[
         track_grad: Bool = True,
         simdwidth: Int = simd_width_of[Self.dtype](),
-        tile_size: Int = TILE_SIZE,  # Tune this: 32, 64, or 128
+        tile_size: Int = TILE_SIZE,
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
@@ -261,26 +270,27 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
         if B_contiguous:
             # ========================================
-            # TILED/BLOCKED MATMUL with Manual SIMD
+            # PARALLELIZED TILED MATMUL
             # ========================================
-            for i_tile in range(0, m, tile_size):
+            var num_tiles_i = (m + tile_size - 1) // tile_size
+
+            @parameter
+            fn process_row_tile(tile_idx: Int):
+                var i_tile = tile_idx * tile_size
+                var i_end = min(i_tile + tile_size, m)
+
                 for j_tile in range(0, p, tile_size):
                     for k_tile in range(0, n, tile_size):
-                        # Compute tile boundaries
-                        var i_end = min(i_tile + tile_size, m)
                         var j_end = min(j_tile + tile_size, p)
                         var k_end = min(k_tile + tile_size, n)
 
-                        # Process this tile
                         for i in range(i_tile, i_end):
                             var a_row_base = i * A_stride0 + A_offset
                             var c_row_base = i * C_stride0 + C_offset
 
-                            # Manual SIMD vectorization for columns
                             var j = j_tile
-                            var cols_remaining = j_end - j_tile
 
-                            # Main vectorized loop (process simdwidth columns at a time)
+                            # Main vectorized loop
                             while j + simdwidth <= j_end:
                                 var c_addr = c_row_base + j * C_stride1
                                 var accumulator = C_data.load[width=simdwidth](
@@ -305,7 +315,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                                 )
                                 j += simdwidth
 
-                            # Tail handling: process remaining columns one at a time
+                            # Tail handling
                             while j < j_end:
                                 var c_addr = c_row_base + j * C_stride1
                                 var accumulator = C_data[c_addr]
@@ -321,6 +331,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
                                 C_data[c_addr] = accumulator
                                 j += 1
+
+            parallelize[process_row_tile](num_tiles_i, num_physical_cores())
+
         else:
             # Non-contiguous path (scalar)
             for i in range(m):
@@ -382,12 +395,17 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
         var C_data = C.buffer.buffer.data
 
         # ========================================
-        # TILED MATMUL with Manual SIMD
+        # PARALLELIZED TILED MATMUL
         # ========================================
-        for i_tile in range(0, m, tile_size):
+        var num_tiles_i = (m + tile_size - 1) // tile_size
+
+        @parameter
+        fn process_row_tile(tile_idx: Int):
+            var i_tile = tile_idx * tile_size
+            var i_end = min(i_tile + tile_size, m)
+
             for j_tile in range(0, p, tile_size):
                 for k_tile in range(0, n, tile_size):
-                    var i_end = min(i_tile + tile_size, m)
                     var j_end = min(j_tile + tile_size, p)
                     var k_end = min(k_tile + tile_size, n)
 
@@ -395,10 +413,8 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                         var a_row_base = i * A_stride0 + A_offset
                         var c_row_base = i * C_stride0 + C_offset
 
-                        # Manual SIMD vectorization
                         var j = j_tile
 
-                        # Main vectorized loop
                         while j + simdwidth <= j_end:
                             var c_addr = c_row_base + j * C_stride1
                             var accumulator = C_data.load[width=simdwidth](
@@ -417,7 +433,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                             C_data.store[width=simdwidth](c_addr, accumulator)
                             j += simdwidth
 
-                        # Tail handling: remaining columns
                         while j < j_end:
                             var c_addr = c_row_base + j * C_stride1
                             var accumulator = C_data[c_addr]
@@ -429,6 +444,8 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
                             C_data[c_addr] = accumulator
                             j += 1
+
+        parallelize[process_row_tile](num_tiles_i, num_physical_cores())
 
         return C^
 
@@ -463,24 +480,26 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             var C_data = C.buffer.buffer.data
 
             # ========================================
-            # TILED MATMUL with Manual SIMD
+            # PARALLELIZED TILED MATMUL
             # ========================================
-            for i_tile in range(0, m, tile_size):
+            var num_tiles_i = (m + tile_size - 1) // tile_size
+
+            @parameter
+            fn process_row_tile(tile_idx: Int):
+                var i_tile = tile_idx * tile_size
+                var i_end = min(i_tile + tile_size, m)
+
                 for j_tile in range(0, p, tile_size):
                     for k_tile in range(0, n, tile_size):
-                        var i_end = min(i_tile + tile_size, m)
                         var j_end = min(j_tile + tile_size, p)
                         var k_end = min(k_tile + tile_size, n)
 
-                        # Process tile
                         for i in range(i_tile, i_end):
                             var a_row_base = i * A_stride0
                             var c_row_base = i * C_stride0
 
-                            # Manual SIMD vectorization
                             var j = j_tile
 
-                            # Main vectorized loop
                             while j + simdwidth <= j_end:
                                 var c_addr = c_row_base + j * C_stride1
                                 var accumulator = C_data.load[width=simdwidth](
@@ -505,7 +524,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                                 )
                                 j += simdwidth
 
-                            # Tail handling: remaining columns
                             while j < j_end:
                                 var c_addr = c_row_base + j * C_stride1
                                 var accumulator = C_data[c_addr]
@@ -521,6 +539,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
                                 C_data[c_addr] = accumulator
                                 j += 1
+
+            parallelize[process_row_tile](num_tiles_i, num_physical_cores())
+
         else:
             # Non-contiguous fallback (scalar path)
             ref A_strides = A.strides()
@@ -623,10 +644,9 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             return Matmul2d[Self.dtype].forward[track_grad](A, B)
 
         MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
-        # shapes: batch + [m, k], batch + [k, n]
         batch_shape = ShapeBroadcaster.broadcast_shape(
             A_shape[0:-2], B_shape[0:-2]
-        )  # all dims except last 2
+        )
 
         m = A_shape[-2]
         n = B_shape[-1]
@@ -638,7 +658,6 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         C = Tensor[dtype].zeros(out_shape)
 
         for indices in batch_shape:
-            # select batch slices
             A_indices = ShapeBroadcaster.broadcasted_indices(
                 indices, batch_shape, batch_dims_a
             )
@@ -650,12 +669,10 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             C_slice = C.__getitem__[track_grad=False](il(indices), s(), s())
 
             result = Matmul2d[Self.dtype].forward[track_grad=False](
-                A_slice,
-                B_slice,
+                A_slice, B_slice
             )
             C_slice.buffer.copy_from_alike[overwrite=True](result.buffer)
 
-        # Only attach backward handler if gradients are needed
         @parameter
         if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
@@ -677,58 +694,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     ) -> Gradbox[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
-        # Short-circuit for 2D
-        if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[Self.dtype].forward(A, B)
 
-        MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
-
-        # shapes: batch + [m, k], batch + [k, n]
-        batch_shape = ShapeBroadcaster.broadcast_shape(
-            A_shape[0:-2], B_shape[0:-2]
-        )
-        m = A_shape[-2]
-        n = B_shape[-1]
-        batch_dims_a = A_shape[:-2]
-        batch_dims_b = B_shape[:-2]
-
-        out_shape = batch_shape + [m, n]
-        var C = Gradbox[dtype].zeros(
-            out_shape, share=True
-        )  # Views are not allowed from unshared gradbox
-
-        for indices in batch_shape:
-            var A_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, batch_dims_a
-            )
-            var B_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, batch_dims_b
-            )
-
-            var A_slice = A.__getitem__[track_grad=False](
-                il(A_indices), s(), s()
-            )
-            var B_slice = B[il(B_indices), s(), s()]
-            var C_slice = C[il(indices), s(), s()]
-
-            # Use 2D matmul for GradBox (no backward needed)
-            var result = Matmul2d[Self.dtype].forward(
-                A_slice, B_slice
-            )  # Backward fn would not be attached
-            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer^)
-
-        return C^
-
-    # Gradbox and Tensor matmul_nd - No backward fn needed
-    @always_inline
-    @staticmethod
-    fn forward(
-        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
-    ) -> Gradbox[Self.dtype]:
-        ref A_shape = A.shape()
-        ref B_shape = B.shape()
-
-        # Short-circuit for 2D
         if A_shape.rank() == 2 and B_shape.rank() == 2:
             return Matmul2d[Self.dtype].forward(A, B)
 
@@ -753,16 +719,57 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
                 indices, batch_shape, batch_dims_b
             )
 
+            var A_slice = A.__getitem__[track_grad=False](
+                il(A_indices), s(), s()
+            )
+            var B_slice = B[il(B_indices), s(), s()]
+            var C_slice = C[il(indices), s(), s()]
+
+            var result = Matmul2d[Self.dtype].forward(A_slice, B_slice)
+            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer^)
+
+        return C^
+
+    @always_inline
+    @staticmethod
+    fn forward(
+        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
+        ref A_shape = A.shape()
+        ref B_shape = B.shape()
+
+        if A_shape.rank() == 2 and B_shape.rank() == 2:
+            return Matmul2d[Self.dtype].forward(A, B)
+
+        MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
+
+        batch_shape = ShapeBroadcaster.broadcast_shape(
+            A_shape[0:-2], B_shape[0:-2]
+        )
+        m = A_shape[-2]
+        n = B_shape[-1]
+        batch_dims_a = A_shape[:-2]
+        batch_dims_b = B_shape[:-2]
+
+        out_shape = batch_shape + [m, n]
+        var C = Gradbox[Self.dtype].zeros(out_shape, share=True)
+
+        for indices in batch_shape:
+            var A_indices = ShapeBroadcaster.broadcasted_indices(
+                indices, batch_shape, batch_dims_a
+            )
+            var B_indices = ShapeBroadcaster.broadcasted_indices(
+                indices, batch_shape, batch_dims_b
+            )
+
             var A_slice = A[il(A_indices), s(), s()]
             var B_slice = B.__getitem__[track_grad=False](
                 il(B_indices), s(), s()
             )
             var C_slice = C[il(indices), s(), s()]
 
-            # Use 2D matmul for GradBox (no backward needed)
             var result = Matmul2d[Self.dtype].forward(A_slice, B_slice)
             C_slice.buffer.copy_from_alike[overwrite=False](result.buffer^)
-
         return C^
 
 
@@ -851,5 +858,84 @@ fn classify_matmul(a: Shape, b: Shape) -> Int:
             return invalid
 
 
+from time import perf_counter_ns as now
+from sys import argv
+
+
+fn test_gflops() raises:
+    alias dtype = DType.float32
+    var M = 128
+    var K = 512
+    var O = 512
+    var N = 256
+
+    var A_shape = Shape(M, K)
+    var B_shape = Shape(O, N)
+
+    var shape_dims = argv()
+    try:
+        var length = len(shape_dims)
+        if length > 1:
+            if length == 2:
+                var dim = Int(shape_dims[1])
+                A_shape = Shape(dim, dim)
+                B_shape = Shape(dim, dim)
+            elif length == 3:
+                var dim1, dim2 = Int(shape_dims[1]), Int(shape_dims[2])
+                A_shape = Shape(dim1, dim2)
+                B_shape = Shape(dim2, dim2)
+            elif length == 4:
+                var dim1, dim2, dim3, dim4 = (
+                    Int(shape_dims[1]),
+                    Int(shape_dims[2]),
+                    Int(shape_dims[3]),
+                    Int(shape_dims[4]),
+                )
+                A_shape = Shape(dim1, dim2)
+                B_shape = Shape(dim3, dim4)
+
+    except e:
+        print("Could not parse shape dims")
+
+    if A_shape[1] != B_shape[0]:
+        panic(
+            "Matrix dimension mismatch: ", A_shape.__str__(), B_shape.__str__()
+        )
+    # Setup
+    var A = Tensor[dtype].randn(A_shape)
+    var B = Tensor[dtype].randn(B_shape)
+
+    print("Benchmarking Matmul2d...")
+
+    # Warmup
+    for _ in range(10):
+        var _ = Matmul2d[dtype].forward(A, B)
+
+    # Benchmark
+    var start = now()
+    for _ in range(100):
+        var _ = Matmul2d[dtype].forward(A, B)
+    var end = now()
+
+    # Calculations
+    var avg_time_ms = (end - start) / (100.0 * 1_000_000.0)
+
+    var gflops = (2.0 * M * K * N) / (avg_time_ms * 1_000_000.0)
+
+    M = A_shape[0]
+    K = A_shape[1]
+    N = B_shape[1]
+
+    # Formatted output
+    var shape_str = String("(") + M.__str__() + "×" + K.__str__() + ") @ ("
+    shape_str += K.__str__() + "×" + N.__str__() + ")"
+
+    print("Results:")
+    print("  Matrix dimensions: " + shape_str)
+    print("  Average time:      " + avg_time_ms.__str__() + " ms")
+    print("  Performance:       " + gflops.__str__() + " GFLOPS")
+    print("  Operations:        " + (2 * M * K * N).__str__() + " FLOP")
+
+
 fn main() raises:
-    pass
+    test_gflops()

@@ -967,7 +967,7 @@ struct BLASHandleLite[dtype: DType](ImplicitlyCopyable):
 
 
 fn main() raises:
-    pass
+    test_blas_case_4_Atranspose_Btranspose()
 
 
 # ============================================================================
