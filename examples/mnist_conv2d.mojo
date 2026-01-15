@@ -40,17 +40,17 @@ fn train_mnist() raises:
 
     # ========== Data Preparation ==========
     alias dtype = DType.float32
-    alias ldtype = DType.int32
+    alias label_dtype = DType.int32
 
     train_images = train_images.astype(numpy_dtype(dtype))
-    train_labels = train_labels.astype(numpy_dtype(ldtype))
+    train_labels = train_labels.astype(numpy_dtype(label_dtype))
     test_images = test_images.astype(numpy_dtype(dtype))
-    test_labels = test_labels.astype(numpy_dtype(ldtype))
+    test_labels = test_labels.astype(numpy_dtype(label_dtype))
 
     var X_train = from_ndarray[dtype](train_images, copy=True)
-    var y_train = from_ndarray[ldtype](train_labels, copy=True)
+    var y_train = from_ndarray[label_dtype](train_labels, copy=True)
     var X_test = from_ndarray[dtype](test_images, copy=True)
-    var y_test = from_ndarray[ldtype](test_labels, copy=True)
+    var y_test = from_ndarray[label_dtype](test_labels, copy=True)
 
     # Normalize to [0, 1]
     X_train = X_train / 255.0
@@ -65,8 +65,8 @@ fn train_mnist() raises:
     var train_batch_size = 128
     var test_batch_size = 128
 
-    var train_dataset = NumpyDataset[dtype, ldtype](X_train, y_train)
-    var test_dataset = NumpyDataset[dtype, ldtype](X_test, y_test)
+    var train_dataset = NumpyDataset[dtype, label_dtype](X_train, y_train)
+    var test_dataset = NumpyDataset[dtype, label_dtype](X_test, y_test)
 
     var train_loader = train_dataset.into_loader(
         batch_size=train_batch_size, shuffle=True, drop_last=False

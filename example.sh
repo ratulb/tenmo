@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No example specified"
-    echo "Usage: $0 [mnist|xor|spiral|cifar_10|mnist_conv2d]"
+    echo "Usage: $0 [binary_mnist|mnist|xor|spiral|cifar_10|mnist_conv2d]"
     exit 1
 fi
 
@@ -14,6 +14,11 @@ fi
 
 # Determine which test to run based on the argument
 case $1 in
+    binary_mnist)
+        echo "Running binary mnist training loop"
+        mojo -I . $DEBUG_MODE examples/binary_mnist.mojo
+        ;;
+
     mnist)
         echo "Running mnist training loop"
         mojo -I . $DEBUG_MODE examples/mnist.mojo
@@ -37,7 +42,7 @@ case $1 in
 
     *)
        echo "Error: Unknown test '$1'"
-       echo "Available training loops: mnist, xor, spiral, cifar_10, mnist_conv2d"
+       echo "Available training loops: binary_mnist, mnist, xor, spiral, cifar_10, mnist_conv2d"
        exit 1
     ;;
 esac
