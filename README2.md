@@ -1,43 +1,48 @@
-# Tenmo - High-Performance Tensor Library for Mojo 🔥
+# Tenmo 🔥
 
-**Fast, type-safe tensor operations and neural network training in pure Mojo.**
+**A high-performance tensor library and neural network framework built entirely in Mojo**
 
-Tenmo brings PyTorch-like ergonomics to Mojo with automatic differentiation, modular neural networks, and production-ready optimizers—all with **competitive CPU performance** and **zero Python overhead**.
+Tenmo brings PyTorch-like ergonomics to Mojo with automatic differentiation, modular neural networks, and production-ready training pipelines—delivering competitive performance with zero Python overhead.
+
+> ⚠️ **Development Status**: Tenmo is actively evolving alongside Mojo itself. The API is subject to change as we incorporate improvements from the Mojo ecosystem. Not recommended for production use yet, but great for learning and experimentation!
 
 ---
 
-## ⚡ Performance Highlights
+## ⚡ Performance
 
-### MNIST Training Benchmark (10 Epochs, 105K Parameters)
+### MNIST Training Benchmark (15 Epochs, 105K Parameters)
+
+Training the same 4-layer MLP (784→128→32→10) on identical hardware:
 
 | Platform | Device | Avg Epoch Time | Total Time | Final Test Acc |
 |----------|--------|----------------|------------|----------------|
-| **Tenmo (He Init)** | **CPU (Mojo)** | **8.4s** | **84s** | **96.95%** |
-| PyTorch | CPU | 22.7s | 227s | 97.67% |
-| PyTorch | GPU (CUDA) | 18.1s | 181s | 97.71% |
+| **Tenmo** | **CPU (Mojo)** | **11.4s** | **171s** | **97.44%** |
+| PyTorch | CPU | 14.5s | 218s | 98.26% |
+| PyTorch | GPU (Tesla T4) | 15.2s | 227s | 97.87% |
 
-**Key Takeaways:**
-- ⚡ **2.7x faster than PyTorch CPU** (8.4s vs 22.7s per epoch)
-- 🚀 **2.2x faster than PyTorch GPU** (8.4s vs 18.1s per epoch)
-- 🎯 **97% accuracy** comparable to PyTorch with pure Mojo implementation
-- 💾 **Zero Python overhead** - runs entirely in compiled Mojo
-- 🏆 **Fastest MNIST training on CPU** - outperforms even GPU implementations
+**Key Observations:**
+- 🚀 **1.3x faster than PyTorch CPU** - Pure Mojo implementation with SIMD optimization
+- ⚡ **1.3x faster than PyTorch GPU** - Efficient CPU utilization outperforms GPU on small models
+- 🎯 **97.4% accuracy** - Comparable to PyTorch with proper initialization
+- 💾 **Zero Python overhead** - Runs entirely in compiled Mojo
 
-*Benchmarked on: Google Colab (Intel Xeon 2-core CPU, Tesla T4 GPU), batch_size=64, He initialization*
+*All benchmarks performed on the same machine (Intel Xeon CPU, Tesla T4 GPU), batch_size=64*
 
-### What Makes Tenmo Fast?
+**Why is Tenmo competitive?**
 
-- **Zero-copy data loading**: Pre-allocated batch buffers with bulk `memcpy` at `0.03ms` per batch
-- **SIMD-optimized operations**: Vectorized math kernels with manual loop unrolling
-- **He initialization**: Better gradient flow reduces training time by ~25%
-- **Efficient memory layout**: Contiguous tensors with cache-friendly access patterns
-- **Compile-time specialization**: `track_grad` parameter eliminates graph overhead in eval mode
+The performance comes from eliminating Python's interpreter overhead and data movement costs. For MNIST-scale models, the time spent in Python's runtime (scheduling, GIL, type checking) and GPU data transfers dominates actual compute. Tenmo's compiled Mojo code runs these operations directly on CPU with:
+- SIMD-vectorized operations (manual loop unrolling)
+- Zero-copy batch loading (bulk memcpy at ~0.03ms/batch)
+- Cache-friendly memory layouts
+- Compile-time specialization (eliminates graph overhead in eval mode)
+
+For larger models where GPU compute advantages outweigh transfer costs, GPU acceleration becomes more beneficial. Tenmo's current focus is proving out the fundamentals on CPU before adding GPU support.
 
 ---
 
 ## 🚀 Quick Start
 
-### XOR Problem in 10 Lines
+### XOR Problem - Neural Network in 15 Lines
 ```mojo
 from tenmo import Tensor, Sequential, Linear, Sigmoid, MSELoss, SGD
 
@@ -68,83 +73,168 @@ model.eval()
 print(model(X))  # Perfect XOR solution!
 ```
 
----
+### Creating and Operating on Tensors
+```mojo
+from tenmo import Tensor
 
-## 📊 Detailed Benchmarks
+# Create tensors with various constructors
+var a = Tensor[DType.float32].arange(6, requires_grad=True).reshape(2, 3)
+a.print()
+# [2D Tensor(2, 3), Type: float32, requires_grad: True]
+#   [
+#     [0.0, 1.0, 2.0],
+#     [3.0, 4.0, 5.0],
+#   ]
 
-### MNIST Training Progression
+# Broadcasting and element-wise operations
+var b = a + 1.0
+var c = a * 2.0
 
-#### Tenmo CPU (Mojo) - **He Initialization**
-```
-Epoch 1:  Loss: 0.664, Train Acc: 79.8%, Test Acc: 89.5%, Time: 8.3s
-Epoch 5:  Loss: 0.181, Train Acc: 95.3%, Test Acc: 94.9%, Time: 8.5s
-Epoch 10: Loss: 0.078, Train Acc: 97.7%, Test Acc: 96.9%, Time: 8.5s
-Total: 84s (10 epochs)
-```
+# Automatic differentiation
+var y = c.sum()
+y.backward()
+a.grad[].print()  # Gradients computed!
 
-#### PyTorch CPU (Google Colab)
-```
-Epoch 1:  Loss: 0.321, Train Acc: 90.5%, Test Acc: 95.2%, Time: 23.5s
-Epoch 5:  Loss: 0.035, Train Acc: 98.9%, Test Acc: 97.3%, Time: 22.2s
-Epoch 10: Loss: 0.014, Train Acc: 99.6%, Test Acc: 97.7%, Time: 21.9s
-Average: 22.7s per epoch
-Total: 227s (10 epochs)
-```
+# Views and slicing (memory-efficient)
+var v1 = a.view([5, 2], offset=2)   # Slice starting from a[2]
+var v2 = v1.view([2, 5])            # Reshape
+var v3 = v2.view([10])              # Flatten
 
-#### PyTorch GPU (Google Colab - CUDA)
+# More constructors
+var zeros = Tensor[DType.float32].zeros(3, 4)
+var ones = Tensor[DType.float32].ones(2, 2)
+var randn = Tensor[DType.float32].randn(5, 5)
+var linspace = Tensor[DType.float32].linspace(0, 10, 100)
 ```
-Epoch 1:  Loss: 0.330, Train Acc: 90.3%, Test Acc: 95.9%, Time: 19.3s
-Epoch 5:  Loss: 0.034, Train Acc: 98.8%, Test Acc: 97.5%, Time: 17.6s
-Epoch 10: Loss: 0.017, Train Acc: 99.5%, Test Acc: 97.7%, Time: 17.8s
-Average: 18.1s per epoch
-Total: 181s (10 epochs)
-```
-
-**Performance Summary:**
-- Tenmo achieves **97% accuracy 2.7x faster** than PyTorch CPU
-- Tenmo **outperforms PyTorch GPU by 2.2x** on the same CPU hardware
-- He initialization provides **25% speedup** over Xavier (11.3s → 8.4s per epoch)
-- All implementations reach **~97-98% test accuracy** showing comparable model quality
 
 ---
 
 ## 🎯 Features
 
 ### Core Tensor Operations
-- ✅ **Automatic differentiation** with computational graph
-- ✅ **Broadcasting** for all arithmetic operations
-- ✅ **SIMD-optimized** kernels for contiguous tensors
-- ✅ **Memory-efficient** gradient accumulation
-- ✅ **Type-safe** with compile-time dtype checking
-- ✅ **Numerically stable** statistics (Welford's algorithm with Kahan summation)
+- **Automatic differentiation** with dynamic computational graph
+- **Broadcasting** for arithmetic operations (`+`, `-`, `*`, `/`, `pow`)
+- **SIMD-optimized** kernels with manual vectorization
+- **Views and slicing** with zero-copy memory sharing
+- **Comprehensive constructors**: `zeros`, `ones`, `rand`, `randn`, `arange`, `linspace`, `full`
+- **Advanced indexing**: slice-based and index-based getitem/setitem
+- **Reductions**: `sum`, `mean`, `max`, `min`, `argmax`, `argmin` (with axis support)
+- **Reshaping**: `reshape`, `view`, `transpose`, `permute`, `squeeze`, `unsqueeze`, `flatten`
+- **Statistical ops**: `variance`, `std` (numerically stable algorithms)
+- **Comparison ops**: `eq`, `ne`, `all`, `any`, `all_close`
+- **Utility ops**: `concat`, `stack`, `vstack`, `hstack`, `chunk`, `tile`, `repeat`
 
-### Neural Network Layers
-- `Linear` - Fully connected layers with Xavier/He initialization
-- `ReLU`, `Sigmoid`, `Tanh` - Activation functions with cached masks
-- `Sequential` - Container for layer composition
-- `MSELoss`, `BCELoss`, `CrossEntropyLoss` - Loss functions
+### Neural Network Components
 
-### Optimizers
-- `SGD` - Stochastic Gradient Descent with momentum
-- Zero-overhead `.train()` / `.eval()` mode switching
+**Layers:**
+- `Linear` - Fully connected with Xavier/He initialization
+- `ReLU`, `Sigmoid`, `Tanh` - Standard activations
+- `Flatten` - Spatial to vector conversion
+- `MaxPool2d` - 2D max pooling with stride/padding support
+- `Conv2d` - 2D convolution (functional, optimization in progress)
+- `Dropout` - Regularization layer
+- `Sequential` - Layer composition container
 
-### Data Loading
-- `TensorDataset`, `NumpyDataset` - PyTorch-style dataset wrappers
-- `DataLoader` - High-performance batching with:
-  - Pre-allocated batch buffers (zero allocations during iteration)
-  - Bulk memcpy for sequential access (validation/test)
-  - Row-by-row memcpy for shuffled access (training)
-  - Built-in shuffle using Mojo's optimized RNG
+**Loss Functions:**
+- `MSELoss` - Mean squared error
+- `BCELoss` - Binary cross-entropy
+- `CrossEntropyLoss` - Multi-class classification
+
+**Optimizers:**
+- `SGD` - Stochastic gradient descent with momentum
+
+**Training Utilities:**
+- `.train()` / `.eval()` mode switching
+- `DataLoader` with optimized batching
+- `TensorDataset`, `NumpyDataset` wrappers
+
+### BLAS Integration
+Tenmo supports configurable BLAS backends for linear algebra operations. When the `BLAS_PATH` environment variable is specified the `LinearBLAS` layer will dispatch operations to the configured BLAS library. This remains optional, as Tenmo's pure Mojo implementation provides competitive performance and is the primary focus.
+
+---
+
+## 🏗️ Architecture
+
+Tenmo's design prioritizes memory efficiency and performance through careful separation of concerns:
+
+### Memory Layout
+```
+Tensor[dtype: DType]
+├── buffer: NDBuffer          # Single source of truth for shape/strides/offset
+├── requires_grad: Bool       # Gradient tracking flag
+├── gradbox: UnsafePointer    # Gradients (only allocated when needed)
+├── ancestors: Optional       # Parent tensors in computation graph
+└── backwardFn: Optional      # Backward pass function
+
+Gradbox[dtype: DType]
+└── buffer: NDBuffer          # Contiguous gradient storage
+
+NDBuffer[dtype: DType]
+├── buffer: Buffer            # Underlying data (ref-counted for views)
+├── shape: Shape              # Tensor dimensions
+├── strides: Strides          # Memory layout
+└── offset: Int               # View offset into parent buffer
+
+Buffer[dtype: DType]
+└── UnsafePointer[Scalar]     # SIMD-capable linear storage
+```
+
+**Key Design Decisions:**
+
+1. **Tensor vs Gradbox**: Gradients don't need to be full-fledged Tensors, so they live in a lightweight `Gradbox` struct. This results in 70 % code reduction for Gradboxes!
+
+2. **NDBuffer as Single Source of Truth**: Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both `Tensor` and `Gradbox`. This ensures views, slicing, and broadcasting behave consistently.
+
+3. **Reference-Counted Buffer**: The innermost `Buffer` becomes ref-counted when views are created, enabling zero-copy slicing while maintaining memory safety.
+
+4. **Manual Broadcasting**: Broadcasting is explicitly handled in `NDBuffer` operations rather than being implicit, giving fine-grained control over memory layouts.
+
+---
+
+## 📖 Examples
+
+### 1. XOR Problem
+Binary classification demonstrating non-linear decision boundaries. Perfect separation achieved in ~2000 epochs with a simple 2-layer network.
+```bash
+./example xor
+```
+
+### 2. Spiral Dataset
+Multi-class classification with complex decision boundaries:
+- 2 rotations: 99% accuracy, quick convergence
+- 3 rotations: Requires deeper architecture
+```bash
+./example spiral
+```
+
+### 3. MNIST Digit Classification
+
+Full training pipeline with data loading, batching, and validation:
+```bash
+./example mnist
+```
+
+**Architecture**: 784 → 128 → 32 → 10  
+**Training**: 15 epochs, batch_size=64, lr=0.01, momentum=0.9  
+**Results**: 97.44% test accuracy in 171 seconds
+
+**Training Progression** (Tenmo on CPU):
+```
+Epoch 1:  Loss: 0.711, Train: 76.96%, Test: 89.40%, Time: 11.7s
+Epoch 5:  Loss: 0.158, Train: 95.40%, Test: 95.76%, Time: 11.0s
+Epoch 10: Loss: 0.091, Train: 97.38%, Test: 97.13%, Time: 11.6s
+Epoch 15: Loss: 0.059, Train: 98.38%, Test: 97.44%, Time: 11.7s
+```
 
 ---
 
 ## 🔧 Installation
 
 ### Prerequisites
-- Mojo 0.25.7.0
-- Python 3.10, <3.13 (for NumPy interop)
+- Mojo 0.25.7.0 or newer
+- Python 3.10-3.12 (for NumPy interop in examples)
 
-### Usage
+### Setup
 ```bash
 git clone https://github.com/yourusername/tenmo.git
 cd tenmo
@@ -153,97 +243,31 @@ cd tenmo
 ./example xor
 ./example mnist
 ./example spiral
-
 ```
+
+All core tensor operations are in pure Mojo with no external dependencies. NumPy is only used for loading MNIST data in the examples.
 
 ---
 
-## 📖 Examples
+## 🔬 Advanced Features
 
-### 1. **XOR Problem** ([examples/xor.mojo](./examples/xor.mojo))
-Binary classification with perfect separation in 2000 epochs.
+### Compile-Time Optimization
 
-### 2. **Spiral Dataset** ([examples/spiral.mojo](./examples/spiral.mojo))
-Non-linear decision boundaries with 2-3 rotations.
-- 2 rotations: 99% accuracy, converges quickly
-- 3 rotations: Complex architecture required
-
-### 3. **MNIST Training** ([examples/mnist.mojo](./examples/mnist.mojo))
-Full production pipeline with:
-- NumPy data loading
-- Train/validation splits
-- Batch processing (64 samples/batch)
-- Accuracy tracking
-- Learning rate scheduling
-
-**Architecture:**
-```
-Input(784) → Linear(128) → ReLU →
-Linear(64) → ReLU →
-Linear(32) → ReLU →
-Linear(10)
-```
-
-**Training Configuration:**
-- Batch size: 64 (train), 64 (test)
-- Learning rate: 0.01 (reduced by 10x at epochs 6)
-- Momentum: 0.9
-- Weight initialization: He (for ReLU)
-- Total parameters: 104,938
-
-**Results:**
-- **96.95% test accuracy** in 10 epochs
-- **8.4s per epoch** on CPU
-- **84 seconds total training time**
-
----
-
-## 🏗️ Architecture
-
-
-### Design Principles
-
-1. **Zero-cost abstractions**: Compile-time `track_grad` parameter eliminates runtime overhead
-2. **Move semantics**: Efficient memory management with explicit ownership
-3. **Memory efficiency**: Pre-allocated buffers and zero-copy operations
-4. **Type safety**: Leverages Mojo's strong type system for correctness
-
-
-### Key Components
-```
-tenmo/
-├── tensor.mojo          # Core Tensor with autograd
-├── buffer.mojo          # Low-level SIMD-optimized buffer operations
-├── ops/                 # Operations (matmul, add, relu, etc.)
-├── nn/                  # Neural network layers
-│   ├── linear.mojo
-│   ├── activations.mojo
-│   └── sequential.mojo
-├── optim/               # Optimizers (SGD, Adam)
-└── data/                # Data loading utilities
-    ├── dataset.mojo
-    └── dataloader.mojo
-```
-
----
-
-## 🎓 Advanced Features
-
-### Compile-Time Graph Optimization
+The `track_grad` compile-time parameter eliminates graph overhead during evaluation:
 ```mojo
 # Training: builds computational graph
 model.train()
 criterion.train()
-loss = criterion(pred, target)  # Graph enabled
+loss = criterion(pred, target)  # Graph tracking enabled
 loss.backward()
 
 # Evaluation: zero overhead
 model.eval()
 criterion.eval()
-loss = criterion(pred, target)  # No graph, pure forward pass
+loss = criterion(pred, target)  # Pure forward pass, no graph, utilizes Mojo's compile-time metaprogramming that eliminates generation of grad tracking code path 
 ```
 
-### Memory-Efficient Batching
+### Memory-Efficient Data Loading
 ```mojo
 var train_loader = train_dataset.into_loader(
     batch_size=64,
@@ -251,110 +275,81 @@ var train_loader = train_dataset.into_loader(
     drop_last=False
 )
 
-# Pre-allocated buffers reused for all batches
+# Pre-allocated batch buffers reused across iterations
 for batch in train_loader:
-    var pred = model(batch.features)  # Zero allocations
+    var pred = model(batch.features)
     var loss = criterion(pred, batch.labels)
     # ... training step
 ```
 
-### Optimized Statistics
-```mojo
-// Numerically stable mean, variance, std in one pass
-var stats = buffer.compute_statistics(bias=False)
-print("Mean:", stats.mean)
-print("Std:", stats.std)
-print("Variance:", stats.variance)
-```
-
----
-
-## 🔬 Benchmarking Details
-
-### Test Environment
-- **CPU**: Google Colab default runtime (Intel Xeon, 2 cores)
-- **GPU**: Tesla T4 (CUDA 11.8)
-- **Dataset**: MNIST (60K train, 10K test)
-- **Model**: 4-layer MLP (784→128→64→32→10)
-- **Batch Size**: 64 (both Tenmo and PyTorch)
-
-### Model Architecture Comparison
-Both implementations use identical architecture:
-```python
-# PyTorch
-nn.Linear(784, 128), nn.ReLU(),
-nn.Linear(128, 64), nn.ReLU(),
-nn.Linear(64, 32), nn.ReLU(),
-nn.Linear(32, 10)
-
-# Tenmo (Mojo)
-Linear[DType.float32](784, 128, he=True), ReLU[DType.float32](),
-Linear[DType.float32](128, 64, he=True), ReLU[DType.float32](),
-Linear[DType.float32](64, 32, he=True), ReLU[DType.float32](),
-Linear[DType.float32](32, 10, he=True)
-```
-
-### Reproducibility
-All benchmarks use the same:
-- Model architecture (4-layer MLP)
-- Hyperparameters (LR=0.01, momentum=0.9)
-- Initialization scheme (He for ReLU)
-- Loss function (CrossEntropy)
-- Batch size (64)
-
----
-
-## 🔍 Performance Deep Dive
-
-### DataLoader Optimization
-| Approach | Epoch Time | Notes |
-|----------|-----------|-------|
-| Manual batching (no DataLoader) | 10.0s | Direct numpy slicing |
-| DataLoader v1 (element-wise copy) | 46.0s | ❌ Too slow |
-| **DataLoader v2 (optimized)** | **8.4s** | ✅ Pre-allocated + memcpy |
-
-**Optimization techniques:**
+**DataLoader Optimization:**
 - Pre-allocated batch buffers (zero allocations during iteration)
-- Bulk `memcpy` for contiguous data (validation: single memcpy per batch)
-- Row-by-row `memcpy` for shuffled data (training: 64 memcpy calls per batch)
-- Built-in index shuffling (no data movement)
+- Bulk `memcpy` for sequential access (validation: single copy per batch)
+- Row-by-row `memcpy` for shuffled access (training: 64 copies per batch)
+- Built-in shuffling without data movement
 
-### Gradient Flow Optimization
-He initialization provides better gradient flow for ReLU networks:
-- Xavier → He: **11.3s → 8.4s per epoch (25% speedup)**
-- Faster convergence in early epochs
-- Better training stability
+### Numerically Stable Statistics
+```mojo
+# Welford's algorithm with Kahan summation
+var mean = tensor.mean()
+var std = tensor.std()
+var variance = tensor.variance()
+```
 
 ---
 
 ## 🚧 Roadmap
 
 ### Near Term
-- [ ] **Optimizers**: Adam, AdamW, RMSprop
-- [ ] **Layers**: Conv2D, MaxPool2D, Dropout
-- [ ] **Data augmentation**: Random crops, flips, normalization
-
+- [ ] Additional optimizers (Adam, AdamW, RMSprop)
+- [ ] Improved Conv2d performance
+- [ ] BatchNorm and LayerNorm layers
+- [ ] Model checkpointing
+- [ ] Learning rate schedulers
+      
 ### Medium Term
-- [ ] **Advanced layers**: BatchNorm, LayerNorm, Embedding
-- [ ] **Loss functions**: Focal loss, Triplet loss
-- [ ] **Learning rate schedulers**: CosineAnnealing, ReduceLROnPlateau
+- [ ] Advanced architectures (ResNet, Transformer blocks)
+- [ ] Data augmentation utilities
+- [ ] Mixed precision training (FP16)
 
 ### Long Term
-- [ ] **Distributed training**: Multi-core parallelism
-- [ ] **Model zoo**: Pre-trained ResNet, ViT
-- [ ] **Advanced ops**: Attention, Transformer blocks
-- [ ] **Mixed precision**: FP16 training support
+- [ ] Transparent GPU support
+- [ ] Distributed training (multi-core parallelism)
+- [ ] Pre-trained model zoo
+- [ ] Integration with latest Mojo/Modular improvements
+
+---
+
+## 💡 Inspirations
+Tenmo is built with a simple goal:
+> Understand, control, and optimize the full ML stack from ground up — from memory layout to backpropagation - yet be extremely lightweight while wearing a familiar look!
+
+Tenmo draws inspiration from:
+- [Mojo by Modular](https://www.modular.com/mojo) - Systems programming in the guise of Python ergonomics!
+- [PyTorch](https://pytorch.org/) - API design and autograd architecture
+- [NumPy](https://numpy.org/) - Array operations and broadcasting semantics
+- [Karpathy's llm.c](https://github.com/karpathy/llm.c) - Minimalist, educational approach
+
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
+Tenmo is about exploring what's possible with Mojo. Contributions are welcome!
+
+**How to contribute:**
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Make your changes with tests
+4. Commit (`git commit -m 'Add amazing feature'`)
+5. Push to your branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
+
+**Areas where help is needed:**
+- Performance optimization
+- Additional layers and operations
+- Documentation and examples
+- Bug reports and testing
 
 ---
 
@@ -368,17 +363,8 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 Built with ❤️ using [Mojo](https://www.modular.com/mojo) by Modular.
 
-Inspired by PyTorch's elegant API and Mojo's performance potential.
-
-Special thanks to the [Mojo community](https://forum.modular.com/) for promt responses.
+Kudos to Modular team for democratizing SIMD and practical cross-platform GPU programming.
 
 ---
 
-## 📬 Contact
-
-Questions? Suggestions? Open an issue or reach out!
-
-**Star ⭐ this repo if Tenmo helps your ML journey!**
-
----
-
+**⭐ Star this repo if Tenmo helps your ML journey in Mojo!**
