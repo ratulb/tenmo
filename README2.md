@@ -1,6 +1,6 @@
 # Tenmo 🔥
 
-**A high-performance tensor library and neural network framework built entirely in Mojo 🔥**
+**A high-performance, lean tensor library and neural network framework built entirely in Mojo 🔥**
 
 Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differentiation, modular neural networks, and end-to-end training pipelines—aiming for performance competitive with modern ML systems.
 
@@ -26,90 +26,148 @@ Training the same 4-layer MLP (784→128→32→10) on identical hardware:
 - 🎯︎ **97.4% accuracy** - Comparable to PyTorch with proper initialization
 - 📉 **Zero Python overhead** - Runs entirely in compiled Mojo
 
-*All benchmarks performed on the same machine (Intel Xeon CPU, Tesla T4 GPU), batch_size=64*
+*All runs were performed sequentially on the same system, batch_size=64*
 
 **Why is Tenmo competitive?**
+- GPU overhead (kernel launch + data movement) dominates for small MNIST models
+- Tenmo benefits from:
+  - Zero Python overhead 
+  - SIMD-vectorized operations on contiguous buffers
+  - Zero-copy batch loading
+  - Compile-time specialization (eliminates graph overhead in eval mode)
 
-The performance comes from eliminating Python's interpreter overhead and data movement costs. For MNIST-scale models, the time spent in Python's runtime (scheduling, GIL, type checking) and GPU data transfers dominates actual compute. Tenmo's compiled Mojo code runs these operations directly on CPU with:
-- SIMD-vectorized operations (manual loop unrolling)
-- Zero-copy batch loading (bulk memcpy at ~0.03ms/batch)
-- Cache-friendly memory layouts
-- Compile-time specialization (eliminates graph overhead in eval mode)
+ The MNIST example does not use BLAS - it executes pure mojo code.
 
 For larger models where GPU compute advantages outweigh transfer costs, GPU acceleration becomes more beneficial. Tenmo's current focus is proving out the fundamentals on CPU before adding GPU support.
 
 ---
 
-## ⚡︎ Quick Start
+## Quick Start
 
-### XOR Problem - Neural Network in 15 Lines
+#### Tensor operation with backpropgation
 ```mojo
-from tenmo import Tensor, Sequential, Linear, Sigmoid, MSELoss, SGD
-
-var model = Sequential[DType.float32]()
-model.append(
-    Linear[DType.float32](2, 4).into(),
-    Sigmoid[DType.float32]().into(),
-    Linear[DType.float32](4, 1).into(),
-    Sigmoid[DType.float32]().into()
-)
-
-var X = Tensor[DType.float32].d2([[0, 0], [0, 1], [1, 0], [1, 1]])
-var y = Tensor[DType.float32].d2([[0], [1], [1], [0]])
-
-var optimizer = SGD(model.parameters(), lr=0.5, momentum=0.9)
-var criterion = MSELoss[DType.float32]()
-
-for epoch in range(2000):
-    model.train()
-    criterion.train()
-    var pred = model(X)
-    var loss = criterion(pred, y)
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-
-model.eval()
-print(model(X))  # Perfect XOR solution!
-```
-
-### Creating and Operating on Tensors
-```mojo
+from testing import assert_true
 from tenmo import Tensor
 
-# Create tensors with various constructors
-var a = Tensor[DType.float32].arange(6, requires_grad=True).reshape(2, 3)
-a.print()
-# [2D Tensor(2, 3), Type: float32, requires_grad: True]
-#   [
-#     [0.0, 1.0, 2.0],
-#     [3.0, 4.0, 5.0],
-#   ]
+fn main() raises:
+    # Default DType is DType.float32
 
-# Broadcasting and element-wise operations
-var b = a + 1.0
-var c = a * 2.0
+    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
 
-# Automatic differentiation
-var y = c.sum()
-y.backward()
-a.grad[].print()  # Gradients computed!
+    # a is used in two places
+    var b = a * 2  # ∂b/∂a = 2
+    var c = a * 3  # ∂c/∂a = 3
 
-# Views and slicing (memory-efficient)
-var v1 = a.view([5, 2], offset=2)   # Slice starting from a[2]
-var v2 = v1.view([2, 5])            # Reshape
-var v3 = v2.view([10])              # Flatten
+    var d = b + c  # ∂d/∂a = ∂b/∂a + ∂c/∂a = 2 + 3 = 5
 
-# More constructors
-var zeros = Tensor[DType.float32].zeros(3, 4)
-var ones = Tensor[DType.float32].ones(2, 2)
-var randn = Tensor[DType.float32].randn(5, 5)
-var linspace = Tensor[DType.float32].linspace(0, 10, 100)
+    d.backward()
+
+    # Final grad: ∂d/∂a = [5, 5, 5]
+    assert_true(a.grad().all_close(Tensor.d1([5.0, 5.0, 5.0])), "∂d/∂a = 5")
 ```
+#### Broadcast matmul
+```mojo
 
+from tenmo import Tensor
+
+fn main() raises:
+    """Broadcasting (2,3) @ (1,3,4)."""
+    var A = Tensor.ones(2, 3, requires_grad=True)
+    var B = Tensor.ones(1, 3, 4)
+    var result = A.matmul(B)
+    result.backward()
+    print(" Broadcast matmul result")
+    result.print()
+    print(" \nA's gradients")
+    A.grad().print()
+
+ Broadcast matmul result
+
+ [3D Tensor(1, 2, 4), strides: (8, 4, 1), offset: 0, Type: float32, requires_grad: True]
+  [
+    [
+      [3.0, 3.0, 3.0, 3.0],
+      [3.0, 3.0, 3.0, 3.0]
+    ]
+  ] 
+A's gradients
+
+ [2D Gradbox(2, 3), Type: float32, Shared : False, Strides : (3, 1), Offset : 0]
+  [
+    [4.0, 4.0, 4.0],
+    [4.0, 4.0, 4.0]
+  ]  
+
+```
+#### Solve XOR
+```mojo
+from tenmo import Tensor
+from net import Sequential, Linear, Sigmoid, MSELoss
+from sgd import SGD
+
+fn main():
+    """
+    Classic non-linearly separable XOR problem requiring hidden layers.
+    """
+    alias dtype = DType.float64
+
+    # XOR truth table
+    var X = Tensor[dtype].d2([[0, 0], [0, 1], [1, 0], [1, 1]])
+    var y = Tensor[dtype].d2([[0], [1], [1], [0]])
+
+    var model = Sequential[dtype]()
+    model.append(
+        Linear[dtype](2, 4, init_method="xavier").into(),
+        Sigmoid[dtype]().into(),
+        Linear[dtype](4, 1, init_method="xavier").into(),
+        Sigmoid[dtype]().into(),
+    )
+
+    var criterion = MSELoss[dtype]()
+    var optimizer = SGD(model.parameters(), lr=0.5, momentum=0.9)
+
+    model.train()
+    criterion.train()
+
+    for epoch in range(200):
+        var pred = model(X)
+        var loss = criterion(pred, y)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    # Final evaluation
+    model.eval()
+    var final_pred = model(X)
+    var final_loss = criterion(final_pred, y)
+
+    var correct = 0
+    var total_error = 0.0
+    for i in range(4):
+        var pred_class = 1 if final_pred[i, 0] > 0.5 else 0
+        var true_class = Int(y[i, 0])
+        if pred_class == true_class:
+            correct += 1
+        total_error += abs(final_pred[i, 0] - y[i, 0])
+
+    print("Final loss: ", final_loss.item())
+    print("Accuracy: ", 100.0 * correct / 4, "%")
+
+    if correct == 4:
+        print("Success: Network learned XOR perfectly")
+    else:
+        print("Failed: Network did not learn XOR")
+
+
+    Final loss: 0.028409039159250152
+    Accuracy: 100.0%
+
+    Success: Network learned XOR perfectly
+```
 ---
 
-## ⚡︎ Features
+## Features
 
 ### Core Tensor Operations
 - **Automatic differentiation** with dynamic computational graph
@@ -155,9 +213,9 @@ Tenmo supports configurable BLAS backends for linear algebra operations. When th
 
 ## 🏗️ Architecture
 
-Tenmo's design prioritizes memory efficiency and performance through careful separation of concerns:
+Tenmo's design prioritizes memory efficiency and performance through careful separation of concerns - organized around a small number of tightly scoped core building blocks:
 
-### Memory Layout
+### Core Types (Conceptual)
 ```
 Tensor[dtype: DType]
 ├── buffer: NDBuffer          # Single source of truth for shape/strides/offset
@@ -179,15 +237,21 @@ Buffer[dtype: DType]
 └── UnsafePointer[Scalar]     # SIMD-capable linear storage
 ```
 
-**Key Design Decisions:**
+### Design Rationale
 
-1. **Tensor vs Gradbox**: Gradients don't need to be full-fledged Tensors, so they live in a lightweight `Gradbox` struct. This results in 70 % code reduction for Gradboxes!
+**Gradbox is not a Tensor**  
+Gradients don't need the full Tensor API. A `Gradbox` encapsulates only an `NDBuffer`, keeping gradient storage minimal and explicit — **70% less code than full Tensors**.
 
-2. **NDBuffer as Single Source of Truth**: Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both `Tensor` and `Gradbox`. This ensures views, slicing, and broadcasting behave consistently.
+**NDBuffer as Single Source of Truth**  
+Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both `Tensor` and `Gradbox`. This ensures views, slicing, and broadcasting behave consistently across the system.
 
-3. **Reference-Counted Buffer**: The innermost `Buffer` becomes ref-counted when views are created, enabling zero-copy slicing while maintaining memory safety.
+**Views are cheap**  
+`Buffer` is linear and becomes reference-counted when views are created. Views share storage without copying — which provides zero-cost slicing.
 
-4. **Manual Broadcasting**: Broadcasting is explicitly handled in `NDBuffer` operations rather than being implicit, giving fine-grained control over memory layouts.
+**Backpropagation**  
+The innermost linear buffer is shared (ref-counted) between user tensors and the autograd engine, ensuring gradients flow correctly through the computation graph.
+
+This architecture keeps the system **explicit, predictable, and close to the metal**.
 
 ---
 
@@ -231,7 +295,7 @@ Epoch 15: Loss: 0.059, Train: 98.38%, Test: 97.44%, Time: 11.7s
 ## 🔧 Installation
 
 ### Prerequisites
-- Mojo 0.25.7.0 or newer
+- Mojo 0.25.7.0
 - Python 3.10-3.12 (for NumPy interop in examples)
 
 ### Setup
@@ -290,7 +354,6 @@ for batch in train_loader:
 
 ### Numerically Stable Statistics
 ```mojo
-# Welford's algorithm with Kahan summation
 var mean = tensor.mean()
 var std = tensor.std()
 var variance = tensor.variance()
