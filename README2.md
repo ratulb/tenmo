@@ -149,7 +149,7 @@ var linspace = Tensor[DType.float32].linspace(0, 10, 100)
 - `TensorDataset`, `NumpyDataset` wrappers
 
 ### BLAS Integration
-Tenmo supports configurable BLAS backends for linear algebra operations. When the `BLAS_PATH` environment variable is specified the `LinearBLAS` layer will dispatch operations to the configured BLAS library. This remains optional, as Tenmo's pure Mojo implementation provides competitive performance and is the primary focus.
+Tenmo supports configurable BLAS backends for linear algebra operations. When the `BLAS_PATH` environment variable is specified, the `LinearBLAS` layer will dispatch operations to the configured BLAS library. This remains optional, as Tenmo's pure Mojo implementation provides competitive performance and is the primary focus.
 
 ---
 
