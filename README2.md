@@ -1,14 +1,14 @@
 # Tenmo 🔥
 
-**A high-performance tensor library and neural network framework built entirely in Mojo**
+**A high-performance tensor library and neural network framework built entirely in Mojo 🔥**
 
-Tenmo brings PyTorch-like ergonomics to Mojo with automatic differentiation, modular neural networks, and production-ready training pipelines—delivering competitive performance with zero Python overhead.
+Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differentiation, modular neural networks, and end-to-end training pipelines—aiming for performance competitive with modern ML systems.
 
-> ⚠️ **Development Status**: Tenmo is actively evolving alongside Mojo itself. The API is subject to change as we incorporate improvements from the Mojo ecosystem. Not recommended for production use yet, but great for learning and experimentation!
+> ⚠️ **Development Status**: Tenmo is actively evolving alongside Mojo itself. The API is subject to change as we incorporate improvements from the Mojo ecosystem. Not recommended for production use yet, but great for learning, experimentation, and systems-level exploration.
 
 ---
 
-## ⚡ Performance
+## ⚡︎ Performance
 
 ### MNIST Training Benchmark (15 Epochs, 105K Parameters)
 
@@ -21,10 +21,10 @@ Training the same 4-layer MLP (784→128→32→10) on identical hardware:
 | PyTorch | GPU (Tesla T4) | 15.2s | 227s | 97.87% |
 
 **Key Observations:**
-- 🚀 **1.3x faster than PyTorch CPU** - Pure Mojo implementation with SIMD optimization
-- ⚡ **1.3x faster than PyTorch GPU** - Efficient CPU utilization outperforms GPU on small models
-- 🎯 **97.4% accuracy** - Comparable to PyTorch with proper initialization
-- 💾 **Zero Python overhead** - Runs entirely in compiled Mojo
+- ⚡︎ **1.3x faster than PyTorch CPU** - Pure Mojo implementation with SIMD optimization
+- ⚡︎ **1.3x faster than PyTorch GPU** - Efficient CPU utilization outperforms GPU on small models
+- 🎯︎ **97.4% accuracy** - Comparable to PyTorch with proper initialization
+- 📉 **Zero Python overhead** - Runs entirely in compiled Mojo
 
 *All benchmarks performed on the same machine (Intel Xeon CPU, Tesla T4 GPU), batch_size=64*
 
@@ -40,7 +40,7 @@ For larger models where GPU compute advantages outweigh transfer costs, GPU acce
 
 ---
 
-## 🚀 Quick Start
+## ⚡︎ Quick Start
 
 ### XOR Problem - Neural Network in 15 Lines
 ```mojo
@@ -109,15 +109,15 @@ var linspace = Tensor[DType.float32].linspace(0, 10, 100)
 
 ---
 
-## 🎯 Features
+## ⚡︎ Features
 
 ### Core Tensor Operations
 - **Automatic differentiation** with dynamic computational graph
-- **Broadcasting** for arithmetic operations (`+`, `-`, `*`, `/`, `pow`)
+- **Broadcasting** for arithmetic operations (`+`, `-`, `*`, `/`)
 - **SIMD-optimized** kernels with manual vectorization
 - **Views and slicing** with zero-copy memory sharing
 - **Comprehensive constructors**: `zeros`, `ones`, `rand`, `randn`, `arange`, `linspace`, `full`
-- **Advanced indexing**: slice-based and index-based getitem/setitem
+- **Indexing**: Advanced `slicing`, `getitem`, `setitem`, and view operations
 - **Reductions**: `sum`, `mean`, `max`, `min`, `argmax`, `argmin` (with axis support)
 - **Reshaping**: `reshape`, `view`, `transpose`, `permute`, `squeeze`, `unsqueeze`, `flatten`
 - **Statistical ops**: `variance`, `std` (numerically stable algorithms)
@@ -196,7 +196,7 @@ Buffer[dtype: DType]
 ### 1. XOR Problem
 Binary classification demonstrating non-linear decision boundaries. Perfect separation achieved in ~2000 epochs with a simple 2-layer network.
 ```bash
-./example xor
+./example.sh xor
 ```
 
 ### 2. Spiral Dataset
@@ -204,14 +204,14 @@ Multi-class classification with complex decision boundaries:
 - 2 rotations: 99% accuracy, quick convergence
 - 3 rotations: Requires deeper architecture
 ```bash
-./example spiral
+./example.sh spiral
 ```
 
 ### 3. MNIST Digit Classification
 
 Full training pipeline with data loading, batching, and validation:
 ```bash
-./example mnist
+./example.sh mnist
 ```
 
 **Architecture**: 784 → 128 → 32 → 10  
@@ -236,13 +236,13 @@ Epoch 15: Loss: 0.059, Train: 98.38%, Test: 97.44%, Time: 11.7s
 
 ### Setup
 ```bash
-git clone https://github.com/yourusername/tenmo.git
+git clone https://github.com/ratulb/tenmo.git
 cd tenmo
 
 # Run examples
-./example xor
-./example mnist
-./example spiral
+./example.sh xor
+./example.sh mnist
+./example.sh spiral
 ```
 
 All core tensor operations are in pure Mojo with no external dependencies. NumPy is only used for loading MNIST data in the examples.
@@ -301,55 +301,46 @@ var variance = tensor.variance()
 ## 🚧 Roadmap
 
 ### Near Term
-- [ ] Additional optimizers (Adam, AdamW, RMSprop)
-- [ ] Improved Conv2d performance
-- [ ] BatchNorm and LayerNorm layers
-- [ ] Model checkpointing
-- [ ] Learning rate schedulers
+- [ ] More Optimizers: Adam, RMSprop, AdamW
+- [ ] Aggressive performance optimization of core components
+- [ ] Checkpointing: Model serialization and loading
+- [ ] Additional Layers: BatchNorm, LayerNorm
       
 ### Medium Term
-- [ ] Advanced architectures (ResNet, Transformer blocks)
-- [ ] Data augmentation utilities
-- [ ] Mixed precision training (FP16)
+- [ ] Transparent GPU Support: Unified CPU/GPU tensor operations
+- [ ] Investigate memory-efficient ancestry tracking for autodiff.
 
 ### Long Term
-- [ ] Transparent GPU support
-- [ ] Distributed training (multi-core parallelism)
-- [ ] Pre-trained model zoo
-- [ ] Integration with latest Mojo/Modular improvements
+- [ ] Distributed Training: Multi-device and multi-node support
+- [ ] Advanced Operations: Attention mechanisms, transformer blocks
+- [ ] Model Zoo: Pre-trained models and architectures
+- [ ] Production Readiness: API stabilization and comprehensive testing
 
 ---
 
-## 💡 Inspirations
-Tenmo is built with a simple goal:
-> Understand, control, and optimize the full ML stack from ground up — from memory layout to backpropagation - yet be extremely lightweight while wearing a familiar look!
+## 💡 Inspirations & Acknowledgments
 
-Tenmo draws inspiration from:
-- [Mojo by Modular](https://www.modular.com/mojo) - Systems programming in the guise of Python ergonomics!
-- [PyTorch](https://pytorch.org/) - API design and autograd architecture
-- [NumPy](https://numpy.org/) - Array operations and broadcasting semantics
-- [Karpathy's llm.c](https://github.com/karpathy/llm.c) - Minimalist, educational approach
+Tenmo is built with a simple goal: **understand, control, and optimize the full ML stack from the ground up** — from memory layout to backpropagation — while remaining lightweight and ergonomically familiar.
 
+This project stands on the shoulders of giants:
+
+- **[Mojo by Modular](https://www.modular.com/mojo)** for proving that systems programming can wear Python's ergonomics, making SIMD and GPU programming genuinely accessible
+- **[PyTorch](https://pytorch.org/)** for its intuitive API design and elegant autograd architecture that made deep learning feel natural
+- **[NumPy](https://numpy.org/)** for defining the standard in array operations and broadcasting semantics
+- **[Karpathy's llm.c](https://github.com/karpathy/llm.c)** for championing radical transparency: showing that understanding beats abstraction
 
 ---
 
 ## 🤝 Contributing
 
-Tenmo is about exploring what's possible with Mojo. Contributions are welcome!
+Tenmo welcomes contributions! Given the experimental nature of both the library and Mojo itself, we particularly value:
 
-**How to contribute:**
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes with tests
-4. Commit (`git commit -m 'Add amazing feature'`)
-5. Push to your branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
+1. **Bug reports** with reproducible examples.
+2. **Performance optimizations** for existing operations.
+3. **Documentation** and examples.
+4. **Additional layers and operations**.
 
-**Areas where help is needed:**
-- Performance optimization
-- Additional layers and operations
-- Documentation and examples
-- Bug reports and testing
+Please ensure any contributions maintain API consistency and include appropriate tests.
 
 ---
 
@@ -359,12 +350,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🙏 Acknowledgments
-
-Built with ❤️ using [Mojo](https://www.modular.com/mojo) by Modular.
-
-Kudos to Modular team for democratizing SIMD and practical cross-platform GPU programming.
-
----
-
-**⭐ Star this repo if Tenmo helps your ML journey in Mojo!**
+**⭐ Building ML systems in Mojo? Star this repo to follow along as we push toward production-grade performance!**
