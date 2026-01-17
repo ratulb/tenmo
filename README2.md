@@ -1,4 +1,4 @@
-# Tenmo 🔥
+# Tenmo 🧬
 
 **A high-performance, lean tensor library and neural network framework built entirely in Mojo 🔥**
 
@@ -22,7 +22,7 @@ Training the same 4-layer MLP (784→128→32→10) on identical hardware:
 
 **Key Observations:**
 - ⚡︎ **1.3x faster than PyTorch CPU** - Pure Mojo implementation with SIMD optimization
-- ⚡︎ **1.3x faster than PyTorch GPU** - Efficient CPU utilization outperforms GPU on small models
+- ⚡︎ **Competitive with PyTorch GPU for small models**
 - 🎯︎ **97.4% accuracy** - Comparable to PyTorch with proper initialization
 - 📉 **Zero Python overhead** - Runs entirely in compiled Mojo
 
@@ -36,7 +36,7 @@ Training the same 4-layer MLP (784→128→32→10) on identical hardware:
   - Zero-copy batch loading
   - Compile-time specialization (eliminates graph overhead in eval mode)
 
- The MNIST example does not use BLAS - it executes pure mojo code.
+ The MNIST example does not use BLAS - it executes pure Mojo code.
 
 For larger models where GPU compute advantages outweigh transfer costs, GPU acceleration becomes more beneficial. Tenmo's current focus is proving out the fundamentals on CPU before adding GPU support.
 
@@ -44,7 +44,7 @@ For larger models where GPU compute advantages outweigh transfer costs, GPU acce
 
 ## Quick Start
 
-#### Tensor operation with backpropgation
+#### Tensor operation with backpropagation
 ```mojo
 from testing import assert_true
 from tenmo import Tensor
@@ -293,6 +293,19 @@ Multi-class classification with complex decision boundaries:
 - 3 rotations: Requires deeper architecture
 ```bash
 ./example.sh spiral
+Final Validation Loss: 0.022977224874494065
+Final Validation Accuracy: 99.2 %
+
+================================================================================
+Performance Summary
+================================================================================
+Total epochs: 3000
+Total batches processed: 96000
+Average time per batch: 6.463713670645833 ms
+Average time per epoch: 206.83883746066667 ms
+
+✓ Training successful! Model learned the spiral pattern.
+================================================================================
 ```
 
 ### 3. MNIST Digit Classification
