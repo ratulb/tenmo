@@ -93,7 +93,7 @@ struct BLASMatmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
 
 alias BLAS_PATH = env_get_string[
-    "BLAS_PATH", "/home/ritu91b/tenmo/.pixi/envs/default/lib/libopenblas.so.0"
+    "BLAS_PATH", "/usr/lib/x86_64-linux-gnu/libopenblas.so.0"
 ]()
 # void cblas_sgemm(
 #    int order,           1. CblasRowMajor (101)
