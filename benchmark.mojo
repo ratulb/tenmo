@@ -131,7 +131,7 @@ fn benchmark_matmul():
                     max_diff = diff
 
         if max_diff < 1e-3:
-            print("  ✓ Results match (max diff:", max_diff, ")")
+            print("   Results match (max diff:", max_diff, ")")
         else:
             print("  ✗ Results differ (max diff:", max_diff, ")")
 
@@ -225,4 +225,4 @@ fn main():
     # Run memory bandwidth test
     benchmark_memory_bandwidth()
 
-    print("\n✓ All benchmarks complete!")
+    print("\n All benchmarks complete!")
