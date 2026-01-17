@@ -237,7 +237,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn __iter__(ref self) -> ElementIterator[Self.dtype, origin_of(self)]:
         return ElementIterator(Pointer(to=self))
-
+    @always_inline
     fn __getitem__(self, slice: Slice) -> Buffer[Self.dtype]:
         var start, end, step = slice.indices(len(self))
         var spread = range(start, end, step)
@@ -284,27 +284,6 @@ struct Buffer[dtype: DType = DType.float32](
                 ]
         else:
             # Too small for SIMD - just use scalar loop
-            for i in range(result_size):
-                result.data[i] = self.data[start + i * step]
-
-        return result^
-
-    @always_inline
-    fn __getitem__old(self, slice: Slice) -> Buffer[Self.dtype]:
-        var start, end, step = slice.indices(len(self))
-        var spread = range(start, end, step)
-        var result_size = len(spread)
-
-        if result_size == 0:
-            return Buffer[Self.dtype]()
-
-        var result = Buffer[Self.dtype](result_size)
-
-        # Fast path: contiguous slice (step == 1)
-        if step == 1:
-            memcpy(dest=result.data, src=self.data + start, count=result_size)
-        else:
-            # Slow path: non-contiguous slice
             for i in range(result_size):
                 result.data[i] = self.data[start + i * step]
 
