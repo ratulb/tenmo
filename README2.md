@@ -1,6 +1,6 @@
 # Tenmo 🧬
 
-**A high-performance, lean tensor library and neural network framework built entirely in Mojo 🔥**
+**A lean tensor library and neural network framework built entirely in Mojo 🔥**
 
 Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differentiation, modular neural networks, and end-to-end training pipelines—aiming for performance competitive with modern ML systems.
 
@@ -173,7 +173,7 @@ fn main():
 
 **Transparency you can trust**: Every operation is implemented in pure Mojo — no hidden BLAS calls, no opaque kernels. Perfect for learning and optimization.
 
-**Production trajectory**: Currently competitive with PyTorch CPU; actively working toward GPU support and distributed training.
+**Forward-looking design**: Competitive with PyTorch CPU today; exploring GPU support and distributed training.
 
 **Mojo-native**: Leverages compile-time metaprogramming, zero-cost abstractions, and systems-level control that Python-based frameworks can't match.
 
