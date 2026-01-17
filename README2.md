@@ -278,6 +278,13 @@ cd tenmo
 Binary classification demonstrating non-linear decision boundaries. Perfect separation achieved in ~2000 epochs with a simple 2-layer network.
 ```bash
 ./example.sh xor
+
+Epoch 1999 predictions:
+  (0,0) → 0 | 0.0107 (err: 0.0107)
+  (0,1) → 1 | 0.9845 (err: 0.0154)
+  (1,0) → 1 | 0.9880 (err: 0.0119)
+  (1,1) → 0 | 0.0166 (err: 0.0166)
+
 ```
 
 ### 2. Spiral Dataset
