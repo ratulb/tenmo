@@ -226,7 +226,7 @@ Tenmo supports configurable BLAS backends for linear algebra operations. When th
 
 ## 🏗️ Architecture
 
-Tenmo's design prioritizes memory efficiency and performance through careful separation of concerns - organized around a small number of tightly scoped core building blocks:
+Tenmo's design prioritizes memory efficiency and performance through careful separation of concerns - organized around a few tightly scoped core building blocks:
 
 ### Core Types (Conceptual)
 ```
