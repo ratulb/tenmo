@@ -92,9 +92,7 @@ struct BLASMatmul2dBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
-_="""alias BLAS_PATH = env_get_string[
-    "BLAS_PATH", "/usr/lib/x86_64-linux-gnu/libopenblas.so.0"
-]()"""
+#alias BLAS_PATH = env_get_string["BLAS_PATH", "/usr/lib/x86_64-linux-gnu/libopenblas.so.0"]()
 alias BLAS_PATH = env_get_string[
     "BLAS_PATH", "/content/tenmo/.pixi/envs/default/lib/libopenblas.so.0"
 ]()
