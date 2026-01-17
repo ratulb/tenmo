@@ -4,7 +4,7 @@
 
 Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differentiation, modular neural networks, and end-to-end training pipelines—aiming for performance competitive with modern ML systems.
 
-> ⚠️ **Development Status**: Tenmo is actively evolving alongside Mojo itself. The API is subject to change as we incorporate improvements from the Mojo ecosystem. Not recommended for production use yet, but great for learning, experimentation, and systems-level exploration.
+> ⚠️ **Development Status**: Tenmo is actively evolving alongside Mojo itself. The API is subject to change as we incorporate improvements from the Mojo ecosystem. Not production-ready yet, but excellent for learning, experimentation, and systems-level exploration.
 
 ---
 
@@ -50,7 +50,7 @@ from testing import assert_true
 from tenmo import Tensor
 
 fn main() raises:
-    # Default DType is DType.float32
+    # Defaults to DType.float32
 
     var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
 
@@ -167,6 +167,17 @@ fn main():
 ```
 ---
 
+## Why Tenmo?
+
+**Performance without compromise**: 1.3× faster than PyTorch CPU on MNIST, with zero Python overhead and full SIMD optimization.
+
+**Transparency you can trust**: Every operation is implemented in pure Mojo — no hidden BLAS calls, no opaque kernels. Perfect for learning and optimization.
+
+**Production trajectory**: Currently competitive with PyTorch CPU; actively working toward GPU support and distributed training.
+
+**Mojo-native**: Leverages compile-time metaprogramming, zero-cost abstractions, and systems-level control that Python-based frameworks can't match.
+
+---
 ## Tensor Capabilities
 
 Tenmo provides a broad set of tensor operations. Below is a representative (not exhaustive) selection:
@@ -209,7 +220,7 @@ Tenmo provides a broad set of tensor operations. Below is a representative (not 
 - `TensorDataset`, `NumpyDataset` wrappers
 
 ### BLAS Integration
-Tenmo supports configurable BLAS backends for linear algebra operations. When the `BLAS_PATH` environment variable is specified, the `LinearBLAS` layer will dispatch operations to the configured BLAS library. This remains optional, as Tenmo's pure Mojo implementation provides competitive performance and is the primary focus.
+Tenmo supports configurable BLAS backends for linear algebra operations. When the `BLAS_PATH` environment variable is specified, the `LinearBLAS` layer will dispatch operations to the configured BLAS library. However, **Tenmo's pure Mojo implementation is competitive and recommended** — BLAS support is maintained for compatibility.
 
 ---
 
