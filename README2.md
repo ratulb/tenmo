@@ -167,7 +167,9 @@ fn main():
 ```
 ---
 
-## Features
+## Tensor Capabilities
+
+Tenmo provides a broad set of tensor operations. Below is a representative (not exhaustive) selection:
 
 ### Core Tensor Operations
 - **Automatic differentiation** with dynamic computational graph
@@ -257,6 +259,21 @@ This architecture keeps the system **explicit, predictable, and close to the met
 
 ## 📖 Examples
 
+### Prerequisites
+- Mojo 0.25.7.0
+- Python 3.10-3.12 (for NumPy interop in examples)
+
+### Setup
+```bash
+git clone https://github.com/ratulb/tenmo.git
+cd tenmo
+
+# Run examples
+./example.sh xor
+./example.sh mnist
+./example.sh spiral
+```
+
 ### 1. XOR Problem
 Binary classification demonstrating non-linear decision boundaries. Perfect separation achieved in ~2000 epochs with a simple 2-layer network.
 ```bash
@@ -265,7 +282,7 @@ Binary classification demonstrating non-linear decision boundaries. Perfect sepa
 
 ### 2. Spiral Dataset
 Multi-class classification with complex decision boundaries:
-- 2 rotations: 99% accuracy, quick convergence
+- 2 rotations: 99% accuracy
 - 3 rotations: Requires deeper architecture
 ```bash
 ./example.sh spiral
@@ -289,26 +306,6 @@ Epoch 5:  Loss: 0.158, Train: 95.40%, Test: 95.76%, Time: 11.0s
 Epoch 10: Loss: 0.091, Train: 97.38%, Test: 97.13%, Time: 11.6s
 Epoch 15: Loss: 0.059, Train: 98.38%, Test: 97.44%, Time: 11.7s
 ```
-
----
-
-## 🔧 Installation
-
-### Prerequisites
-- Mojo 0.25.7.0
-- Python 3.10-3.12 (for NumPy interop in examples)
-
-### Setup
-```bash
-git clone https://github.com/ratulb/tenmo.git
-cd tenmo
-
-# Run examples
-./example.sh xor
-./example.sh mnist
-./example.sh spiral
-```
-
 All core tensor operations are in pure Mojo with no external dependencies. NumPy is only used for loading MNIST data in the examples.
 
 ---
@@ -328,7 +325,7 @@ loss.backward()
 # Evaluation: zero overhead
 model.eval()
 criterion.eval()
-loss = criterion(pred, target)  # Pure forward pass, no graph, utilizes Mojo's compile-time metaprogramming that eliminates generation of grad tracking code path 
+loss = criterion(pred, target)  # Pure forward pass, no graph, utilizes Mojo's compile-time metaprogramming that eliminates generation of grad tracking code
 ```
 
 ### Memory-Efficient Data Loading
@@ -351,14 +348,6 @@ for batch in train_loader:
 - Bulk `memcpy` for sequential access (validation: single copy per batch)
 - Row-by-row `memcpy` for shuffled access (training: 64 copies per batch)
 - Built-in shuffling without data movement
-
-### Numerically Stable Statistics
-```mojo
-var mean = tensor.mean()
-var std = tensor.std()
-var variance = tensor.variance()
-```
-
 ---
 
 ## 🚧 Roadmap
