@@ -1,4 +1,4 @@
-# Tenmo 🧬
+# Tenmo
 
 **A lean tensor library and neural network framework built entirely in Mojo 🔥**
 
