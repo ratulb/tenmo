@@ -277,7 +277,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
 @register_passable
 struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
     """
-    Production-grade fused Im2Col + Conv + Bias operation.
+    Fused Im2Col + Conv + Bias operation.
 
     Combines patch extraction, matrix multiplication, and bias addition
     into a single optimized kernel.
