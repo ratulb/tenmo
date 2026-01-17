@@ -49,7 +49,6 @@ from time import perf_counter_ns
 from math import sqrt, cos, sin, pi
 from random import randn_float64
 from intarray import IntArray
-from common_utils import SpiralDataGenerator, binary_accuracy
 
 
 fn generate_spiral_data(
@@ -160,14 +159,12 @@ fn train_spiral_classifier():
     print("Generating spiral dataset...")
 
     # Generate training data
-    # var (X_train, y_train) = generate_spiral_data(
-    var (X_train, y_train) = SpiralDataGenerator.generate_data(
+    var (X_train, y_train) = generate_spiral_data(
         n_points=num_train_samples, n_rotations=2.0, noise=0.01
     )
 
     # Generate validation data
-    # var (X_val, y_val) = generate_spiral_data(
-    var (X_val, y_val) = SpiralDataGenerator.generate_data(
+    var (X_val, y_val) = generate_spiral_data(
         n_points=num_val_samples, noise=0.01, n_rotations=2.0
     )
 
@@ -287,7 +284,6 @@ fn train_spiral_classifier():
             epoch_train_loss += loss.item() * train_batch.batch_size
 
             var batch_correct_count, _ = accuracy(
-                # var batch_correct_count, _ = binary_accuracy(
                 predictions,
                 train_batch.labels,
             )
