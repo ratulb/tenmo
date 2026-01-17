@@ -15,7 +15,3 @@ struct MSELoss[dtype: DType = DType.float32]:
         diff = preds - target
         loss = (diff * diff).mean()
         return loss^
-
-
-fn main():
-    print("passes")
