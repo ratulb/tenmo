@@ -1,7 +1,3 @@
-"""
-blas.mojo - BLAS integration for fast matrix operations
-"""
-
 from sys.ffi import OwnedDLHandle, _DLHandle
 from tenmo import Tensor
 from shapes import Shape
