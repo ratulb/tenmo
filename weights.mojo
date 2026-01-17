@@ -1,6 +1,6 @@
 from memory import UnsafePointer, memcpy
 from python import Python, PythonObject
-from tensors import Tensor
+from tenmo import Tensor
 from utils import StaticTuple, Variant
 
 alias TensorVariant = Variant[
