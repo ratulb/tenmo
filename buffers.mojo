@@ -216,8 +216,8 @@ struct Buffer[dtype: DType = DType.float32](
             fence[ordering = Consistency.ACQUIRE]()
 
             # Destroy data elements
-            for i in range(self.size):
-                (self.data + i).destroy_pointee()
+            _="""for i in range(self.size):
+                (self.data + i).destroy_pointee()"""
 
             # Free allocation (starts at refcount, not data)
             var refcount_size = size_of[Atomic[DType.uint64]]()
@@ -226,8 +226,8 @@ struct Buffer[dtype: DType = DType.float32](
 
         else:
             # Unshared buffer - direct free
-            for i in range(self.size):
-                (self.data + i).destroy_pointee()
+            _="""for i in range(self.size):
+                (self.data + i).destroy_pointee()"""
             self.data.free()
             log_debug("Buffer__del__ → freed unshared buffer")
 
