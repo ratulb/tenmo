@@ -205,18 +205,11 @@ struct IndexCalculator:
                 )
 
         var flat = offset  # absolute base offset
-
-        # print("var flat: ", flat, indices.size(), shape)
-        # IntArrayHelper.print(indices)
         # 2. Normalize negative indices, bounds-check, and accumulate
         for dim_idx in range(indices.size()):
             var idx = indices[dim_idx]
             dim_size = shape[dim_idx]
-            # allow negative indexing like Python/NumPy: -1 => last element
             idx = idx + dim_size if idx < 0 else idx
-
-            # now validate
-
             if idx < 0 or idx >= dim_size:
                 panic(
                     "flatten_index: index out of bounds: axis",
@@ -226,9 +219,7 @@ struct IndexCalculator:
                     ", size",
                     dim_size.__str__(),
                 )
-
             flat = flat + idx * strides[dim_idx]
-
         return flat
 
     @always_inline
@@ -268,16 +259,12 @@ struct IndexCalculator:
                 )
 
         var flat = offset  # absolute base offset
-
         # 2. Normalize negative indices, bounds-check, and accumulate
         for dim_idx in range(len(indices)):
             var idx = indices[dim_idx]
             dim_size = shape[dim_idx]
-
-            # allow negative indexing like Python/NumPy: -1 => last element
             idx = idx + dim_size if idx < 0 else idx
-
-            # now validate
+            # Validate
             if idx < 0 or idx >= dim_size:
                 panic(
                     "flatten_index: index out of bounds: axis",
@@ -289,7 +276,6 @@ struct IndexCalculator:
                 )
 
             flat = flat + idx * strides[dim_idx]
-
         return flat
 
     @always_inline
@@ -332,16 +318,12 @@ struct IndexCalculator:
                 )
 
         var flat = offset  # absolute base offset
-
         # 2. Normalize negative indices, bounds-check, and accumulate
         for dim_idx in range(len(indices)):
             var idx = indices[dim_idx]
             dim_size = shape[dim_idx]
-
-            # allow negative indexing like Python/NumPy: -1 => last element
             idx = idx + dim_size if idx < 0 else idx
-
-            # now validate
+            # Validate
             if idx < 0 or idx >= dim_size:
                 panic(
                     "flatten_index: index out of bounds: axis",
@@ -353,7 +335,6 @@ struct IndexCalculator:
                 )
 
             flat = flat + idx * strides[dim_idx]
-
         return flat
 
     @always_inline
@@ -375,5 +356,4 @@ struct IndexCalculator:
             var dim = shape[i]
             indices[i] = remaining % dim
             remaining //= dim
-
         return indices^
