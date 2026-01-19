@@ -93,7 +93,7 @@ struct NDBuffer[dtype: DType](
         self._contiguous = other._contiguous
 
     fn __copyinit__(out self, other: Self):
-        """Copy NDBuffer - buffer handles ref counting automatically!."""
+        """Copy NDBuffer - Buffer handles ref counting automatically."""
         self.buffer = (
             other.buffer.copy()
         )  # Buffer copy handles shared/unshared!
@@ -259,7 +259,6 @@ struct NDBuffer[dtype: DType](
                     + "Use .contiguous() or scalar loads."
                 )
 
-        # Direct field access - no copy!
         var addr = row * self.strides[0] + col * self.strides[1] + self.offset
         return self.buffer.load[simdwidth](addr)
 
@@ -311,7 +310,6 @@ struct NDBuffer[dtype: DType](
                     + "Use .contiguous() or scalar stores."
                 )
 
-        # Direct field access - no copy!
         var addr = row * self.strides[0] + col * self.strides[1] + self.offset
         self.buffer.store[simdwidth](addr, value)
 
@@ -638,7 +636,7 @@ struct NDBuffer[dtype: DType](
         for elem in uniques:
             distincts.append(elem)
         var unique_shape = Shape(len(distincts))
-        return NDBuffer[Self.dtype](Buffer[Self.dtype](distincts), unique_shape)
+        return NDBuffer[Self.dtype](Buffer[Self.dtype](distincts^), unique_shape)
 
     @always_inline
     fn copy_from_alike[
