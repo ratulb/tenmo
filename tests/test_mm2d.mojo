@@ -69,7 +69,7 @@ fn validate_matmul_2d_grads[
             )
 
         if not auto_grad_A.all_close(expected_grad_A):
-            print("❌ Gradient mismatch for A")
+            print("Gradient mismatch for A")
             print("Expected gradA:", expected_grad_A)
             print("Actual gradA:", auto_grad_A)
             panic("validate_matmul_2d_grads → Gradient mismatch for A.")
@@ -88,14 +88,14 @@ fn validate_matmul_2d_grads[
             )
 
         if not auto_grad_B.all_close(expected_grad_B):
-            print("❌ Gradient mismatch for B")
+            print("Gradient mismatch for B")
             print("Expected gradB:", expected_grad_B)
             print("Actual gradB:", auto_grad_B)
             panic("validate_matmul_2d_grads → Gradient mismatch for B.")
     else:
-        print("⚠️ Skipping B.grad validation (requires_grad == False)")
+        print("Skipping B.grad validation (requires_grad == False)")
 
-    print("✅ Matmul_2d gradient validation passed for all applicable tensors")
+    print("Matmul_2d gradient validation passed for all applicable tensors")
 
 
 fn main() raises:
