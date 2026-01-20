@@ -19,10 +19,10 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
     var offset: Int
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[dtype](self), Self.TAG)
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward[
-        simdwidth: Int = simd_width_of[dtype]()
+        simdwidth: Int = simd_width_of[Self.dtype]()
     ](self, read output: Tensor[Self.dtype]) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
