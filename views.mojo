@@ -131,7 +131,7 @@ struct View[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        mut tensor: Tensor[dtype],
+        mut tensor: Tensor[Self.dtype],
         shape: Shape,
         strides: Strides,
         offset: Int = 0,
