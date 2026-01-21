@@ -8,21 +8,21 @@ from sys import simd_width_of
 @fieldwise_init
 @register_passable
 struct ClipBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_CLIP
-    var min_val: Scalar[dtype]
-    var max_val: Scalar[dtype]
+    comptime TAG = BACKWARD_CLIP
+    var min_val: Scalar[Self.dtype]
+    var max_val: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """Gradient passes where min ≤ x ≤ max, blocked elsewhere."""
         ref grad_output = output.gradients()[]
         var parent = output.ancestry().get(0)
         ref shape = parent.shape()
-        var parent_gradbox = Gradbox[dtype].zeros(shape, share=False)
+        var parent_gradbox = Gradbox[Self.dtype].zeros(shape, share=False)
 
         if parent.is_contiguous():
             var src = parent.buffer.data_buffer().data
@@ -31,7 +31,7 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable):
             var offset = parent.offset()
             var numels = parent.numels()
 
-            alias simd_width = simd_width_of[dtype]()
+            comptime simd_width = simd_width_of[Self.dtype]()
 
             for i in range(0, numels - simd_width + 1, simd_width):
                 var x = src.load[width=simd_width](offset + i)
@@ -40,7 +40,7 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable):
                 # Mask: gradient passes only if min ≤ x ≤ max
                 var in_range = x.ge(self.min_val) & x.le(self.max_val)
 
-                var mask_float = in_range.cast[dtype]()
+                var mask_float = in_range.cast[Self.dtype]()
                 var grad_in = grad_out * mask_float
 
                 dest.store[width=simd_width](i, grad_in)
@@ -53,7 +53,7 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable):
                 if x >= self.min_val and x <= self.max_val:
                     dest[i] = grad_out  # Pass through
                 else:
-                    dest[i] = Scalar[dtype](0)  # Block
+                    dest[i] = Scalar[Self.dtype](0)  # Block
         else:
             # Non-contiguous fallback
             for coord in shape:
@@ -61,7 +61,7 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable):
                 if x >= self.min_val and x <= self.max_val:
                     parent_gradbox[coord] = grad_output[coord]
                 else:
-                    parent_gradbox[coord] = Scalar[dtype](0)
+                    parent_gradbox[coord] = Scalar[Self.dtype](0)
 
         return [(parent^, parent_gradbox^, AddTensor)]
 
@@ -73,14 +73,14 @@ struct Clip[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
-        min_val: Scalar[dtype],
-        max_val: Scalar[dtype],
+        self: Tensor[Self.dtype],
+        min_val: Scalar[Self.dtype],
+        max_val: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         """Clip values: y = clamp(x, min, max)."""
         var shape = self.shape()
-        var out = Tensor[dtype].zeros(shape, requires_grad=False)
+        var out = Tensor[Self.dtype].zeros(shape, requires_grad=False)
 
         if self.is_contiguous():
             var src = self.buffer.data_buffer().data
@@ -88,7 +88,7 @@ struct Clip[dtype: DType]:
             var offset = self.offset()
             var numels = self.numels()
 
-            alias simd_width = simd_width_of[dtype]()
+            comptime simd_width = simd_width_of[Self.dtype]()
 
             for i in range(0, numels - simd_width + 1, simd_width):
                 var x = src.load[width=simd_width](offset + i)
@@ -110,7 +110,7 @@ struct Clip[dtype: DType]:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = ClipBackward[dtype](
+                var backward_fn = ClipBackward[Self.dtype](
                     min_val, max_val
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)

@@ -18,7 +18,7 @@ from forwards import Concate
 struct StackBackward[dtype: DType](ImplicitlyCopyable):
     """Backward pass for stack operation."""
 
-    alias TAG = BACKWARD_STACK
+    comptime TAG = BACKWARD_STACK
 
     var axis: Int
     var num_tensors: Int

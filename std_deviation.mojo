@@ -8,18 +8,18 @@ from common_utils import panic
 @fieldwise_init
 @register_passable
 struct StdBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_STD
+    comptime TAG = BACKWARD_STD
     var axis: Int
     var unbiased: Bool
     var keepdims: Bool
-    var epsilon: Scalar[dtype]
+    var epsilon: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()  # Copy
         var input_tensor = output.ancestry().get(0)
         ref input_shape = input_tensor.shape()
@@ -32,11 +32,11 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable):
         var mean_val = input_tensor.mean[track_grad=False](dim, keepdims=True)
         var diff = input_tensor.__sub__[track_grad=False](mean_val)
 
-        var n: Scalar[dtype]
+        var n: Scalar[Self.dtype]
         if self.axis != -100:
-            n = Scalar[dtype](input_shape[self.axis])
+            n = Scalar[Self.dtype](input_shape[self.axis])
         else:
-            n = Scalar[dtype](input_shape.num_elements())
+            n = Scalar[Self.dtype](input_shape.num_elements())
 
         var divisor = n
         if self.unbiased and n > 1:
@@ -61,13 +61,13 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable):
         )
 
         # Handle keepdims
-        var gradbox_ancestor: Gradbox[dtype]
+        var gradbox_ancestor: Gradbox[Self.dtype]
         if not self.keepdims:
             if self.axis != -100:
                 gradbox_ancestor = gradbox.unsqueeze([self.axis])
             else:
                 var scalar_grad = gradbox.item()
-                gradbox_ancestor = Gradbox[dtype].full(
+                gradbox_ancestor = Gradbox[Self.dtype].full(
                     input_shape, scalar_grad, share=False
                 )
         else:
@@ -86,13 +86,13 @@ struct StdDev[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        self: Tensor[Self.dtype],
         axis: Int = -100,
         keepdims: Bool = False,
         unbiased: Bool = True,
-        epsilon: Scalar[dtype] = Scalar[dtype](1e-12),
+        epsilon: Scalar[Self.dtype] = Scalar[dtype](1e-12),
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         if axis != -100 and (axis < 0 or axis >= self.rank()):
             panic("axis is not valid for standard deviation")
         var var_result = self.variance[track_grad=False](
@@ -111,7 +111,7 @@ struct StdDev[dtype: DType]:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
-                backward_fn = StdBackward[dtype](
+                backward_fn = StdBackward[Self.dtype](
                     axis=axis,
                     unbiased=unbiased,
                     keepdims=keepdims,

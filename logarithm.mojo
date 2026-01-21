@@ -9,9 +9,9 @@ from sys import simd_width_of
 @fieldwise_init
 @register_passable
 struct LogBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_LOG
+    comptime TAG = BACKWARD_LOG
 
-    var epsilon: Scalar[dtype]  # Runtime epsilon value
+    var epsilon: Scalar[Self.dtype]  # Runtime epsilon value
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
@@ -32,7 +32,7 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
             var offset = parent.offset()
             var numels = parent.numels()
 
-            alias simd_width = simd_width_of[Self.dtype]()
+            comptime simd_width = simd_width_of[Self.dtype]()
 
             for i in range(0, numels - simd_width + 1, simd_width):
                 var x = src.load[width=simd_width](offset + i)  # Original input
@@ -95,7 +95,7 @@ struct Logarithm[dtype: DType]:
             var offset = self.offset()
             var numels = self.numels()
 
-            alias simd_width = simd_width_of[Self.dtype]()
+            comptime simd_width = simd_width_of[Self.dtype]()
 
             for i in range(0, numels - simd_width + 1, simd_width):
                 var chunk = src.load[width=simd_width](offset + i)

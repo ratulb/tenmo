@@ -15,19 +15,19 @@ from shapes import Shape
 @fieldwise_init
 @register_passable
 struct ConcatBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_CONCAT
+    comptime TAG = BACKWARD_CONCAT
     var axis: Int
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_output = output.gradients()[]
         var grad_data = grad_output.buffer.buffer.data
         ref grad_shape = grad_output.shape()
         ref grad_strides = grad_output.strides()
 
         var count = len(output.ancestry())
-        var result = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]()
+        var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
 
         # Fast path: axis 0
         if self.axis == 0:
@@ -36,7 +36,7 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable):
                 var tensor = output.ancestry().get(i)
                 var num_elements = tensor.numels()
                 if tensor.requires_grad:
-                    var grad_input = Gradbox[dtype].zeros(tensor.shape())
+                    var grad_input = Gradbox[Self.dtype].zeros(tensor.shape())
                     var grad_input_data = grad_input.buffer.buffer.data
                     for j in range(num_elements):
                         grad_input_data[j] = grad_data[src_offset + j]
@@ -53,7 +53,7 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable):
                 continue
 
             ref tensor_shape = tensor.shape()
-            var grad_input = Gradbox[dtype].zeros(tensor_shape)
+            var grad_input = Gradbox[Self.dtype].zeros(tensor_shape)
             var grad_input_data = grad_input.buffer.buffer.data
 
             var elem_idx = 0

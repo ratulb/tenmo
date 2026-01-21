@@ -21,7 +21,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
     3. Vectorized accumulation where possible
     """
 
-    alias TAG = BACKWARD_MAXPOOL2D
+    comptime TAG = BACKWARD_MAXPOOL2D
     var kernel_size: Int
     var stride: Int
     var padding: Int
@@ -116,7 +116,7 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
     4. Cache-friendly memory access
     """
 
-    alias TAG = MAXPOOL2D
+    comptime TAG = MAXPOOL2D
     var training: Bool
     var kernel_size: Int
     var stride: Int

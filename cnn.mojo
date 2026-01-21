@@ -380,7 +380,7 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
         var out_stride_Co = H_out * W_out
         var out_stride_H = W_out
 
-        alias simd_w = simd_width_of[Self.dtype]()
+        comptime simd_w = simd_width_of[Self.dtype]()
 
         # ═══════════════════════════════════════════════════════════
         # STEP 6: Parallel computation
@@ -550,7 +550,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
     - Input grad: Over N (each thread owns grad_padded[n, :, :, :])
     """
 
-    alias TAG = BACKWARD_FUSED_CONV
+    comptime TAG = BACKWARD_FUSED_CONV
     var N: Int
     var C_in: Int
     var H_pad: Int
@@ -639,7 +639,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var grad_ptr = grad_output.buffer.data_buffer().data
         var bias_ptr = grad_bias.buffer.data_buffer().data
 
-        alias simd_w = simd_width_of[dtype]()
+        comptime simd_w = simd_width_of[dtype]()
 
         var stride_N = C_out * H_out * W_out
         var stride_C = H_out * W_out
@@ -855,7 +855,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
                                 # Vectorize over KW if it's large enough
                                 # @parameter
                                 if KW >= 4:  # Worth vectorizing
-                                    alias kw_simd_w = min(
+                                    comptime kw_simd_w = min(
                                         4, simd_width_of[dtype]()
                                     )
                                     var kx = 0
