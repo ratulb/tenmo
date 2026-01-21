@@ -9,7 +9,7 @@ from testing import assert_true
 fn benchmark_cifar_sizes() raises:
     print("CIFAR-10 FC Layer Sizes:")
     print("=" * 50)
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     blas = BLASHandle[dtype]()
     # First layer: batch @ weights (128, 3072) @ (3072, 256)
     var start = now()
@@ -74,7 +74,7 @@ fn main() raises:
 fn test_blas_matmul_simple_f32() raises:
     """Test simple 2x2 matrix multiplication."""
     print("test_blas_matmul_simple_f32")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -91,7 +91,7 @@ fn test_blas_matmul_simple_f32() raises:
 fn test_blas_matmul_simple_f64() raises:
     """Test simple matrix multiplication with float64."""
     print("test_blas_matmul_simple_f64")
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -106,7 +106,7 @@ fn test_blas_matmul_simple_f64() raises:
 fn test_blas_matmul_identity() raises:
     """Test multiplication with identity matrix."""
     print("test_blas_matmul_identity")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -123,7 +123,7 @@ fn test_blas_matmul_identity() raises:
 fn test_blas_matmul_rectangular() raises:
     """Test rectangular matrix multiplication."""
     print("test_blas_matmul_rectangular")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     # (2, 3) @ (3, 4) -> (2, 4)
@@ -148,7 +148,7 @@ fn test_blas_matmul_transpose_a() raises:
     """Test matrix multiplication with transpose_A=True."""
 
     print("test_blas_matmul_transpose_a")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     # A is (3, 2), A^T is (2, 3)
@@ -170,7 +170,7 @@ fn test_blas_matmul_transpose_a() raises:
 fn test_blas_matmul_transpose_b() raises:
     """Test matrix multiplication with transpose_B=True."""
     print("test_blas_matmul_transpose_b")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # (2, 3)
@@ -190,7 +190,7 @@ fn test_blas_matmul_transpose_b() raises:
 fn test_blas_matmul_transpose_both() raises:
     """Test matrix multiplication with both transposes."""
     print("test_blas_matmul_transpose_both")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
@@ -213,7 +213,7 @@ fn test_blas_matmul_transpose_both() raises:
 fn test_blas_matmul_large_square() raises:
     """Test large square matrix multiplication."""
     print("test_blas_matmul_large_square")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var N = 100
@@ -232,7 +232,7 @@ fn test_blas_matmul_large_square() raises:
 fn test_blas_matmul_large_rectangular() raises:
     """Test large rectangular matrix multiplication."""
     print("test_blas_matmul_large_rectangular")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     # Simulate neural network layer: (batch, in_features) @ (in_features, out_features)
@@ -255,7 +255,7 @@ fn test_blas_matmul_large_rectangular() raises:
 fn test_blas_matmul_backward_simple() raises:
     """Test backward pass for simple matmul."""
     print("test_blas_matmul_backward_simple")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
     var blas_handle = blas.lite_handle()
 
@@ -284,7 +284,7 @@ fn test_blas_matmul_backward_simple() raises:
 fn test_blas_matmul_backward_single_requires_grad() raises:
     """Test backward when only one tensor requires grad."""
     print("test_blas_matmul_backward_single_requires_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -304,7 +304,7 @@ fn test_blas_matmul_backward_single_requires_grad() raises:
 fn test_blas_matmul_backward_chain() raises:
     """Test backward through chain of matmuls."""
     print("test_blas_matmul_backward_chain")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -333,7 +333,7 @@ fn test_blas_matmul_backward_chain() raises:
 fn test_blas_vs_native_random() raises:
     """Compare BLAS result with native matmul."""
     print("test_blas_vs_native_random")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].rand(50, 60)
@@ -349,7 +349,7 @@ fn test_blas_vs_native_random() raises:
 fn test_blas_vs_native_transpose_a() raises:
     """Compare BLAS transpose_A with native implementation."""
     print("test_blas_vs_native_transpose_a")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].rand(60, 50)  # Will be transposed to (50, 60)
@@ -365,7 +365,7 @@ fn test_blas_vs_native_transpose_a() raises:
 fn test_blas_vs_native_transpose_b() raises:
     """Compare BLAS transpose_B with native implementation."""
     print("test_blas_vs_native_transpose_b")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].rand(50, 60)
@@ -386,7 +386,7 @@ fn test_blas_vs_native_transpose_b() raises:
 fn test_blas_performance_small() raises:
     """Benchmark small matrices."""
     print("test_blas_performance_small")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].rand(10, 10)
@@ -410,7 +410,7 @@ fn test_blas_performance_small() raises:
 fn test_blas_performance_medium() raises:
     """Benchmark medium matrices (typical NN layer)."""
     print("test_blas_performance_medium")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].rand(128, 784)  # Batch of 128, 784 features
@@ -434,7 +434,7 @@ fn test_blas_performance_medium() raises:
 fn test_blas_performance_large() raises:
     """Benchmark large matrices."""
     print("test_blas_performance_large")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].rand(512, 1024)
@@ -463,7 +463,7 @@ fn test_blas_performance_large() raises:
 fn test_blas_matmul_vector_like() raises:
     """Test with very thin matrices (vector-like)."""
     print("test_blas_matmul_vector_like")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     # (100, 1) @ (1, 100) -> (100, 100) outer product
@@ -483,7 +483,7 @@ fn test_blas_matmul_vector_like() raises:
 fn test_blas_matmul_non_contiguous() raises:
     """Test with non-contiguous input (should be made contiguous)."""
     print("test_blas_matmul_non_contiguous")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     var A = Tensor[dtype].rand(10, 10)
@@ -564,7 +564,7 @@ fn test_blas_case_4_Atranspose_Btranspose() raises:
     print("TEST CASE 4: C = A^T @ B^T")
     print("=" * 80)
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Dimensions: A(3,2)^T @ B(4,3)^T → A^T(2,3) @ B^T(3,4) → C(2,4)
     var A = Tensor[dtype].d2(
@@ -636,7 +636,7 @@ fn test_case_2() raises:
     print("TEST CASE 2: C = A^T @ B")
     print("=" * 80)
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Same matrices as before
     var A = Tensor[dtype].d2(
@@ -701,7 +701,7 @@ fn test_blas_case_1_A_B() raises:
     print("TEST CASE 1: C = A @ B")
     print("=" * 80)
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Create tensors: A(3,2), B(2,4) → C(3,4)
     var A = Tensor[dtype].d2(
@@ -768,7 +768,7 @@ fn test_blas_case_2_Atranspose_B() raises:
     print("TEST CASE 2: C = A^T @ B")
     print("=" * 80)
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     A = Tensor[dtype].d2(
         [[1.0, 2.0],
@@ -843,7 +843,7 @@ fn test_blas_case_3_A_Btranspose() raises:
     print("TEST CASE 3: C = A @ B^T")
     print("=" * 80)
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Dimensions: A(3,2) @ B(4,2)^T → A(3,2) @ B^T(2,4) → C(3,4)
     var A = Tensor[dtype].d2(
@@ -902,7 +902,7 @@ fn test_case_4_comprehensive() raises:
     Test Case 4: C = A^T @ B^T.
     Compare: Native Mojo matmul, BLAS matmul, and PyTorch.
     """
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     print("=" * 80)
     print("TEST CASE 4: C = A^T @ B^T")
@@ -999,7 +999,7 @@ fn test_blas_matmul_edge_cases() raises:
     print("BLAS MATMUL EDGE CASES")
     print("=" * 80)
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var blas = BLASHandle[dtype]()
 
     # Test 1: Tall skinny matrices
@@ -1055,7 +1055,7 @@ fn test_blas_gradient_accuracy() raises:
     print("BLAS GRADIENT ACCURACY TEST (Finite Differences)")
     print("=" * 80)
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var eps = Scalar[dtype](0.0001)
 
     # Simple test case: C = A @ B, A(2,2), B(2,2)

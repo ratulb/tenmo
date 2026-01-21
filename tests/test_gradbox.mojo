@@ -40,7 +40,7 @@ fn main() raises:
 
 fn test_gradbox_unsqueeze_basic() raises:
     print("test_gradbox_unsqueeze_basic")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var g = Gradbox[dtype].arange(6).reshape(Shape(2, 3))
 
     var g1 = g.unsqueeze([0])
@@ -60,7 +60,7 @@ fn test_gradbox_unsqueeze_basic() raises:
 
 fn test_gradbox_squeeze_basic() raises:
     print("test_gradbox_squeeze_basic")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var g = Gradbox[dtype].arange(6).reshape(Shape(1, 2, 3, 1))
 
     var g1 = g.squeeze()
@@ -83,7 +83,7 @@ fn test_gradbox_squeeze_basic() raises:
 
 fn test_gradbox_squeeze_unsqueeze_symmetry() raises:
     print("test_gradbox_squeeze_unsqueeze_symmetry")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var g = Gradbox[dtype].arange(12).reshape(Shape(2, 3, 2))
 
     var u = g.unsqueeze([0, 3])
@@ -97,7 +97,7 @@ fn test_gradbox_squeeze_unsqueeze_symmetry() raises:
 
 fn test_gradbox_unsqueeze_negative_axes() raises:
     print("test_gradbox_unsqueeze_negative_axes")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var g = Gradbox[dtype].arange(4).reshape(Shape(2, 2))
 
     var g1 = g.unsqueeze([-1])
@@ -117,7 +117,7 @@ fn test_gradbox_unsqueeze_negative_axes() raises:
 
 fn test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
     print("test_gradbox_squeeze_unsqueeze_multiple_axes")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var g = Gradbox[dtype].arange(8).reshape(Shape(1, 2, 1, 4, 1))
 
     var s = g.squeeze([0, 2, 4])
@@ -132,7 +132,7 @@ fn test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
 
 
 fn test_gradbox_permute_basic() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     print("Running test_gradbox_permute_basic")
     g1 = Gradbox[dtype](Shape(3, 4))
     g1.buffer.fill(Scalar[dtype](1.0))
@@ -143,7 +143,7 @@ fn test_gradbox_permute_basic() raises:
 
 
 fn test_gradbox_permute_3d() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     print("Running test_gradbox_permute_3d")
     g1 = Gradbox[dtype](Shape(3, 4, 5))
     g1.buffer.fill(Scalar[dtype](2.0))
@@ -154,7 +154,7 @@ fn test_gradbox_permute_3d() raises:
 
 
 fn test_gradbox_permute_inverse() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     print("Running test_gradbox_permute_inverse")
     g1 = Gradbox[dtype](Shape(2, 3, 4))
     g1.buffer.fill(Scalar[dtype](3.0))
@@ -166,7 +166,7 @@ fn test_gradbox_permute_inverse() raises:
 
 
 fn test_gradbox_permute_identity() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     print("Running test_gradbox_permute_identity")
     g1 = Gradbox[dtype](Shape(3, 4, 5))
     g1.buffer.fill(Scalar[dtype](5.0))
@@ -177,7 +177,7 @@ fn test_gradbox_permute_identity() raises:
 
 
 fn test_gradbox_permute_singleton_dims() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     print("Running test_gradbox_permute_singleton_dims")
     g1 = Gradbox[dtype](Shape(1, 4, 1))
     g1.buffer.fill(Scalar[dtype](7.0))
@@ -189,7 +189,7 @@ fn test_gradbox_permute_singleton_dims() raises:
 
 
 fn test_gradbox_permute_high_rank() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     print("Running test_gradbox_permute_high_rank")
     g1 = Gradbox[dtype](Shape(2, 3, 4, 5))
     g1.buffer.fill(Scalar[dtype](9.0))
@@ -316,7 +316,7 @@ fn test_gradbox_squeeze_chain_of_ops() raises:
 
 fn test_gradbox_reverse_division() raises:
     print("test_gradbox_reverse_division")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
@@ -329,7 +329,7 @@ fn test_gradbox_reverse_division() raises:
 
 fn test_gradbox_reverse_subtract() raises:
     print("test_gradbox_reverse_subtract")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
@@ -341,7 +341,7 @@ fn test_gradbox_reverse_subtract() raises:
 
 fn test_gradbox_reshape() raises:
     print("test_gradbox_reshape")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
@@ -354,7 +354,7 @@ fn test_gradbox_reshape() raises:
 
 fn test_gradbox_inplace_add() raises:
     print("test_gradbox_inplace_add")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
@@ -374,7 +374,7 @@ fn test_gradbox_inplace_add() raises:
 
 fn test_gradbox_is_shared() raises:
     print("test_gradbox_is_shared")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)
@@ -385,7 +385,7 @@ fn test_gradbox_is_shared() raises:
 
 fn test_seed_gradbox() raises:
     print("test_seed_gradbox")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     buffer = Buffer[dtype]([1, 2, 3, 4, 5, 6])
     ndb = NDBuffer[dtype](buffer^, Shape(2, 3))
     gradbox = Gradbox[dtype](ndb^)

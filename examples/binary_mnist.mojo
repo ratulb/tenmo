@@ -33,7 +33,7 @@ fn train_mnist_binary() raises:
     print("Filtered to", len(filtered_labels), "samples (0s and 1s only)\n")
 
     # Convert to Mojo
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var X_train = from_ndarray[dtype](filtered_images, copy=True) / 255.0
     var y_train = from_ndarray[dtype](filtered_labels, copy=True)
     y_train = y_train.reshape(-1, 1)

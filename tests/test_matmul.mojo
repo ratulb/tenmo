@@ -68,7 +68,7 @@ fn test_3d_times_2d() raises:
     print("=" * 80)
 
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].ones(1, 2, 4, requires_grad=True)
     var B = Tensor[dtype].ones(4, 9, requires_grad=True)
 
@@ -108,7 +108,7 @@ fn test_batch_broadcasting() raises:
     print("=" * 80)
 
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[DType.float32].ones(3, 2, 4, requires_grad=True)
     var B = Tensor[DType.float32].ones(1, 4, 9, requires_grad=True)
 
@@ -340,7 +340,7 @@ fn test_complex_broadcasting() raises:
     print("=" * 80)
 
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[DType.float32].ones(2, 1, 3, 1, 4, 5, requires_grad=True)
     var B = Tensor[DType.float32].ones(1, 4, 1, 6, 5, 7, requires_grad=True)
 
@@ -479,7 +479,7 @@ fn test_pytorch_comparison() raises:
     print("]]]")
 
     result.backward()
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     A_grad_expected = Tensor[dtype].d2([[10.0, 26.0, 42.0], [10.0, 26.0, 42.0]])
     assert_true(A.grad() == A_grad_expected)
     B_grad_expected = Tensor[dtype].d3(

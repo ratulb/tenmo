@@ -13,9 +13,9 @@ from ndbuffer import NDBuffer
 @register_passable
 struct Reduction(Copyable, EqualityComparable, ImplicitlyCopyable):
     var reduction: Int
-    alias Mean = Reduction(0)
-    alias Sum = Reduction(1)
-    alias `None` = Reduction(2)
+    comptime Mean = Reduction(0)
+    comptime Sum = Reduction(1)
+    comptime `None` = Reduction(2)
 
     fn __init__(out self, reduction: Int = 0):
         self.reduction = reduction
@@ -422,7 +422,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
 struct CrossEntropyBackward[dtype: DType](
     Copyable & Movable & ImplicitlyCopyable
 ):
-    alias TAG = BACKWARD_CROSS_ENTROPY
+    comptime TAG = BACKWARD_CROSS_ENTROPY
     var reduction: Reduction
     var ignore_index: Int
     var label_smoothing: Scalar[Self.dtype]

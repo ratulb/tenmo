@@ -36,8 +36,8 @@ fn train_mnist() raises:
     print("  Test samples:", len(test_images), "\n")
 
     # ========== Data Preparation ==========
-    alias FEATURE_DTYPE = DType.float32
-    alias LABEL_DTYPE = DType.int32
+    comptime FEATURE_DTYPE = DType.float32
+    comptime LABEL_DTYPE = DType.int32
 
     train_images = train_images.astype(numpy_dtype(FEATURE_DTYPE))
     train_labels = train_labels.astype(numpy_dtype(LABEL_DTYPE))

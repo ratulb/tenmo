@@ -12,7 +12,7 @@ fn main() raises:
 
 fn test_matmul_nd_3d_basic_with_grad() raises:
     print("test_matmul_nd_3d_basic_with_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [
             [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
@@ -50,7 +50,7 @@ fn test_matmul_nd_3d_basic_with_grad() raises:
 
 fn test_matmul_nd_3d_broadcast_A_with_grad() raises:
     print("test_matmul_nd_3d_broadcast_A_with_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
     )  # Shape(1,2,2)
@@ -72,7 +72,7 @@ fn test_matmul_nd_3d_broadcast_A_with_grad() raises:
 
 fn test_matmul_nd_3d_broadcast_B_with_grad() raises:
     print("test_matmul_nd_3d_broadcast_B_with_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )  # Shape(2,2,2)
@@ -97,7 +97,7 @@ fn test_matmul_nd_3d_broadcast_B_with_grad() raises:
 
 fn test_matmul_nd_4d_basic_with_grad() raises:
     print("test_matmul_nd_4d_basic_with_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d4(
         [
             [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
@@ -125,7 +125,7 @@ fn test_matmul_nd_4d_basic_with_grad() raises:
 
 fn test_matmul_nd_4d_complex_broadcast_with_grad() raises:
     print("test_matmul_nd_4d_complex_broadcast_with_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d4(
         [[[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]],
         requires_grad=True,
@@ -148,7 +148,7 @@ fn test_matmul_nd_4d_complex_broadcast_with_grad() raises:
 
 fn test_matmul_nd_with_view_offset_grad() raises:
     print("test_matmul_nd_with_view_offset_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base_A = Tensor[dtype].d3(
         [
             [[0.0, 0.0], [0.0, 0.0]],  # Padding
@@ -184,7 +184,7 @@ fn test_matmul_nd_with_view_offset_grad() raises:
 
 fn test_matmul_nd_with_strided_view_grad() raises:
     print("test_matmul_nd_with_strided_view_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base_A = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]],
         requires_grad=True,
@@ -214,7 +214,7 @@ fn test_matmul_nd_with_strided_view_grad() raises:
 
 fn test_matmul_nd_single_batch_with_grad() raises:
     print("test_matmul_nd_single_batch_with_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
     var B = Tensor[dtype].d3([[[2.0, 0.0], [0.0, 2.0]]], requires_grad=True)
     var C = A.matmul(B)
@@ -228,7 +228,7 @@ fn test_matmul_nd_single_batch_with_grad() raises:
 
 fn test_matmul_nd_large_batch_small_matrices_with_grad() raises:
     print("test_matmul_nd_large_batch_small_matrices_with_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[2.0]], [[3.0]], [[4.0]]], requires_grad=True)
     var B = Tensor[dtype].d3([[[3.0]], [[4.0]], [[5.0]]], requires_grad=True)
     var C = A.matmul(B)
@@ -243,7 +243,7 @@ fn test_matmul_nd_large_batch_small_matrices_with_grad() raises:
 
 fn test_matmul_nd_identity_batch_with_grad() raises:
     print("test_matmul_nd_identity_batch_with_grad")
-    _ = """alias dtype = DType.float32
+    _ = """comptime dtype = DType.float32
     var A = Tensor[dtype].d3([
         [[1.0, 2.0], [3.0, 4.0]],
         [[5.0, 6.0], [7.0, 8.0]]
@@ -264,7 +264,7 @@ fn test_matmul_nd_identity_batch_with_grad() raises:
 
 fn test_matmul_nd_zeros_with_grad() raises:
     print("test_matmul_nd_zeros_with_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
@@ -287,7 +287,7 @@ fn test_matmul_nd_zeros_with_grad() raises:
 
 fn test_matmul_nd_mixed_batch_dims_with_grad() raises:
     print("test_matmul_nd_mixed_batch_dims_with_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )  # Shape(2,2,2)
@@ -338,7 +338,7 @@ fn test_matmul_nd_complete() raises:
 
 fn test_matmul_nd_3d_basic() raises:
     print("test_matmul_nd_3d_basic")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Batch of 2 matrices: 2x(2x3) × 2x(3x2) → 2x(2x2)
     var A = Tensor[dtype].d3(
         [
@@ -362,7 +362,7 @@ fn test_matmul_nd_3d_basic() raises:
 
 fn test_matmul_nd_3d_broadcast_A() raises:
     print("test_matmul_nd_3d_broadcast_A")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # A: 1x(2x3) broadcast to match B: 2x(3x2)
     var A = Tensor[dtype].d3([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])
     var B = Tensor[dtype].d3(
@@ -380,7 +380,7 @@ fn test_matmul_nd_3d_broadcast_A() raises:
 
 fn test_matmul_nd_3d_broadcast_B() raises:
     print("test_matmul_nd_3d_broadcast_B")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # B: 1x(3x2) broadcast to match A: 2x(2x3)
     var A = Tensor[dtype].d3(
         [
@@ -401,7 +401,7 @@ fn test_matmul_nd_3d_broadcast_B() raises:
 
 fn test_matmul_nd_4d_basic() raises:
     print("test_matmul_nd_4d_basic")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # 2x2 batch of 2x3 matrices × 2x2 batch of 3x2 matrices → 2x2 batch of 2x2 matrices
     var A = Tensor[dtype].d4(
         [
@@ -436,7 +436,7 @@ fn test_matmul_nd_4d_basic() raises:
 
 fn test_matmul_nd_4d_complex_broadcast() raises:
     print("test_matmul_nd_4d_complex_broadcast")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # A: 1x2 batch, B: 2x1 batch → broadcast to 2x2 batch
     var A = Tensor[dtype].d4(
         [[[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]]
@@ -460,7 +460,7 @@ fn test_matmul_nd_4d_complex_broadcast() raises:
 
 fn test_matmul_nd_single_batch_element() raises:
     print("test_matmul_nd_single_batch_element")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Single batch element: 1x(2x3) × 1x(3x2) → 1x(2x2)
     var A = Tensor[dtype].d3([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])
     var B = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]])
@@ -471,7 +471,7 @@ fn test_matmul_nd_single_batch_element() raises:
 
 fn test_matmul_nd_large_batch_small_matrices() raises:
     print("test_matmul_nd_large_batch_small_matrices")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Many batches of 1x1 matrices
     var A = Tensor[dtype].d3(
         [[[2.0]], [[3.0]], [[4.0]], [[5.0]]]
@@ -486,7 +486,7 @@ fn test_matmul_nd_large_batch_small_matrices() raises:
 
 fn test_matmul_nd_identity_batch() raises:
     print("test_matmul_nd_identity_batch")
-    _ = """alias dtype = DType.float32
+    _ = """comptime dtype = DType.float32
     # Batch of identity matrices
     var identity = Tensor[dtype].d2([[1.0, 0.0], [0.0, 1.0]])
     var A = Tensor[dtype].d3(
@@ -501,7 +501,7 @@ fn test_matmul_nd_identity_batch() raises:
 
 fn test_matmul_nd_zeros_batch() raises:
     print("test_matmul_nd_zeros_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
     )
@@ -513,7 +513,7 @@ fn test_matmul_nd_zeros_batch() raises:
 
 fn test_matmul_nd_ones_batch() raises:
     print("test_matmul_nd_ones_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
     )
@@ -531,7 +531,7 @@ fn test_matmul_nd_ones_batch() raises:
 
 fn test_matmul_nd_mixed_batch_dims() raises:
     print("test_matmul_nd_mixed_batch_dims")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # A: 3D, B: 4D with broadcasting
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]

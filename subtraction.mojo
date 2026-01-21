@@ -15,7 +15,7 @@ from broadcastbackward import BroadcastBackward
 
 @register_passable
 struct SubBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_SUB
+    comptime TAG = BACKWARD_SUB
     var signs: IntArray
 
     fn __init__(out self):
@@ -56,7 +56,7 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_SUB_SCALAR
+    comptime TAG = BACKWARD_SUB_SCALAR
     var negate: Bool
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -76,7 +76,7 @@ struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
         ]
 
 
-alias SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[
+comptime SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[
     dtype,
     augment=False,
     lhs_op=AddTensor,

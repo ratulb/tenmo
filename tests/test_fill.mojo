@@ -12,7 +12,7 @@ fn test_fill_scalar_single_index_1d() raises:
     """Test filling single element in 1D tensor with scalar."""
     print("test_fill_scalar_single_index_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(10)
 
     x.fill(999.0, i(5))
@@ -27,7 +27,7 @@ fn test_fill_scalar_single_index_2d() raises:
     """Test filling single element in 2D tensor with scalar."""
     print("test_fill_scalar_single_index_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
 
     x.fill(42.0, i(1), i(2))
@@ -41,7 +41,7 @@ fn test_fill_scalar_negative_index() raises:
     """Test filling with negative index."""
     print("test_fill_scalar_negative_index")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(10)
 
     x.fill(777.0, i(-1))  # Last element
@@ -54,7 +54,7 @@ fn test_fill_scalar_3d_index() raises:
     """Test filling single element in 3D tensor."""
     print("test_fill_scalar_3d_index")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(2, 3, 4)
 
     x.fill(123.0, i(1), i(1), i(2))
@@ -73,7 +73,7 @@ fn test_fill_scalar_full_slice_1d() raises:
     """Test filling entire 1D tensor with scalar."""
     print("test_fill_scalar_full_slice_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(10)
 
     x.fill(5.0, s())
@@ -87,7 +87,7 @@ fn test_fill_scalar_partial_slice_1d() raises:
     """Test filling partial slice in 1D tensor."""
     print("test_fill_scalar_partial_slice_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(10)
 
     x.fill(99.0, s(2, 7))
@@ -103,7 +103,7 @@ fn test_fill_scalar_slice_with_step_1d() raises:
     """Test filling slice with step in 1D tensor."""
     print("test_fill_scalar_slice_with_step_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10)
 
     x.fill(7.0, s(None, None, 2))  # Every other element
@@ -119,7 +119,7 @@ fn test_fill_scalar_2d_slice_row() raises:
     """Test filling entire row in 2D tensor."""
     print("test_fill_scalar_2d_slice_row")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
 
     x.fill(10.0, i(1), s())  # Second row
@@ -135,7 +135,7 @@ fn test_fill_scalar_2d_slice_col() raises:
     """Test filling entire column in 2D tensor."""
     print("test_fill_scalar_2d_slice_col")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
 
     x.fill(20.0, s(), i(2))  # Third column
@@ -151,7 +151,7 @@ fn test_fill_scalar_2d_submatrix() raises:
     """Test filling submatrix in 2D tensor."""
     print("test_fill_scalar_2d_submatrix")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 5)
 
     x.fill(8.0, s(1, 4), s(1, 4))  # 3x3 submatrix
@@ -167,7 +167,7 @@ fn test_fill_scalar_strided_2d() raises:
     """Test filling with strides in 2D (checkerboard pattern)."""
     print("test_fill_scalar_strided_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(4, 4)
 
     x.fill(1.0, s(None, None, 2), s(None, None, 2))  # Every other row/col
@@ -189,7 +189,7 @@ fn test_fill_scalar_array_index_1d() raises:
     """Test filling specific indices in 1D tensor."""
     print("test_fill_scalar_array_index_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10)
 
     x.fill(50.0, il(1))
@@ -210,7 +210,7 @@ fn test_fill_scalar_array_index_2d() raises:
     """Test filling specific rows in 2D tensor."""
     print("test_fill_scalar_array_index_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 3)
 
     x.fill(33.0, s(0, 5, 2), s())  # Rows 0, 2, 4
@@ -226,7 +226,7 @@ fn test_fill_scalar_empty_array() raises:
     """Test filling with empty index array."""
     print("test_fill_scalar_empty_array")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].ones(5)
 
     x.fill(999.0, s())
@@ -240,7 +240,7 @@ fn test_fill_scalar_single_element_array() raises:
     """Test filling with single-element index array."""
     print("test_fill_scalar_single_element_array")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10)
 
     var indices = IntArray()
@@ -260,7 +260,7 @@ fn test_fill_scalar_mixed_int_slice() raises:
     """Test filling with mixed integer and slice indices."""
     print("test_fill_scalar_mixed_int_slice")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4, 5)
 
     x.fill(15.0, i(1), s(1, 3), s())  # [1, 1:3, :]
@@ -278,7 +278,7 @@ fn test_fill_scalar_mixed_array_slice() raises:
     """Test filling with array and slice indices."""
     print("test_fill_scalar_mixed_array_slice")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 4)
 
     x.fill(25.0, s(1, 3), s(1, 3))  # Rows [1, 3], cols [1:3]
@@ -297,7 +297,7 @@ fn test_fill_scalar_on_view_slice() raises:
     """Test filling on a sliced view."""
     print("test_fill_scalar_on_view_slice")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(20)
     var view = x[5:15]  # View of x
     view.fill(88.0, s())
@@ -312,7 +312,7 @@ fn test_fill_scalar_on_view_reshape() raises:
     """Test filling on reshaped view."""
     print("test_fill_scalar_on_view_reshape")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(12)
     var view = x.reshape(3, 4)
 
@@ -328,7 +328,7 @@ fn test_fill_scalar_on_strided_view() raises:
     """Test filling on non-contiguous view."""
     print("test_fill_scalar_on_strided_view")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10)
     var view = x[::2]  # Every other element
 
@@ -350,7 +350,7 @@ fn test_fill_tensor_exact_shape() raises:
     """Test filling with tensor of exact shape."""
     print("test_fill_tensor_exact_shape")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
     var src = Tensor[dtype].ones(3, 4) * 5.0
 
@@ -365,7 +365,7 @@ fn test_fill_tensor_broadcast_1d_to_2d() raises:
     """Test broadcasting 1D tensor to 2D (row broadcast)."""
     print("test_fill_tensor_broadcast_1d_to_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
     var src = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0])  # (4,)
 
@@ -382,7 +382,7 @@ fn test_fill_tensor_broadcast_column() raises:
     """Test broadcasting (3, 1) to (3, 4)."""
     print("test_fill_tensor_broadcast_column")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
     var src = Tensor[dtype].d2([[10.0], [20.0], [30.0]])  # (3, 1)
 
@@ -399,7 +399,7 @@ fn test_fill_tensor_broadcast_to_slice() raises:
     """Test broadcasting tensor to a slice."""
     print("test_fill_tensor_broadcast_to_slice")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 6)
     var src = Tensor[dtype].d1([1.0, 2.0, 3.0])  # (3,)
 
@@ -416,7 +416,7 @@ fn test_fill_tensor_broadcast_scalar() raises:
     """Test broadcasting scalar-like (1,) tensor."""
     print("test_fill_tensor_broadcast_scalar")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(3, 4)
     var src = Tensor[dtype].d1([42.0])  # (1,) - effectively scalar
 
@@ -431,7 +431,7 @@ fn test_fill_tensor_broadcast_strided() raises:
     """Test broadcasting to strided slice."""
     print("test_fill_tensor_broadcast_strided")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(4, 6)
     var src = Tensor[dtype].d1([10.0, 20.0, 30.0])  # (3,)
 
@@ -454,7 +454,7 @@ fn test_fill_tensor_to_view() raises:
     """Test filling tensor into a view."""
     print("test_fill_tensor_to_view")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(20)
     var view = x[5:10]
 
@@ -472,7 +472,7 @@ fn test_fill_tensor_reshaped_view() raises:
     """Test filling into reshaped view."""
     print("test_fill_tensor_reshaped_view")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(12)
     var view = x.reshape(3, 4)
 
@@ -495,7 +495,7 @@ fn test_fill_scalar_0d_tensor() raises:
     """Test filling 0D (scalar) tensor."""
     print("test_fill_scalar_0d_tensor")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].scalar(0.0)
 
     x.fill(123.0, il(IntArray()))  # Empty indices for scalar
@@ -507,7 +507,7 @@ fn test_fill_tensor_partial_fill() raises:
     """Test filling only part of tensor."""
     print("test_fill_tensor_partial_fill")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(5, 5)
     var src = Tensor[dtype].ones(2, 2) * 9.0
 
@@ -524,7 +524,7 @@ fn test_fill_contiguous_optimization() raises:
     """Test that contiguous fills are optimized."""
     print("test_fill_contiguous_optimization")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(100)
     var src = Tensor[dtype].ones(100) * 7.0
 
@@ -544,7 +544,7 @@ fn test_fill_complex_indexing_scenario() raises:
     """Test complex real-world indexing scenario."""
     print("test_fill_complex_indexing_scenario")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(10, 10)
 
     # Fill diagonal
@@ -560,7 +560,7 @@ fn test_fill_image_patch_simulation() raises:
     """Test filling patches like in image processing."""
     print("test_fill_image_patch_simulation")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var image = Tensor[dtype].zeros(8, 8)
     var patch = Tensor[dtype].ones(3, 3) * 5.0
 

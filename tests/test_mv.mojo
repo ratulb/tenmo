@@ -2,7 +2,7 @@ from tenmo import Tensor
 from shapes import Shape
 from operators import mv
 
-# alias mv = 2 # matrix vector
+# comptime mv = 2 # matrix vector
 
 
 fn main() raises:
@@ -26,7 +26,7 @@ from strides import Strides
 fn test_matrix_vector_no_batch() raises:
     """Test: M[m,k] @ v[k] -> result[m]."""
     print("test_matrix_vector_no_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # M = [[1, 2, 3],
     #      [4, 5, 6]]  (2x3)
@@ -60,7 +60,7 @@ fn test_matrix_vector_no_batch() raises:
 fn test_matrix_vector_batch_v_only() raises:
     """Test: M[m,k] @ v[batch,k] -> result[batch,m]."""
     print("test_matrix_vector_batch_v_only")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # M = [[1, 2],
     #      [3, 4]]  (2x2)
@@ -96,7 +96,7 @@ fn test_matrix_vector_batch_v_only() raises:
 fn test_matrix_vector_batch_M_only() raises:
     """Test: M[batch,m,k] @ v[k] -> result[batch,m]."""
     print("test_matrix_vector_batch_M_only")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # M[0] = [[1, 2],   batch=0
     #         [3, 4]]
@@ -140,7 +140,7 @@ fn test_matrix_vector_batch_M_only() raises:
 fn test_matrix_vector_both_batched() raises:
     """Test: M[batch,m,k] @ v[batch,k] -> result[batch,m]."""
     print("test_matrix_vector_both_batched")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # M[0] = [[1, 2],   batch=0
     #         [3, 4]]
@@ -187,7 +187,7 @@ fn test_matrix_vector_both_batched() raises:
 fn test_matrix_vector_broadcast_batch() raises:
     """Test: M[2,3,m,k] @ v[3,k] -> result[2,3,m] (broadcasting)."""
     print("test_matrix_vector_broadcast_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # M has batch dims [2, 3]
     # v has batch dims [3] (broadcasts to [2, 3])
@@ -296,7 +296,7 @@ fn test_matrix_vector_broadcast_batch() raises:
 
 fn test_matrix_vector_basic_forward_backward() raises:
     print("test_matrix_vector_basic_forward_backward")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
     )
@@ -317,7 +317,7 @@ fn test_matrix_vector_basic_forward_backward() raises:
 
 fn test_matrix_vector_identity() raises:
     print("test_matrix_vector_identity")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2(
         [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], requires_grad=True
     )
@@ -342,7 +342,7 @@ fn test_matrix_vector_identity() raises:
 
 fn test_matrix_vector_zeros_matrix() raises:
     print("test_matrix_vector_zeros_matrix")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2(
         [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], requires_grad=True
     )
@@ -362,7 +362,7 @@ fn test_matrix_vector_zeros_matrix() raises:
 
 fn test_matrix_vector_zeros_vector() raises:
     print("test_matrix_vector_zeros_vector")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
     )
@@ -382,7 +382,7 @@ fn test_matrix_vector_zeros_vector() raises:
 
 fn test_matrix_vector_single_element() raises:
     print("test_matrix_vector_single_element")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2([[3.0]], requires_grad=True)
     var v = Tensor[dtype].d1([2.0], requires_grad=True)
     var r = M.matmul[mode=mv](v)
@@ -399,7 +399,7 @@ fn test_matrix_vector_single_element() raises:
 
 fn test_matrix_vector_3d_2d_batched_matrix() raises:
     print("test_matrix_vector_3d_2d_batched_matrix")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
@@ -425,7 +425,7 @@ fn test_matrix_vector_3d_2d_batched_matrix() raises:
 
 fn test_matrix_vector_2d_2d_batched_vector() raises:
     print("test_matrix_vector_2d_2d_batched_vector")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var v = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var r = M.matmul[mode=mv](v)
@@ -438,7 +438,7 @@ fn test_matrix_vector_2d_2d_batched_vector() raises:
 
 fn test_matrix_vector_3d_3d_batched_both() raises:
     print("test_matrix_vector_3d_3d_batched_both")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
@@ -456,7 +456,7 @@ fn test_matrix_vector_3d_3d_batched_both() raises:
 
 fn test_matrix_vector_broadcast_matrix() raises:
     print("test_matrix_vector_broadcast_matrix")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var v = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -477,7 +477,7 @@ fn test_matrix_vector_broadcast_matrix() raises:
 
 fn test_matrix_vector_broadcast_vector() raises:
     print("test_matrix_vector_broadcast_vector")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
@@ -497,7 +497,7 @@ fn test_matrix_vector_broadcast_vector() raises:
 
 fn test_matrix_vector_4d_batch() raises:
     print("test_matrix_vector_4d_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d4([[[[1.0, 2.0], [3.0, 4.0]]]], requires_grad=True)
     var v = Tensor[dtype].d3([[[1.0, 2.0]]], requires_grad=True)
     var r = M.matmul[mode=mv](v)
@@ -511,7 +511,7 @@ fn test_matrix_vector_4d_batch() raises:
 
 fn test_matrix_vector_3d_4d_broadcast() raises:
     print("test_matrix_vector_3d_4d_broadcast")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], requires_grad=True
     )
@@ -539,7 +539,7 @@ fn test_matrix_vector_3d_4d_broadcast() raises:
 
 fn test_matrix_vector_with_matrix_view() raises:
     print("test_matrix_vector_with_matrix_view")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base_M = Tensor[dtype].d1(
         [0.0, 0.0, 1.0, 2.0, 3.0, 4.0, 0.0, 0.0], requires_grad=True
     )
@@ -562,7 +562,7 @@ fn test_matrix_vector_with_matrix_view() raises:
 
 fn test_matrix_vector_with_vector_view() raises:
     print("test_matrix_vector_with_vector_view")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
     )
@@ -582,7 +582,7 @@ fn test_matrix_vector_with_vector_view() raises:
 
 fn test_matrix_vector_double_view() raises:
     print("test_matrix_vector_double_view")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base_M = Tensor[dtype].d2(
         [[0.0, 0.0, 0.0], [1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [0.0, 0.0, 0.0]],
         requires_grad=True,
@@ -606,7 +606,7 @@ fn test_matrix_vector_double_view() raises:
 
 fn test_matrix_vector_large_dimensions() raises:
     print("test_matrix_vector_large_dimensions")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]], requires_grad=True
     )
@@ -627,7 +627,7 @@ fn test_matrix_vector_large_dimensions() raises:
 
 fn test_matrix_vector_non_contiguous_batch() raises:
     print("test_matrix_vector_non_contiguous_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base = Tensor[dtype].d3(
         [
             [[1.0, 2.0], [3.0, 4.0]],
@@ -653,7 +653,7 @@ fn test_matrix_vector_non_contiguous_batch() raises:
 
 fn test_matrix_vector_singleton_batch() raises:
     print("test_matrix_vector_singleton_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True)
     var v = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
     var r = M.matmul[mode=mv](v)
@@ -667,7 +667,7 @@ fn test_matrix_vector_singleton_batch() raises:
 
 fn test_matrix_vector_complex_broadcasting() raises:
     print("test_matrix_vector_complex_broadcasting")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d4([[[[1.0, 2.0], [3.0, 4.0]]]], requires_grad=True)
     var v = Tensor[dtype].d3([[[1.0, 2.0]]], requires_grad=True)
     var r = M.matmul[mode=mv](v)
@@ -684,7 +684,7 @@ fn test_matrix_vector_complex_broadcasting() raises:
 
 fn test_matrix_vector_multiple_backward_calls() raises:
     print("test_matrix_vector_multiple_backward_calls")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var v = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
 
@@ -706,7 +706,7 @@ fn test_matrix_vector_multiple_backward_calls() raises:
 
 fn test_matrix_vector_no_grad() raises:
     print("test_matrix_vector_no_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=False)
     var v = Tensor[dtype].d1([1.0, 2.0], requires_grad=False)
     var r = M.matmul[mode=mv](v)

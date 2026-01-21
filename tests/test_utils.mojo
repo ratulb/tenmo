@@ -10,7 +10,7 @@ fn main() raises:
 fn test_accuracy_perfect_predictions() raises:
     """Test accuracy with perfect predictions."""
     print("test_accuracy_perfect_predictions")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var pred = Tensor.d2([[0.9], [0.1], [0.8], [0.2]])
     var target = Tensor.d2([[1.0], [0.0], [1.0], [0.0]])
@@ -23,7 +23,7 @@ fn test_accuracy_perfect_predictions() raises:
 fn test_accuracy_all_wrong_predictions() raises:
     """Test accuracy with all wrong predictions."""
     print("test_accuracy_all_wrong_predictions")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var pred = Tensor.d2([[0.1], [0.9], [0.2], [0.8]])
     var target = Tensor.d2([[1.0], [0.0], [1.0], [0.0]])
@@ -36,7 +36,7 @@ fn test_accuracy_all_wrong_predictions() raises:
 fn test_accuracy_mixed_predictions() raises:
     """Test accuracy with some correct and some wrong."""
     print("test_accuracy_mixed_predictions")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var pred = Tensor.d2([[0.9], [0.1], [0.2], [0.8]])  # [1, 0, 0, 1]
     var target = Tensor.d2([[1.0], [0.0], [1.0], [0.0]])  # [1, 0, 1, 0]
@@ -49,7 +49,7 @@ fn test_accuracy_mixed_predictions() raises:
 fn test_accuracy_threshold_boundary() raises:
     """Test accuracy at threshold boundary (0.5)."""
     print("test_accuracy_threshold_boundary")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var pred = Tensor.d2([[0.5], [0.50001], [0.49999]])
     var target = Tensor.d2([[1.0], [1.0], [0.0]])
@@ -65,7 +65,7 @@ fn test_accuracy_threshold_boundary() raises:
 fn test_accuracy_custom_threshold() raises:
     """Test accuracy with custom threshold."""
     print("test_accuracy_custom_threshold")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var pred = Tensor.d2([[0.7], [0.3], [0.6], [0.4]])
     var target = Tensor.d2([[1.0], [0.0], [1.0], [0.0]])
@@ -83,7 +83,7 @@ fn test_accuracy_custom_threshold() raises:
 fn test_accuracy_single_sample() raises:
     """Test accuracy with single sample."""
     print("test_accuracy_single_sample")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var pred = Tensor.d2([[0.9]])
     var target = Tensor.d2([[1.0]])
@@ -96,7 +96,7 @@ fn test_accuracy_single_sample() raises:
 fn test_accuracy_large_batch() raises:
     """Test accuracy with larger batch."""
     print("test_accuracy_large_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Create batch of 100 samples, all correct
     var pred_list = List[Scalar[dtype]]()
@@ -120,7 +120,7 @@ fn test_accuracy_large_batch() raises:
 fn test_accuracy_float64() raises:
     """Test accuracy with float64 dtype."""
     print("test_accuracy_float64")
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
 
     var pred = Tensor.d2([[0.9], [0.1], [0.8]])
     var target = Tensor.d2([[1.0], [0.0], [1.0]])

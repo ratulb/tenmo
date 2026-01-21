@@ -4,7 +4,7 @@ from testing import assert_true
 from strides import Strides
 from operators import vm
 
-# alias vm = 1
+# comptime vm = 1
 
 
 fn main() raises:
@@ -60,7 +60,7 @@ fn main() raises:
 fn test_vector_matrix_no_batch() raises:
     """Test: v[k] @ M[k,n] -> result[n]."""
     print("test_vector_matrix_no_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # v = [1, 2, 3]         (3,)
     # M = [[1, 2],
@@ -98,7 +98,7 @@ fn test_vector_matrix_no_batch() raises:
 fn test_vector_matrix_batch_M_only() raises:
     """Test: v[k] @ M[batch,k,n] -> result[batch,n]."""
     print("test_vector_matrix_batch_M_only")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # v = [1, 2]            (2,)
     # M[0] = [[1, 2, 3],
@@ -153,7 +153,7 @@ fn test_vector_matrix_batch_M_only() raises:
 fn test_vector_matrix_batch_v_only() raises:
     """Test: v[batch,k] @ M[k,n] -> result[batch,n]."""
     print("test_vector_matrix_batch_v_only")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # v[0] = [1, 0]         batch=0
     # v[1] = [0, 1]         batch=1
@@ -189,7 +189,7 @@ fn test_vector_matrix_batch_v_only() raises:
 fn test_vector_matrix_both_batched() raises:
     """Test: v[batch,k] @ M[batch,k,n] -> result[batch,n]."""
     print("test_vector_matrix_both_batched")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # v[0] = [1, 2]         batch=0
     # v[1] = [3, 4]         batch=1
@@ -247,7 +247,7 @@ fn test_vector_matrix_both_batched() raises:
 fn test_vector_matrix_broadcast_batch() raises:
     """Test: v[3,k] @ M[2,3,k,n] -> result[2,3,n] (broadcasting)."""
     print("test_vector_matrix_broadcast_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # v has batch dims [3]
     # M has batch dims [2, 3]
@@ -358,7 +358,7 @@ fn test_vector_matrix_asymmetric_shapes() raises:
     """Test: v[batch,k] @ M[batch,k,n] with k≠n to ensure no accidental transposes.
     """
     print("test_vector_matrix_asymmetric_shapes")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # v[0] = [1, 2, 3]      batch=0, k=3
     # v[1] = [4, 5, 6]      batch=1, k=3
@@ -422,7 +422,7 @@ fn test_vector_matrix_asymmetric_shapes() raises:
 fn test_vector_matrix_single_element() raises:
     """Test: v[k] @ M[k,1] -> result[1] (edge case: n=1)."""
     print("test_vector_matrix_single_element")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # v = [2, 3, 4]         (3,)
     # M = [[1],
@@ -449,7 +449,7 @@ fn test_vector_matrix_single_element() raises:
 
 fn test_vector_matrix_1d_2d_basic() raises:
     print("test_vector_matrix_1d_2d_basic")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var M = Tensor.d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True)
     var r = v.matmul[mode=vm](M)
@@ -468,7 +468,7 @@ fn test_vector_matrix_1d_2d_basic() raises:
 
 fn test_vector_matrix_identity() raises:
     print("test_vector_matrix_identity")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var identity = Tensor.d2(
         [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]], requires_grad=True
@@ -488,7 +488,7 @@ fn test_vector_matrix_identity() raises:
 
 fn test_vector_matrix_zeros() raises:
     print("test_vector_matrix_zeros")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var M = Tensor.d2([[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]], requires_grad=True)
     var r = v.matmul[mode=vm](M)
@@ -507,7 +507,7 @@ fn test_vector_matrix_zeros() raises:
 
 fn test_vector_matrix_2d_2d_batched() raises:
     print("test_vector_matrix_2d_2d_batched")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d2(
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
     )  # batch=2, dim=2
@@ -526,7 +526,7 @@ fn test_vector_matrix_2d_2d_batched() raises:
 
 fn test_vector_matrix_2d_3d_batched() raises:
     print("test_vector_matrix_2d_3d_batched")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0]], requires_grad=True
     )  # batch=2, dim=2
@@ -553,7 +553,7 @@ fn test_vector_matrix_2d_3d_batched() raises:
 
 fn test_vector_matrix_broadcast_vector() raises:
     print("test_vector_matrix_broadcast_vector")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d1([1.0, 2.0], requires_grad=True)  # single vector
     var M = Tensor.d3(
         [[[1.0, 0.0], [0.0, 1.0]], [[2.0, 0.0], [0.0, 2.0]]], requires_grad=True
@@ -578,7 +578,7 @@ fn test_vector_matrix_broadcast_vector() raises:
 
 fn test_vector_matrix_broadcast_matrix() raises:
     print("test_vector_matrix_broadcast_matrix")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)  # batch=2
     var M = Tensor.d2(
         [[1.0, 0.0], [0.0, 1.0]], requires_grad=True
@@ -598,7 +598,7 @@ fn test_vector_matrix_broadcast_matrix() raises:
 
 fn test_vector_matrix_3d_3d_high_batch() raises:
     print("test_vector_matrix_3d_3d_high_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d3(
         [[[1.0, 2.0]], [[3.0, 4.0]]], requires_grad=True
     )  # shape: [2, 1, 2]
@@ -617,7 +617,7 @@ fn test_vector_matrix_3d_3d_high_batch() raises:
 
 fn test_vector_matrix_4d_batch() raises:
     print("test_vector_matrix_4d_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d4(
         [[[[1.0, 2.0]]]], requires_grad=True
     )  # shape: [1, 1, 1, 2]
@@ -638,7 +638,7 @@ fn test_vector_matrix_4d_batch() raises:
 
 fn test_vector_matrix_with_vector_view() raises:
     print("test_vector_matrix_with_vector_view")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base_v = Tensor.d1([0.0, 1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var v_view = base_v.view(
         shape=Shape(3), strides=Strides(1), offset=1
@@ -656,7 +656,7 @@ fn test_vector_matrix_with_vector_view() raises:
 
 fn test_vector_matrix_with_matrix_view() raises:
     print("test_vector_matrix_with_matrix_view")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d1([1.0, 2.0], requires_grad=True)
     var base_M = Tensor.d2(
         [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], requires_grad=True
@@ -683,7 +683,7 @@ fn test_vector_matrix_with_matrix_view() raises:
 
 fn test_vector_matrix_single_element_orig() raises:
     print("test_vector_matrix_single_element_orig")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var v = Tensor.d1([2.0], requires_grad=True)  # 1D vector with 1 element
     var M = Tensor.d2([[3.0]], requires_grad=True)  # 1x1 matrix
     var r = v.matmul[mode=vm](M)
@@ -697,7 +697,7 @@ fn test_vector_matrix_single_element_orig() raises:
 
 fn test_vector_matrix_large_dimensions() raises:
     print("test_vector_matrix_large_dimensions")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Test with larger dimensions to catch indexing issues
     var v = Tensor.d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var M = Tensor.d2(
@@ -715,7 +715,7 @@ fn test_vector_matrix_large_dimensions() raises:
 
 fn test_vector_matrix_non_contiguous_batch() raises:
     print("test_vector_matrix_non_contiguous_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base = Tensor.d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True
     )
@@ -861,7 +861,7 @@ fn test_vector_matrix_high_dimensional_batch() raises:
 
 fn test_matmul_nd_with_view_offset_grad() raises:
     print("test_matmul_nd_with_view_offset_grad")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base_A = Tensor[dtype].d3(
         [
             [[0.0, 0.0], [0.0, 0.0]],  # Padding

@@ -9,7 +9,7 @@ from intarray import IntArray
 @fieldwise_init
 @register_passable
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_TRANSPOSE
+    comptime TAG = BACKWARD_TRANSPOSE
     var axes: IntArray
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:

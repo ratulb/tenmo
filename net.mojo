@@ -22,22 +22,22 @@ from ndbuffer import NDBuffer
 from random import seed, random_float64
 from sys import simd_width_of
 
-alias LINEAR = 0
-alias LINEAR_BLAS = 1
-alias RELU = 2
-alias SIGMOID = 3
-alias TANH = 4
-alias DROPOUT = 5
-alias CONV2D = 6
-alias FLATTEN = 7
-alias MAXPOOL2D = 8
+comptime LINEAR = 0
+comptime LINEAR_BLAS = 1
+comptime RELU = 2
+comptime SIGMOID = 3
+comptime TANH = 4
+comptime DROPOUT = 5
+comptime CONV2D = 6
+comptime FLATTEN = 7
+comptime MAXPOOL2D = 8
 
 
 @fieldwise_init
 struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     """Fully connected layer: y = xW + b."""
 
-    alias TAG = LINEAR
+    comptime TAG = LINEAR
 
     var weight: Tensor[Self.dtype]
     var bias: Tensor[Self.dtype]
@@ -238,7 +238,7 @@ struct Profile(ImplicitlyCopyable):
 struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     """Fully connected layer: y = xW + b."""
 
-    alias TAG = LINEAR_BLAS
+    comptime TAG = LINEAR_BLAS
 
     var weight: Tensor[Self.dtype]
     var bias: Tensor[Self.dtype]
@@ -557,7 +557,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 @register_passable
 struct ReLU[dtype: DType](ImplicitlyCopyable):
     var training: Bool
-    alias TAG = RELU
+    comptime TAG = RELU
 
     fn __init__(out self):
         self.training = True
@@ -607,7 +607,7 @@ struct Dropout[dtype: DType](ImplicitlyCopyable):
     var scale: Scalar[Self.dtype]
     var seed: Int  # For reproducible randomness
 
-    alias TAG = DROPOUT
+    comptime TAG = DROPOUT
 
     fn __init__(out self, p: Scalar[Self.dtype] = Scalar[Self.dtype](0.5)):
         """Initialize Dropout layer."""
@@ -648,7 +648,7 @@ struct Dropout[dtype: DType](ImplicitlyCopyable):
 
         var total_elements = x.numels()
 
-        alias simd_w = simd_width_of[dtype]()
+        comptime simd_w = simd_width_of[dtype]()
 
         # Vectorized constants
         var threshold_vec = SIMD[dtype, simd_w](self.p)
@@ -726,7 +726,7 @@ struct Dropout[dtype: DType](ImplicitlyCopyable):
 @register_passable
 struct Sigmoid[dtype: DType](ImplicitlyCopyable):
     var training: Bool
-    alias TAG = SIGMOID
+    comptime TAG = SIGMOID
 
     fn __init__(out self):
         self.training = True
@@ -761,7 +761,7 @@ struct Sigmoid[dtype: DType](ImplicitlyCopyable):
 @register_passable
 struct Tanh[dtype: DType](ImplicitlyCopyable):
     var training: Bool
-    alias TAG = TANH
+    comptime TAG = TANH
 
     fn __init__(out self):
         self.training = True
@@ -796,12 +796,12 @@ struct Tanh[dtype: DType](ImplicitlyCopyable):
 # Refer to operators & matmul
 # Defined in operators
 
-# alias dot = 28  # dot product
-# alias vm = 29  # vector & tensor matmul
-# alias mv = 30  # tensor & vector matmul
-# alias mm = 31  # tensor & tensor matmul
+# comptime dot = 28  # dot product
+# comptime vm = 29  # vector & tensor matmul
+# comptime mv = 30  # tensor & vector matmul
+# comptime mm = 31  # tensor & tensor matmul
 
-alias Layer[dtype: DType] = Variant[
+comptime Layer[dtype: DType] = Variant[
     Linear[dtype, mm],
     LinearBLAS[dtype, mm],
     ReLU[dtype],
@@ -1206,7 +1206,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
     Stores weights and bias as trainable parameters.
     """
 
-    alias TAG = CONV2D
+    comptime TAG = CONV2D
 
     var weight: Tensor[Self.dtype]  # (out_channels, in_channels, KH, KW)
     var bias: Tensor[Self.dtype]  # (out_channels,)
@@ -1439,7 +1439,7 @@ struct Flatten[dtype: DType](ImplicitlyCopyable):
     Flatten spatial dimensions: (N, C, H, W) → (N, C*H*W).
     """
 
-    alias TAG = FLATTEN
+    comptime TAG = FLATTEN
     var training: Bool
 
     fn __init__(out self):

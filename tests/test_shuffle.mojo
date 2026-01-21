@@ -18,7 +18,7 @@ fn main() raises:
 
 fn test_tensor_shuffle_forward_basic() raises:
     print("test_tensor_shuffle_forward_basic")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     # permute along axis=0 with [1, 0]
@@ -33,7 +33,7 @@ fn test_tensor_shuffle_forward_basic() raises:
 
 fn test_tensor_shuffle_forward_axis1() raises:
     print("test_tensor_shuffle_forward_axis1")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     # permute along axis=1 with [2, 0, 1]
@@ -47,7 +47,7 @@ fn test_tensor_shuffle_forward_axis1() raises:
 
 fn test_tensor_shuffle_backward_axis0() raises:
     print("test_tensor_shuffle_backward_axis0")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var t = Tensor[dtype].d2([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]])
     t.requires_grad_(True)
@@ -64,7 +64,7 @@ fn test_tensor_shuffle_backward_axis0() raises:
 
 fn test_tensor_shuffle_backward_axis1() raises:
     print("test_tensor_shuffle_backward_axis1")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     t.requires_grad_(True)
@@ -81,7 +81,7 @@ fn test_tensor_shuffle_backward_axis1() raises:
 
 fn test_tensor_shuffle_backward_grad_mapping() raises:
     print("test_tensor_shuffle_backward_grad_mapping")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     t.requires_grad_(True)
@@ -104,7 +104,7 @@ fn test_tensor_shuffle_backward_grad_mapping() raises:
 
 fn test_tensor_shuffle_random_perm_length_check() raises:
     print("test_tensor_shuffle_random_perm_length_check")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var t = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var shuffled = Shuffle[dtype].forward[False](t, [], axis=0)
@@ -116,7 +116,7 @@ fn test_tensor_shuffle_random_perm_length_check() raises:
 
 fn test_tensor_shuffle_multi_dimensional() raises:
     print("test_tensor_shuffle_multi_dimensional")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4))
     var shuffled = Shuffle[dtype].forward[False](t, [2, 0, 1], axis=1)

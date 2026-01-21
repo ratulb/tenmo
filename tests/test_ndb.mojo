@@ -9,8 +9,8 @@ from operators import *
 # ============================================
 # Test Constants
 # ============================================
-alias SMALL_SIZE = 3
-alias MEDIUM_SIZE = 4
+comptime SMALL_SIZE = 3
+comptime MEDIUM_SIZE = 4
 
 # ============================================
 # arithmetic_ops Tests
@@ -1855,7 +1855,7 @@ fn run_all_ndbuffer_tests() raises:
 
 fn main() raises:
     var runs = 1
-    alias _dtype = DType.float32
+    comptime _dtype = DType.float32
 
     for _ in range(runs):
         test_ndbuffer_set_get()
@@ -1888,7 +1888,7 @@ fn main() raises:
 
 fn test_buffer_sum() raises:
     print("test_buffer_sum")
-    alias dtype = DType.int32
+    comptime dtype = DType.int32
     size = 21
     l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
@@ -1915,7 +1915,7 @@ fn test_buffer_sum() raises:
 
 fn test_buffer_sum_all() raises:
     print("test_buffer_sum_all")
-    alias dtype = DType.int32
+    comptime dtype = DType.int32
     size = 21
     l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
@@ -1946,7 +1946,7 @@ fn test_buffer_sum_all() raises:
 
 
 fn test_buffer_overwrite() raises:
-    alias dtype = DType.int32
+    comptime dtype = DType.int32
     size = 21
     l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
@@ -1960,7 +1960,7 @@ fn test_buffer_overwrite() raises:
 
 fn test_compare_buffer() raises:
     print("test_compare_buffer")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     ndb2 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 3, 4, 6]), Shape(2, 3))
     result = ndb.compare[GreaterThan](ndb2)
@@ -1972,7 +1972,7 @@ fn test_compare_buffer() raises:
 
 fn test_compare_scalar() raises:
     print("test_compare_scalar")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     result = ndb.compare_scalar[GreaterThan](3)
     assert_true(
@@ -1989,7 +1989,7 @@ fn test_compare_scalar() raises:
 
 fn test_inplace_broadcast_operations() raises:
     print("test_inplace_broadcast_operations")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     ndb2 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3]), Shape(3))
     ndb += ndb2
@@ -2010,7 +2010,7 @@ fn test_inplace_broadcast_operations() raises:
 
 fn test_inplace_operations() raises:
     print("test_inplace_operations")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](
         Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9]), Shape(3, 3)
     )
@@ -2073,14 +2073,14 @@ fn test_inplace_operations() raises:
 
 fn test_unique() raises:
     print("test_unique")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
     assert_true(ndb.unique().data_buffer() == Buffer[dtype]([2, 3, 4, 6]))
 
 
 fn test_count() raises:
     print("test_count")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
     assert_true(ndb.count(2) == 3)
     shared = ndb.share()
@@ -2097,7 +2097,7 @@ fn test_count() raises:
 
 fn test_scalar_inplace_update() raises:
     print("test_scalar_inplace_update")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     ndb.inplace_scalar_ops[Add](99)
     assert_true(
@@ -2118,7 +2118,7 @@ fn test_scalar_inplace_update() raises:
 
 fn test_element_at() raises:
     print("test_element_at")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     shared = ndb.share(Shape(3, 1), offset=3)
     assert_true(
@@ -2128,7 +2128,7 @@ fn test_element_at() raises:
 
 fn test_scalar_ops() raises:
     print("test_scalar_ops")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     ndb_shared = ndb.share(Shape(1, 3), offset=3)
     result = ndb_shared.scalar_ops[Add](42)
@@ -2137,7 +2137,7 @@ fn test_scalar_ops() raises:
 
 fn test_dtype_conversion() raises:
     print("test_dtype_conversion")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     ndb_shared = ndb.share(Shape(1, 3), offset=3)
     converted = ndb_shared.to_dtype[DType.float64]()
@@ -2152,7 +2152,7 @@ fn test_dtype_conversion() raises:
 
 fn test_equal() raises:
     print("test_equal")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb1 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     ndb1_shared = ndb1.share(Shape(1, 3), offset=3)
     ndb2 = NDBuffer[dtype](Buffer[dtype]([4, 10, 6]), Shape(1, 3))
@@ -2162,7 +2162,7 @@ fn test_equal() raises:
 
 fn test_add() raises:
     print("test_add")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb1 = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     ndb1_shared = ndb1.share(Shape(1, 3), offset=3)
     ndb2 = NDBuffer[dtype](Buffer[dtype]([10, 20, 30]), Shape(1, 3))
@@ -2176,7 +2176,7 @@ fn test_add() raises:
 
 fn test_zero() raises:
     print("test_zero")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Shape(2, 3))
     ndb.fill(42)
     shared = ndb.share(Shape(3), offset=3)
@@ -2186,7 +2186,7 @@ fn test_zero() raises:
 
 fn test_broadcast_fill() raises:
     print("test_broadcast_fill")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Shape(2, 3))
     filler = NDBuffer[dtype](Shape(2, 1))
     filler.fill(42)
@@ -2201,7 +2201,7 @@ fn test_broadcast_fill() raises:
 
 fn test_fill_2() raises:
     print("test_fill_2")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Shape(2, 3))
     filler = NDBuffer[dtype](Shape(2, 3))
     filler.fill(91)
@@ -2336,7 +2336,7 @@ fn test_fill_2() raises:
 
 fn test_ndbuffer_fill_orig() raises:
     print("test_ndbuffer_fill")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Shape(8))
     ndb.fill(42)
     expected = Buffer[dtype].full(42, 8)
@@ -2379,7 +2379,7 @@ fn test_ndbuffer_fill_orig() raises:
 
     assert_true(ndb.item() == 101)
 
-    alias _Bool = Scalar[DType.bool]
+    comptime _Bool = Scalar[DType.bool]
 
     _list = List[Scalar[DType.bool]](
         [
@@ -2409,7 +2409,7 @@ fn test_ndbuffer_fill_orig() raises:
 fn test_ndbuffer_broadcast_ops() raises:
     print("test_ndbuffer_broadcast_ops")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     buffer1 = Buffer[dtype]([42, 42, 42, 42, 42, 42])
     shape1 = Shape(2, 3)
     ndbuffer1 = NDBuffer[dtype](buffer1^, shape1)
@@ -2430,7 +2430,7 @@ fn test_ndbuffer_broadcast_ops() raises:
 fn test_ndbuffer_inplace_ops() raises:
     print("test_ndbuffer_inplace_ops")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     buffer1 = Buffer[dtype](30)
     buffer1.fill(42)
     shape = Shape(5, 6)
@@ -2463,7 +2463,7 @@ fn test_ndbuffer_inplace_ops() raises:
 fn test_ndbuffer_set_get() raises:
     print("test_ndbuffer_set_get")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     buffer = Buffer[dtype](1)
     buffer[0] = 42
     shape = Shape()

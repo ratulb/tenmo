@@ -6,10 +6,10 @@ from time import perf_counter_ns
 # ============================================
 # Test Constants
 # ============================================
-alias SMALL_SIZE = 7  # Less than typical SIMD width
-alias MEDIUM_SIZE = 68  # Multiple SIMD blocks + remainder
-alias LARGE_SIZE = 1000  # Stress test
-alias SMALL_SIZE_NEW = 17  # Prime number to test tail loop
+comptime SMALL_SIZE = 7  # Less than typical SIMD width
+comptime MEDIUM_SIZE = 68  # Multiple SIMD blocks + remainder
+comptime LARGE_SIZE = 1000  # Stress test
+comptime SMALL_SIZE_NEW = 17  # Prime number to test tail loop
 
 
 # ============================================
@@ -908,13 +908,13 @@ fn test_imul_bool_scalar() raises:
 # ============================================
 fn test_simd_boundary_sizes() raises:
     print("test_simd_boundary_sizes")
-    alias sizes = VariadicList[Int](
+    comptime sizes = VariadicList[Int](
         1, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65
     )
 
     @parameter
     for idx in range(len(sizes)):
-        alias size = sizes[idx]
+        comptime size = sizes[idx]
         var a = Buffer[DType.int32].full(10, size)
         var b = Buffer[DType.int32].full(5, size)
 
@@ -1365,11 +1365,11 @@ fn test_dunder_compare_empty() raises:
 fn test_dunder_compare_simd_boundary() raises:
     print("test_dunder_compare_simd_boundary")
     # Test sizes around SIMD width (8 for int32)
-    alias sizes = VariadicList[Int](1, 7, 8, 9, 15, 16, 17, 31, 32, 33)
+    comptime sizes = VariadicList[Int](1, 7, 8, 9, 15, 16, 17, 31, 32, 33)
 
     @parameter
     for idx in range(len(sizes)):
-        alias size = sizes[idx]
+        comptime size = sizes[idx]
         var buffer = Buffer[DType.int32].full(10, size)
 
         assert_true(buffer == 10, "Size " + size.__str__() + ": ==")
@@ -1390,11 +1390,11 @@ fn test_dunder_compare_simd_boundary() raises:
 
 fn test_dunder_compare_position_sensitivity() raises:
     print("test_dunder_compare_position_sensitivity")
-    alias positions = VariadicList[Int](0, 7, 8, 9, 16, 33, 64, 67)
+    comptime positions = VariadicList[Int](0, 7, 8, 9, 16, 33, 64, 67)
 
     @parameter
     for idx in range(len(positions)):
-        alias pos = positions[idx]
+        comptime pos = positions[idx]
         if pos < MEDIUM_SIZE:
             var buffer = Buffer[DType.int32].full(100, MEDIUM_SIZE)
             buffer[pos] = 99
@@ -1873,13 +1873,13 @@ fn test_compare_single_element() raises:
 fn test_compare_simd_boundary() raises:
     print("test_compare_simd_boundary")
     # Test sizes around typical SIMD widths
-    alias sizes = VariadicList[Int](
+    comptime sizes = VariadicList[Int](
         1, 2, 4, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65
     )
 
     @parameter
     for s_idx in range(len(sizes)):
-        alias size = sizes[s_idx]
+        comptime size = sizes[s_idx]
         var buffer = Buffer[DType.int32](size)
         for i in range(size):
             buffer[i] = i
@@ -2102,7 +2102,7 @@ fn test_lt_breaks_original() raises:
 
 fn test_simd_indexing() raises:
     print("test_simd_indexing")
-    alias simd_width = 8
+    comptime simd_width = 8
 
     # Create a SIMD vector with distinct values
     var vec = SIMD[DType.int32, simd_width](0, 1, 2, 3, 4, 5, 6, 7)
@@ -2119,7 +2119,7 @@ fn test_simd_indexing() raises:
 
 fn test_what_values() raises:
     print("test_what_values")
-    alias simd_width = 8
+    comptime simd_width = 8
 
     var buffer = Buffer[DType.float32](16)
     for i in range(16):
@@ -2629,7 +2629,7 @@ fn test_buffer_float_inequality() raises:
 
 fn test_fill_segment() raises:
     print("test_fill_segment")
-    alias dtype = DType.int32
+    comptime dtype = DType.int32
     size = 21
     l = List[Scalar[dtype]](capacity=Int(size))
     for i in range(size):
@@ -2680,7 +2680,7 @@ fn test_fill_segment() raises:
 
 fn test_overwrite_orig() raises:
     print("test_overwrite")
-    alias dtype = DType.int32
+    comptime dtype = DType.int32
     size = 21
     l = List[Scalar[dtype]](capacity=Int(size))
     for i in range(size):
@@ -2860,7 +2860,7 @@ fn test_count_alternating_pattern_cnt() raises:
 fn test_count_simd_boundary_cnt() raises:
     """Test counting across SIMD boundaries."""
     print("test_count_simd_boundary_cnt")
-    alias simd_w = simd_width_of[DType.int32]()
+    comptime simd_w = simd_width_of[DType.int32]()
     var size = simd_w * 3 + 5  # Not aligned to SIMD width
     var buffer = Buffer[DType.int32](size)
 
@@ -3319,7 +3319,7 @@ fn test_inplace_float64_precision_ips() raises:
 fn test_inplace_simd_boundary_ips() raises:
     """Test inplace operations across SIMD boundaries."""
     print("test_inplace_simd_boundary_ips")
-    alias simd_w = simd_width_of[DType.int32]()
+    comptime simd_w = simd_width_of[DType.int32]()
     var size = simd_w * 5 + 7  # Not aligned to SIMD width
     var buffer = Buffer[DType.int32](size)
 
@@ -3655,7 +3655,7 @@ fn test_arithmetic_float32_precision_arith() raises:
 fn test_arithmetic_simd_boundary_arith() raises:
     """Test arithmetic across SIMD boundaries."""
     print("test_arithmetic_simd_boundary_arith")
-    alias simd_w = simd_width_of[DType.int32]()
+    comptime simd_w = simd_width_of[DType.int32]()
     var size = simd_w * 4 + 7
 
     var buf1 = Buffer[DType.int32](size)
@@ -3819,7 +3819,7 @@ fn test_arithmetic_scalar_float64_arith() raises:
 fn test_arithmetic_scalar_simd_boundary_arith() raises:
     """Test scalar arithmetic across SIMD boundaries."""
     print("test_arithmetic_scalar_simd_boundary_arith")
-    alias simd_w = simd_width_of[DType.int32]()
+    comptime simd_w = simd_width_of[DType.int32]()
     var size = simd_w * 3 + 5
 
     var buffer = Buffer[DType.int32](size)
@@ -4283,7 +4283,7 @@ fn test_mv_inplace_tail_alignment() raises:
     print("test_mv_inplace_tail_alignment")
 
     # Size that's not SIMD-aligned (e.g., 13 for 16-byte SIMD)
-    alias SIZE = 13
+    comptime SIZE = 13
     var buffer1 = Buffer[DType.float32](SIZE)
     var buffer2 = Buffer[DType.float32](SIZE)
 
@@ -4328,7 +4328,7 @@ fn test_mv_performance_comparison() raises:
     """Compare performance: small vs large buffers."""
     print("test_mv_performance_comparison")
 
-    alias PERF_SIZE = 10000
+    comptime PERF_SIZE = 10000
     var buffer1 = Buffer[DType.float64](PERF_SIZE)
     var buffer2 = Buffer[DType.float64](PERF_SIZE)
 
@@ -4406,9 +4406,9 @@ fn run_all_manual_vectorization_tests() raises:
     print("=" * 60)
 
 
-alias TEST_SMALL = 17
-alias TEST_MEDIUM = 68
-alias TEST_LARGE = 1024
+comptime TEST_SMALL = 17
+comptime TEST_MEDIUM = 68
+comptime TEST_LARGE = 1024
 
 # ========== SUM TESTS ==========
 
@@ -4901,7 +4901,7 @@ fn test_bufops_tail_alignment() raises:
     """Test tail loop handling for non-SIMD-aligned sizes."""
     print("test_bufops_tail_alignment")
 
-    alias SIZE = 13  # Likely not SIMD-aligned
+    comptime SIZE = 13  # Likely not SIMD-aligned
     var buffer = Buffer[DType.float64](SIZE)
 
     for i in range(SIZE):
@@ -4924,7 +4924,7 @@ fn test_bufops_performance_comparison() raises:
     """Compare performance across operations."""
     print("test_bufops_performance_comparison")
 
-    alias PERF_SIZE = 10000
+    comptime PERF_SIZE = 10000
     var buffer = Buffer[DType.float64](PERF_SIZE)
 
     for i in range(PERF_SIZE):

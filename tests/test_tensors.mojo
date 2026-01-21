@@ -2986,7 +2986,7 @@ fn test_exponentiation() raises:
 
 fn test_grad_update() raises:
     print("test_grad_update")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     a = Tensor[dtype].rand([3, 4], requires_grad=True)
     v = a.into_view()
     v.init_gradbox()
@@ -4427,7 +4427,7 @@ fn test_argmin_max() raises:
 
 fn test_slice_backward() raises:
     print("test_slice_backward")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6], requires_grad=True)
     r = a.reshape([2, 3])
     s = r[Slice(1, None, None), Slice(0, 3, 1)]
@@ -4440,7 +4440,7 @@ fn test_slice_backward() raises:
 
 fn test_view_backward() raises:
     print("test_view_backward")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     a = Tensor[dtype].d1([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], requires_grad=True)
     v = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
     assert_true(v == Tensor[dtype].d2([[3, 4, 5, 6], [7, 8, 9, 10]]))
@@ -4460,7 +4460,7 @@ fn test_view_backward() raises:
 
 fn test_complex_mixed_ops_backward() raises:
     print("test_complex_mixed_ops_backward")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     a = Tensor[dtype].d2(
         [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], requires_grad=True

@@ -11,7 +11,7 @@ fn test_stack_axis0_2d() raises:
     """Test stack along axis 0 for 2D tensors."""
     print("test_stack_axis0_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
 
@@ -43,7 +43,7 @@ fn test_stack_axis1_2d() raises:
     """Test stack along axis 1 for 2D tensors."""
     print("test_stack_axis1_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
 
@@ -75,7 +75,7 @@ fn test_stack_axis2_2d() raises:
     """Test stack along axis 2 for 2D tensors."""
     print("test_stack_axis2_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
 
@@ -107,7 +107,7 @@ fn test_stack_axis_negative() raises:
     """Test stack with negative axis."""
     print("test_stack_axis_negative")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])
 
@@ -126,7 +126,7 @@ fn test_stack_1d_tensors() raises:
     """Test stack of 1D tensors."""
     print("test_stack_1d_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0])
     var C = Tensor[dtype].d1([7.0, 8.0, 9.0])
@@ -153,7 +153,7 @@ fn test_stack_1d_axis1() raises:
     """Test stack of 1D tensors along axis 1."""
     print("test_stack_1d_axis1")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0])
 
@@ -176,7 +176,7 @@ fn test_stack_3d_tensors() raises:
     """Test stack of 3D tensors."""
     print("test_stack_3d_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
     var B = Tensor[dtype].d3([[[5.0, 6.0], [7.0, 8.0]]])  # (1, 2, 2)
 
@@ -197,7 +197,7 @@ fn test_stack_many_tensors() raises:
     """Test stack of many tensors."""
     print("test_stack_many_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var tensors = List[Tensor[dtype]]()
 
     # Create 5 tensors
@@ -217,7 +217,7 @@ fn test_stack_single_tensor() raises:
     """Test stack of single tensor (edge case)."""
     print("test_stack_single_tensor")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
 
     var tensors = List[Tensor[dtype]]()
@@ -238,7 +238,7 @@ fn test_vstack_2d() raises:
     """Test vstack with 2D tensors."""
     print("test_vstack_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])  # (3,)
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0])  # (3,)
 
@@ -260,7 +260,7 @@ fn test_vstack_1d() raises:
     """Test vstack with 1D tensors."""
     print("test_vstack_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0])
     var C = Tensor[dtype].d1([7.0, 8.0, 9.0])
@@ -287,7 +287,7 @@ fn test_vstack_mixed_rows() raises:
     """Test vstack with different number of rows."""
     print("test_vstack_mixed_rows")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
     var B = Tensor[dtype].d2([[5.0, 6.0]])  # (1, 2)
     var C = Tensor[dtype].d2([[7.0, 8.0], [9.0, 10.0], [11.0, 12.0]])  # (3, 2)
@@ -325,7 +325,7 @@ fn test_hstack_2d() raises:
     """Test hstack with 2D tensors."""
     print("test_hstack_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0], [2.0], [3.0]])  # (3, 1)
     var B = Tensor[dtype].d2([[4.0], [5.0], [6.0]])  # (3, 1)
 
@@ -348,7 +348,7 @@ fn test_hstack_1d() raises:
     """Test hstack with 1D tensors."""
     print("test_hstack_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0])
     var C = Tensor[dtype].d1([6.0, 7.0, 8.0, 9.0])
@@ -374,7 +374,7 @@ fn test_hstack_mixed_cols() raises:
     """Test hstack with different number of columns."""
     print("test_hstack_mixed_cols")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
     var B = Tensor[dtype].d2([[5.0], [6.0]])  # (2, 1)
     var C = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])  # (2, 3)
@@ -406,7 +406,7 @@ fn test_stack_backward_axis0() raises:
     """Test gradient flow through stack along axis 0."""
     print("test_stack_backward_axis0")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
 
@@ -429,7 +429,7 @@ fn test_stack_backward_axis1() raises:
     """Test gradient flow through stack along axis 1."""
     print("test_stack_backward_axis1")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
 
@@ -452,7 +452,7 @@ fn test_stack_backward_weighted() raises:
     """Test gradient flow with weighted loss."""
     print("test_stack_backward_weighted")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
 
@@ -478,7 +478,7 @@ fn test_stack_backward_three_tensors() raises:
     """Test gradient flow through stack of three tensors."""
     print("test_stack_backward_three_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
     var C = Tensor[dtype].d1([5.0, 6.0], requires_grad=True)
@@ -503,7 +503,7 @@ fn test_stack_backward_chain() raises:
     """Test gradient flow through chained operations."""
     print("test_stack_backward_chain")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
 
@@ -533,7 +533,7 @@ fn test_vstack_backward() raises:
     """Test gradient flow through vstack."""
     print("test_vstack_backward")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)  # (1, 2)
     var B = Tensor[dtype].d2(
         [[3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -558,7 +558,7 @@ fn test_vstack_backward_1d() raises:
     """Test gradient flow through vstack with 1D tensors."""
     print("test_vstack_backward_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
 
@@ -580,7 +580,7 @@ fn test_vstack_backward_weighted() raises:
     """Test gradient flow through vstack with weighted loss."""
     print("test_vstack_backward_weighted")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
     var C = Tensor[dtype].d1([5.0, 6.0], requires_grad=True)
@@ -616,7 +616,7 @@ fn test_hstack_backward() raises:
     """Test gradient flow through hstack."""
     print("test_hstack_backward")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0], [2.0]], requires_grad=True)  # (2, 1)
     var B = Tensor[dtype].d2(
         [[3.0, 4.0], [5.0, 6.0]], requires_grad=True
@@ -641,7 +641,7 @@ fn test_hstack_backward_1d() raises:
     """Test gradient flow through hstack with 1D tensors."""
     print("test_hstack_backward_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0, 4.0, 5.0], requires_grad=True)
 
@@ -704,7 +704,7 @@ fn test_stk_basic_2_tensors_axis0() raises:
     """Test stacking 2 tensors along axis 0."""
     print("test_stk_basic_2_tensors_axis0")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0])
 
@@ -722,7 +722,7 @@ fn test_stk_basic_3_tensors_axis0() raises:
     """Test stacking 3 tensors along axis 0."""
     print("test_stk_basic_3_tensors_axis0")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0])
     var B = Tensor[dtype].d1([3.0, 4.0])
     var C = Tensor[dtype].d1([5.0, 6.0])
@@ -742,7 +742,7 @@ fn test_stk_axis1_2d() raises:
     """Test stacking along axis 1 for 2D tensors."""
     print("test_stk_axis1_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])  # (2, 2)
 
@@ -764,7 +764,7 @@ fn test_stk_axis_negative() raises:
     """Test stacking with negative axis."""
     print("test_stk_axis_negative")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0])
 
@@ -783,7 +783,7 @@ fn test_stk_single_element_tensors() raises:
     """Test stacking single-element tensors."""
     print("test_stk_single_element_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0])
     var B = Tensor[dtype].d1([2.0])
     var C = Tensor[dtype].d1([3.0])
@@ -803,7 +803,7 @@ fn test_stk_3d_tensors() raises:
     """Test stacking 3D tensors."""
     print("test_stk_3d_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].zeros(2, 3, 4)
     var B = Tensor[dtype].ones(2, 3, 4)
 
@@ -828,7 +828,7 @@ fn test_stk_backward_simple_axis0() raises:
     """Test gradient flow through stack with axis=0."""
     print("test_stk_backward_simple_axis0")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
 
@@ -850,7 +850,7 @@ fn test_stk_backward_weighted() raises:
     """Test gradient flow with weighted loss."""
     print("test_stk_backward_weighted")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
 
@@ -878,7 +878,7 @@ fn test_stk_backward_axis1() raises:
     """Test gradient flow through stack with axis=1."""
     print("test_stk_backward_axis1")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
 
@@ -900,7 +900,7 @@ fn test_stk_backward_three_tensors() raises:
     """Test gradient flow with three input tensors."""
     print("test_stk_backward_three_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
     var C = Tensor[dtype].d1([5.0, 6.0], requires_grad=True)
@@ -931,7 +931,7 @@ fn test_stk_backward_selective_grad() raises:
     """Test gradient flow when only some tensors require grad."""
     print("test_stk_backward_selective_grad")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=False)
     var C = Tensor[dtype].d1([7.0, 8.0, 9.0], requires_grad=True)
@@ -961,7 +961,7 @@ fn test_stk_vstack_1d_tensors() raises:
     """Test vstack with 1D tensors."""
     print("test_stk_vstack_1d_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0])
 
@@ -979,7 +979,7 @@ fn test_stk_vstack_2d_tensors() raises:
     """Test vstack with 2D tensors."""
     print("test_stk_vstack_2d_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])  # (2, 2)
 
@@ -999,7 +999,7 @@ fn test_stk_vstack_different_rows() raises:
     """Test vstack with tensors having different number of rows."""
     print("test_stk_vstack_different_rows")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0]])  # (1, 3)
     var B = Tensor[dtype].d2([[4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])  # (2, 3)
 
@@ -1019,7 +1019,7 @@ fn test_stk_vstack_backward() raises:
     """Test gradient flow through vstack."""
     print("test_stk_vstack_backward")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
 
@@ -1051,7 +1051,7 @@ fn test_stk_hstack_1d_tensors() raises:
     """Test hstack with 1D tensors."""
     print("test_stk_hstack_1d_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0])
 
@@ -1069,7 +1069,7 @@ fn test_stk_hstack_2d_tensors() raises:
     """Test hstack with 2D tensors."""
     print("test_stk_hstack_2d_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])  # (2, 2)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])  # (2, 2)
 
@@ -1089,7 +1089,7 @@ fn test_stk_hstack_different_columns() raises:
     """Test hstack with tensors having different number of columns."""
     print("test_stk_hstack_different_columns")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0], [2.0]])  # (2, 1)
     var B = Tensor[dtype].d2([[3.0, 4.0, 5.0], [6.0, 7.0, 8.0]])  # (2, 3)
 
@@ -1109,7 +1109,7 @@ fn test_stk_hstack_backward() raises:
     """Test gradient flow through hstack."""
     print("test_stk_hstack_backward")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
 
@@ -1136,7 +1136,7 @@ fn test_stk_hstack_2d_backward() raises:
     """Test gradient flow through hstack with 2D tensors."""
     print("test_stk_hstack_2d_backward")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
 
@@ -1168,7 +1168,7 @@ fn test_stk_large_number_tensors() raises:
     """Test stacking a large number of tensors."""
     print("test_stk_large_number_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var tensors = List[Tensor[dtype]]()
 
     for i in range(10):
@@ -1186,7 +1186,7 @@ fn test_stk_zeros_and_ones() raises:
     """Test stacking tensors with zeros and ones."""
     print("test_stk_zeros_and_ones")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].zeros(3, 4)
     var B = Tensor[dtype].ones(3, 4)
     var C = Tensor[dtype].zeros(3, 4)
@@ -1211,7 +1211,7 @@ fn test_stk_chain_operations() raises:
     """Test stacking followed by other operations."""
     print("test_stk_chain_operations")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var B = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
 
@@ -1234,7 +1234,7 @@ fn test_stk_mixed_operations() raises:
     """Test mixing stack, vstack, and hstack."""
     print("test_stk_mixed_operations")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0])
     var B = Tensor[dtype].d1([3.0, 4.0])
 
@@ -1307,7 +1307,7 @@ fn run_all_stack_tests() raises:
 
 
 fn test_stack_operations() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     print("=" * 70)
     print("TEST 1: Basic stack along axis 0")

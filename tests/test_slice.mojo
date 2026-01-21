@@ -221,7 +221,7 @@ fn test_slice_1d_full() raises:
     """Test slicing entire 1D tensor."""
     print("test_slice_1d_full")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
 
     var sliced = x[:]
@@ -235,7 +235,7 @@ fn test_slice_1d_start_only() raises:
     """Test 1D slice with start index only."""
     print("test_slice_1d_start_only")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
 
     var sliced = x[2:]
@@ -250,7 +250,7 @@ fn test_slice_1d_end_only() raises:
     """Test 1D slice with end index only."""
     print("test_slice_1d_end_only")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
 
     var sliced = x[:3]
@@ -265,7 +265,7 @@ fn test_slice_1d_start_end() raises:
     """Test 1D slice with both start and end."""
     print("test_slice_1d_start_end")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
 
     var sliced = x[1:4]
@@ -280,7 +280,7 @@ fn test_slice_1d_with_step() raises:
     """Test 1D slice with step."""
     print("test_slice_1d_with_step")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
 
     var sliced = x[::2]  # Every other element
@@ -295,7 +295,7 @@ fn test_slice_1d_negative_indices() raises:
     """Test 1D slice with negative indices."""
     print("test_slice_1d_negative_indices")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
 
     var sliced = x[-3:-1]
@@ -310,7 +310,7 @@ fn test_slice_1d_single_element() raises:
     """Test 1D slice getting single element range."""
     print("test_slice_1d_single_element")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
 
     var sliced = x[2:3]
@@ -329,7 +329,7 @@ fn test_slice_2d_full() raises:
     """Test slicing entire 2D tensor."""
     print("test_slice_2d_full")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
     )
@@ -345,7 +345,7 @@ fn test_slice_2d_single_row() raises:
     """Test slicing single row from 2D tensor."""
     print("test_slice_2d_single_row")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
     )
@@ -363,7 +363,7 @@ fn test_slice_2d_single_column() raises:
     """Test slicing single column from 2D tensor."""
     print("test_slice_2d_single_column")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
     )
@@ -381,7 +381,7 @@ fn test_slice_2d_submatrix() raises:
     """Test slicing submatrix from 2D tensor."""
     print("test_slice_2d_submatrix")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [
             [1.0, 2.0, 3.0, 4.0],
@@ -404,7 +404,7 @@ fn test_slice_2d_rows_subset() raises:
     """Test slicing subset of rows."""
     print("test_slice_2d_rows_subset")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0], [10.0, 11.0, 12.0]]
     )
@@ -422,7 +422,7 @@ fn test_slice_2d_cols_subset() raises:
     """Test slicing subset of columns."""
     print("test_slice_2d_cols_subset")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]]
     )
@@ -440,7 +440,7 @@ fn test_slice_2d_with_step() raises:
     """Test 2D slicing with step."""
     print("test_slice_2d_with_step")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [
             [1.0, 2.0, 3.0, 4.0],
@@ -468,7 +468,7 @@ fn test_slice_3d_full() raises:
     """Test slicing entire 3D tensor."""
     print("test_slice_3d_full")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].ones(2, 3, 4)
 
     var sliced = x[:, :, :]
@@ -483,7 +483,7 @@ fn test_slice_3d_single_depth() raises:
     """Test slicing single depth slice from 3D tensor."""
     print("test_slice_3d_single_depth")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(2 * 3 * 4)
     for i in range(24):
         x[i] = Float32(i) + 1.0
@@ -499,7 +499,7 @@ fn test_slice_3d_subvolume() raises:
     """Test slicing subvolume from 3D tensor."""
     print("test_slice_3d_subvolume")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(4 * 4 * 4)
     for i in range(64):
         x[i] = Float32(i)
@@ -517,7 +517,7 @@ fn test_slice_3d_single_channel() raises:
     """Test slicing single channel from 3D tensor (like CNN)."""
     print("test_slice_3d_single_channel")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(3 * 28 * 28)  # 3 channels, 28x28 spatial
     x = x.reshape(3, 28, 28)
     var sliced = x[1:2, :, :]  # Get channel 1
@@ -531,7 +531,7 @@ fn test_slice_3d_spatial_region() raises:
     """Test slicing spatial region from 3D tensor."""
     print("test_slice_3d_spatial_region")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].arange(3 * 28 * 28)
     x = x.reshape(3, 28, 28)
 
@@ -551,7 +551,7 @@ fn test_slice_4d_full() raises:
     """Test slicing entire 4D tensor."""
     print("test_slice_4d_full")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].ones(2, 3, 28, 28)
 
     var sliced = x[:, :, :, :]
@@ -566,7 +566,7 @@ fn test_slice_4d_single_batch() raises:
     """Test slicing single batch element from 4D tensor."""
     print("test_slice_4d_single_batch")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].rand(8, 3, 32, 32)  # Batch of 8 images
 
     var sliced = x[0:1, :, :, :]  # First image
@@ -581,7 +581,7 @@ fn test_slice_4d_batch_subset() raises:
     """Test slicing subset of batch."""
     print("test_slice_4d_batch_subset")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].rand(16, 3, 32, 32)
 
     var sliced = x[4:8, :, :, :]  # Mini-batch of 4 images
@@ -596,7 +596,7 @@ fn test_slice_4d_channel_subset() raises:
     """Test slicing subset of channels from 4D tensor."""
     print("test_slice_4d_channel_subset")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].rand(2, 64, 14, 14)  # 64 channels
 
     var sliced = x[:, 0:32, :, :]  # First 32 channels
@@ -611,7 +611,7 @@ fn test_slice_4d_spatial_crop() raises:
     """Test spatial cropping from 4D tensor."""
     print("test_slice_4d_spatial_crop")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].rand(4, 3, 224, 224)  # Large images
 
     var sliced = x[:, :, 50:150, 50:150]  # Crop center 100x100
@@ -631,7 +631,7 @@ fn test_chained_slicing_2d() raises:
     """Test chaining multiple slicing operations."""
     print("test_chained_slicing_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [
             [1.0, 2.0, 3.0, 4.0],
@@ -655,7 +655,7 @@ fn test_chained_slicing_3d() raises:
     """Test chaining slices on 3D tensor."""
     print("test_chained_slicing_3d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].rand(4, 4, 4)
     for i in range(64):
         x.buffer.data_buffer()[i] = Float32(i)
@@ -678,7 +678,7 @@ fn test_immutable_multiple_slices() raises:
     """Test that we can create multiple slices from same immutable tensor."""
     print("test_immutable_multiple_slices")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
 
     # With 'self' (not 'mut self'), we can create multiple views
@@ -700,7 +700,7 @@ fn test_immutable_slice_from_const() raises:
     """Test slicing from a const-reference like scenario."""
     print("test_immutable_slice_from_const")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
 
     # This should work with 'self' but not with 'mut self'
@@ -716,7 +716,7 @@ fn test_immutable_overlapping_slices() raises:
     """Test creating overlapping slices (only possible with 'self')."""
     print("test_immutable_overlapping_slices")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
     )
@@ -746,7 +746,7 @@ fn test_slice_backward_1d() raises:
     """Test gradient flow through 1D slice."""
     print("test_slice_backward_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0], requires_grad=True)
 
     var sliced = x[1:4]  # [2, 3, 4]
@@ -762,7 +762,7 @@ fn test_slice_backward_2d() raises:
     """Test gradient flow through 2D slice."""
     print("test_slice_backward_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], requires_grad=True
     )
@@ -782,7 +782,7 @@ fn test_slice_backward_chained() raises:
     """Test gradient flow through chained slices."""
     print("test_slice_backward_chained")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2(
         [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]],
         requires_grad=True,
@@ -803,7 +803,7 @@ fn test_slice_backward_multiple_paths() raises:
     """Test gradient accumulation from multiple slices."""
     print("test_slice_backward_multiple_paths")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
 
     var slice1 = x[0:3]  # [1, 2, 3]

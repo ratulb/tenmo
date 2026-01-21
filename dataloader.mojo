@@ -7,20 +7,20 @@ from memory import memcpy, Pointer
 from shapes import Shape
 
 # MNIST
-alias MNIST_MEAN = 0.1307
-alias MNIST_STD = 0.3081
+comptime MNIST_MEAN = 0.1307
+comptime MNIST_STD = 0.3081
 
 # Fashion-MNIST
-alias FASHION_MNIST_MEAN = 0.2860
-alias FASHION_MNIST_STD = 0.3530
+comptime FASHION_MNIST_MEAN = 0.2860
+comptime FASHION_MNIST_STD = 0.3530
 
 # CIFAR-10 (per-channel)
-alias CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
-alias CIFAR10_STD = (0.2470, 0.2435, 0.2616)
+comptime CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
+comptime CIFAR10_STD = (0.2470, 0.2435, 0.2616)
 
 # ImageNet (per-channel)
-alias IMAGENET_MEAN = (0.485, 0.456, 0.406)
-alias IMAGENET_STD = (0.229, 0.224, 0.225)
+comptime IMAGENET_MEAN = (0.485, 0.456, 0.406)
+comptime IMAGENET_STD = (0.229, 0.224, 0.225)
 
 
 @fieldwise_init
@@ -47,8 +47,8 @@ struct Batch[feature_dtype: DType, label_dtype: DType](
 
 
 trait Dataset(Sized & Copyable & Movable):
-    alias _feature_dtype: DType
-    alias _label_dtype: DType
+    comptime _feature_dtype: DType
+    comptime _label_dtype: DType
 
     fn __len__(self) -> Int:
         ...
@@ -360,8 +360,8 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 ):
     """Dataset that preserves original tensor shapes."""
 
-    alias _feature_dtype = feature_dtype
-    alias _label_dtype = label_dtype
+    comptime _feature_dtype = feature_dtype
+    comptime _label_dtype = label_dtype
 
     var _features: Tensor[Self.feature_dtype]
     var _labels: Tensor[Self.label_dtype]
@@ -505,8 +505,8 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 ):
     """Dataset from tensors. References existing data (no copy)."""
 
-    alias _feature_dtype = feature_dtype
-    alias _label_dtype = label_dtype
+    comptime _feature_dtype = feature_dtype
+    comptime _label_dtype = label_dtype
 
     var _features: Tensor[Self.feature_dtype]
     var _labels: Tensor[Self.label_dtype]

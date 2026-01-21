@@ -19,7 +19,7 @@ fn main() raises:
 
 
 fn test_tensor_permute_basic() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     print("Running test_tensor_permute_basic")
     t1 = Tensor[dtype].arange(0, 12).reshape(Shape(3, 4))
     p = t1.permute(IntArray([1, 0]))
@@ -30,7 +30,7 @@ fn test_tensor_permute_basic() raises:
 
 
 fn test_tensor_permute_3d_axes() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     print("Running test_tensor_permute_3d_axes")
     t1 = Tensor[dtype].arange(0, 60).reshape(Shape(3, 4, 5))
     p = t1.permute([2, 0, 1])
@@ -40,7 +40,7 @@ fn test_tensor_permute_3d_axes() raises:
 
 
 fn test_tensor_permute_inverse() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     print("Running test_tensor_permute_inverse")
     t1 = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4))
     p = Permute[dtype].forward(t1, IntArray([2, 0, 1]))
@@ -52,7 +52,7 @@ fn test_tensor_permute_inverse() raises:
 
 fn test_tensor_permute_grad_sum_2d() raises:
     print("test_tensor_permute_grad_sum_2d")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var t = Tensor[dtype].arange(0, 12).reshape(Shape(3, 4))
     t.requires_grad_(True)
     var p = Permute[dtype].forward(t, IntArray([1, 0]))
@@ -67,7 +67,7 @@ fn test_tensor_permute_grad_sum_2d() raises:
 
 fn test_tensor_permute_grad_inverse_chain() raises:
     print("test_tensor_permute_grad_inverse_chain")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4))
     t.requires_grad_(True)
     # Apply a permutation and then its inverse (should return original layout)
@@ -93,7 +93,7 @@ fn test_tensor_permute_grad_partial_ops() raises:
         "This test checks a permute followed by a partial reduction along"
         " permuted axes"
     )
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var t = Tensor[dtype].arange(0, 60, requires_grad=True)
     var r = t.reshape(Shape(3, 4, 5))
     # permute to (5,3,4) then mean over first axis (axis=0 of permuted)
@@ -109,7 +109,7 @@ fn test_tensor_permute_grad_partial_ops() raises:
 
 fn test_tensor_permute_grad_scaled_sum_3d() raises:
     print("test_tensor_permute_grad_scaled_sum_3d")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var t = Tensor[dtype].arange(0, 60).reshape(Shape(3, 4, 5))
     t.requires_grad_(True)
     var p = Permute[dtype].forward(t, IntArray([2, 0, 1]))  # shape -> (5,3,4)

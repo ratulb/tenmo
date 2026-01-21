@@ -12,7 +12,7 @@ from intarray import IntArray
 
 fn test_tanh_forward_values() raises:
     print("test_tanh_forward_values")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([0.0, 1.0, -1.0, 2.0, -2.0], requires_grad=False)
     var y = x.tanh[track_grad=False]()
 
@@ -26,7 +26,7 @@ fn test_tanh_forward_values() raises:
 
 fn test_tanh_moderate_range() raises:
     print("test_tanh_moderate_range")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # For |x| < 5, tanh should be strictly within (-1, 1)
     var x = Tensor[dtype].d1([-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0], requires_grad=False)
     var y = x.tanh[track_grad=False]()
@@ -37,7 +37,7 @@ fn test_tanh_moderate_range() raises:
 
 fn test_tanh_range_bounded() raises:
     print("test_tanh_range_bounded")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([-10.0, -5.0, 0.0, 5.0, 10.0], requires_grad=False)
     var y = x.tanh[track_grad=False]()
 
@@ -67,7 +67,7 @@ fn test_tanh_range_bounded() raises:
 
 fn test_tanh_saturation() raises:
     print("test_tanh_saturation")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # For large |x|, tanh saturates to ±1.0 due to float32 precision
     var x = Tensor[dtype].d1([-10.0, -20.0, 10.0, 20.0], requires_grad=False)
     var y = x.tanh[track_grad=False]()
@@ -82,7 +82,7 @@ fn test_tanh_saturation() raises:
 
 fn test_tanh_no_overflow() raises:
     print("test_tanh_no_overflow")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Test that extreme values don't cause NaN or Inf
     var x = Tensor[dtype].d1([-100.0, -50.0, 50.0, 100.0], requires_grad=False)
     var y = x.tanh[track_grad=False]()
@@ -95,7 +95,7 @@ fn test_tanh_no_overflow() raises:
 
 fn test_tanh_gradient_at_zero() raises:
     print("test_tanh_gradient_at_zero")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([0.0], requires_grad=True)
     var y = x.tanh[track_grad=True]()
     var loss = y.sum()
@@ -108,7 +108,7 @@ fn test_tanh_gradient_at_zero() raises:
 
 fn test_tanh_gradient_positive() raises:
     print("test_tanh_gradient_positive")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0], requires_grad=True)
     var y = x.tanh[track_grad=True]()
     var loss = y.sum()
@@ -121,7 +121,7 @@ fn test_tanh_gradient_positive() raises:
 
 fn test_tanh_gradient_negative() raises:
     print("test_tanh_gradient_negative")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([-1.0], requires_grad=True)
     var y = x.tanh[track_grad=True]()
     var loss = y.sum()
@@ -133,7 +133,7 @@ fn test_tanh_gradient_negative() raises:
 
 fn test_tanh_gradient_saturation() raises:
     print("test_tanh_gradient_saturation")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([5.0, -5.0], requires_grad=True)
     var y = x.tanh[track_grad=True]()
     var loss = y.sum()
@@ -148,7 +148,7 @@ fn test_tanh_gradient_saturation() raises:
 
 fn test_tanh_gradient_batch() raises:
     print("test_tanh_gradient_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d2([[0.0, 1.0], [-1.0, 2.0]], requires_grad=True)
     var y = x.tanh[track_grad=True]()
     var loss = y.sum()
@@ -164,7 +164,7 @@ fn test_tanh_gradient_batch() raises:
 
 fn test_tanh_chain_rule() raises:
     print("test_tanh_chain_rule")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([0.5], requires_grad=True)
     var y = x.tanh[track_grad=True]()
     var z = y * y  # z = tanh²(x)
@@ -179,7 +179,7 @@ fn test_tanh_chain_rule() raises:
 
 fn test_tanh_no_grad_mode() raises:
     print("test_tanh_no_grad_mode")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var y = x.tanh[track_grad=False]()
 
@@ -188,7 +188,7 @@ fn test_tanh_no_grad_mode() raises:
 
 fn test_tanh_layer_train_mode() raises:
     print("test_tanh_layer_train_mode")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var activation = Tanh[dtype]()
     activation.train()
 
@@ -201,7 +201,7 @@ fn test_tanh_layer_train_mode() raises:
 
 fn test_tanh_layer_eval_mode() raises:
     print("test_tanh_layer_eval_mode")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var activation = Tanh[dtype]()
     activation.eval()
 
@@ -212,7 +212,7 @@ fn test_tanh_layer_eval_mode() raises:
 
 fn test_tanh_numerical_stability_positive() raises:
     print("test_tanh_numerical_stability_positive")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Test large positive values
     var x = Tensor[dtype].d1([10.0, 20.0, 50.0], requires_grad=False)
     var y = x.tanh[track_grad=False]()
@@ -226,7 +226,7 @@ fn test_tanh_numerical_stability_positive() raises:
 
 fn test_tanh_numerical_stability_negative() raises:
     print("test_tanh_numerical_stability_negative")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Test large negative values
     var x = Tensor[dtype].d1([-10.0, -20.0, -50.0], requires_grad=False)
     var y = x.tanh[track_grad=False]()
@@ -243,7 +243,7 @@ fn test_tanh_numerical_stability_negative() raises:
 fn test_tanh_contiguous_vs_non_contiguous() raises:
     print("test_tanh_contiguous_vs_non_contiguous")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x_contig = Tensor[dtype].d1([0.0, 1.0, -1.0], requires_grad=True)
     var y_contig = x_contig.tanh[track_grad=True]()
 
@@ -259,7 +259,7 @@ fn test_tanh_contiguous_vs_non_contiguous() raises:
 
 fn test_tanh_with_linear_layer() raises:
     print("test_tanh_with_linear_layer")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var layer = Linear[dtype](2, 3, xavier=True)
     var activation = Tanh[dtype]()
     layer.train()
@@ -281,7 +281,7 @@ fn test_tanh_with_linear_layer() raises:
 
 fn test_tanh_zero_tensor() raises:
     print("test_tanh_zero_tensor")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x = Tensor[dtype].zeros(Shape(3, 3), requires_grad=True)
     var y = x.tanh[track_grad=True]()
     var loss = y.sum()
@@ -295,7 +295,7 @@ fn test_tanh_zero_tensor() raises:
 
 fn test_tanh_symmetry() raises:
     print("test_tanh_symmetry")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var x_pos = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=False)
     var x_neg = Tensor[dtype].d1([-1.0, -2.0, -3.0], requires_grad=False)
 

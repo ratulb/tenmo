@@ -42,10 +42,10 @@ struct Tensor[dtype: DType = DType.float32](
     & EqualityComparable
     & ImplicitlyCopyable
 ):
-    alias Row = List[Scalar[Self.dtype]]
-    alias Rows = List[Self.Row]
-    alias Block = List[Self.Rows]
-    alias Blocks = List[Self.Block]
+    comptime Row = List[Scalar[Self.dtype]]
+    comptime Rows = List[Self.Row]
+    comptime Block = List[Self.Rows]
+    comptime Blocks = List[Self.Block]
     var _id: UInt
     var buffer: NDBuffer[Self.dtype]
     var requires_grad: Bool

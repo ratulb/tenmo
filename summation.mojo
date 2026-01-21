@@ -10,7 +10,7 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct SumBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_SUM
+    comptime TAG = BACKWARD_SUM
     var axes: IntArray
     var keepdims: Bool
 

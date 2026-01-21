@@ -101,8 +101,8 @@ fn assert_close(
     msg: String = "Assertion failed",
 ) raises:
     """Assert two tensors are close within tolerance."""
-    alias rtol: Float32 = 1e-5
-    alias atol: Float32 = 1e-5
+    comptime rtol: Float32 = 1e-5
+    comptime atol: Float32 = 1e-5
 
     if not actual.all_close[rtol=rtol, atol=atol](expected):
         print("Expected:")
@@ -123,8 +123,8 @@ fn assert_close(
     msg: String = "Assertion failed",
 ) raises:
     """Assert two tensors are close within tolerance."""
-    alias rtol: Float32 = 1e-5
-    alias atol: Float32 = 1e-5
+    comptime rtol: Float32 = 1e-5
+    comptime atol: Float32 = 1e-5
 
     if not actual.all_close[rtol=rtol, atol=atol](expected):
         print("Expected:")

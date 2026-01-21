@@ -10,7 +10,7 @@ fn test_log_forward_basic() raises:
     """Test basic logarithm computation."""
     print("test_log_forward_basic")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([1.0, 2.0, 3.0, 4.0])
     var y = x.log()
 
@@ -25,7 +25,7 @@ fn test_log_forward_with_epsilon() raises:
     """Test logarithm with very small values (epsilon handling)."""
     print("test_log_forward_with_epsilon")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([1e-15, 1e-13, 1.0, 10.0])
     var epsilon = Scalar[dtype](1e-12)
     var y = x.log(epsilon=epsilon)
@@ -45,7 +45,7 @@ fn test_log_forward_zero_handling() raises:
     """Test that zero values are handled safely."""
     print("test_log_forward_zero_handling")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([0.0, 1.0, 2.0])
     var epsilon = Scalar[dtype](1e-10)
     var y = x.log(epsilon=epsilon)
@@ -63,7 +63,7 @@ fn test_log_forward_negative_values() raises:
     """Test that negative values are handled (clamped to epsilon)."""
     print("test_log_forward_negative_values")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([-1.0, -0.5, 1.0])
     var epsilon = Scalar[dtype](1e-10)
     var y = x.log(epsilon=epsilon)
@@ -79,7 +79,7 @@ fn test_log_forward_2d() raises:
     """Test logarithm on 2D tensor."""
     print("test_log_forward_2d")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var y = x.log()
 
@@ -96,7 +96,7 @@ fn test_log_forward_e() raises:
     """Test that log(e) = 1."""
     print("test_log_forward_e")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var e = Scalar[dtype](2.718281828459045)
     var x = Tensor[dtype].scalar(e)
     var y = x.log()
@@ -112,7 +112,7 @@ fn test_log_backward_basic() raises:
     """Test basic gradient computation: d/dx log(x) = 1/x."""
     print("test_log_backward_basic")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([2.0, 3.0, 4.0], requires_grad=True)
     var y = x.log()
     var loss = y.sum()
@@ -130,7 +130,7 @@ fn test_log_backward_weighted() raises:
     """Test gradient with weighted loss."""
     print("test_log_backward_weighted")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([1.0, 2.0, 4.0], requires_grad=True)
     var y = x.log()
 
@@ -152,7 +152,7 @@ fn test_log_backward_chain_rule() raises:
     """Test gradient with chain rule: d/dx log(x^2)."""
     print("test_log_backward_chain_rule")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([2.0, 3.0, 4.0], requires_grad=True)
     var x_squared = x * x  # x^2
     var y = x_squared.log()  # log(x^2)
@@ -171,7 +171,7 @@ fn test_log_backward_with_epsilon() raises:
     """Test gradient computation with epsilon (small values)."""
     print("test_log_backward_with_epsilon")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var epsilon = Scalar[dtype](1e-10)
     var x = Tensor[dtype]([1e-15, 1.0, 2.0], requires_grad=True)
     var y = x.log(epsilon=epsilon)
@@ -192,7 +192,7 @@ fn test_log_backward_zero_input() raises:
     """Test gradient with zero input (should use epsilon)."""
     print("test_log_backward_zero_input")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var epsilon = Scalar[dtype](1e-8)
     var x = Tensor[dtype]([0.0, 1.0, 2.0], requires_grad=True)
     var y = x.log(epsilon=epsilon)
@@ -211,7 +211,7 @@ fn test_log_backward_2d() raises:
     """Test gradient computation on 2D tensor."""
     print("test_log_backward_2d")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var y = x.log()
     var loss = y.sum()
@@ -230,7 +230,7 @@ fn test_log_backward_multiple_uses() raises:
     """Test gradient when log output is used multiple times."""
     print("test_log_backward_multiple_uses")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([2.0, 3.0], requires_grad=True)
     var y = x.log()
 
@@ -255,7 +255,7 @@ fn test_log_numerical_stability_large() raises:
     """Test numerical stability with large values."""
     print("test_log_numerical_stability_large")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([1e10, 1e20, 1e30])
     var y = x.log()
 
@@ -272,7 +272,7 @@ fn test_log_numerical_stability_small() raises:
     """Test numerical stability with very small values."""
     print("test_log_numerical_stability_small")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var epsilon = Scalar[dtype](1e-12)
     var x = Tensor[dtype]([1e-20, 1e-15, 1e-10])
     var y = x.log(epsilon=epsilon)
@@ -289,7 +289,7 @@ fn test_log_gradient_stability() raises:
     """Test that gradients remain stable near zero."""
     print("test_log_gradient_stability")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var epsilon = Scalar[dtype](1e-10)
     var x = Tensor[dtype].d1([1e-12, 1e-8, 1.0], requires_grad=True)
     var y = x.log(epsilon=epsilon)
@@ -311,7 +311,7 @@ fn test_log_single_element() raises:
     """Test logarithm of single element tensor."""
     print("test_log_single_element")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([2.718281828459045], requires_grad=True)  # e
     var y = x.log()
     y.backward()
@@ -325,7 +325,7 @@ fn test_log_all_ones() raises:
     """Test logarithm of tensor with all ones."""
     print("test_log_all_ones")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype].ones(5, requires_grad=True)
     var y = x.log()
     var loss = y.sum()
@@ -341,7 +341,7 @@ fn test_log_custom_epsilon_values() raises:
     """Test different epsilon values."""
     print("test_log_custom_epsilon_values")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
     var x = Tensor[dtype]([0.0, 1.0])
 
     # Test with different epsilon values
@@ -411,7 +411,7 @@ fn main() raises:
     """Example usage and quick verification."""
     print("Example: Basic logarithm with epsilon")
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
 
     # Example 1: Basic usage
     var x = Tensor[dtype]([1.0, 2.0, 3.0], requires_grad=True)

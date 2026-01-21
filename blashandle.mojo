@@ -13,7 +13,7 @@ from walkback import Matmul2dBackward
 @fieldwise_init
 @register_passable
 struct BLASMatmul2dBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BLAS_BACKWARD_MATMUL_2D
+    comptime TAG = BLAS_BACKWARD_MATMUL_2D
     var transpose_A: Bool
     var transpose_B: Bool
     var blas: BLASHandleLite[Self.dtype]
@@ -88,8 +88,8 @@ struct BLASMatmul2dBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
-#alias BLAS_PATH = env_get_string["BLAS_PATH", "/usr/lib/x86_64-linux-gnu/libopenblas.so.0"]()
-alias BLAS_PATH = env_get_string[
+#comptime BLAS_PATH = env_get_string["BLAS_PATH", "/usr/lib/x86_64-linux-gnu/libopenblas.so.0"]()
+comptime BLAS_PATH = env_get_string[
     "BLAS_PATH", "/content/tenmo/.pixi/envs/default/lib/libopenblas.so.0"
 ]()
 
@@ -111,13 +111,13 @@ alias BLAS_PATH = env_get_string[
 # );
 
 # CBLAS constants
-alias CblasRowMajor = Int32(101)
-alias CblasColMajor = Int32(102)
-alias CblasNoTrans = Int32(111)
-alias CblasTrans = Int32(112)
+comptime CblasRowMajor = Int32(101)
+comptime CblasColMajor = Int32(102)
+comptime CblasNoTrans = Int32(111)
+comptime CblasTrans = Int32(112)
 
 # Function type aliases
-alias CBLAS_SGEMM_FN = fn (
+comptime CBLAS_SGEMM_FN = fn (
     Int32,  # order
     Int32,  # transA
     Int32,  # transB
@@ -134,7 +134,7 @@ alias CBLAS_SGEMM_FN = fn (
     Int32,  # ldc
 ) -> None
 
-alias CBLAS_DGEMM_FN = fn (
+comptime CBLAS_DGEMM_FN = fn (
     Int32,
     Int32,
     Int32,
@@ -981,7 +981,7 @@ fn test_blas_case_4_Atranspose_Btranspose() raises:
     print("TEST CASE 4: C = A^T @ B^T")
     print("=" * 80)
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Dimensions: A(3,2)^T @ B(4,3)^T → A^T(2,3) @ B^T(3,4) → C(2,4)
     var A = Tensor[dtype].d2(

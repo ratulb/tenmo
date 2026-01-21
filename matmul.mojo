@@ -18,13 +18,13 @@ from algorithm import parallelize
 from sys.info import num_logical_cores as num_physical_cores
 
 
-alias TILE_SIZE = 32
+comptime TILE_SIZE = 32
 
 
 @fieldwise_init
 @register_passable
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_MATMUL_2D
+    comptime TAG = BACKWARD_MATMUL_2D
 
     @always_inline
     fn backward[
@@ -581,7 +581,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_MATMUL_ND
+    comptime TAG = BACKWARD_MATMUL_ND
 
     fn backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
@@ -834,11 +834,11 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
         return MatmulNd[Self.dtype].forward(A, B)
 
 
-# alias dot = 0  # dot product
-# alias vm = 1  # vector & tensor matmul
-# alias mv = 2  # tensor & vector matmul
-# alias mm = 3  # tensor & tensor matmul
-# alias invalid = 4  # Invalid case
+# comptime dot = 0  # dot product
+# comptime vm = 1  # vector & tensor matmul
+# comptime mv = 2  # tensor & vector matmul
+# comptime mm = 3  # tensor & tensor matmul
+# comptime invalid = 4  # Invalid case
 
 
 fn classify_matmul(a: Shape, b: Shape) -> Int:
@@ -864,7 +864,7 @@ from blashandle import BLASHandle
 
 
 fn test_gflops_blas() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = 128
     var K = 512
     var O = 512
@@ -939,7 +939,7 @@ fn test_gflops_blas() raises:
 
 
 fn test_gflops() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var M = 128
     var K = 512
     var O = 512

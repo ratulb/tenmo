@@ -103,7 +103,7 @@ fn main():
     num_samples = 100
     (train_x, train_y) = make_synthetic_mnist_dataset(num_samples)
     # Define model
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     model = Sequential[dtype]()
     model.append(Linear[dtype](784, 128).into())
     model.append(ReLU[dtype]().into())

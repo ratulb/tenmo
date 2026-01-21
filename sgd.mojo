@@ -70,7 +70,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
     fn compute_grad_norm(self) -> Scalar[Self.dtype]:
         """Compute total gradient norm with SIMD optimization."""
         var total_norm_sq: Scalar[Self.dtype] = 0.0
-        alias simd_w = simd_width_of[Self.dtype]()
+        comptime simd_w = simd_width_of[Self.dtype]()
 
         for i in range(len(self.parameters)):
             ref parameter = self.parameters[i][]
@@ -100,7 +100,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
     fn clip_gradients(mut self):
         """Optimized gradient clipping with SIMD."""
-        alias simd_w = simd_width_of[Self.dtype]()
+        comptime simd_w = simd_width_of[Self.dtype]()
 
         # 1. NORM CLIPPING (if enabled)
         if self.clip_norm > 0:
@@ -175,7 +175,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         self.clip_gradients()
 
         # 2. Update parameters with SIMD
-        alias simd_w = simd_width_of[Self.dtype]()
+        comptime simd_w = simd_width_of[Self.dtype]()
 
         var lr_vec = SIMD[Self.dtype, simd_w](self.lr)
         var momentum_vec = SIMD[Self.dtype, simd_w](self.momentum)

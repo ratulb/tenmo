@@ -292,7 +292,7 @@ fn test_dropout_backward_with_upstream_gradient() raises:
 
 
 fn test_dropout_backward_2d_tensor() raises:
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     """Test dropout backward pass on 2D tensor."""
     print("test_dropout_backward_2d_tensor")
 

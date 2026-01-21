@@ -10,7 +10,7 @@ from forwards import DivideByScalar
 
 @register_passable
 struct MeanBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_MEAN
+    comptime TAG = BACKWARD_MEAN
     var axes: IntArray
     var keepdims: Bool
 

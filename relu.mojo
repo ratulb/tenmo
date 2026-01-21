@@ -8,7 +8,7 @@ from buffers import Buffer
 
 @fieldwise_init
 struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    alias TAG = BACKWARD_RELU
+    comptime TAG = BACKWARD_RELU
     var mask: Buffer[Self.dtype]  # Stores 0.0 or 1.0 in same dtype
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:

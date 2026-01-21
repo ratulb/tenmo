@@ -3,14 +3,14 @@ from python import Python, PythonObject
 from tenmo import Tensor
 from utils import StaticTuple, Variant
 
-alias TensorVariant = Variant[
+comptime TensorVariant = Variant[
     Tensor[1, DType.float32],
     Tensor[2, DType.float32],
     Tensor[3, DType.float32],
     Tensor[4, DType.float32],
 ]
 
-alias Resultant = Optional[TensorVariant]
+comptime Resultant = Optional[TensorVariant]
 
 
 struct Weights:

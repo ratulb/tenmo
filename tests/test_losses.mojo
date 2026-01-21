@@ -10,7 +10,7 @@ from intarray import IntArray
 
 fn test_mse_loss_perfect_prediction() raises:
     print("test_mse_loss_perfect_prediction")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var loss = pred.mse[track_grad=True](target)
@@ -18,7 +18,7 @@ fn test_mse_loss_perfect_prediction() raises:
 
 fn test_mse_loss_simple_gradient() raises:
     print("test_mse_loss_simple_gradient")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[2.0, 4.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0, 2.0]])
     var loss = pred.mse[track_grad=True](target)
@@ -31,7 +31,7 @@ fn test_mse_loss_simple_gradient() raises:
 
 fn test_mse_loss_batch_gradient() raises:
     print("test_mse_loss_batch_gradient")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[0.0, 0.0], [0.0, 0.0]])
     var loss = pred.mse[track_grad=True](target)
@@ -42,7 +42,7 @@ fn test_mse_loss_batch_gradient() raises:
 
 fn test_mse_loss_no_grad_mode() raises:
     print("test_mse_loss_no_grad_mode")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[2.0, 4.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0, 2.0]])
     var loss = pred.mse[track_grad=False](target)
@@ -51,7 +51,7 @@ fn test_mse_loss_no_grad_mode() raises:
 
 fn test_mse_loss_struct_train_mode() raises:
     print("test_mse_loss_struct_train_mode")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var criterion = MSELoss[dtype]()
     criterion.train()
     var pred = Tensor[dtype].d2([[2.0, 4.0]], requires_grad=True)
@@ -63,7 +63,7 @@ fn test_mse_loss_struct_train_mode() raises:
 
 fn test_mse_loss_struct_eval_mode() raises:
     print("test_mse_loss_struct_eval_mode")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var criterion = MSELoss[dtype]()
     criterion.eval()
     var pred = Tensor[dtype].d2([[2.0, 4.0]], requires_grad=True)
@@ -77,7 +77,7 @@ fn test_mse_loss_struct_eval_mode() raises:
 
 fn test_bce_loss_perfect_prediction() raises:
     print("test_bce_loss_perfect_prediction")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.9, 0.1], [0.2, 0.8]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0, 0.0], [0.0, 1.0]])
     var loss = pred.binary_cross_entropy[track_grad=True](target)
@@ -86,7 +86,7 @@ fn test_bce_loss_perfect_prediction() raises:
 
 fn test_bce_loss_worst_prediction() raises:
     print("test_bce_loss_worst_prediction")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.1, 0.9]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0, 0.0]])
     var loss = pred.binary_cross_entropy[track_grad=True](target)
@@ -95,7 +95,7 @@ fn test_bce_loss_worst_prediction() raises:
 
 fn test_bce_loss_gradient_positive_target() raises:
     print("test_bce_loss_gradient_positive_target")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.6]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0]])
     var loss = pred.binary_cross_entropy[track_grad=True](target, epsilon=1e-7)
@@ -108,7 +108,7 @@ fn test_bce_loss_gradient_positive_target() raises:
 
 fn test_bce_loss_gradient_negative_target() raises:
     print("test_bce_loss_gradient_negative_target")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.6]], requires_grad=True)
     var target = Tensor[dtype].d2([[0.0]])
     var loss = pred.binary_cross_entropy[track_grad=True](target, epsilon=1e-7)
@@ -120,7 +120,7 @@ fn test_bce_loss_gradient_negative_target() raises:
 
 fn test_bce_with_logits_positive_gradient() raises:
     print("test_bce_with_logits_positive_gradient")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[2.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0]])
     var loss = logits.binary_cross_entropy_with_logits[track_grad=True](target)
@@ -132,7 +132,7 @@ fn test_bce_with_logits_positive_gradient() raises:
 
 fn test_bce_with_logits_negative_gradient() raises:
     print("test_bce_with_logits_negative_gradient")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[-2.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0]])
     var loss = logits.binary_cross_entropy_with_logits[track_grad=True](target)
@@ -144,7 +144,7 @@ fn test_bce_with_logits_negative_gradient() raises:
 
 fn test_bce_loss_boundary_values() raises:
     print("test_bce_loss_boundary_values")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Test with values very close to 0 and 1
     var pred = Tensor[dtype].d2([[0.001, 0.999]], requires_grad=True)
     var target = Tensor[dtype].d2([[0.0, 1.0]])
@@ -157,7 +157,7 @@ fn test_bce_loss_boundary_values() raises:
 
 fn test_bce_loss_clipping() raises:
     print("test_bce_loss_clipping")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Test extreme values don't cause NaN
     var pred = Tensor[dtype].d2([[0.0, 1.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0, 0.0]])
@@ -169,7 +169,7 @@ fn test_bce_loss_clipping() raises:
 
 fn test_bce_loss_no_grad_mode() raises:
     print("test_bce_loss_no_grad_mode")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[0.6, 0.4]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0, 0.0]])
     var loss = pred.binary_cross_entropy[track_grad=False](target)
@@ -177,7 +177,7 @@ fn test_bce_loss_no_grad_mode() raises:
 
 fn test_bce_loss_struct_train_eval() raises:
     print("test_bce_loss_struct_train_eval")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var criterion = BCELoss[dtype]()
     var pred = Tensor[dtype].d2([[0.7]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0]])
@@ -198,7 +198,7 @@ fn test_bce_loss_struct_train_eval() raises:
 
 fn test_bce_with_logits_zero_logits() raises:
     print("test_bce_with_logits_zero_logits")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Logits=0 -> sigmoid(0)=0.5
     var logits = Tensor[dtype].d2([[0.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[0.5]])
@@ -210,7 +210,7 @@ fn test_bce_with_logits_zero_logits() raises:
 
 fn test_bce_with_logits_batch() raises:
     print("test_bce_with_logits_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0, -1.0], [2.0, -2.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0, 0.0], [1.0, 0.0]])
     var loss = logits.binary_cross_entropy_with_logits[track_grad=True](target)
@@ -220,7 +220,7 @@ fn test_bce_with_logits_batch() raises:
 
 fn test_bce_with_logits_no_grad_mode() raises:
     print("test_bce_with_logits_no_grad_mode")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var logits = Tensor[dtype].d2([[1.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0]])
     var loss = logits.binary_cross_entropy_with_logits[track_grad=False](target)
@@ -228,7 +228,7 @@ fn test_bce_with_logits_no_grad_mode() raises:
 
 fn test_bce_with_logits_struct() raises:
     print("test_bce_with_logits_struct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var criterion = BCEWithLogitsLoss[dtype]()
     var logits = Tensor[dtype].d2([[0.5]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0]])
@@ -249,7 +249,7 @@ fn test_bce_with_logits_struct() raises:
 
 fn test_mse_loss_with_linear_layer() raises:
     print("test_mse_loss_with_linear_layer")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var layer = Linear[dtype](2, 1, xavier=True)
     layer.train()
 
@@ -268,7 +268,7 @@ fn test_mse_loss_with_linear_layer() raises:
 
 fn test_bce_loss_with_sigmoid_output() raises:
     print("test_bce_loss_with_sigmoid_output")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var layer = Linear[dtype](2, 1, xavier=True)
     var sigmoid = Sigmoid[dtype]()
     layer.train()
@@ -288,7 +288,7 @@ fn test_bce_loss_with_sigmoid_output() raises:
 
 fn test_bce_with_logits_end_to_end() raises:
     print("test_bce_with_logits_end_to_end")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var layer = Linear[dtype](2, 1, xavier=True)
     layer.train()
 
@@ -309,7 +309,7 @@ fn test_bce_with_logits_end_to_end() raises:
 
 fn test_mse_loss_single_element() raises:
     print("test_mse_loss_single_element")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d1([5.0], requires_grad=True)
     var target = Tensor[dtype].d1([3.0])
     var loss = pred.mse[track_grad=True](target)
@@ -321,7 +321,7 @@ fn test_mse_loss_single_element() raises:
 
 fn test_loss_with_zero_gradient() raises:
     print("test_loss_with_zero_gradient")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var pred = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
     var target = Tensor[dtype].d2([[1.0, 2.0]])
     var loss = pred.mse[track_grad=True](target)

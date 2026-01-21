@@ -30,7 +30,7 @@ fn assert_tensors_equal[
 
 fn test_tensor_dataset_basic_creation() raises:
     print("test_tensor_dataset_basic_creation")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
     var labels = Tensor[dtype].d1([10, 20, 30])
 
@@ -46,7 +46,7 @@ fn test_tensor_dataset_basic_creation() raises:
 
 fn test_tensor_dataset_2d_labels() raises:
     print("test_tensor_dataset_2d_labels")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var labels = Tensor[dtype].d2([[10, 11], [20, 21]])
 
@@ -62,7 +62,7 @@ fn test_tensor_dataset_2d_labels() raises:
 fn test_tensor_dataset_getitem_1d_labels() raises:
     print("test_tensor_dataset_getitem_1d_labels")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
     var labels = Tensor[dtype].d1([10, 20, 30])
 
@@ -78,7 +78,7 @@ fn test_tensor_dataset_getitem_1d_labels() raises:
 
 fn test_tensor_dataset_getitem_2d_labels() raises:
     print("test_tensor_dataset_getitem_2d_labels")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var labels = Tensor[dtype].d2([[10, 11], [20, 21]])
 
@@ -94,7 +94,7 @@ fn test_tensor_dataset_getitem_2d_labels() raises:
 
 fn test_tensor_dataset_getitem_all_indices() raises:
     print("test_tensor_dataset_getitem_all_indices")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8]])
     var labels = Tensor[dtype].d1([10, 20, 30, 40])
 
@@ -127,7 +127,7 @@ fn test_tensor_dataset_getitem_all_indices() raises:
 
 fn test_batch_creation() raises:
     print("test_batch_creation")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
     var labels = Tensor[dtype].d2([[10], [20]])
 
@@ -143,7 +143,7 @@ fn test_batch_creation() raises:
 
 fn test_batch_single_sample() raises:
     print("test_batch_single_sample")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2]])
     var labels = Tensor[dtype].d2([[10]])
 
@@ -160,7 +160,7 @@ fn test_batch_single_sample() raises:
 
 fn test_dataloader_basic_iteration() raises:
     print("test_dataloader_basic_iteration")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8]])
     var labels = Tensor[dtype].d1([10, 20, 30, 40])
     var dataset = TensorDataset(features, labels)
@@ -180,7 +180,7 @@ fn test_dataloader_basic_iteration() raises:
 
 fn test_dataloader_batch_size_one() raises:
     print("test_dataloader_batch_size_one")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
     var labels = Tensor[dtype].d1([10, 20, 30])
     var dataset = TensorDataset(features, labels)
@@ -200,7 +200,7 @@ fn test_dataloader_batch_size_one() raises:
 
 fn test_dataloader_partial_last_batch() raises:
     print("test_dataloader_partial_last_batch")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]])
     var labels = Tensor[dtype].d1([10, 20, 30, 40, 50])
     var dataset = TensorDataset(features, labels)
@@ -227,7 +227,7 @@ fn test_dataloader_partial_last_batch() raises:
 
 fn test_dataloader_drop_last_true() raises:
     print("test_dataloader_drop_last_true")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]])
     var labels = Tensor[dtype].d1([10, 20, 30, 40, 50])
     var dataset = TensorDataset(features, labels)
@@ -249,7 +249,7 @@ fn test_dataloader_drop_last_true() raises:
 
 fn test_dataloader_exact_division() raises:
     print("test_dataloader_exact_division")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8]])
     var labels = Tensor[dtype].d1([10, 20, 30, 40])
     var dataset = TensorDataset(features, labels)
@@ -267,7 +267,7 @@ fn test_dataloader_exact_division() raises:
 
 fn test_dataloader_content_correctness() raises:
     print("test_dataloader_content_correctness")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
     var labels = Tensor[dtype].d1([10, 20, 30])
     var dataset = TensorDataset(features, labels)
@@ -304,7 +304,7 @@ fn test_dataloader_content_correctness() raises:
 
 fn test_dataloader_2d_labels() raises:
     print("test_dataloader_2d_labels")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4]])
     var labels = Tensor[dtype].d2([[10, 11], [20, 21]])
     var dataset = TensorDataset(features, labels)
@@ -324,7 +324,7 @@ fn test_dataloader_2d_labels() raises:
 
 fn test_dataloader_large_batch_size() raises:
     print("test_dataloader_large_batch_size")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6]])
     var labels = Tensor[dtype].d1([10, 20, 30])
     var dataset = TensorDataset(features, labels)
@@ -345,7 +345,7 @@ fn test_dataloader_large_batch_size() raises:
 
 fn test_dataloader_multiple_epochs() raises:
     print("test_dataloader_multiple_epochs")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2], [3, 4]])
     var labels = Tensor[dtype].d1([10, 20])
     var dataset = TensorDataset(features, labels)
@@ -369,7 +369,7 @@ fn test_dataloader_multiple_epochs() raises:
 
 fn test_dataloader_reshuffle_changes_order() raises:
     print("test_dataloader_reshuffle_changes_order")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Use a medium-sized dataset to test shuffle
     var features = Tensor[dtype].d2([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]])
     var labels = Tensor[dtype].d1([10, 20, 30, 40, 50])
@@ -393,7 +393,7 @@ fn test_dataloader_reshuffle_changes_order() raises:
 
 fn test_dataloader_reshuffle_changes_order_orig() raises:
     print("test_dataloader_reshuffle_changes_order")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Use a larger dataset to make shuffle more apparent
     var features = Tensor[dtype].d2(
         [
@@ -427,7 +427,7 @@ fn test_dataloader_reshuffle_changes_order_orig() raises:
 
 fn test_dataloader_single_sample_dataset() raises:
     print("test_dataloader_single_sample_dataset")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2([[1, 2, 3]])
     var labels = Tensor[dtype].d1([10])
     var dataset = TensorDataset(features, labels)
@@ -447,7 +447,7 @@ fn test_dataloader_single_sample_dataset() raises:
 
 fn test_dataloader_high_dimensional_features() raises:
     print("test_dataloader_high_dimensional_features")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var features = Tensor[dtype].d2(
         [
             [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
@@ -473,7 +473,7 @@ fn test_dataloader_high_dimensional_features() raises:
 
 fn test_dataloader_shuffle_quality() raises:
     print("test_dataloader_shuffle_quality")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Create a dataset with ordered indices
     var features = Tensor[dtype].d2(
         [

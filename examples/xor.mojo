@@ -14,7 +14,7 @@ from sgd import SGD
 fn xor_classification() -> None:
     """Train a minimal neural network to solve XOR."""
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
 
     # Configuration
     var num_epochs = 2000

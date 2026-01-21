@@ -7,7 +7,7 @@ from sgd import SGD
 fn test_sgd_basic() raises:
     """Test 1: Basic SGD without momentum."""
     print("\n=== Test 1: Basic SGD ===")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -28,7 +28,7 @@ fn test_sgd_basic() raises:
 fn test_sgd_momentum() raises:
     """Test 2: SGD with momentum."""
     print("\n=== Test 2: SGD with Momentum ===")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -56,7 +56,7 @@ fn test_sgd_momentum() raises:
 fn test_sgd_weight_decay() raises:
     """Test 3: SGD with weight decay."""
     print("\n=== Test 3: Weight Decay ===")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -75,7 +75,7 @@ fn test_sgd_weight_decay() raises:
 fn test_sgd_grad_norm_clipping() raises:
     """Test 4: Gradient norm clipping."""
     print("\n=== Test 4: Gradient norm Clipping ===")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()
@@ -97,7 +97,7 @@ fn test_sgd_grad_norm_clipping() raises:
 fn test_sgd_value_clipping() raises:
     """Test 5: Gradient value clipping."""
     print("\n=== Test 5: Value Clipping ===")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var param = Tensor[dtype].ones(Shape([2, 2]), requires_grad=True)
     var params = List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]()

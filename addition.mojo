@@ -15,7 +15,7 @@ from broadcastbackward import BroadcastBackward
 @fieldwise_init
 @register_passable
 struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_ADD_SCALAR
+    comptime TAG = BACKWARD_ADD_SCALAR
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
@@ -31,7 +31,7 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
         return [(ancestor^, gradbox, AddTensor)]
 
 
-alias AddBroadcastBackward[dtype: DType] = BroadcastBackward[
+comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
     dtype,
     augment=False,
     lhs_op=AddTensor,
@@ -43,7 +43,7 @@ alias AddBroadcastBackward[dtype: DType] = BroadcastBackward[
 @fieldwise_init
 @register_passable
 struct AddBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_ADD
+    comptime TAG = BACKWARD_ADD
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)

@@ -20,7 +20,7 @@ fn main() raises:
 
 fn test_tensor_softmax_backward_1d() raises:
     print("test_tensor_softmax_backward_1d")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var t = Tensor[dtype].d1([1.0, 2.0, 3.0])
     t.requires_grad_(True)

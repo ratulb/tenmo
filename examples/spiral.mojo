@@ -131,7 +131,7 @@ fn train_spiral_classifier():
     # Configuration
     # ============================================================================
 
-    alias dtype = DType.float64
+    comptime dtype = DType.float64
 
     var num_train_samples = 500
     var num_val_samples = 250

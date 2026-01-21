@@ -10,7 +10,7 @@ fn test_concat_axis0_2d() raises:
     """Test concatenation along axis 0 for 2D tensors."""
     print("test_concat_axis0_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
 
@@ -36,7 +36,7 @@ fn test_concat_axis1_2d() raises:
     """Test concatenation along axis 1 for 2D tensors."""
     print("test_concat_axis1_2d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
 
@@ -62,7 +62,7 @@ fn test_concat_three_tensors_axis0() raises:
     """Test concatenation of three tensors along axis 0."""
     print("test_concat_three_tensors_axis0")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var B = Tensor[dtype].d2([[5.0, 6.0]])
     var C = Tensor[dtype].d2([[7.0, 8.0], [9.0, 10.0]])
@@ -90,7 +90,7 @@ fn test_concat_1d_tensors() raises:
     """Test concatenation of 1D tensors."""
     print("test_concat_1d_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0])
     var C = Tensor[dtype].d1([6.0, 7.0, 8.0, 9.0])
@@ -117,7 +117,7 @@ fn test_concat_3d_tensors_axis0() raises:
     """Test concatenation of 3D tensors along axis 0."""
     print("test_concat_3d_tensors_axis0")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
     var B = Tensor[dtype].d3(
         [[[5.0, 6.0], [7.0, 8.0]], [[9.0, 10.0], [11.0, 12.0]]]
@@ -155,7 +155,7 @@ fn test_concat_3d_tensors_axis1() raises:
     """Test concatenation of 3D tensors along axis 1."""
     print("test_concat_3d_tensors_axis1")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[1.0, 2.0]]])  # (1, 1, 2)
     var B = Tensor[dtype].d3([[[3.0, 4.0], [5.0, 6.0]]])  # (1, 2, 2)
 
@@ -175,7 +175,7 @@ fn test_concat_3d_tensors_axis2() raises:
     """Test concatenation of 3D tensors along axis 2."""
     print("test_concat_3d_tensors_axis2")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[1.0], [2.0]]])  # (1, 2, 1)
     var B = Tensor[dtype].d3([[[3.0, 4.0], [5.0, 6.0]]])  # (1, 2, 2)
 
@@ -200,7 +200,7 @@ fn test_concat_single_tensor() raises:
     """Test concatenation of a single tensor (edge case)."""
     print("test_concat_single_tensor")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
 
     var tensors = List[Tensor[dtype]]()
@@ -221,7 +221,7 @@ fn test_concat_backward_axis0_simple() raises:
     """Test gradient flow through concat along axis 0."""
     print("test_concat_backward_axis0_simple")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0, 6.0]], requires_grad=True)
 
@@ -245,7 +245,7 @@ fn test_concat_backward_axis1_simple() raises:
     """Test gradient flow through concat along axis 1."""
     print("test_concat_backward_axis1_simple")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0], [6.0]], requires_grad=True)
 
@@ -269,7 +269,7 @@ fn test_concat_backward_weighted_loss() raises:
     """Test gradient flow with weighted loss."""
     print("test_concat_backward_weighted_loss")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
 
@@ -301,7 +301,7 @@ fn test_concat_backward_three_tensors() raises:
     """Test gradient flow through concat of three tensors."""
     print("test_concat_backward_three_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0], requires_grad=True)
     var C = Tensor[dtype].d1([4.0, 5.0, 6.0], requires_grad=True)
@@ -333,7 +333,7 @@ fn test_concat_backward_3d_axis0() raises:
     """Test gradient flow through 3D concat along axis 0."""
     print("test_concat_backward_3d_axis0")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3(
         [[[1.0, 2.0], [3.0, 4.0]]], requires_grad=True
     )  # (1,2,2)
@@ -360,7 +360,7 @@ fn test_concat_backward_3d_axis2() raises:
     """Test gradient flow through 3D concat along axis 2."""
     print("test_concat_backward_3d_axis2")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d3([[[1.0], [2.0]]], requires_grad=True)  # (1,2,1)
     var B = Tensor[dtype].d3(
         [[[3.0, 4.0], [5.0, 6.0]]], requires_grad=True
@@ -385,7 +385,7 @@ fn test_concat_backward_chain() raises:
     """Test gradient flow through chained operations."""
     print("test_concat_backward_chain")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
 
@@ -416,7 +416,7 @@ fn test_concat_simple_views_axis0() raises:
     """Test concatenation of simple views along axis 0."""
     print("test_concat_simple_views_axis0")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]])
     var view1 = base.view([2, 4])  # Same as base
     var view2 = base.view([2, 4])  # Another view
@@ -448,7 +448,7 @@ fn test_concat_views_with_offsets() raises:
     """Test concatenation of views with different offsets."""
     print("test_concat_views_with_offsets")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
 
     # Create two views: first half and second half
@@ -469,7 +469,7 @@ fn test_concat_reshaped_views() raises:
     """Test concatenation of reshaped views."""
     print("test_concat_reshaped_views")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
 
     # Reshape to 2D views
@@ -491,7 +491,7 @@ fn test_concat_nested_views() raises:
     """Test concatenation of nested views (view of view)."""
     print("test_concat_nested_views")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base = Tensor[dtype].d3([[[1.0, 2.0, 3.0, 4.0]]])  # (1,1,4)
 
     # Create view and then view of view
@@ -515,7 +515,7 @@ fn test_concat_views_backward() raises:
     """Test gradient flow through concatenated views."""
     print("test_concat_views_backward")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base1 = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     var base2 = Tensor[dtype].d1([5.0, 6.0, 7.0, 8.0], requires_grad=True)
 
@@ -541,7 +541,7 @@ fn test_concat_views_with_different_offsets_backward() raises:
     """Test gradient flow through views with different offsets."""
     print("test_concat_views_with_different_offsets_backward")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base = Tensor[dtype].d1(
         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], requires_grad=True
     )
@@ -573,7 +573,7 @@ fn test_concat_mixed_tensors_and_views() raises:
     """Test concatenation of mixed tensors and views."""
     print("test_concat_mixed_tensors_and_views")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var base_B = Tensor[dtype].d1([5.0, 6.0, 7.0, 8.0], requires_grad=True)
     var view_B = base_B.view([2, 2])
@@ -602,7 +602,7 @@ fn test_concat_empty_dimension() raises:
     """Test concatenation when some tensors have size 0 in concat dimension."""
     print("test_concat_empty_dimension")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0]])  # (1, 3)
     var B = Tensor[dtype].zeros(0, 3)  # (0, 3) - empty
     var C = Tensor[dtype].d2([[4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])  # (2, 3)
@@ -623,7 +623,7 @@ fn test_concat_large_number_of_tensors() raises:
     """Test concatenation of many tensors."""
     print("test_concat_large_number_of_tensors")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var tensors = List[Tensor[dtype]]()
 
     # Create 10 tensors, each (1, 5)
@@ -653,7 +653,7 @@ fn test_concat_requires_grad_propagation() raises:
     """Test that requires_grad is properly set."""
     print("test_concat_requires_grad_propagation")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0, 4.0], requires_grad=False)
 
@@ -674,7 +674,7 @@ fn test_concat_contiguous_output() raises:
     """Test that concat output is contiguous."""
     print("test_concat_contiguous_output")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])
 
@@ -692,7 +692,7 @@ fn test_concat_negative_axis() raises:
     """Test concatenation with negative axis."""
     print("test_concat_negative_axis")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]])
 
@@ -711,7 +711,7 @@ fn test_concat_scalar_to_1d() raises:
     """Test concatenation of scalar views to 1D."""
     print("test_concat_scalar_to_1d")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var a = Tensor[dtype].scalar(10.0)
     var b = Tensor[dtype].scalar(20.0)
     var c = Tensor[dtype].scalar(30.0)
@@ -741,7 +741,7 @@ fn test_concat_in_network_forward() raises:
     """Test concat as part of a network forward pass."""
     print("test_concat_in_network_forward")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Simulate two branches of a network
     var branch1 = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
@@ -772,7 +772,7 @@ fn test_concat_multiple_times() raises:
     """Test multiple concatenations in sequence."""
     print("test_concat_multiple_times")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0, 4.0], requires_grad=True)
 
@@ -802,7 +802,7 @@ fn test_concat_view_contiguous_mix() raises:
     """Test concatenation of views that need contiguous conversion."""
     print("test_concat_view_contiguous_mix")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var base = Tensor[dtype].d1(
         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], requires_grad=True
     )
@@ -902,7 +902,7 @@ fn main() raises:
 fn test_concat_axis0_basic_ct() raises:
     """Test basic concatenation along axis 0."""
     print("test_concat_axis0_basic_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     var B = Tensor[dtype].d2([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]])
@@ -927,7 +927,7 @@ fn test_concat_axis0_basic_ct() raises:
 fn test_concat_axis1_basic_ct() raises:
     """Test basic concatenation along axis 1."""
     print("test_concat_axis1_basic_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [4.0, 5.0]])
     var B = Tensor[dtype].d2([[3.0], [6.0]])
@@ -954,7 +954,7 @@ fn test_concat_axis1_basic_ct() raises:
 fn test_concat_three_tensors_ct() raises:
     """Test concatenating three tensors."""
     print("test_concat_three_tensors_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d2([[1.0, 2.0]])  # (1, 2)
     var B = Tensor[dtype].d2([[3.0, 4.0]])  # (1, 2)
@@ -980,7 +980,7 @@ fn test_concat_three_tensors_ct() raises:
 fn test_concat_single_tensor_ct() raises:
     """Test concatenating a single tensor (should return copy)."""
     print("test_concat_single_tensor_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var tensors = List[Tensor[dtype]]()
@@ -998,7 +998,7 @@ fn test_concat_single_tensor_ct() raises:
 fn test_concat_1d_tensors_ct() raises:
     """Test concatenating 1D tensors."""
     print("test_concat_1d_tensors_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var B = Tensor[dtype].d1([4.0, 5.0])
@@ -1019,7 +1019,7 @@ fn test_concat_1d_tensors_ct() raises:
 fn test_concat_3d_tensors_axis0_ct() raises:
     """Test concatenating 3D tensors along axis 0."""
     print("test_concat_3d_tensors_axis0_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].ones(2, 3, 4)
     var B = Tensor[dtype].ones(1, 3, 4) * 2.0
@@ -1044,7 +1044,7 @@ fn test_concat_3d_tensors_axis0_ct() raises:
 fn test_concat_3d_tensors_axis1_ct() raises:
     """Test concatenating 3D tensors along axis 1."""
     print("test_concat_3d_tensors_axis1_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].ones(2, 2, 3)
     var B = Tensor[dtype].ones(2, 1, 3) * 2.0
@@ -1068,7 +1068,7 @@ fn test_concat_3d_tensors_axis1_ct() raises:
 fn test_concat_3d_tensors_axis2_ct() raises:
     """Test concatenating 3D tensors along axis 2."""
     print("test_concat_3d_tensors_axis2_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].ones(2, 3, 2)
     var B = Tensor[dtype].ones(2, 3, 1) * 2.0
@@ -1097,7 +1097,7 @@ fn test_concat_3d_tensors_axis2_ct() raises:
 fn test_concat_backward_axis0_ct() raises:
     """Test gradient flow for concat along axis 0."""
     print("test_concat_backward_axis0_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0, 6.0]], requires_grad=True)
@@ -1121,7 +1121,7 @@ fn test_concat_backward_axis0_ct() raises:
 fn test_concat_backward_axis1_ct() raises:
     """Test gradient flow for concat along axis 1."""
     print("test_concat_backward_axis1_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[5.0], [6.0]], requires_grad=True)
@@ -1145,7 +1145,7 @@ fn test_concat_backward_axis1_ct() raises:
 fn test_concat_backward_weighted_ct() raises:
     """Test gradient flow with weighted loss."""
     print("test_concat_backward_weighted_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[3.0, 4.0]], requires_grad=True)
@@ -1174,7 +1174,7 @@ fn test_concat_backward_weighted_ct() raises:
 fn test_concat_backward_three_tensors_ct() raises:
     """Test gradient flow with three tensors."""
     print("test_concat_backward_three_tensors_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var B = Tensor[dtype].d1([3.0], requires_grad=True)
@@ -1198,7 +1198,7 @@ fn test_concat_backward_three_tensors_ct() raises:
 fn test_concat_backward_chain_ct() raises:
     """Test gradient flow through chain of operations."""
     print("test_concat_backward_chain_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d2([[1.0, 2.0]], requires_grad=True)
     var B = Tensor[dtype].d2([[3.0, 4.0]], requires_grad=True)
@@ -1226,7 +1226,7 @@ fn test_concat_backward_chain_ct() raises:
 fn test_concat_with_views_ct() raises:
     """Test concatenating views."""
     print("test_concat_with_views_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var base = Tensor[dtype].arange(0.0, 12.0, 1.0)
     base = base.reshape(3, 4)
@@ -1250,7 +1250,7 @@ fn test_concat_with_views_ct() raises:
 fn test_concat_views_grad_flow_ct() raises:
     """Test gradient flow through concatenated views."""
     print("test_concat_views_grad_flow_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var base = Tensor[dtype].ones(4, 3, requires_grad=True)
 
@@ -1275,7 +1275,7 @@ fn test_concat_nested_views_ct() raises:
     """Test concatenating nested views."""
     print("test_concat_nested_views_ct")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var base = Tensor[dtype].arange(0.0, 24.0, 1.0, requires_grad=True)
     r = base.reshape(4, 6)
@@ -1315,7 +1315,7 @@ fn test_concat_nested_views_ct() raises:
 fn test_concat_view_with_tensor_ct() raises:
     """Test concatenating view with regular tensor."""
     print("test_concat_view_with_tensor_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var base = Tensor[dtype].ones(2, 3, requires_grad=True)
     var view = base.view([2, 3], offset=0)
@@ -1350,7 +1350,7 @@ fn test_concat_view_with_tensor_ct() raises:
 fn test_concat_scalar_views_ct() raises:
     """Test concatenating scalar views (edge case)."""
     print("test_concat_scalar_views_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var a = Tensor[dtype].scalar(5.0, requires_grad=True)
     var b = Tensor[dtype].scalar(10.0, requires_grad=True)
@@ -1389,7 +1389,7 @@ fn test_concat_scalar_views_ct() raises:
 fn test_concat_different_sizes_axis0_ct() raises:
     """Test concatenating tensors with different sizes along non-concat dims."""
     print("test_concat_different_sizes_axis0_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # These should have same size along all dims except axis 0
     var A = Tensor[dtype].ones(2, 3, 4)
@@ -1417,7 +1417,7 @@ fn test_concat_different_sizes_axis0_ct() raises:
 fn test_concat_contiguous_check_ct() raises:
     """Test that result is contiguous."""
     print("test_concat_contiguous_check_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].ones(2, 3)
     var B = Tensor[dtype].ones(1, 3)
@@ -1435,7 +1435,7 @@ fn test_concat_contiguous_check_ct() raises:
 fn test_concat_preserves_values_ct() raises:
     """Test that concatenation preserves exact values."""
     print("test_concat_preserves_values_ct")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var A = Tensor[dtype].d2([[1.5, 2.5], [3.5, 4.5]])
     var B = Tensor[dtype].d2([[5.5, 6.5]])

@@ -11,7 +11,7 @@ from broadcasthelper import ShapeBroadcaster
 @fieldwise_init
 @register_passable
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_EXPAND
+    comptime TAG = BACKWARD_EXPAND
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)

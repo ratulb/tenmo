@@ -35,7 +35,7 @@ fn matmul_naive[
 # BENCHMARK RUNNER
 # ============================================
 fn benchmark_matmul():
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     print("=" * 60)
     print("MATMUL BENCHMARK - Float32")
@@ -144,8 +144,8 @@ fn benchmark_matmul():
 # DETAILED TIMING BREAKDOWN
 # ============================================
 fn benchmark_backward_breakdown():
-    alias dtype = DType.float32
-    alias size = 1024
+    comptime dtype = DType.float32
+    comptime size = 1024
 
     print("\n" + "=" * 60)
     print("BACKWARD PASS DETAILED BREAKDOWN")
@@ -183,8 +183,8 @@ fn benchmark_backward_breakdown():
 # ============================================
 fn benchmark_memory_bandwidth():
     """Test if we're compute-bound or memory-bound."""
-    alias dtype = DType.float32
-    alias size = 1024
+    comptime dtype = DType.float32
+    comptime size = 1024
 
     print("\n" + "=" * 60)
     print("MEMORY BANDWIDTH TEST")

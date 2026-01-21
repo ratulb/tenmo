@@ -8,7 +8,7 @@ fn main() raises:
 
 fn test_relu_basic() raises:
     print("test_relu_basic")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var t = Tensor[dtype].d1([-1.0, 0.0, 1.0, 2.0])
     t.requires_grad_(True)
@@ -21,7 +21,7 @@ fn test_relu_basic() raises:
 
 fn test_relu_multidim() raises:
     print("test_relu_multidim")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # 2×3 input tensor
     var t = Tensor[dtype].d2([

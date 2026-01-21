@@ -265,7 +265,7 @@ fn test_reshape_identity() raises:
 fn test_reshape_large_tensor() raises:
     print("test_reshape_large_tensor")
     # Test with larger tensors to ensure no memory issues
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var data = List[Scalar[dtype]](capacity=UInt(1024))
     for i in range(1024):
         data.append(Scalar[dtype](i))

@@ -13,7 +13,7 @@ from sys import simd_width_of
 @fieldwise_init
 @register_passable
 struct ViewBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_VIEW
+    comptime TAG = BACKWARD_VIEW
     var shape: Shape
     var strides: Strides
     var offset: Int

@@ -171,7 +171,7 @@ fn test_matmul_2d_large_contiguous_simd_path() raises:
     # Verify B is contiguous and suitable for SIMD
     var b_strides = B.strides()
     assert_true(b_strides[1] == 1)  # Columns are contiguous
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     assert_true(p >= simd_width_of[dtype]())  # Ensure SIMD can be used
 
     var C = A.matmul(B)
@@ -227,7 +227,7 @@ fn test_matmul_2d_simd_width_boundary() raises:
     print("test_matmul_2d_simd_width_boundary")
     # Test right at SIMD width boundary
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     var simd_width = simd_width_of[dtype]()
     var m: Int = simd_width  # 4 for float32
     var n: Int = simd_width * 2  # 8 for float32
@@ -274,7 +274,7 @@ fn test_matmul_2d_large_views_simd_path() raises:
     var A = A_base.view(shape=Shape(8, 12), strides=Strides(24, 1), offset=0)
     var B = B_base.view(shape=Shape(12, 16), strides=Strides(32, 1), offset=0)
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Verify views are SIMD-friendly
     assert_true(B.strides()[1] == 1)
     assert_true(B.shape()[1] >= simd_width_of[dtype]())

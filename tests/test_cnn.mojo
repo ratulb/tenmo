@@ -1329,7 +1329,7 @@ fn test_conv2d_forward_single_batch_single_channel() raises:
     """Test basic convolution: single batch, single channel."""
     print("test_conv2d_forward_single_batch_single_channel")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Input: (1, 1, 3, 3)
     var x = Tensor[dtype].rand(1, 1, 3, 3)
@@ -1355,7 +1355,7 @@ fn test_conv2d_forward_with_bias() raises:
     """Test convolution with bias."""
     print("test_conv2d_forward_with_bias")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(Shape(1, 1, 3, 3))
     x.fill(1.0)
@@ -1378,7 +1378,7 @@ fn test_conv2d_forward_multiple_channels() raises:
     """Test convolution with multiple input channels."""
     print("test_conv2d_forward_multiple_channels")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Input: (1, 3, 4, 4) - 3 input channels
     var x = Tensor[dtype].zeros(1, 3, 4, 4)
@@ -1404,7 +1404,7 @@ fn test_conv2d_forward_multiple_filters() raises:
     """Test convolution with multiple output filters."""
     print("test_conv2d_forward_multiple_filters")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Input: (1, 1, 4, 4)
     var x = Tensor[dtype].zeros(1, 1, 4, 4)
@@ -1439,7 +1439,7 @@ fn test_conv2d_forward_batch_processing() raises:
     """Test convolution with batch dimension."""
     print("test_conv2d_forward_batch_processing")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     # Input: (4, 1, 3, 3) - batch of 4
     var x = Tensor[dtype](4, 1, 3, 3)
@@ -1472,7 +1472,7 @@ fn test_conv2d_stride_2() raises:
     """Test convolution with stride=2."""
     print("test_conv2d_stride_2")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 5, 5)
     x.fill(1.0)
@@ -1497,7 +1497,7 @@ fn test_conv2d_stride_3() raises:
     """Test convolution with stride=3."""
     print("test_conv2d_stride_3")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 7, 7)
     x.fill(2.0)
@@ -1526,7 +1526,7 @@ fn test_conv2d_padding_valid() raises:
     """Test 'valid' padding (no padding)."""
     print("test_conv2d_padding_valid")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype](Shape(1, 1, 5, 5))
     x.fill(1.0)
@@ -1547,7 +1547,7 @@ fn test_conv2d_padding_same() raises:
     """Test 'same' padding (output same size as input)."""
     print("test_conv2d_padding_same")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype](Shape(1, 1, 5, 5))
     x.fill(1.0)
@@ -1568,7 +1568,7 @@ fn test_conv2d_padding_int() raises:
     """Test integer padding (same on all sides)."""
     print("test_conv2d_padding_int")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 3, 3)
     x.fill(1.0)
@@ -1592,7 +1592,7 @@ fn test_conv2d_padding_tuple() raises:
     """Test tuple padding (height, width)."""
     print("test_conv2d_padding_tuple")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 4, 4)
     x.fill(1.0)
@@ -1616,7 +1616,7 @@ fn test_conv2d_padding_list_asymmetric() raises:
     """Test list padding (asymmetric padding)."""
     print("test_conv2d_padding_list_asymmetric")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 4, 4)
     x.fill(1.0)
@@ -1648,7 +1648,7 @@ fn test_conv2d_dilation_2() raises:
     """Test dilated convolution (atrous convolution)."""
     print("test_conv2d_dilation_2")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 7, 7)
     x.fill(1.0)
@@ -1676,7 +1676,7 @@ fn test_conv2d_dilation_3() raises:
     """Test high dilation rate."""
     print("test_conv2d_dilation_3")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 9, 9)
     x.fill(2.0)
@@ -1707,7 +1707,7 @@ fn test_conv2d_stride_and_padding() raises:
     """Test combination of stride and padding."""
     print("test_conv2d_stride_and_padding")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].ones(1, 1, 5, 5)
 
@@ -1726,7 +1726,7 @@ fn test_conv2d_stride_padding_dilation() raises:
     """Test combination of stride, padding, and dilation."""
     print("test_conv2d_stride_padding_dilation")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].ones(1, 1, 8, 8)
 
@@ -1764,7 +1764,7 @@ fn test_conv2d_all_parameters() raises:
     """
     print("test_conv2d_all_parameters")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].ones(
         2, 3, 8, 8, requires_grad=True
@@ -1884,7 +1884,7 @@ fn test_conv2d_all_parameters() raises:
 fn test_conv2d_backward_simple() raises:
     """Test basic backward pass."""
     print("test_conv2d_backward_simple")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].ones(1, 1, 3, 3, requires_grad=True)
 
@@ -1911,7 +1911,7 @@ fn test_conv2d_backward_simple() raises:
 fn test_conv2d_backward_input_gradient() raises:
     """Test input gradient computation."""
     print("test_conv2d_backward_input_gradient")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 4, 4, requires_grad=True)
     for i in range(16):
@@ -1938,7 +1938,7 @@ fn test_conv2d_backward_kernel_gradient() raises:
     """Test kernel gradient computation."""
     print("test_conv2d_backward_kernel_gradient")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 4, 4, requires_grad=True)
     x.fill(2.0)
@@ -1963,7 +1963,7 @@ fn test_conv2d_backward_with_stride() raises:
     """Test backward pass with stride."""
     print("test_conv2d_backward_with_stride")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 5, 5, requires_grad=True)
     x.fill(1.0)
@@ -1991,7 +1991,7 @@ fn test_conv2d_edge_1x1_kernel() raises:
     """Test 1x1 convolution (pointwise)."""
     print("test_conv2d_edge_1x1_kernel")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 3, 4, 4)
     x.fill(1.0)
@@ -2012,7 +2012,7 @@ fn test_conv2d_edge_large_kernel() raises:
     """Test with large kernel."""
     print("test_conv2d_edge_large_kernel")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 10, 10)
     x.fill(1.0)
@@ -2033,7 +2033,7 @@ fn test_conv2d_edge_output_size_1() raises:
     """Test when output size is 1x1."""
     print("test_conv2d_edge_output_size_1")
 
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
 
     var x = Tensor[dtype].zeros(1, 1, 3, 3)
     x.fill(1.0)

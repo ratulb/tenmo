@@ -43,7 +43,7 @@ fn test_tensor_linspace_edge_cases() raises:
 
 fn test_tensor_linspace_precision() raises:
     print("test_tensor_linspace_precision")
-    alias dtype = DType.float32
+    comptime dtype = DType.float32
     # Test with many points for precision
     var many_points = Tensor.linspace(0.0, 1.0, 11).float()
     # Should be exactly [0.0, 0.1, 0.2, ..., 1.0]
