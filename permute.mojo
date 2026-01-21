@@ -15,12 +15,12 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
     comptime TAG = BACKWARD_PERMUTE
     var permutation: IntArray  # forward permutation used
 
-    fn into_backward_fn(self) -> BackwardFn[Self.Self.dtype]:
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.Self.dtype]
-    ) -> List[Tuple[Tensor[Self.Self.dtype], Gradbox[Self.Self.dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
         parent = output.ancestry().get(0)
         # Compute inverse permutation
@@ -47,7 +47,7 @@ struct Permute[dtype: DType]:
         mut self: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.Self.dtype]:
+    ) -> Tensor[Self.dtype]:
         if len(axes) != self.rank():
             panic("Tensor → permute: number of axes must match tensor rank")
 
@@ -76,7 +76,7 @@ struct Permute[dtype: DType]:
             requires_grad=False,
             validated=True,
         )"""
-        out = Tensor[Self.Self.dtype].build_view(
+        out = Tensor[Self.dtype].build_view(
             self,
             shape=Shape(new_shape),
             strides=Strides(new_strides),
@@ -90,7 +90,7 @@ struct Permute[dtype: DType]:
             if grad_required:
                 out.requires_grad_(True)
                 permutation = axes.copy()
-                backward_fn = PermuteBackward[Self.Self.dtype](
+                backward_fn = PermuteBackward[Self.dtype](
                     permutation
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)

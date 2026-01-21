@@ -124,7 +124,7 @@ struct MultiplyScalar[dtype: DType]:
 # Element wise multiplication of two tensors
 @fieldwise_init
 @register_passable
-struct Multiplicator[Self.dtype: DType]:
+struct Multiplicator[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
