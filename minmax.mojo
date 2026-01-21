@@ -11,17 +11,17 @@ from indexhelper import IndexCalculator
 from algorithm import parallelize
 
 
-alias Gradbag[dtype: DType] = List[Tuple[IntArray, Scalar[dtype]]]
+comptime Gradbag[dtype: DType] = List[Tuple[IntArray, Scalar[dtype]]]
 
 
 @fieldwise_init
 struct MinMaxBackward[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
-    alias TAG = BACKWARD_MINMAX
+    comptime TAG = BACKWARD_MINMAX
     var axes: IntArray
     var keepdims: Bool
-    var gradbag: Gradbag[dtype]
+    var gradbag: Gradbag[Self.dtype]
 
     fn __copyinit__(out self, other: Self):
         self.axes = other.axes.copy()
@@ -33,15 +33,15 @@ struct MinMaxBackward[dtype: DType = DType.float32](
         self.keepdims = other.keepdims
         self.gradbag = other.gradbag^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
         var ancestor = output.ancestry().get(0)
-        var mask = Gradbox[dtype].zeros(ancestor.shape(), share=False)
+        var mask = Gradbox[Self.dtype].zeros(ancestor.shape(), share=False)
 
         # Build mask from saved gradient contributions
         for grad in self.gradbag:
@@ -55,12 +55,12 @@ struct MinMaxBackward[dtype: DType = DType.float32](
 
         if gradbox.shape() == Shape():
             # Scalar upstream gradient
-            var filled = Gradbox[dtype].full(shape, gradbox.item(), share=False)
+            var filled = Gradbox[Self.dtype].full(shape, gradbox.item(), share=False)
             var grad_contrib = filled * mask
             return [(ancestor^, grad_contrib^, AddTensor)]
         else:
             # Non-scalar upstream gradient
-            var gradbox_like_input: Gradbox[dtype]
+            var gradbox_like_input: Gradbox[Self.dtype]
             if not self.keepdims:
                 gradbox_like_input = gradbox.unsqueeze(self.axes).broadcast_to(
                     shape, share=False
@@ -79,17 +79,17 @@ struct MinMax[dtype: DType = DType.float32]:
     fn forward[
         max: Bool, track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        self: Tensor[Self.dtype],
         axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         var shape = self.shape()
         var rank = shape.rank()
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
         var out_shape = shape.compute_output_shape(normalized_axes, keepdims)
-        var result = Tensor[dtype].zeros(out_shape)
-        var gradbag: Gradbag[dtype] = Gradbag[dtype]()
+        var result = Tensor[Self.dtype].zeros(out_shape)
+        var gradbag: Gradbag[Self.dtype] = Gradbag[Self.dtype]()
 
         # ===== FAST PATH: Scalar Input =====
         if rank == 0:
@@ -101,7 +101,7 @@ struct MinMax[dtype: DType = DType.float32]:
                 grad_required = requires_grad.or_else(self.requires_grad)
                 if grad_required:
                     result.requires_grad_(True)
-                    var backward_fn = MinMaxBackward[dtype](
+                    var backward_fn = MinMaxBackward[Self.dtype](
                         normalized_axes, keepdims, gradbag^
                     ).into_backward_fn()
                     result.backwardFn = Optional(backward_fn^)
@@ -139,14 +139,14 @@ struct MinMax[dtype: DType = DType.float32]:
     fn _full_reduction_vectorized[
         max: Bool, track_grad: Bool
     ](
-        self: Tensor[dtype],
+        self: Tensor[Self.dtype],
         shape: Shape,
         normalized_axes: IntArray,
         keepdims: Bool,
-        var result: Tensor[dtype],
-        var gradbag: Gradbag[dtype],
+        var result: Tensor[Self.dtype],
+        var gradbag: Gradbag[Self.dtype],
         requires_grad: Optional[Bool],
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         var total_elements = shape.num_elements()
 
         # Initialize with first element
@@ -203,14 +203,14 @@ struct MinMax[dtype: DType = DType.float32]:
             # Split gradient among all tied positions
             var count = len(best_positions)
             if count > 0:
-                var inv = Scalar[dtype](1) / count
+                var inv = Scalar[Self.dtype](1) / count
                 for p in best_positions:
                     gradbag.append((p, inv))
 
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
-                var backward_fn = MinMaxBackward[dtype](
+                var backward_fn = MinMaxBackward[Self.dtype](
                     normalized_axes, keepdims, gradbag^
                 ).into_backward_fn()
                 result.backwardFn = Optional(backward_fn^)
@@ -224,23 +224,23 @@ struct MinMax[dtype: DType = DType.float32]:
     fn _partial_reduction_parallel[
         max: Bool, track_grad: Bool
     ](
-        self: Tensor[dtype],
+        self: Tensor[Self.dtype],
         shape: Shape,
         normalized_axes: IntArray,
         keepdims: Bool,
         out_shape: Shape,
-        var result: Tensor[dtype],
-        var gradbag: Gradbag[dtype],
+        var result: Tensor[Self.dtype],
+        var gradbag: Gradbag[Self.dtype],
         requires_grad: Optional[Bool],
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         var reduced_shape = shape.reduced_shape(normalized_axes)
         var num_output_elements = out_shape.num_elements()
 
         # Thread-local storage for gradient bags (one per output element)
         # Note: In real Mojo, you'd need proper synchronization primitives
-        var local_gradbags = List[Gradbag[dtype]]()
+        var local_gradbags = List[Gradbag[Self.dtype]]()
         for _ in range(num_output_elements):
-            local_gradbags.append(Gradbag[dtype]())
+            local_gradbags.append(Gradbag[Self.dtype]())
 
         # ===== PARALLEL PROCESSING: Each output element computed independently =====
         @parameter
@@ -249,14 +249,14 @@ struct MinMax[dtype: DType = DType.float32]:
             var out_idx = IndexCalculator.index_to_coord(
                 out_shape, out_flat_idx
             )
-            var best_value: Scalar[dtype]
+            var best_value: Scalar[Self.dtype]
 
             # Initialize best value for this output element
             @parameter
             if max:
-                best_value = min_finite[dtype]()
+                best_value = min_finite[Self.dtype]()
             else:
-                best_value = max_finite[dtype]()
+                best_value = max_finite[Self.dtype]()
 
             var best_positions = List[IntArray]()
             var first_iteration = True
@@ -322,7 +322,7 @@ struct MinMax[dtype: DType = DType.float32]:
                 # Store gradient contributions in thread-local storage
                 var count = len(best_positions)
                 if count > 0:
-                    var inv = Scalar[dtype](1) / count
+                    var inv = Scalar[Self.dtype](1) / count
                     for p in best_positions:
                         local_gradbags[out_flat_idx].append((p, inv))
 
@@ -340,7 +340,7 @@ struct MinMax[dtype: DType = DType.float32]:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
-                var backward_fn = MinMaxBackward[dtype](
+                var backward_fn = MinMaxBackward[Self.dtype](
                     normalized_axes, keepdims, gradbag^
                 ).into_backward_fn()
                 result.backwardFn = Optional(backward_fn^)

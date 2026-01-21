@@ -9,7 +9,7 @@ from ndbuffer import NDBuffer
 @fieldwise_init
 @register_passable
 struct SqrtBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_SQRT
+    comptime TAG = BACKWARD_SQRT
     var epsilon: Scalar[Self.dtype]
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -78,7 +78,7 @@ struct Sqrt[dtype: DType]:
                 NDBuffer[Self.dtype](buffer^, shape), requires_grad=False
             )
         else:
-            out = Tensor[dtype].zeros(shape, requires_grad=False)
+            out = Tensor[Self.dtype].zeros(shape, requires_grad=False)
             var index = 0
             ref out_buffer = out.buffer.data_buffer()
             for coord in shape:

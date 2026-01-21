@@ -11,16 +11,16 @@ from indexhelper import IndexCalculator
 @fieldwise_init
 @register_passable
 struct TileBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_TILE
+    comptime TAG = BACKWARD_TILE
     var repeat: IntArray
     var orig_shape: Shape
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
         var parent = output.ancestry().get(0)
         var parent_shape = self.orig_shape
@@ -30,7 +30,7 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable):
         # Handle scalar case
         if parent_rank == 0:
             var total_grad = grad_out.sum().item()
-            var gradbox_parent = Gradbox[dtype].full(
+            var gradbox_parent = Gradbox[Self.dtype].full(
                 Shape(), total_grad, share=False
             )
             return [(parent^, gradbox_parent^, AddTensor)]
@@ -79,10 +79,10 @@ struct Tile[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        self: Tensor[Self.dtype],
         repeat: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         """
         Tile — unified superset of torch.repeat and torch.tile.
 
@@ -153,7 +153,7 @@ struct Tile[dtype: DType]:
             new_shape.append(orig_dim * repeat_factor)
 
         var out_shape = Shape(new_shape)
-        var out = Tensor[dtype](out_shape, requires_grad=False)
+        var out = Tensor[Self.dtype](out_shape, requires_grad=False)
         out_numels = out.numels()
 
         # --- Forward computation ---
@@ -180,7 +180,7 @@ struct Tile[dtype: DType]:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = TileBackward[dtype](
+                backward_fn = TileBackward[Self.dtype](
                     repeat, orig_shape
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)

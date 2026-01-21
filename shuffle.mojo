@@ -8,7 +8,7 @@ from gradbox import Gradbox
 
 @fieldwise_init
 struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    alias TAG = BACKWARD_SHUFFLE
+    comptime TAG = BACKWARD_SHUFFLE
     var axis: Int
     var permutation: List[Int]
 
@@ -20,19 +20,19 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
         self.axis = other.axis
         self.permutation = other.permutation^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
         var shape = gradbox.shape()
 
         # Allocate gradient w.r.t. ancestor
-        var gradbox_parent = Gradbox[dtype].zeros(
+        var gradbox_parent = Gradbox[Self.dtype].zeros(
             shape, share=False
         )  # parent.shape == gradients.shape, only difference is coord postions along the permuted axis
 
@@ -53,11 +53,11 @@ struct Shuffle[dtype: DType](Copyable & Movable):
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        self: Tensor[Self.dtype],
         perm: List[Int],  # permutation, length == axis length/span/spread
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         shape = self.shape()
         axis_length = shape[axis]
 
@@ -73,7 +73,7 @@ struct Shuffle[dtype: DType](Copyable & Movable):
             shuffle(permutation)
 
         # Allocate output
-        var out = Tensor[dtype].zeros(shape)
+        var out = Tensor[Self.dtype].zeros(shape)
 
         for coord in shape:
             shifted_src_coord = coord
@@ -86,7 +86,7 @@ struct Shuffle[dtype: DType](Copyable & Movable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = ShuffleBackward[dtype](
+                backward_fn = ShuffleBackward[Self.dtype](
                     axis, permutation^
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)

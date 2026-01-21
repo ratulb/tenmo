@@ -22,9 +22,9 @@ from ndbuffer import NDBuffer
 
 @fieldwise_init
 struct SoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    alias TAG = BACKWARD_SOFTMAX
+    comptime TAG = BACKWARD_SOFTMAX
     var axes: IntArray
-    var softmax_out_buffer: Buffer[dtype]  # Store raw buffer
+    var softmax_out_buffer: Buffer[Self.dtype]  # Store raw buffer
     var softmax_out_shape: Shape
 
     fn __copyinit__(out self, other: Self):
@@ -37,19 +37,19 @@ struct SoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         self.softmax_out_buffer = other.softmax_out_buffer^
         self.softmax_out_shape = other.softmax_out_shape^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
 
         # Reconstruct softmax output from buffer
-        var ndb = NDBuffer[dtype](
+        var ndb = NDBuffer[Self.dtype](
             self.softmax_out_buffer.copy(), self.softmax_out_shape.copy()
         )
-        var softmax_out = Gradbox[dtype](ndb^)
+        var softmax_out = Gradbox[Self.dtype](ndb^)
 
         # softmax_grad = y * (g - sum(g * y, axis, keepdims=True))
         var gy_sum = (gradbox * softmax_out).sum(self.axes, keepdims=True)
@@ -66,28 +66,28 @@ struct Softmax[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        this: Tensor[dtype],
+        this: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         var shape = this.shape()
 
         # Normalize axes
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
 
         # Numerical stability: subtract max along axes
-        var max_vals = MinMax[dtype].forward[max=True, track_grad=False](
+        var max_vals = MinMax[Self.dtype].forward[max=True, track_grad=False](
             this, normalized_axes, keepdims=True, requires_grad=False
         )
 
-        var stable = Subtractor[dtype].forward[track_grad=False](this, max_vals)
+        var stable = Subtractor[Self.dtype].forward[track_grad=False](this, max_vals)
 
         # Compute exponentials
         var stable_exp = stable.exp()
-        var exp_sum = Summer[dtype].forward[track_grad=False](
+        var exp_sum = Summer[Self.dtype].forward[track_grad=False](
             stable_exp, normalized_axes, True
         )
-        var out = Divider[dtype].forward[track_grad=False](stable_exp, exp_sum)
+        var out = Divider[Self.dtype].forward[track_grad=False](stable_exp, exp_sum)
 
         @parameter
         if track_grad:
@@ -97,7 +97,7 @@ struct Softmax[dtype: DType]:
                 out.requires_grad_(True)
 
                 # Store buffer and shape (much more efficient than coordinate-value pairs)
-                var backward_fn = SoftmaxBackward[dtype](
+                var backward_fn = SoftmaxBackward[Self.dtype](
                     normalized_axes^,
                     out.buffer.contiguous_buffer(),
                     out.shape(),
@@ -114,9 +114,9 @@ struct Softmax[dtype: DType]:
 
 @fieldwise_init
 struct LogSoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    alias TAG = BACKWARD_LOG_SOFTMAX
+    comptime TAG = BACKWARD_LOG_SOFTMAX
     var axes: IntArray
-    var softmax_out_buffer: Buffer[dtype]
+    var softmax_out_buffer: Buffer[Self.dtype]
     var softmax_out_shape: Shape
 
     fn __copyinit__(out self, other: Self):
@@ -129,19 +129,19 @@ struct LogSoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         self.softmax_out_buffer = other.softmax_out_buffer^
         self.softmax_out_shape = other.softmax_out_shape^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
 
         # Reconstruct softmax
-        var ndb = NDBuffer[dtype](
+        var ndb = NDBuffer[Self.dtype](
             self.softmax_out_buffer.copy(), self.softmax_out_shape.copy()
         )
-        var softmax_out = Gradbox[dtype](ndb^)
+        var softmax_out = Gradbox[Self.dtype](ndb^)
 
         # Gradient for log_softmax: g - softmax(x) * sum(g, axis, keepdims=True)
         var sum_grad = gradbox.sum(self.axes, keepdims=True)
@@ -158,30 +158,30 @@ struct LogSoftmax[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        this: Tensor[dtype],
+        this: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         var shape = this.shape()
 
         # Normalize axes
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
 
         # Numerical stability: subtract max along axes
-        var max_vals = MinMax[dtype].forward[max=True, track_grad=False](
+        var max_vals = MinMax[Self.dtype].forward[max=True, track_grad=False](
             this, normalized_axes, keepdims=True, requires_grad=False
         )
-        var stable = Subtractor[dtype].forward[track_grad=False](this, max_vals)
+        var stable = Subtractor[Self.dtype].forward[track_grad=False](this, max_vals)
 
         # Compute exponentials and sum
         var stable_exp = stable.exp()
-        var exp_sum = Summer[dtype].forward[track_grad=False](
+        var exp_sum = Summer[Self.dtype].forward[track_grad=False](
             stable_exp, normalized_axes, True
         )
 
         # Log softmax: (x - max(x)) - log(sum(exp(x - max(x))))
         var log_sum_exp = exp_sum.log(requires_grad=False)
-        var out = Subtractor[dtype].forward[track_grad=False](
+        var out = Subtractor[Self.dtype].forward[track_grad=False](
             stable, log_sum_exp
         )
 
@@ -193,11 +193,11 @@ struct LogSoftmax[dtype: DType]:
                 out.requires_grad_(True)
 
                 # Compute and store softmax for backward pass
-                var softmax_vals = Divider[dtype].forward[track_grad=False](
+                var softmax_vals = Divider[Self.dtype].forward[track_grad=False](
                     stable_exp, exp_sum
                 )
 
-                var backward_fn = LogSoftmaxBackward[dtype](
+                var backward_fn = LogSoftmaxBackward[Self.dtype](
                     normalized_axes^,
                     softmax_vals.buffer.contiguous_buffer(),
                     softmax_vals.shape(),
