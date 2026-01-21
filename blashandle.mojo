@@ -88,10 +88,7 @@ struct BLASMatmul2dBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
-#comptime BLAS_PATH = env_get_string["BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.00"]()
-comptime BLAS_PATH = env_get_string[
-    "BLAS_PATH", "/content/tenmo/.pixi/envs/default/lib/libopenblas.so.0"
-]()
+comptime BLAS_PATH = env_get_string["BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"]()
 
 # void cblas_sgemm(
 #    int order,           1. CblasRowMajor (101)
