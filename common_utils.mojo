@@ -13,19 +13,19 @@ from intarray import IntArray
 from random import randn_float64
 
 
-alias LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
-alias log = Logger[Level._from_str(LOG_LEVEL)]()
+comptime LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
+comptime log = Logger[Level._from_str(LOG_LEVEL)]()
 
 # Color codes
-alias RED: String = "\033[31m"
-alias CYAN: String = "\033[36m"
-alias MAGENTA: String = "\033[35m"
-alias BLUE: String = "\033[34m"  # Standard blue
-alias YELLOW: String = "\033[33m"  # Standard yellow
-alias RESET: String = "\033[0m"
+comptime RED: String = "\033[31m"
+comptime CYAN: String = "\033[36m"
+comptime MAGENTA: String = "\033[35m"
+comptime BLUE: String = "\033[34m"  # Standard blue
+comptime YELLOW: String = "\033[33m"  # Standard yellow
+comptime RESET: String = "\033[0m"
 
 # Bright variants (more vibrant)
-alias BRIGHT_BLUE: String = "\033[94m"
+comptime BRIGHT_BLUE: String = "\033[94m"
 
 
 @always_inline("nodebug")
@@ -254,9 +254,9 @@ struct NewAxis(Copyable & Movable):  # Empty struct as a sentinel
     pass
 
 
-alias Idx = Variant[Int, IntArray, Slice, NewAxis]
+comptime Idx = Variant[Int, IntArray, Slice, NewAxis]
 
-alias newaxis = Idx(NewAxis())
+comptime newaxis = Idx(NewAxis())
 
 
 @always_inline("nodebug")

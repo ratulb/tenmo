@@ -1041,5 +1041,5 @@ fn test_blas_case_4_Atranspose_Btranspose() raises:
 
     assert_true(native_A_grad.all_close(blas_A_grad), "grad_A differs!")
     assert_true(native_B_grad.all_close(blas_B_grad), "grad_B differs!")
-
+    _ = blas
     print("✓ All checks passed!")
