@@ -30,7 +30,7 @@ from operators import (
     GreaterThanEqual,
 )
 
-alias _volatile = False
+comptime _volatile = False
 
 
 struct Buffer[dtype: DType = DType.float32](
@@ -216,18 +216,12 @@ struct Buffer[dtype: DType = DType.float32](
             fence[ordering = Consistency.ACQUIRE]()
 
             # Destroy data elements
-            _="""for i in range(self.size):
-                (self.data + i).destroy_pointee()"""
-
             # Free allocation (starts at refcount, not data)
-            var refcount_size = size_of[Atomic[DType.uint64]]()
             var alloc_start = self._refcount.bitcast[UInt8]()
             alloc_start.free()
 
         else:
             # Unshared buffer - direct free
-            _="""for i in range(self.size):
-                (self.data + i).destroy_pointee()"""
             self.data.free()
             log_debug("Buffer__del__ → freed unshared buffer")
 
@@ -254,7 +248,7 @@ struct Buffer[dtype: DType = DType.float32](
             return result^
 
         # Strided path: use SIMD if beneficial
-        alias simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
+        comptime simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
         ]()
 
@@ -486,7 +480,7 @@ struct Buffer[dtype: DType = DType.float32](
             return
 
         # SIMD vectorization for non-bool types
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
 
         var idx = start_index
         var remaining = extent
@@ -573,7 +567,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         else:
             # SIMD vectorization for non-bool types
-            alias simd_width = simd_width_of[Self.dtype]()
+            comptime simd_width = simd_width_of[Self.dtype]()
 
             # Calculate loop bounds
             var vectorized_end = (self_extent // simd_width) * simd_width
@@ -676,7 +670,7 @@ struct Buffer[dtype: DType = DType.float32](
             return out^
 
         # SIMD vectorization for non-bool types
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
 
         var idx = 0
         var remaining = self_extent
@@ -754,7 +748,7 @@ struct Buffer[dtype: DType = DType.float32](
             return out^
 
         # SIMD vectorization for non-bool types
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
 
         var idx = 0
         var remaining = extent
@@ -1039,7 +1033,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         var out = Buffer[DType.bool](total)
 
-        alias smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
+        comptime smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
         ]()
 
@@ -1111,7 +1105,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         var out = Buffer[DType.bool](total)
 
-        alias smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
+        comptime smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
         ]()
 
@@ -1200,7 +1194,7 @@ struct Buffer[dtype: DType = DType.float32](
         var out = Buffer[Self.dtype].zeros(self_extent)
         var zero = Scalar[Self.dtype](0)
 
-        alias smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
+        comptime smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
         ]()
 
@@ -1257,7 +1251,7 @@ struct Buffer[dtype: DType = DType.float32](
         var extent = end_index.or_else(self.size) - start_index
         var out = Buffer[Self.dtype](extent)
 
-        alias smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
+        comptime smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
         ]()
 
@@ -1302,7 +1296,7 @@ struct Buffer[dtype: DType = DType.float32](
         var out = Buffer[Self.dtype](extent)
         var mask = Buffer[Self.dtype](extent)
 
-        alias simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
+        comptime simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
         ]()
 
@@ -1504,7 +1498,7 @@ struct Buffer[dtype: DType = DType.float32](
         if extent <= 0:
             return accum
 
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (extent // simd_width) * simd_width
 
         # Vectorized accumulation
@@ -1535,7 +1529,7 @@ struct Buffer[dtype: DType = DType.float32](
         if extent <= 0:
             return result  # Empty product = multiplicative identity
 
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (extent // simd_width) * simd_width
 
         # Vectorized multiplication
@@ -1563,7 +1557,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         var out = Buffer[Self.dtype](self.size)
 
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
 
         # Vectorized power
@@ -1586,7 +1580,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         var out = Buffer[Self.dtype](self.size)
 
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
 
         # Vectorized absolute value
@@ -1611,7 +1605,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         var out = Buffer[Self.dtype](self.size)
 
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
 
         # Vectorized absolute value
@@ -1636,7 +1630,7 @@ struct Buffer[dtype: DType = DType.float32](
             "Buffer → clamp is for numeric data types only",
         ]()
 
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
 
         # Vectorized absolute value
@@ -1670,7 +1664,7 @@ struct Buffer[dtype: DType = DType.float32](
             for idx in range(extent):
                 self[idx + start_index] = value
         else:
-            alias simd_width = simd_width_of[Self.dtype]()
+            comptime simd_width = simd_width_of[Self.dtype]()
             var vectorized_end = (extent // simd_width) * simd_width
 
             # Vectorized fill
@@ -1690,7 +1684,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         var out = Buffer[Self.dtype](self.size)
 
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
 
         # Vectorized negation
@@ -1722,7 +1716,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         var out = Buffer[Self.dtype](self.size)
 
-        alias simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
+        comptime simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
         ]()
 
@@ -1747,7 +1741,7 @@ struct Buffer[dtype: DType = DType.float32](
         if total == 0:
             return False
 
-        alias smdwidth = simd_width_of[Self.dtype]()
+        comptime smdwidth = simd_width_of[Self.dtype]()
 
         var simd_blocks = total // smdwidth
         for block in range(simd_blocks):
@@ -1918,7 +1912,7 @@ struct Buffer[dtype: DType = DType.float32](
         if total == 0:
             return False
 
-        alias smdwidth = simd_width_of[Self.dtype]()
+        comptime smdwidth = simd_width_of[Self.dtype]()
 
         var simd_blocks = total // smdwidth
         for block in range(simd_blocks):
@@ -2049,10 +2043,10 @@ struct Buffer[dtype: DType = DType.float32](
                 out[i] = self[i].cast[NewType]()
         else:
             # Both types are non-bool and different: use efficient SIMD vectorization
-            alias input_simd_width = simd_width_of[Self.dtype]()
+            comptime input_simd_width = simd_width_of[Self.dtype]()
 
             # Use the smaller of the two SIMD widths for safe vectorization
-            alias min_simd_width = input_simd_width if input_simd_width < simdwidth else simdwidth
+            comptime min_simd_width = input_simd_width if input_simd_width < simdwidth else simdwidth
 
             var vectorized_end = (self.size // min_simd_width) * min_simd_width
 
@@ -2120,7 +2114,7 @@ struct Buffer[dtype: DType = DType.float32](
             return total
 
         # SIMD vectorization for non-bool types
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
 
         var idx = start_index
         var remaining = extent
@@ -2182,7 +2176,7 @@ struct Buffer[dtype: DType = DType.float32](
             tolerance = atol + rtol * abs(vec2)
             return diff.le(tolerance).reduce_and()
 
-        alias simd_width = simd_width_of[Self.dtype]()
+        comptime simd_width = simd_width_of[Self.dtype]()
         num_elems = self.size
         simd_blocks = num_elems // simd_width
 
