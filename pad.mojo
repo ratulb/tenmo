@@ -32,14 +32,14 @@ from utils import Variant
 from sys import simd_width_of
 from algorithm import parallelize
 
-alias Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
+comptime Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
 
 
 @fieldwise_init
 struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """Backward pass for padding operation - handles all modes."""
 
-    alias TAG = BACKWARD_PAD
+    comptime TAG = BACKWARD_PAD
 
     var pad: List[Tuple[Int, Int]]
     var mode: String
@@ -152,7 +152,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var grad_out_ptr = grad_out.buffer.data_buffer().data
         var grad_in_ptr = grad_parent.buffer.data_buffer().data
 
-        alias simd_w = simd_width_of[dtype]()
+        comptime simd_w = simd_width_of[dtype]()
         # Strides
         var out_stride_N = C * H_pad * W_pad
         var out_stride_C = H_pad * W_pad
@@ -459,7 +459,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable):
         var x_ptr = x.buffer.data_buffer().data
         var result_ptr = result.buffer.data_buffer().data
 
-        alias simd_w = simd_width_of[Self.dtype]()
+        comptime simd_w = simd_width_of[Self.dtype]()
         # ═══════════════════════════════════════════════════════════
         # Step 1: Fill with pad value (SIMD vectorized)
         # ═══════════════════════════════════════════════════════════
