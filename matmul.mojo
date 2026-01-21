@@ -860,6 +860,82 @@ fn classify_matmul(a: Shape, b: Shape) -> Int:
 
 from time import perf_counter_ns as now
 from sys import argv
+from blashandle import BLASHandle
+
+
+fn test_gflops_blas() raises:
+    alias dtype = DType.float32
+    var M = 128
+    var K = 512
+    var O = 512
+    var N = 256
+
+    var A_shape = Shape(M, K)
+    var B_shape = Shape(O, N)
+
+    var shape_dims = argv()
+    try:
+        var length = len(shape_dims)
+        if length > 1:
+            if length == 2:
+                var dim = Int(shape_dims[1])
+                A_shape = Shape(dim, dim)
+                B_shape = Shape(dim, dim)
+            elif length == 3:
+                var dim1, dim2 = Int(shape_dims[1]), Int(shape_dims[2])
+                A_shape = Shape(dim1, dim2)
+                B_shape = Shape(dim2, dim2)
+            elif length == 4:
+                var dim1, dim2, dim3, dim4 = (
+                    Int(shape_dims[1]),
+                    Int(shape_dims[2]),
+                    Int(shape_dims[3]),
+                    Int(shape_dims[4]),
+                )
+                A_shape = Shape(dim1, dim2)
+                B_shape = Shape(dim3, dim4)
+
+    except e:
+        print("Could not parse shape dims")
+
+    if A_shape[1] != B_shape[0]:
+        panic(
+            "Matrix dimension mismatch: ", A_shape.__str__(), B_shape.__str__()
+        )
+    # Setup
+    var A = Tensor[dtype].randn(A_shape)
+    var B = Tensor[dtype].randn(B_shape)
+
+    print("Benchmarking Matmul2d...")
+    var blas = BLASHandle[dtype]()
+    # Warmup
+    for _ in range(10):
+        var _ = blas.matmul(A, B)
+
+    # Benchmark
+    var start = now()
+    for _ in range(100):
+        var _ = blas.matmul(A, B)
+    var end = now()
+
+    # Calculations
+    var avg_time_ms = (end - start) / (100.0 * 1_000_000.0)
+
+    var gflops = (2.0 * M * K * N) / (avg_time_ms * 1_000_000.0)
+
+    M = A_shape[0]
+    K = A_shape[1]
+    N = B_shape[1]
+
+    # Formatted output
+    var shape_str = String("(") + M.__str__() + "×" + K.__str__() + ") @ ("
+    shape_str += K.__str__() + "×" + N.__str__() + ")"
+
+    print("Blas matmul Results:")
+    print("  Matrix dimensions: " + shape_str)
+    print("  Average time:      " + avg_time_ms.__str__() + " ms")
+    print("  Performance:       " + gflops.__str__() + " GFLOPS")
+    print("  Operations:        " + (2 * M * K * N).__str__() + " FLOP")
 
 
 fn test_gflops() raises:
@@ -937,5 +1013,33 @@ fn test_gflops() raises:
     print("  Operations:        " + (2 * M * K * N).__str__() + " FLOP")
 
 
+from testing import assert_true
+
+
 fn main() raises:
     test_gflops()
+    test_gflops_blas()
+    comptime dtype = DType.float16
+    var A = Tensor[dtype].randn(128, 128)
+    var B = Tensor[dtype].randn(128, 128)
+
+    var R_mojo = Matmul2d[dtype].forward(A, B)
+    var blas = BLASHandle[dtype]()
+    var R_blas = blas.matmul(A, B)
+    assert_true(R_mojo.all_close(R_blas))
+
+    var A_T = A.transpose()
+    R_mojo = Matmul2d[dtype].forward(A_T, B)
+    R_blas = blas.matmul(A_T, B, transpose_A=True)
+    assert_true(R_mojo.all_close(R_blas))
+
+    var B_T = A.transpose()
+    R_mojo = Matmul2d[dtype].forward(A_T, B_T)
+    R_blas = blas.matmul(A_T, B_T, transpose_A=True, transpose_B=True)
+    assert_true(R_mojo.all_close(R_blas))
+
+    R_mojo = Matmul2d[dtype].forward(A, B_T)
+    R_blas = blas.matmul(A, B_T, transpose_B=True)
+    assert_true(R_mojo.all_close(R_blas))
+
+    print("BLAS and Mojo computes same result")
