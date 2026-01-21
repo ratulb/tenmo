@@ -11,7 +11,7 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_SQUEEZE
+    comptime TAG = BACKWARD_SQUEEZE
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)

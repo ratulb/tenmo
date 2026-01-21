@@ -12,7 +12,7 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_UNSQUEEZE
+    comptime TAG = BACKWARD_UNSQUEEZE
     var axes: IntArray  # where axes were inserted
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:

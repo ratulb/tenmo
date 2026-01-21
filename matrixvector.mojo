@@ -110,12 +110,12 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_MATRIX_VECTOR_MUL
+    comptime TAG = BACKWARD_MATRIX_VECTOR_MUL
 
     fn backward(
         self, read output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        alias simdwidth = simd_width_of[Self.dtype]()
+        comptime simdwidth = simd_width_of[Self.dtype]()
 
         ref grad_out = output.gradients()[]
         var M = output.ancestry().get(0)
@@ -178,7 +178,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
                 # Outer product: grad_M[m, k] = grad_out[m] * v[k]
                 if grad_M_contiguous:
                     # MANUAL VECTORIZATION for outer product
-                    alias simd_width = simdwidth
+                    comptime simd_width = simdwidth
                     var num_full_vectors = k // simd_width
                     var remainder = k % simd_width
 

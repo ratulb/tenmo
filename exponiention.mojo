@@ -8,15 +8,15 @@ from ndbuffer import NDBuffer
 @fieldwise_init
 @register_passable
 struct ExponientionBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_EXPONENTIATION
-    var exponent: Scalar[dtype]
+    comptime TAG = BACKWARD_EXPONENTIATION
+    var exponent: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
 
@@ -40,17 +40,17 @@ struct Exponentiator[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[dtype], exponent: Scalar[dtype]) -> Tensor[dtype]:
-        nd_buffer = NDBuffer[dtype](
+    ](self: Tensor[Self.dtype], exponent: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        nd_buffer = NDBuffer[Self.dtype](
             (self.buffer.contiguous_buffer() ** exponent), self.shape()
         )
-        var out = Tensor[dtype](nd_buffer^, requires_grad=False)
+        var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 
         @parameter
         if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                backward_fn = ExponientionBackward[dtype](
+                backward_fn = ExponientionBackward[Self.dtype](
                     exponent
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)

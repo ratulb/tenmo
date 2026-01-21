@@ -80,7 +80,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
             # Optimized vector-matrix multiply: result[n] = v[k] @ M[k, n]
             if M_contiguous:
                 # Fast path: M has contiguous rows - MANUAL VECTORIZATION
-                alias simd_width = simdwidth
+                comptime simd_width = simdwidth
                 var num_full_vectors = n // simd_width
                 var remainder = n % simd_width
 
@@ -152,7 +152,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_VECTOR_MATMUL
+    comptime TAG = BACKWARD_VECTOR_MATMUL
 
     fn backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
@@ -279,7 +279,7 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
                 # Outer product: grad_M[k, n] = v[k] * grad_out[n]
                 if grad_M_contiguous:
                     # MANUAL VECTORIZATION for outer product
-                    alias simd_width = simdwidth
+                    comptime simd_width = simdwidth
                     var num_full_vectors = n // simd_width
                     var remainder = n % simd_width
 

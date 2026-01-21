@@ -15,15 +15,15 @@ from broadcastbackward import BroadcastBackward
 @fieldwise_init
 @register_passable
 struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_MULTIPLY_SCALAR
-    var factor: Scalar[dtype]
+    comptime TAG = BACKWARD_MULTIPLY_SCALAR
+    var factor: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * self.factor
@@ -40,14 +40,14 @@ struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_MULTIPLY
+    comptime TAG = BACKWARD_MULTIPLY
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         # ref gradbox = output.gradients()[]
         var gradbox = output.grad()
         count = len(output.ancestry())
@@ -55,10 +55,10 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
 
         if count == 1:  # B = A * A, A is the only ancestor of B
             gradbox_prod = ancestor_lhs * gradbox
-            gradbox_prod = gradbox_prod * Scalar[dtype](2)
+            gradbox_prod = gradbox_prod * Scalar[Self.dtype](2)
             return [(ancestor_lhs^, gradbox_prod^, AddTensor)]
 
-        var grad_shares = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]](
+        var grad_shares = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]](
             capacity=2
         )
 
@@ -88,7 +88,7 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
         return grad_shares^
 
 
-alias MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
+comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
     dtype,
     augment=True,
     lhs_op=AddTensor,
@@ -103,8 +103,8 @@ struct MultiplyScalar[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[dtype], factor: Scalar[dtype]) -> Tensor[dtype]:
-        var out: Tensor[dtype] = Tensor[dtype](
+    ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
             self.buffer.scalar_ops[Multiply](factor), requires_grad=False
         )
 
@@ -112,7 +112,7 @@ struct MultiplyScalar[dtype: DType]:
         if track_grad:
             out.requires_grad_(True)
             if self.requires_grad:
-                backward_fn = MultiplyBackwardScalar[dtype](
+                backward_fn = MultiplyBackwardScalar[Self.dtype](
                     factor
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
@@ -124,11 +124,11 @@ struct MultiplyScalar[dtype: DType]:
 # Element wise multiplication of two tensors
 @fieldwise_init
 @register_passable
-struct Multiplicator[dtype: DType]:
+struct Multiplicator[Self.dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[dtype], other: Tensor[dtype]) -> Tensor[dtype]:
+    ](self: Tensor[Self.dtype], other: Tensor[dtype]) -> Tensor[dtype]:
         if not self.broadcastable(other):
             panic(
                 "Tensor → __mul__(self * other) → dimension mismatch: "
@@ -138,7 +138,7 @@ struct Multiplicator[dtype: DType]:
                 "at Multiplicator → forward",
             )
 
-        var out: Tensor[dtype] = Tensor[dtype](
+        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
             self.buffer.arithmetic_ops[Multiply](other.buffer),
             requires_grad=False,
         )
@@ -150,7 +150,7 @@ struct Multiplicator[dtype: DType]:
                 out.requires_grad_(True)
 
                 if self.shape() == other.shape():
-                    backward_fn = MultiplyBackward[dtype]().into_backward_fn()
+                    backward_fn = MultiplyBackward[Self.dtype]().into_backward_fn()
                     out.backwardFn = Optional(backward_fn^)
                     if id(self) == id(other):  # B = A * A, self == other == A
                         out.add_ancestry(self)
@@ -158,7 +158,7 @@ struct Multiplicator[dtype: DType]:
                         out.add_ancestry(self, other)
                 else:
                     backward_fn = MultiplyBroadcastBackward[
-                        dtype
+                        Self.dtype
                     ]().into_backward_fn()
                     out.backwardFn = Optional(backward_fn^)
                     out.add_ancestry(self, other)
@@ -166,6 +166,6 @@ struct Multiplicator[dtype: DType]:
         return out^
 
     @staticmethod
-    fn forward(self: Tensor[dtype], other: Gradbox[dtype]) -> Gradbox[dtype]:
+    fn forward(self: Tensor[Self.dtype], other: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
         var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer)
-        return Gradbox[dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)

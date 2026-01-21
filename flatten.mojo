@@ -8,14 +8,14 @@ from gradbox import Gradbox
 @fieldwise_init
 @register_passable
 struct FlattenBackward[dtype: DType](ImplicitlyCopyable):
-    alias TAG = BACKWARD_FLATTEN
+    comptime TAG = BACKWARD_FLATTEN
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         ancestor_shape = ancestor.shape()
@@ -32,13 +32,13 @@ struct FlattenForward[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        self: Tensor[Self.dtype],
         start_dim: Int = 0,
         end_dim: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         flattened_buffer = self.buffer.flatten(start_dim, end_dim)
-        out = Tensor[dtype](flattened_buffer^, requires_grad=False)
+        out = Tensor[Self.dtype](flattened_buffer^, requires_grad=False)
 
         # autograd hookup
         @parameter
@@ -47,7 +47,7 @@ struct FlattenForward[dtype: DType]:
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = FlattenBackward[dtype]().into_backward_fn()
+                backward_fn = FlattenBackward[Self.dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
