@@ -30,8 +30,6 @@ from operators import (
     GreaterThanEqual,
 )
 
-comptime _volatile = False
-
 
 struct Buffer[dtype: DType = DType.float32](
     ImplicitlyCopyable
@@ -291,7 +289,7 @@ struct Buffer[dtype: DType = DType.float32](
             self.size,
             index,
         )
-        return self.data.load[width=1, volatile=_volatile](index)
+        return self.data.load[width=1](index)
 
     @always_inline
     fn __setitem__(self, index: Int, scalar: Scalar[Self.dtype]):
@@ -301,7 +299,7 @@ struct Buffer[dtype: DType = DType.float32](
             self.size,
             index,
         )
-        self.data.store[width=1, volatile=_volatile](index, scalar)
+        self.data.store[width=1](index, scalar)
 
     @always_inline
     fn load[
@@ -314,7 +312,7 @@ struct Buffer[dtype: DType = DType.float32](
             offset,
             simdwidth,
         )
-        return self.data.load[width=simdwidth, volatile=_volatile](offset)
+        return self.data.load[width=simdwidth](offset)
 
     @always_inline
     fn store[
@@ -328,7 +326,7 @@ struct Buffer[dtype: DType = DType.float32](
             simdwidth,
         )
 
-        self.data.store[width=simdwidth, volatile=_volatile](offset, values)
+        self.data.store[width=simdwidth](offset, values)
 
     @always_inline
     fn __add__(
@@ -2303,7 +2301,7 @@ struct Buffer[dtype: DType = DType.float32](
 @register_passable
 struct ElementIterator[
     dtype: DType,
-    origin: Origin[False],
+    origin: ImmutOrigin,
 ](Sized & Copyable):
     var index: Int
     var src: Pointer[Buffer[Self.dtype], Self.origin]
