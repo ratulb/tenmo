@@ -1019,7 +1019,7 @@ from testing import assert_true
 fn main() raises:
     test_gflops()
     test_gflops_blas()
-    comptime dtype = DType.float16
+    comptime dtype = DType.float64
     var A = Tensor[dtype].randn(128, 128)
     var B = Tensor[dtype].randn(128, 128)
 
