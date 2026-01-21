@@ -1,7 +1,7 @@
 from algorithm import vectorize
 from sys import simd_width_of, size_of
 from memory import memset_zero, memcpy
-from math import exp, log, ceil, tanh, sqrt
+from math import exp, log10, ceil, tanh, sqrt
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
 from os.atomic import Atomic, Consistency, fence
@@ -1000,7 +1000,7 @@ struct Buffer[dtype: DType = DType.float32](
         elif op_code == Exp:
             return exp(block)
         elif op_code == Log:
-            return log(block)
+            return log10(block)  * 2.3025850929 # Upcoming 26.1 does not recognize 'log' here
         elif op_code == SqrtForwardOp:
             return sqrt(block)
         elif op_code == SqrtBackwardOp:
