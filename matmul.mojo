@@ -919,7 +919,7 @@ fn test_gflops_blas() raises:
     var end = now()
 
     # Calculations
-    var avg_time_ms = (end - start) / (100.0 * 1_000_000.0)
+    var avg_time_ms = Float64(end - start) / (100.0 * 1_000_000.0)
 
     var gflops = (2.0 * M * K * N) / (avg_time_ms * 1_000_000.0)
 
@@ -994,7 +994,7 @@ fn test_gflops() raises:
     var end = now()
 
     # Calculations
-    var avg_time_ms = (end - start) / (100.0 * 1_000_000.0)
+    var avg_time_ms = Float64(end - start) / (100.0 * 1_000_000.0)
 
     var gflops = (2.0 * M * K * N) / (avg_time_ms * 1_000_000.0)
 
