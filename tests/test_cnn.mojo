@@ -363,9 +363,9 @@ fn test_gradient_flow() raises:
     out2.backward(grad_output)
 
     # Check that all gradients exist
-    assert_true(image.gradients().__as_bool__())
-    assert_true(kernel1.gradients().__as_bool__())
-    assert_true(kernel2.gradients().__as_bool__())
+    assert_true(image.gradients())
+    assert_true(kernel1.gradients())
+    assert_true(kernel2.gradients())
 
     print("Gradient flow correct")
 

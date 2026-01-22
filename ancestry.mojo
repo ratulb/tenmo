@@ -48,7 +48,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         return AncestorIterator[Self.dtype](0, Pointer(to=self))
 
 
-struct AncestorIterator[dtype: DType, origin: Origin[False]](
+struct AncestorIterator[dtype: DType, origin: ImmutOrigin](
     Sized & ImplicitlyCopyable
 ):
     var index: Int
