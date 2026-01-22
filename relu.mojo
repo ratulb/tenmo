@@ -9,10 +9,10 @@ from buffers import Buffer
 @fieldwise_init
 struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
     comptime TAG = BACKWARD_RELU
-    var mask: Buffer[Self.dtype]  # Stores 0.0 or 1.0 in same dtype
+    var mask: Buffer[Self.dtype]  # Stores 0.0 or 1.0 in same Self.dtype
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[dtype](Delegate[Self.dtype](self), Self.TAG)
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
         self, read output: Tensor[Self.dtype]
@@ -24,7 +24,7 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var grad_buffer = gradbox.buffer.data_buffer()
         var result_buffer = grad_buffer * self.mask
 
-        var ndb = NDBuffer[dtype](result_buffer^, shape)
+        var ndb = NDBuffer[Self.dtype](result_buffer^, shape)
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
 
         return [(input_tensor^, gradbox_ancestor^, AddTensor)]
@@ -67,8 +67,8 @@ struct ReLU[dtype: DType]:
             var buffer = result[0]
             mask = result[1]
 
-            out = Tensor[dtype](
-                NDBuffer[dtype](buffer^, shape), requires_grad=False
+            out = Tensor[Self.dtype](
+                NDBuffer[Self.dtype](buffer^, shape), requires_grad=False
             )
         # Slow path: non-contiguous - compute element-wise
         else:
@@ -76,8 +76,8 @@ struct ReLU[dtype: DType]:
             mask = Buffer[Self.dtype](self.numels())
             ref out_buffer = out.buffer.data_buffer()
             ref self_buffer = self.buffer.data_buffer()
-            var zero = Scalar[dtype](0)
-            var one = Scalar[dtype](1)
+            var zero = Scalar[Self.dtype](0)
+            var one = Scalar[Self.dtype](1)
             var index = 0
 
             # Compute output and mask together in same loop

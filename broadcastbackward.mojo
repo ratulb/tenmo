@@ -8,18 +8,18 @@ from gradbox import Gradbox
 struct BroadcastBackward[
     dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int, TAG: Int
 ](ImplicitlyCopyable):
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         # This is the gradient flowing *into* this broadcasted op.
         # We need to call copy explicitly because we have not annotated Gradbox with `ImplicitlyCopyable` yet - Intententionally
         ref incoming_grad = output.gradients()[]
 
         # capacity = 2 because we always have 2 parents(at most)
-        var parent_grad_list = List[Tuple[Tensor[dtype], Gradbox[dtype], Int]](
+        var parent_grad_list = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]](
             capacity=2
         )
 
