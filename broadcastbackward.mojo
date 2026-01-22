@@ -31,21 +31,21 @@ struct BroadcastBackward[
         if left_parent.requires_grad:
             # This function reduces the broadcast grad back to left_tensor shape.
             var left_parent_grad = left_parent.upstream_grad_share[
-                augment=augment
+                augment=Self.augment
             ](right_parent, incoming_grad)
 
             # Append to return list:
             #   - which ancestor gets the update
             #   - the computed gradient box
             #   - the operation code (AddTensor/SubtractTensor/etc.)
-            parent_grad_list.append((left_parent, left_parent_grad^, lhs_op))
+            parent_grad_list.append((left_parent, left_parent_grad^, Self.lhs_op))
 
         # For right parent: compute its gradient if needed
         if right_parent.requires_grad:
             var right_parent_grad = right_parent.upstream_grad_share[
-                augment=augment
+                augment=Self.augment
             ](left_parent, incoming_grad)
 
-            parent_grad_list.append((right_parent^, right_parent_grad^, rhs_op))
+            parent_grad_list.append((right_parent^, right_parent_grad^, Self.rhs_op))
 
         return parent_grad_list^

@@ -152,7 +152,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var grad_out_ptr = grad_out.buffer.data_buffer().data
         var grad_in_ptr = grad_parent.buffer.data_buffer().data
 
-        comptime simd_w = simd_width_of[dtype]()
+        comptime simd_w = simd_width_of[Self.dtype]()
         # Strides
         var out_stride_N = C * H_pad * W_pad
         var out_stride_C = H_pad * W_pad
