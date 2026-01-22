@@ -626,8 +626,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @always_inline
     @staticmethod
     fn compute_bias_gradient(
-        grad_output: Gradbox[dtype], N: Int, C_out: Int, H_out: Int, W_out: Int
-    ) -> Gradbox[dtype]:
+        grad_output: Gradbox[Self.dtype], N: Int, C_out: Int, H_out: Int, W_out: Int
+    ) -> Gradbox[Self.dtype]:
         """
         Vectorized bias gradient: sum over (N, H_out, W_out) for each C_out.
 
@@ -635,11 +635,11 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         For each channel co, data is at indices:
           [n*C_out*H_out*W_out + co*H_out*W_out + spatial_pos]
         """
-        var grad_bias = Gradbox[dtype].zeros(Shape(C_out), share=False)
+        var grad_bias = Gradbox[Self.dtype].zeros(Shape(C_out), share=False)
         var grad_ptr = grad_output.buffer.data_buffer().data
         var bias_ptr = grad_bias.buffer.data_buffer().data
 
-        comptime simd_w = simd_width_of[dtype]()
+        comptime simd_w = simd_width_of[Self.dtype]()
 
         var stride_N = C_out * H_out * W_out
         var stride_C = H_out * W_out
@@ -647,8 +647,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         @parameter
         fn accumulate_bias(co: Int):
-            var accum_vec = SIMD[dtype, simd_w](0)
-            var accum_scalar: Scalar[dtype] = 0
+            var accum_vec = SIMD[Self.dtype, simd_w](0)
+            var accum_scalar: Scalar[Self.dtype] = 0
             var base_co = co * stride_C
 
             for n in range(N):
@@ -674,8 +674,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @always_inline
     @staticmethod
     fn compute_kernel_gradient(
-        grad_output: Gradbox[dtype],
-        padded_image: Tensor[dtype],
+        grad_output: Gradbox[Self.dtype],
+        padded_image: Tensor[Self.dtype],
         N: Int,
         C_in: Int,
         C_out: Int,
@@ -687,7 +687,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         KW: Int,
         stride: Int,
         dilation: Int,
-    ) -> Gradbox[dtype]:
+    ) -> Gradbox[Self.dtype]:
         """
         We need to transpose (N,C_out,H,W) → (C_out,N,H,W) before matmul.
 
@@ -701,7 +701,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         # Extract patches
         var num_patches = N * H_out * W_out
         var patch_size = C_in * KH * KW
-        var patches = Tensor[dtype].zeros(num_patches, patch_size)
+        var patches = Tensor[Self.dtype].zeros(num_patches, patch_size)
 
         var input_ptr = padded_image.buffer.data_buffer().data
         var patch_ptr = patches.buffer.data_buffer().data
@@ -770,8 +770,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @always_inline
     @staticmethod
     fn compute_input_gradient(
-        grad_output: Gradbox[dtype],
-        kernel: Tensor[dtype],
+        grad_output: Gradbox[Self.dtype],
+        kernel: Tensor[Self.dtype],
         N: Int,
         C_in: Int,
         C_out: Int,
@@ -783,7 +783,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         KW: Int,
         stride: Int,
         dilation: Int,
-    ) -> Gradbox[dtype]:
+    ) -> Gradbox[Self.dtype]:
         """
         Vectorized input gradient.
 
@@ -795,7 +795,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         Note: Hard to vectorize due to scatter pattern. Focus on cache optimization.
         """
-        var grad_padded = Gradbox[dtype].zeros(
+        var grad_padded = Gradbox[Self.dtype].zeros(
             Shape(N, C_in, H_pad, W_pad), share=False
         )
 
@@ -832,7 +832,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
                         ]
 
                         # Early skip for zeros
-                        if grad_val == Scalar[dtype](0):
+                        if grad_val == Scalar[Self.dtype](0):
                             continue
 
                         var kernel_co_base = co * kernel_stride_Co
@@ -856,7 +856,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
                                 # @parameter
                                 if KW >= 4:  # Worth vectorizing
                                     comptime kw_simd_w = min(
-                                        4, simd_width_of[dtype]()
+                                        4, simd_width_of[Self.dtype]()
                                     )
                                     var kx = 0
                                     var vec_end = (KW // kw_simd_w) * kw_simd_w

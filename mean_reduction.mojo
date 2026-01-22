@@ -23,14 +23,14 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         self.keepdims = other.keepdims
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
         if gradbox_shape == Shape():
             scalar_grad = gradbox.item() / ancestor.shape().num_elements()
-            grad_contrib = Gradbox[dtype].full(
+            grad_contrib = Gradbox[Self.dtype].full(
                 ancestor.shape(),
                 scalar_grad,
             )
@@ -60,7 +60,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         # Compute total count of elements being reduced
         var count = ancestor.shape().reduced_shape(self.axes).product()
         count = count if count > 0 else 1
-        var average = broadcasted / Scalar[dtype](count)
+        var average = broadcasted / Scalar[Self.dtype](count)
 
         return [
             (
@@ -70,8 +70,8 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
             )
         ]
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -82,11 +82,11 @@ struct Mean[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        tensor: Tensor[dtype],
+        tensor: Tensor[Self.dtype],
         axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         normalized_axes = Validator.validate_and_normalize_axes(
             tensor.shape(), axes
         )
@@ -95,7 +95,7 @@ struct Mean[dtype: DType](Copyable):
         total = tensor.sum[track_grad=False](
             axes=normalized_axes, keepdims=keepdims
         )
-        var out = DivideByScalar[dtype].forward[track_grad=False](total, count)
+        var out = DivideByScalar[Self.dtype].forward[track_grad=False](total, count)
 
         @parameter
         if track_grad:
@@ -103,7 +103,7 @@ struct Mean[dtype: DType](Copyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = MeanBackward[dtype](
+                backward_fn = MeanBackward[Self.dtype](
                     normalized_axes.copy(), keepdims
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
@@ -114,10 +114,10 @@ struct Mean[dtype: DType](Copyable):
     @always_inline
     @staticmethod
     fn forward(
-        gradbox: Gradbox[dtype],
+        gradbox: Gradbox[Self.dtype],
         axes: IntArray,
         keepdims: Bool = False,
-    ) -> Gradbox[dtype]:
+    ) -> Gradbox[Self.dtype]:
         var gradbox_shape = gradbox.shape()
         normalized_axes = Validator.validate_and_normalize_axes(
             gradbox_shape, axes
@@ -125,7 +125,7 @@ struct Mean[dtype: DType](Copyable):
         var count = gradbox_shape.reduced_shape(normalized_axes).product()
         count = count if count > 0 else 1
         out = gradbox.sum(axes=normalized_axes, keepdims=keepdims) / Scalar[
-            dtype
+            Self.dtype
         ](count)
 
         return out^
