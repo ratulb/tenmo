@@ -128,7 +128,7 @@ struct Multiplicator[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[dtype]) -> Tensor[dtype]:
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         if not self.broadcastable(other):
             panic(
                 "Tensor → __mul__(self * other) → dimension mismatch: "

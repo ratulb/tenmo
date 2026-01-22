@@ -736,26 +736,30 @@ fn test_padding_modes() raises:
     var out_valid = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding("valid")
     )
-    assert_shape_equal(out_valid, List[Int](1, 1, 6, 6), "Valid padding")
+    var expect: List[Int] = [1, 1, 6, 6]
+    assert_shape_equal(out_valid, expect, "Valid padding")
 
     # Test 2.2: Same padding (preserve dimensions)
     var out_same = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding("same")
     )
-    assert_shape_equal(out_same, List[Int](1, 1, 8, 8), "Same padding")
+    expect = [1, 1, 8, 8]
+    assert_shape_equal(out_same, expect, "Same padding")
 
     # Test 2.3: Uniform integer padding
     var out_pad1 = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding(1)
     )
-    assert_shape_equal(out_pad1, List[Int](1, 1, 8, 8), "Uniform padding=1")
+    expect = [1, 1, 8, 8]
+    assert_shape_equal(out_pad1, expect, "Uniform padding=1")
 
     # Test 2.4: Tuple padding (height, width)
     var out_pad_tuple = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding((1, 2))
     )
+    expect = [1, 1, 8, 10]
     assert_shape_equal(
-        out_pad_tuple, List[Int](1, 1, 8, 10), "Tuple padding (1,2)"
+        out_pad_tuple, expect, "Tuple padding (1,2)"
     )
 
     # Test 2.5: Asymmetric padding
@@ -765,7 +769,8 @@ fn test_padding_modes() raises:
     var out_asym = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, padding=Padding(pad_list.copy())
     )
-    assert_shape_equal(out_asym, List[Int](1, 1, 9, 9), "Asymmetric padding")
+    expect = [1, 1, 9, 9]
+    assert_shape_equal(out_asym, expect, "Asymmetric padding")
 
     print("\n All padding tests passed!\n")
 
@@ -787,26 +792,30 @@ fn test_stride_2() raises:
     var out_s1 = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, stride=1
     )
-    assert_shape_equal(out_s1, List[Int](1, 1, 6, 6), "Stride=1")
+    var expect: List[Int] = [1, 1, 6, 6]
+    assert_shape_equal(out_s1, expect, "Stride=1")
 
     # Test 3.2: Stride = 2
     var out_s2 = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, stride=2
     )
-    assert_shape_equal(out_s2, List[Int](1, 1, 3, 3), "Stride=2")
+    expect = [1, 1, 3, 3]
+    assert_shape_equal(out_s2, expect, "Stride=2")
 
     # Test 3.3: Stride = 3
     var out_s3 = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, stride=3
     )
-    assert_shape_equal(out_s3, List[Int](1, 1, 2, 2), "Stride=3")
+    expect = [1, 1, 2, 2]
+    assert_shape_equal(out_s3, expect, "Stride=3")
 
     # Test 3.4: Stride with padding
     var out_s2_pad = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, stride=2, padding=Padding("same")
     )
+    expect = [1, 1, 4, 4]
     assert_shape_equal(
-        out_s2_pad, List[Int](1, 1, 4, 4), "Stride=2 with same padding"
+        out_s2_pad, expect, "Stride=2 with same padding"
     )
 
     print("\n All stride tests passed!\n")
@@ -829,7 +838,8 @@ fn test_dilation_2() raises:
     var out_d1 = Conv2dFused[DType.float32].forward[track_grad=False](
         img, kernel, dilation=1
     )
-    assert_shape_equal(out_d1, List[Int](1, 1, 8, 8), "Dilation=1")
+    var expect: List[Int] = [1, 1, 8, 8]
+    assert_shape_equal(out_d1, expect, "Dilation=1")
 
     # Test 4.2: Dilation = 2 (effective kernel 5x5)
     var out_d2 = Conv2dFused[DType.float32].forward[track_grad=False](
@@ -837,7 +847,8 @@ fn test_dilation_2() raises:
     )
     # Effective kernel: 3 + (3-1)*1 = 5
     # Output: 10 - 5 + 1 = 6
-    assert_shape_equal(out_d2, List[Int](1, 1, 6, 6), "Dilation=2")
+    expect = [1, 1, 6, 6]
+    assert_shape_equal(out_d2, expect, "Dilation=2")
 
     # Test 4.3: Dilation = 3 (effective kernel 7x7)
     var out_d3 = Conv2dFused[DType.float32].forward[track_grad=False](
@@ -845,7 +856,8 @@ fn test_dilation_2() raises:
     )
     # Effective kernel: 3 + (3-1)*2 = 7
     # Output: 10 - 7 + 1 = 4
-    assert_shape_equal(out_d3, List[Int](1, 1, 4, 4), "Dilation=3")
+    expect = [1, 1, 4, 4]
+    assert_shape_equal(out_d3, expect, "Dilation=3")
 
     print("\n All dilation tests passed!\n")
 
@@ -1284,8 +1296,9 @@ fn test_edge_cases_2() raises:
     var out_1x1 = Conv2dFused[DType.float32].forward[track_grad=False](
         img_small, kernel_large
     )
+    var expect: List[Int] = [1, 1, 1, 1]
     assert_shape_equal(
-        out_1x1, List[Int](1, 1, 1, 1), "Kernel size = image size"
+        out_1x1, expect, "Kernel size = image size"
     )
 
     # Test 12.2: 1x1 kernel (pointwise convolution)
@@ -1294,7 +1307,8 @@ fn test_edge_cases_2() raises:
     var out_pw = Conv2dFused[DType.float32].forward[track_grad=False](
         img_pw, kernel_1x1
     )
-    assert_shape_equal(out_pw, List[Int](1, 16, 5, 5), "1x1 kernel (pointwise)")
+    expect = [1, 16, 5, 5]
+    assert_shape_equal(out_pw, expect, "1x1 kernel (pointwise)")
 
     # Test 12.3: Large batch
     var img_large_batch = Tensor[DType.float32].randn(32, 3, 8, 8)
@@ -1302,7 +1316,8 @@ fn test_edge_cases_2() raises:
     var out_lb = Conv2dFused[DType.float32].forward[track_grad=False](
         img_large_batch, kernel_lb
     )
-    assert_shape_equal(out_lb, List[Int](32, 8, 6, 6), "Large batch (32)")
+    expect = [32, 8, 6, 6]
+    assert_shape_equal(out_lb, expect, "Large batch (32)")
 
     # Test 12.4: Many channels
     var img_many_ch = Tensor[DType.float32].randn(1, 64, 4, 4)
@@ -1310,8 +1325,9 @@ fn test_edge_cases_2() raises:
     var out_many = Conv2dFused[DType.float32].forward[track_grad=False](
         img_many_ch, kernel_many
     )
+    expect= [1, 128, 3, 3]
     assert_shape_equal(
-        out_many, List[Int](1, 128, 3, 3), "Many channels (64128)"
+        out_many, expect, "Many channels (64128)"
     )
 
     print("\n All edge case tests passed!\n")

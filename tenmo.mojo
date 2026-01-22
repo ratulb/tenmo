@@ -679,7 +679,7 @@ struct Tensor[dtype: DType = DType.float32](
         for i in range(numels):
             buffer[i] = random_float64(min_f64, max_f64).cast[Self.dtype]()
 
-        var nd_buffer = NDBuffer[dtype](buffer^, shape)
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
     @staticmethod
@@ -953,7 +953,7 @@ struct Tensor[dtype: DType = DType.float32](
     @staticmethod
     fn d5(
         blockhive: List[Self.Blocks], requires_grad: Bool = False
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d5")
         dims = IntArray(
             len(blockhive),
