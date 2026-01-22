@@ -15,8 +15,8 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
     var keepdims: Bool
 
     fn backward(
-        self, read output: Tensor[dtype]
-    ) -> List[Tuple[Tensor[dtype], Gradbox[dtype], Int]]:
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         rank = ancestor.shape().rank()
@@ -24,11 +24,11 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
             return [(ancestor^, gradbox.copy(), AddTensor)]
         shape = ancestor.shape()
 
-        var grad_contrib: Gradbox[dtype]
+        var grad_contrib: Gradbox[Self.dtype]
 
         # Handle scalar gradient case (sum reduced to scalar)
         if gradbox.shape() == Shape():
-            grad_contrib = Gradbox[dtype].full(
+            grad_contrib = Gradbox[Self.dtype].full(
                 shape,
                 gradbox.item(),
                 share=False,
@@ -61,8 +61,8 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
             )
         ]
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -72,15 +72,15 @@ struct Summer[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        tensor: Tensor[dtype],
+        tensor: Tensor[Self.dtype],
         axes: IntArray,
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         shape = tensor.shape()
         reduction_axes = Validator.validate_and_normalize_axes(shape, axes)
         var nd_buffer = tensor.buffer.sum(reduction_axes, keepdims)
-        var out = Tensor[dtype](nd_buffer^, requires_grad=False)
+        var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 
         @parameter
         if track_grad:
@@ -88,7 +88,7 @@ struct Summer[dtype: DType](Copyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = SumBackward[dtype](
+                backward_fn = SumBackward[Self.dtype](
                     reduction_axes, keepdims
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)

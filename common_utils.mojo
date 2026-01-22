@@ -154,19 +154,19 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
     ]()
 
     @parameter
-    if dtype is DType.bfloat16:
+    if dtype == DType.bfloat16:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
         )
-    elif dtype is DType.float16:
+    elif dtype == DType.float16:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f16>`,
         )
-    elif dtype is DType.float32:
+    elif dtype == DType.float32:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f32>`,
         )
-    elif dtype is DType.float64:
+    elif dtype == DType.float64:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
         )
@@ -204,11 +204,11 @@ fn nan[dtype: DType]() -> Scalar[dtype]:
     ]()
 
     @parameter
-    if dtype is DType.float32:
+    if dtype == DType.float32:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
         )
-    elif dtype is DType.float64:
+    elif dtype == DType.float64:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
         )
