@@ -7,72 +7,72 @@ from buffers import Buffer
 struct Utils[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     @always_inline
-    fn log_scalar(s: Scalar[dtype]) -> Scalar[dtype]:
+    fn log_scalar(s: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
         return log(s)
 
     @staticmethod
     @always_inline
-    fn log_buffer(b: Buffer[dtype]) -> Buffer[dtype]:
+    fn log_buffer(b: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
         return b.log()
 
     @staticmethod
     @always_inline
     fn sum_buffer(
-        b: Buffer[dtype],
+        b: Buffer[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
-    ) -> Scalar[dtype]:
+    ) -> Scalar[Self.dtype]:
         return b.sum(start_index, end_index)
 
     @staticmethod
     @always_inline
-    fn sum_scalars(this: Scalar[dtype], that: Scalar[dtype]) -> Scalar[dtype]:
+    fn sum_scalars(this: Scalar[Self.dtype], that: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
         return this + that
 
     @staticmethod
     @always_inline
     fn product_buffer(
-        b: Buffer[dtype],
+        b: Buffer[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
-    ) -> Scalar[dtype]:
+    ) -> Scalar[Self.dtype]:
         return b.product(start_index, end_index)
 
     @staticmethod
     @always_inline
     fn product_scalars(
-        this: Scalar[dtype], that: Scalar[dtype]
-    ) -> Scalar[dtype]:
+        this: Scalar[Self.dtype], that: Scalar[Self.dtype]
+    ) -> Scalar[Self.dtype]:
         return this * that
 
     @staticmethod
     @always_inline
-    fn exp_buffer(b: Buffer[dtype]) -> Buffer[dtype]:
+    fn exp_buffer(b: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
         return b.exp()
 
     @staticmethod
     @always_inline
-    fn exp_scalar(s: Scalar[dtype]) -> Scalar[dtype]:
+    fn exp_scalar(s: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
         return exp(s)
 
     @staticmethod
     @always_inline
-    fn abs_buffer(b: Buffer[dtype]) -> Buffer[dtype]:
+    fn abs_buffer(b: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
         return b.__abs__()
 
     @staticmethod
     @always_inline
-    fn abs_scalar(s: Scalar[dtype]) -> Scalar[dtype]:
+    fn abs_scalar(s: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
         return s.__abs__()
 
     @staticmethod
     @always_inline
-    fn negate_buffer(b: Buffer[dtype]) -> Buffer[dtype]:
+    fn negate_buffer(b: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
         return -b
 
     @staticmethod
     @always_inline
-    fn negate_scalar(s: Scalar[dtype]) -> Scalar[dtype]:
+    fn negate_scalar(s: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
         return -s
 
     @staticmethod

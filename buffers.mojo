@@ -145,7 +145,8 @@ struct Buffer[dtype: DType = DType.float32](
         refcount_ptr[] = Atomic[DType.uint64](1)
 
         # Copy data after refcount
-        var new_data = new_alloc.offset(refcount_size).bitcast[
+        #var new_data = new_alloc.offset(refcount_size).bitcast[
+        var new_data = (new_alloc + refcount_size).bitcast[
             Scalar[Self.dtype]
         ]()
         memcpy(dest=new_data, src=self.data, count=self.size)

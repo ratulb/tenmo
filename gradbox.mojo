@@ -83,7 +83,7 @@ struct Gradbox[dtype: DType](
 
     fn __abs__(self) -> Gradbox[Self.dtype]:
         var buffer = self.buffer.map[
-            Utils[Self.dtype].abs_buffer, Utils[dtype].abs_scalar
+            Utils[Self.dtype].abs_buffer, Utils[Self.dtype].abs_scalar
         ]()
         var nd_buffer = NDBuffer[Self.dtype](buffer^, self.buffer.shape)
         return Gradbox[Self.dtype](nd_buffer^, share=False)
@@ -619,7 +619,7 @@ struct Gradbox[dtype: DType](
         )
 
     fn matmul(
-        A: Gradbox[Self.dtype], mut B: Tensor[dtype]
+        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         return Matmul[Self.dtype].forward(A, B)
 

@@ -341,7 +341,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                 var c_row_base = i * C_stride0 + C_offset
 
                 for j in range(p):
-                    var accumulator: Scalar[dtype] = 0
+                    var accumulator: Scalar[Self.dtype] = 0
 
                     for k in range(n):
                         var a_addr = a_row_base + k * A_stride1
@@ -565,7 +565,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                 var c_row_base = i * C_stride0
 
                 for j in range(p):
-                    var accumulator: Scalar[dtype] = 0
+                    var accumulator: Scalar[Self.dtype] = 0
 
                     for k in range(n):
                         var a_addr = a_row_base + k * A_stride1
@@ -709,7 +709,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         batch_dims_b = B_shape[:-2]
 
         out_shape = batch_shape + [m, n]
-        var C = Gradbox[dtype].zeros(out_shape, share=True)
+        var C = Gradbox[Self.dtype].zeros(out_shape, share=True)
 
         for indices in batch_shape:
             var A_indices = ShapeBroadcaster.broadcasted_indices(

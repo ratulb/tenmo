@@ -9,8 +9,8 @@ from common_utils import panic
 struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
     ImplicitlyCopyable
 ):
-    var shape: Pointer[Shape, shape_origin]
-    var strides: Pointer[Strides, strides_origin]
+    var shape: Pointer[Shape, Self.shape_origin]
+    var strides: Pointer[Strides, Self.strides_origin]
     var start_offset: Int
     var current_offset: Int
     var current_index: Int
