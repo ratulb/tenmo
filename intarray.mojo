@@ -577,7 +577,7 @@ struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
 
 @register_passable
 struct IntArrayIterator[
-    origin: Origin[False],
+    origin: ImmutOrigin,
     forward: Bool = True,
 ](Sized & Copyable):
     var index: Int
