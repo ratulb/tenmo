@@ -655,7 +655,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         batch_dims_b = B_shape[:-2]
 
         out_shape = batch_shape + [m, n]
-        C = Tensor[dtype].zeros(out_shape)
+        C = Tensor[Self.dtype].zeros(out_shape)
 
         for indices in batch_shape:
             A_indices = ShapeBroadcaster.broadcasted_indices(

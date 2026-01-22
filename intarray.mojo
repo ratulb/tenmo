@@ -617,8 +617,8 @@ struct IntArrayIterator[
 
 
 struct ZipIterator[
-    origin_this: Origin[False],
-    origin_that: Origin[False],
+    origin_this: ImmutOrigin,
+    origin_that: ImmutOrigin,
     forward: Bool = True,
 ](Sized & Copyable):
     var index: Int
