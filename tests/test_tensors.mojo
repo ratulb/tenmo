@@ -2015,6 +2015,7 @@ fn test_zero_grad() raises:
     a.zero_grad()
     assert_true(a.grad().item() == 0.0)
 
+
 fn test_transpose_grad() raises:
     print("test_transpose_grad")
     var a = Tensor.d2([[1, 2], [3, 4]], requires_grad=True)
@@ -3540,13 +3541,13 @@ fn test_vector_matrix_mm_backward_matrix() raises:
 
 fn test_vector_matrix_mm_batched_matrix() raises:
     print("test_vector_matrix_mm_batched_matrix")
-    var a = Tensor.d1([1, 2], requires_grad=True)  # shape (2,)
+    var a = Tensor.d1(d1([1, 2]), requires_grad=True)  # shape (2,)
     # b: batch of 2 matrices, each (2,2) ; shape (2, 2, 2)
     var b = Tensor.d3(
-        [
+        d3([
             [[1, 2], [3, 4]],  # batch 0, shape (2,2)
             [[5, 6], [7, 8]],  # batch 1, shape (2,2)
-        ],
+        ]),
         requires_grad=True,
     )
     var y = a.matmul(b)
@@ -3561,9 +3562,9 @@ fn test_vector_matrix_mm_batched_matrix() raises:
 
 fn test_vector_matrix_mm_backward_batched_matrix_vector_grad() raises:
     print("test_vector_matrix_mm_backward_batched_matrix_vector_grad")
-    var a = Tensor.d1([1, 2], requires_grad=True)  # shape (2,)
+    var a = Tensor.d1(d1([1, 2]), requires_grad=True)  # shape (2,)
     var b = Tensor.d3(
-        [[[1, 0], [0, 1]], [[2, 3], [4, 5]]],  # batch 0  # batch 1
+        d3([[[1, 0], [0, 1]], [[2, 3], [4, 5]]]),  # batch 0  # batch 1
         requires_grad=False,
     )  # shape (2,2,2)
     var y = a.matmul(b)  # shape (2,2)
@@ -3571,22 +3572,22 @@ fn test_vector_matrix_mm_backward_batched_matrix_vector_grad() raises:
     s.backward()
     # grad wrt vector = sum across batch of column-sums
     # batch0 column sums = [1,1]; batch1 column sums = [6,8]; total = [7,9]
-    var expected_grad = Tensor.d1([6, 10])
+    var expected_grad = Tensor.d1(d1([6, 10]))
     assert_true(a.grad().all_close(expected_grad))
 
 
 fn test_vector_matrix_mm_backward_batched_matrix_matrix_grad() raises:
     print("test_vector_matrix_mm_backward_batched_matrix_matrix_grad")
-    var a = Tensor.d1([3, 4], requires_grad=False)  # shape (2,)
+    var a = Tensor.d1(d1([3, 4]), requires_grad=False)  # shape (2,)
     var b = Tensor.d3(
-        [[[1, 2], [3, 4]], [[5, 6], [7, 8]]], requires_grad=True
+        d3([[[1, 2], [3, 4]], [[5, 6], [7, 8]]]), requires_grad=True
     )  # shape (2,2,2)
     var y = a.matmul(b)  # shape (2,2)
-    # var y1 = a1.matmul_nd(b1)  # shape (2,2)
+    # var y1 = a1.matmul(b1)  # shape (2,2)
     var s = y.sum()
     s.backward()
     # grad wrt b = outer(a, ones(cols)) broadcast across each batch slice
-    var expected_grad = Tensor.d3([[[3, 3], [4, 4]], [[3, 3], [4, 4]]])
+    var expected_grad = Tensor.d3(d3([[[3, 3], [4, 4]], [[3, 3], [4, 4]]]))
     assert_true(b.grad().all_close(expected_grad))
 
 
@@ -3682,67 +3683,69 @@ fn test_max_min_mixed() raises:
     )
 
     # Test 8: Edge case - all same values
-    var c = Tensor.d2([[5.0, 5.0], [5.0, 5.0]], requires_grad=True)
+    var c = Tensor.d2(d2([[5.0, 5.0], [5.0, 5.0]]), requires_grad=True)
 
     var max_same = c.max(IntArray(1))
-    assert_true(max_same.all_close(Tensor.d1([5.0, 5.0])))
+    assert_true(max_same.all_close(Tensor.d1(d1([5.0, 5.0]))))
     max_same.backward()
-    assert_true(c.grad().all_close(Tensor.d2([[0.5, 0.5], [0.5, 0.5]])))
+    assert_true(c.grad().all_close(Tensor.d2(d2([[0.5, 0.5], [0.5, 0.5]]))))
 
     # Test 9: Edge case - negative infinity
-    var d = Tensor.d2([[-3.4028235e38, 0.0], [1.0, 2.0]], requires_grad=True)
+    var d = Tensor.d2(
+        d2([[-3.4028235e38, 0.0], [1.0, 2.0]]), requires_grad=True
+    )
 
     var max_with_inf = d.max(IntArray(1))
-    assert_true(max_with_inf.all_close(Tensor.d1([0.0, 2.0])))
+    assert_true(max_with_inf.all_close(Tensor.d1(d1([0.0, 2.0]))))
     max_with_inf.backward()
-    assert_true(d.grad().all_close(Tensor.d2([[0.0, 1.0], [0.0, 1.0]])))
+    assert_true(d.grad().all_close(Tensor.d2(d2([[0.0, 1.0], [0.0, 1.0]]))))
 
     # Test 10: Keep dimensions
-    var e = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var e = Tensor.d2(d2([[1.0, 2.0], [3.0, 4.0]]), requires_grad=True)
 
     var max_keepdim = e.max(IntArray(1), keepdims=True)
-    assert_true(max_keepdim.all_close(Tensor.d2([[2.0], [4.0]])))
+    assert_true(max_keepdim.all_close(Tensor.d2(d2([[2.0], [4.0]]))))
     max_keepdim.backward()
-    assert_true(e.grad().all_close(Tensor.d2([[0.0, 1.0], [0.0, 1.0]])))
+    assert_true(e.grad().all_close(Tensor.d2(d2([[0.0, 1.0], [0.0, 1.0]]))))
 
 
 fn test_max_min() raises:
     print("test_max_min")
     a = Tensor.d2(
-        [[42.0, 0.0, -5.0], [0.0, 35.0, 0.0], [51.0, 0.0, 51.0]],
+        d2([[42.0, 0.0, -5.0], [0.0, 35.0, 0.0], [51.0, 0.0, 51.0]]),
         requires_grad=True,
     )
 
     max_result = a.max(IntArray(1))
-    expected = Tensor.d1([42.0, 35.0, 51.0])
+    expected = Tensor.d1(d1([42.0, 35.0, 51.0]))
     assert_true(max_result.all_close(expected))
 
     max_result.backward()
     assert_true(
         a.grad().all_close(
-            Tensor.d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.5, 0.0, 0.5]])
+            Tensor.d2(d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.5, 0.0, 0.5]]))
         )
     )
     min_result = a.min([1])
-    assert_true(min_result.all_close(Tensor.d1([-5.0, 0.0, 0.0])))
+    assert_true(min_result.all_close(Tensor.d1(d1([-5.0, 0.0, 0.0]))))
     min_result.backward()
 
     assert_true(
         a.grad().all_close(
-            Tensor.d2([[1.0, 0.0, 1.0], [0.5, 1.0, 0.5], [0.5, 1.0, 0.5]])
+            Tensor.d2(d2([[1.0, 0.0, 1.0], [0.5, 1.0, 0.5], [0.5, 1.0, 0.5]]))
         )
     )
 
 
 fn test_mask() raises:
     print("test_mask")
-    a = Tensor.arange(2 * 3)
+    a = Tensor.arange(Scalar[DType.float32](2 * 3))
     r = a.reshape(2, 3)
     mask = r != 2
     converted = mask.float64()
 
     assert_true(
-        (converted == Tensor.d2([[1.0, 1.0, 0.0], [1.0, 1.0, 1.0]])),
+        (converted == Tensor.d2(d2([[1.0, 1.0, 0.0], [1.0, 1.0, 1.0]]))),
         "Mask assertion failed",
     )
 
@@ -3765,53 +3768,57 @@ fn test_randint() raises:
 
 fn test_slice_single_axis() raises:
     print("test_slice_single_axis")
-    x = Tensor.arange(0, 12)
+    x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](12))
     r = x.reshape([3, 4])
 
     y = r.slice(1, 3)  # slice along axis 0 (rows 1..2)
     z = r.slice(0, 4, 2, 1)  # slice along axis 1 (cols 0,2)
 
     assert_true(
-        (y == Tensor.d2([[4.0, 5.0, 6.0, 7.0], [8.0, 9.0, 10.0, 11.0]]).float())
+        (y == Tensor.d2(d2([[4.0, 5.0, 6.0, 7.0], [8.0, 9.0, 10.0, 11.0]])))
     )
-    assert_true((z == Tensor.d2([[0.0, 2.0], [4.0, 6.0], [8.0, 10.0]]).float()))
+    assert_true((z == Tensor.d2(d2([[0.0, 2.0], [4.0, 6.0], [8.0, 10.0]]))))
 
 
 fn test_slice_single_axis_positive() raises:
     print("test_slice_single_axis_positive")
-    var x = Tensor.arange(0, 10)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](10))
     r = x.reshape([10])
     var y = r.slice(axes=[0], starts=[2], ends=[7])
-    assert_true((y == Tensor.arange(2, 7)))
+    assert_true(
+        (y == Tensor.arange(Scalar[DType.float32](2), Scalar[DType.float32](7)))
+    )
 
 
 fn test_slice_single_axis_negative_indices() raises:
     print("test_slice_single_axis_negative_indices")
-    var x = Tensor.arange(0, 10)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](10))
     r = x.reshape([10])
     var y = r.slice(axes=[0], starts=[-7], ends=[-2])
-    assert_true((y == Tensor.arange(3, 8)))
+    assert_true(
+        (y == Tensor.arange(Scalar[DType.float32](3), Scalar[DType.float32](8)))
+    )
 
 
 fn test_slice_single_axis_step_greater_than_1() raises:
     print("test_slice_single_axis_step_greater_than_1")
-    var x = Tensor.arange(0, 10)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](10))
     r = x.reshape([10])
     var y = r.slice(axes=[0], starts=[1], ends=[9], steps=[2])
-    assert_true((y == Tensor([1, 3, 5, 7])))
+    assert_true((y == Tensor.d1(d1([1, 3, 5, 7]))))
 
 
 fn test_slice_single_axis_step_negative() raises:
     print("test_slice_single_axis_step_negative")
-    var x = Tensor.arange(0, 10)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](10))
     r = x.reshape([10])
     var y = r.slice(axes=[0], starts=[8], ends=[2], steps=[-2])
-    assert_true((y == Tensor([8, 6, 4])))
+    assert_true((y == Tensor.d1(d1([8, 6, 4]))))
 
 
 fn test_slice_single_axis_full_axis() raises:
     print("test_slice_single_axis_full_axis")
-    var x = Tensor.arange(0, 5)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](5))
     r = x.reshape([5])
     var y = r.slice(axes=[0], starts=[0], ends=[5])
     assert_true((y == r))
@@ -3819,10 +3826,10 @@ fn test_slice_single_axis_full_axis() raises:
 
 fn test_slice_single_axis_single_element() raises:
     print("test_slice_single_axis_single_element")
-    var x = Tensor.arange(0, 5)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](5))
     r = x.reshape([5])
     var y = r.slice(axes=[0], starts=[2], ends=[3])
-    assert_true((y == Tensor([2])))
+    assert_true((y == Tensor.d1(d1([2]))))
 
 
 # ===================== MULTI-AXIS SLICES =====================
@@ -3830,46 +3837,61 @@ fn test_slice_single_axis_single_element() raises:
 
 fn test_slice_multi_axis_basic() raises:
     print("test_slice_multi_axis_basic")
-    var x = Tensor.arange(0, 24)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](24))
     r = x.reshape([4, 6])
     var y = r.slice(axes=[0, 1], starts=[1, 2], ends=[3, 5])
-    assert_true((y == Tensor.d2([[8, 9, 10], [14, 15, 16]])))
+    assert_true((y == Tensor.d2(d2([[8, 9, 10], [14, 15, 16]]))))
 
 
 fn test_slice_multi_axis_negative_indices() raises:
     print("test_slice_multi_axis_negative_indices")
-    var x = Tensor.arange(0, 24)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](24))
     r = x.reshape([4, 6])
     var y = r.slice(axes=[0, 1], starts=[-3, -4], ends=[-1, -1])
-    assert_true((y == Tensor.d2([[8, 9, 10], [14, 15, 16]])))
+    assert_true((y == Tensor.d2(d2([[8, 9, 10], [14, 15, 16]]))))
 
 
 fn test_slice_multi_axis_step() raises:
     print("test_slice_multi_axis_step")
-    var x = Tensor.arange(0, 24)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](24))
     r = x.reshape([4, 6])
     var y = r.slice(axes=[0, 1], starts=[0, 0], ends=[4, 6], steps=[2, 3])
-    assert_true((y == Tensor.d2([[0, 3], [12, 15]])))
+    assert_true((y == Tensor.d2(d2([[0, 3], [12, 15]]))))
 
 
 fn test_slice_multi_axis_mixed() raises:
     print("test_slice_multi_axis_mixed")
-    var x = Tensor.arange(0, 24)
+    var x = Tensor.arange(Scalar[DType.float32](0), Scalar[DType.float32](24))
     r = x.reshape([4, 6])
     var y = r.slice(axes=[0, 1], starts=[3, 5], ends=[0, 0], steps=[-1, -2])
-    var expected = Tensor.d2([[23, 21, 19], [17, 15, 13], [11, 9, 7]])
+    var expected = Tensor.d2(d2([[23.0, 21, 19], [17, 15, 13], [11, 9, 7]]))
     assert_true((y == expected))
 
     assert_true(
-        (y.transpose() == Tensor.d2([[23, 17, 11], [21, 15, 9], [19, 13, 7]]))
+        (
+            y.transpose()
+            == Tensor.d2(d2([[23, 17, 11], [21, 15, 9], [19, 13, 7]]))
+        )
     )
+
+
+fn d3(l: List[List[List[Float32]]]) -> List[List[List[Scalar[DType.float32]]]]:
+    return List[List[List[Scalar[DType.float32]]]](l)
+
+
+fn d2(l: List[List[Float32]]) -> List[List[Scalar[DType.float32]]]:
+    return List[List[Scalar[DType.float32]]](l)
 
 
 fn test_repeat_1d_axis0() raises:
     print("test_repeat_1d_axis0")
-    var a = Tensor.d1([10, 20, 30])
+    var a = Tensor.d1(d1([10.0, 20, 30]))
     var r = a.repeat([2])
-    assert_true((r == Tensor.d1([10, 20, 30, 10, 20, 30])))
+    assert_true((r == Tensor.d1(d1([10.0, 20, 30, 10, 20, 30]))))
+
+
+fn d1(l: List[Float32]) -> List[Scalar[DType.float32]]:
+    return List[Scalar[DType.float32]](l)
 
 
 fn test_repeat_backward_simple() raises:
@@ -4016,69 +4038,80 @@ fn test_tile_single_axis_repeat_one() raises:
 
 fn test_tile_edge_empty_tensor() raises:
     print("test_tile_edge_empty_tensor")
-    var a = Tensor.d1([]).float()
+    var l: List[Scalar[DType.float32]] = []
+    var a = Tensor.d1(l).float()
     var t = a.tile([3])
     assert_true(t.numels() == 0)
 
 
 fn test_tile_multi_axis_edge_case() raises:
     print("test_tile_multi_axis_edge_case")
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var d2: List[List[Scalar[DType.float32]]] = [[1.0, 2.0], [3.0, 4.0]]
+    var a = Tensor.d2(d2)
     var t = a.tile([0, 3])
     assert_true(t.numels() == 0)
 
 
 fn test_flatten_forward_contiguous_1d() raises:
     print("test_flatten_forward_contiguous_1d")
-    var a = Tensor.d1([1.0, 2.0, 3.0]).float()
+    var d1: List[Scalar[DType.float32]] = [1.0, 2.0, 3.0]
+    var a = Tensor.d1(d1).float()
     var f = a.flatten()
-    assert_true((f == Tensor.d1([1.0, 2.0, 3.0]).float()))
+    var expected: List[Scalar[DType.float32]] = [1.0, 2.0, 3.0]
+    assert_true((f == Tensor.d1(expected)))
 
 
 fn test_flatten_forward_contiguous_2d() raises:
     print("test_flatten_forward_contiguous_2d")
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]]).float()
+    var d2: List[List[Scalar[DType.float32]]] = [[1.0, 2.0], [3.0, 4.0]]
+    var a = Tensor.d2(d2)
     var f = a.flatten()
-    assert_true((f == Tensor.d1([1.0, 2.0, 3.0, 4.0]).float()))
+    var d1: List[Scalar[DType.float32]] = [1.0, 2.0, 3.0, 4.0]
+    assert_true((f == Tensor.d1(d1)))
 
 
 fn test_flatten_backward_contiguous() raises:
     print("test_flatten_backward_contiguous")
-    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True).float()
+    var d2: List[List[Scalar[DType.float32]]] = [[1.0, 2.0], [3.0, 4.0]]
+    var a = Tensor.d2(d2, requires_grad=True)
     var f = a.flatten()
     var loss = f.sum()
     loss.backward()
     # each element contributes once, so gradient should be 1 everywhere
-    assert_true(
-        (a.grad().all_close(Tensor.d2([[1.0, 1.0], [1.0, 1.0]]).float()))
-    )
+    d2 = [[1.0, 1.0], [1.0, 1.0]]
+    assert_true((a.grad().all_close(Tensor.d2(d2))))
 
 
 fn test_flatten_forward_view_slice() raises:
     print("test_flatten_forward_view_slice")
-    var a = Tensor.d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).float()
+    var d2: List[List[Scalar[DType.float32]]] = [
+        [1.0, 2.0, 3.0],
+        [4.0, 5.0, 6.0],
+    ]
+    var a = Tensor.d2(d2)
     var v = a.slice(0, 1)  # take first row: [[1,2,3]]
     var f = v.flatten()
-    assert_true((f == Tensor.d1([1.0, 2.0, 3.0]).float()))
+    var d1: List[Scalar[DType.float32]] = [1.0, 2.0, 3.0]
+    assert_true((f == Tensor.d1(d1)))
 
 
 fn test_flatten_backward_view_slice() raises:
     print("test_flatten_backward_view_slice")
-    var a = Tensor.d2(
-        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
-    ).float()
+    var d2: List[List[Scalar[DType.float32]]] = [
+        [1.0, 2.0, 3.0],
+        [4.0, 5.0, 6.0],
+    ]
+    var a = Tensor.d2(d2, requires_grad=True).float()
     var v = a.slice(0, 1)  # first row
     var f = v.flatten()
     var loss = f.sum()
     loss.backward()
     # only first row gets gradient ones, second row untouched
-    assert_true(
-        (
-            a.grad().all_close(
-                Tensor.d2([[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]).float()
-            )
-        )
-    )
+    var expect: List[List[Scalar[DType.float32]]] = [
+        [1.0, 1.0, 1.0],
+        [0.0, 0.0, 0.0],
+    ]
+    assert_true((a.grad().all_close(Tensor.d2(expect))))
 
 
 fn test_flatten_backward_non_contiguous_stride() raises:
@@ -4345,13 +4378,14 @@ fn test_flatten_gradient_correctness() raises:
 
 fn test_shuffle() raises:
     print("test_shuffle")
-    perm = List(2, 3, 0, 4, 1)
-    a = Tensor.arange(5, requires_grad=True)
+    var perm: List[Int] = [2, 3, 0, 4, 1]
+    a = Tensor.arange(Scalar[DType.float32](5), requires_grad=True)
     shuffled = a.shuffle(perm=perm)
     sliced = shuffled[1:4]
     c = sliced * 42
     c.backward()
-    expected = Tensor.d1([42.0, 0.0, 0.0, 42.0, 42.0]).float()
+    var l: List[Scalar[DType.float32]] = [42.0, 0.0, 0.0, 42.0, 42.0]
+    expected = Tensor.d1(l)
     assert_true(a.grad().all_close(expected))
 
 
@@ -4361,36 +4395,63 @@ fn test_fill() raises:
     a.fill(42)
     v = a.view(shape=[3], offset=2)
     v.fill(99)
-    assert_true((v == Tensor.d1([99, 99, 99])), "view fill assertion failed")
+    var _v: List[Scalar[DType.float32]] = [99, 99, 99]
+    assert_true((v == Tensor.d1(_v)), "view fill assertion failed")
+    var _a: List[Scalar[DType.float32]] = [
+        42,
+        42,
+        99,
+        99,
+        99,
+        42,
+        42,
+        42,
+        42,
+        42,
+    ]
     assert_true(
-        (a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 42, 42, 42])),
+        (a == Tensor.d1(_a)),
         "view fill propagation1 to parent failed",
     )
     v1 = a.view(shape=[2, 5])
     v2 = v1[il(1), s(2, None, 2)]
     v2.fill(101)
 
+    _a = [42, 42, 99, 99, 99, 42, 42, 101, 42, 101]
     assert_true(
-        (a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 101, 42, 101])),
+        (a == Tensor.d1(_a)),
         "view fill propagation2 to parent failed",
     )
     assert_true(
         (v.sum_all() == 3 * 99) and (v2.sum_all() == 2 * 101),
         "fill sum_all assertion failed for views",
     )
-    b = Tensor.d1([1919, 1919])
+    var _b: List[Scalar[DType.float32]] = [1919, 1919]
+    b = Tensor.d1(_b)
 
     v2.fill(b, s())
 
+    var l: List[Scalar[DType.float32]] = [
+        42,
+        42,
+        99,
+        99,
+        99,
+        42,
+        42,
+        1919,
+        42,
+        1919,
+    ]
     assert_true(
-        (a == Tensor.d1([42, 42, 99, 99, 99, 42, 42, 1919, 42, 1919])),
+        (a == Tensor.d1(l)),
         "view set propagation to parent failed",
     )
 
 
 fn test_element_at() raises:
     print("test_element_at")
-    a = Tensor.arange(10)
+    a = Tensor.arange(Scalar[DType.float32](10))
     v = a[s(2, 8, 2)]
     assert_true(
         v.max_index() == 6 and v.element_at(-4) == 2,
@@ -4399,7 +4460,9 @@ fn test_element_at() raises:
 
 
 fn test_argmin_max() raises:
-    a = Tensor.d1([1, 4, -9, 2, 10, 8])
+    comptime dtype = DType.float32
+    var l: List[Scalar[dtype]] = [1, 4, -9, 2, 10, 8]
+    a = Tensor.d1(l)
     v = a.view(shape=[4], offset=2)
     assert_true(
         (a.argmax(0) == Tensor[DType.int32].scalar(4)),
@@ -4486,8 +4549,13 @@ fn test_complex_mixed_ops_backward() raises:
 fn test_view_chain_with_hidden_elements() raises:
     print("=== Mojo: View chain with hidden elements ===")
 
+    var l: List[List[Scalar[DType.float32]]] = [
+        [1, 2, 3, 4, 5, 6],
+        [7, 8, 9, 10, 11, 12],
+        [13, 14, 15, 16, 17, 18],
+    ]
     var a = Tensor.d2(
-        [[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], [13, 14, 15, 16, 17, 18]],
+        l,
         requires_grad=True,
     )
 
@@ -4497,22 +4565,22 @@ fn test_view_chain_with_hidden_elements() raises:
     var result = v2.sum()
     result.backward()
 
-    expected = Tensor.d2(
-        [[0, 0, 1, 1, 0, 1], [1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]
-    )
+    l = [[0, 0, 1, 1, 0, 1], [1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]
+    expected = Tensor.d2(l)
 
     assert_true(a.grad() == expected)
 
 
 fn test_gradient_flow_through_views() raises:
     print("=== Testing Gradient Flow Through View Chain ===")
-    var a = Tensor.d2([[1, 2, 3, 4], [5, 6, 7, 8]], requires_grad=True)
+    var l: List[List[Scalar[DType.float32]]] = [[1, 2, 3, 4], [5, 6, 7, 8]]
+    var a = Tensor.d2(l, requires_grad=True)
     var v1 = a.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=1)
     var v2 = v1.view(shape=Shape(1, 2), strides=Strides(2, 1), offset=3)
     var result = v2.sum()
     result.backward()
-
-    var expected = Tensor.d2([[0, 0, 0, 1], [1, 0, 0, 0]])
+    l = [[0, 0, 0, 1], [1, 0, 0, 0]]
+    var expected = Tensor.d2(l)
     assert_true(a.grad() == expected)
 
 
