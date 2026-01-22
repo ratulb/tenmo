@@ -94,7 +94,7 @@ struct Tanh[dtype: DType]:
         return out^
 
     @staticmethod
-    fn tanh_stable(x: Scalar[Self.dtype]) -> Scalar[dtype]:
+    fn tanh_stable(x: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
         """
         More numerically stable tanh implementation.
         """

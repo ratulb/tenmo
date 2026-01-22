@@ -67,7 +67,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable):
                     grad_input_shape_dims.append(grad_shape[d])
 
             var grad_input_shape = Shape(grad_input_shape_dims)
-            var grad_input = Gradbox[dtype].zeros(grad_input_shape)
+            var grad_input = Gradbox[Self.dtype].zeros(grad_input_shape)
             var grad_input_data = grad_input.buffer.buffer.data
 
             # ===== EXTRACT SLICE: grad_output[..., tensor_idx, ...] =====
@@ -90,8 +90,8 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable):
 
         return result^
 
-    fn into_backward_fn(self) -> BackwardFn[dtype]:
-        return BackwardFn[dtype](Delegate[dtype](self), Self.TAG)
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -146,7 +146,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable):
             panic("Axis out of bounds for stack")
 
         # ===== 2. UNSQUEEZE: Add dimension at stack_axis to each tensor =====
-        var expanded_tensors = List[Tensor[dtype]]()
+        var expanded_tensors = List[Tensor[Self.dtype]]()
 
         for i in range(len(tensors)):
             var to_be_expanded = tensors[i]
@@ -182,7 +182,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable):
         track_grad: Bool = True
     ](
         tensors: List[Tensor[Self.dtype]], requires_grad: Optional[Bool] = None
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         """
         Stack tensors vertically (row-wise).
 
@@ -212,7 +212,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable):
         # Special case: 1D tensors
         if first_ndim == 1:
             # Reshape each (N,) → (1, N) then concatenate
-            var reshaped = List[Tensor[dtype]]()
+            var reshaped = List[Tensor[Self.dtype]]()
             for i in range(len(tensors)):
                 var tensor = tensors[i]
                 var size = tensor.shape()[0]
