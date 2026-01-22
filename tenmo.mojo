@@ -1661,7 +1661,11 @@ struct Tensor[dtype: DType = DType.float32](
             var ready_queue = Deque[UInt](capacity=graph_size)
             ready_queue.append(output.id())
             while len(ready_queue) > 0:
-                var node_id = ready_queue.popleft()
+                var node_id: UInt = 0
+                try:
+                    node_id = ready_queue.popleft()
+                except key_err:
+                    panic(key_err.__str__())
                 var node_idx = id_to_index[node_id]
                 ref node = node_list[node_idx]
 
