@@ -5,6 +5,8 @@ from math import exp, log10, ceil, tanh, sqrt
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
 from os.atomic import Atomic, Consistency, fence
+from builtin.device_passable import DevicePassable
+from gpu.host import DeviceBuffer, HostBuffer
 from operators import (
     Multiply,
     Add,
@@ -39,6 +41,7 @@ struct Buffer[dtype: DType = DType.float32](
     & Writable
     & Representable
     & Absable
+    & DevicePassable
 ):
 
     """
@@ -80,6 +83,23 @@ struct Buffer[dtype: DType = DType.float32](
             else:
                 self.data = alloc[Scalar[Self.dtype]](size)
 
+    @staticmethod
+    fn get_type_name() -> String:
+        return String(
+            "Buffer[dtype = ",
+            Self.dtype,
+            "]",
+        )
+
+    comptime device_type: AnyType = Self
+
+    @staticmethod
+    fn get_device_type_name() -> String:
+        return Self.get_type_name()
+
+    fn _to_device_type(self, target: MutOpaquePointer[_]):
+        target.bitcast[Self.device_type]()[] = self
+
     fn __init__(out self, elems: List[Scalar[Self.dtype]]):
         var length = len(elems)
         self.data = alloc[Scalar[Self.dtype]](length)
@@ -89,6 +109,38 @@ struct Buffer[dtype: DType = DType.float32](
         self._refcount = UnsafePointer[
             Atomic[DType.uint64], MutAnyOrigin
         ]()  # Null
+
+    fn __init__(
+        out self,
+        size: Int,
+        device_buffer: DeviceBuffer[Self.dtype],
+    ):
+        self.size = size
+        self._refcount = UnsafePointer[
+            Atomic[DType.uint64], MutAnyOrigin
+        ]()  # Null
+        self.external = True
+        self.data = (
+            device_buffer.unsafe_ptr()
+            .mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+
+    fn __init__(
+        out self,
+        size: Int,
+        host_buffer: HostBuffer[Self.dtype],
+    ):
+        self.size = size
+        self._refcount = UnsafePointer[
+            Atomic[DType.uint64], MutAnyOrigin
+        ]()  # Null
+        self.external = True
+        self.data = (
+            host_buffer.unsafe_ptr()
+            .mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
     fn __init__(
         out self,
@@ -145,10 +197,8 @@ struct Buffer[dtype: DType = DType.float32](
         refcount_ptr[] = Atomic[DType.uint64](1)
 
         # Copy data after refcount
-        #var new_data = new_alloc.offset(refcount_size).bitcast[
-        var new_data = (new_alloc + refcount_size).bitcast[
-            Scalar[Self.dtype]
-        ]()
+        # var new_data = new_alloc.offset(refcount_size).bitcast[
+        var new_data = (new_alloc + refcount_size).bitcast[Scalar[Self.dtype]]()
         memcpy(dest=new_data, src=self.data, count=self.size)
 
         # Free old allocation
@@ -230,6 +280,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn __iter__(ref self) -> ElementIterator[Self.dtype, origin_of(self)]:
         return ElementIterator(Pointer(to=self))
+
     @always_inline
     fn __getitem__(self, slice: Slice) -> Buffer[Self.dtype]:
         var start, end, step = slice.indices(len(self))
@@ -1001,7 +1052,9 @@ struct Buffer[dtype: DType = DType.float32](
         elif op_code == Exp:
             return exp(block)
         elif op_code == Log:
-            return log10(block)  * 2.3025850929 # Upcoming 26.1 does not recognize 'log' here
+            return (
+                log10(block) * 2.3025850929
+            )  # Upcoming 26.1 does not recognize 'log' here
         elif op_code == SqrtForwardOp:
             return sqrt(block)
         elif op_code == SqrtBackwardOp:
@@ -2324,3 +2377,7 @@ struct ElementIterator[
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index
+
+
+fn main():
+    pass
