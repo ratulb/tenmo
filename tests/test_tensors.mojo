@@ -3742,7 +3742,7 @@ fn test_mask() raises:
     a = Tensor.arange(Scalar[DType.float32](2 * 3))
     r = a.reshape(2, 3)
     mask = r != 2
-    converted = mask.float64()
+    converted = mask.float()
 
     assert_true(
         (converted == Tensor.d2(d2([[1.0, 1.0, 0.0], [1.0, 1.0, 1.0]]))),

@@ -13,7 +13,8 @@ fn test_relu_basic() raises:
     var t = Tensor[dtype].d1([-1.0, 0.0, 1.0, 2.0])
     t.requires_grad_(True)
     var out = ReLU[dtype].forward[True](t)
-    out.sum().backward()
+    s = out.sum()
+    s.backward()
 
     assert_true(out == Tensor[dtype].d1([0.0, 0.0, 1.0, 2.0]))
     assert_true(t.grad() == Tensor[dtype].d1([0.0, 0.0, 1.0, 1.0]))
@@ -38,7 +39,8 @@ fn test_relu_multidim() raises:
     ]))
 
     # Backward on sum of outputs
-    out.sum().backward()
+    s = out.sum()
+    s.backward()
 
     # Gradient should be 1 where input > 0, else 0
     var expected_grad = Tensor[dtype].d2([
