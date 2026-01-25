@@ -1,17 +1,12 @@
 from memory import AddressSpace
+from builtin.device_passable import DevicePassable
+from gpu.host import DeviceBuffer, HostBuffer
 
 
 struct Buffer[
     dtype: DType = DType.float32,
     address_space: AddressSpace = AddressSpace.GENERIC,
-](
-    ImplicitlyCopyable
-    & Movable
-    & Sized
-    # & Stringable
-    # & Writable
-    # & Representable
-):
+](ImplicitlyCopyable & Movable & Sized & Stringable & Writable & Representable):
     var data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]
 
     fn __init__(out self):
@@ -31,9 +26,32 @@ struct Buffer[
     fn get_device_type_name() -> String:
         return Self.get_type_name()
 
+    fn _to_device_type(self, target: MutOpaquePointer[_]):
+        target.bitcast[Self.device_type]()[] = self
+
     fn __init__(out self, elem: Scalar[Self.dtype]):
         self.data = alloc[Scalar[Self.dtype]](1)
         self.data[0] = elem
+
+    fn __init__(
+        out self,
+        device_buffer: DeviceBuffer[Self.dtype],
+    ):
+        self.data = (
+            device_buffer.unsafe_ptr()
+            .mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+
+    fn __init__(
+        out self,
+        host_buffer: HostBuffer[Self.dtype],
+    ):
+        self.data = (
+            host_buffer.unsafe_ptr()
+            .mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
     # ========================================
     # Copy/Move semantics
@@ -77,6 +95,19 @@ struct Buffer[
         var out = Buffer[Self.dtype]()
         out.set(self.get() + other.get())
         return out^
+
+    @no_inline
+    fn __str__(self) -> String:
+        return String.write(self)
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write("Buffer[")
+        writer.write(self.get())
+        writer.write(", dtype=", self.dtype, "]")
+
+    @no_inline
+    fn __repr__(self) -> String:
+        return self.__str__()
 
 
 fn main() raises:
