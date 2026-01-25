@@ -23,5 +23,5 @@ def main():
     )
     ctx.synchronize()
 
-    #with a.map_to_host() as out_buf_host:
-        #print("out:", out_buf_host)
+    with a.map_to_host() as out_buf_host:
+        print("out:", out_buf_host)

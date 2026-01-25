@@ -11,7 +11,7 @@ from ndbuffer import NDBuffer
 
 
 @register_passable
-struct Reduction(Copyable, EqualityComparable, ImplicitlyCopyable):
+struct Reduction(Copyable, Equatable, ImplicitlyCopyable):
     var reduction: Int
     comptime Mean = Reduction(0)
     comptime Sum = Reduction(1)

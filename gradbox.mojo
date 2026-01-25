@@ -25,7 +25,7 @@ struct Gradbox[dtype: DType](
     & Stringable
     & Representable
     & Writable
-    & EqualityComparable
+    & Equatable
     & Absable
 ):
     var buffer: NDBuffer[Self.dtype]

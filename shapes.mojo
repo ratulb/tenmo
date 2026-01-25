@@ -4,7 +4,7 @@ from intarray import IntArray
 
 @register_passable
 struct Shape(
-    EqualityComparable,
+    Equatable,
     ImplicitlyCopyable,
     Movable,
     Representable,

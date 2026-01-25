@@ -39,7 +39,7 @@ struct Tensor[dtype: DType = DType.float32](
     & Representable
     & Writable
     & Absable
-    & EqualityComparable
+    & Equatable
     & ImplicitlyCopyable
 ):
     comptime Row = List[Scalar[Self.dtype]]

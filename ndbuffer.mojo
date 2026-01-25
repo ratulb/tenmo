@@ -28,7 +28,7 @@ from operators import (
 struct NDBuffer[dtype: DType](
     ImplicitlyCopyable
     & Movable
-    & EqualityComparable
+    & Equatable
     & Stringable
     & Representable
     & Writable
