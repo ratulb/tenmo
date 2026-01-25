@@ -129,6 +129,12 @@ struct Tensor[dtype: DType = DType.float32](
         else:
             return Gradbox[Self.dtype](self^.buffer^, share=share)
 
+    fn as_list(self) -> List[Scalar[Self.dtype]]:
+        var count = self.numels()
+        var tensor_data = List[Scalar[Self.dtype]](capacity=count)
+        memcpy(dest=tensor_data._data, src=self.buffer.buffer.data, count=count)
+        return tensor_data^
+
     fn __moveinit__(out self, deinit other: Self):
         self._id = other._id
         self.buffer = other.buffer^
@@ -581,7 +587,8 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn unsafe_ptr[
         mut: Bool,
-        origin: Origin[mut], //,
+        origin: Origin[mut],
+        //,
     ](ref [origin]self) -> UnsafePointer[Self, origin]:
         return (
             UnsafePointer(to=self).mut_cast[mut]().unsafe_origin_cast[origin]()
