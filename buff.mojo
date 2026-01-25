@@ -6,7 +6,15 @@ from gpu.host import DeviceBuffer, HostBuffer
 struct Buffer[
     dtype: DType = DType.float32,
     address_space: AddressSpace = AddressSpace.GENERIC,
-](ImplicitlyCopyable & Movable & Sized & Stringable & Writable & Representable):
+](
+    ImplicitlyCopyable
+    & Movable
+    & Sized
+    & Stringable
+    & Writable
+    & Representable
+    & DevicePassable
+):
     var data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]
 
     fn __init__(out self):
