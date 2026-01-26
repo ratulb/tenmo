@@ -1,6 +1,7 @@
 from memory import AddressSpace
 from builtin.device_passable import DevicePassable
 from gpu.host import DeviceBuffer, HostBuffer
+from builtin.variadics import Variadic
 
 
 struct Buffer[
@@ -36,6 +37,16 @@ struct Buffer[
 
     fn _to_device_type(self, target: MutOpaquePointer[_]):
         target.bitcast[Self.device_type]()[] = self
+
+    @staticmethod
+    fn _is_convertible_to_device_type[T: AnyType]() -> Bool:
+        return Variadic.contains[
+            T,
+            Variadic.types[
+                T=AnyType,
+                Self,
+            ],
+        ]
 
     fn __init__(out self, elem: Scalar[Self.dtype]):
         self.data = alloc[Scalar[Self.dtype]](1)
