@@ -1,3 +1,4 @@
+from builtin.variadics import Variadic
 from algorithm import vectorize
 from sys import simd_width_of, size_of
 from memory import memset_zero, memcpy
@@ -99,6 +100,16 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn _to_device_type(self, target: MutOpaquePointer[_]):
         target.bitcast[Self.device_type]()[] = self
+
+    @staticmethod
+    fn _is_convertible_to_device_type[T: AnyType]() -> Bool:
+        return Variadic.contains[
+            T,
+            Variadic.types[
+                T=AnyType,
+                Self,
+            ],
+        ]
 
     fn __init__(out self, elems: List[Scalar[Self.dtype]]):
         var length = len(elems)
