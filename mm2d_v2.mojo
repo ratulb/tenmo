@@ -32,9 +32,24 @@ fn matmul_2d(A: Matrix_A, B: Matrix_B, C: Matrix_C):
     if C.dim(0) > output_row and C.dim(1) > output_col:
         var accum = Scalar[dtype](0)
         var row = A.tile[1, cols](output_row, 0)
+        var dest_row = LayoutTensor[
+            dtype,
+            Layout.row_major(1, cols),
+            MutAnyOrigin,
+            address_space = AddressSpace.SHARED,
+        ].stack_allocation()
+        dest_row.copy_from(row)
         var col = B.tile[rows, 1](0, output_col)
+        var dest_col = LayoutTensor[
+            dtype,
+            Layout.row_major(rows, 1),
+            MutAnyOrigin,
+            address_space = AddressSpace.SHARED,
+        ].stack_allocation()
+        dest_col.copy_from(col)
+
         for i in range(A.dim(1)):
-            accum += (row[0, i] * col[i, 0])[0]
+            accum += (dest_row[0, i] * dest_col[i, 0])[0]
         C[output_row, output_col] = accum
 
 
