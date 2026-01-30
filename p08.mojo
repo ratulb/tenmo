@@ -34,7 +34,7 @@ fn add_10_shared(
         output[gtid] = shared[local_tid] + 10
 
 
-fn main() raises:
+fn main_1() raises:
     with DeviceContext() as ctx:
         var out_buff_d = ctx.enqueue_create_buffer[dtype](SIZE)
         var host_buff = ctx.enqueue_create_host_buffer[dtype](SIZE)
@@ -55,3 +55,11 @@ fn main() raises:
         with out_buff_d.map_to_host() as out_buff_h:
             for i in range(SIZE):
                 assert_true(out_buff_h[i] == host_buff[i] + 10)
+
+
+fn main() raises:
+    with DeviceContext() as ctx:
+        var device_fn = ctx.compile_function[add_10_shared, add_10_shared]()
+        print("Done")
+
+    print("Done outer")
