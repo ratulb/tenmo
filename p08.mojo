@@ -31,5 +31,7 @@ fn main() raises:
         var out_buff_d = ctx.enqueue_create_buffer[dtype](SIZE)
         out_buff_d.enqueue_fill(0)
         var a_buff_d = ctx.enqueue_create_buffer[dtype](SIZE)
-        iota(a_buff_d.unsafe_ptr, SIZE)
+        with a_buff_d.map_to_host() as a_buff_h:
+            iota(a_buff_h.unsafe_ptr(), SIZE)
         print(a_buff_d)
+        ctx.synchronize()
