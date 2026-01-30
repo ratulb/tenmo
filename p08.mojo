@@ -14,7 +14,7 @@ comptime dtype = DType.float32
 fn add_10_shared(
     output: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     a: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     var shared = stack_allocation[
         TPB, Scalar[dtype], address_space = AddressSpace.SHARED
@@ -24,6 +24,7 @@ fn add_10_shared(
         block_idx.x * block_dim.x + thread_idx.x
     )  # Globally unique thread id
     var local_tid = thread_idx.x  # Block local thread id
+    print("Global thread id: ", gtid, "local thread id: ", local_tid)
 
 
 fn main() raises:
@@ -34,4 +35,11 @@ fn main() raises:
         with a_buff_d.map_to_host() as a_buff_h:
             iota(a_buff_h.unsafe_ptr(), SIZE)
         print(a_buff_d)
+        ctx.enqueue_function[add_10_shared, add_10_shared](
+            out_buff_d,
+            a_buff_d,
+            SIZE,
+            grid_dim=BLOCKS_PER_GRID,
+            block_dim=THREADS_PER_BLOCK,
+        )
         ctx.synchronize()
