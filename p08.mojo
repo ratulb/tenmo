@@ -1,6 +1,7 @@
 from memory import stack_allocation, AddressSpace
 from gpu import thread_idx, block_idx, block_dim, barrier
 from gpu.host import DeviceContext
+from math import iota
 from testing import assert_true
 
 comptime TPB = 4
