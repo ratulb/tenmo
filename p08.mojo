@@ -34,7 +34,7 @@ fn add_10_shared(
         output[gtid] = shared[local_tid] + 10
 
 
-fn main_1() raises:
+fn main() raises:
     with DeviceContext() as ctx:
         var out_buff_d = ctx.enqueue_create_buffer[dtype](SIZE)
         var host_buff = ctx.enqueue_create_host_buffer[dtype](SIZE)
@@ -44,20 +44,73 @@ fn main_1() raises:
             iota(a_buff_h.unsafe_ptr(), SIZE)
         print(a_buff_d)
         iota(host_buff.unsafe_ptr(), SIZE)
-        ctx.enqueue_function[add_10_shared, add_10_shared](
+        var device_fn = ctx.compile_function[add_10_shared, add_10_shared]()
+        # ctx.enqueue_function[add_10_shared, add_10_shared](
+        ctx.enqueue_function(
+            device_fn,
             out_buff_d,
             a_buff_d,
             SIZE,
             grid_dim=BLOCKS_PER_GRID,
             block_dim=THREADS_PER_BLOCK,
         )
+        ctx.enqueue_function(
+            device_fn,
+            out_buff_d,
+            a_buff_d,
+            SIZE,
+            grid_dim=BLOCKS_PER_GRID,
+            block_dim=THREADS_PER_BLOCK,
+        )
+        ctx.enqueue_function(
+            device_fn,
+            out_buff_d,
+            a_buff_d,
+            SIZE,
+            grid_dim=BLOCKS_PER_GRID,
+            block_dim=THREADS_PER_BLOCK,
+        )
+        ctx.enqueue_function(
+            device_fn,
+            out_buff_d,
+            a_buff_d,
+            SIZE,
+            grid_dim=BLOCKS_PER_GRID,
+            block_dim=THREADS_PER_BLOCK,
+        )
+        ctx.enqueue_function(
+            device_fn,
+            out_buff_d,
+            a_buff_d,
+            SIZE,
+            grid_dim=BLOCKS_PER_GRID,
+            block_dim=THREADS_PER_BLOCK,
+        )
+        ctx.enqueue_function(
+            device_fn,
+            out_buff_d,
+            a_buff_d,
+            SIZE,
+            grid_dim=BLOCKS_PER_GRID,
+            block_dim=THREADS_PER_BLOCK,
+        )
+        ctx.enqueue_function(
+            device_fn,
+            out_buff_d,
+            a_buff_d,
+            SIZE,
+            grid_dim=BLOCKS_PER_GRID,
+            block_dim=THREADS_PER_BLOCK,
+        )
+
         ctx.synchronize()
         with out_buff_d.map_to_host() as out_buff_h:
+            print(out_buff_h)
             for i in range(SIZE):
                 assert_true(out_buff_h[i] == host_buff[i] + 10)
 
 
-fn main() raises:
+fn main_1() raises:
     with DeviceContext() as ctx:
         var device_fn = ctx.compile_function[add_10_shared, add_10_shared]()
         print("Done")
