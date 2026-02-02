@@ -79,10 +79,10 @@ fn main() raises:
         with result.map_to_host() as out_host:
             assert_equal(out_host[0], expected[0])
 
-        var tensor_a = Tensor[dtype].rand(128)
-        var tensor_b = Tensor[dtype].rand(128)
-        result = ctx.enqueue_create_buffer[dtype](1)
         SIZE = 512
+        var tensor_a = Tensor[dtype].rand(SIZE)
+        var tensor_b = Tensor[dtype].rand(SIZE)
+        result = ctx.enqueue_create_buffer[dtype](1)
         a = ctx.enqueue_create_buffer[dtype](SIZE)
         b = ctx.enqueue_create_buffer[dtype](SIZE)
         with a.map_to_host() as a_host, b.map_to_host() as b_host:
@@ -109,3 +109,4 @@ fn main() raises:
         var dot_result = tensor_a.matmul[mode=dot](tensor_b)
         with result.map_to_host() as out_host:
             assert_almost_equal(out_host[0], dot_result.item())
+            print(out_host[0], dot_result.item())
