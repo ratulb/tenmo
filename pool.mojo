@@ -22,12 +22,12 @@ fn pooling(matrix_in: Matrix[ImmutAnyOrigin], matrix_out: Matrix[MutAnyOrigin]):
     barrier()  # Make sure each block thread has copied own slot data from global memory
     print(bsm)
     if gti < size:
-        var left_bound = max(0, bti - 2)
-        var right_bound = bti + 1
-        var accum: Scalar[dtype] = 0
-        for j in range(left_bound, right_bound):
-            accum += bsm[j][0]
-        matrix_out[gti] = accum
+        if gti == 0:
+            matrix_out[0] = bsm[0]
+        elif gti == 1:
+            matrix_out[1] = bsm[0] + bsm[1]
+        else:
+            matrix_out[gti] = bsm[bti - 2] + bsm[bti - 1] + bsm[bti]
 
 
 fn main() raises:
