@@ -4,7 +4,7 @@ from memory import AddressSpace
 from layout import Layout, LayoutTensor
 from testing import assert_true
 
-comptime SIZE = 10
+comptime SIZE = 12
 comptime dtype = DType.float32
 comptime layout = Layout.row_major(SIZE)
 comptime Matrix = LayoutTensor[dtype, layout, _]
@@ -42,9 +42,8 @@ fn main() raises:
     var matrix_in = Matrix[ImmutAnyOrigin](dev_buff_in)
     var matrix_out = Matrix[MutAnyOrigin](dev_buff_out)
     ctx.enqueue_function[pooling, pooling](
-        matrix_in, matrix_out, grid_dim=1, block_dim=8
+        matrix_in, matrix_out, grid_dim=10, block_dim=80
     )
     ctx.synchronize()
     with dev_buff_out.map_to_host() as host_buff:
-        # print(host_buff)
-        pass
+        print(host_buff)
