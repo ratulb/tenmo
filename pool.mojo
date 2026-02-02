@@ -20,6 +20,7 @@ fn pooling(matrix_in: Matrix[ImmutAnyOrigin], matrix_out: Matrix[MutAnyOrigin]):
     if gti < size:
         bsm[bti] = matrix_in[gti]
     barrier()  # Make sure each block thread has copied own slot data from global memory
+    print(bsm)
     if gti < size:
         var left_bound = max(0, bti - 2)
         var right_bound = bti + 1
@@ -32,17 +33,18 @@ fn pooling(matrix_in: Matrix[ImmutAnyOrigin], matrix_out: Matrix[MutAnyOrigin]):
 fn main() raises:
     var ctx = DeviceContext()
     var dev_buff_in = ctx.enqueue_create_buffer[dtype](SIZE)
-    var dev_buff_out = ctx.enquue_create_buffer[dtype](SIZE)
-    dev_buff_out.fill(0)
+    var dev_buff_out = ctx.enqueue_create_buffer[dtype](SIZE)
+    dev_buff_out.enqueue_fill(0)
     with dev_buff_in.map_to_host() as dev_buff_host:
         for i in range(SIZE):
             dev_buff_host[i] = i
+        # print(dev_buff_host)
     var matrix_in = Matrix[ImmutAnyOrigin](dev_buff_in)
     var matrix_out = Matrix[MutAnyOrigin](dev_buff_out)
     ctx.enqueue_function[pooling, pooling](
-        matrix_in, matrix_out, grid_dim=10, block_dim=100
+        matrix_in, matrix_out, grid_dim=1, block_dim=8
     )
     ctx.synchronize()
     with dev_buff_out.map_to_host() as host_buff:
-        print(host_buff)
-
+        # print(host_buff)
+        pass
