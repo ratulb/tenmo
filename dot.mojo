@@ -79,7 +79,7 @@ fn main() raises:
         with result.map_to_host() as out_host:
             assert_equal(out_host[0], expected[0])
 
-        SIZE = 512
+        SIZE = 4096
         var tensor_a = Tensor[dtype].rand(SIZE)
         var tensor_b = Tensor[dtype].rand(SIZE)
         result = ctx.enqueue_create_buffer[dtype](1)
