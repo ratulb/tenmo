@@ -52,9 +52,7 @@ fn main() raises:
         var result = ctx.enqueue_create_buffer[dtype](1)
         result.enqueue_fill(0)
         var a = ctx.enqueue_create_buffer[dtype](SIZE)
-
         var b = ctx.enqueue_create_buffer[dtype](SIZE)
-
         with a.map_to_host() as a_host, b.map_to_host() as b_host:
             for i in range(SIZE):
                 a_host[i] = i
@@ -79,24 +77,25 @@ fn main() raises:
                 expected[0] += a_host[i] * b_host[i]
 
         with result.map_to_host() as out_host:
-            print("out:", out_host)
-            print("expected:", expected)
             assert_equal(out_host[0], expected[0])
 
         var tensor_a = Tensor[dtype].rand(128)
         var tensor_b = Tensor[dtype].rand(128)
-        #tensor_a.print()
-        #ctx = DeviceContext()
         result = ctx.enqueue_create_buffer[dtype](1)
-        #result.enqueue_fill(0)
         SIZE = 512
         a = ctx.enqueue_create_buffer[dtype](SIZE)
-        #a.enqueue_fill(0)
         b = ctx.enqueue_create_buffer[dtype](SIZE)
-        b.enqueue_fill(0)
         with a.map_to_host() as a_host, b.map_to_host() as b_host:
-            memcpy(dest=a_host.unsafe_ptr(), src=tensor_a.buffer.buffer.data, count=SIZE)
-            memcpy(dest=b_host.unsafe_ptr(), src=tensor_b.buffer.buffer.data, count=SIZE)
+            memcpy(
+                dest=a_host.unsafe_ptr(),
+                src=tensor_a.buffer.buffer.data,
+                count=SIZE,
+            )
+            memcpy(
+                dest=b_host.unsafe_ptr(),
+                src=tensor_b.buffer.buffer.data,
+                count=SIZE,
+            )
         ctx.enqueue_function[dot_product[dtype], dot_product[dtype]](
             result,
             a,
@@ -109,6 +108,4 @@ fn main() raises:
         ctx.synchronize()
         var dot_result = tensor_a.matmul[mode=dot](tensor_b)
         with result.map_to_host() as out_host:
-            print("out:", out_host)
             assert_almost_equal(out_host[0], dot_result.item())
-            print(out_host[0],  dot_result.item())
