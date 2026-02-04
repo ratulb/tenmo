@@ -21,7 +21,7 @@ struct Reduction(Copyable, Equatable, ImplicitlyCopyable):
         self.reduction = reduction
         if reduction < 0 or reduction > 2:
             panic(
-                "Invalid reduction type. Must '0 → mean', '1 → sum', or '2 →"
+                "Invalid reduction type. Must be '0 → mean', '1 → sum', or '2 →"
                 " none'"
             )
 
@@ -34,7 +34,7 @@ struct Reduction(Copyable, Equatable, ImplicitlyCopyable):
             self.reduction = 2
         else:
             self.reduction = -1
-            panic("Invalid reduction type. Must 'mean', 'sum', or 'none'")
+            panic("Invalid reduction type. Must be 'mean', 'sum', or 'none'")
 
     fn __copyinit__(out self, existing: Self):
         self.reduction = existing.reduction
