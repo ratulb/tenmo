@@ -1,7 +1,7 @@
 from builtin.variadics import Variadic
 from algorithm import vectorize
 from sys import simd_width_of, size_of
-from memory import memset_zero, memcpy
+from memory import memset_zero, memcpy, AddressSpace
 from math import exp, log10, ceil, tanh, sqrt
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
@@ -34,7 +34,10 @@ from operators import (
 )
 
 
-struct Buffer[dtype: DType = DType.float32](
+struct Buffer[
+    dtype: DType = DType.float32,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+](
     ImplicitlyCopyable
     & Movable
     & Sized
@@ -289,19 +292,23 @@ struct Buffer[dtype: DType = DType.float32](
     fn __len__(self) -> Int:
         return self.size
 
-    fn __iter__(ref self) -> ElementIterator[Self.dtype, origin_of(self)]:
+    fn __iter__(
+        ref self,
+    ) -> ElementIterator[Self.dtype, Self.address_space, origin_of(self)]:
         return ElementIterator(Pointer(to=self))
 
     @always_inline
-    fn __getitem__(self, slice: Slice) -> Buffer[Self.dtype]:
+    fn __getitem__(
+        self, slice: Slice
+    ) -> Buffer[Self.dtype, Self.address_space]:
         var start, end, step = slice.indices(len(self))
         var spread = range(start, end, step)
         var result_size = len(spread)
 
         if result_size == 0:
-            return Buffer[Self.dtype]()
+            return Buffer[Self.dtype, Self.address_space]()
 
-        var result = Buffer[Self.dtype](result_size)
+        var result = Buffer[Self.dtype, Self.address_space](result_size)
 
         # Fast path: contiguous (step == 1)
         if step == 1:
@@ -393,8 +400,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __add__(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __add__(other) is for numeric data types only",
@@ -413,7 +421,7 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Add, False](other)
 
     @always_inline
-    fn __iadd__(self, other: Buffer[Self.dtype]):
+    fn __iadd__(self, other: Buffer[Self.dtype, Self.address_space]):
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __iadd__(other) is for numeric data types only",
@@ -433,7 +441,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops[Add, False](other)
 
     @always_inline
-    fn __isub__(self, other: Buffer[Self.dtype]):
+    fn __isub__(self, other: Buffer[Self.dtype, Self.address_space]):
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __isub__(other) is for numeric data types only",
@@ -454,8 +462,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __sub__(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __sub__(other) is for numeric data types only",
@@ -475,8 +484,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __mul__(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Buffer[Self.dtype, Self.address_space]:
         # No constraint checking for Self.dtype - DType.bool multplication allowed
         if not self.size == other.size:
             panic(
@@ -491,13 +501,13 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Multiply, False](other)
 
     @always_inline
-    fn __imul__(self, other: Buffer[Self.dtype]):
+    fn __imul__(self, other: Buffer[Self.dtype, Self.address_space]):
         # No constraint checking for Self.dtype - DType.bool multplication allowed
         if self.size != other.size:
             panic(
                 (
-                    "Buffer → __imul__(Buffer[Self.dtype]: buffer size does not"
-                    " match -> self:"
+                    "Buffer → __imul__(Buffer[Self.dtype, Self.address_space]:"
+                    " buffer size does not match -> self:"
                 ),
                 self.size.__str__(),
                 "vs. other:",
@@ -513,7 +523,7 @@ struct Buffer[dtype: DType = DType.float32](
     fn inplace_ops_scalar[
         op_code: Int
     ](
-        self: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
         scalar: Scalar[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
@@ -583,8 +593,8 @@ struct Buffer[dtype: DType = DType.float32](
     fn inplace_ops[
         op_code: Int, validate: Bool = True
     ](
-        self: Buffer[Self.dtype],
-        other: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
         self_start: Int = 0,
         self_end: Optional[Int] = None,
         other_start: Int = 0,
@@ -687,13 +697,13 @@ struct Buffer[dtype: DType = DType.float32](
     fn arithmetic_ops[
         op_code: Int, validate: Bool = True
     ](
-        self: Buffer[Self.dtype],
-        other: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
         self_start: Int = 0,
         self_end: Optional[Int] = None,
         other_start: Int = 0,
         other_end: Optional[Int] = None,
-    ) -> Buffer[Self.dtype]:
+    ) -> Buffer[Self.dtype, Self.address_space]:
         var self_actual_end = self_end.or_else(self.size)
         var other_actual_end = other_end.or_else(other.size)
         var self_extent = self_actual_end - self_start
@@ -713,7 +723,7 @@ struct Buffer[dtype: DType = DType.float32](
                     + other_extent.__str__()
                 )
 
-        var out = Buffer[Self.dtype](self_extent)
+        var out = Buffer[Self.dtype, Self.address_space](self_extent)
 
         @parameter
         if Self.dtype == DType.bool:
@@ -778,18 +788,18 @@ struct Buffer[dtype: DType = DType.float32](
     fn arithmetic_ops_scalar[
         op_code: Int
     ](
-        self: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
         scalar: Scalar[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
-    ) -> Buffer[Self.dtype]:
+    ) -> Buffer[Self.dtype, Self.address_space]:
         var actual_end = end_index.or_else(self.size)
         var extent = actual_end - start_index
 
         if self.size == 0 or extent <= 0:
             panic("Buffer -> arithmetic_ops_scalar: buffer size 0")
 
-        var out = Buffer[Self.dtype](extent)
+        var out = Buffer[Self.dtype, Self.address_space](extent)
 
         @parameter
         if Self.dtype == DType.bool:
@@ -859,8 +869,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __truediv__(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __truediv__(other) is for numeric data types only",
@@ -883,7 +894,10 @@ struct Buffer[dtype: DType = DType.float32](
         return self.arithmetic_ops[Divide, False](other)
 
     @always_inline
-    fn __itruediv__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]):
+    fn __itruediv__(
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ):
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __itruediv__(other) is for numeric data types only",
@@ -905,7 +919,9 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops[Divide, False](other)
 
     @always_inline
-    fn __iadd__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
+    fn __iadd__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ):
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __iadd__(scalar) is for numeric data types only",
@@ -914,7 +930,9 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops_scalar[Add](scalar)
 
     @always_inline
-    fn __isub__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
+    fn __isub__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ):
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __isub__(scalar) is for numeric data types only",
@@ -923,12 +941,16 @@ struct Buffer[dtype: DType = DType.float32](
         self.inplace_ops_scalar[Subtract](scalar)
 
     @always_inline
-    fn __imul__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
+    fn __imul__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ):
         # No constraint checking for Self.dtype - DType.bool multplication allowed
         self.inplace_ops_scalar[Multiply](scalar)
 
     @always_inline
-    fn __itruediv__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
+    fn __itruediv__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ):
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __itruediv__(scalar) is for numeric data types only",
@@ -941,8 +963,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __rsub__(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             (
@@ -955,8 +977,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __sub__(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __sub__(scalar) -> Buffer is for numeric data types only",
@@ -966,8 +988,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __rmul__(
-        self: Buffer[Self.dtype], factor: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space], factor: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             (
@@ -980,15 +1002,15 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __mul__(
-        self: Buffer[Self.dtype], factor: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space], factor: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype, Self.address_space]:
         # No constraint checking for Self.dtype - DType.bool multplication allowed
         return self.arithmetic_ops_scalar[Multiply](factor)
 
     @always_inline
     fn __radd__(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             (
@@ -1001,8 +1023,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __add__(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             (
@@ -1015,8 +1037,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __truediv__(
-        self: Buffer[Self.dtype], divisor: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space],
+        divisor: Scalar[Self.dtype],
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             (
@@ -1029,8 +1052,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __rtruediv__(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             (
@@ -1076,9 +1099,10 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn compare_buffer_full[
         op_code: Int
-    ](self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Buffer[
-        DType.bool
-    ]:
+    ](
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Buffer[DType.bool]:
         if not self.size == other.size:
             panic(
                 (
@@ -1159,9 +1183,9 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn compare_scalar_full[
         op_code: Int
-    ](self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Buffer[
-        DType.bool
-    ]:
+    ](
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Buffer[DType.bool]:
         var total = self.size
         if total == 0:
             panic("Buffer -> compare_scalar_full: buffer size is zero")
@@ -1230,13 +1254,13 @@ struct Buffer[dtype: DType = DType.float32](
     fn select[
         op_code: Int, validate: Bool = True
     ](
-        self: Buffer[Self.dtype],
-        other: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
         self_start: Int = 0,
         self_end: Optional[Int] = None,
         other_start: Int = 0,
         other_end: Optional[Int] = None,
-    ) -> Buffer[Self.dtype]:
+    ) -> Buffer[Self.dtype, Self.address_space]:
         var self_extent = self_end.or_else(self.size) - self_start
         var other_extent = other_end.or_else(other.size) - other_start
 
@@ -1254,7 +1278,7 @@ struct Buffer[dtype: DType = DType.float32](
                     other_extent.__str__(),
                 )
 
-        var out = Buffer[Self.dtype].zeros(self_extent)
+        var out = Buffer[Self.dtype, Self.address_space].zeros(self_extent)
         var zero = Scalar[Self.dtype](0)
 
         comptime smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
@@ -1307,12 +1331,12 @@ struct Buffer[dtype: DType = DType.float32](
     fn unary_ops[
         op_code: Int
     ](
-        self: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
-    ) -> Buffer[Self.dtype]:
+    ) -> Buffer[Self.dtype, Self.address_space]:
         var extent = end_index.or_else(self.size) - start_index
-        var out = Buffer[Self.dtype](extent)
+        var out = Buffer[Self.dtype, Self.address_space](extent)
 
         comptime smdwidth = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
@@ -1344,10 +1368,13 @@ struct Buffer[dtype: DType = DType.float32](
     fn unary_ops_with_mask[
         op_code: Int
     ](
-        self: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
-    ) -> Tuple[Buffer[Self.dtype], Buffer[Self.dtype]]:
+    ) -> Tuple[
+        Buffer[Self.dtype, Self.address_space],
+        Buffer[Self.dtype, Self.address_space],
+    ]:
         """Compute unary operation and mask simultaneously.
 
         For ReLU: output = max(0, x), mask = (x > 0) ? 1.0 : 0.0
@@ -1356,8 +1383,8 @@ struct Buffer[dtype: DType = DType.float32](
             Tuple of (output_buffer, mask_buffer).
         """
         var extent = end_index.or_else(self.size) - start_index
-        var out = Buffer[Self.dtype](extent)
-        var mask = Buffer[Self.dtype](extent)
+        var out = Buffer[Self.dtype, Self.address_space](extent)
+        var mask = Buffer[Self.dtype, Self.address_space](extent)
 
         comptime simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
@@ -1420,7 +1447,7 @@ struct Buffer[dtype: DType = DType.float32](
         return (out^, mask^)
 
     @always_inline
-    fn exp(self) -> Buffer[Self.dtype]:
+    fn exp(self) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → exp is for numeric data types only",
@@ -1430,8 +1457,10 @@ struct Buffer[dtype: DType = DType.float32](
 
     @staticmethod
     @always_inline
-    fn full(value: Scalar[Self.dtype], size: Int) -> Buffer[Self.dtype]:
-        buffer = Buffer[Self.dtype](size)
+    fn full(
+        value: Scalar[Self.dtype], size: Int
+    ) -> Buffer[Self.dtype, Self.address_space]:
+        buffer = Buffer[Self.dtype, Self.address_space](size)
         buffer.fill(value)
         return buffer^
 
@@ -1439,14 +1468,16 @@ struct Buffer[dtype: DType = DType.float32](
     @staticmethod
     fn arange[
         max_arange_elements: Int = 1000000  # Safety limit to prevent infinite loops with very small steps
-    ](*args: Scalar[Self.dtype]) -> Buffer[Self.dtype]:
+    ](*args: Scalar[Self.dtype]) -> Buffer[Self.dtype, Self.address_space]:
         return Self.arange[max_arange_elements](args)
 
     @always_inline
     @staticmethod
     fn arange[
         max_arange_elements: Int = 1000000  # Safety limit to prevent infinite loops with very small steps
-    ](args: VariadicList[Scalar[Self.dtype]]) -> Buffer[Self.dtype]:
+    ](args: VariadicList[Scalar[Self.dtype]]) -> Buffer[
+        Self.dtype, Self.address_space
+    ]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → arange is for numeric data types only",
@@ -1502,12 +1533,12 @@ struct Buffer[dtype: DType = DType.float32](
         if len(data) == 0:
             panic("Buffer → arange: computed arange size is zero")
 
-        return Buffer[Self.dtype](data^)
+        return Buffer[Self.dtype, Self.address_space](data^)
 
     @staticmethod
     @always_inline
-    fn zeros(size: Int) -> Buffer[Self.dtype]:
-        buffer = Buffer[Self.dtype](size)
+    fn zeros(size: Int) -> Buffer[Self.dtype, Self.address_space]:
+        buffer = Buffer[Self.dtype, Self.address_space](size)
         memset_zero(buffer.data, size)
         return buffer^
 
@@ -1516,7 +1547,7 @@ struct Buffer[dtype: DType = DType.float32](
         start: Scalar[Self.dtype],
         end: Scalar[Self.dtype],
         steps: Int,
-    ) -> Buffer[Self.dtype]:
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → linspace is for numeric data types only",
@@ -1526,12 +1557,12 @@ struct Buffer[dtype: DType = DType.float32](
             panic("Buffer → linspace: steps must be at least 1")
 
         if steps == 1:
-            var buffer = Buffer[Self.dtype](1)
+            var buffer = Buffer[Self.dtype, Self.address_space](1)
             buffer[0] = start
             return buffer^
 
         var step_size = (end - start) / Scalar[Self.dtype](steps - 1)
-        var buffer = Buffer[Self.dtype](steps)
+        var buffer = Buffer[Self.dtype, Self.address_space](steps)
 
         for i in range(steps):
             buffer[i] = start + Scalar[Self.dtype](i) * step_size
@@ -1539,12 +1570,12 @@ struct Buffer[dtype: DType = DType.float32](
         return buffer^
 
     @always_inline
-    fn zero(self: Buffer[Self.dtype]):
+    fn zero(self: Buffer[Self.dtype, Self.address_space]):
         memset_zero(self.data, self.size)
 
     @always_inline
     fn sum(
-        self: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Scalar[Self.dtype]:
@@ -1577,7 +1608,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn product(
-        self: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Scalar[Self.dtype]:
@@ -1608,8 +1639,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __pow__(
-        self: Buffer[Self.dtype], exponent: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+        self: Buffer[Self.dtype, Self.address_space],
+        exponent: Scalar[Self.dtype],
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             (
@@ -1618,7 +1650,7 @@ struct Buffer[dtype: DType = DType.float32](
             ),
         ]()
 
-        var out = Buffer[Self.dtype](self.size)
+        var out = Buffer[Self.dtype, Self.address_space](self.size)
 
         comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
@@ -1635,13 +1667,13 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn __abs__(self) -> Buffer[Self.dtype]:
+    fn __abs__(self) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __abs__ is for numeric data types only",
         ]()
 
-        var out = Buffer[Self.dtype](self.size)
+        var out = Buffer[Self.dtype, Self.address_space](self.size)
 
         comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
@@ -1660,13 +1692,13 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn clamp(
         self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
-    ) -> Buffer[Self.dtype]:
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → clamp is for numeric data types only",
         ]()
 
-        var out = Buffer[Self.dtype](self.size)
+        var out = Buffer[Self.dtype, Self.address_space](self.size)
 
         comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
@@ -1709,7 +1741,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn fill(
-        self: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
         value: Scalar[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
@@ -1739,13 +1771,15 @@ struct Buffer[dtype: DType = DType.float32](
                 self[idx + start_index] = value
 
     @always_inline
-    fn __neg__(self: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
+    fn __neg__(
+        self: Buffer[Self.dtype, Self.address_space]
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → __neg__ is for numeric data types only",
         ]()
 
-        var out = Buffer[Self.dtype](self.size)
+        var out = Buffer[Self.dtype, Self.address_space](self.size)
 
         comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
@@ -1762,7 +1796,9 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn log(self: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
+    fn log(
+        self: Buffer[Self.dtype, Self.address_space]
+    ) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_numeric(),
             "Buffer → log is for numeric data types only",
@@ -1771,13 +1807,13 @@ struct Buffer[dtype: DType = DType.float32](
         return self.unary_ops[Log]()
 
     @always_inline
-    fn __invert__(self) -> Buffer[Self.dtype]:
+    fn __invert__(self) -> Buffer[Self.dtype, Self.address_space]:
         constrained[
             Self.dtype.is_integral() or DType.bool == Self.dtype,
             "Buffer → __invert__ is for Bool or integral data types only",
         ]()
 
-        var out = Buffer[Self.dtype](self.size)
+        var out = Buffer[Self.dtype, Self.address_space](self.size)
 
         comptime simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
             Self.dtype
@@ -1799,7 +1835,9 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn compare_scalar[
         op_code: Int
-    ](self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    ](
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Bool:
         total = self.size
         if total == 0:
             return False
@@ -1864,105 +1902,126 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn __eq__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    fn __eq__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Bool:
         return self.compare_scalar[Equal](scalar)
 
     @always_inline
-    fn __ne__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    fn __ne__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Bool:
         return self.compare_scalar[NotEqual](scalar)
 
     @always_inline
-    fn __lt__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    fn __lt__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Bool:
         return self.compare_scalar[LessThan](scalar)
 
     @always_inline
-    fn __le__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    fn __le__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Bool:
         return self.compare_scalar[LessThanEqual](scalar)
 
     @always_inline
-    fn __gt__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    fn __gt__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Bool:
         return self.compare_scalar[GreaterThan](scalar)
 
     @always_inline
-    fn __ge__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]) -> Bool:
+    fn __ge__(
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
+    ) -> Bool:
         return self.compare_scalar[GreaterThanEqual](scalar)
 
     @always_inline
     fn eq(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[Equal](scalar)
 
     @always_inline
     fn ne(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[NotEqual](scalar)
 
     @always_inline
     fn ge(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[GreaterThanEqual](scalar)
 
     @always_inline
     fn gt(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[GreaterThan](scalar)
 
     @always_inline
     fn le(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[LessThanEqual](scalar)
 
     @always_inline
     fn lt(
-        self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space], scalar: Scalar[Self.dtype]
     ) -> Buffer[DType.bool]:
         return self.compare_scalar_full[LessThan](scalar)
 
     @always_inline
     fn eq(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[Equal](other)
 
     @always_inline
     fn ne(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[NotEqual](other)
 
     @always_inline
     fn lt(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[LessThan](other)
 
     @always_inline
     fn le(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[LessThanEqual](other)
 
     @always_inline
     fn gt(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[GreaterThan](other)
 
     @always_inline
     fn ge(
-        self: Buffer[Self.dtype], other: Buffer[Self.dtype]
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
     ) -> Buffer[DType.bool]:
         return self.compare_buffer_full[GreaterThanEqual](other)
 
     @always_inline
     fn compare_buffer[
         op_code: Int
-    ](self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
+    ](
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Bool:
         if not self.size == other.size:
             panic(
                 "Buffer → compare_buffer: buffer sizes do not match -> self:",
@@ -2035,27 +2094,45 @@ struct Buffer[dtype: DType = DType.float32](
         return True
 
     @always_inline
-    fn __eq__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
+    fn __eq__(
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Bool:
         return self.compare_buffer[Equal](other)
 
     @always_inline
-    fn __ne__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
+    fn __ne__(
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Bool:
         return self.compare_buffer[NotEqual](other)
 
     @always_inline
-    fn __lt__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
+    fn __lt__(
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Bool:
         return self.compare_buffer[LessThan](other)
 
     @always_inline
-    fn __le__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
+    fn __le__(
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Bool:
         return self.compare_buffer[LessThanEqual](other)
 
     @always_inline
-    fn __gt__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
+    fn __gt__(
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Bool:
         return self.compare_buffer[GreaterThan](other)
 
     @always_inline
-    fn __ge__(self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
+    fn __ge__(
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Bool:
         return self.compare_buffer[GreaterThanEqual](other)
 
     @always_inline
@@ -2125,7 +2202,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn dot(
-        lhs: Buffer[Self.dtype], rhs: Buffer[Self.dtype]
+        lhs: Buffer[Self.dtype, Self.address_space],
+        rhs: Buffer[Self.dtype, Self.address_space],
     ) -> Scalar[Self.dtype]:
         if not lhs.size == rhs.size:
             panic(
@@ -2140,7 +2218,7 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn overwrite(
         self,
-        other: Buffer[Self.dtype],
+        other: Buffer[Self.dtype, Self.address_space],
         self_start: Int = 0,
         self_end: Optional[Int] = None,
         other_start: Int = 0,
@@ -2151,7 +2229,7 @@ struct Buffer[dtype: DType = DType.float32](
         )
 
     fn count(
-        self: Buffer[Self.dtype],
+        self: Buffer[Self.dtype, Self.address_space],
         key: Scalar[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
@@ -2207,7 +2285,9 @@ struct Buffer[dtype: DType = DType.float32](
 
         return total
 
-    fn tolist(self: Buffer[Self.dtype]) -> List[Scalar[Self.dtype]]:
+    fn tolist(
+        self: Buffer[Self.dtype, Self.address_space]
+    ) -> List[Scalar[Self.dtype]]:
         var result = List[Scalar[Self.dtype]](capacity=Int(len(self)))
         for i in range(len(self)):
             result.append(self[i])
@@ -2217,7 +2297,10 @@ struct Buffer[dtype: DType = DType.float32](
     fn all_close[
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
-    ](self: Buffer[Self.dtype], other: Buffer[Self.dtype]) -> Bool:
+    ](
+        self: Buffer[Self.dtype, Self.address_space],
+        other: Buffer[Self.dtype, Self.address_space],
+    ) -> Bool:
         """Check if all elements are close within tolerance: |a - b| <= atol + rtol * |b|.
         """
         constrained[
@@ -2256,7 +2339,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn any(
-        self: Buffer[Self.dtype], pred: fn (Scalar[Self.dtype]) -> Bool
+        self: Buffer[Self.dtype, Self.address_space],
+        pred: fn (Scalar[Self.dtype]) -> Bool,
     ) -> Bool:
         """Check if any element satisfies the predicate."""
         for i in range(self.size):
@@ -2266,7 +2350,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn all(
-        self: Buffer[Self.dtype], pred: fn (Scalar[Self.dtype]) -> Bool
+        self: Buffer[Self.dtype, Self.address_space],
+        pred: fn (Scalar[Self.dtype]) -> Bool,
     ) -> Bool:
         """Check if all elements satisfy the predicate."""
         for i in range(self.size):
@@ -2276,7 +2361,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn map_to_bool(
-        self: Buffer[Self.dtype], pred: fn (Scalar[Self.dtype]) -> Bool
+        self: Buffer[Self.dtype, Self.address_space],
+        pred: fn (Scalar[Self.dtype]) -> Bool,
     ) -> Buffer[DType.bool]:
         """Apply predicate to each element, returning a boolean buffer."""
         var out = Buffer[DType.bool](self.size)
@@ -2366,12 +2452,16 @@ struct Buffer[dtype: DType = DType.float32](
 @register_passable
 struct ElementIterator[
     dtype: DType,
+    address_space: AddressSpace,
     origin: ImmutOrigin,
 ](Sized & Copyable):
     var index: Int
-    var src: Pointer[Buffer[Self.dtype], Self.origin]
+    var src: Pointer[Buffer[Self.dtype, Self.address_space], Self.origin]
 
-    fn __init__(out self, src: Pointer[Buffer[Self.dtype], Self.origin]):
+    fn __init__(
+        out self,
+        src: Pointer[Buffer[Self.dtype, Self.address_space], Self.origin],
+    ):
         self.src = src
         self.index = 0
 

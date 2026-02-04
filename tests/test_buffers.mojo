@@ -2383,7 +2383,8 @@ fn test_log_orig() raises:
 
 fn test_buffer_iter() raises:
     print("test_buffer_iter")
-    buff = Buffer([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    comptime dtype = DType.float32
+    buff = Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     sliced = buff[4:1:-1]
     var expect = 5
     for elem in sliced:
@@ -2393,10 +2394,11 @@ fn test_buffer_iter() raises:
 
 fn test_buffer_slice() raises:
     print("test_buffer_slice")
-    buff = Buffer([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    comptime dtype = DType.float32
+    buff = Buffer[dtype]([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     sliced = buff[4:1:-2]
     assert_true(
-        (sliced == Buffer([5, 3])),
+        (sliced == Buffer[dtype]([5, 3])),
         "Buffer slicing assertion failed",
     )
 
