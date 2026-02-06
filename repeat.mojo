@@ -11,10 +11,10 @@ struct Repeat[dtype: DType]:
     fn forward[
         track_grad: Bool = True
     ](
-        self: Tensor[dtype],
+        self: Tensor[Self.dtype],
         repeat: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         if len(repeat) < self.rank():
             panic(
                 "repeat: Number of dimensions of repeat dims ("
@@ -23,4 +23,4 @@ struct Repeat[dtype: DType]:
                 + self.rank().__str__()
                 + ")"
             )
-        return Tile[dtype].forward[track_grad](self, repeat, requires_grad)
+        return Tile[Self.dtype].forward[track_grad](self, repeat, requires_grad)

@@ -90,7 +90,7 @@ struct StdDev[dtype: DType]:
         axis: Int = -100,
         keepdims: Bool = False,
         unbiased: Bool = True,
-        epsilon: Scalar[Self.dtype] = Scalar[dtype](1e-12),
+        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         if axis != -100 and (axis < 0 or axis >= self.rank()):

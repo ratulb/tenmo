@@ -1,5 +1,6 @@
 from intarray import IntArray
 from shapes import Shape
+from layout.layout import IntTuple
 
 
 @register_passable
@@ -68,6 +69,13 @@ struct Strides(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
     @always_inline
     fn intarray(self) -> IntArray:
         return self.data
+
+    @always_inline
+    fn int_tuple(self) -> IntTuple:
+        var result = IntTuple()
+        for i in range(len(self)):
+            result.extend(self[i])
+        return result^
 
     @always_inline
     fn permute(self, axes: IntArray) -> Self:

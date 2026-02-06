@@ -69,7 +69,8 @@ fn from_ndarray[
     var shape_list = ndarray.shape
     var mojo_list = List[Int](capacity=len(shape_list))
     for elem in shape_list:
-        mojo_list.append(Int(elem))
+        var value: Int = Int(py=elem)
+        mojo_list.append(value)
     var shape = Shape(mojo_list)
 
     var numels = shape.product()
@@ -107,11 +108,12 @@ fn main() raises:
     var test_images = test_data[0]
     var test_labels = test_data[1]
     assert_true(len(test_images) == 10000 and len(test_labels) == 10000)
-    # test_to_ndarray()
+    test_to_ndarray()
 
 
 fn test_to_ndarray() raises:
-    o = Tensor.arange(10)
+    comptime dtype = DType.int32
+    o = Tensor[dtype].arange(10)
     a = o.reshape(2, 5)
     py_obj = to_ndarray(a)
     py = Python.import_module("builtins")

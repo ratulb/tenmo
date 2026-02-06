@@ -8,7 +8,7 @@ from utils.numerics import max_finite, min_finite
 struct Argmin[dtype: DType]:
     @staticmethod
     fn argmin(
-        tensor: Tensor[dtype],
+        tensor: Tensor[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,
     ) -> Tensor[DType.int32]:
@@ -38,7 +38,7 @@ struct Argmin[dtype: DType]:
 
         # --- Iterate over output indices ---
         for out_idx in out_shape:
-            var min_val = max_finite[dtype]()
+            var min_val = max_finite[Self.dtype]()
             var min_pos = 0
 
             # Determine the reduced index position to insert
@@ -64,7 +64,7 @@ struct Argmin[dtype: DType]:
 struct Argmax[dtype: DType]:
     @staticmethod
     fn argmax(
-        tensor: Tensor[dtype],
+        tensor: Tensor[Self.dtype],
         axis: Int = 0,
         keepdims: Bool = False,
     ) -> Tensor[DType.int32]:
@@ -94,7 +94,7 @@ struct Argmax[dtype: DType]:
 
         # --- Iterate over output indices ---
         for out_idx in out_shape:
-            var max_val = min_finite[dtype]()
+            var max_val = min_finite[Self.dtype]()
             var max_pos = 0
 
             # Determine the reduced index position to insert

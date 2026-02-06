@@ -56,17 +56,17 @@ struct Buffer[
     """
 
     var size: Int
-    var data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]
+    var data: UnsafePointer[Scalar[Self.dtype], MutExternalOrigin]
     var _refcount: UnsafePointer[
-        Atomic[DType.uint64], MutAnyOrigin
+        Atomic[DType.uint64], MutExternalOrigin
     ]  # Null if not shared!
     var external: Bool
 
     fn __init__(out self):
         self.size = 0
-        self.data = UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]()
+        self.data = UnsafePointer[Scalar[Self.dtype], MutExternalOrigin]()
         self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutAnyOrigin
+            Atomic[DType.uint64], MutExternalOrigin
         ]()  # Null
         self.external = False
 
@@ -76,14 +76,16 @@ struct Buffer[
         self.size = size
         self.external = external
         self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutAnyOrigin
+            Atomic[DType.uint64], MutExternalOrigin
         ]()  # Null (not shared yet)
 
         if size == 0:
-            self.data = UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]()
+            self.data = UnsafePointer[Scalar[Self.dtype], MutExternalOrigin]()
         else:
             if external:
-                self.data = UnsafePointer[Scalar[Self.dtype], MutAnyOrigin]()
+                self.data = UnsafePointer[
+                    Scalar[Self.dtype], MutExternalOrigin
+                ]()
             else:
                 self.data = alloc[Scalar[Self.dtype]](size)
 
@@ -118,10 +120,10 @@ struct Buffer[
         var length = len(elems)
         self.data = alloc[Scalar[Self.dtype]](length)
         self.size = length
-        memcpy(dest=self.data, src=elems._data, count=length)
+        memcpy(dest=self.data, src=elems.unsafe_ptr(), count=length)
         self.external = False
         self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutAnyOrigin
+            Atomic[DType.uint64], MutExternalOrigin
         ]()  # Null
 
     fn __init__(
@@ -131,13 +133,13 @@ struct Buffer[
     ):
         self.size = size
         self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutAnyOrigin
+            Atomic[DType.uint64], MutExternalOrigin
         ]()  # Null
         self.external = True
         self.data = (
             device_buffer.unsafe_ptr()
             .mut_cast[True]()
-            .unsafe_origin_cast[MutAnyOrigin]()
+            .unsafe_origin_cast[MutExternalOrigin]()
         )
 
     fn __init__(
@@ -147,31 +149,32 @@ struct Buffer[
     ):
         self.size = size
         self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutAnyOrigin
+            Atomic[DType.uint64], MutExternalOrigin
         ]()  # Null
         self.external = True
         self.data = (
             host_buffer.unsafe_ptr()
             .mut_cast[True]()
-            .unsafe_origin_cast[MutAnyOrigin]()
+            .unsafe_origin_cast[MutExternalOrigin]()
         )
 
     fn __init__(
         out self,
         size: Int,
+        # data: UnsafePointer[Scalar[Self.dtype], MutExternalOrigin],
         data: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
         copy: Bool = False,
     ):
         self.size = size
         self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutAnyOrigin
+            Atomic[DType.uint64], MutExternalOrigin
         ]()  # Null
         if copy:
             self.data = alloc[Scalar[Self.dtype]](size)
             memcpy(dest=self.data, src=data, count=size)
             self.external = False
         else:
-            self.data = data
+            self.data = rebind[type_of(self.data)](data)
             self.external = True
 
     # Shared state management
@@ -180,10 +183,10 @@ struct Buffer[
         """Check if this buffer has ref counting enabled."""
         return (
             self._refcount
-            != UnsafePointer[Atomic[DType.uint64], MutAnyOrigin]()
+            != UnsafePointer[Atomic[DType.uint64], MutExternalOrigin]()
         )
 
-    fn shared(mut self):
+    fn shared(mut self) -> Self:
         """
         Convert this buffer to shared mode (enable ref counting).
 
@@ -192,13 +195,13 @@ struct Buffer[
         After:  [refcount: 8 bytes][data array]
         """
         if self.is_shared():
-            return  # Already shared
+            return self  # Already shared
 
         if self.external:
             panic("Cannot share external buffer")
 
         if self.size == 0:
-            return  # Nothing to share
+            return self  # Nothing to share
 
         # Allocate new memory: [refcount][data]
         var refcount_size = size_of[Atomic[DType.uint64]]()
@@ -211,7 +214,6 @@ struct Buffer[
         refcount_ptr[] = Atomic[DType.uint64](1)
 
         # Copy data after refcount
-        # var new_data = new_alloc.offset(refcount_size).bitcast[
         var new_data = (new_alloc + refcount_size).bitcast[Scalar[Self.dtype]]()
         memcpy(dest=new_data, src=self.data, count=self.size)
 
@@ -223,6 +225,7 @@ struct Buffer[
         # Update pointers
         self.data = new_data
         self._refcount = refcount_ptr
+        return self
 
     fn ref_count(self) -> UInt64:
         """Count the amount of current references.
@@ -267,7 +270,7 @@ struct Buffer[
         if self.external:
             return  # Don't free external data
 
-        if self.is_shared():
+        if self._refcount and self.is_shared():
             # Shared buffer - atomic decrement
             if (
                 self._refcount[].fetch_sub[ordering = Consistency.RELEASE](1)
@@ -278,14 +281,12 @@ struct Buffer[
             # Last reference - free everything
             fence[ordering = Consistency.ACQUIRE]()
 
-            # Destroy data elements
             # Free allocation (starts at refcount, not data)
             var alloc_start = self._refcount.bitcast[UInt8]()
             alloc_start.free()
 
         else:
             # Unshared buffer - direct free
-            self.data.free()
             log_debug("Buffer__del__ → freed unshared buffer")
 
     @always_inline

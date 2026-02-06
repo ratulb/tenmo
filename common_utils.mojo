@@ -30,12 +30,13 @@ comptime BRIGHT_BLUE: String = "\033[94m"
 
 @always_inline("nodebug")
 fn now() -> Float64:
-    return perf_counter_ns() / 1e9
+    return Float64(perf_counter_ns()) / 1e9
 
 
 @always_inline
 fn binary_accuracy[
-    dtype: DType, //,
+    dtype: DType,
+    //,
     threshold: Scalar[dtype] = Scalar[dtype](0.5),
 ](pred: Tensor[dtype], target: Tensor[DType.int64]) -> Tuple[Int, Int]:
     var batch_size = pred.shape()[0]
@@ -118,7 +119,7 @@ fn addrs[
 
 
 fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
-    return ptr.__as_bool__() == False
+    return ptr.__bool__() == False
 
 
 @register_passable
@@ -606,3 +607,7 @@ fn print_summary[
     print("  Total params:        ", total_params)
     print("  Trainable params:    ", trainable_params)
     print("  Non-trainable params:", non_trainable_params)
+
+
+fn main():
+    pass

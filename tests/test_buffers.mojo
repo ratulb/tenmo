@@ -2429,11 +2429,12 @@ fn test_buffer_buffer_mul() raises:
 
 fn test_buffer_buffer_add() raises:
     print("test_buffer_buffer_add")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(43.0)
-    b = Buffer(72)
+    b = Buffer[dtype](72)
     b.fill(43.0)
-    expected = Buffer(72)
+    expected = Buffer[dtype](72)
     expected.fill(86)
     added = a + b
     result = added == expected
@@ -2445,7 +2446,8 @@ fn test_buffer_buffer_add() raises:
 
 fn test_buffer_scalar_float_greater_than_eq() raises:
     print("test_buffer_scalar_float_greater_than_eq")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(43.0)
     result1 = a >= 42
     a.fill(42.0)
@@ -2458,7 +2460,8 @@ fn test_buffer_scalar_float_greater_than_eq() raises:
 
 fn test_buffer_scalar_float_less_than_eq() raises:
     print("test_buffer_scalar_float_less_than_eq")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
     result1 = a <= 43
     result2 = a <= 42
@@ -2470,7 +2473,8 @@ fn test_buffer_scalar_float_less_than_eq() raises:
 
 fn test_buffer_scalar_float_greater_than() raises:
     print("test_buffer_scalar_float_greater_than")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
     result = a > 41
     assert_true(result, "Buffer scalar float greater than assertion failed")
@@ -2478,7 +2482,8 @@ fn test_buffer_scalar_float_greater_than() raises:
 
 fn test_buffer_scalar_float_less_than() raises:
     print("test_buffer_scalar_float_less_than")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
     result = a < 43
     assert_true(result, "Buffer scalar float less than assertion failed")
@@ -2486,7 +2491,8 @@ fn test_buffer_scalar_float_less_than() raises:
 
 fn test_buffer_scalar_float_inequality() raises:
     print("test_buffer_scalar_float_inequality")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
     result = a != 43
     assert_true(result, "Buffer scalar float inequality assertion failed")
@@ -2494,7 +2500,8 @@ fn test_buffer_scalar_float_inequality() raises:
 
 fn test_buffer_scalar_float_equality() raises:
     print("test_buffer_scalar_float_equality")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
     result = a == 42
     assert_true(result, "Buffer scalar float equality assertion failed")
@@ -2502,9 +2509,10 @@ fn test_buffer_scalar_float_equality() raises:
 
 fn test_buffer_dot() raises:
     print("test_buffer_dot")
-    a = Buffer(33)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](33)
     a.fill(42.0)
-    b = Buffer(33)
+    b = Buffer[dtype](33)
     b.fill(2.0)
     assert_true(
         a.dot(b) == b.dot(a) and a.dot(b) == 2772, "dot assertion failed"
@@ -2513,7 +2521,8 @@ fn test_buffer_dot() raises:
 
 fn test_buffer_prod() raises:
     print("test_buffer_prod")
-    a = Buffer(2)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](2)
     a.fill(42.0)
     result = a.product()
     assert_true(result == 1764, "prod assertion failed")
@@ -2521,7 +2530,8 @@ fn test_buffer_prod() raises:
 
 fn test_buffer_sum() raises:
     print("test_buffer_sum")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
     result = a.sum()
     assert_true(result == 3024, "Sum assertion failed")
@@ -2529,16 +2539,17 @@ fn test_buffer_sum() raises:
 
 fn test_buffer_float_greater_than_eq() raises:
     print("test_buffer_float_greater_than_eq")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer(72)
+    b = Buffer[dtype](72)
     b.fill(420)
     result = b >= a
     assert_true(result, "72 float greater than eq assertion failed")
 
-    a = Buffer(31)
+    a = Buffer[dtype](31)
     a.fill(42.0)
-    b = Buffer(31)
+    b = Buffer[dtype](31)
     b.fill(42)
     result = b >= a
     assert_true(result, "31 float greater than eq assertion failed")
@@ -2546,9 +2557,10 @@ fn test_buffer_float_greater_than_eq() raises:
 
 fn test_buffer_float_greater_than() raises:
     print("test_buffer_float_greater_than")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer(72)
+    b = Buffer[dtype](72)
     b.fill(420)
     result = b > a
     assert_true(result, "72 float greater than assertion failed")
@@ -2556,16 +2568,17 @@ fn test_buffer_float_greater_than() raises:
 
 fn test_buffer_float_less_eq_than() raises:
     print("test_buffer_float_less_eq_than")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer(72)
+    b = Buffer[dtype](72)
     b.fill(420)
     result = a <= b
     assert_true(result, "72 float less than eq assertion failed")
 
-    a = Buffer(65)
+    a = Buffer[dtype](65)
     a.fill(42.0)
-    b = Buffer(65)
+    b = Buffer[dtype](65)
     b.fill(42)
     result = a <= b
     assert_true(result, "65 float less than eq assertion failed")
@@ -2573,9 +2586,10 @@ fn test_buffer_float_less_eq_than() raises:
 
 fn test_buffer_float_less_than() raises:
     print("test_buffer_float_less_than")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer(72)
+    b = Buffer[dtype](72)
     b.fill(420)
     result = a < b
     assert_true(result, "72 float less than assertion failed")
@@ -2583,23 +2597,24 @@ fn test_buffer_float_less_than() raises:
 
 fn test_buffer_float_equality() raises:
     print("test_buffer_float_equality")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer(72)
+    b = Buffer[dtype](72)
     b.fill(42)
     result = a == b
     assert_true(result, "72 float equality assertion failed")
 
-    a = Buffer(1)
+    a = Buffer[dtype](1)
     a.fill(42.0)
-    b = Buffer(1)
+    b = Buffer[dtype](1)
     b.fill(42)
     result = a == b
     assert_true(result, "1 float equality assertion failed")
 
-    a = Buffer(1024)
+    a = Buffer[dtype](1024)
     a.fill(42.0)
-    b = Buffer(1024)
+    b = Buffer[dtype](1024)
     b.fill(42)
     result = a == b
     assert_true(result, "1024 float equality assertion failed")
@@ -2607,23 +2622,24 @@ fn test_buffer_float_equality() raises:
 
 fn test_buffer_float_inequality() raises:
     print("test_buffer_float_inequality")
-    a = Buffer(72)
+    comptime dtype = DType.float32
+    a = Buffer[dtype](72)
     a.fill(42.0)
-    b = Buffer(72)
+    b = Buffer[dtype](72)
     b.fill(420)
     result = a != b
     assert_true(result, "72 float inequality assertion failed")
 
-    a = Buffer(1)
+    a = Buffer[dtype](1)
     a.fill(42.0)
-    b = Buffer(1)
+    b = Buffer[dtype](1)
     b.fill(420)
     result = a != b
     assert_true(result, "1 float inequality assertion failed")
 
-    a = Buffer(1024)
+    a = Buffer[dtype](1024)
     a.fill(42.0)
-    b = Buffer(1024)
+    b = Buffer[dtype](1024)
     b.fill(420)
     result = a != b
     assert_true(result, "1024 float inequality assertion failed")

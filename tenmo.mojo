@@ -4,7 +4,7 @@ from math import exp, floor, log, cos, sin, sqrt, pi
 from random import seed, random_float64
 from sys import simd_width_of
 from utils.numerics import min_finite
-from memory import memcpy, memset, memset_zero
+from memory import memcpy, memset, memset_zero, AddressSpace
 from shapes import Shape, ShapeIndexIterator
 from ancestry import Ancestors
 from strides import Strides
@@ -582,16 +582,16 @@ struct Tensor[dtype: DType = DType.float32](
     ](self, other: Self,) -> Bool:
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
-    fn address(self) -> UnsafePointer[Self, MutAnyOrigin]:
-        return UnsafePointer(to=self)
-
     fn unsafe_ptr[
-        mut: Bool,
-        origin: Origin[mut],
-        //,
-    ](ref [origin]self) -> UnsafePointer[Self, origin]:
+        origin: Origin, address_space: AddressSpace, //
+    ](ref [origin, address_space]self) -> UnsafePointer[
+        Self, origin, address_space=address_space
+    ]:
         return (
-            UnsafePointer(to=self).mut_cast[mut]().unsafe_origin_cast[origin]()
+            UnsafePointer(to=self)
+            .unsafe_mut_cast[origin.mut]()
+            .unsafe_origin_cast[origin]()
+            .address_space_cast[address_space]()
         )
 
     fn seed_grad(mut self, with_tensor: Tensor[Self.dtype]):
@@ -2211,10 +2211,10 @@ struct Tensor[dtype: DType = DType.float32](
 
 @register_passable
 struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
-    var src: Pointer[Tensor[Self.dtype], origin]
+    var src: Pointer[Tensor[Self.dtype], Self.origin]
     var index_itr: ShapeIndexIterator[ImmutAnyOrigin]
 
-    fn __init__(out self, src: Pointer[Tensor[Self.dtype], origin]):
+    fn __init__(out self, src: Pointer[Tensor[Self.dtype], Self.origin]):
         self.src = src
         self.index_itr = rebind[ShapeIndexIterator[ImmutAnyOrigin]](
             src[].shape().__iter__()
@@ -2232,3 +2232,7 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
 
     fn __has_next__(self) -> Bool:
         return self.index_itr.__has_next__()
+
+
+fn main() raises:
+    pass
