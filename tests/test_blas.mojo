@@ -56,7 +56,7 @@ fn benchmark_cifar_sizes() raises:
 fn main() raises:
     # benchmark_cifar_sizes()
     run_all_blas_tests()
-    #test_case_4_comprehensive()
+    # test_case_4_comprehensive()
     test_case_2()
     test_blas_case_1_A_B()
     test_blas_case_2_Atranspose_B()
@@ -281,6 +281,7 @@ fn test_blas_matmul_backward_simple() raises:
     assert_true(B.grad().all_close[atol=1e-4](expected_grad_B))
     _ = blas^
 
+
 fn test_blas_matmul_backward_single_requires_grad() raises:
     """Test backward when only one tensor requires grad."""
     print("test_blas_matmul_backward_single_requires_grad")
@@ -300,6 +301,7 @@ fn test_blas_matmul_backward_single_requires_grad() raises:
     assert_true(A.grad().shape()[0] == 2)
     assert_true(A.grad().shape()[1] == 2)
     _ = blas^
+
 
 fn test_blas_matmul_backward_chain() raises:
     """Test backward through chain of matmuls."""
@@ -324,6 +326,7 @@ fn test_blas_matmul_backward_chain() raises:
     assert_true(C.grad().shape()[0] == 2)
 
     _ = blas^
+
 
 # ============================================================================
 # Correctness vs Native Implementation
@@ -395,12 +398,12 @@ fn test_blas_performance_small() raises:
     var start = perf_counter_ns()
     for _ in range(1000):
         var _C = blas.matmul(A, B)
-    var time_blas = (perf_counter_ns() - start) / 1e9
+    var time_blas = Float64(perf_counter_ns() - start) / 1e9
 
     start = perf_counter_ns()
     for _ in range(1000):
         var _C = A.matmul(B)
-    var time_native = (perf_counter_ns() - start) / 1e9
+    var time_native = Float64(perf_counter_ns() - start) / 1e9
 
     print("  BLAS (1000 iters):", time_blas, "sec")
     print("  Native (1000 iters):", time_native, "sec")
@@ -419,16 +422,16 @@ fn test_blas_performance_medium() raises:
     var start = perf_counter_ns()
     for _ in range(100):
         var _C = blas.matmul(A, B)
-    var time_blas = (perf_counter_ns() - start) / 1e9
+    var time_blas = Float64(perf_counter_ns() - start) / 1e9
 
     start = perf_counter_ns()
     for _ in range(100):
         var _C = A.matmul(B)
-    var time_native = (perf_counter_ns() - start) / 1e9
+    var time_native = Float64(perf_counter_ns() - start) / 1e9
 
     print("  BLAS (100 iters):", time_blas, "sec")
     print("  Native (100 iters):", time_native, "sec")
-    print("  Speedup:", time_native / time_blas, "x")
+    print("  Speedup:", (time_native / time_blas), "x")
 
 
 fn test_blas_performance_large() raises:
@@ -443,16 +446,16 @@ fn test_blas_performance_large() raises:
     var start = perf_counter_ns()
     for _ in range(10):
         var _C = blas.matmul(A, B)
-    var time_blas = (perf_counter_ns() - start) / 1e9
+    var time_blas = Float64(perf_counter_ns() - start) / 1e9
 
     start = perf_counter_ns()
     for _ in range(10):
         var _C = A.matmul(B)
-    var time_native = (perf_counter_ns() - start) / 1e9
+    var time_native = Float64(perf_counter_ns() - start) / 1e9
 
     print("  BLAS (10 iters):", time_blas, "sec")
     print("  Native (10 iters):", time_native, "sec")
-    print("  Speedup:", time_native / time_blas, "x")
+    print("  Speedup:", (time_native / time_blas), "x")
 
 
 # ============================================================================
@@ -480,6 +483,7 @@ fn test_blas_matmul_vector_like() raises:
 
     _ = blas^
 
+
 fn test_blas_matmul_non_contiguous() raises:
     """Test with non-contiguous input (should be made contiguous)."""
     print("test_blas_matmul_non_contiguous")
@@ -499,6 +503,7 @@ fn test_blas_matmul_non_contiguous() raises:
     assert_true(C.shape()[1] == 10)
 
     _ = blas^
+
 
 fn run_all_blas_tests() raises:
     # Basic tests
@@ -552,11 +557,10 @@ fn run_all_blas_tests() raises:
     print("=== All BLAS Tests Passed! ===\n")
 
 
-
-
 # ============================================================================
 # COMPREHENSIVE BLAS MATMUL TESTS
 # ============================================================================
+
 
 fn test_blas_case_4_Atranspose_Btranspose() raises:
     """Test Case 4: C = A^T @ B^T."""
@@ -568,18 +572,17 @@ fn test_blas_case_4_Atranspose_Btranspose() raises:
 
     # Dimensions: A(3,2)^T @ B(4,3)^T → A^T(2,3) @ B^T(3,4) → C(2,4)
     var A = Tensor[dtype].d2(
-        [[1.0, 2.0],
-         [3.0, 4.0],
-         [5.0, 6.0]],
-        requires_grad=True
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
     )  # 3x2
 
     var B = Tensor[dtype].d2(
-        [[7.0, 8.0, 9.0],
-         [10.0, 11.0, 12.0],
-         [13.0, 14.0, 15.0],
-         [16.0, 17.0, 18.0]],
-        requires_grad=True
+        [
+            [7.0, 8.0, 9.0],
+            [10.0, 11.0, 12.0],
+            [13.0, 14.0, 15.0],
+            [16.0, 17.0, 18.0],
+        ],
+        requires_grad=True,
     )  # 4x3
 
     # === NATIVE MOJO ===
@@ -630,6 +633,7 @@ fn test_blas_case_4_Atranspose_Btranspose() raises:
 
     _ = blas^
 
+
 fn test_case_2() raises:
     """Test Case 2: C = A^T @ B (The problematic one)."""
     print("\n" + "=" * 80)
@@ -640,17 +644,12 @@ fn test_case_2() raises:
 
     # Same matrices as before
     var A = Tensor[dtype].d2(
-        [[1.0, 2.0],
-         [3.0, 4.0],
-         [5.0, 6.0]],
-        requires_grad=True
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
     )
 
     var B = Tensor[dtype].d2(
-        [[7.0, 8.0, 9.0],
-         [10.0, 11.0, 12.0],
-         [13.0, 14.0, 15.0]],
-        requires_grad=True
+        [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0], [13.0, 14.0, 15.0]],
+        requires_grad=True,
     )
 
     # BLAS forward
@@ -667,15 +666,11 @@ fn test_case_2() raises:
 
     # Expected from PyTorch
     var expected_grad_A = Tensor[dtype].d2(
-        [[24.0, 24.0],
-         [33.0, 33.0],
-         [42.0, 42.0]]
+        [[24.0, 24.0], [33.0, 33.0], [42.0, 42.0]]
     )
 
     var expected_grad_B = Tensor[dtype].d2(
-        [[3.0, 3.0, 3.0],
-         [7.0, 7.0, 7.0],
-         [11.0, 11.0, 11.0]]
+        [[3.0, 3.0, 3.0], [7.0, 7.0, 7.0], [11.0, 11.0, 11.0]]
     )
 
     print("\nValidation:")
@@ -695,6 +690,7 @@ fn test_case_2() raises:
 
     _ = blas^
 
+
 fn test_blas_case_1_A_B() raises:
     """Test Case 1: C = A @ B (no transposes)."""
     print("\n" + "=" * 80)
@@ -705,16 +701,11 @@ fn test_blas_case_1_A_B() raises:
 
     # Create tensors: A(3,2), B(2,4) → C(3,4)
     var A = Tensor[dtype].d2(
-        [[1.0, 2.0],
-         [3.0, 4.0],
-         [5.0, 6.0]],
-        requires_grad=True
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
     )
 
     var B = Tensor[dtype].d2(
-        [[7.0, 8.0, 9.0, 10.0],
-         [11.0, 12.0, 13.0, 14.0]],
-        requires_grad=True
+        [[7.0, 8.0, 9.0, 10.0], [11.0, 12.0, 13.0, 14.0]], requires_grad=True
     )
 
     # === NATIVE MOJO ===
@@ -730,7 +721,6 @@ fn test_blas_case_1_A_B() raises:
     var native_A_grad = A.grad().copy()
     var native_B_grad = B.grad().copy()
 
-
     # Reset gradients
     A.zero_grad()
     B.zero_grad()
@@ -745,7 +735,6 @@ fn test_blas_case_1_A_B() raises:
     var C_blas = blas.matmul(A, B, transpose_A=False, transpose_B=False)
     var loss_blas = C_blas.sum()
     loss_blas.backward()
-
 
     # === VALIDATION ===
     print("\n3. VALIDATION:")
@@ -771,17 +760,12 @@ fn test_blas_case_2_Atranspose_B() raises:
     comptime dtype = DType.float32
 
     A = Tensor[dtype].d2(
-        [[1.0, 2.0],
-         [3.0, 4.0],
-         [5.0, 6.0]],
-        requires_grad=True
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
     )  # 3x2 (m=3, k=2)
 
     B = Tensor[dtype].d2(
-        [[7.0, 8.0, 9.0],
-         [10.0, 11.0, 12.0],
-         [13.0, 14.0, 15.0]],
-        requires_grad=True
+        [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0], [13.0, 14.0, 15.0]],
+        requires_grad=True,
     )  # 3x3 (m=3, n=3)
 
     print("\nFinal dimensions:")
@@ -847,18 +831,12 @@ fn test_blas_case_3_A_Btranspose() raises:
 
     # Dimensions: A(3,2) @ B(4,2)^T → A(3,2) @ B^T(2,4) → C(3,4)
     var A = Tensor[dtype].d2(
-        [[1.0, 2.0],
-         [3.0, 4.0],
-         [5.0, 6.0]],
-        requires_grad=True
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
     )  # 3x2
 
     var B = Tensor[dtype].d2(
-        [[7.0, 8.0],
-         [9.0, 10.0],
-         [11.0, 12.0],
-         [13.0, 14.0]],
-        requires_grad=True
+        [[7.0, 8.0], [9.0, 10.0], [11.0, 12.0], [13.0, 14.0]],
+        requires_grad=True,
     )  # 4x2
 
     # === NATIVE MOJO ===
@@ -867,7 +845,6 @@ fn test_blas_case_3_A_Btranspose() raises:
     var C_native = A.matmul(B_T)  # (3x2) @ (2x4) = 3x4
     var loss_native = C_native.sum()
     loss_native.backward()
-
 
     var native_A_grad = A.grad().copy()
     var native_B_grad = B.grad().copy()
@@ -882,7 +859,6 @@ fn test_blas_case_3_A_Btranspose() raises:
     var C_blas = blas.matmul(A, B, transpose_A=False, transpose_B=True)
     var loss_blas = C_blas.sum()
     loss_blas.backward()
-
 
     # === VALIDATION ===
     print("\n3. VALIDATION:")
@@ -993,6 +969,7 @@ fn test_case_4_comprehensive() raises:
 # DIMENSION EDGE CASE TESTS
 # ============================================================================
 
+
 fn test_blas_matmul_edge_cases() raises:
     """Test edge cases: different sizes, non-square, etc."""
     print("\n" + "=" * 80)
@@ -1049,6 +1026,7 @@ fn test_blas_matmul_edge_cases() raises:
 # GRADIENT ACCURACY TESTS (Compare with finite differences)
 # ============================================================================
 
+
 fn test_blas_gradient_accuracy() raises:
     """Test gradient accuracy using finite differences."""
     print("\n" + "=" * 80)
@@ -1059,17 +1037,9 @@ fn test_blas_gradient_accuracy() raises:
     var eps = Scalar[dtype](0.0001)
 
     # Simple test case: C = A @ B, A(2,2), B(2,2)
-    var A = Tensor[dtype].d2(
-        [[1.0, 2.0],
-         [3.0, 4.0]],
-        requires_grad=True
-    )
+    var A = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
 
-    var B = Tensor[dtype].d2(
-        [[5.0, 6.0],
-         [7.0, 8.0]],
-        requires_grad=True
-    )
+    var B = Tensor[dtype].d2([[5.0, 6.0], [7.0, 8.0]], requires_grad=True)
 
     var blas = BLASHandle[dtype]()
 
@@ -1086,17 +1056,17 @@ fn test_blas_gradient_accuracy() raises:
 
     # Perturb A[0,0] and compute finite difference
     var A_plus = A.copy()
-    A_plus[0,0] = A_plus[0,0] + eps
+    A_plus[0, 0] = A_plus[0, 0] + eps
     var C_plus = blas.matmul(A_plus, B)
     var loss_plus = C_plus.sum()
 
     var A_minus = A.copy()
-    A_minus[0,0] = A_minus[0,0] - eps
+    A_minus[0, 0] = A_minus[0, 0] - eps
     var C_minus = blas.matmul(A_minus, B)
     var loss_minus = C_minus.sum()
 
     var grad_A_fd = (loss_plus - loss_minus) / (2 * eps)
-    var grad_A_blas_00 = grad_A_blas[0,0]
+    var grad_A_blas_00 = grad_A_blas[0, 0]
 
     print("\nFinite difference check for grad_A[0,0]:")
     print("\nBLAS gradient:\n", grad_A_blas_00)
@@ -1107,8 +1077,9 @@ fn test_blas_gradient_accuracy() raises:
     (grad_A_blas_00 - grad_A_fd).print()
 
     # Should be close
-    assert_true(((grad_A_blas_00 - grad_A_fd).__abs__() < 0.014).all_true(),
-                "Gradient accuracy test failed!")
+    assert_true(
+        ((grad_A_blas_00 - grad_A_fd).__abs__() < 0.014).all_true(),
+        "Gradient accuracy test failed!",
+    )
 
     print("\n✓ Gradient accuracy test passed!")
-
