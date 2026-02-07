@@ -2,9 +2,11 @@ from tenmo import Tensor
 from testing import assert_true, assert_false
 from common_utils import isnan, isinf
 from math import log
+
 # ============================================================================
 # TESTS - Forward Pass
 # ============================================================================
+
 
 fn test_log_forward_basic() raises:
     """Test basic logarithm computation."""
@@ -20,7 +22,6 @@ fn test_log_forward_basic() raises:
     assert_true(y.all_close[atol=1e-5](expected))
 
 
-
 fn test_log_forward_with_epsilon() raises:
     """Test logarithm with very small values (epsilon handling)."""
     print("test_log_forward_with_epsilon")
@@ -31,14 +32,13 @@ fn test_log_forward_with_epsilon() raises:
     var y = x.log(epsilon=epsilon)
 
     # First two values should be clamped to epsilon
-    # log(1e-12) ˜ -27.63
+    # log(1e-12)  -27.63
     var expected_first = log(epsilon)
 
     # Should not crash and should produce finite values
     assert_true(not isnan(y[0]))
     assert_true(not isinf(y[0]))
     assert_true(abs(y[0] - expected_first) < 1e-6)
-
 
 
 fn test_log_forward_zero_handling() raises:
@@ -58,7 +58,6 @@ fn test_log_forward_zero_handling() raises:
     assert_true(abs(y[1] - 0.0) < 1e-6)  # log(1) = 0
 
 
-
 fn test_log_forward_negative_values() raises:
     """Test that negative values are handled (clamped to epsilon)."""
     print("test_log_forward_negative_values")
@@ -74,7 +73,6 @@ fn test_log_forward_negative_values() raises:
     assert_true(abs(y[1] - expected_neg) < 1e-6)
 
 
-
 fn test_log_forward_2d() raises:
     """Test logarithm on 2D tensor."""
     print("test_log_forward_2d")
@@ -83,13 +81,9 @@ fn test_log_forward_2d() raises:
     var x = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
     var y = x.log()
 
-    var expected = Tensor[dtype].d2([
-        [0.0, 0.693147],
-        [1.098612, 1.386294]
-    ])
+    var expected = Tensor[dtype].d2([[0.0, 0.693147], [1.098612, 1.386294]])
 
     assert_true(y.all_close[atol=1e-5](expected))
-
 
 
 fn test_log_forward_e() raises:
@@ -103,10 +97,10 @@ fn test_log_forward_e() raises:
     assert_true(abs(y.item() - 1.0) < 1e-9)
 
 
-
 # ============================================================================
 # TESTS - Backward Pass
 # ============================================================================
+
 
 fn test_log_backward_basic() raises:
     """Test basic gradient computation: d/dx log(x) = 1/x."""
@@ -123,7 +117,6 @@ fn test_log_backward_basic() raises:
     var expected = Tensor[dtype]([0.5, 0.333333, 0.25])
 
     assert_true(x.grad().all_close[atol=1e-5](expected))
-
 
 
 fn test_log_backward_weighted() raises:
@@ -147,7 +140,6 @@ fn test_log_backward_weighted() raises:
     assert_true(x.grad().all_close[atol=1e-5](expected))
 
 
-
 fn test_log_backward_chain_rule() raises:
     """Test gradient with chain rule: d/dx log(x^2)."""
     print("test_log_backward_chain_rule")
@@ -164,7 +156,6 @@ fn test_log_backward_chain_rule() raises:
     var expected = Tensor[dtype]([1.0, 0.666667, 0.5])
 
     assert_true(x.grad().all_close[atol=1e-4](expected))
-
 
 
 fn test_log_backward_with_epsilon() raises:
@@ -187,7 +178,6 @@ fn test_log_backward_with_epsilon() raises:
     assert_true(abs(x.grad()[2] - 0.5) < 1e-5)
 
 
-
 fn test_log_backward_zero_input() raises:
     """Test gradient with zero input (should use epsilon)."""
     print("test_log_backward_zero_input")
@@ -202,9 +192,10 @@ fn test_log_backward_zero_input() raises:
     # Zero is clamped to epsilon, gradient is 1/epsilon
     var expected_zero_grad = 1.0 / epsilon
 
-    assert_true(abs(x.grad()[0] - expected_zero_grad) < 1.0)  # Should be very large
+    assert_true(
+        abs(x.grad()[0] - expected_zero_grad) < 1.0
+    )  # Should be very large
     assert_true(x.grad()[0] > 1e6)  # Should be large
-
 
 
 fn test_log_backward_2d() raises:
@@ -217,13 +208,9 @@ fn test_log_backward_2d() raises:
     var loss = y.sum()
     loss.backward()
 
-    var expected = Tensor[dtype].d2([
-        [1.0, 0.5],
-        [0.333333, 0.25]
-    ])
+    var expected = Tensor[dtype].d2([[1.0, 0.5], [0.333333, 0.25]])
 
     assert_true(x.grad().all_close[atol=1e-5](expected))
-
 
 
 fn test_log_backward_multiple_uses() raises:
@@ -241,15 +228,15 @@ fn test_log_backward_multiple_uses() raises:
     loss.backward()
 
     # Gradient accumulation: (2 + 3) / x = 5 / x
-    var expected = Tensor[dtype]([2.5, 5.0/3.0])
+    var expected = Tensor[dtype]([2.5, 5.0 / 3.0])
 
     assert_true(x.grad().all_close[atol=1e-5](expected))
-
 
 
 # ============================================================================
 # NUMERICAL STABILITY TESTS
 # ============================================================================
+
 
 fn test_log_numerical_stability_large() raises:
     """Test numerical stability with large values."""
@@ -266,8 +253,6 @@ fn test_log_numerical_stability_large() raises:
         assert_true(y[i] > 0.0)  # log of large positive is positive
 
 
-
-
 fn test_log_numerical_stability_small() raises:
     """Test numerical stability with very small values."""
     print("test_log_numerical_stability_small")
@@ -281,8 +266,6 @@ fn test_log_numerical_stability_small() raises:
     for i in range(3):
         assert_true(not isnan(y[i]))
         assert_true(not isinf(y[i]))
-
-
 
 
 fn test_log_gradient_stability() raises:
@@ -301,11 +284,10 @@ fn test_log_gradient_stability() raises:
         assert_false(isinf(x.grad()[i]))
 
 
-
-
 # ============================================================================
 # EDGE CASES
 # ============================================================================
+
 
 fn test_log_single_element() raises:
     """Test logarithm of single element tensor."""
@@ -317,8 +299,7 @@ fn test_log_single_element() raises:
     y.backward()
 
     assert_true(abs(y[0] - 1.0) < 1e-9)  # log(e) = 1
-    assert_true(abs(x.grad()[0] - (1.0/2.718281828459045)) < 1e-9)  # 1/e
-
+    assert_true(abs(x.grad()[0] - (1.0 / 2.718281828459045)) < 1e-9)  # 1/e
 
 
 fn test_log_all_ones() raises:
@@ -334,7 +315,6 @@ fn test_log_all_ones() raises:
     # log(1) = 0, gradient = 1/1 = 1
     assert_true(y.sum().item() < 1e-10)  # All zeros
     assert_true(x.grad().all_close[atol=1e-6](Tensor[dtype].ones(5)))
-
 
 
 fn test_log_custom_epsilon_values() raises:
@@ -355,17 +335,16 @@ fn test_log_custom_epsilon_values() raises:
     assert_true(abs(y3[0] - log(Scalar[dtype](1e-15))) < 1e-8)
 
 
-
-
 # ============================================================================
 # MASTER TEST RUNNER
 # ============================================================================
 
+
 fn run_all_log_tests() raises:
     """Run all logarithm tests."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("RUNNING COMPREHENSIVE LOGARITHM TEST SUITE")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     # Forward pass tests
     print("--- LOG FORWARD TESTS ---")
@@ -398,14 +377,15 @@ fn run_all_log_tests() raises:
     test_log_all_ones()
     test_log_custom_epsilon_values()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("ALL TESTS PASSED!")
-    print("="*60)
+    print("=" * 60)
 
 
 # ============================================================================
 # USAGE EXAMPLE
 # ============================================================================
+
 
 fn main() raises:
     """Example usage and quick verification."""
@@ -416,21 +396,13 @@ fn main() raises:
     # Example 1: Basic usage
     var x = Tensor[dtype]([1.0, 2.0, 3.0], requires_grad=True)
     var y = x.log()
-    print("\nlog([1, 2, 3]):")
-    y.print()
 
     # Example 2: With zero handling
-    var x_with_zero = Tensor[dtype]([0.0, 1.0, 2.0], requires_grad=True)
-    var y_with_zero = x_with_zero.log(epsilon=1e-10)
-    print("\nlog([0, 1, 2]) with epsilon=1e-10:")
-    y_with_zero.print()
+    # var x_with_zero = Tensor[dtype]([0.0, 1.0, 2.0], requires_grad=True)
+    # var y_with_zero = x_with_zero.log(epsilon=1e-10)
 
     # Example 3: Gradient computation
     var loss = y.sum()
     loss.backward()
-    print("\nGradient (should be [1, 0.5, 0.333]):")
-    x.grad().print()
 
-    # Run all tests
-    print("\n")
     run_all_log_tests()
