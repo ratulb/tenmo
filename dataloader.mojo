@@ -99,7 +99,7 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 ):
     """Zero-copy batched data loading that preserves tensor shapes."""
 
-    var dataset: Pointer[DatasetSource, Self.origin]
+    var dataset: Pointer[Self.DatasetSource, Self.origin]
     var batch_size: Int
     var shuffle_data: Bool
     var drop_last: Bool
@@ -114,9 +114,13 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     var _labels_per_sample: Int
 
     # Pre-allocated batch buffers
-    var _batch: Batch[DatasetSource._feature_dtype, DatasetSource._label_dtype]
+    var _batch: Batch[
+        Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
+    ]
     var _last_batch: Optional[
-        Batch[DatasetSource._feature_dtype, DatasetSource._label_dtype]
+        Batch[
+            Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
+        ]
     ]
     var _last_batch_size: Int
 
@@ -138,7 +142,7 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 
     fn __init__(
         out self,
-        dataset: Pointer[DatasetSource, Self.origin],
+        dataset: Pointer[Self.DatasetSource, Self.origin],
         batch_size: Int,
         shuffle: Bool = False,
         drop_last: Bool = False,
@@ -183,15 +187,15 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             batch_label_dims.append(self._label_shape[i])
 
         # Allocate full-size batch
-        var batch_features = Tensor[DatasetSource._feature_dtype].zeros(
+        var batch_features = Tensor[Self.DatasetSource._feature_dtype].zeros(
             Shape(batch_feature_dims)
         )
-        var batch_labels = Tensor[DatasetSource._label_dtype].zeros(
+        var batch_labels = Tensor[Self.DatasetSource._label_dtype].zeros(
             Shape(batch_label_dims)
         )
 
         self._batch = Batch[
-            DatasetSource._feature_dtype, DatasetSource._label_dtype
+            Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
         ](batch_features^, batch_labels^)
 
         # Allocate last batch if needed
@@ -214,15 +218,16 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
                 for i in range(self._label_shape.rank()):
                     last_label_dims.append(self._label_shape[i])
 
-                var last_features = Tensor[DatasetSource._feature_dtype].zeros(
-                    Shape(last_feature_dims)
-                )
-                var last_labels = Tensor[DatasetSource._label_dtype].zeros(
+                var last_features = Tensor[
+                    Self.DatasetSource._feature_dtype
+                ].zeros(Shape(last_feature_dims))
+                var last_labels = Tensor[Self.DatasetSource._label_dtype].zeros(
                     Shape(last_label_dims)
                 )
 
                 self._last_batch = Batch[
-                    DatasetSource._feature_dtype, DatasetSource._label_dtype
+                    Self.DatasetSource._feature_dtype,
+                    Self.DatasetSource._label_dtype,
                 ](last_features^, last_labels^)
             else:
                 self._last_batch_size = 0
@@ -240,7 +245,7 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     fn __next__(
         mut self,
     ) -> ref [self._batch, self._last_batch.value()] Batch[
-        DatasetSource._feature_dtype, DatasetSource._label_dtype
+        Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
     ]:
         """Get next batch with proper shape preservation."""
         var start_idx = self._current_idx
@@ -268,10 +273,12 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 
     fn _fill_batch(
         self,
-        batch: Batch[DatasetSource._feature_dtype, DatasetSource._label_dtype],
+        batch: Batch[
+            Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
+        ],
         start_idx: Int,
         actual_batch_size: Int,
-        ref dataset_ref: DatasetSource,
+        ref dataset_ref: Self.DatasetSource,
     ):
         """Fill batch with data, preserving multi-dimensional structure."""
         var dataset_features_ptr = dataset_ref.get_features_ptr()
@@ -360,8 +367,8 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 ):
     """Dataset that preserves original tensor shapes."""
 
-    comptime _feature_dtype = feature_dtype
-    comptime _label_dtype = label_dtype
+    comptime _feature_dtype = Self.feature_dtype
+    comptime _label_dtype = Self.label_dtype
 
     var _features: Tensor[Self.feature_dtype]
     var _labels: Tensor[Self.label_dtype]
@@ -505,8 +512,8 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 ):
     """Dataset from tensors. References existing data (no copy)."""
 
-    comptime _feature_dtype = feature_dtype
-    comptime _label_dtype = label_dtype
+    comptime _feature_dtype = Self.feature_dtype
+    comptime _label_dtype = Self.label_dtype
 
     var _features: Tensor[Self.feature_dtype]
     var _labels: Tensor[Self.label_dtype]
