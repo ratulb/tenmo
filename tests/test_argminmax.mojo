@@ -35,7 +35,7 @@ fn test_tensor_argmax_keepdims() raises:
     assert_true(a1.shape() == Shape(2))
     assert_true(a2.shape() == Shape(2, 1))
     assert_true(a1 == Tensor[DType.int32].d1([1, 2]))
-    assert_true(a2 == Tensor.d2([[1], [2]]).to_dtype[DType.int32]())
+    assert_true(a2 == Tensor[dtype].d2([[1], [2]]).to_dtype[DType.int32]())
     print("✓ Passed argmax keepdims test")
 
 
@@ -82,7 +82,8 @@ fn test_tensor_argmax_2d_keepdims() raises:
 fn test_tensor_argmax_3d_axis_and_neg() raises:
     print("test_tensor_argmax_3d_axis_and_neg")
     comptime dtype = DType.float32
-    var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4))
+    var a = Tensor[dtype].arange(0, 24)
+    t = a.reshape(Shape(2, 3, 4))
     var a0 = t.argmax(axis=0)
     var a1 = t.argmax(axis=1)
     var a2 = t.argmax(axis=2)
@@ -97,7 +98,8 @@ fn test_tensor_argmax_3d_axis_and_neg() raises:
 fn test_tensor_argmax_keepdims_true_false_3d() raises:
     print("test_tensor_argmax_keepdims_true_false_3d")
     comptime dtype = DType.float32
-    var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4))
+    var a = Tensor[dtype].arange(0, 24)
+    t = a.reshape(Shape(2, 3, 4))
     var a_no = t.argmax(axis=1, keepdims=False)
     var a_yes = t.argmax(axis=1, keepdims=True)
     assert_true(a_no.shape() == Shape(2, 4))
@@ -148,7 +150,8 @@ fn test_tensor_argmin_2d_keepdims() raises:
 fn test_tensor_argmin_3d_axis_and_neg() raises:
     print("test_tensor_argmin_3d_axis_and_neg")
     comptime dtype = DType.float32
-    var t = Tensor[dtype].arange(10, 34).reshape(Shape(2, 3, 4))
+    var a = Tensor[dtype].arange(10, 34)
+    t = a.reshape(Shape(2, 3, 4))
     var a0 = t.argmin(axis=0)
     var a1 = t.argmin(axis=1)
     var a2 = t.argmin(axis=2)
@@ -163,7 +166,8 @@ fn test_tensor_argmin_3d_axis_and_neg() raises:
 fn test_tensor_argmin_keepdims_true_false_3d() raises:
     print("test_tensor_argmin_keepdims_true_false_3d")
     comptime dtype = DType.float32
-    var t = Tensor[dtype].arange(10, 34).reshape(Shape(2, 3, 4))
+    var a = Tensor[dtype].arange(10, 34)
+    t = a.reshape(Shape(2, 3, 4))
     var a_no = t.argmin(axis=1, keepdims=False)
     var a_yes = t.argmin(axis=1, keepdims=True)
     assert_true(a_no.shape() == Shape(2, 4))
