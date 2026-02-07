@@ -59,6 +59,7 @@ fn test_tensor_dataset_2d_labels() raises:
     )
     print("✓ Passed")
 
+
 fn test_tensor_dataset_getitem_1d_labels() raises:
     print("test_tensor_dataset_getitem_1d_labels")
 
@@ -71,7 +72,7 @@ fn test_tensor_dataset_getitem_1d_labels() raises:
     assert_true(feat.shape()[0] == 2, "Feature should have 2 elements")
     assert_true(feat[0] == 3, "First feature element should be 3")
     assert_true(feat[1] == 4, "Second feature element should be 4")
-    #assert_true(lab[0] == 20, "Label should be 20")
+    # assert_true(lab[0] == 20, "Label should be 20")
     assert_true(lab[[]] == 20, "Label should be 20")
     print("✓ Passed")
 
@@ -2014,9 +2015,11 @@ fn test_numpy_dataset_integration() raises:
     print("test_numpy_dataset_integration")
 
     var np = Python.import_module("numpy")
-
+    var array: PythonObject = Python.list(
+        Python.list(1.0, 2.0), Python.list(3.0, 4.0), Python.list(5.0, 6.0)
+    )
     var features_np = np.array(
-        [Python.list(1.0, 2.0), Python.list(3.0, 4.0), Python.list(5.0, 6.0)],
+        array,
         dtype=np.float32,
     )
 
