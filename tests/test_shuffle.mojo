@@ -118,9 +118,10 @@ fn test_tensor_shuffle_multi_dimensional() raises:
     print("test_tensor_shuffle_multi_dimensional")
     comptime dtype = DType.float32
 
-    var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4))
+    var a = Tensor[dtype].arange(0, 24)
+    t = a.reshape(Shape(2, 3, 4))
     var shuffled = Shuffle[dtype].forward[False](t, [2, 0, 1], axis=1)
-    expected = Tensor.d3(
+    expected = Tensor[dtype].d3(
         [
             [
                 [8.0, 9.0, 10.0, 11.0],
@@ -133,7 +134,7 @@ fn test_tensor_shuffle_multi_dimensional() raises:
                 [16.0, 17.0, 18.0, 19.0],
             ],
         ]
-    ).float()
+    )
 
     assert_true(shuffled.shape() == Shape(2, 3, 4))
     assert_true(shuffled == expected)
