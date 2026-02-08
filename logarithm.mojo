@@ -2,7 +2,7 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_LOG
 from gradbox import Gradbox
-from math import log10
+from math import log
 from sys import simd_width_of
 
 
@@ -71,7 +71,7 @@ struct Logarithm[dtype: DType]:
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
         epsilon: Scalar[Self.dtype] = 1e-12,  # Default epsilon
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """
         Natural logarithm: y = log(x).
 
@@ -101,16 +101,13 @@ struct Logarithm[dtype: DType]:
                 var chunk = src.load[width=simd_width](offset + i)
                 # Clamp to epsilon to avoid log(0)
                 var chunk_safe = max(chunk, epsilon)
-                # log10(block) * 2.3025850929
-                dest.store[width=simd_width](
-                    i, log10(chunk_safe) * 2.3025850929
-                )
+                dest.store[width=simd_width](i, log(chunk_safe))
 
             # Handle remainder
             for i in range(numels - numels % simd_width, numels):
                 var val = src[offset + i]
                 var val_safe = max(val, epsilon)
-                dest[i] = log10(val_safe) * 2.3025850929
+                dest[i] = log(val_safe)
         else:
             # Non-contiguous fallback
             var index = 0
@@ -118,7 +115,7 @@ struct Logarithm[dtype: DType]:
             for idx in self.index_iterator():
                 var val = self.element_at(idx)
                 var val_safe = max(val, epsilon)
-                out_buffer[index] = log10(val_safe) * 2.3025850929
+                out_buffer[index] = log(val_safe)
                 index += 1
 
         @parameter

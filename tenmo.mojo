@@ -571,7 +571,7 @@ struct Tensor[dtype: DType = DType.float32](
         self,
         requires_grad: Optional[Bool] = None,
         epsilon: Scalar[Self.dtype] = 1e-12,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         return Logarithm[Self.dtype].forward[track_grad](
             self, requires_grad, epsilon
         )
@@ -589,6 +589,18 @@ struct Tensor[dtype: DType = DType.float32](
     ]:
         return (
             UnsafePointer(to=self)
+            .unsafe_mut_cast[origin.mut]()
+            .unsafe_origin_cast[origin]()
+            .address_space_cast[address_space]()
+        )
+
+    fn data_ptr[
+        origin: Origin, address_space: AddressSpace, //
+    ](ref [origin, address_space]self) -> UnsafePointer[
+        Scalar[Self.dtype], origin, address_space=address_space
+    ]:
+        return (
+            self.buffer.data_ptr()
             .unsafe_mut_cast[origin.mut]()
             .unsafe_origin_cast[origin]()
             .address_space_cast[address_space]()

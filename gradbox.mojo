@@ -770,5 +770,18 @@ struct Gradbox[dtype: DType](
             num_last=num_last,
         )
 
-    fn __del__(deinit self):
-        _ = self.buffer^
+    fn data_ptr[
+        origin: Origin, address_space: AddressSpace, //
+    ](ref [origin, address_space]self) -> UnsafePointer[
+        Scalar[Self.dtype], origin, address_space=address_space
+    ]:
+        return (
+            self.buffer.data_ptr()
+            .unsafe_mut_cast[origin.mut]()
+            .unsafe_origin_cast[origin]()
+            .address_space_cast[address_space]()
+        )
+
+
+fn main():
+    pass

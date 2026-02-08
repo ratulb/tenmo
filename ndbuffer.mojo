@@ -5,7 +5,7 @@ from intarray import IntArray
 from indexhelper import IndexCalculator, IndexIterator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic, log_warning
-from memory import memcpy
+from memory import memcpy, AddressSpace
 from collections import Set
 from sys import simd_width_of
 from mnemonics import (
@@ -383,7 +383,6 @@ struct NDBuffer[dtype: DType](
         new_strides = strides.or_else(Strides.default(new_shape))
         return NDBuffer[Self.dtype](
             buffer=self.buffer.copy(),
-            # buffer=self.buffer,
             shape=new_shape,
             strides=new_strides,
             offset=offset,
@@ -391,6 +390,18 @@ struct NDBuffer[dtype: DType](
 
     fn __is__(self, other: NDBuffer[Self.dtype]) -> Bool:
         return self.buffer.data == other.buffer.data
+
+    fn data_ptr[
+        origin: Origin, address_space: AddressSpace, //
+    ](ref [origin, address_space]self) -> UnsafePointer[
+        Scalar[Self.dtype], origin, address_space=address_space
+    ]:
+        return (
+            self.buffer.unsafe_ptr()
+            .unsafe_mut_cast[origin.mut]()
+            .unsafe_origin_cast[origin]()
+            .address_space_cast[address_space]()
+        )
 
     fn zero(self):
         self.fill(Scalar[Self.dtype](0))
@@ -450,7 +461,6 @@ struct NDBuffer[dtype: DType](
                 accum = reduce_elements(self.buffer[index], accum)
             return accum
 
-    #
     fn sum_all(self) -> Scalar[Self.dtype]:
         if self.is_contiguous():
             var start = self.offset
@@ -1199,3 +1209,22 @@ struct NDBuffer[dtype: DType](
                 result = result.sum(reduction_axes=IntArray(i), keepdims=True)
                 current_shape = result.shape
         return result^
+
+
+from tenmo import Tensor
+
+
+fn main():
+    comptime dtype = DType.float32
+    var buffer = Buffer[dtype].arange(5, 10, 1)
+    var ndb = NDBuffer[dtype](buffer, Shape(5))
+    print(buffer)
+    var data_ptr = ndb.data_ptr()
+    data_ptr[3] = 42
+    # print(data_ptr[3])
+    var a = Tensor(ndb)
+    a.print()
+    buffer[4] = 1919
+    a.print()
+    print(buffer)
+    _ = ndb
