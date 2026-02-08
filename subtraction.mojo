@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from intarray import IntArray
-from operators import AddTensor, SubtractTensor, Subtract, ReverseSubtract
+from mnemonics import AddTensor, SubtractTensor, Subtract, ReverseSubtract
 from backpropagation import (
     Delegate,
     BackwardFn,

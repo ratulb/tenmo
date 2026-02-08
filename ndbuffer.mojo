@@ -8,7 +8,7 @@ from common_utils import panic, log_warning
 from memory import memcpy
 from collections import Set
 from sys import simd_width_of
-from operators import (
+from mnemonics import (
     Multiply,
     Add,
     Subtract,

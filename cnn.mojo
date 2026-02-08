@@ -5,7 +5,7 @@ from backpropagation import (
     BACKWARD_FUSED_CONV,
     BACKWARD_MAXPOOL2D,
 )
-from operators import AddTensor
+from mnemonics import AddTensor
 from common_utils import panic
 from forwards import Pad
 from shapes import Shape
@@ -626,7 +626,11 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @always_inline
     @staticmethod
     fn compute_bias_gradient(
-        grad_output: Gradbox[Self.dtype], N: Int, C_out: Int, H_out: Int, W_out: Int
+        grad_output: Gradbox[Self.dtype],
+        N: Int,
+        C_out: Int,
+        H_out: Int,
+        W_out: Int,
     ) -> Gradbox[Self.dtype]:
         """
         Vectorized bias gradient: sum over (N, H_out, W_out) for each C_out.

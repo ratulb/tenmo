@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from shapes import Shape
-from operators import mv
+from mnemonics import mv
 
 # comptime mv = 2 # matrix vector
 

@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_PERMUTE
-from operators import AddTensor, ZeroGrad
+from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
 from shapes import Shape
 from strides import Strides

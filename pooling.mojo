@@ -2,7 +2,7 @@ from tenmo import Tensor
 from shapes import Shape
 from gradbox import Gradbox
 from backpropagation import BackwardFn, Delegate, BACKWARD_MAXPOOL2D
-from operators import AddTensor
+from mnemonics import AddTensor
 from ndbuffer import NDBuffer
 from utils.numerics import neg_inf
 from common_utils import panic

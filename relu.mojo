@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor, ReLUForwardOp, ReLUBackwardOp
+from mnemonics import AddTensor, ReLUForwardOp, ReLUBackwardOp
 from backpropagation import Delegate, BackwardFn, BACKWARD_RELU
 from gradbox import Gradbox
 from ndbuffer import NDBuffer

@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_CONTIGUOUS
-from operators import AddTensor
+from mnemonics import AddTensor
 from gradbox import Gradbox
 
 
@@ -36,9 +36,7 @@ struct Contiguous[dtype: DType](Copyable):
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[
-        Self.dtype
-    ]:
+    ) -> Tensor[Self.dtype]:
         var ndb = self.buffer.contiguous()
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
@@ -50,7 +48,9 @@ struct Contiguous[dtype: DType](Copyable):
                 out.requires_grad_(True)
                 if self.requires_grad and self.has_grad():
                     out.update_grad[AddTensor](self.grad())
-                backward_fn = ContiguousBackward[Self.dtype]().into_backward_fn()
+                backward_fn = ContiguousBackward[
+                    Self.dtype
+                ]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 

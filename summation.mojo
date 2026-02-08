@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor
+from mnemonics import AddTensor
 from intarray import IntArray
 from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_SUM

@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_VECTOR_MATMUL
-from operators import AddTensor
+from mnemonics import AddTensor
 from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic

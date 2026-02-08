@@ -41,7 +41,7 @@ fn dot_product[
 
 from tenmo import Tensor
 from memory import memcpy
-from operators import dot
+from mnemonics import dot
 from testing import assert_equal, assert_almost_equal
 
 

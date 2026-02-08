@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor, ZeroGrad
+from mnemonics import AddTensor, ZeroGrad
 from backpropagation import BackwardFn, Delegate, BACKWARD_RESHAPE
 from shapes import Shape
 from validators import Validator

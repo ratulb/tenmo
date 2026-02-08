@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_TILE
 from intarray import IntArray
-from operators import AddTensor
+from mnemonics import AddTensor
 from shapes import Shape
 from validators import Validator
 from gradbox import Gradbox

@@ -25,7 +25,7 @@ from tenmo import Tensor
 from shapes import Shape
 from gradbox import Gradbox
 from backpropagation import BackwardFn, Delegate, BACKWARD_PAD
-from operators import AddTensor
+from mnemonics import AddTensor
 from common_utils import panic
 from intarray import IntArray
 from utils import Variant

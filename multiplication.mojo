@@ -6,7 +6,7 @@ from backpropagation import (
     BACKWARD_MULTIPLY_SCALAR,
     BACKWARD_MULTIPLY_BROADCAST,
 )
-from operators import AddTensor, Multiply
+from mnemonics import AddTensor, Multiply
 from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
@@ -58,9 +58,9 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
             gradbox_prod = gradbox_prod * Scalar[Self.dtype](2)
             return [(ancestor_lhs^, gradbox_prod^, AddTensor)]
 
-        var grad_shares = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]](
-            capacity=2
-        )
+        var grad_shares = List[
+            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+        ](capacity=2)
 
         var ancestor_rhs = output.ancestry().get(1)
 
@@ -103,7 +103,9 @@ struct MultiplyScalar[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         var out: Tensor[Self.dtype] = Tensor[Self.dtype](
             self.buffer.scalar_ops[Multiply](factor), requires_grad=False
         )
@@ -128,7 +130,9 @@ struct Multiplicator[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         if not self.broadcastable(other):
             panic(
                 "Tensor → __mul__(self * other) → dimension mismatch: "
@@ -150,7 +154,9 @@ struct Multiplicator[dtype: DType]:
                 out.requires_grad_(True)
 
                 if self.shape() == other.shape():
-                    backward_fn = MultiplyBackward[Self.dtype]().into_backward_fn()
+                    backward_fn = MultiplyBackward[
+                        Self.dtype
+                    ]().into_backward_fn()
                     out.backwardFn = Optional(backward_fn^)
                     if id(self) == id(other):  # B = A * A, self == other == A
                         out.add_ancestry(self)
@@ -166,6 +172,8 @@ struct Multiplicator[dtype: DType]:
         return out^
 
     @staticmethod
-    fn forward(self: Tensor[Self.dtype], other: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
+    fn forward(
+        self: Tensor[Self.dtype], other: Gradbox[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
         var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer)
         return Gradbox[Self.dtype](nd_buffer^, share=False)

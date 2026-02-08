@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor, SubtractTensor
+from mnemonics import AddTensor, SubtractTensor
 from utils import Variant
 from walkback import *
 from common_utils import panic

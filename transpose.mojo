@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_TRANSPOSE
-from operators import AddTensor
+from mnemonics import AddTensor
 from validators import Validator
 from gradbox import Gradbox
 from intarray import IntArray

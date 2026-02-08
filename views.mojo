@@ -2,7 +2,7 @@ from tenmo import Tensor
 from shapes import Shape
 from strides import Strides
 from backpropagation import Delegate, BackwardFn, BACKWARD_VIEW
-from operators import AddTensor, ZeroGrad
+from mnemonics import AddTensor, ZeroGrad
 from validators import Validator
 from gradbox import Gradbox
 from intarray import IntArray

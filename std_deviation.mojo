@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor
+from mnemonics import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_STD
 from gradbox import Gradbox
 from common_utils import panic

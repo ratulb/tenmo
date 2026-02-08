@@ -4,7 +4,7 @@ from common_utils import panic
 from math import log, exp
 from subtraction import Subtractor
 from backpropagation import Delegate, BackwardFn, BACKWARD_CROSS_ENTROPY
-from operators import AddTensor
+from mnemonics import AddTensor
 from buffers import Buffer
 from gradbox import Gradbox
 from ndbuffer import NDBuffer

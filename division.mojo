@@ -6,7 +6,7 @@ from backpropagation import (
     BACKWARD_DIV_SCALAR,
     BACKWARD_RIGHT_DIV_SCALAR,
 )
-from operators import AddTensor, SubtractTensor, Divide, ReverseDivide
+from mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
 from gradbox import Gradbox
 
@@ -126,7 +126,9 @@ struct DivideScalar[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         constrained[
             Self.dtype.is_numeric(),
             "Tensor → __rtruediv__ is for numeric data types only",
@@ -154,7 +156,9 @@ struct DivideByScalar[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         constrained[
             Self.dtype.is_numeric(),
             "Tensor → __truediv__ is for numeric data types only",
@@ -187,7 +191,9 @@ struct Divider[dtype: DType]:
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         if not self.broadcastable(other):
             panic(
                 "Tensor →__truediv__(self * other): dimension mismatch: "

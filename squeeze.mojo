@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor, ZeroGrad
+from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
 from backpropagation import Delegate, BackwardFn, BACKWARD_SQUEEZE
 from common_utils import panic

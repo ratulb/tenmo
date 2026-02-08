@@ -7,7 +7,7 @@ from backpropagation import (
     BACKWARD_MATMUL_ND,
     BACKWARD_MATMUL_2D,
 )
-from operators import AddTensor, mm, vm, mv, dot, invalid
+from mnemonics import AddTensor, mm, vm, mv, dot, invalid
 from gradbox import Gradbox
 from shapes import Shape
 from broadcasthelper import ShapeBroadcaster

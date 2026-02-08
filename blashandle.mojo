@@ -2,7 +2,7 @@ from sys.ffi import OwnedDLHandle, _DLHandle
 from tenmo import Tensor
 from shapes import Shape
 from common_utils import panic
-from operators import AddTensor
+from mnemonics import AddTensor
 from backpropagation import BackwardFn, Delegate, BLAS_BACKWARD_MATMUL_2D
 from sys.param_env import env_get_string
 from gradbox import Gradbox
@@ -88,7 +88,9 @@ struct BLASMatmul2dBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
-comptime BLAS_PATH = env_get_string["BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"]()
+comptime BLAS_PATH = env_get_string[
+    "BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"
+]()
 
 # void cblas_sgemm(
 #    int order,           1. CblasRowMajor (101)

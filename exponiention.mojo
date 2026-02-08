@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from backpropagation import BackwardFn, Delegate, BACKWARD_EXPONENTIATION
-from operators import AddTensor
+from mnemonics import AddTensor
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 
@@ -40,7 +40,9 @@ struct Exponentiator[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], exponent: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+    ](self: Tensor[Self.dtype], exponent: Scalar[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
         nd_buffer = NDBuffer[Self.dtype](
             (self.buffer.contiguous_buffer() ** exponent), self.shape()
         )

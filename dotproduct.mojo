@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from common_utils import panic
 from backpropagation import Delegate, BackwardFn, BACKWARD_DOT
-from operators import AddTensor
+from mnemonics import AddTensor
 from gradbox import Gradbox
 
 

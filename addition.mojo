@@ -6,7 +6,7 @@ from backpropagation import (
     BACKWARD_ADD_SCALAR,
     BACKWARD_ADD_BROADCAST,
 )
-from operators import AddTensor, Add
+from mnemonics import AddTensor, Add
 from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward

@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor
+from mnemonics import AddTensor
 from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_MINMAX
 from common_utils import panic
@@ -55,7 +55,9 @@ struct MinMaxBackward[dtype: DType = DType.float32](
 
         if gradbox.shape() == Shape():
             # Scalar upstream gradient
-            var filled = Gradbox[Self.dtype].full(shape, gradbox.item(), share=False)
+            var filled = Gradbox[Self.dtype].full(
+                shape, gradbox.item(), share=False
+            )
             var grad_contrib = filled * mask
             return [(ancestor^, grad_contrib^, AddTensor)]
         else:

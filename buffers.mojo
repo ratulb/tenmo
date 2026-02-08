@@ -8,7 +8,7 @@ from utils.numerics import max_finite
 from os.atomic import Atomic, Consistency, fence
 from builtin.device_passable import DevicePassable
 from gpu.host import DeviceBuffer, HostBuffer
-from operators import (
+from mnemonics import (
     Multiply,
     Add,
     Subtract,

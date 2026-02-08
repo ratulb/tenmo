@@ -1,5 +1,5 @@
 from buffers import Buffer
-from operators import *
+from mnemonics import *
 from sys import simd_width_of
 from time import perf_counter_ns
 

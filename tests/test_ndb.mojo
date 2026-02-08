@@ -4,7 +4,7 @@ from intarray import IntArray
 from shapes import Shape
 from strides import Strides
 from ndbuffer import NDBuffer
-from operators import *
+from mnemonics import *
 
 # ============================================
 # Test Constants

@@ -4,7 +4,7 @@ from backpropagation import (
     BackwardFn,
     BACKWARD_STACK,
 )
-from operators import AddTensor
+from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
 from intarray import IntArray

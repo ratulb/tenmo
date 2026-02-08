@@ -2,7 +2,7 @@ from tenmo import Tensor
 from shapes import Shape
 from testing import assert_true
 from strides import Strides
-from operators import vm
+from mnemonics import vm
 
 # comptime vm = 1
 

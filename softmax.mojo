@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor
+from mnemonics import AddTensor
 from validators import Validator
 from backpropagation import (
     Delegate,
@@ -80,14 +80,18 @@ struct Softmax[dtype: DType]:
             this, normalized_axes, keepdims=True, requires_grad=False
         )
 
-        var stable = Subtractor[Self.dtype].forward[track_grad=False](this, max_vals)
+        var stable = Subtractor[Self.dtype].forward[track_grad=False](
+            this, max_vals
+        )
 
         # Compute exponentials
         var stable_exp = stable.exp()
         var exp_sum = Summer[Self.dtype].forward[track_grad=False](
             stable_exp, normalized_axes, True
         )
-        var out = Divider[Self.dtype].forward[track_grad=False](stable_exp, exp_sum)
+        var out = Divider[Self.dtype].forward[track_grad=False](
+            stable_exp, exp_sum
+        )
 
         @parameter
         if track_grad:
@@ -171,7 +175,9 @@ struct LogSoftmax[dtype: DType]:
         var max_vals = MinMax[Self.dtype].forward[max=True, track_grad=False](
             this, normalized_axes, keepdims=True, requires_grad=False
         )
-        var stable = Subtractor[Self.dtype].forward[track_grad=False](this, max_vals)
+        var stable = Subtractor[Self.dtype].forward[track_grad=False](
+            this, max_vals
+        )
 
         # Compute exponentials and sum
         var stable_exp = stable.exp()
@@ -193,9 +199,9 @@ struct LogSoftmax[dtype: DType]:
                 out.requires_grad_(True)
 
                 # Compute and store softmax for backward pass
-                var softmax_vals = Divider[Self.dtype].forward[track_grad=False](
-                    stable_exp, exp_sum
-                )
+                var softmax_vals = Divider[Self.dtype].forward[
+                    track_grad=False
+                ](stable_exp, exp_sum)
 
                 var backward_fn = LogSoftmaxBackward[Self.dtype](
                     normalized_axes^,

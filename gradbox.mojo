@@ -1,6 +1,6 @@
 ### Mojo Tensor Gradbox
 from shapes import Shape
-from operators import *
+from mnemonics import *
 from validators import Validator
 from tenmo import Tensor
 from intarray import IntArray

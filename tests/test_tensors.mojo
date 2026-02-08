@@ -4,7 +4,7 @@ from intarray import IntArray
 from shapes import Shape
 from common_utils import *
 from utils.numerics import min_finite
-from operators import AddTensor
+from mnemonics import AddTensor
 from strides import Strides
 
 

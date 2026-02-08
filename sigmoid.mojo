@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor, SigmoidOp
+from mnemonics import AddTensor, SigmoidOp
 from backpropagation import Delegate, BackwardFn, BACKWARD_SIGMOID
 from gradbox import Gradbox
 from math import exp
@@ -57,9 +57,7 @@ struct Sigmoid[dtype: DType]:
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[
-        Self.dtype
-    ]:
+    ) -> Tensor[Self.dtype]:
         var out: Tensor[Self.dtype]
         ref shape = self.shape()
         if self.is_contiguous():

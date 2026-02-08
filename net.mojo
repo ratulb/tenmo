@@ -14,7 +14,7 @@ from forwards import (
     Conv2dFused,
     MaxPool2d,
 )
-from operators import mm, mv, vm, dot
+from mnemonics import mm, mv, vm, dot
 from blashandle import BLASHandle, BLASHandleLite
 from utils.numerics import neg_inf
 from algorithm import parallelize

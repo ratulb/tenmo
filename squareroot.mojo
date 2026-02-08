@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor, SqrtForwardOp, SqrtBackwardOp
+from mnemonics import AddTensor, SqrtForwardOp, SqrtBackwardOp
 from backpropagation import Delegate, BackwardFn, BACKWARD_SQRT
 from gradbox import Gradbox
 from math import sqrt

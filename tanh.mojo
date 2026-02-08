@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from operators import AddTensor, TanhForwardOp, TanhBackwardOp
+from mnemonics import AddTensor, TanhForwardOp, TanhBackwardOp
 from backpropagation import Delegate, BackwardFn, BACKWARD_TANH
 from gradbox import Gradbox
 from math import tanh, exp
@@ -39,7 +39,9 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable):
             ref ancestor_gradbox_buffer = gradbox_ancestor.buffer.data_buffer()
             for idx in input_tensor.index_iterator():
                 var tanh_value = (
-                    1 - Tanh[Self.dtype].tanh_stable(input_tensor.buffer[idx]) ** 2
+                    1
+                    - Tanh[Self.dtype].tanh_stable(input_tensor.buffer[idx])
+                    ** 2
                 )
                 ancestor_gradbox_buffer[index] = (
                     gradbox_buffer[index] * tanh_value
@@ -58,9 +60,7 @@ struct Tanh[dtype: DType]:
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[
-        Self.dtype
-    ]:
+    ) -> Tensor[Self.dtype]:
         var out: Tensor[Self.dtype]
         ref shape = self.shape()
         if self.is_contiguous():

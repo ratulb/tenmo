@@ -17,7 +17,7 @@ from common_utils import (
     panic,
     variadic1or2,
 )
-from operators import *
+from mnemonics import *
 from indexhelper import IndexIterator
 from backpropagation import BackwardFn
 from forwards import *

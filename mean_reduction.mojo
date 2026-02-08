@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from intarray import IntArray
-from operators import AddTensor
+from mnemonics import AddTensor
 from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_MEAN
 from validators import Validator
@@ -95,7 +95,9 @@ struct Mean[dtype: DType](Copyable):
         total = tensor.sum[track_grad=False](
             axes=normalized_axes, keepdims=keepdims
         )
-        var out = DivideByScalar[Self.dtype].forward[track_grad=False](total, count)
+        var out = DivideByScalar[Self.dtype].forward[track_grad=False](
+            total, count
+        )
 
         @parameter
         if track_grad:
