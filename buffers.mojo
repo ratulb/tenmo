@@ -2,7 +2,7 @@ from builtin.variadics import Variadic
 from algorithm import vectorize
 from sys import simd_width_of, size_of
 from memory import memset_zero, memcpy, AddressSpace
-from math import exp, log10, ceil, tanh, sqrt
+from math import exp, log, ceil, tanh, sqrt
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
 from os.atomic import Atomic, Consistency, fence
@@ -18,7 +18,6 @@ from operators import (
     SigmoidOp,
     TanhForwardOp,
     TanhBackwardOp,
-    Log,
     Exp,
     ReLUBackwardOp,
     ReLUForwardOp,
@@ -1086,10 +1085,6 @@ struct Buffer[
             return 1 - (tanh(block) * tanh(block))
         elif op_code == Exp:
             return exp(block)
-        elif op_code == Log:
-            return (
-                log10(block) * 2.3025850929
-            )  # Upcoming 26.1 does not recognize 'log' here
         elif op_code == SqrtForwardOp:
             return sqrt(block)
         elif op_code == SqrtBackwardOp:
@@ -1799,13 +1794,23 @@ struct Buffer[
     @always_inline
     fn log(
         self: Buffer[Self.dtype, Self.address_space]
-    ) -> Buffer[Self.dtype, Self.address_space]:
-        constrained[
-            Self.dtype.is_numeric(),
-            "Buffer → log is for numeric data types only",
-        ]()
+    ) -> Buffer[
+        Self.dtype, Self.address_space
+    ] where Self.dtype.is_floating_point():
+        var out = Buffer[Self.dtype, Self.address_space](self.size)
 
-        return self.unary_ops[Log]()
+        comptime simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (self.size // simd_width) * simd_width
+
+        for idx in range(0, vectorized_end, simd_width):
+            var chunk = self.load[simdwidth=simd_width](idx)
+
+            out.store[simdwidth=simd_width](idx, log(chunk))
+
+        # Scalar tail
+        for idx in range(vectorized_end, self.size):
+            out[idx] = log(self[idx])
+        return out^
 
     @always_inline
     fn __invert__(self) -> Buffer[Self.dtype, Self.address_space]:
