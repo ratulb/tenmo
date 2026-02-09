@@ -1390,12 +1390,16 @@ fn run_all_copy_fill_tests() raises:
 # Constructor Tests
 # ============================================
 fn test_ndbuffer_from_varargs() raises:
-    print("test_ndbuffer_from_varargs")
-    var ndb = NDBuffer[DType.float32](1.0, 2.0, 3.0, 4.0)
-    assert_true(ndb.shape == Shape(4), "Shape should be (4,)")
-    assert_true(ndb[IntArray(0)] == 1.0, "First element")
-    assert_true(ndb[IntArray(3)] == 4.0, "Last element")
-    print("test_ndbuffer_from_varargs passed")
+    try:
+        print("test_ndbuffer_from_varargs")
+        var ndb = NDBuffer[DType.float32](1.0, 2.0, 3.0, 4.0)
+        assert_true(ndb.shape == Shape(4), "Shape should be (4,)")
+        assert_true(ndb[IntArray(0)] == 1.0, "First element")
+        assert_true(ndb[IntArray(3)] == 4.0, "Last element")
+        print("test_ndbuffer_from_varargs passed")
+    except e:
+        print(e)
+        raise e^
 
 
 fn test_ndbuffer_from_shape() raises:
@@ -1577,23 +1581,27 @@ fn test_ndbuffer_sum_all() raises:
 
 
 fn test_ndbuffer_sum_axis() raises:
-    print("test_ndbuffer_sum_axis")
-    var ndb = NDBuffer[DType.int32](Shape(2, 3))
-    # Row 0: 1, 2, 3
-    # Row 1: 4, 5, 6
-    var val = 1
-    for i in range(2):
-        for j in range(3):
-            ndb[IntArray(i, j)] = val
-            val += 1
+    try:
+        print("test_ndbuffer_sum_axis")
+        var ndb = NDBuffer[DType.int32](Shape(2, 3))
+        # Row 0: 1, 2, 3
+        # Row 1: 4, 5, 6
+        var val = 1
+        for i in range(2):
+            for j in range(3):
+                ndb[IntArray(i, j)] = val
+                val += 1
 
-    # Sum over axis 0 (rows) -> shape (3,)
-    var result = ndb.sum(IntArray(0), keepdims=False)
-    assert_true(result.shape == Shape(3), "Sum axis 0 shape")
-    assert_true(result[IntArray(0)] == 5, "Sum col 0: 1+4=5")
-    assert_true(result[IntArray(1)] == 7, "Sum col 1: 2+5=7")
-    assert_true(result[IntArray(2)] == 9, "Sum col 2: 3+6=9")
-    print("test_ndbuffer_sum_axis passed")
+        # Sum over axis 0 (rows) -> shape (3,)
+        var result = ndb.sum(IntArray(0), keepdims=False)
+        assert_true(result.shape == Shape(3), "Sum axis 0 shape")
+        assert_true(result[IntArray(0)] == 5, "Sum col 0: 1+4=5")
+        assert_true(result[IntArray(1)] == 7, "Sum col 1: 2+5=7")
+        assert_true(result[IntArray(2)] == 9, "Sum col 2: 3+6=9")
+        print("test_ndbuffer_sum_axis passed")
+    except e:
+        print(e)
+        raise e^
 
 
 fn test_ndbuffer_sum_axis_keepdims() raises:
@@ -1751,45 +1759,53 @@ fn test_ndbuffer_to_dtype() raises:
 # Sharing Tests
 # ============================================
 fn test_ndbuffer_share() raises:
-    print("test_ndbuffer_share")
-    var ndb = NDBuffer[DType.int32].full(Shape(2, 3), 42)
-    assert_true(not ndb.shared(), "Initially not shared")
+    try:
+        print("test_ndbuffer_share")
+        var ndb = NDBuffer[DType.int32].full(Shape(2, 3), 42)
+        assert_true(not ndb.shared(), "Initially not shared")
 
-    var view = ndb.share()
-    assert_true(ndb.shared(), "Now shared")
-    assert_true(view.shared(), "View is shared")
+        var view = ndb.share()
+        assert_true(ndb.shared(), "Now shared")
+        assert_true(view.shared(), "View is shared")
 
-    # Modify original
-    ndb[IntArray(0, 0)] = 99
-    assert_true(view[IntArray(0, 0)] == 99, "View sees modification")
-    print("test_ndbuffer_share passed")
+        # Modify original
+        ndb[IntArray(0, 0)] = 99
+        assert_true(view[IntArray(0, 0)] == 99, "View sees modification")
+        print("test_ndbuffer_share passed")
+    except e:
+        print(e)
+        raise e^
 
 
 # ============================================
 # SIMD Load/Store Tests
 # ============================================
 fn test_ndbuffer_simd_load_store() raises:
-    print("test_ndbuffer_simd_load_store")
-    var ndb = NDBuffer[DType.float32](Shape(4, 8))
+    try:
+        print("test_ndbuffer_simd_load_store")
+        var ndb = NDBuffer[DType.float32](Shape(4, 8))
 
-    # Fill with pattern
-    for i in range(4):
-        for j in range(8):
-            ndb[IntArray(i, j)] = Scalar[DType.float32](i * 10 + j)
+        # Fill with pattern
+        for i in range(4):
+            for j in range(8):
+                ndb[IntArray(i, j)] = Scalar[DType.float32](i * 10 + j)
 
-    # SIMD load row 1, starting at col 0, width 4
-    var vec = ndb.load[4](1, 0)
-    assert_true(vec[0] == 10.0, "SIMD load [0]")
-    assert_true(vec[1] == 11.0, "SIMD load [1]")
-    assert_true(vec[2] == 12.0, "SIMD load [2]")
-    assert_true(vec[3] == 13.0, "SIMD load [3]")
+        # SIMD load row 1, starting at col 0, width 4
+        var vec = ndb.load[4](1, 0)
+        assert_true(vec[0] == 10.0, "SIMD load [0]")
+        assert_true(vec[1] == 11.0, "SIMD load [1]")
+        assert_true(vec[2] == 12.0, "SIMD load [2]")
+        assert_true(vec[3] == 13.0, "SIMD load [3]")
 
-    # SIMD store
-    var new_vec = SIMD[DType.float32, 4](100.0, 101.0, 102.0, 103.0)
-    ndb.store[4](2, 0, new_vec)
-    assert_true(ndb[IntArray(2, 0)] == 100.0, "SIMD store [0]")
-    assert_true(ndb[IntArray(2, 3)] == 103.0, "SIMD store [3]")
-    print("test_ndbuffer_simd_load_store passed")
+        # SIMD store
+        var new_vec = SIMD[DType.float32, 4](100.0, 101.0, 102.0, 103.0)
+        ndb.store[4](2, 0, new_vec)
+        assert_true(ndb[IntArray(2, 0)] == 100.0, "SIMD store [0]")
+        assert_true(ndb[IntArray(2, 3)] == 103.0, "SIMD store [3]")
+        print("test_ndbuffer_simd_load_store passed")
+    except e:
+        print(e)
+        raise e^
 
 
 # ============================================
@@ -1854,37 +1870,39 @@ fn run_all_ndbuffer_tests() raises:
 
 
 fn main() raises:
-    var runs = 1
-    comptime _dtype = DType.float32
+    try:
+        var runs = 1
+        comptime _dtype = DType.float32
 
-    for _ in range(runs):
-        test_ndbuffer_set_get()
-        test_fill_2()
-        test_broadcast_fill()
-        test_zero()
-        test_add()
-        test_equal()
-        test_dtype_conversion()
-        test_element_at()
-        test_ndbuffer_inplace_ops()
-        test_count()
-        test_unique()
-        test_inplace_operations()
-        test_inplace_broadcast_operations()
-        test_ndbuffer_broadcast_ops()
-        test_scalar_ops()
-        test_compare_scalar()
-        test_compare_buffer()
-        test_buffer_overwrite()
-        test_scalar_inplace_update()
-        test_ndbuffer_fill_orig()
-        test_buffer_sum_all()
-        test_buffer_sum()
-        # Consolidated
-        run_all_ndbuffer_tests()
-        run_all_copy_fill_tests()
-        run_all_ndb_ops_tests()
-
+        for _ in range(runs):
+            test_ndbuffer_set_get()
+            test_fill_2()
+            test_broadcast_fill()
+            test_zero()
+            test_add()
+            test_equal()
+            test_dtype_conversion()
+            test_element_at()
+            test_ndbuffer_inplace_ops()
+            test_count()
+            test_unique()
+            test_inplace_operations()
+            test_inplace_broadcast_operations()
+            test_ndbuffer_broadcast_ops()
+            test_scalar_ops()
+            test_compare_scalar()
+            test_compare_buffer()
+            test_buffer_overwrite()
+            test_scalar_inplace_update()
+            test_ndbuffer_fill_orig()
+            test_buffer_sum_all()
+            test_buffer_sum()
+            # Consolidated
+            run_all_ndbuffer_tests()
+            run_all_copy_fill_tests()
+            run_all_ndb_ops_tests()
+    except e:
+        raise e^
 
 fn test_buffer_sum() raises:
     print("test_buffer_sum")
@@ -1914,35 +1932,39 @@ fn test_buffer_sum() raises:
 
 
 fn test_buffer_sum_all() raises:
-    print("test_buffer_sum_all")
-    comptime dtype = DType.int32
-    size = 21
-    l = List[Scalar[dtype]](capacity=size)
-    for i in range(size):
-        l.append(i)
+    try:
+        print("test_buffer_sum_all")
+        comptime dtype = DType.int32
+        size = 21
+        l = List[Scalar[dtype]](capacity=size)
+        for i in range(size):
+            l.append(i)
 
-    buffer = Buffer[dtype](l)
-    ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
+        buffer = Buffer[dtype](l)
+        ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
 
-    assert_true(ndb.sum_all() == 210)
-    shared = ndb.share(Shape(5, 2), offset=1, strides=Strides(2, 2))
-    assert_true(shared.sum_all() == 60)
-    # Scalar
-    ndb = NDBuffer[dtype](Shape())
-    ndb.fill(42)
-    assert_true(ndb.sum_all() == 42)
-    shared = ndb.share()
-    assert_true(
-        shared.sum_all() == 42 and shared.item() == 42 and ndb.item() == 42
-    )
-    # Shape(1)
-    ndb = NDBuffer[dtype](Shape(1))
-    ndb.fill(39)
-    assert_true(ndb.sum_all() == 39 and ndb[IntArray(0)] == 39)
-    shared = ndb.share()
-    assert_true(
-        shared.sum_all() == 39 and shared.item() == 39 and ndb.item() == 39
-    )
+        assert_true(ndb.sum_all() == 210)
+        shared = ndb.share(Shape(5, 2), offset=1, strides=Strides(2, 2))
+        assert_true(shared.sum_all() == 60)
+        # Scalar
+        ndb = NDBuffer[dtype](Shape())
+        ndb.fill(42)
+        assert_true(ndb.sum_all() == 42)
+        shared = ndb.share()
+        assert_true(
+            shared.sum_all() == 42 and shared.item() == 42 and ndb.item() == 42
+        )
+        # Shape(1)
+        ndb = NDBuffer[dtype](Shape(1))
+        ndb.fill(39)
+        assert_true(ndb.sum_all() == 39 and ndb[IntArray(0)] == 39)
+        shared = ndb.share()
+        assert_true(
+            shared.sum_all() == 39 and shared.item() == 39 and ndb.item() == 39
+        )
+    except e:
+        print(e)
+        raise e^
 
 
 fn test_buffer_overwrite() raises:

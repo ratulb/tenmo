@@ -283,6 +283,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         else:
             # Unshared buffer - direct free
+            self.data.free()
             log_debug("Buffer__del__ → freed unshared buffer")
 
     fn unsafe_ptr[
