@@ -7,12 +7,16 @@ from buffers import Buffer
 struct Utils[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     @always_inline
-    fn log_scalar(s: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
+    fn log_scalar(
+        s: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
         return log(s)
 
     @staticmethod
     @always_inline
-    fn log_buffer(b: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
+    fn log_buffer(
+        b: Buffer[Self.dtype],
+    ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
         return b.log()
 
     @staticmethod
@@ -26,7 +30,9 @@ struct Utils[dtype: DType](ImplicitlyCopyable):
 
     @staticmethod
     @always_inline
-    fn sum_scalars(this: Scalar[Self.dtype], that: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
+    fn sum_scalars(
+        this: Scalar[Self.dtype], that: Scalar[Self.dtype]
+    ) -> Scalar[Self.dtype]:
         return this + that
 
     @staticmethod
