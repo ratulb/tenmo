@@ -4042,7 +4042,7 @@ fn test_mv_inplace_add_basic() raises:
             + String(expected),
         )
 
-    print("✓ test_mv_inplace_add_basic passed")
+    print("test_mv_inplace_add_basic passed")
 
 
 fn test_mv_inplace_add_range() raises:
@@ -4066,7 +4066,7 @@ fn test_mv_inplace_add_range() raises:
     for i in range(50, MEDIUM_SIZE):
         assert_true(buffer1[i] == 10.0, "After range changed")
 
-    print("✓ test_mv_inplace_add_range passed")
+    print("test_mv_inplace_add_range passed")
 
 
 # ========== Multiply Operation Tests ==========
@@ -4088,7 +4088,7 @@ fn test_mv_inplace_multiply_basic() raises:
         var expected = (i + 1) * 2
         assert_true(buffer1[i] == expected, "Multiply failed at " + String(i))
 
-    print("✓ test_mv_inplace_multiply_basic passed")
+    print("test_mv_inplace_multiply_basic passed")
 
 
 fn test_mv_inplace_multiply_large() raises:
@@ -4107,7 +4107,7 @@ fn test_mv_inplace_multiply_large() raises:
         var expected = Float64(i) * 1.5
         assert_true(abs(buffer1[i] - expected) < 1e-10, "Large multiply failed")
 
-    print("✓ test_mv_inplace_multiply_large passed")
+    print("test_mv_inplace_multiply_large passed")
 
 
 # ========== Subtract Operation Tests ==========
@@ -4129,7 +4129,7 @@ fn test_mv_inplace_subtract_basic() raises:
         var expected = 100 - i
         assert_true(buffer1[i] == expected, "Subtract failed")
 
-    print("✓ test_mv_inplace_subtract_basic passed")
+    print("test_mv_inplace_subtract_basic passed")
 
 
 fn test_mv_inplace_subtract_negative() raises:
@@ -4147,7 +4147,7 @@ fn test_mv_inplace_subtract_negative() raises:
     for i in range(SMALL_SIZE_NEW):
         assert_true(buffer1[i] == -10.0, "Negative result incorrect")
 
-    print("✓ test_mv_inplace_subtract_negative passed")
+    print("test_mv_inplace_subtract_negative passed")
 
 
 # ========== Divide Operation Tests ==========
@@ -4168,7 +4168,7 @@ fn test_mv_inplace_divide_basic() raises:
     for i in range(SMALL_SIZE_NEW):
         assert_true(buffer1[i] == 25.0, "Divide failed")
 
-    print("✓ test_mv_inplace_divide_basic passed")
+    print("test_mv_inplace_divide_basic passed")
 
 
 fn test_mv_inplace_divide_fractional() raises:
@@ -4189,7 +4189,7 @@ fn test_mv_inplace_divide_fractional() raises:
             abs(buffer1[i] - expected) < 1e-10, "Fractional divide failed"
         )
 
-    print("✓ test_mv_inplace_divide_fractional passed")
+    print("test_mv_inplace_divide_fractional passed")
 
 
 # ========== Overwrite Operation Tests ==========
@@ -4210,7 +4210,7 @@ fn test_mv_inplace_overwrite_basic() raises:
     for i in range(SMALL_SIZE_NEW):
         assert_true(buffer1[i] == i * 10, "Overwrite failed at " + String(i))
 
-    print("✓ test_mv_inplace_overwrite_basic passed")
+    print("test_mv_inplace_overwrite_basic passed")
 
 
 fn test_mv_inplace_overwrite_partial() raises:
@@ -4234,7 +4234,7 @@ fn test_mv_inplace_overwrite_partial() raises:
     for i in range(30, MEDIUM_SIZE):
         assert_true(buffer1[i] == 1.0, "Tail should be unchanged")
 
-    print("✓ test_mv_inplace_overwrite_partial passed")
+    print("test_mv_inplace_overwrite_partial passed")
 
 
 fn test_mv_inplace_bool_multiply() raises:
@@ -4254,7 +4254,7 @@ fn test_mv_inplace_bool_multiply() raises:
         var expected = (i < 40) and (i > 20)  # True for [21, 39]
         assert_true(buffer1[i] == expected, "Bool multiply failed")
 
-    print("✓ test_mv_inplace_bool_multiply passed")
+    print("test_mv_inplace_bool_multiply passed")
 
 
 fn test_mv_inplace_bool_overwrite() raises:
@@ -4272,7 +4272,7 @@ fn test_mv_inplace_bool_overwrite() raises:
     for i in range(SMALL_SIZE_NEW):
         assert_true(buffer1[i] == ((i % 2) == 0), "Bool overwrite failed")
 
-    print("✓ test_mv_inplace_bool_overwrite passed")
+    print("test_mv_inplace_bool_overwrite passed")
 
 
 # ========== Edge Cases ==========
@@ -4293,7 +4293,7 @@ fn test_mv_inplace_single_element() raises:
     buffer1.inplace_ops[Multiply](buffer2)
     assert_true(buffer1[0] == 75, "Single element multiply failed")
 
-    print("✓ test_mv_inplace_single_element passed")
+    print("test_mv_inplace_single_element passed")
 
 
 fn test_mv_inplace_tail_alignment() raises:
@@ -4316,7 +4316,7 @@ fn test_mv_inplace_tail_alignment() raises:
         var expected = Float32(i + 1)
         assert_true(buffer1[i] == expected, "Tail element failed")
 
-    print("✓ test_mv_inplace_tail_alignment passed")
+    print("test_mv_inplace_tail_alignment passed")
 
 
 fn test_mv_inplace_mismatched_ranges() raises:
@@ -4336,7 +4336,7 @@ fn test_mv_inplace_mismatched_ranges() raises:
     for i in range(100):
         assert_true(buffer1[i] == i, "Validation bypass failed")
 
-    print("✓ test_mv_inplace_mismatched_ranges passed")
+    print("test_mv_inplace_mismatched_ranges passed")
 
 
 # ========== Performance Comparison Test ==========
@@ -4375,7 +4375,7 @@ fn test_mv_performance_comparison() raises:
             "Performance test: result incorrect",
         )
 
-    print("✓ test_mv_performance_comparison passed")
+    print("test_mv_performance_comparison passed")
 
 
 # ========== Test Runner ==========
@@ -4420,7 +4420,7 @@ fn run_all_manual_vectorization_tests() raises:
     test_mv_performance_comparison()
 
     print("\n" + "=" * 60)
-    print("✅ All Manual Vectorization Tests Passed!")
+    print("All Manual Vectorization Tests Passed!")
     print("=" * 60)
 
 
@@ -4447,7 +4447,7 @@ fn test_bufops_sum_basic() raises:
         "Sum failed: got " + String(result) + ", expected " + String(expected),
     )
 
-    print("✓ test_bufops_sum_basic passed")
+    print("test_bufops_sum_basic passed")
 
 
 fn test_bufops_sum_range() raises:
@@ -4462,7 +4462,7 @@ fn test_bufops_sum_range() raises:
     var result = buffer.sum(10, 30)
     assert_true(result == 20.0, "Sum range failed")
 
-    print("✓ test_bufops_sum_range passed")
+    print("test_bufops_sum_range passed")
 
 
 fn test_bufops_sum_negative() raises:
@@ -4478,7 +4478,7 @@ fn test_bufops_sum_negative() raises:
 
     assert_true(result == expected, "Sum with negatives failed")
 
-    print("✓ test_bufops_sum_negative passed")
+    print("test_bufops_sum_negative passed")
 
 
 fn test_bufops_sum_large() raises:
@@ -4492,7 +4492,7 @@ fn test_bufops_sum_large() raises:
     var result = buffer.sum()
     assert_true(result == Float64(TEST_LARGE), "Large sum failed")
 
-    print("✓ test_bufops_sum_large passed")
+    print("test_bufops_sum_large passed")
 
 
 fn test_bufops_sum_empty_range() raises:
@@ -4503,7 +4503,7 @@ fn test_bufops_sum_empty_range() raises:
     var result = buffer.sum(50, 50)  # Empty range
     assert_true(result == 0, "Empty sum should be 0")
 
-    print("✓ test_bufops_sum_empty_range passed")
+    print("test_bufops_sum_empty_range passed")
 
 
 # ========== PRODUCT TESTS ==========
@@ -4520,7 +4520,7 @@ fn test_bufops_product_basic() raises:
     var result = buffer.product()
     assert_true(result == 120, "Product failed: expected 120")
 
-    print("✓ test_bufops_product_basic passed")
+    print("test_bufops_product_basic passed")
 
 
 fn test_bufops_product_range() raises:
@@ -4535,7 +4535,7 @@ fn test_bufops_product_range() raises:
     var result = buffer.product(5, 10)
     assert_true(result == 32.0, "Product range failed")
 
-    print("✓ test_bufops_product_range passed")
+    print("test_bufops_product_range passed")
 
 
 fn test_bufops_product_with_zero() raises:
@@ -4549,7 +4549,7 @@ fn test_bufops_product_with_zero() raises:
     var result = buffer.product()
     assert_true(result == 0, "Product with zero should be 0")
 
-    print("✓ test_bufops_product_with_zero passed")
+    print("test_bufops_product_with_zero passed")
 
 
 fn test_bufops_product_fractional() raises:
@@ -4565,7 +4565,7 @@ fn test_bufops_product_fractional() raises:
     var result = buffer.product()
     assert_true(result == 1.0, "Fractional product failed")
 
-    print("✓ test_bufops_product_fractional passed")
+    print("test_bufops_product_fractional passed")
 
 
 fn test_bufops_product_empty() raises:
@@ -4576,7 +4576,7 @@ fn test_bufops_product_empty() raises:
     var result = buffer.product(10, 10)  # Empty range
     assert_true(result == 1, "Empty product should be 1")
 
-    print("✓ test_bufops_product_empty passed")
+    print("test_bufops_product_empty passed")
 
 
 # ========== POWER TESTS ==========
@@ -4596,7 +4596,7 @@ fn test_bufops_pow_basic() raises:
         var expected = Float32(i * i)
         assert_true(result[i] == expected, "Pow failed at " + String(i))
 
-    print("✓ test_bufops_pow_basic passed")
+    print("test_bufops_pow_basic passed")
 
 
 fn test_bufops_pow_fractional() raises:
@@ -4613,7 +4613,7 @@ fn test_bufops_pow_fractional() raises:
         var expected = Float64(i + 1)
         assert_true(abs(result[i] - expected) < 1e-8, "Fractional pow failed")
 
-    print("✓ test_bufops_pow_fractional passed")
+    print("test_bufops_pow_fractional passed")
 
 
 fn test_bufops_pow_zero_exponent() raises:
@@ -4629,7 +4629,7 @@ fn test_bufops_pow_zero_exponent() raises:
     for i in range(TEST_MEDIUM):
         assert_true(result[i] == 1, "Pow 0 should be 1")
 
-    print("✓ test_bufops_pow_zero_exponent passed")
+    print("test_bufops_pow_zero_exponent passed")
 
 
 fn test_bufops_pow_negative_base() raises:
@@ -4651,7 +4651,7 @@ fn test_bufops_pow_negative_base() raises:
     assert_true(result[3] == 1.0, "Positive pow failed")
     assert_true(result[4] == 8.0, "Positive pow failed")
 
-    print("✓ test_bufops_pow_negative_base passed")
+    print("test_bufops_pow_negative_base passed")
 
 
 # ========== ABSOLUTE VALUE TESTS ==========
@@ -4671,7 +4671,7 @@ fn test_bufops_abs_basic() raises:
         var expected = abs(i - 8)
         assert_true(result[i] == expected, "Abs failed")
 
-    print("✓ test_bufops_abs_basic passed")
+    print("test_bufops_abs_basic passed")
 
 
 fn test_bufops_abs_all_negative() raises:
@@ -4687,7 +4687,7 @@ fn test_bufops_abs_all_negative() raises:
     for i in range(TEST_MEDIUM):
         assert_true(result[i] == Float32(i + 1), "Abs negative failed")
 
-    print("✓ test_bufops_abs_all_negative passed")
+    print("test_bufops_abs_all_negative passed")
 
 
 fn test_bufops_abs_all_positive() raises:
@@ -4703,7 +4703,7 @@ fn test_bufops_abs_all_positive() raises:
     for i in range(20):
         assert_true(result[i] == i * 5, "Abs positive changed value")
 
-    print("✓ test_bufops_abs_all_positive passed")
+    print("test_bufops_abs_all_positive passed")
 
 
 fn test_bufops_abs_mixed() raises:
@@ -4728,7 +4728,7 @@ fn test_bufops_abs_mixed() raises:
     assert_true(result[3] == 0.0, "Abs zero failed")
     assert_true(result[7] == 50.0, "Abs mixed failed")
 
-    print("✓ test_bufops_abs_mixed passed")
+    print("test_bufops_abs_mixed passed")
 
 
 # ========== FILL TESTS ==========
@@ -4744,7 +4744,7 @@ fn test_bufops_fill_basic() raises:
     for i in range(TEST_SMALL):
         assert_true(buffer[i] == 42, "Fill failed")
 
-    print("✓ test_bufops_fill_basic passed")
+    print("test_bufops_fill_basic passed")
 
 
 fn test_bufops_fill_range() raises:
@@ -4770,7 +4770,7 @@ fn test_bufops_fill_range() raises:
     for i in range(40, TEST_MEDIUM):
         assert_true(buffer[i] == 1.0, "Fill tail changed")
 
-    print("✓ test_bufops_fill_range passed")
+    print("test_bufops_fill_range passed")
 
 
 fn test_bufops_fill_bool() raises:
@@ -4788,7 +4788,7 @@ fn test_bufops_fill_bool() raises:
     for i in range(5, 10):
         assert_true(buffer[i] == False, "Bool fill range failed")
 
-    print("✓ test_bufops_fill_bool passed")
+    print("test_bufops_fill_bool passed")
 
 
 fn test_bufops_fill_zero() raises:
@@ -4806,7 +4806,7 @@ fn test_bufops_fill_zero() raises:
     for i in range(TEST_MEDIUM):
         assert_true(buffer[i] == 0.0, "Fill zero failed")
 
-    print("✓ test_bufops_fill_zero passed")
+    print("test_bufops_fill_zero passed")
 
 
 fn test_bufops_fill_negative() raises:
@@ -4819,7 +4819,7 @@ fn test_bufops_fill_negative() raises:
     for i in range(30):
         assert_true(buffer[i] == -999, "Fill negative failed")
 
-    print("✓ test_bufops_fill_negative passed")
+    print("test_bufops_fill_negative passed")
 
 
 # ========== NEGATION TESTS ==========
@@ -4838,7 +4838,7 @@ fn test_bufops_neg_basic() raises:
     for i in range(TEST_SMALL):
         assert_true(result[i] == -(i + 1), "Neg failed")
 
-    print("✓ test_bufops_neg_basic passed")
+    print("test_bufops_neg_basic passed")
 
 
 fn test_bufops_neg_mixed() raises:
@@ -4855,7 +4855,7 @@ fn test_bufops_neg_mixed() raises:
         var expected = Float32(5 - i)
         assert_true(result[i] == expected, "Neg mixed failed")
 
-    print("✓ test_bufops_neg_mixed passed")
+    print("test_bufops_neg_mixed passed")
 
 
 fn test_bufops_neg_zero() raises:
@@ -4870,7 +4870,7 @@ fn test_bufops_neg_zero() raises:
     for i in range(TEST_MEDIUM):
         assert_true(result[i] == 0.0, "Neg zero failed")
 
-    print("✓ test_bufops_neg_zero passed")
+    print("test_bufops_neg_zero passed")
 
 
 fn test_bufops_neg_double_negation() raises:
@@ -4887,7 +4887,7 @@ fn test_bufops_neg_double_negation() raises:
     for i in range(20):
         assert_true(neg2[i] == buffer[i], "Double neg failed")
 
-    print("✓ test_bufops_neg_double_negation passed")
+    print("test_bufops_neg_double_negation passed")
 
 
 # ========== EDGE CASE TESTS ==========
@@ -4912,7 +4912,7 @@ fn test_bufops_single_element() raises:
     var neg_result = buffer.__neg__()
     assert_true(neg_result[0] == -5.0, "Single neg failed")
 
-    print("✓ test_bufops_single_element passed")
+    print("test_bufops_single_element passed")
 
 
 fn test_bufops_tail_alignment() raises:
@@ -4935,7 +4935,7 @@ fn test_bufops_tail_alignment() raises:
     for i in range(SIZE):
         assert_true(buffer[i] == 7.0, "Tail fill failed at " + String(i))
 
-    print("✓ test_bufops_tail_alignment passed")
+    print("test_bufops_tail_alignment passed")
 
 
 fn test_bufops_performance_comparison() raises:
@@ -4982,7 +4982,7 @@ fn test_bufops_performance_comparison() raises:
         + " ms"
     )
 
-    print("✓ test_bufops_performance_comparison passed")
+    print("test_bufops_performance_comparison passed")
 
 
 # ========== TEST RUNNER ==========
@@ -5039,7 +5039,7 @@ fn run_all_buffer_ops_tests() raises:
     test_bufops_performance_comparison()
 
     print("\n" + "=" * 70)
-    print("✅ All 30 Buffer Operations Tests Passed!")
+    print("All 30 Buffer Operations Tests Passed!")
     print("=" * 70)
 
 
@@ -5164,7 +5164,7 @@ fn test_unary_ops_manual_sigmoid() raises:
     for i in range(10):
         buffer[i] = Float32(i - 5)  # Values from -5 to 4
 
-    var result = buffer.unary_ops[SigmoidOp]()
+    var result = buffer.sigmoid()
 
     # Check that all values are in (0, 1) range
     var all_in_range = True

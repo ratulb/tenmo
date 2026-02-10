@@ -3,7 +3,13 @@ from memory import memcpy
 
 
 @register_passable
-struct IntArray(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
+struct IntArray(
+    ImplicitlyCopyable,
+    Representable,
+    Sized,
+    Stringable,
+    Writable,
+):
     """A lightweight, register-passable growable array of integers.
 
     Optimized for tensor indexing operations with minimal overhead.

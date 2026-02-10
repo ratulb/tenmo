@@ -1625,7 +1625,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn backward[
         graph_size: Int = 50
-    ](mut output: Tensor[Self.dtype], start_grad: Scalar[Self.dtype] = 1.0):
+    ](
+        mut output: Tensor[Self.dtype], start_grad: Scalar[Self.dtype] = 1.0
+    ) where Self.dtype.is_floating_point():
         if not output.requires_grad:
             return
         var shape = output.shape()
@@ -1634,7 +1636,9 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn backward[
         graph_size: Int = 50
-    ](mut output, seed_tensor: Tensor[Self.dtype]):
+    ](
+        mut output, seed_tensor: Tensor[Self.dtype]
+    ) where Self.dtype.is_floating_point():
         if not output.requires_grad:
             return
         output.seed_grad(seed_tensor)
@@ -2063,12 +2067,22 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn tanh[
         track_grad: Bool = True
-    ](self, requires_grad: Optional[Bool] = None,) -> Tensor[Self.dtype]:
+    ](
+        self,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
         return Tanh[Self.dtype].forward[track_grad](self, requires_grad)
 
     fn sigmoid[
         track_grad: Bool = True
-    ](self, requires_grad: Optional[Bool] = None,) -> Tensor[Self.dtype]:
+    ](
+        self,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
         return Sigmoid[Self.dtype].forward[track_grad](self, requires_grad)
 
     fn softmax[

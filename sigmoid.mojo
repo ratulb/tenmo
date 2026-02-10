@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from mnemonics import AddTensor, SigmoidOp
+from mnemonics import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_SIGMOID
 from gradbox import Gradbox
 from math import exp
@@ -15,8 +15,10 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        self, output: Tensor[Self.dtype]
+    ) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+    ] where Self.dtype.is_floating_point():
         ref gradbox = output.gradients()[]
         var input_tensor = output.ancestry().get(0)
         ref shape = input_tensor.shape()
@@ -25,9 +27,7 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable):
         if input_tensor.is_contiguous():
             var start = input_tensor.offset()
             var end = start + input_tensor.numels()
-            var buffer = input_tensor.buffer.data_buffer().unary_ops[SigmoidOp](
-                start, end
-            )
+            var buffer = input_tensor.buffer.data_buffer().sigmoid(start, end)
             var ancestor_grad_buffer = gradbox.buffer.data_buffer() * (
                 buffer * (1 - buffer)
             )  # These would get vectorized
@@ -57,15 +57,13 @@ struct Sigmoid[dtype: DType]:
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out: Tensor[Self.dtype]
         ref shape = self.shape()
         if self.is_contiguous():
             var start = self.offset()
             var end = start + self.numels()
-            var buffer = self.buffer.data_buffer().unary_ops[SigmoidOp](
-                start, end
-            )
+            var buffer = self.buffer.data_buffer().sigmoid(start, end)
             out = Tensor[Self.dtype](
                 NDBuffer[Self.dtype](buffer^, shape), requires_grad=False
             )

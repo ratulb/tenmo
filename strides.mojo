@@ -4,7 +4,13 @@ from layout.layout import IntTuple
 
 
 @register_passable
-struct Strides(ImplicitlyCopyable, Representable, Sized, Stringable, Writable):
+struct Strides(
+    ImplicitlyCopyable,
+    Representable,
+    Sized,
+    Stringable,
+    Writable,
+):
     """Strides for tensor indexing."""
 
     var data: IntArray

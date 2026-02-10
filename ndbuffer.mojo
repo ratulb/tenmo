@@ -103,15 +103,18 @@ struct NDBuffer[dtype: DType](
         self._contiguous = other._contiguous
 
     @staticmethod
+    @always_inline
     fn zeros(shape: Shape) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
     @staticmethod
+    @always_inline
     fn full(shape: Shape, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype].full(scalar, shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
+    @always_inline
     fn index_iterator(
         self,
     ) -> IndexIterator[origin_of(self.shape), origin_of(self.strides)]:
@@ -143,13 +146,14 @@ struct NDBuffer[dtype: DType](
         var shape = Shape(buffer.size)
         return NDBuffer[Self.dtype](buffer^, shape^)
 
+    @always_inline
     fn is_contiguous(self) -> Bool:
         return self.strides.is_contiguous(self.shape)
 
+    @always_inline
     fn size(self) -> Int:
         return self.buffer.size
 
-    #
     fn __getitem__(self, indices: IntArray) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
@@ -186,7 +190,6 @@ struct NDBuffer[dtype: DType](
         )
         self.buffer[index] = value
 
-    #
     fn item(self) -> Scalar[Self.dtype]:
         if self.shape != Shape(1) and self.shape != Shape():
             panic(
@@ -317,15 +320,19 @@ struct NDBuffer[dtype: DType](
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
+    @always_inline
     fn data_buffer(ref self) -> ref [self.buffer] Buffer[Self.dtype]:
         return self.buffer
 
+    @always_inline
     fn is_scalar(self) -> Bool:
         return self.numels() == 1 and self.shape == Shape()
 
+    @always_inline
     fn numels(self) -> Int:
         return self.shape.num_elements()
 
+    @always_inline
     fn rank(self) -> Int:
         return self.shape.rank()
 
@@ -388,6 +395,7 @@ struct NDBuffer[dtype: DType](
             offset=offset,
         )
 
+    @always_inline
     fn __is__(self, other: NDBuffer[Self.dtype]) -> Bool:
         return self.buffer.data == other.buffer.data
 
@@ -403,6 +411,7 @@ struct NDBuffer[dtype: DType](
             .address_space_cast[address_space]()
         )
 
+    @always_inline
     fn zero(self):
         self.fill(Scalar[Self.dtype](0))
 

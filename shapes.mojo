@@ -1,7 +1,6 @@
 from common_utils import panic
 from intarray import IntArray
 
-
 @register_passable
 struct Shape(
     Equatable,
@@ -290,9 +289,10 @@ struct Shape(
     fn product(self) -> Int:
         return self._numels
 
-
 @register_passable
-struct ShapeIndexIterator[origin: ImmutOrigin](ImplicitlyCopyable):
+struct ShapeIndexIterator[origin: ImmutOrigin](
+    ImplicitlyCopyable
+):
     """Iterator over IntArray coordinates of a shape."""
 
     var shape: Pointer[Shape, Self.origin]
@@ -331,3 +331,7 @@ struct ShapeIndexIterator[origin: ImmutOrigin](ImplicitlyCopyable):
 
     fn __has_next__(self) -> Bool:
         return self.index < self.shape[].num_elements()
+
+
+fn main():
+    pass

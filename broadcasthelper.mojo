@@ -2,12 +2,6 @@ from shapes import Shape
 from common_utils import panic
 from intarray import IntArray
 
-from testing import assert_true
-
-
-fn main() raises:
-    pass
-
 
 @register_passable
 struct ShapeBroadcaster:

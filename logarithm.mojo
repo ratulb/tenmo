@@ -2,8 +2,8 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_LOG
 from gradbox import Gradbox
+from ndbuffer import NDBuffer
 from math import log
-from sys import simd_width_of
 
 
 @fieldwise_init
@@ -17,45 +17,39 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        self, output: Tensor[Self.dtype]
+    ) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+    ] where Self.dtype.is_floating_point():
         """Compute gradient: ∂log(x)/∂x = 1/x."""
         ref grad_output = output.gradients()[]
         var parent = output.ancestry().get(0)
         ref shape = parent.shape()
-        var parent_gradbox = Gradbox[Self.dtype].zeros(shape, share=False)
+        var parent_gradbox: Gradbox[Self.dtype]
 
         if parent.is_contiguous():
-            var src = parent.buffer.data_buffer().data
-            var dest = parent_gradbox.buffer.data_buffer().data
-            var grad_output_data = grad_output.buffer.data_buffer().data
-            var offset = parent.offset()
-            var numels = parent.numels()
+            var start = parent.offset()
+            var end = start + parent.numels()
+            var parent_buffer = parent.buffer.data_buffer()
+            var grad_output_buffer = grad_output.buffer.data_buffer()
+            var grad_box_buffer = parent_buffer.log_back(
+                grad_output_buffer, self.epsilon, start, end
+            )
+            var nd_buffer = NDBuffer[Self.dtype](grad_box_buffer^, shape)
+            parent_gradbox = Gradbox[Self.dtype](nd_buffer^, share=False)
 
-            comptime simd_width = simd_width_of[Self.dtype]()
-
-            for i in range(0, numels - simd_width + 1, simd_width):
-                var x = src.load[width=simd_width](offset + i)  # Original input
-                var grad_out = grad_output_data.load[width=simd_width](i)
-
-                # Apply epsilon: max(x, epsilon) to avoid division by zero
-                var x_safe = max(x, self.epsilon)
-                dest.store[width=simd_width](i, grad_out / x_safe)
-
-            # Handle remainder
-            for i in range(numels - numels % simd_width, numels):
-                var x = src[offset + i]  # Original input
-                var x_safe = max(x, self.epsilon)
-                dest[i] = grad_output_data[i] / x_safe
         else:
             # Non-contiguous fallback
+            parent_gradbox = Gradbox[Self.dtype].zeros(shape, share=False)
             var index = 0
             var parent_gradbox_data = parent_gradbox.buffer.data_buffer().data
             var grad_output_data = grad_output.buffer.data_buffer().data
-            for coord in shape:
-                var x = parent[coord]  # Original input
-                var x_safe = max(x, self.epsilon)
-                parent_gradbox_data[index] = grad_output_data[index] / x_safe
+            for idx in parent.index_iterator():
+                var input_value = parent.element_at(idx)  # Original input
+                var input_value_safe = max(input_value, self.epsilon)
+                parent_gradbox_data[index] = (
+                    grad_output_data[index] / input_value_safe
+                )
                 index += 1
 
         return [(parent^, parent_gradbox^, AddTensor)]
@@ -73,49 +67,29 @@ struct Logarithm[dtype: DType]:
         epsilon: Scalar[Self.dtype] = 1e-12,  # Default epsilon
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """
-        Natural logarithm: y = log(x).
-
-        Args:
-            self: Input tensor.
-            requires_grad: Whether to track gradients.
-            epsilon: Small value to avoid log(0) and division by zero (default: 1e-12).
-
-        Returns:
-            Logarithm of input tensor.
-
         Note:
             Values less than epsilon are clamped to epsilon before taking log.
         """
         var shape = self.shape()
-        var out = Tensor[Self.dtype].zeros(shape, requires_grad=False)
+        var out: Tensor[Self.dtype]
 
         if self.is_contiguous():
-            var src = self.buffer.data_buffer().data
-            var dest = out.buffer.data_buffer().data
-            var offset = self.offset()
-            var numels = self.numels()
+            var start = self.offset()
+            var end = start + self.numels()
+            var input_buffer = self.buffer.data_buffer()
+            var out_buffer = input_buffer.log(start, end, epsilon)
+            var nd_buffer = NDBuffer[Self.dtype](out_buffer^, shape)
+            out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 
-            comptime simd_width = simd_width_of[Self.dtype]()
-
-            for i in range(0, numels - simd_width + 1, simd_width):
-                var chunk = src.load[width=simd_width](offset + i)
-                # Clamp to epsilon to avoid log(0)
-                var chunk_safe = max(chunk, epsilon)
-                dest.store[width=simd_width](i, log(chunk_safe))
-
-            # Handle remainder
-            for i in range(numels - numels % simd_width, numels):
-                var val = src[offset + i]
-                var val_safe = max(val, epsilon)
-                dest[i] = log(val_safe)
         else:
             # Non-contiguous fallback
+            out = Tensor[Self.dtype].zeros(shape, requires_grad=False)
             var index = 0
             ref out_buffer = out.buffer.data_buffer()
             for idx in self.index_iterator():
-                var val = self.element_at(idx)
-                var val_safe = max(val, epsilon)
-                out_buffer[index] = log(val_safe)
+                var input_value = self.element_at(idx)
+                var input_value_safe = max(input_value, epsilon)
+                out_buffer[index] = log(input_value_safe)
                 index += 1
 
         @parameter

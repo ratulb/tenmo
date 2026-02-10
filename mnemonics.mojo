@@ -16,18 +16,14 @@ comptime LessThanEqual = 14
 comptime GreaterThan = 15
 comptime GreaterThanEqual = 16
 comptime Overwrite = 17
-comptime SigmoidOp = 18
-comptime Exp = 19
-comptime TanhForwardOp = 20
-comptime TanhBackwardOp = 21
-comptime ReLUForwardOp = 22
-comptime ReLUBackwardOp = 23
-comptime SqrtForwardOp = 24
-comptime SqrtBackwardOp = 25
+comptime ReLUForwardOp = 18
+comptime ReLUBackwardOp = 19
+comptime SqrtForwardOp = 20
+comptime SqrtBackwardOp = 21
 ###################
 ### matul ###########
-comptime dot = 26  # dot product
-comptime vm = 27  # vector & tensor matmul
-comptime mv = 28  # tensor & vector matmul
-comptime mm = 29  # tensor & tensor matmul
-comptime invalid = 30  # Invalid case
+comptime dot = 22  # dot product
+comptime vm = 23  # vector & tensor matmul
+comptime mv = 24  # tensor & vector matmul
+comptime mm = 25  # tensor & tensor matmul
+comptime invalid = 26  # Invalid case

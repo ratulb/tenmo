@@ -167,7 +167,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         if self.training:
             var matmul_out = Matmul[Self.dtype].forward[
-                track_grad=True, mode=mode
+                track_grad=True, mode = Self.mode
             ](xs, self.weight)
             result = Adder[Self.dtype].forward[track_grad=True](
                 matmul_out^, self.bias
@@ -175,7 +175,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         else:
             var matmul_out = Matmul[Self.dtype].forward[
-                track_grad=False, mode=mode
+                track_grad=False, mode = Self.mode
             ](xs, self.weight)
             result = Adder[Self.dtype].forward[track_grad=False](
                 matmul_out^, self.bias
@@ -769,7 +769,9 @@ struct Tanh[dtype: DType](ImplicitlyCopyable):
     fn __copyinit__(out self, other: Self):
         self.training = other.training
 
-    fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    fn __call__(
+        self, x: Tensor[Self.dtype]
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
             return x.tanh[track_grad=True]()
         else:

@@ -131,7 +131,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
     fn __call__(
         self, output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+    ) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+    ] where Self.dtype.is_floating_point():
         """O(1) dispatch using integer tag comparison.
         Order: Most common operations first for branch prediction.
         """

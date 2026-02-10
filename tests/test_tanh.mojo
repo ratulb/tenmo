@@ -260,7 +260,7 @@ fn test_tanh_contiguous_vs_non_contiguous() raises:
 fn test_tanh_with_linear_layer() raises:
     print("test_tanh_with_linear_layer")
     comptime dtype = DType.float32
-    var layer = Linear[dtype](2, 3, xavier=True)
+    var layer = Linear[dtype](2, 3, init_method="xavier")
     var activation = Tanh[dtype]()
     layer.train()
     activation.train()

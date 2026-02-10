@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from mnemonics import AddTensor, TanhForwardOp, TanhBackwardOp
+from mnemonics import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_TANH
 from gradbox import Gradbox
 from math import tanh, exp
@@ -16,7 +16,9 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable):
 
     fn backward(
         self, read output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+    ) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+    ] where Self.dtype.is_floating_point():
         ref gradbox = output.gradients()[]
         ref input_tensor = output.ancestry().get(0)
         ref shape = input_tensor.shape()
@@ -25,9 +27,9 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable):
         if input_tensor.is_contiguous():
             var start = input_tensor.offset()
             var end = start + input_tensor.numels()
-            var buffer = input_tensor.buffer.data_buffer().unary_ops[
-                TanhBackwardOp
-            ](start, end)
+            var buffer = input_tensor.buffer.data_buffer().tanh[forward=False](
+                start, end
+            )
             var ancestor_grad_buffer = gradbox.buffer.data_buffer() * buffer
             var ndb = NDBuffer[Self.dtype](ancestor_grad_buffer^, shape)
             gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
@@ -60,13 +62,13 @@ struct Tanh[dtype: DType]:
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out: Tensor[Self.dtype]
         ref shape = self.shape()
         if self.is_contiguous():
             var start = self.offset()
             var end = start + self.numels()
-            var buffer = self.buffer.data_buffer().unary_ops[TanhForwardOp](
+            var buffer = self.buffer.data_buffer().tanh[forward=True](
                 start, end
             )
             out = Tensor[Self.dtype](
