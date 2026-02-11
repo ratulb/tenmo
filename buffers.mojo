@@ -234,11 +234,6 @@ struct Buffer[dtype: DType = DType.float32](
     fn __len__(self) -> Int:
         return self.size
 
-    fn __iter__(
-        ref self,
-    ) -> ElementIterator[Self.dtype, origin_of(self)]:
-        return ElementIterator(Pointer(to=self))
-
     @always_inline
     fn __getitem__(self, slice: Slice) -> Buffer[Self.dtype]:
         var start, end, step = slice.indices(len(self))
@@ -2484,37 +2479,6 @@ struct Buffer[dtype: DType = DType.float32](
     @no_inline
     fn __repr__(self) -> String:
         return self.__str__()
-
-
-@register_passable
-struct ElementIterator[
-    dtype: DType,
-    origin: ImmutOrigin,
-    # ](Sized & Copyable & RegisterPassable):
-](Sized & Copyable):
-    var index: Int
-    var src: Pointer[Buffer[Self.dtype], Self.origin]
-
-    fn __init__(
-        out self,
-        src: Pointer[Buffer[Self.dtype], Self.origin],
-    ):
-        self.src = src
-        self.index = 0
-
-    fn __iter__(self) -> Self:
-        return self.copy()
-
-    fn __next__(mut self) -> Scalar[Self.dtype]:
-        self.index += 1
-        return self.src[][self.index - 1]
-
-    @always_inline
-    fn __has_next__(self) -> Bool:
-        return self.__len__() > 0
-
-    fn __len__(self) -> Int:
-        return len(self.src[]) - self.index
 
 
 fn main():
