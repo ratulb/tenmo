@@ -1,4 +1,3 @@
-from builtin.variadics import Variadic
 from algorithm import vectorize
 from sys import simd_width_of, size_of
 from memory import memset_zero, memcpy, AddressSpace
@@ -6,7 +5,6 @@ from math import exp, log, ceil, tanh, sqrt
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
 from os.atomic import Atomic, Consistency, fence
-from builtin.device_passable import DevicePassable
 from gpu.host import DeviceBuffer, HostBuffer
 from mnemonics import (
     Multiply,
@@ -37,12 +35,11 @@ struct Buffer[dtype: DType = DType.float32](
     & Writable
     & Representable
     & Absable
-    & DevicePassable
 ):
 
     """
     Unified buffer with optional reference counting built-in.
-
+    This buffer lives only on the CPU.
     When unshared: Just manages data pointer.
     When shared: Adds atomic refcount in same allocation as data.
     """
@@ -67,46 +64,12 @@ struct Buffer[dtype: DType = DType.float32](
             panic("Buffer size must be >= 0")
         self.size = size
         self.external = external
-        self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutExternalOrigin
-        ]()  # Null (not shared yet)
+        self._refcount = {}
 
         if size == 0:
-            self.data = UnsafePointer[Scalar[Self.dtype], MutExternalOrigin]()
+            self.data = {}
         else:
-            if external:
-                self.data = UnsafePointer[
-                    Scalar[Self.dtype], MutExternalOrigin
-                ]()
-            else:
-                self.data = alloc[Scalar[Self.dtype]](size)
-
-    @staticmethod
-    fn get_type_name() -> String:
-        return String(
-            "Buffer[dtype = ",
-            Self.dtype,
-            "]",
-        )
-
-    comptime device_type: AnyType = Self
-
-    @staticmethod
-    fn get_device_type_name() -> String:
-        return Self.get_type_name()
-
-    fn _to_device_type(self, target: MutOpaquePointer[_]):
-        target.bitcast[Self.device_type]()[] = self
-
-    @staticmethod
-    fn _is_convertible_to_device_type[T: AnyType]() -> Bool:
-        return Variadic.contains[
-            T,
-            Variadic.types[
-                T=AnyType,
-                Self,
-            ],
-        ]
+            self.data = alloc[Scalar[Self.dtype]](size)
 
     fn __init__(out self, elems: List[Scalar[Self.dtype]]):
         var length = len(elems)
@@ -114,41 +77,7 @@ struct Buffer[dtype: DType = DType.float32](
         self.size = length
         memcpy(dest=self.data, src=elems.unsafe_ptr(), count=length)
         self.external = False
-        self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutExternalOrigin
-        ]()  # Null
-
-    fn __init__(
-        out self,
-        size: Int,
-        device_buffer: DeviceBuffer[Self.dtype],
-    ):
-        self.size = size
-        self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutExternalOrigin
-        ]()  # Null
-        self.external = True
-        self.data = (
-            device_buffer.unsafe_ptr()
-            .mut_cast[True]()
-            .unsafe_origin_cast[MutExternalOrigin]()
-        )
-
-    fn __init__(
-        out self,
-        size: Int,
-        host_buffer: HostBuffer[Self.dtype],
-    ):
-        self.size = size
-        self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutExternalOrigin
-        ]()  # Null
-        self.external = True
-        self.data = (
-            host_buffer.unsafe_ptr()
-            .mut_cast[True]()
-            .unsafe_origin_cast[MutExternalOrigin]()
-        )
+        self._refcount = {}
 
     fn __init__(
         out self,
@@ -158,9 +87,7 @@ struct Buffer[dtype: DType = DType.float32](
         copy: Bool = False,
     ):
         self.size = size
-        self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutExternalOrigin
-        ]()  # Null
+        self._refcount = {}
         if copy:
             self.data = alloc[Scalar[Self.dtype]](size)
             memcpy(dest=self.data, src=data, count=size)
@@ -334,7 +261,7 @@ struct Buffer[dtype: DType = DType.float32](
         ]()
 
         # Only use SIMD if we have enough elements
-        _ = """if result_size >= simd_width:
+        if result_size >= simd_width:
             var num_chunks = result_size // simd_width
             var remainder = result_size % simd_width
 
@@ -357,10 +284,10 @@ struct Buffer[dtype: DType = DType.float32](
                 result.data[start_remainder + i] = self.data[
                     start + (start_remainder + i) * step
                 ]
-        else:"""
-        # Too small for SIMD - just use scalar loop
-        for i in range(result_size):
-            result.data[i] = self.data[start + i * step]
+        else:
+            # Too small for SIMD - just use scalar loop
+            for i in range(result_size):
+                result.data[i] = self.data[start + i * step]
 
         return result^
 
@@ -1466,7 +1393,8 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
-        var extent = end_index.or_else(self.size) - start_index
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
         var out = Buffer[Self.dtype](extent)
 
         comptime simd_width = simd_width_of[Self.dtype]()
@@ -1478,7 +1406,7 @@ struct Buffer[dtype: DType = DType.float32](
             out.store[simdwidth=simd_width](idx, sigmoid_block)
 
         # Tail
-        for idx in range(vectorized_end, extent):
+        for idx in range(vectorized_end, actual_end):
             out[idx] = 1.0 / (1.0 + exp(-self[idx]))
         return out^
 
@@ -1492,7 +1420,8 @@ struct Buffer[dtype: DType = DType.float32](
     ) -> Buffer[
         Self.dtype
     ] where Self.dtype.is_floating_point():
-        var extent = end_index.or_else(self.size) - start_index
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
         var out = Buffer[Self.dtype](extent)
 
         comptime simd_width = simd_width_of[Self.dtype]()
@@ -1510,7 +1439,7 @@ struct Buffer[dtype: DType = DType.float32](
                 out.store[simdwidth=simd_width](idx, tanh_chunk)
 
         # Tail
-        for idx in range(vectorized_end, extent):
+        for idx in range(vectorized_end, actual_end):
 
             @parameter
             if forward:
@@ -1792,7 +1721,8 @@ struct Buffer[dtype: DType = DType.float32](
             "Buffer → log_back is for numeric data types only",
         ]()
 
-        var extent = end_index.or_else(self.size) - start_index
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
         var out = Buffer[Self.dtype](extent)
 
         comptime simd_width = simd_width_of[Self.dtype]()
@@ -1807,7 +1737,7 @@ struct Buffer[dtype: DType = DType.float32](
             )
 
         # Scalar tail
-        for idx in range(vectorized_end, extent):
+        for idx in range(vectorized_end, actual_end):
             var other_value = other[idx]
             out[idx] = other_value / max(self[idx], min_value)
 
@@ -2295,7 +2225,13 @@ struct Buffer[dtype: DType = DType.float32](
     fn dot(
         lhs: Buffer[Self.dtype],
         rhs: Buffer[Self.dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
     ) -> Scalar[Self.dtype]:
+        constrained[
+            Self.dtype.is_numeric(),
+            "Buffer → dot is for numeric data types only",
+        ]()
         if not lhs.size == rhs.size:
             panic(
                 "Buffer → dot: buffer size does not match -> lhs:",
@@ -2303,8 +2239,23 @@ struct Buffer[dtype: DType = DType.float32](
                 "vs. rhs:",
                 rhs.size.__str__(),
             )
+        var actual_end = end_index.or_else(lhs.size)
+        var extent = actual_end - start_index
+        var accum = Scalar[Self.dtype](0)
 
-        return (lhs * rhs).sum()
+        comptime simd_width = simd_width_of[Self.dtype]()
+
+        var vectorized_end = (extent // simd_width) * simd_width
+
+        for idx in range(start_index, vectorized_end, simd_width):
+            var lhs_chunk = lhs.load[simdwidth=simd_width](idx)
+            var rhs_chunk = rhs.load[simdwidth=simd_width](idx)
+            accum += (lhs_chunk * rhs_chunk).reduce_add()
+
+        for idx in range(vectorized_end, actual_end):
+            accum += lhs[idx] * rhs[idx]
+
+        return accum
 
     @always_inline
     fn overwrite(

@@ -2,6 +2,7 @@ from buffers import Buffer
 from mnemonics import *
 from sys import simd_width_of
 from time import perf_counter_ns
+from testing import assert_almost_equal
 
 # ============================================
 # Test Constants
@@ -437,6 +438,15 @@ fn test_log() raises:
     print("test_log passed")
 
 
+fn test_log_buffer() raises:
+    print("test_log_buffer")
+    comptime dtype = DType.float32
+    var a = Buffer[dtype].arange(3, MEDIUM_SIZE)
+    var result = a.log(10, 50)
+
+    assert_almost_equal(result[17], 3.40119738, "ln(30) should be 3.4011974")
+
+
 fn test_invert_bool() raises:
     print("test_invert_bool")
     var buffer = Buffer[DType.bool](MEDIUM_SIZE)
@@ -512,6 +522,14 @@ fn test_dot() raises:
     assert_true(
         result == 30, "dot: expected 30 (2*3*5), got " + result.__str__()
     )
+    comptime dtype = DType.float32
+    var A = Buffer[dtype].full(2, 42)
+    var B = Buffer[dtype].full(2, 42)
+    var scalar = A.dot(B)
+    assert_true(
+        scalar == 168, "dot: expected 168 (2*2*42), got " + scalar.__str__()
+    )
+
     print("test_dot passed")
 
 
@@ -2297,6 +2315,7 @@ fn main() raises:
     test_buffer_float_less_eq_than()
     test_count_orig()
     test_log()
+    test_log_buffer()
     run_all_tests()
     run_all_buffer_tests()
     run_all_count_tests()
