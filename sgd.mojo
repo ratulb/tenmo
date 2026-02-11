@@ -76,7 +76,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             ref parameter = self.parameters[i][]
             if parameter.requires_grad and parameter.has_grad():
                 ref grad = parameter.gradients()[]
-                var grad_ptr = grad.buffer.data_buffer().data
+                var grad_ptr = grad.data_ptr()
                 var num_elements = grad.num_elements()
 
                 # Norm computation
@@ -114,7 +114,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     ref parameter = self.parameters[i][]
                     if parameter.requires_grad and parameter.has_grad():
                         ref grad = parameter.gradients()[]
-                        var grad_ptr = grad.buffer.data_buffer().data
+                        var grad_ptr = grad.data_ptr()
                         var num_elements = grad.num_elements()
 
                         var clip_vec = SIMD[Self.dtype, simd_w](clip_coef)
@@ -141,7 +141,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 ref parameter = self.parameters[i][]
                 if parameter.requires_grad and parameter.has_grad():
                     ref grad = parameter.gradients()[]
-                    var grad_ptr = grad.buffer.data_buffer().data
+                    var grad_ptr = grad.data_ptr()
                     var num_elements = grad.num_elements()
 
                     var j = 0
@@ -190,14 +190,14 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 continue
 
             ref grad = parameter.gradients()[]
-            var param_ptr = parameter.buffer.data_buffer().data
-            var grad_ptr = grad.buffer.data_buffer().data
+            var param_ptr = parameter.data_ptr()
+            var grad_ptr = grad.data_ptr()
             var num_elements = parameter.num_elements()
 
             # Momentum SGD: v = β*v + g, θ = θ - η*v
             if self.use_momentum:
                 ref velocity = self.velocities[i]
-                var vel_ptr = velocity.buffer.data_buffer().data
+                var vel_ptr = velocity.data_ptr()
 
                 # Fused momentum update
                 var j = 0

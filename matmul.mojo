@@ -36,29 +36,40 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
 
-        var m = A.shape()[0]
-        var n = A.shape()[1]
+        ref A_shape = A.shape()
+        var m = A_shape[0]
+        var n = A_shape[1]
         var p = B.shape()[1]
 
         var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
+
+        ref grad_out_strides = grad_out.strides()
+        var grad_out_stride0 = grad_out_strides[0]
+        var grad_out_stride1 = grad_out_strides[1]
+        var grad_out_data = grad_out.data_ptr()
 
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
         if A.requires_grad:
             var grad_A = Gradbox[Self.dtype].zeros(Shape([m, n]))
 
             # Hoist all metadata
-            var grad_out_stride0 = grad_out.strides()[0]
-            var grad_out_stride1 = grad_out.strides()[1]
-            var grad_out_data = grad_out.buffer.buffer.data
+            _ = """ref grad_out_strides = grad_out.strides()
 
-            var B_stride0 = B.buffer.strides[0]
-            var B_stride1 = B.buffer.strides[1]
-            var B_offset = B.buffer.offset
-            var B_data = B.buffer.buffer.data
+            var grad_out_stride0 = grad_out.strides[0]
+            var grad_out_stride1 = grad_out.strides[1]
 
-            var grad_A_stride0 = grad_A.strides()[0]
-            var grad_A_stride1 = grad_A.strides()[1]
-            var grad_A_data = grad_A.buffer.buffer.data
+            var grad_out_data = grad_out.data_ptr()"""
+
+            ref B_strides = B.strides()
+            var B_stride0 = B_strides[0]
+            var B_stride1 = B_strides[1]
+            var B_offset = B.offset()
+            var B_data = B.data_ptr()
+
+            ref grad_A_strides = grad_A.strides()
+            var grad_A_stride0 = grad_A_strides[0]
+            var grad_A_stride1 = grad_A_strides[1]
+            var grad_A_data = grad_A.data_ptr()
 
             # PARALLELIZED TILED computation
             var num_tiles_i = (m + tile_size - 1) // tile_size
@@ -138,18 +149,22 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         if B.requires_grad:
             var grad_B = Gradbox[Self.dtype].zeros(Shape([n, p]))
 
-            var A_stride0 = A.buffer.strides[0]
-            var A_stride1 = A.buffer.strides[1]
-            var A_offset = A.buffer.offset
-            var A_data = A.buffer.buffer.data
+            ref A_strides = A.strides()
+            var A_stride0 = A_strides[0]
+            var A_stride1 = A_strides[1]
+            var A_offset = A.offset()
+            var A_data = A.data_ptr()
 
-            var grad_out_stride0 = grad_out.strides()[0]
-            var grad_out_stride1 = grad_out.strides()[1]
-            var grad_out_data = grad_out.buffer.buffer.data
+            _ = """ref grad_out_strides = grad_out.strides()
+            var grad_out_stride0 = grad_out_strides[0]
+            var grad_out_stride1 = grad_out_strides[1]
+            var grad_out_data = grad_out.data_ptr()"""
 
-            var grad_B_stride0 = grad_B.strides()[0]
-            var grad_B_stride1 = grad_B.strides()[1]
-            var grad_B_data = grad_B.buffer.buffer.data
+            ref grad_B_strides = grad_B.strides()
+
+            var grad_B_stride0 = grad_B_strides[0]
+            var grad_B_stride1 = grad_B_strides[1]
+            var grad_B_data = grad_B.data_ptr()
 
             # PARALLELIZED TILED computation
             var num_tiles_j = (n + tile_size - 1) // tile_size
@@ -252,21 +267,24 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
         var C = Tensor[Self.dtype].zeros(Shape([m, p]))
 
         # Hoist metadata
-        var A_stride0 = A.buffer.strides[0]
-        var A_stride1 = A.buffer.strides[1]
-        var A_offset = A.buffer.offset
-        var A_data = A.buffer.buffer.data
+        ref A_strides = A.strides()
+        var A_stride0 = A_strides[0]
+        var A_stride1 = A_strides[1]
+        var A_offset = A.offset()
+        var A_data = A.data_ptr()
 
-        var B_stride0 = B.buffer.strides[0]
-        var B_stride1 = B.buffer.strides[1]
-        var B_offset = B.buffer.offset
-        var B_data = B.buffer.buffer.data
+        ref B_strides = B.strides()
+        var B_stride0 = B_strides[0]
+        var B_stride1 = B_strides[1]
+        var B_offset = B.offset()
+        var B_data = B.data_ptr()
         var B_contiguous = B.is_contiguous()
 
-        var C_stride0 = C.buffer.strides[0]
-        var C_stride1 = C.buffer.strides[1]
-        var C_offset = C.buffer.offset
-        var C_data = C.buffer.buffer.data
+        ref C_strides = C.strides()
+        var C_stride0 = C_strides[0]
+        var C_stride1 = C_strides[1]
+        var C_offset = C.offset()
+        var C_data = C.data_ptr()
 
         if B_contiguous:
             # ========================================
@@ -381,18 +399,18 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
         var A_stride0 = A_strides[0]
         var A_stride1 = A_strides[1]
         var A_offset = A.offset()
-        var A_data = A.buffer.buffer.data
+        var A_data = A.data_ptr()
 
         ref B_strides = B.strides()
         var B_stride0 = B_strides[0]
         var B_stride1 = B_strides[1]
-        var B_data = B.buffer.buffer.data
+        var B_data = B.data_ptr()
 
         ref C_strides = C.strides()
         var C_stride0 = C_strides[0]
         var C_stride1 = C_strides[1]
         var C_offset = C.offset()
-        var C_data = C.buffer.buffer.data
+        var C_data = C.data_ptr()
 
         # ========================================
         # PARALLELIZED TILED MATMUL
@@ -466,18 +484,18 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             ref A_strides = A.strides()
             var A_stride0 = A_strides[0]
             var A_stride1 = A_strides[1]
-            var A_data = A.buffer.buffer.data
+            var A_data = A.data_ptr()
 
             ref B_strides = B.strides()
             var B_stride0 = B_strides[0]
             var B_stride1 = B_strides[1]
             var B_offset = B.offset()
-            var B_data = B.buffer.buffer.data
+            var B_data = B.data_ptr()
 
             ref C_strides = C.strides()
             var C_stride0 = C_strides[0]
             var C_stride1 = C_strides[1]
-            var C_data = C.buffer.buffer.data
+            var C_data = C.data_ptr()
 
             # ========================================
             # PARALLELIZED TILED MATMUL
@@ -547,18 +565,18 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             ref A_strides = A.strides()
             var A_stride0 = A_strides[0]
             var A_stride1 = A_strides[1]
-            var A_data = A.buffer.buffer.data
+            var A_data = A.data_ptr()
 
             ref B_strides = B.strides()
             var B_stride0 = B_strides[0]
             var B_stride1 = B_strides[1]
             var B_offset = B.offset()
-            var B_data = B.buffer.buffer.data
+            var B_data = B.data_ptr()
 
             ref C_strides = C.strides()
             var C_stride0 = C_strides[0]
             var C_stride1 = C_strides[1]
-            var C_data = C.buffer.buffer.data
+            var C_data = C.data_ptr()
 
             for i in range(m):
                 var a_row_base = i * A_stride0

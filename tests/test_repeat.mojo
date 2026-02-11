@@ -310,4 +310,4 @@ fn main() raises:
     test_repeat_in_computational_graph_1()
     test_repeat_strict_validation()
 
-    print("✓ All PyTorch-compatible repeat functionality tests passed!")
+    print("All PyTorch-compatible repeat functionality tests passed!")

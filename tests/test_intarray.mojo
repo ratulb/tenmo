@@ -11,7 +11,7 @@ fn test_ia2_empty_construction() raises:
     # assert_equal(ia.capacity(), IntArray.SMALL_SIZE)
     assert_equal(ia.capacity(), 0)
     assert_true(ia.is_empty())
-    print("✓ test_ia2_empty_construction")
+    print("test_ia2_empty_construction")
 
 
 fn test_ia2_variadic_construction() raises:
@@ -28,7 +28,7 @@ fn test_ia2_variadic_construction() raises:
     var ia3 = IntArray(-1, -2, -3)
     assert_equal(len(ia3), 3)
     assert_equal(ia3[0], -1)
-    print("✓ test_ia2_variadic_construction")
+    print("test_ia2_variadic_construction")
 
 
 fn test_ia2_list_construction() raises:
@@ -38,7 +38,7 @@ fn test_ia2_list_construction() raises:
     assert_equal(len(ia), 4)
     assert_equal(ia[0], 1)
     assert_equal(ia[3], 4)
-    print("✓ test_ia2_list_construction")
+    print("test_ia2_list_construction")
 
 
 fn test_ia2_filled_construction() raises:
@@ -50,7 +50,7 @@ fn test_ia2_filled_construction() raises:
 
     var ia_empty = IntArray.filled(0, 99)
     assert_equal(len(ia_empty), 0)
-    print("✓ test_ia2_filled_construction")
+    print("test_ia2_filled_construction")
 
 
 fn test_ia2_range_construction() raises:
@@ -82,7 +82,7 @@ fn test_ia2_range_construction() raises:
     assert_equal(len(ia5), 6)
     assert_equal(ia5[0], -3)
     assert_equal(ia5[5], 2)
-    print("✓ test_ia2_range_construction")
+    print("test_ia2_range_construction")
 
 
 fn test_ia2_with_capacity() raises:
@@ -91,7 +91,7 @@ fn test_ia2_with_capacity() raises:
     assert_equal(len(ia), 0)
     assert_equal(ia.capacity(), 10)
     assert_true(ia.is_empty())
-    print("✓ test_ia2_with_capacity")
+    print("test_ia2_with_capacity")
 
 
 fn test_ia2_copy_construction() raises:
@@ -105,7 +105,7 @@ fn test_ia2_copy_construction() raises:
     ia2[0] = 99
     assert_equal(ia1[0], 1)  # Original unchanged
     assert_equal(ia2[0], 99)  # Copy modified
-    print("✓ test_ia2_copy_construction")
+    print("test_ia2_copy_construction")
 
 
 # ========== Access Tests ==========
@@ -117,7 +117,7 @@ fn test_ia2_positive_indexing() raises:
     assert_equal(ia[0], 10)
     assert_equal(ia[2], 30)
     assert_equal(ia[4], 50)
-    print("✓ test_ia2_positive_indexing")
+    print("test_ia2_positive_indexing")
 
 
 fn test_ia2_negative_indexing() raises:
@@ -126,7 +126,7 @@ fn test_ia2_negative_indexing() raises:
     assert_equal(ia[-1], 50)
     assert_equal(ia[-2], 40)
     assert_equal(ia[-5], 10)
-    print("✓ test_ia2_negative_indexing")
+    print("test_ia2_negative_indexing")
 
 
 fn test_ia2_setitem() raises:
@@ -138,7 +138,7 @@ fn test_ia2_setitem() raises:
     assert_equal(ia[0], 100)
     assert_equal(ia[4], 500)
     assert_equal(ia[3], 400)
-    print("✓ test_ia2_setitem")
+    print("test_ia2_setitem")
 
 
 fn test_ia2_slicing_basic() raises:
@@ -164,7 +164,7 @@ fn test_ia2_slicing_basic() raises:
     # Full slice
     var s4 = ia[:]
     assert_equal(len(s4), 10)
-    print("✓ test_ia2_slicing_basic")
+    print("test_ia2_slicing_basic")
 
 
 fn test_ia2_slicing_step() raises:
@@ -189,7 +189,7 @@ fn test_ia2_slicing_step() raises:
     assert_equal(len(s3), 3)
     assert_equal(s3[0], 8)
     assert_equal(s3[2], 4)
-    print("✓ test_ia2_slicing_step")
+    print("test_ia2_slicing_step")
 
 
 fn test_ia2_slicing_negative_indices() raises:
@@ -204,7 +204,7 @@ fn test_ia2_slicing_negative_indices() raises:
     var s2 = ia[-5:]
     assert_equal(len(s2), 5)
     assert_equal(s2[0], 1)
-    print("✓ test_ia2_slicing_negative_indices")
+    print("test_ia2_slicing_negative_indices")
 
 
 # ========== Growth Operations Tests ==========
@@ -228,7 +228,7 @@ fn test_ia2_append() raises:
     for i in range(100):
         ia.append(i)
     assert_equal(len(ia), 103)
-    print("✓ test_ia2_append")
+    print("test_ia2_append")
 
 
 fn test_ia2_prepend() raises:
@@ -244,7 +244,7 @@ fn test_ia2_prepend() raises:
     assert_equal(ia[0], 1)
     assert_equal(ia[1], 2)
     assert_equal(ia[2], 3)
-    print("✓ test_ia2_prepend")
+    print("test_ia2_prepend")
 
 
 fn test_ia2__add__() raises:
@@ -255,7 +255,7 @@ fn test_ia2__add__() raises:
     assert_equal(len(ia1), 3)  # Original unchanged
     assert_equal(len(ia2), 4)  # New array extended
     assert_equal(ia2[3], 4)
-    print("✓ test_ia2__add__")
+    print("test_ia2__add__")
 
 
 fn test_ia2_pop() raises:
@@ -277,7 +277,7 @@ fn test_ia2_pop() raises:
     var val3 = ia.pop(-1)
     assert_equal(val3, 4)
     assert_equal(len(ia), 2)
-    print("✓ test_ia2_pop")
+    print("test_ia2_pop")
 
 
 fn test_ia2_clear() raises:
@@ -293,7 +293,7 @@ fn test_ia2_clear() raises:
     ia.append(10)
     assert_equal(len(ia), 1)
     assert_equal(ia[0], 10)
-    print("✓ test_ia2_clear")
+    print("test_ia2_clear")
 
 
 # ========== Insert/Replace Tests ==========
@@ -320,7 +320,7 @@ fn test_ia2_insert_single() raises:
     var ia4 = ia1.insert(3, 5)
     assert_equal(ia4[3], 5)
     assert_equal(len(ia4), 4)
-    print("✓ test_ia2_insert_single")
+    print("test_ia2_insert_single")
 
 
 fn test_ia2_insert_multiple() raises:
@@ -337,7 +337,7 @@ fn test_ia2_insert_multiple() raises:
     assert_equal(result[3], 3)
     assert_equal(result[4], 5)
     assert_equal(result[5], 6)
-    print("✓ test_ia2_insert_multiple")
+    print("test_ia2_insert_multiple")
 
 
 fn test_ia2_insert_empty_array() raises:
@@ -351,7 +351,7 @@ fn test_ia2_insert_empty_array() raises:
     assert_equal(result[0], 10)
     assert_equal(result[1], 20)
     assert_equal(result[2], 30)
-    print("✓ test_ia2_insert_empty_array")
+    print("test_ia2_insert_empty_array")
 
 
 fn test_ia2_replace_single() raises:
@@ -367,7 +367,7 @@ fn test_ia2_replace_single() raises:
     # Test negative index
     var ia3 = ia1.replace(-1, 50)
     assert_equal(ia3[4], 50)
-    print("✓ test_ia2_replace_single")
+    print("test_ia2_replace_single")
 
 
 fn test_ia2_replace_multiple() raises:
@@ -384,7 +384,7 @@ fn test_ia2_replace_multiple() raises:
     assert_equal(result[3], 30)
     assert_equal(result[4], 4)
     assert_equal(result[5], 50)
-    print("✓ test_ia2_replace_multiple")
+    print("test_ia2_replace_multiple")
 
 
 # ========== Operation Tests ==========
@@ -398,7 +398,7 @@ fn test_ia2_fill() raises:
     assert_equal(len(ia), 5)
     for i in range(5):
         assert_equal(ia[i], 0)
-    print("✓ test_ia2_fill")
+    print("test_ia2_fill")
 
 
 fn test_ia2_contains() raises:
@@ -413,7 +413,7 @@ fn test_ia2_contains() raises:
 
     var empty = IntArray()
     assert_false(1 in empty)
-    print("✓ test_ia2_contains")
+    print("test_ia2_contains")
 
 
 fn test_ia2_equality() raises:
@@ -430,7 +430,7 @@ fn test_ia2_equality() raises:
     # Test with List
     var lst: List[Int] = [1, 2, 3]
     assert_true(ia1 == lst)
-    print("✓ test_ia2_equality")
+    print("test_ia2_equality")
 
 
 fn test_ia2_reverse() raises:
@@ -451,7 +451,7 @@ fn test_ia2_reverse() raises:
     var ia3 = IntArray()
     ia3.reverse()
     assert_equal(len(ia3), 0)
-    print("✓ test_ia2_reverse")
+    print("test_ia2_reverse")
 
 
 fn test_ia2_reversed() raises:
@@ -466,7 +466,7 @@ fn test_ia2_reversed() raises:
     # Reversed copy
     assert_equal(ia2[0], 5)
     assert_equal(ia2[4], 1)
-    print("✓ test_ia2_reversed")
+    print("test_ia2_reversed")
 
 
 # ========== Math Operations Tests ==========
@@ -485,7 +485,7 @@ fn test_ia2_product() raises:
 
     var ia4 = IntArray(1, 2, 0, 4)
     assert_equal(ia4.product(), 0)
-    print("✓ test_ia2_product")
+    print("test_ia2_product")
 
 
 fn test_ia2_sum() raises:
@@ -501,7 +501,7 @@ fn test_ia2_sum() raises:
 
     var ia4 = IntArray(-5, 5, -3, 3)
     assert_equal(ia4.sum(), 0)
-    print("✓ test_ia2_sum")
+    print("test_ia2_sum")
 
 
 # ========== Conversion Tests ==========
@@ -519,7 +519,7 @@ fn test_ia2_tolist() raises:
     var empty = IntArray()
     var empty_list = empty.tolist()
     assert_equal(len(empty_list), 0)
-    print("✓ test_ia2_tolist")
+    print("test_ia2_tolist")
 
 
 fn test_ia2_string_representation() raises:
@@ -535,7 +535,7 @@ fn test_ia2_string_representation() raises:
     var ia3 = IntArray(42)
     var s3 = ia3.__str__()
     assert_equal(s3, "[42]")
-    print("✓ test_ia2_string_representation")
+    print("test_ia2_string_representation")
 
 
 # ========== Edge Case Tests ==========
@@ -551,7 +551,7 @@ fn test_ia2_large_array() raises:
     assert_equal(ia[0], 0)
     assert_equal(ia[999], 999)
     assert_equal(ia.sum(), 499500)
-    print("✓ test_ia2_large_array")
+    print("test_ia2_large_array")
 
 
 fn test_ia2_capacity_growth() raises:
@@ -567,7 +567,7 @@ fn test_ia2_capacity_growth() raises:
         prev_cap = curr_cap
 
     assert_equal(len(ia), 100)
-    print("✓ test_ia2_capacity_growth")
+    print("test_ia2_capacity_growth")
 
 
 fn test_ia2_negative_values() raises:
@@ -581,7 +581,7 @@ fn test_ia2_negative_values() raises:
     var ia2 = ia.reversed()
     assert_equal(ia2[0], 5)
     assert_equal(ia2[6], -5)
-    print("✓ test_ia2_negative_values")
+    print("test_ia2_negative_values")
 
 
 fn test_ia2_mixed_operations() raises:
@@ -599,7 +599,7 @@ fn test_ia2_mixed_operations() raises:
 
     ia3.reverse()
     assert_equal(ia3[0], 4)
-    print("✓ test_ia2_mixed_operations")
+    print("test_ia2_mixed_operations")
 
 
 # ========== Main Test Runner ==========

@@ -27,7 +27,7 @@ fn test_tensor_permute_basic() raises:
     assert_true(p.shape() == Shape(4, 3))
     assert_true(p.strides()[0] == t1.strides()[1])
     assert_true(p.strides()[1] == t1.strides()[0])
-    print("✓ Passed basic permute test")
+    print("Passed basic permute test")
 
 
 fn test_tensor_permute_3d_axes() raises:
@@ -38,7 +38,7 @@ fn test_tensor_permute_3d_axes() raises:
     p = t1.permute([2, 0, 1])
     assert_true(p.shape() == Shape(5, 3, 4))
     assert_true(p.rank() == 3)
-    print("✓ Passed 3D permutation")
+    print("Passed 3D permutation")
 
 
 fn test_tensor_permute_inverse() raises:
@@ -50,7 +50,7 @@ fn test_tensor_permute_inverse() raises:
     inv = Permute[dtype].forward(p, IntArray([1, 2, 0]))
     assert_true(inv.shape() == t1.shape())
     assert_true(inv.all_close(t1))
-    print("✓ Passed inverse permutation test")
+    print("Passed inverse permutation test")
 
 
 fn test_tensor_permute_grad_sum_2d() raises:
@@ -69,7 +69,7 @@ fn test_tensor_permute_grad_sum_2d() raises:
         .to_dtype[dtype]()
     )
     assert_true(t.grad().all_close(expected))
-    print("✓ Passed test_tensor_permute_grad_sum_2d")
+    print("Passed test_tensor_permute_grad_sum_2d")
 
 
 fn test_tensor_permute_grad_inverse_chain() raises:
@@ -104,8 +104,8 @@ fn test_tensor_permute_grad_inverse_chain() raises:
         )
         .to_dtype[dtype]()
     )
-    assert_true(t.grad().all_close(expected))
-    print("✓ Passed test_tensor_permute_grad_inverse_chain")
+    assert_true(t.grad().all_close(expected)
+    print("Passed test_tensor_permute_grad_inverse_chain")
 
 
 fn test_tensor_permute_grad_partial_ops() raises:
@@ -126,7 +126,7 @@ fn test_tensor_permute_grad_partial_ops() raises:
     # since m.sum() -> sums all elements of p, gradient on t should be ones
 
     assert_true(t.grad().all_close(Tensor.full(Shape(60), Scalar[dtype](0.2))))
-    print("✓ Passed test_tensor_permute_grad_partial_ops")
+    print("Passed test_tensor_permute_grad_partial_ops")
 
 
 fn test_tensor_permute_grad_scaled_sum_3d() raises:
@@ -167,4 +167,4 @@ fn test_tensor_permute_grad_scaled_sum_3d() raises:
         .to_dtype[dtype]()
     )
     assert_true(t.grad().all_close(expected))
-    print("✓ Passed test_tensor_permute_grad_scaled_sum_3d")
+    print("Passed test_tensor_permute_grad_scaled_sum_3d")

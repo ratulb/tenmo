@@ -36,7 +36,7 @@ fn main() raises:
     test_tiles_with_negative_gradient_flow()
     test_tiles_high_dimensional()
 
-    print("✓ All tiles functionality tests passed!")
+    print("All tiles functionality tests passed!")
     print("passes")
 
 
@@ -150,7 +150,7 @@ fn test_tensor_tiles_1d() raises:
     )
     assert_true(z == expected_z)
 
-    print("✓ Passed 1D tiles test")
+    print("Passed 1D tiles test")
 
 
 fn test_tensor_tiles_2d() raises:
@@ -171,7 +171,7 @@ fn test_tensor_tiles_2d() raises:
     )
     assert_true(y == expected)
 
-    print("✓ Passed 2D tiles test")
+    print("Passed 2D tiles test")
 
 
 fn test_tensor_tiles_1d_to_2d_with_gradients() raises:
@@ -198,7 +198,7 @@ fn test_tensor_tiles_1d_to_2d_with_gradients() raises:
     var expected_grad = Tensor[dtype].d1([4.0, 4.0, 4.0])
     assert_true(x.grad().all_close(expected_grad))
 
-    print("✓ Passed 1D to 2D tiles with gradients test")
+    print("Passed 1D to 2D tiles with gradients test")
 
 
 fn test_tensor_tiles_2d_to_3d_with_gradients() raises:
@@ -217,7 +217,7 @@ fn test_tensor_tiles_2d_to_3d_with_gradients() raises:
     var expected_grad = Tensor[dtype].d2([[12.0, 12.0], [12.0, 12.0]])
     assert_true(x.grad().all_close(expected_grad))
 
-    print("✓ Passed 2D to 3D tiles with gradients test")
+    print("Passed 2D to 3D tiles with gradients test")
 
 
 fn test_scalar_tiles_1d() raises:

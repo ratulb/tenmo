@@ -55,7 +55,7 @@ fn test_gradbox_unsqueeze_basic() raises:
     assert_true(g.flatten() == g2.flatten())
     assert_true(g.flatten() == g3.flatten())
 
-    print("✓ Passed unsqueeze basic test")
+    print("Passed unsqueeze basic test")
 
 
 fn test_gradbox_squeeze_basic() raises:
@@ -78,7 +78,7 @@ fn test_gradbox_squeeze_basic() raises:
     assert_true(g.flatten() == g3.flatten())
     assert_true(g.flatten() == g4.flatten())
 
-    print("✓ Passed squeeze basic test")
+    print("Passed squeeze basic test")
 
 
 fn test_gradbox_squeeze_unsqueeze_symmetry() raises:
@@ -92,7 +92,7 @@ fn test_gradbox_squeeze_unsqueeze_symmetry() raises:
     assert_true(g.shape() == s.shape())
     assert_true(g.flatten() == s.flatten())
 
-    print("✓ Passed squeeze-unsqueeze symmetry test")
+    print("Passed squeeze-unsqueeze symmetry test")
 
 
 fn test_gradbox_unsqueeze_negative_axes() raises:
@@ -112,7 +112,7 @@ fn test_gradbox_unsqueeze_negative_axes() raises:
     assert_true(g.flatten() == g2.flatten())
     assert_true(g.flatten() == g3.flatten())
 
-    print("✓ Passed unsqueeze negative axes test")
+    print("Passed unsqueeze negative axes test")
 
 
 fn test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
@@ -128,7 +128,7 @@ fn test_gradbox_squeeze_unsqueeze_multiple_axes() raises:
     assert_true(g.flatten() == s.flatten())
     assert_true(s.flatten() == u.flatten())
 
-    print("✓ Passed squeeze-unsqueeze multiple axes test")
+    print("Passed squeeze-unsqueeze multiple axes test")
 
 
 fn test_gradbox_permute_basic() raises:
@@ -139,7 +139,7 @@ fn test_gradbox_permute_basic() raises:
     p = g1.permute(IntArray([1, 0]))
     assert_true(p.shape() == Shape(4, 3))
     assert_true(g1.numels() == p.numels())
-    print("✓ Passed test_gradbox_permute_basic")
+    print("Passed test_gradbox_permute_basic")
 
 
 fn test_gradbox_permute_3d() raises:
@@ -150,7 +150,7 @@ fn test_gradbox_permute_3d() raises:
     p = g1.permute(IntArray([2, 0, 1]))
     assert_true(p.shape() == Shape(5, 3, 4))
     assert_true(g1.numels() == p.numels())
-    print("✓ Passed test_gradbox_permute_3d")
+    print("Passed test_gradbox_permute_3d")
 
 
 fn test_gradbox_permute_inverse() raises:
@@ -162,7 +162,7 @@ fn test_gradbox_permute_inverse() raises:
     inv = p.permute(IntArray([2, 0, 1]))
     assert_true(inv.shape() == g1.shape())
     assert_true(inv.all_close(g1))
-    print("✓ Passed test_gradbox_permute_inverse")
+    print("Passed test_gradbox_permute_inverse")
 
 
 fn test_gradbox_permute_identity() raises:
@@ -173,7 +173,7 @@ fn test_gradbox_permute_identity() raises:
     p = g1.permute(IntArray([0, 1, 2]))
     assert_true(p.shape() == g1.shape())
     assert_true(p.all_close(g1))
-    print("✓ Passed test_gradbox_permute_identity")
+    print("Passed test_gradbox_permute_identity")
 
 
 fn test_gradbox_permute_singleton_dims() raises:
@@ -185,7 +185,7 @@ fn test_gradbox_permute_singleton_dims() raises:
     assert_true(p.shape() == Shape(1, 4, 1))
     assert_true(p.numels() == g1.numels())
     assert_true(p.all_close(g1))
-    print("✓ Passed test_gradbox_permute_singleton_dims")
+    print("Passed test_gradbox_permute_singleton_dims")
 
 
 fn test_gradbox_permute_high_rank() raises:
@@ -196,7 +196,7 @@ fn test_gradbox_permute_high_rank() raises:
     p = g1.permute(IntArray([3, 2, 1, 0]))
     assert_true(p.shape() == Shape(5, 4, 3, 2))
     assert_true(g1.numels() == p.numels())
-    print("✓ Passed test_gradbox_permute_high_rank")
+    print("Passed test_gradbox_permute_high_rank")
 
 
 fn test_gradbox_squeeze_noop() raises:

@@ -99,7 +99,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         logits: Tensor[Self.dtype],
         target: Tensor[DType.int32],
         validate: Bool = True,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
             return self._forward_class_indices[track_grad=True](
                 logits, target, validate
@@ -114,7 +114,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         validate: Bool = True,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
             return self._forward_probabilities[track_grad=True](
                 logits, target, validate
@@ -131,7 +131,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         var logits: Tensor[Self.dtype],
         var target: Tensor[DType.int32],
         validate: Bool,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Optimized forward pass for class indices targets."""
         # Validate inputs
 
@@ -229,7 +229,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         var logits: Tensor[Self.dtype],
         var target: Tensor[Self.dtype],
         validate: Bool,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Optimized forward pass for probability/one-hot targets."""
         # Validate inputs
 

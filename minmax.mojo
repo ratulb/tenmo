@@ -239,7 +239,7 @@ struct MinMax[dtype: DType = DType.float32]:
         var num_output_elements = out_shape.num_elements()
 
         # Thread-local storage for gradient bags (one per output element)
-        # Note: In real Mojo, you'd need proper synchronization primitives
+        # Note: In real Mojo, we would need proper synchronization primitives
         var local_gradbags = List[Gradbag[Self.dtype]]()
         for _ in range(num_output_elements):
             local_gradbags.append(Gradbag[Self.dtype]())

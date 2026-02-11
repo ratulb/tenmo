@@ -1,16 +1,17 @@
 from time import perf_counter_ns
-from tensors import Tensor
+from tenmo import Tensor
 from testing import assert_true
 from algorithm import vectorize
-from sys import simdwidthof
+from sys import simd_width_of
+from shapes import Shape
 
 
 fn main() raises:
     A_rows, A_cols = 128, 64
     B_rows, B_cols = 64, 128
     runs = 15
-    forward_only_time = 0
-    forward_backward_time = 0
+    forward_only_time: UInt = 0
+    forward_backward_time: UInt = 0
 
     A = Tensor.rand(Shape(A_rows, A_cols))
     B = Tensor.rand(Shape(B_rows, B_cols))
@@ -45,7 +46,7 @@ fn main() raises:
 
 fn bench_tensor_tensor[
     dtype: DType, //
-](A: Tensor[dtype], B: Tensor[dtype]) -> (Tensor[dtype], UInt):
+](mut A: Tensor[dtype], mut B: Tensor[dtype]) -> Tuple[Tensor[dtype], UInt]:
     start = perf_counter_ns()
     C = A.matmul(B)
     end = perf_counter_ns()
@@ -55,12 +56,12 @@ fn bench_tensor_tensor[
 
 fn bench_tensor_tensor_backward[
     dtype: DType, //
-](A: Tensor[dtype], B: Tensor[dtype]) -> (
+](A: Tensor[dtype], B: Tensor[dtype]) -> Tuple[
     Tensor[dtype],
     Tensor[dtype],
     Tensor[dtype],
     UInt,
-):
+]:
     start = perf_counter_ns()
     C = A.matmul(B)
     C.backward()
@@ -71,7 +72,7 @@ fn bench_tensor_tensor_backward[
 
 fn mm_naive[
     dtype: DType, //
-](A: Tensor[dtype], B: Tensor[dtype]) -> (Tensor[dtype], UInt):
+](A: Tensor[dtype], B: Tensor[dtype]) -> Tuple[Tensor[dtype], UInt]:
     start = perf_counter_ns()
     M = A.rows()
     K = A.cols()
@@ -87,15 +88,15 @@ fn mm_naive[
 
 
 fn mm_vectorize[
-    dtype: DType, //, simd_width: Int = simdwidthof[dtype]()
-](A: Tensor[dtype], B: Tensor[dtype]) -> (Tensor[dtype], UInt):
+    dtype: DType, //, simd_width: Int = simd_width_of[dtype]()
+](A: Tensor[dtype], B: Tensor[dtype]) -> Tuple[Tensor[dtype], UInt]:
     rows_a = A.rows()
     cols_a = A.cols()
     cols_b = B.cols()
     C = Tensor[dtype].zeros(rows_a, cols_b, requires_grad=False)
-    A_buffer = A.data()
-    B_buffer = B.data()
-    C_buffer = C.data()
+    A_buffer = A.data_buffer()
+    B_buffer = B.data_buffer()
+    C_buffer = C.data_buffer()
     start = perf_counter_ns()
     for i in range(rows_a):
         for j in range(cols_a):
@@ -119,18 +120,18 @@ fn mm_vectorize[
 
 fn mm_simd_tiled[
     dtype: DType,
-    simd_width: Int = simdwidthof[dtype](),
+    simd_width: Int = simd_width_of[dtype](),
     TILE_I: Int = 16,
     TILE_J: Int = 16,
     TILE_K: Int = 2 * simd_width,
-](A: Tensor[dtype], B: Tensor[dtype]) -> (Tensor[dtype], UInt):
+](A: Tensor[dtype], B: Tensor[dtype]) -> Tuple[Tensor[dtype], UInt]:
     rows = A.rows()
     cols = A.cols()
     cols_b = B.cols()
     C = Tensor[dtype].zeros(rows, cols_b)
-    A_buffer = A.data()
-    B_buffer = B.data()
-    C_buffer = C.data()
+    A_buffer = A.data_buffer()
+    B_buffer = B.data_buffer()
+    C_buffer = C.data_buffer()
 
     start = perf_counter_ns()
     # Tile the loops

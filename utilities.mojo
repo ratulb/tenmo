@@ -53,12 +53,16 @@ struct Utils[dtype: DType](ImplicitlyCopyable):
 
     @staticmethod
     @always_inline
-    fn exp_buffer(b: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
+    fn exp_buffer(
+        b: Buffer[Self.dtype],
+    ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
         return b.exp()
 
     @staticmethod
     @always_inline
-    fn exp_scalar(s: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
+    fn exp_scalar(
+        s: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
         return exp(s)
 
     @staticmethod

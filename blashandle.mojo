@@ -333,9 +333,21 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
         var C = Tensor[Self.dtype].zeros(M, N)
 
         # Get pointers
-        var A_ptr = A.buffer.data_buffer().data
-        var B_ptr = B.buffer.data_buffer().data
-        var C_ptr = C.buffer.data_buffer().data
+        var A_ptr = (
+            A.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var B_ptr = (
+            B.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var C_ptr = (
+            C.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # Leading dimensions (columns in stored layout)
         var lda = A.shape()[1]
@@ -445,9 +457,21 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
         var C = Gradbox[Self.dtype].zeros(Shape([M, N]))
 
         # Get pointers
-        var A_ptr = A.buffer.data_buffer().data
-        var B_ptr = B.buffer.data_buffer().data
-        var C_ptr = C.buffer.data_buffer().data
+        var A_ptr = (
+            A.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var B_ptr = (
+            B.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var C_ptr = (
+            C.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # Leading dimensions
         var lda = A.shape()[1]
@@ -528,9 +552,21 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
         var C = Gradbox[Self.dtype].zeros(Shape([M, N]))
 
         # Get pointers
-        var A_ptr = A.buffer.data_buffer().data
-        var B_ptr = B.buffer.data_buffer().data
-        var C_ptr = C.buffer.data_buffer().data
+        var A_ptr = (
+            A.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var B_ptr = (
+            B.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var C_ptr = (
+            C.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # Leading dimensions (columns in stored layout)
         var lda = A.shape()[1]
@@ -723,9 +759,21 @@ struct BLASHandleLite[dtype: DType](ImplicitlyCopyable):
         var C = Tensor[Self.dtype].zeros(M, N)
 
         # Get pointers
-        var A_ptr = A.buffer.data_buffer().data
-        var B_ptr = B.buffer.data_buffer().data
-        var C_ptr = C.buffer.data_buffer().data
+        var A_ptr = (
+            A.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var B_ptr = (
+            B.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var C_ptr = (
+            C.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # Leading dimensions (columns in stored layout)
         var lda = A.shape()[1]
@@ -837,9 +885,21 @@ struct BLASHandleLite[dtype: DType](ImplicitlyCopyable):
         var C = Gradbox[Self.dtype].zeros(Shape([M, N]))
 
         # Get pointers
-        var A_ptr = A.buffer.data_buffer().data
-        var B_ptr = B.buffer.data_buffer().data
-        var C_ptr = C.buffer.data_buffer().data
+        var A_ptr = (
+            A.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var B_ptr = (
+            B.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var C_ptr = (
+            C.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # Leading dimensions
         var lda = A.shape()[1]
@@ -920,9 +980,21 @@ struct BLASHandleLite[dtype: DType](ImplicitlyCopyable):
         var C = Gradbox[Self.dtype].zeros(Shape([M, N]))
 
         # Get pointers
-        var A_ptr = A.buffer.data_buffer().data
-        var B_ptr = B.buffer.data_buffer().data
-        var C_ptr = C.buffer.data_buffer().data
+        var A_ptr = (
+            A.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var B_ptr = (
+            B.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var C_ptr = (
+            C.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # Leading dimensions (columns in stored layout)
         var lda = A.shape()[1]

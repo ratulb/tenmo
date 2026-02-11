@@ -11,14 +11,14 @@ fn main() raises:
     test_tensor_argmin_2d_keepdims()
     test_tensor_argmin_3d_axis_and_neg()
     test_tensor_argmin_keepdims_true_false_3d()
-    print("✓ All Argmin tests passed\n")
+    print("All Argmin tests passed\n")
     print("\n=== Running all Argmax tests ===")
     test_tensor_argmax_1d()
     test_tensor_argmax_2d_basic()
     test_tensor_argmax_2d_keepdims()
     test_tensor_argmax_3d_axis_and_neg()
     test_tensor_argmax_keepdims_true_false_3d()
-    print("✓ All Argmax tests passed\n")
+    print("All Argmax tests passed\n")
 
     print("passes")
 
@@ -36,7 +36,7 @@ fn test_tensor_argmax_keepdims() raises:
     assert_true(a2.shape() == Shape(2, 1))
     assert_true(a1 == Tensor[DType.int32].d1([1, 2]))
     assert_true(a2 == Tensor[dtype].d2([[1], [2]]).to_dtype[DType.int32]())
-    print("✓ Passed argmax keepdims test")
+    print("Passed argmax keepdims test")
 
 
 # ==========================================================
@@ -50,7 +50,7 @@ fn test_tensor_argmax_1d() raises:
     var t = Tensor[dtype].d1([0.5, 2.3, 1.1, 2.3])
     var a = t.argmax(axis=0)
     assert_true(a == Tensor[DType.int32].scalar(1))
-    print("✓ Passed 1D argmax test")
+    print("Passed 1D argmax test")
 
 
 fn test_tensor_argmax_2d_basic() raises:
@@ -63,7 +63,7 @@ fn test_tensor_argmax_2d_basic() raises:
     var a1 = t.argmax(axis=1)
     assert_true(a0 == Tensor[DType.int32].d1([1, 2, 1]))
     assert_true(a1 == Tensor[DType.int32].d1([1, 2, 1]))
-    print("✓ Passed 2D argmax basic test")
+    print("Passed 2D argmax basic test")
 
 
 fn test_tensor_argmax_2d_keepdims() raises:
@@ -76,7 +76,7 @@ fn test_tensor_argmax_2d_keepdims() raises:
     assert_true(a2.shape() == Shape(2, 1))
     assert_true(a1 == Tensor[DType.int32].d1([1, 2]))
     assert_true(a2 == Tensor[DType.int32].d2([[1], [2]]))
-    print("✓ Passed argmax keepdims test")
+    print("Passed argmax keepdims test")
 
 
 fn test_tensor_argmax_3d_axis_and_neg() raises:
@@ -92,7 +92,7 @@ fn test_tensor_argmax_3d_axis_and_neg() raises:
     assert_true(a1.shape() == Shape(2, 4))
     assert_true(a2.shape() == Shape(2, 3))
     assert_true(a2 == aneg1)
-    print("✓ Passed 3D argmax positive/negative axes test")
+    print("Passed 3D argmax positive/negative axes test")
 
 
 fn test_tensor_argmax_keepdims_true_false_3d() raises:
@@ -104,7 +104,7 @@ fn test_tensor_argmax_keepdims_true_false_3d() raises:
     var a_yes = t.argmax(axis=1, keepdims=True)
     assert_true(a_no.shape() == Shape(2, 4))
     assert_true(a_yes.shape() == Shape(2, 1, 4))
-    print("✓ Passed argmax keepdims true/false shape test")
+    print("Passed argmax keepdims true/false shape test")
 
 
 # ==========================================================
@@ -118,7 +118,7 @@ fn test_tensor_argmin_1d() raises:
     var t = Tensor[dtype].d1([5.0, -1.0, 3.0, -1.0])
     var a = t.argmin(axis=0)
     assert_true(a == Tensor[DType.int32].scalar(1))
-    print("✓ Passed 1D argmin test")
+    print("Passed 1D argmin test")
 
 
 fn test_tensor_argmin_2d_basic() raises:
@@ -131,7 +131,7 @@ fn test_tensor_argmin_2d_basic() raises:
     var a1 = t.argmin(axis=1)
     assert_true(a0 == Tensor[DType.int32].d1([1, 1, 2]))
     assert_true(a1 == Tensor[DType.int32].d1([1, 1, 2]))
-    print("✓ Passed 2D argmin basic test")
+    print("Passed 2D argmin basic test")
 
 
 fn test_tensor_argmin_2d_keepdims() raises:
@@ -144,7 +144,7 @@ fn test_tensor_argmin_2d_keepdims() raises:
     assert_true(a2.shape() == Shape(2, 1))
     assert_true(a1 == Tensor[DType.int32].d1([1, 2]))
     assert_true(a2 == Tensor[DType.int32].d2([[1], [2]]))
-    print("✓ Passed argmin keepdims test")
+    print("Passed argmin keepdims test")
 
 
 fn test_tensor_argmin_3d_axis_and_neg() raises:
@@ -160,7 +160,7 @@ fn test_tensor_argmin_3d_axis_and_neg() raises:
     assert_true(a1.shape() == Shape(2, 4))
     assert_true(a2.shape() == Shape(2, 3))
     assert_true(a2 == aneg1)
-    print("✓ Passed 3D argmin positive/negative axes test")
+    print("Passed 3D argmin positive/negative axes test")
 
 
 fn test_tensor_argmin_keepdims_true_false_3d() raises:
@@ -172,4 +172,4 @@ fn test_tensor_argmin_keepdims_true_false_3d() raises:
     var a_yes = t.argmin(axis=1, keepdims=True)
     assert_true(a_no.shape() == Shape(2, 4))
     assert_true(a_yes.shape() == Shape(2, 1, 4))
-    print("✓ Passed argmin keepdims true/false shape test")
+    print("Passed argmin keepdims true/false shape test")

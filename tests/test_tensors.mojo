@@ -2114,8 +2114,11 @@ fn test_matmul_shapes() raises:
     var m1 = Tensor[dtype].d2([[1, 2], [3, 4]], requires_grad=True)
     var m2 = Tensor[dtype].d2([[5, 6], [7, 8]], requires_grad=True)
     var mm = m1.matmul(m2)
-    ss = mm.sum()
-    ss.backward()
+    mm.print()
+    s = mm.sum()
+    s.backward()
+    m1.grad().print()
+    m2.grad().print()
     assert_true(mm.all_close(Tensor[dtype].d2([[19, 22], [43, 50]])))
     assert_true(m1.grad().all_close(Tensor[dtype].d2([[11, 15], [11, 15]])))
     assert_true(m2.grad().all_close(Tensor[dtype].d2([[4, 4], [6, 6]])))
@@ -3488,7 +3491,9 @@ fn test_batched_matrix_matmul() raises:
         c.all_close(Tensor[dtype].d3([[[4, 4], [10, 8]], [[5, 6], [7, 8]]]))
     )
 
-    c.backward()
+    # c.backward()
+    s = c.sum()
+    s.backward()
     # For batched matmul, gradients are computed per batch
     # da: [[[2+0, 1+2], [2+0, 1+2]], [[1+0, 0+1], [1+0, 0+1]]] = [[[2,3],[2,3]], [[1,1],[1,1]]]
 
@@ -5280,7 +5285,7 @@ fn main() raises:
     test_sum_all()
     test_dot_product()
     test_matrix_vector_matmul()
-    test_matrix_matrix_matmul()
+    test_matrix_matrix_matmul()  # To be enabled
     test_batched_matrix_matmul()
     test_broadcasted_matrix_matmul()
     test_high_dim_batched_matmul()

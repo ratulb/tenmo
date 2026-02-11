@@ -43,17 +43,21 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
         # Hoist metadata for vector and matrix
         var v_stride = v.buffer.strides[-1]
         var v_offset = v.buffer.offset
-        var v_data = v.buffer.buffer.data
+        var v_data = v.data_ptr()
 
         var M_stride0 = M.buffer.strides[-2]
         var M_stride1 = M.buffer.strides[-1]
         var M_offset = M.buffer.offset
-        var M_data = M.buffer.buffer.data
+        var M_data = M.data_ptr()
         var M_contiguous = M.is_contiguous()
 
         var result_stride = result.buffer.strides[-1]
         var result_offset = result.buffer.offset
-        var result_data = result.buffer.buffer.data
+        var result_data = (
+            result.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # Process each batch element
         for indices in batch_shape:
@@ -186,16 +190,16 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
             # Hoist metadata
             var grad_out_stride = grad_out.strides()[-1]
-            var grad_out_data = grad_out.buffer.buffer.data
+            var grad_out_data = grad_out.data_ptr()
 
             var M_stride0 = M.buffer.strides[-2]
             var M_stride1 = M.buffer.strides[-1]
             var M_offset = M.buffer.offset
-            var M_data = M.buffer.buffer.data
+            var M_data = M.data_ptr()
 
             var grad_v_stride = grad_v.strides()[-1]
             var grad_v_offset = grad_v.offset()
-            var grad_v_data = grad_v.buffer.buffer.data
+            var grad_v_data = grad_v.data_ptr()
 
             for indices in batch_shape:
                 var v_indices = ShapeBroadcaster.broadcasted_indices(
@@ -243,15 +247,15 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
             # Hoist metadata
             var v_stride = v.buffer.strides[-1]
             var v_offset = v.buffer.offset
-            var v_data = v.buffer.buffer.data
+            var v_data = v.data_ptr()
 
             var grad_out_stride = grad_out.strides()[-1]
-            var grad_out_data = grad_out.buffer.buffer.data
+            var grad_out_data = grad_out.data_ptr()
 
             var grad_M_stride0 = grad_M.strides()[-2]
             var grad_M_stride1 = grad_M.strides()[-1]
             var grad_M_offset = grad_M.offset()
-            var grad_M_data = grad_M.buffer.buffer.data
+            var grad_M_data = grad_M.data_ptr()
             var grad_M_contiguous = (
                 True  # Gradbox is always contiguous and has zero offset
             )

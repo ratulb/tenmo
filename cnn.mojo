@@ -360,10 +360,10 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
         # ═══════════════════════════════════════════════════════════
         # STEP 4: Get raw pointers for direct access
         # ═══════════════════════════════════════════════════════════
-        var img_ptr = padded_image.buffer.data_buffer().data
-        var kernel_ptr = kernel.buffer.data_buffer().data
-        var bias_ptr = bias.buffer.data_buffer().data
-        var out_ptr = output.buffer.data_buffer().data
+        var img_ptr = padded_image.data_ptr()
+        var kernel_ptr = kernel.data_ptr()
+        var bias_ptr = bias.data_ptr()
+        var out_ptr = output.data_ptr()
 
         # ═══════════════════════════════════════════════════════════
         # STEP 5: Precompute strides
@@ -640,8 +640,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
           [n*C_out*H_out*W_out + co*H_out*W_out + spatial_pos]
         """
         var grad_bias = Gradbox[Self.dtype].zeros(Shape(C_out), share=False)
-        var grad_ptr = grad_output.buffer.data_buffer().data
-        var bias_ptr = grad_bias.buffer.data_buffer().data
+        var grad_ptr = grad_output.data_ptr()
+        var bias_ptr = grad_bias.data_ptr()
 
         comptime simd_w = simd_width_of[Self.dtype]()
 
@@ -707,8 +707,8 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var patch_size = C_in * KH * KW
         var patches = Tensor[Self.dtype].zeros(num_patches, patch_size)
 
-        var input_ptr = padded_image.buffer.data_buffer().data
-        var patch_ptr = patches.buffer.data_buffer().data
+        var input_ptr = padded_image.data_ptr()
+        var patch_ptr = patches.data_ptr()
 
         var input_stride_N = C_in * H_pad * W_pad
         var input_stride_C = H_pad * W_pad
@@ -803,9 +803,9 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
             Shape(N, C_in, H_pad, W_pad), share=False
         )
 
-        var grad_ptr = grad_output.buffer.data_buffer().data
-        var kernel_ptr = kernel.buffer.data_buffer().data
-        var grad_in_ptr = grad_padded.buffer.data_buffer().data
+        var grad_ptr = grad_output.data_ptr()
+        var kernel_ptr = kernel.data_ptr()
+        var grad_in_ptr = grad_padded.data_ptr()
 
         # Strides
         var grad_stride_N = C_out * H_out * W_out

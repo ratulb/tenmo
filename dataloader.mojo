@@ -283,8 +283,16 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
         """Fill batch with data, preserving multi-dimensional structure."""
         var dataset_features_ptr = dataset_ref.get_features_ptr()
         var dataset_labels_ptr = dataset_ref.get_labels_ptr()
-        var batch_features_ptr = batch.features.buffer.data_buffer().data
-        var batch_labels_ptr = batch.labels.buffer.data_buffer().data
+        var batch_features_ptr = (
+            batch.features.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var batch_labels_ptr = (
+            batch.labels.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # OPTIMIZATION: Bulk copy if not shuffled
         if not self.shuffle_data:
@@ -440,12 +448,12 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     fn get_features_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self.feature_dtype], ImmutAnyOrigin]:
-        return self._features.buffer.data_buffer().data.as_immutable()
+        return self._features.data_ptr().as_immutable()
 
     fn get_labels_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
-        return self._labels.buffer.data_buffer().data.as_immutable()
+        return self._labels.data_ptr().as_immutable()
 
     fn get_feature_shape(self) -> Shape:
         return self._feature_shape
@@ -474,8 +482,16 @@ struct NumpyDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 
         var dataset_features_ptr = self.get_features_ptr()
         var dataset_labels_ptr = self.get_labels_ptr()
-        var sample_feature_ptr = sample_feature.buffer.data_buffer().data
-        var sample_label_ptr = sample_label.buffer.data_buffer().data
+        var sample_feature_ptr = (
+            sample_feature.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var sample_label_ptr = (
+            sample_label.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # Copy data
         var src_feature_offset = idx * self._features_per_sample
@@ -582,12 +598,12 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
     fn get_features_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self.feature_dtype], ImmutAnyOrigin]:
-        return self._features.buffer.data_buffer().data.as_immutable()
+        return self._features.data_ptr().as_immutable()
 
     fn get_labels_ptr(
         ref self,
     ) -> UnsafePointer[Scalar[Self.label_dtype], ImmutAnyOrigin]:
-        return self._labels.buffer.data_buffer().data.as_immutable()
+        return self._labels.data_ptr().as_immutable()
 
     # New API methods (required by updated Dataset trait)
     fn get_feature_shape(self) -> Shape:
@@ -636,8 +652,16 @@ struct TensorDataset[feature_dtype: DType, label_dtype: DType = feature_dtype](
 
         var dataset_features_ptr = self.get_features_ptr()
         var dataset_labels_ptr = self.get_labels_ptr()
-        var sample_feature_ptr = sample_feature.buffer.data_buffer().data
-        var sample_label_ptr = sample_label.buffer.data_buffer().data
+        var sample_feature_ptr = (
+            sample_feature.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var sample_label_ptr = (
+            sample_label.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
 
         # Copy feature data
         var src_feature_offset = idx * self._features_per_sample

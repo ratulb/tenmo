@@ -178,7 +178,8 @@ struct Buffer[dtype: DType = DType.float32](
             != UnsafePointer[Atomic[DType.uint64], MutExternalOrigin]()
         )
 
-    fn shared(mut self) -> Self:
+    # fn shared(mut self) -> Self:
+    fn shared(mut self):
         """
         Convert this buffer to shared mode (enable ref counting).
 
@@ -187,13 +188,13 @@ struct Buffer[dtype: DType = DType.float32](
         After:  [refcount: 8 bytes][data array]
         """
         if self.is_shared():
-            return self  # Already shared
+            return  # self  # Already shared
 
         if self.external:
             panic("Cannot share external buffer")
 
         if self.size == 0:
-            return self  # Nothing to share
+            return  # self  # Nothing to share
 
         # Allocate new memory: [refcount][data]
         var refcount_size = size_of[Atomic[DType.uint64]]()
@@ -217,7 +218,7 @@ struct Buffer[dtype: DType = DType.float32](
         # Update pointers
         self.data = new_data
         self._refcount = refcount_ptr
-        return self
+        # return self
 
     fn ref_count(self) -> UInt64:
         """Count the amount of current references.
@@ -333,7 +334,7 @@ struct Buffer[dtype: DType = DType.float32](
         ]()
 
         # Only use SIMD if we have enough elements
-        if result_size >= simd_width:
+        _ = """if result_size >= simd_width:
             var num_chunks = result_size // simd_width
             var remainder = result_size % simd_width
 
@@ -356,10 +357,10 @@ struct Buffer[dtype: DType = DType.float32](
                 result.data[start_remainder + i] = self.data[
                     start + (start_remainder + i) * step
                 ]
-        else:
-            # Too small for SIMD - just use scalar loop
-            for i in range(result_size):
-                result.data[i] = self.data[start + i * step]
+        else:"""
+        # Too small for SIMD - just use scalar loop
+        for i in range(result_size):
+            result.data[i] = self.data[start + i * step]
 
         return result^
 

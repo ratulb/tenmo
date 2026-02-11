@@ -4,6 +4,7 @@ from testing import assert_true, assert_raises
 from broadcasthelper import ShapeBroadcaster
 from intarray import IntArray
 
+
 fn test_empty_shape_broadcastable() raises:
     print("test_empty_shape_broadcastable")
     shape = Shape()
@@ -78,6 +79,7 @@ fn test_broadcast_shape() raises:
 
 fn test_broadcastable() raises:
     print("test_broadcastable")
+    comptime dtype = DType.float32
     assert_true(
         ShapeBroadcaster.broadcastable(Shape(1), Shape.of(1)),
         "broadcastable assertion 1 failed",
@@ -94,8 +96,8 @@ fn test_broadcastable() raises:
         ShapeBroadcaster.broadcastable(Shape(2, 3, 5), Shape.of(3, 5)),
         "broadcastable assertion 4 failed",
     )
-    tensor1 = Tensor.of(1, 2, 3, 4, 5)
-    tensor2 = Tensor.of(6)
+    tensor1 = Tensor[dtype].of(1, 2, 3, 4, 5)
+    tensor2 = Tensor[dtype].of(6)
     assert_true(
         tensor1.broadcastable(tensor2) and tensor2.broadcastable(tensor1),
         "Tensor shape broadcastable assertion failed",

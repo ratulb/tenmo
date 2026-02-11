@@ -70,8 +70,14 @@ struct Filler[dtype: DType](ImplicitlyCopyable & Movable):
         var absolute_offset = target.offset + offset
         if shape == source_shape:
             if source.is_contiguous() and strides.is_contiguous(shape):
-                dest = target.buffer.data
-                src = source.buffer.data
+                # dest = target.buffer.data
+                dest = (
+                    target.data_ptr()
+                    .unsafe_mut_cast[True]()
+                    .unsafe_origin_cast[MutAnyOrigin]()
+                )
+                # src = source.buffer.data
+                src = source.data_ptr()
                 memcpy(
                     dest=dest + absolute_offset,
                     src=src + source.offset,

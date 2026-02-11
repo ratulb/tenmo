@@ -170,7 +170,7 @@ fn train_mnist() raises:
             val_total += batch.batch_size
 
         # --- Epoch Report ---
-        var epoch_time = (perf_counter_ns() - epoch_start) / 1e9
+        var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9
         var avg_train_loss = train_loss / train_total
         var train_acc = 100.0 * train_correct / train_total
         var avg_val_loss = val_loss / val_total
@@ -196,7 +196,7 @@ fn train_mnist() raises:
             "%",
         )
 
-    var total_time = (perf_counter_ns() - training_start) / 1e9
+    var total_time = Float64(perf_counter_ns() - training_start) / 1e9
     print("=" * 80)
     print("Training completed in", total_time, "seconds")
     print("=" * 80)

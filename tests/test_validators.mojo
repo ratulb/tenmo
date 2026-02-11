@@ -262,7 +262,7 @@ fn run_validate_axes_tests() raises:
     test_validate_axes_all_axes()
 
     print("\n" + "=" * 60)
-    print("ALL VALIDATE_AXES TESTS PASSED ✓")
+    print("ALL VALIDATE_AXES TESTS PASSED")
     print("=" * 60)
 
 
@@ -286,7 +286,7 @@ fn run_validate_reshape_tests() raises:
     test_reshape_infer_last()
 
     print("\n" + "=" * 60)
-    print("ALL VALIDATE_RESHAPE TESTS PASSED ✓")
+    print("ALL VALIDATE_RESHAPE TESTS PASSED")
     print("=" * 60)
 
 
@@ -300,7 +300,7 @@ fn run_all_validator_tests() raises:
     run_validate_reshape_tests()
 
     print("\n" + "#" * 60)
-    print("# ALL VALIDATOR TESTS PASSED SUCCESSFULLY ✓✓✓")
+    print("# ALL VALIDATOR TESTS PASSED SUCCESSFULLY")
     print("#" * 60 + "\n")
 
 

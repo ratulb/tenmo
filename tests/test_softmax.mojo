@@ -28,7 +28,7 @@ fn test_tensor_softmax_backward_1d() raises:
     var loss = s.sum()
     loss.backward()
     assert_true(t.grad().all_close(Tensor[dtype].zeros(Shape(3))))
-    print("✓ Passed 1D softmax backward test")
+    print("Passed 1D softmax backward test")
 
 
 fn test_softmax_1d_basic() raises:

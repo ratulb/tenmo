@@ -42,7 +42,7 @@ fn validate_matmul_2d_grads[
     # --- Early exit if no gradients were tracked ---
     if not A.requires_grad and not B.requires_grad and not C.requires_grad:
         print(
-            "ℹ️ validate_matmul_2d_grads → No gradients to validate "
+            "validate_matmul_2d_grads → No gradients to validate "
             + "(requires_grad == False for all tensors)."
         )
         return
@@ -74,7 +74,7 @@ fn validate_matmul_2d_grads[
             print("Actual gradA:", auto_grad_A)
             panic("validate_matmul_2d_grads → Gradient mismatch for A.")
     else:
-        print("⚠️ Skipping A.grad validation (requires_grad == False)")
+        print("gSkipping A.grad validation (requires_grad == False)")
 
     # --- Validate B.grad ---
     if B.requires_grad:
@@ -139,7 +139,7 @@ fn run_all_matmul_2d_forward_tests() raises:
 
     test_all_matmul_2d_large_simd()
 
-    print("✓ All matmul_2d tests passed!")
+    print("All matmul_2d tests passed!")
 
 
 fn test_all_matmul_2d_large_simd() raises:
@@ -152,7 +152,7 @@ fn test_all_matmul_2d_large_simd() raises:
     test_matmul_2d_large_views_simd_path()
     test_matmul_2d_large_transposed_slow_path()
     test_matmul_2d_very_very_large_matrices()
-    print("✓ All large matmul_2d SIMD tests passed!")
+    print("All large matmul_2d SIMD tests passed!")
 
 
 # ===== LARGE MATRICES FOR SIMD PATH TESTING =====

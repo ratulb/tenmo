@@ -36,7 +36,8 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable):
         """
 
         ref grad_output = output.gradients()[]
-        var grad_data = grad_output.buffer.buffer.data
+        # var grad_data = grad_output.buffer.buffer.data
+        var grad_data = grad_output.data_ptr()
         ref grad_shape = grad_output.shape()
         ref grad_strides = grad_output.strides()
 
@@ -68,7 +69,8 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable):
 
             var grad_input_shape = Shape(grad_input_shape_dims)
             var grad_input = Gradbox[Self.dtype].zeros(grad_input_shape)
-            var grad_input_data = grad_input.buffer.buffer.data
+            # var grad_input_data = grad_input.buffer.buffer.data
+            var grad_input_data = grad_input.data_ptr()
 
             # ===== EXTRACT SLICE: grad_output[..., tensor_idx, ...] =====
             var elem_idx = 0

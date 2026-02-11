@@ -49,7 +49,7 @@ fn to_ndarray[dtype: DType, //](tensor: Tensor[dtype]) raises -> PythonObject:
     ndarray = np.zeros(shape_tuple, dtype=numpy_dtype(tensor.dtype))
     if tensor.is_contiguous():
         dst_ptr = ndarray_ptr[dtype](ndarray)
-        buffer_ptr = tensor.buffer.data_buffer().data + tensor.offset()
+        buffer_ptr = tensor.data_ptr() + tensor.offset()
         memcpy(dest=dst_ptr, src=buffer_ptr, count=tensor.numels())
     else:
         flat = ndarray.flat

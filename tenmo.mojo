@@ -132,7 +132,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn as_list(self) -> List[Scalar[Self.dtype]]:
         var count = self.numels()
         var tensor_data = List[Scalar[Self.dtype]](capacity=count)
-        memcpy(dest=tensor_data._data, src=self.buffer.buffer.data, count=count)
+        memcpy(dest=tensor_data.unsafe_ptr(), src=self.data_ptr(), count=count)
         return tensor_data^
 
     fn __moveinit__(out self, deinit other: Self):
@@ -293,8 +293,8 @@ struct Tensor[dtype: DType = DType.float32](
         var absolute_offset = self.offset() + offset
         if strides.is_contiguous(shape):
             memcpy(
-                dest=result.buffer.buffer.data,
-                src=self.buffer.buffer.data + absolute_offset,
+                dest=result.data_ptr(),
+                src=self.data_ptr() + absolute_offset,
                 count=shape.num_elements(),
             )
         else:
@@ -887,7 +887,7 @@ struct Tensor[dtype: DType = DType.float32](
         numels = len(row)
         shape = Shape(IntArray(numels))
         buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=row._data, count=numels)
+        memcpy(dest=buffer.data, src=row.unsafe_ptr(), count=numels)
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
@@ -905,7 +905,7 @@ struct Tensor[dtype: DType = DType.float32](
         shape = Shape(dims)
         numels = shape.num_elements()
         buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=flattened._data, count=numels)
+        memcpy(dest=buffer.data, src=flattened.unsafe_ptr(), count=numels)
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad)
 
@@ -927,7 +927,7 @@ struct Tensor[dtype: DType = DType.float32](
         shape = Shape(dims)
         numels = shape.num_elements()
         buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=flattened._data, count=numels)
+        memcpy(dest=buffer.data, src=flattened.unsafe_ptr(), count=numels)
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
@@ -965,7 +965,7 @@ struct Tensor[dtype: DType = DType.float32](
         shape = Shape(dims)
         numels = shape.num_elements()
         buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=flattened._data, count=numels)
+        memcpy(dest=buffer.data, src=flattened.unsafe_ptr(), count=numels)
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
@@ -1007,7 +1007,7 @@ struct Tensor[dtype: DType = DType.float32](
         shape = Shape(dims)
         numels = shape.num_elements()
         buffer = Buffer[Self.dtype](numels)
-        memcpy(dest=buffer.data, src=flattened._data, count=numels)
+        memcpy(dest=buffer.data, src=flattened.unsafe_ptr(), count=numels)
         nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
         return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
 
@@ -1462,7 +1462,7 @@ struct Tensor[dtype: DType = DType.float32](
             unit = Scalar[Self.dtype](1),
         ]()
 
-    fn exp(self) -> Tensor[Self.dtype]:
+    fn exp(self) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         constrained[
             Self.dtype.is_floating_point(),
             "Tensor → exp is for floating point data types only",
@@ -2091,7 +2091,7 @@ struct Tensor[dtype: DType = DType.float32](
         self,
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         @parameter
         if log:
             return LogSoftmax[Self.dtype].forward[track_grad](
@@ -2110,7 +2110,7 @@ struct Tensor[dtype: DType = DType.float32](
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[
         Self.dtype
-    ]:
+    ] where Self.dtype.is_floating_point():
         @parameter
         if log:
             return LogSoftmax[Self.dtype].forward[track_grad](
@@ -2127,7 +2127,7 @@ struct Tensor[dtype: DType = DType.float32](
         pred: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         return BCELoss[Self.dtype].forward[track_grad](pred, target, epsilon)
 
     fn binary_cross_entropy_with_logits[
@@ -2136,7 +2136,7 @@ struct Tensor[dtype: DType = DType.float32](
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         return BCEWithLogitsLoss[Self.dtype].forward[track_grad](
             logits, target, epsilon
         )
@@ -2150,7 +2150,7 @@ struct Tensor[dtype: DType = DType.float32](
         return Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 
     fn matmul[
-        track_grad: Bool = True, mode: Int = mm
+        track_grad: Bool = True, mode: Int = mnemonics.mm
     ](mut A: Tensor[Self.dtype], mut B: Tensor[Self.dtype]) -> Tensor[
         Self.dtype
     ]:

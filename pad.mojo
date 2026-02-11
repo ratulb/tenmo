@@ -149,8 +149,8 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var H_pad = grad_out_shape[2]
         var W_pad = grad_out_shape[3]
 
-        var grad_out_ptr = grad_out.buffer.data_buffer().data
-        var grad_in_ptr = grad_parent.buffer.data_buffer().data
+        var grad_out_ptr = grad_out.data_ptr()
+        var grad_in_ptr = grad_parent.data_ptr().unsafe_mut_cast[True]()
 
         comptime simd_w = simd_width_of[Self.dtype]()
         # Strides
@@ -456,8 +456,8 @@ struct Pad[dtype: DType](ImplicitlyCopyable):
         var pad_left = pad[3][0]
         # Note: pad[0] and pad[1] are assumed to be (0,0) for Conv2D
 
-        var x_ptr = x.buffer.data_buffer().data
-        var result_ptr = result.buffer.data_buffer().data
+        var x_ptr = x.data_ptr()
+        var result_ptr = result.data_ptr()
 
         comptime simd_w = simd_width_of[Self.dtype]()
         # ═══════════════════════════════════════════════════════════

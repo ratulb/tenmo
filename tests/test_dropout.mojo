@@ -204,8 +204,12 @@ fn test_dropout_forward_mode_switching() raises:
 # ============================================================================
 # BACKWARD PASS TESTS
 # ============================================================================
-
 fn test_dropout_backward_simple() raises:
+    """Test dropout backward pass - gradients should flow through non-dropped elements."""
+    print("test_dropout_backward_simple")
+
+
+fn main() raises:
     """Test dropout backward pass - gradients should flow through non-dropped elements."""
     print("test_dropout_backward_simple")
 
@@ -221,8 +225,12 @@ fn test_dropout_backward_simple() raises:
 
     var out = dropout(x)
     var loss = out.sum()
+    print(loss.has_backward_fn(), out.has_backward_fn(), out.requires_grad)
     loss.backward()
+    out.print()
+    x.grad().print()
 
+    print()
     # Gradients should be:
     # - 0.0 where elements were dropped
     # - scale (2.0) where elements were kept
@@ -230,17 +238,15 @@ fn test_dropout_backward_simple() raises:
     for i in range(4):
         if out[i] == 0.0:
             # Element was dropped, gradient should be 0
-            var expected = Tensor[DType.float32](1)
-            expected[0] = 0.0
-            var actual = Tensor[DType.float32](1)
-            actual[0] = grad[i]
+            var expected = Tensor[DType.float32].scalar(0)
+            var actual = Tensor[DType.float32].scalar(grad[i])
+            print("Out zero", actual.item())
             assert_true(actual.all_close[atol=1e-6](expected))
         else:
             # Element was kept, gradient should be scale (2.0)
-            var expected = Tensor[DType.float32](1)
-            expected[0] = 2.0
-            var actual = Tensor[DType.float32](1)
-            actual[0] = grad[i]
+            var expected = Tensor[DType.float32].scalar(2)
+            var actual = Tensor[DType.float32].scalar(grad[i])
+            print("Out not zero", actual.item())
             assert_true(actual.all_close[atol=1e-6](expected))
 
 
@@ -559,7 +565,7 @@ fn test_dropout_large_tensor_backward() raises:
 # MAIN TEST RUNNER
 # ============================================================================
 
-fn main() raises:
+fn main_1() raises:
     print("=" * 80)
     print("DROPOUT COMPREHENSIVE TEST SUITE")
     print("=" * 80)

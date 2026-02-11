@@ -74,13 +74,13 @@ fn main() raises:
     with input_buffer_A.map_to_host() as A_host_buffer:
         memcpy(
             dest=A_host_buffer.unsafe_ptr(),
-            src=A_src.buffer.buffer.data,
+            src=A_src.data_ptr(),
             count=A_src.numels(),
         )
     with input_buffer_B.map_to_host() as B_host_buffer:
         memcpy(
             dest=B_host_buffer.unsafe_ptr(),
-            src=B_src.buffer.buffer.data,
+            src=B_src.data_ptr(),
             count=B_src.numels(),
         )
     var A = Matrix_A(input_buffer_A)
@@ -105,7 +105,7 @@ fn main() raises:
 
     with output_buffer_C.map_to_host() as C_host_buff:
         memcpy(
-            dest=actual.buffer.buffer.data,
+            dest=actual.data_ptr(),
             src=C_host_buff.unsafe_ptr(),
             count=len(C_host_buff),
         )

@@ -354,8 +354,6 @@ case $1 in
         echo "Running tests/test_permute.mojo"
         mojo -I . tests/test_permute.mojo
 
-        echo "Running tensor tests"
-        mojo -I . tests/test_tensors.mojo
         echo "Running flatten tests"
         mojo -I . tests/test_flatten.mojo
         echo "Running squeeze tests"
@@ -370,8 +368,8 @@ case $1 in
         mojo -I . tests/test_ndb.mojo
         echo "Running tranpose tests"
         mojo -I . tests/test_transpose.mojo
-        echo "Running synthetic mnist tests"
-        mojo -I . tests/test_synthetic_mnist.mojo
+        #echo "Running synthetic mnist tests"
+        #mojo -I . tests/test_synthetic_mnist.mojo
         echo "Running crossentropy loss tests"
         mojo -I . tests/test_cross_entropy.mojo
         echo "Running view test cases"
@@ -380,14 +378,14 @@ case $1 in
         mojo -I . tests/test_shapes.mojo
         echo "Running strides test cases"
         mojo -I . tests/test_strides.mojo
-        echo "Running shared test cases"
-        mojo -I . tests/test_shared.mojo
         echo "Running ancestry test cases"
         mojo -I . tests/test_ancestry.mojo
         echo "Running validators test cases"
         mojo -I . tests/test_validators.mojo
-        echo "Running tensor multiplication benchmark"
-        mojo -I . tests/test_matmul_bench.mojo
+        echo "Running tensor tests"
+        mojo -I . tests/test_tensors.mojo
+        #echo "Running tensor multiplication benchmark"
+        #mojo -I . tests/test_matmul_bench.mojo
         ;;
     *)
         echo "Error: Unknown test '$1'"

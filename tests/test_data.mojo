@@ -41,7 +41,7 @@ fn test_tensor_dataset_basic_creation() raises:
         dataset._features.shape()[0] == 3, "Features should have 3 samples"
     )
     assert_true(dataset._labels.shape()[0] == 3, "Labels should have 3 samples")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_tensor_dataset_2d_labels() raises:
@@ -57,7 +57,7 @@ fn test_tensor_dataset_2d_labels() raises:
     assert_true(
         dataset._labels.shape()[1] == 2, "Labels should have 2 dimensions"
     )
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_tensor_dataset_getitem_1d_labels() raises:
@@ -74,7 +74,7 @@ fn test_tensor_dataset_getitem_1d_labels() raises:
     assert_true(feat[1] == 4, "Second feature element should be 4")
     # assert_true(lab[0] == 20, "Label should be 20")
     assert_true(lab[[]] == 20, "Label should be 20")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_tensor_dataset_getitem_2d_labels() raises:
@@ -90,7 +90,7 @@ fn test_tensor_dataset_getitem_2d_labels() raises:
     assert_true(lab.shape()[0] == 2, "Label should have 2 elements")
     assert_true(lab[0] == 10, "First label should be 10")
     assert_true(lab[1] == 11, "Second label should be 11")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_tensor_dataset_getitem_all_indices() raises:
@@ -118,7 +118,7 @@ fn test_tensor_dataset_getitem_all_indices() raises:
         assert_true(
             lab[[]] == expected_label, "Label mismatch at index " + i.__str__()
         )
-    print("✓ Passed")
+    print("Passed")
 
 
 # ============================================================================
@@ -139,7 +139,7 @@ fn test_batch_creation() raises:
         batch.features.shape()[0] == 2, "Features should have 2 samples"
     )
     assert_true(batch.labels.shape()[0] == 2, "Labels should have 2 samples")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_batch_single_sample() raises:
@@ -151,7 +151,7 @@ fn test_batch_single_sample() raises:
     var batch = Batch[dtype](features, labels)
 
     assert_true(batch.batch_size == 1, "Batch size should be 1")
-    print("✓ Passed")
+    print("Passed")
 
 
 # ============================================================================
@@ -176,7 +176,7 @@ fn test_dataloader_basic_iteration() raises:
         assert_true(batch.batch_size == 2, "Each batch should have size 2")
 
     assert_true(batch_count == 2, "Should iterate through 2 batches")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_batch_size_one() raises:
@@ -196,7 +196,7 @@ fn test_dataloader_batch_size_one() raises:
         assert_true(batch.batch_size == 1, "Each batch should have size 1")
 
     assert_true(batch_count == 3, "Should iterate through 3 batches")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_partial_last_batch() raises:
@@ -223,7 +223,7 @@ fn test_dataloader_partial_last_batch() raises:
             assert_true(batch.batch_size == 1, "Last batch should have size 1")
 
     assert_true(batch_count == 3, "Should iterate through 3 batches")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_drop_last_true() raises:
@@ -245,7 +245,7 @@ fn test_dataloader_drop_last_true() raises:
         assert_true(batch.batch_size == 2, "All batches should have size 2")
 
     assert_true(batch_count == 2, "Should iterate through only 2 batches")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_exact_division() raises:
@@ -263,7 +263,7 @@ fn test_dataloader_exact_division() raises:
         assert_true(batch.batch_size == 2, "All batches should have size 2")
 
     assert_true(batch_count == 2, "Should have exactly 2 batches")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_content_correctness() raises:
@@ -286,21 +286,21 @@ fn test_dataloader_content_correctness() raises:
             assert_true(batch.features[1, 1] == 4, "Batch 0 feature mismatch")
             assert_true(
                 batch.labels[0] == 10, "Batch 0 label mismatch"
-            )  # ✅ Fixed
+            )  # Fixed
             assert_true(
                 batch.labels[1] == 20, "Batch 0 label mismatch"
-            )  # ✅ Fixed
+            )  # Fixed
         elif batch_idx == 1:
             # Second batch: sample 2
             assert_true(batch.features[0, 0] == 5, "Batch 1 feature mismatch")
             assert_true(batch.features[0, 1] == 6, "Batch 1 feature mismatch")
             assert_true(
                 batch.labels[0] == 30, "Batch 1 label mismatch"
-            )  # ✅ Fixed
+            )  # Fixed
         batch_idx += 1
 
     assert_true(batch_idx == 2, "Should have 2 batches")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_2d_labels() raises:
@@ -320,7 +320,7 @@ fn test_dataloader_2d_labels() raises:
         assert_true(batch.labels[0, 1] == 11, "Label mismatch")
         assert_true(batch.labels[1, 0] == 20, "Label mismatch")
         assert_true(batch.labels[1, 1] == 21, "Label mismatch")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_large_batch_size() raises:
@@ -341,7 +341,7 @@ fn test_dataloader_large_batch_size() raises:
         assert_true(batch.batch_size == 3, "Batch should contain all 3 samples")
 
     assert_true(batch_count == 1, "Should iterate once")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_multiple_epochs() raises:
@@ -365,7 +365,7 @@ fn test_dataloader_multiple_epochs() raises:
 
     assert_true(count1 == 2, "First epoch should have 2 batches")
     assert_true(count2 == 2, "Second epoch should have 2 batches")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_reshuffle_changes_order() raises:
@@ -389,7 +389,7 @@ fn test_dataloader_reshuffle_changes_order() raises:
 
     assert_true(batch_count == 3, "Should have 3 batches")
     assert_true(total_samples == 5, "Should have processed all 5 samples")
-    print("✓ Passed (shuffle functionality verified)")
+    print("Passed (shuffle functionality verified)")
 
 
 fn test_dataloader_reshuffle_changes_order_orig() raises:
@@ -423,7 +423,7 @@ fn test_dataloader_reshuffle_changes_order_orig() raises:
         assert_true(batch.batch_size <= 2, "Batch size should be at most 2")
 
     assert_true(batch_count == 5, "Should have 5 batches")
-    print("✓ Passed (shuffle functionality verified)")
+    print("Passed (shuffle functionality verified)")
 
 
 fn test_dataloader_single_sample_dataset() raises:
@@ -443,7 +443,7 @@ fn test_dataloader_single_sample_dataset() raises:
         assert_true(batch.labels[0] == 10, "Label value mismatch")
 
     assert_true(batch_count == 1, "Should have 1 batch")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_high_dimensional_features() raises:
@@ -469,7 +469,7 @@ fn test_dataloader_high_dimensional_features() raises:
         )
 
     assert_true(batch_count == 2, "Should have 2 batches")
-    print("✓ Passed")
+    print("Passed")
 
 
 fn test_dataloader_shuffle_quality() raises:
@@ -519,7 +519,7 @@ fn test_dataloader_shuffle_quality() raises:
     for i in range(10):
         assert_true(found[i], "Missing index " + i.__str__() + " after shuffle")
 
-    print("✓ Passed (all indices present after shuffle)")
+    print("Passed (all indices present after shuffle)")
 
 
 # ============================================================================
@@ -1138,7 +1138,7 @@ fn test_iterator_copy_is_lightweight() raises:
         "Iterator copy too slow - might be copying dataset!",
     )
 
-    print("  ✓ Iterator copy is lightweight (<1ms)")
+    print("  Iterator copy is lightweight (<1ms)")
 
 
 fn test_batch_buffers_reused_not_reallocated() raises:
@@ -1181,7 +1181,7 @@ fn test_batch_buffers_reused_not_reallocated() raises:
         "Too many unique buffer pointers - buffers might not be reused!",
     )
 
-    print("  ✓ Batch buffers reused (", num_unique_ptrs, "unique buffers)")
+    print("  Batch buffers reused (", num_unique_ptrs, "unique buffers)")
 
 
 fn test_no_allocation_during_iteration() raises:
@@ -1219,7 +1219,7 @@ fn test_no_allocation_during_iteration() raises:
         "Iteration too slow - might be allocating memory per batch!",
     )
 
-    print("  ✓ No allocation overhead detected")
+    print("  No allocation overhead detected")
 
 
 fn test_shuffle_preserves_data_location() raises:
@@ -1255,7 +1255,7 @@ fn test_shuffle_preserves_data_location() raises:
     assert_equal(original_features_ptr, final_features_ptr)
     assert_equal(original_labels_ptr, final_labels_ptr)
 
-    print("  ✓ Data stays in place during shuffle")
+    print("  Data stays in place during shuffle")
 
 
 fn test_memory_overhead_is_minimal() raises:
@@ -1308,7 +1308,7 @@ fn test_memory_overhead_is_minimal() raises:
     # Overhead should be < 1% of dataset size
     assert_true(overhead_percentage < 1.0, "Memory overhead too large!")
 
-    print("  ✓ Memory overhead minimal (", overhead_percentage, "%)")
+    print("  Memory overhead minimal (", overhead_percentage, "%)")
 
 
 fn test_multi_epoch_no_memory_growth() raises:
@@ -1354,7 +1354,7 @@ fn test_multi_epoch_no_memory_growth() raises:
             )
 
     print(
-        "  ✓ No memory growth across",
+        "  No memory growth across",
         len(epoch_pointers),
         "epochs (",
         len(epoch_pointers[0]),
@@ -1405,7 +1405,7 @@ fn test_performance_overhead_is_negligible() raises:
     # Overhead should be < 20% (ideally < 10%)
     assert_true(overhead < 30.0, "DataLoader overhead too large!")
 
-    print("  ✓ DataLoader overhead acceptable (<30%)")
+    print("  DataLoader overhead acceptable (<30%)")
 
 
 fn test_dataloader_pointer_semantics() raises:
@@ -1440,7 +1440,7 @@ fn test_dataloader_pointer_semantics() raises:
         batch_count += 1
     assert_equal(batch_count, 2)
 
-    print("  ✓ Loader uses pointer semantics (<10ms creation)")
+    print("  Loader uses pointer semantics (<10ms creation)")
 
 
 fn test_comparing_copy_vs_reference_semantics() raises:
@@ -1476,7 +1476,7 @@ fn test_comparing_copy_vs_reference_semantics() raises:
         "DataLoader not significantly faster than copying!",
     )
 
-    print("  ✓ Pointer-based design is", copy_time / loader_time, "x faster")
+    print("  Pointer-based design is", copy_time / loader_time, "x faster")
 
 
 fn test_shuffle_uses_two_buffers() raises:
@@ -1524,7 +1524,7 @@ fn test_shuffle_uses_two_buffers() raises:
         + String(num_unique),
     )
 
-    print("  ✓ Correctly uses 2 pre-allocated buffers (full + remainder)")
+    print("  Correctly uses 2 pre-allocated buffers (full + remainder)")
 
 
 fn test_no_memory_growth_with_shuffle() raises:
@@ -1587,9 +1587,7 @@ fn test_no_memory_growth_with_shuffle() raises:
             found, "New buffer appeared in epoch 2 - possible memory leak!"
         )
 
-    print(
-        "  ✓ No memory growth with shuffle (", len(unique1), "stable buffers)"
-    )
+    print("  No memory growth with shuffle (", len(unique1), "stable buffers)")
 
 
 # ==============================================================================
@@ -1616,9 +1614,9 @@ fn run_zero_copy_tests() raises:
     test_comparing_copy_vs_reference_semantics()
 
     print("\n" + "=" * 70)
-    print("✅ ALL ZERO-COPY TESTS PASSED!")
+    print("ALL ZERO-COPY TESTS PASSED!")
     print("=" * 70)
-    print("\nYour DataLoader achieves true zero-copy performance:")
+    print("\nDataLoader achieves true zero-copy performance:")
     print("  • Dataset referenced via pointer (not copied)")
     print("  • Batch buffers pre-allocated and reused")
     print("  • Iterator copy is lightweight (<1ms)")
@@ -1678,7 +1676,7 @@ fn test_basic_iteration_no_shuffle() raises:
         batch_count += 1
 
     assert_equal(batch_count, 2)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_basic_iteration_with_shuffle() raises:
@@ -1717,7 +1715,7 @@ fn test_basic_iteration_with_shuffle() raises:
     # Verify all data is present (sum should be same)
     assert_true(all_features.sum().all_close(features.sum()))
     assert_true(all_labels.sum().all_close(labels.sum()))
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_drop_last_true() raises:
@@ -1745,7 +1743,7 @@ fn test_drop_last_true() raises:
 
     assert_equal(batch_count, 1)  # Only 1 full batch (3rd sample dropped)
     assert_equal(len(loader), 1)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_drop_last_false() raises:
@@ -1778,7 +1776,7 @@ fn test_drop_last_false() raises:
 
     assert_equal(batch_count, 2)
     assert_equal(len(loader), 2)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_single_batch() raises:
@@ -1799,7 +1797,7 @@ fn test_single_batch() raises:
         batch_count += 1
 
     assert_equal(batch_count, 1)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_batch_size_one() raises:
@@ -1820,7 +1818,7 @@ fn test_batch_size_one() raises:
         batch_count += 1
 
     assert_equal(batch_count, 3)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 # ==============================================================================
@@ -1858,7 +1856,7 @@ fn test_multiple_epochs_no_shuffle() raises:
     assert_true(
         (epoch2_first_val - 10.0).__abs__() < 1e-5
     )  # Should start with same sample
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_multiple_epochs_with_shuffle() raises:
@@ -1909,7 +1907,7 @@ fn test_multiple_epochs_with_shuffle() raises:
             break
 
     assert_true(different)  # Orders should differ
-    print("  ✓ Passed")
+    print("Passed")
 
 
 # ==============================================================================
@@ -1944,7 +1942,7 @@ fn test_no_data_loss() raises:
     for i in range(len(seen_labels)):
         sum += seen_labels[i]
     assert_true((sum - 15.0).__abs__() < 1e-5)  # 1+2+3+4+5 = 15
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_no_data_duplication() raises:
@@ -1974,7 +1972,7 @@ fn test_no_data_duplication() raises:
                 count += 1
         assert_equal(count, 1)  # Each label should appear exactly once
 
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_feature_label_correspondence() raises:
@@ -2004,7 +2002,7 @@ fn test_feature_label_correspondence() raises:
             var label = batch.labels[i]
             assert_true((feat - label).__abs__() < 1e-5)
 
-    print("  ✓ Passed")
+    print("Passed")
 
 
 # ==============================================================================
@@ -2039,7 +2037,7 @@ fn test_numpy_dataset_integration() raises:
 
     assert_equal(batch_count, 2)
     assert_equal(len(loader), 2)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 # ==============================================================================
@@ -2072,7 +2070,7 @@ fn test_empty_last_batch_handling() raises:
         batch_count += 1
 
     assert_equal(batch_count, 2)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_large_batch_size() raises:
@@ -2093,7 +2091,7 @@ fn test_large_batch_size() raises:
         batch_count += 1
 
     assert_equal(batch_count, 1)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_stress_many_small_batches() raises:
@@ -2117,7 +2115,7 @@ fn test_stress_many_small_batches() raises:
         total_samples += batch.batch_size
 
     assert_equal(total_samples, 100)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_stress_large_dataset() raises:
@@ -2143,7 +2141,7 @@ fn test_stress_large_dataset() raises:
 
     assert_equal(total_samples, 1000)
     assert_equal(len(loader), 16)  # ceil(1000/64) = 16
-    print("  ✓ Passed")
+    print("Passed")
 
 
 # ==============================================================================
@@ -2172,7 +2170,7 @@ fn test_performance_no_shuffle() raises:
     var time_per_batch = (end - start) / Float64(batch_count) * 1000
     print("  Time per batch:", time_per_batch, "ms")
     print("  Expected: < 0.1ms (bulk memcpy fast path)")
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_performance_with_shuffle() raises:
@@ -2196,7 +2194,7 @@ fn test_performance_with_shuffle() raises:
     var time_per_batch = (end - start) / Float64(batch_count) * 1000
     print("  Time per batch:", time_per_batch, "ms")
     print("  Expected: < 0.05ms (per-row memcpy)")
-    print("  ✓ Passed")
+    print("Passed")
 
 
 # ==============================================================================
@@ -2224,7 +2222,7 @@ fn test_multi_dimensional_labels() raises:
         batch_count += 1
 
     assert_equal(batch_count, 2)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 fn test_single_feature_dimension() raises:
@@ -2245,7 +2243,7 @@ fn test_single_feature_dimension() raises:
         batch_count += 1
 
     assert_equal(batch_count, 2)
-    print("  ✓ Passed")
+    print("Passed")
 
 
 # ==============================================================================
@@ -2266,7 +2264,7 @@ fn run_basic_tests() raises:
     test_single_batch()
     test_batch_size_one()
 
-    print("\n✅ All basic tests passed!\n")
+    print("\nAll basic tests passed!\n")
 
 
 fn run_multi_epoch_tests() raises:
@@ -2278,7 +2276,7 @@ fn run_multi_epoch_tests() raises:
     test_multiple_epochs_no_shuffle()
     test_multiple_epochs_with_shuffle()
 
-    print("\n✅ All multi-epoch tests passed!\n")
+    print("\nAll multi-epoch tests passed!\n")
 
 
 fn run_data_integrity_tests() raises:
@@ -2291,7 +2289,7 @@ fn run_data_integrity_tests() raises:
     test_no_data_duplication()
     test_feature_label_correspondence()
 
-    print("\n✅ All data integrity tests passed!\n")
+    print("\nAll data integrity tests passed!\n")
 
 
 fn run_numpy_integration_tests() raises:
@@ -2302,7 +2300,7 @@ fn run_numpy_integration_tests() raises:
 
     test_numpy_dataset_integration()
 
-    print("\n✅ All NumPy integration tests passed!\n")
+    print("\nAll NumPy integration tests passed!\n")
 
 
 fn run_edge_case_tests() raises:
@@ -2316,7 +2314,7 @@ fn run_edge_case_tests() raises:
     test_stress_many_small_batches()
     test_stress_large_dataset()
 
-    print("\n✅ All edge case tests passed!\n")
+    print("\nAll edge case tests passed!\n")
 
 
 fn run_performance_tests() raises:
@@ -2328,7 +2326,7 @@ fn run_performance_tests() raises:
     test_performance_no_shuffle()
     test_performance_with_shuffle()
 
-    print("\n✅ All performance tests passed!\n")
+    print("\nAll performance tests passed!\n")
 
 
 fn run_special_case_tests() raises:
@@ -2340,7 +2338,7 @@ fn run_special_case_tests() raises:
     test_multi_dimensional_labels()
     test_single_feature_dimension()
 
-    print("\n✅ All special case tests passed!\n")
+    print("\nAll special case tests passed!\n")
 
 
 fn run_all_dl_tests() raises:

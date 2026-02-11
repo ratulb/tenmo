@@ -29,19 +29,19 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
     ]()
 
     @parameter
-    if dtype is DType.bfloat16:
+    if dtype == DType.bfloat16:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
         )
-    elif dtype is DType.float16:
+    elif dtype == DType.float16:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f16>`,
         )
-    elif dtype is DType.float32:
+    elif dtype == DType.float32:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f32>`,
         )
-    elif dtype is DType.float64:
+    elif dtype == DType.float64:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
         )
@@ -77,11 +77,11 @@ fn nan[dtype: DType]() -> Scalar[dtype]:
     ]()
 
     @parameter
-    if dtype is DType.float32:
+    if dtype == DType.float32:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
         )
-    elif dtype is DType.float64:
+    elif dtype == DType.float64:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
         )
@@ -165,7 +165,7 @@ fn test_ce_basic_class_indices() raises:
     assert_true(
         logits.grad().shape() == logits.shape(), "Gradient shape mismatch"
     )
-    print("✓ Basic class indices test passed")
+    print("Basic class indices test passed")
 
 
 fn test_ce_basic_probability_targets() raises:
@@ -186,7 +186,7 @@ fn test_ce_basic_probability_targets() raises:
     assert_true(
         logits.grad().shape() == logits.shape(), "Gradient shape mismatch"
     )
-    print("✓ Basic probability targets test passed")
+    print("Basic probability targets test passed")
 
 
 # ============================================================================
@@ -210,7 +210,7 @@ fn test_ce_reduction_mean() raises:
     assert_true(
         loss.shape().rank() == 0, "Mean reduction should produce scalar"
     )
-    print("✓ Mean reduction test passed")
+    print("Mean reduction test passed")
 
 
 fn test_ce_reduction_sum() raises:
@@ -230,7 +230,7 @@ fn test_ce_reduction_sum() raises:
 
     # Sum should equal sum of none reduction
     assert_close(loss_sum, loss_none.sum(), msg="Sum reduction mismatch")
-    print("✓ Sum reduction test passed")
+    print("Sum reduction test passed")
 
 
 fn test_ce_reduction_none() raises:
@@ -250,7 +250,7 @@ fn test_ce_reduction_none() raises:
         loss.shape()[0] == 3, "None reduction should return per-sample losses"
     )
     assert_true(loss.shape().rank() == 1, "None reduction output rank mismatch")
-    print("✓ None reduction test passed")
+    print("None reduction test passed")
 
 
 # ============================================================================
@@ -289,7 +289,7 @@ fn test_ce_ignore_index_basic() raises:
     assert_true(
         abs(logits.grad()[2, 0]) > 1e-6, "Non-ignored grad should be non-zero"
     )
-    print("✓ Ignore index basic test passed")
+    print("Ignore index basic test passed")
 
 
 fn test_ce_ignore_index_all_ignored() raises:
@@ -311,7 +311,7 @@ fn test_ce_ignore_index_all_ignored() raises:
 
     # All gradients should be zero
     assert_true(logits.grad().sum().item() < 1e-10, "All grads should be 0")
-    print("✓ All ignored test passed")
+    print("All ignored test passed")
 
 
 fn test_ce_ignore_index_none_reduction() raises:
@@ -334,7 +334,7 @@ fn test_ce_ignore_index_none_reduction() raises:
     # Non-ignored positions should have non-zero loss
     assert_true(loss[0] > 0.0, "Non-ignored loss should be positive")
     assert_true(loss[2] > 0.0, "Non-ignored loss should be positive")
-    print("✓ Ignore index with none reduction test passed")
+    print("Ignore index with none reduction test passed")
 
 
 # ============================================================================
@@ -366,7 +366,7 @@ fn test_ce_label_smoothing_basic() raises:
         abs(loss_smooth.item() - loss_no_smooth.item()) > 1e-6,
         "Label smoothing should change loss value",
     )
-    print("✓ Label smoothing basic test passed")
+    print("Label smoothing basic test passed")
 
 
 fn test_ce_label_smoothing_with_probabilities() raises:
@@ -393,7 +393,7 @@ fn test_ce_label_smoothing_with_probabilities() raises:
         abs(loss_smooth.item() - loss_no_smooth.item()) > 1e-6,
         "Label smoothing should change loss with probability targets",
     )
-    print("✓ Label smoothing with probabilities test passed")
+    print("Label smoothing with probabilities test passed")
 
 
 fn test_ce_label_smoothing_ignore_index_combined() raises:
@@ -422,7 +422,7 @@ fn test_ce_label_smoothing_ignore_index_combined() raises:
     assert_true(
         abs(logits.grad()[0, 0]) > 1e-6, "Non-ignored grad should be non-zero"
     )
-    print("✓ Label smoothing + ignore index test passed")
+    print("Label smoothing + ignore index test passed")
 
 
 fn test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
@@ -510,7 +510,7 @@ fn test_ce_reduction_types_with_ignore_index_and_label_smoothing() raises:
         ).float(),
         msg="None reduction grad mismatch",
     )
-    print("✓ Combined reduction + ignore + smoothing test passed")
+    print("Combined reduction + ignore + smoothing test passed")
 
 
 # ============================================================================
@@ -546,7 +546,7 @@ fn test_ce_spatial_2d() raises:
     assert_true(
         logits.grad().sum().item() != 0.0, "Gradients should be non-zero"
     )
-    print("✓ Spatial 2D test passed")
+    print("Spatial 2D test passed")
 
 
 fn test_ce_spatial_3d() raises:
@@ -578,7 +578,7 @@ fn test_ce_spatial_3d() raises:
     assert_true(
         logits.grad().sum().item() != 0.0, "Gradients should be non-zero"
     )
-    print("✓ Spatial 3D test passed")
+    print("Spatial 3D test passed")
 
 
 fn test_ce_spatial_with_ignore_index() raises:
@@ -634,7 +634,7 @@ fn test_ce_spatial_with_ignore_index() raises:
         has_nonzero_grad, "Non-ignored position should have non-zero grads"
     )
 
-    print("✓ Spatial with ignore index test passed")
+    print("Spatial with ignore index test passed")
 
 
 fn test_ce_spatial_probability_targets() raises:
@@ -662,7 +662,7 @@ fn test_ce_spatial_probability_targets() raises:
     assert_true(
         logits.grad().shape() == logits.shape(), "Gradient shape mismatch"
     )
-    print("✓ Spatial probability targets test passed")
+    print("Spatial probability targets test passed")
 
 
 # ============================================================================
@@ -686,7 +686,7 @@ fn test_ce_single_sample() raises:
     assert_true(
         logits.grad().shape() == logits.shape(), "Gradient shape mismatch"
     )
-    print("✓ Single sample test passed")
+    print("Single sample test passed")
 
 
 fn test_ce_large_batch() raises:
@@ -718,7 +718,7 @@ fn test_ce_large_batch() raises:
     assert_true(
         logits.grad().shape() == logits.shape(), "Gradient shape mismatch"
     )
-    print("✓ Large batch test passed")
+    print("Large batch test passed")
 
 
 fn test_ce_binary_classification() raises:
@@ -738,7 +738,7 @@ fn test_ce_binary_classification() raises:
     assert_true(
         logits.grad().shape() == logits.shape(), "Gradient shape mismatch"
     )
-    print("✓ Binary classification test passed")
+    print("Binary classification test passed")
 
 
 fn test_ce_perfect_prediction() raises:
@@ -762,7 +762,7 @@ fn test_ce_perfect_prediction() raises:
     assert_true(
         loss.item() < 0.1, "Perfect prediction should have near-zero loss"
     )
-    print("✓ Perfect prediction test passed")
+    print("Perfect prediction test passed")
 
 
 fn test_ce_uniform_logits() raises:
@@ -786,7 +786,7 @@ fn test_ce_uniform_logits() raises:
         abs(diff) < 0.01,
         "Uniform prediction loss mismatch",
     )
-    print("✓ Uniform logits test passed")
+    print("Uniform logits test passed")
 
 
 fn test_ce_numerical_stability() raises:
@@ -815,7 +815,7 @@ fn test_ce_numerical_stability() raises:
             assert_true(not isnan(grad_val), "Gradient should not be NaN")
             assert_true(not isinf(grad_val), "Gradient should not be inf")
 
-    print("✓ Numerical stability test passed")
+    print("Numerical stability test passed")
 
 
 fn test_ce_validate_parameter() raises:
@@ -836,7 +836,7 @@ fn test_ce_validate_parameter() raises:
     assert_close(
         loss1, loss2, msg="Validate parameter should not affect result"
     )
-    print("✓ Validate parameter test passed")
+    print("Validate parameter test passed")
 
 
 # ============================================================================
@@ -869,7 +869,7 @@ fn test_ce_gradient_sum_property() raises:
             abs(grad_sum) < 1e-5, "Gradients should sum to 0 for each sample"
         )
 
-    print("✓ Gradient sum property test passed")
+    print("Gradient sum property test passed")
 
 
 fn test_ce_gradient_magnitude() raises:
@@ -895,7 +895,7 @@ fn test_ce_gradient_magnitude() raises:
                 "Gradient magnitude should be < 1 for mean reduction",
             )
 
-    print("✓ Gradient magnitude test passed")
+    print("Gradient magnitude test passed")
 
 
 fn test_ce_gradients_ignore_index() raises:
@@ -920,7 +920,7 @@ fn test_ce_gradients_ignore_index() raises:
     assert_true(
         abs(logits.grad()[0, 0]) > 1e-6, "Non-ignored grad should be non-zero"
     )
-    print("✓ Gradients ignore index test passed")
+    print("Gradients ignore index test passed")
 
 
 fn test_ce_gradients_spatial() raises:
@@ -956,7 +956,7 @@ fn test_ce_gradients_spatial() raises:
     assert_true(
         logits.grad().sum().item() != 0.0, "Should have non-zero gradients"
     )
-    print("✓ Gradients spatial test passed")
+    print("Gradients spatial test passed")
 
 
 # ============================================================================
@@ -984,7 +984,7 @@ fn test_ce_class_indices_vs_onehot() raises:
         loss_onehot,
         msg="Class indices and one-hot should give same loss",
     )
-    print("✓ Class indices vs one-hot equivalence test passed")
+    print("Class indices vs one-hot equivalence test passed")
 
 
 # ============================================================================
@@ -1369,7 +1369,7 @@ fn test_ce_mean_vs_manual_average() raises:
         abs(loss_mean.item() - manual_mean) < 1e-5,
         "Mean reduction should equal average of individual losses",
     )
-    print("✓ Mean vs manual average test passed")
+    print("Mean vs manual average test passed")
 
 
 # ============================================================================
@@ -1396,7 +1396,7 @@ fn test_ce_no_validation_speedup() raises:
 
     assert_close(loss1, loss2, msg="Repeated calls should give same result")
     assert_close(loss2, loss3, msg="Repeated calls should give same result")
-    print("✓ No validation speedup test passed")
+    print("No validation speedup test passed")
 
 
 fn main() raises:

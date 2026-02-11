@@ -43,11 +43,11 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
             var parent_rank = parent_shape.rank()
 
             # Hoist metadata
-            var view_data = gradbox.buffer.buffer.data
+            var view_data = gradbox.data_ptr()
             var view_offset = gradbox.offset()
             ref view_strides = gradbox.strides()
 
-            var parent_grad_data = parent_gradbox.buffer.buffer.data
+            var parent_grad_data = parent_gradbox.data_ptr()
             var parent_grad_offset = parent_gradbox.offset()
             ref parent_grad_strides = parent_gradbox.strides()
 

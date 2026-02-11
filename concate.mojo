@@ -22,7 +22,7 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable):
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_output = output.gradients()[]
-        var grad_data = grad_output.buffer.buffer.data
+        var grad_data = grad_output.data_ptr()
         ref grad_shape = grad_output.shape()
         ref grad_strides = grad_output.strides()
 
@@ -37,7 +37,7 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable):
                 var num_elements = tensor.numels()
                 if tensor.requires_grad:
                     var grad_input = Gradbox[Self.dtype].zeros(tensor.shape())
-                    var grad_input_data = grad_input.buffer.buffer.data
+                    var grad_input_data = grad_input.data_ptr()
                     for j in range(num_elements):
                         grad_input_data[j] = grad_data[src_offset + j]
                     result.append((tensor^, grad_input^, AddTensor))
@@ -54,7 +54,7 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable):
 
             ref tensor_shape = tensor.shape()
             var grad_input = Gradbox[Self.dtype].zeros(tensor_shape)
-            var grad_input_data = grad_input.buffer.buffer.data
+            var grad_input_data = grad_input.data_ptr()
 
             var elem_idx = 0
             for dest_idx in grad_input.index_iterator():

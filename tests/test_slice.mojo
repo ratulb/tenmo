@@ -15,7 +15,7 @@ fn test_tensor_slice_1d_basic() raises:
     var slice2 = x.slice(axis=0, start=1, end=8, step=2)
     assert_true(slice2 == Tensor[dtype].d1([1, 3, 5, 7]))
 
-    print("✓ Passed 1D basic slicing tests")
+    print("Passed 1D basic slicing tests")
 
 
 fn test_tensor_slice_1d_negative_indices() raises:
@@ -32,7 +32,7 @@ fn test_tensor_slice_1d_negative_indices() raises:
     var slice2 = x.slice(axis=0, start=1, end=-1)
     assert_true(slice2 == Tensor[dtype].d1([1, 2, 3, 4]))
 
-    print("✓ Passed 1D negative indices slicing tests")
+    print("Passed 1D negative indices slicing tests")
 
 
 fn test_tensor_slice_1d_step_sizes() raises:
@@ -49,7 +49,7 @@ fn test_tensor_slice_1d_step_sizes() raises:
     var slice2 = x.slice(axis=0, start=0, end=10, step=3)
     assert_true(slice2 == Tensor[dtype].d1([0, 3, 6, 9]))
 
-    print("✓ Passed 1D step size slicing tests")
+    print("Passed 1D step size slicing tests")
 
 
 fn test_tensor_slice_2d_rows() raises:
@@ -68,7 +68,7 @@ fn test_tensor_slice_2d_rows() raises:
     var expected_single = Tensor[dtype].d2([[1, 2, 3, 4]])
     assert_true(single_row == expected_single)
 
-    print("✓ Passed 2D row slicing tests")
+    print("Passed 2D row slicing tests")
 
 
 fn test_tensor_slice_2d_columns() raises:
@@ -87,7 +87,7 @@ fn test_tensor_slice_2d_columns() raises:
     var expected_single_col = Tensor[dtype].d2([[3], [7], [11]])
     assert_true(single_col == expected_single_col)
 
-    print("✓ Passed 2D column slicing tests")
+    print("Passed 2D column slicing tests")
 
 
 fn test_tensor_slice_2d_both_dims() raises:
@@ -102,7 +102,7 @@ fn test_tensor_slice_2d_both_dims() raises:
     var expected = Tensor[dtype].d2([[2, 3], [6, 7]])
     assert_true(slice1 == expected)
 
-    print("✓ Passed 2D both dimensions slicing tests")
+    print("Passed 2D both dimensions slicing tests")
 
 
 fn test_tensor_slice_3d_basic() raises:
@@ -139,7 +139,7 @@ fn test_tensor_slice_3d_basic() raises:
     )
     assert_true(slice_dim2 == expected_dim2)
 
-    print("✓ Passed 3D basic slicing tests")
+    print("Passed 3D basic slicing tests")
 
 
 fn test_tensor_slice_with_gradients() raises:
@@ -159,7 +159,7 @@ fn test_tensor_slice_with_gradients() raises:
     var expected_grad = Tensor[dtype].d2([[1.0, 1.0, 0.0], [1.0, 1.0, 0.0]])
     assert_true(x.grad().all_close(expected_grad))
 
-    print("✓ Passed slicing with gradients test")
+    print("Passed slicing with gradients test")
 
 
 fn test_tensor_nested_slice_with_gradients() raises:
@@ -180,7 +180,7 @@ fn test_tensor_nested_slice_with_gradients() raises:
     var expected_grad = Tensor[dtype].d2([[0.0, 0.0, 0.0], [42.0, 42.0, 0.0]])
     assert_true(x.grad().all_close(expected_grad))
 
-    print("✓ Passed slicing with gradients test")
+    print("Passed slicing with gradients test")
 
 
 fn test_tensor_slice_edge_cases() raises:
@@ -201,7 +201,7 @@ fn test_tensor_slice_edge_cases() raises:
     var full_slice = x.slice(axis=0, start=0, end=5)
     assert_true(full_slice == x)
 
-    print("✓ Passed edge cases slicing tests")
+    print("Passed edge cases slicing tests")
 
 
 fn test_tensor_slice_step_edge_cases() raises:
@@ -218,7 +218,7 @@ fn test_tensor_slice_step_edge_cases() raises:
     var reverse_slice = x.slice(axis=0, start=5, end=0, step=-1)
     assert_true(reverse_slice == Tensor[dtype].d1([5, 4, 3, 2, 1]))
 
-    print("✓ Passed step edge cases slicing tests")
+    print("Passed step edge cases slicing tests")
 
 
 # Consolidated test function
@@ -917,9 +917,8 @@ fn run_additional_tests() raises:
     print("  - Immutability: 3 tests")
     print("  - Gradient flow: 4 tests")
     print("\n" + "=" * 80)
-    print("API CHANGE VALIDATED:")
-    print("✓ 'self' allows multiple simultaneous views")
-    print("✓ Overlapping slices work correctly")
-    print("✓ Const references can be sliced")
-    print("✓ Gradient flow preserved")
+    print("'self' allows multiple simultaneous views")
+    print("Overlapping slices work correctly")
+    print("Const references can be sliced")
+    print("Gradient flow preserved")
     print("=" * 80)

@@ -42,8 +42,10 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
             # Non-contiguous fallback
             parent_gradbox = Gradbox[Self.dtype].zeros(shape, share=False)
             var index = 0
-            var parent_gradbox_data = parent_gradbox.buffer.data_buffer().data
-            var grad_output_data = grad_output.buffer.data_buffer().data
+            # var parent_gradbox_data = parent_gradbox.buffer.data_buffer().data
+            var parent_gradbox_data = parent_gradbox.data_ptr()
+            # var grad_output_data = grad_output.buffer.data_buffer().data
+            var grad_output_data = grad_output.data_ptr()
             for idx in parent.index_iterator():
                 var input_value = parent.element_at(idx)  # Original input
                 var input_value_safe = max(input_value, self.epsilon)

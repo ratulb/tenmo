@@ -69,7 +69,7 @@ struct Softmax[dtype: DType]:
         this: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var shape = this.shape()
 
         # Normalize axes
@@ -165,7 +165,7 @@ struct LogSoftmax[dtype: DType]:
         this: Tensor[Self.dtype],
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var shape = this.shape()
 
         # Normalize axes

@@ -25,9 +25,9 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable):
         var parent_gradbox = Gradbox[Self.dtype].zeros(shape, share=False)
 
         if parent.is_contiguous():
-            var src = parent.buffer.data_buffer().data
-            var dest = parent_gradbox.buffer.data_buffer().data
-            var grad_output_data = grad_output.buffer.data_buffer().data
+            var src = parent.data_ptr()
+            var dest = parent_gradbox.data_ptr()
+            var grad_output_data = grad_output.data_ptr()
             var offset = parent.offset()
             var numels = parent.numels()
 
@@ -83,8 +83,8 @@ struct Clip[dtype: DType]:
         var out = Tensor[Self.dtype].zeros(shape, requires_grad=False)
 
         if self.is_contiguous():
-            var src = self.buffer.data_buffer().data
-            var dest = out.buffer.data_buffer().data
+            var src = self.data_ptr()
+            var dest = out.data_ptr()
             var offset = self.offset()
             var numels = self.numels()
 

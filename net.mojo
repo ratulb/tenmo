@@ -486,7 +486,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         if self.training:
             var matmul_out = Matmul[Self.dtype].forward[
-                track_grad=True, mode=mode
+                track_grad=True, mode = Self.mode
             ](xs, self.weight)
             result = Adder[Self.dtype].forward[track_grad=True](
                 matmul_out^, self.bias
@@ -494,7 +494,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         else:
             var matmul_out = Matmul[Self.dtype].forward[
-                track_grad=False, mode=mode
+                track_grad=False, mode = Self.mode
             ](xs, self.weight)
             result = Adder[Self.dtype].forward[track_grad=False](
                 matmul_out^, self.bias
@@ -641,17 +641,17 @@ struct Dropout[dtype: DType](ImplicitlyCopyable):
         # 2. Compare with threshold
         # 3. Scale survivors
         # 4. Multiply with input
-        var output = Tensor[dtype].zeros(x.shape())
+        var output = Tensor[Self.dtype].zeros(x.shape())
 
-        var x_ptr = x.buffer.data_buffer().data
-        var out_ptr = output.buffer.data_buffer().data
+        var x_ptr = x.data_ptr()
+        var out_ptr = output.data_ptr()
 
         var total_elements = x.numels()
 
-        comptime simd_w = simd_width_of[dtype]()
+        comptime simd_w = simd_width_of[Self.dtype]()
 
         # Vectorized constants
-        var threshold_vec = SIMD[dtype, simd_w](self.p)
+        var threshold_vec = SIMD[Self.dtype, simd_w](self.p)
         var scale_vec = SIMD[Self.dtype, simd_w](self.scale)
         var zero_vec = SIMD[Self.dtype, simd_w](0)
 
@@ -664,11 +664,11 @@ struct Dropout[dtype: DType](ImplicitlyCopyable):
             var x_vec = x_ptr.load[width=simd_w](i)
 
             # Generate random values [0, 1)
-            var rand_vec = SIMD[dtype, simd_w](0)
+            var rand_vec = SIMD[Self.dtype, simd_w](0)
 
             @parameter
             for v in range(simd_w):
-                rand_vec[v] = random_float64(0.0, 1.0).cast[dtype]()
+                rand_vec[v] = random_float64(0.0, 1.0).cast[Self.dtype]()
 
             # Create mask: 1 if rand > p, else 0
             # Using select: selects scale if condition true, else 0
@@ -686,7 +686,7 @@ struct Dropout[dtype: DType](ImplicitlyCopyable):
         # Scalar tail
         for j in range(vec_end, total_elements):
             var x_val = x_ptr[j]
-            var rand_val = random_float64(0.0, 1.0).cast[dtype]()
+            var rand_val = random_float64(0.0, 1.0).cast[Self.dtype]()
 
             if rand_val > self.p:
                 out_ptr[j] = x_val * self.scale
@@ -734,7 +734,9 @@ struct Sigmoid[dtype: DType](ImplicitlyCopyable):
     fn __copyinit__(out self, other: Self):
         self.training = other.training
 
-    fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    fn __call__(
+        self, x: Tensor[Self.dtype]
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
             return x.sigmoid[track_grad=True]()
         else:
@@ -821,7 +823,9 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
     var layer: Layer[Self.dtype]
     var tag: Int
 
-    fn __call__(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    fn __call__(
+        mut self, mut xs: Tensor[Self.dtype]
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.tag == LINEAR:
             return self.layer[Linear[Self.dtype, mm]](xs)
         if self.tag == LINEAR_BLAS:
@@ -943,10 +947,12 @@ struct Sequential[dtype: DType](Copyable & Movable):
                 )
             self.modules.append(m)
 
-    fn __call__(mut self, xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    fn __call__(
+        mut self, xs: Tensor[Self.dtype]
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out = xs
         for i in range(len(self.modules)):
-            var ref m = self.modules[i]
+            ref m = self.modules[i]
             out = m(out)
         return out
 
@@ -1076,7 +1082,7 @@ struct BCELoss[dtype: DType = DType.float32]:
     # Instance method - respects training mode
     fn __call__(
         self, pred: Tensor[Self.dtype], target: Tensor[Self.dtype]
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
             return Self.forward[track_grad=True](pred, target, self.epsilon)
         else:
@@ -1090,7 +1096,7 @@ struct BCELoss[dtype: DType = DType.float32]:
         pred: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         # Clip for numerical stability
         var pred_safe = Clip[Self.dtype].forward[track_grad](
             pred, epsilon, 1 - epsilon
@@ -1144,7 +1150,7 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32]:
     # Instance method - respects training mode
     fn __call__(
         self, logits: Tensor[Self.dtype], target: Tensor[Self.dtype]
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         if self.training:
             return Self.forward[track_grad=True](logits, target, self.epsilon)
         else:
@@ -1158,7 +1164,7 @@ struct BCEWithLogitsLoss[dtype: DType = DType.float32]:
         logits: Tensor[Self.dtype],
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         # Apply sigmoid to convert logits to probabilities
         var pred_probs = logits.sigmoid[track_grad]()
 

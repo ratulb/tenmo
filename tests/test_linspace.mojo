@@ -1,6 +1,7 @@
 from testing import assert_true
 from tenmo import Tensor
 
+
 fn main() raises:
     test_tensor_linspace_basic()
     test_tensor_linspace_edge_cases()
@@ -21,7 +22,8 @@ fn test_tensor_linspace_basic() raises:
     var expected_y = Tensor.d1([-2.0, -1.0, 0.0, 1.0, 2.0])
     assert_true(y.all_close(expected_y))
 
-    print("✓ Passed linspace basic test")
+    print("Passed linspace basic test")
+
 
 fn test_tensor_linspace_edge_cases() raises:
     print("test_tensor_linspace_edge_cases")
@@ -39,7 +41,8 @@ fn test_tensor_linspace_edge_cases() raises:
     var expected_same = Tensor.d1([5.0, 5.0, 5.0, 5.0])
     assert_true(same.all_close(expected_same))
 
-    print("✓ Passed linspace edge cases test")
+    print("Passed linspace edge cases test")
+
 
 fn test_tensor_linspace_precision() raises:
     print("test_tensor_linspace_precision")
@@ -51,7 +54,8 @@ fn test_tensor_linspace_precision() raises:
         var expected_val = Scalar[dtype](i) / Scalar[dtype](10)
         assert_true(abs(many_points.element_at(i) - expected_val) < 1e-6)
 
-    print("✓ Passed linspace precision test")
+    print("Passed linspace precision test")
+
 
 fn test_tensor_linspace_with_gradients() raises:
     print("test_tensor_linspace_with_gradients")
@@ -67,4 +71,4 @@ fn test_tensor_linspace_with_gradients() raises:
     var expected_grad = Tensor.d1([1.0, 1.0, 1.0])
     assert_true(x.grad().all_close(expected_grad))
 
-    print("✓ Passed linspace with gradients test")
+    print("Passed linspace with gradients test")

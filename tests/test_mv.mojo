@@ -13,7 +13,7 @@ fn main() raises:
     test_matrix_vector_both_batched()
     test_matrix_vector_broadcast_batch()
     print("=" * 50)
-    print("ALL TESTS PASSED! ✓")
+    print("ALL TESTS PASSED!")
     print("=" * 50)
 
 
@@ -54,7 +54,7 @@ fn test_matrix_vector_no_batch() raises:
     # grad_v[j] = sum_i(M[i,j] * grad_out[i])
     # grad_v = [1*1+4*1, 2*1+5*1, 3*1+6*1] = [5, 7, 9]
     assert_true(v.grad().all_close(Tensor[dtype].d1([5.0, 7.0, 9.0])))
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_matrix_vector_batch_v_only() raises:
@@ -90,7 +90,7 @@ fn test_matrix_vector_batch_v_only() raises:
     # For batch 0: grad_v[0] = M^T @ grad_out[0] = [[1,3],[2,4]] @ [1,1] = [4, 6]
     # For batch 1: grad_v[1] = M^T @ grad_out[1] = [[1,3],[2,4]] @ [1,1] = [4, 6]
     assert_true(v.grad().all_close(Tensor[dtype].d2([[4.0, 6.0], [4.0, 6.0]])))
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_matrix_vector_batch_M_only() raises:
@@ -134,7 +134,7 @@ fn test_matrix_vector_batch_M_only() raises:
     # grad_v[0] = 1*1 + 3*1 + 5*1 + 7*1 = 16
     # grad_v[1] = 2*1 + 4*1 + 6*1 + 8*1 = 20
     assert_true(v.grad().all_close(Tensor[dtype].d1([16.0, 20.0])))
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_matrix_vector_both_batched() raises:
@@ -181,7 +181,7 @@ fn test_matrix_vector_both_batched() raises:
     assert_true(
         v.grad().all_close(Tensor[dtype].d2([[4.0, 6.0], [12.0, 14.0]]))
     )
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_matrix_vector_broadcast_batch() raises:
@@ -291,7 +291,7 @@ fn test_matrix_vector_broadcast_batch() raises:
             Tensor[dtype].d2([[14.0, 18.0], [18.0, 22.0], [22.0, 26.0]])
         )
     )
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_matrix_vector_basic_forward_backward() raises:

@@ -53,9 +53,13 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             )
 
             # Direct buffer access
-            var grad_out_ptr = grad_output.buffer.data_buffer().data
-            var grad_in_ptr = grad_input.buffer.data_buffer().data
-            var argmax_ptr = self.argmax_mask.data_buffer().data
+            var grad_out_ptr = grad_output.data_ptr()
+            var grad_in_ptr = (
+                grad_input.data_ptr()
+                .unsafe_mut_cast[True]()
+                .unsafe_origin_cast[MutAnyOrigin]()
+            )
+            var argmax_ptr = self.argmax_mask.data_ptr()
 
             # Precompute strides
             var grad_out_stride_N = C * H_out * W_out
@@ -185,9 +189,13 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
         var argmax_mask = NDBuffer[DType.int64].zeros(Shape(N, C, H_out, W_out))
 
         # Direct buffer access
-        var input_ptr = input_tensor.buffer.data_buffer().data
-        var output_ptr = output.buffer.data_buffer().data
-        var argmax_ptr = argmax_mask.data_buffer().data
+        var input_ptr = (
+            input_tensor.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+        var output_ptr = output.data_ptr()
+        var argmax_ptr = argmax_mask.data_ptr()
 
         # Precompute strides
         var in_stride_N = C * H_in * W_in
@@ -326,7 +334,7 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
                     var in_x_start = out_x * stride - pad
 
                     # Unrolled 2×2 window
-                    var max_val = neg_inf[dtype]()
+                    var max_val = neg_inf[Self.dtype]()
                     var max_idx = -1
 
                     # Position (0, 0)
@@ -430,7 +438,7 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
                 for out_x in range(W_out):
                     var in_x_start = out_x * stride - pad
 
-                    var max_val = neg_inf[dtype]()
+                    var max_val = neg_inf[Self.dtype]()
                     var max_idx = -1
 
                     # Unrolled 3×3 window (9 comparisons)
@@ -501,7 +509,7 @@ struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
                 for out_x in range(W_out):
                     var in_x_start = out_x * stride - pad
 
-                    var max_val = neg_inf[dtype]()
+                    var max_val = neg_inf[Self.dtype]()
                     var max_idx = -1
 
                     for ky in range(KH):

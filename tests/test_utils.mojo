@@ -1,6 +1,19 @@
 from tenmo import Tensor
-from common_utils import accuracy, now
+
+# from common_utils import binary_accuracy as accuracy
+from common_utils import now
 from testing import assert_true
+
+
+fn accuracy[
+    dtype: DType = DType.float32,
+    threshold: Scalar[dtype] = Scalar[dtype](0.5),
+](pred: Tensor[dtype], target: Tensor[dtype]) -> Tuple[Int, Int]:
+    var batch_size = pred.shape()[0]
+
+    var prediction = pred.gt(threshold).to_dtype[dtype](requires_grad=False)
+    var correct = prediction.eq(target).count(Scalar[DType.bool](True))
+    return correct, batch_size
 
 
 fn main() raises:
@@ -12,8 +25,8 @@ fn test_accuracy_perfect_predictions() raises:
     print("test_accuracy_perfect_predictions")
     comptime dtype = DType.float32
 
-    var pred = Tensor.d2([[0.9], [0.1], [0.8], [0.2]])
-    var target = Tensor.d2([[1.0], [0.0], [1.0], [0.0]])
+    var pred = Tensor[dtype].d2([[0.9], [0.1], [0.8], [0.2]])
+    var target = Tensor[dtype].d2([[1.0], [0.0], [1.0], [0.0]])
 
     var correct, total = accuracy(pred, target)
     assert_true(correct == 4)
@@ -25,8 +38,8 @@ fn test_accuracy_all_wrong_predictions() raises:
     print("test_accuracy_all_wrong_predictions")
     comptime dtype = DType.float32
 
-    var pred = Tensor.d2([[0.1], [0.9], [0.2], [0.8]])
-    var target = Tensor.d2([[1.0], [0.0], [1.0], [0.0]])
+    var pred = Tensor[dtype].d2([[0.1], [0.9], [0.2], [0.8]])
+    var target = Tensor[dtype].d2([[1.0], [0.0], [1.0], [0.0]])
 
     var correct, total = accuracy(pred, target)
     assert_true(correct == 0)
@@ -38,8 +51,8 @@ fn test_accuracy_mixed_predictions() raises:
     print("test_accuracy_mixed_predictions")
     comptime dtype = DType.float32
 
-    var pred = Tensor.d2([[0.9], [0.1], [0.2], [0.8]])  # [1, 0, 0, 1]
-    var target = Tensor.d2([[1.0], [0.0], [1.0], [0.0]])  # [1, 0, 1, 0]
+    var pred = Tensor[dtype].d2([[0.9], [0.1], [0.2], [0.8]])  # [1, 0, 0, 1]
+    var target = Tensor[dtype].d2([[1.0], [0.0], [1.0], [0.0]])  # [1, 0, 1, 0]
 
     var correct, total = accuracy(pred, target)
     assert_true(correct == 2)  # First two are correct
@@ -51,8 +64,8 @@ fn test_accuracy_threshold_boundary() raises:
     print("test_accuracy_threshold_boundary")
     comptime dtype = DType.float32
 
-    var pred = Tensor.d2([[0.5], [0.50001], [0.49999]])
-    var target = Tensor.d2([[1.0], [1.0], [0.0]])
+    var pred = Tensor[dtype].d2([[0.5], [0.50001], [0.49999]])
+    var target = Tensor[dtype].d2([[1.0], [1.0], [0.0]])
 
     var correct, total = accuracy(pred, target)
     # 0.5 should round down to 0 (not correct)
@@ -67,8 +80,8 @@ fn test_accuracy_custom_threshold() raises:
     print("test_accuracy_custom_threshold")
     comptime dtype = DType.float32
 
-    var pred = Tensor.d2([[0.7], [0.3], [0.6], [0.4]])
-    var target = Tensor.d2([[1.0], [0.0], [1.0], [0.0]])
+    var pred = Tensor[dtype].d2([[0.7], [0.3], [0.6], [0.4]])
+    var target = Tensor[dtype].d2([[1.0], [0.0], [1.0], [0.0]])
 
     # With threshold 0.6
     var correct, total = accuracy[threshold=0.6](pred, target)
@@ -85,8 +98,8 @@ fn test_accuracy_single_sample() raises:
     print("test_accuracy_single_sample")
     comptime dtype = DType.float32
 
-    var pred = Tensor.d2([[0.9]])
-    var target = Tensor.d2([[1.0]])
+    var pred = Tensor[dtype].d2([[0.9]])
+    var target = Tensor[dtype].d2([[1.0]])
 
     var correct, total = accuracy(pred, target)
     assert_true(correct == 1)
@@ -109,8 +122,10 @@ fn test_accuracy_large_batch() raises:
         pred_list.append(0.1)  # Predict 0
         target_list.append(0.0)  # True 0
 
-    var pred = Tensor[dtype](pred_list).reshape(-1, 1)
-    var target = Tensor[dtype](target_list).reshape(-1, 1)
+    var pred = Tensor[dtype](pred_list)
+    pred = pred.reshape(-1, 1)
+    var target = Tensor[dtype](target_list)
+    target = target.reshape(-1, 1)
 
     var correct, total = accuracy(pred, target)
     assert_true(correct == 100)
@@ -122,8 +137,8 @@ fn test_accuracy_float64() raises:
     print("test_accuracy_float64")
     comptime dtype = DType.float64
 
-    var pred = Tensor.d2([[0.9], [0.1], [0.8]])
-    var target = Tensor.d2([[1.0], [0.0], [1.0]])
+    var pred = Tensor[dtype].d2([[0.9], [0.1], [0.8]])
+    var target = Tensor[dtype].d2([[1.0], [0.0], [1.0]])
 
     var correct, total = accuracy(pred, target)
     assert_true(correct == 3)

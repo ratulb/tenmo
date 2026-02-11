@@ -88,12 +88,12 @@ fn main() raises:
         with a.map_to_host() as a_host, b.map_to_host() as b_host:
             memcpy(
                 dest=a_host.unsafe_ptr(),
-                src=tensor_a.buffer.buffer.data,
+                src=tensor_a.data_ptr(),
                 count=SIZE,
             )
             memcpy(
                 dest=b_host.unsafe_ptr(),
-                src=tensor_b.buffer.buffer.data,
+                src=tensor_b.data_ptr(),
                 count=SIZE,
             )
         ctx.enqueue_function[dot_product[dtype], dot_product[dtype]](
