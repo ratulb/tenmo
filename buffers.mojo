@@ -35,6 +35,7 @@ struct Buffer[dtype: DType = DType.float32](
     & Writable
     & Representable
     & Absable
+    & Iterable
 ):
 
     """
@@ -51,12 +52,14 @@ struct Buffer[dtype: DType = DType.float32](
     ]  # Null if not shared!
     var external: Bool
 
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = ElementIterator[Self.dtype, iterable_origin, True]
+
     fn __init__(out self):
         self.size = 0
         self.data = UnsafePointer[Scalar[Self.dtype], MutExternalOrigin]()
-        self._refcount = UnsafePointer[
-            Atomic[DType.uint64], MutExternalOrigin
-        ]()  # Null
+        self._refcount = {}
         self.external = False
 
     fn __init__(out self, size: Int, external: Bool = False):
@@ -78,6 +81,21 @@ struct Buffer[dtype: DType = DType.float32](
         memcpy(dest=self.data, src=elems.unsafe_ptr(), count=length)
         self.external = False
         self._refcount = {}
+
+    fn __init__(out self, *elems: Scalar[Self.dtype]):
+        var length = len(elems)
+        self.data = alloc[Scalar[Self.dtype]](length)
+        self.size = length
+        self.external = False
+        self._refcount = {}
+        for i in range(len(self)):
+            self.data[i] = elems[i]
+
+    fn __init__[
+        size: Int, datatype: DType, //
+    ](out self: Buffer[datatype], vector: SIMD[datatype, size]):
+        self = Buffer[datatype](size)
+        self.store[simdwidth=size](0, vector)
 
     fn __init__(
         out self,
@@ -230,6 +248,9 @@ struct Buffer[dtype: DType = DType.float32](
             .address_space_cast[address_space]()
         )
 
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        return {0, Pointer(to=self)}
+
     @always_inline
     fn __len__(self) -> Int:
         return self.size
@@ -287,14 +308,15 @@ struct Buffer[dtype: DType = DType.float32](
         return result^
 
     @always_inline
-    fn __getitem__(self, index: Int) -> Scalar[Self.dtype]:
+    fn __getitem__(ref self, index: Int) -> ref [self] Scalar[Self.dtype]:
         debug_assert(
             index >= 0 and index < self.size,
             "Buffer -> __getitem__: index out of bounds",
             self.size,
             index,
         )
-        return self.data.load[width=1](index)
+        # return self.data.load[width=1](index)
+        return (self.data + index)[]
 
     @always_inline
     fn __setitem__(self, index: Int, scalar: Scalar[Self.dtype]):
@@ -2481,6 +2503,58 @@ struct Buffer[dtype: DType = DType.float32](
         return self.__str__()
 
 
+@fieldwise_init
+@register_passable
+struct ElementIterator[
+    mut: Bool,
+    //,
+    dtype: DType,
+    origin: Origin[mut=mut],
+    forward: Bool = True,
+](ImplicitlyCopyable, Iterable, Iterator):
+    """Iterator for Buffer."""
+
+    comptime Element = Scalar[Self.dtype]
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = Self
+
+    var index: Int
+    var src: Pointer[Buffer[Self.dtype], Self.origin]
+
+    @always_inline
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        return self.copy()
+
+    fn __next__(
+        mut self,
+    ) raises StopIteration -> ref [Self.origin] Self.Element:
+        @parameter
+        if Self.forward:
+            if self.index >= len(self.src[]):
+                raise StopIteration()
+            self.index += 1
+            return self.src[][self.index - 1]
+        else:
+            if self.index <= 0:
+                raise StopIteration()
+            self.index -= 1
+            return self.src[][self.index]
+
+    @always_inline
+    fn bounds(self) -> Tuple[Int, Optional[Int]]:
+        var iter_len: Int
+
+        @parameter
+        if Self.forward:
+            iter_len = len(self.src[]) - self.index
+        else:
+            iter_len = self.index
+
+        return (iter_len, {iter_len})
+
+
 fn main():
     comptime dtype = DType.float32
-    pass
+    var buff = Buffer[dtype](1, 2, 3)
+    print(buff)
