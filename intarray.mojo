@@ -157,12 +157,12 @@ struct IntArray(
     # ========== Access ==========
 
     @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> Int:
+    fn __getitem__(ref self, idx: Int) -> ref [self] Int:
         """Get element at index (supports negative indexing)."""
         var index = idx if idx >= 0 else idx + self._size
         if index < 0 or index >= self._size:
             panic("IntArray: index out of bounds")
-        return self._data[index]
+        return (self._data + index)[]
 
     @always_inline("nodebug")
     fn __setitem__(mut self, idx: Int, value: Int):
@@ -485,6 +485,7 @@ struct IntArray(
             result.append(self._data[i])
         return result^
 
+    @no_inline
     fn __str__(self) -> String:
         """String representation."""
         if self._size == 0:
@@ -497,9 +498,11 @@ struct IntArray(
         result += "]"
         return result
 
+    @no_inline
     fn __repr__(self) -> String:
         return self.__str__()
 
+    @no_inline
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
@@ -684,3 +687,11 @@ struct ZipIterator[
             return min(len(self.src_this[]), len(self.src_that[])) - self.index
         else:
             return self.index
+
+
+fn main():
+    var ia = IntArray(20, 30, 40)
+    print(ia)
+    ref sec = ia[1]
+    sec += 10
+    print(ia)
