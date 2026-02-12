@@ -104,7 +104,7 @@ fn test_tensor_permute_grad_inverse_chain() raises:
         )
         .to_dtype[dtype]()
     )
-    assert_true(t.grad().all_close(expected)
+    assert_true(t.grad().all_close(expected))
     print("Passed test_tensor_permute_grad_inverse_chain")
 
 
