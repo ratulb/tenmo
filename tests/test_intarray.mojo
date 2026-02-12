@@ -827,7 +827,7 @@ fn run_intarray_insert_replace_tests() raises:
     test_intarray_replace_single_negative_index()
 
     print("\n" + "=" * 60)
-    print("ALL INTARRAY INSERT/REPLACE TESTS PASSED ✓")
+    print("ALL INTARRAY INSERT/REPLACE TESTS PASSED")
     print("=" * 60)
 
 
@@ -1220,7 +1220,7 @@ fn run_all_intarray_tests() raises:
     test_intarray_copyinit()
     run_intarray_insert_replace_tests()
     print("\n" + "=" * 60)
-    print("ALL INTARRAY TESTS PASSED ✓")
+    print("ALL INTARRAY TESTS PASSED")
     print("=" * 60)
 
 
