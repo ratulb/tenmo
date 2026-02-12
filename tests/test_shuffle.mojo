@@ -12,7 +12,7 @@ fn main() raises:
     test_tensor_shuffle_backward_grad_mapping()
     test_tensor_shuffle_multi_dimensional()
     test_tensor_shuffle_random_perm_length_check()
-    print("✓✓ All tensor shuffle tests passed ✓✓")
+    print("All tensor shuffle tests passedg")
     print("passes")
 
 
@@ -28,7 +28,7 @@ fn test_tensor_shuffle_forward_basic() raises:
     assert_true(
         shuffled == Tensor[dtype].d2([[4.0, 5.0, 6.0], [1.0, 2.0, 3.0]])
     )
-    print("✓ Passed forward basic shuffle")
+    print("Passed forward basic shuffle")
 
 
 fn test_tensor_shuffle_forward_axis1() raises:
@@ -42,7 +42,7 @@ fn test_tensor_shuffle_forward_axis1() raises:
     assert_true(
         shuffled == Tensor[dtype].d2([[3.0, 1.0, 2.0], [6.0, 4.0, 5.0]])
     )
-    print("✓ Passed forward shuffle along axis 1")
+    print("Passed forward shuffle along axis 1")
 
 
 fn test_tensor_shuffle_backward_axis0() raises:
@@ -59,7 +59,7 @@ fn test_tensor_shuffle_backward_axis0() raises:
     # Backward should restore correct positions (reversed)
     var expected_grad = Tensor[dtype].d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
     assert_true(t.grad() == expected_grad)
-    print("✓ Passed backward shuffle along axis 0")
+    print("Passed backward shuffle along axis 0")
 
 
 fn test_tensor_shuffle_backward_axis1() raises:
@@ -76,7 +76,7 @@ fn test_tensor_shuffle_backward_axis1() raises:
     # Each input position contributes to exactly one output
     var expected_grad = Tensor[dtype].ones(Shape(2, 3))
     assert_true(t.grad() == expected_grad)
-    print("✓ Passed backward shuffle along axis 1")
+    print("Passed backward shuffle along axis 1")
 
 
 fn test_tensor_shuffle_backward_grad_mapping() raises:
@@ -99,7 +99,7 @@ fn test_tensor_shuffle_backward_grad_mapping() raises:
         [[30.0, 10.0, 20.0], [60.0, 40.0, 50.0]]
     )
     assert_true(t.grad() == expected_grad)
-    print("✓ Passed backward gradient mapping test")
+    print("Passed backward gradient mapping test")
 
 
 fn test_tensor_shuffle_random_perm_length_check() raises:
@@ -111,7 +111,7 @@ fn test_tensor_shuffle_random_perm_length_check() raises:
     # Should keep same shape and values permuted (cannot predict order but same values)
     assert_true(shuffled.shape() == Shape(2, 2))
     assert_true(shuffled != t or shuffled == t)  # likely changed
-    print("✓ Passed random permutation shuffle")
+    print("Passed random permutation shuffle")
 
 
 fn test_tensor_shuffle_multi_dimensional() raises:
@@ -138,4 +138,4 @@ fn test_tensor_shuffle_multi_dimensional() raises:
 
     assert_true(shuffled.shape() == Shape(2, 3, 4))
     assert_true(shuffled == expected)
-    print("✓ Passed multi-dimensional shuffle shape test")
+    print("Passed multi-dimensional shuffle shape test")
