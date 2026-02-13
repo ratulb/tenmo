@@ -52,7 +52,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         """
         var result = self.current_offset
 
-        # Fast path: contiguous tensor (ultra-fast)
+        # Fast path: contiguous tensor
         if self.contiguous:
             self.current_offset += 1
             self.current_index += 1

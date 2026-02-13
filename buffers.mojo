@@ -1,11 +1,11 @@
-from algorithm import vectorize
+from algorithm import vectorize, parallelize
+from sys.info import num_physical_cores
 from sys import simd_width_of, size_of
 from memory import memset_zero, memcpy, AddressSpace
 from math import exp, log, ceil, tanh, sqrt
 from common_utils import log_debug, panic
 from utils.numerics import max_finite
 from os.atomic import Atomic, Consistency, fence
-from gpu.host import DeviceBuffer, HostBuffer
 from mnemonics import (
     Multiply,
     Add,
@@ -277,7 +277,7 @@ struct Buffer[dtype: DType = DType.float32](
         ]()
 
         # Only use SIMD if we have enough elements
-        if result_size >= simd_width:
+        _ = """if result_size >= simd_width:
             var num_chunks = result_size // simd_width
             var remainder = result_size % simd_width
 
@@ -289,7 +289,7 @@ struct Buffer[dtype: DType = DType.float32](
                 # Strided load from source
                 var values = (self.data + src_idx).strided_load[
                     width=simd_width
-                ](step)
+                ](stride=step)
 
                 # Contiguous store to result
                 result.data.store[width=simd_width](dst_idx, values)
@@ -300,10 +300,10 @@ struct Buffer[dtype: DType = DType.float32](
                 result.data[start_remainder + i] = self.data[
                     start + (start_remainder + i) * step
                 ]
-        else:
-            # Too small for SIMD - just use scalar loop
-            for i in range(result_size):
-                result.data[i] = self.data[start + i * step]
+        else:"""
+        # Too small for SIMD - just use scalar loop
+        for i in range(result_size):
+            result.data[i] = self.data[start + i * step]
 
         return result^
 
@@ -327,6 +327,7 @@ struct Buffer[dtype: DType = DType.float32](
             index,
         )
         self.data.store[width=1](index, scalar)
+        # (self.data + index)[] = scalar
 
     @always_inline
     fn load[
@@ -1388,20 +1389,94 @@ struct Buffer[dtype: DType = DType.float32](
         self,
         start_index: Int = 0,
         end_index: Optional[Int] = None,
+        *,
+        threshold: Int = 10000,
     ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
-        var extent = end_index.or_else(self.size) - start_index
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
         var out = Buffer[Self.dtype](extent)
 
         comptime simd_width = simd_width_of[Self.dtype]()
-        var vectorized_end = (extent // simd_width) * simd_width
 
-        for idx in range(start_index, vectorized_end, simd_width):
-            var chunk = self.load[simdwidth=simd_width](idx)
-            out.store[simdwidth=simd_width](idx, exp(chunk))
+        # For small arrays, don't parallelize
+        if extent < threshold:
+            var vectorized_end = (extent // simd_width) * simd_width
 
-        # Tail
-        for idx in range(vectorized_end, extent):
-            out[idx] = exp(self[idx])
+            # SIMD loop
+            for out_idx in range(0, vectorized_end, simd_width):
+                var src_idx = start_index + out_idx
+                var chunk = self.load[simdwidth=simd_width](src_idx)
+                out.store[simdwidth=simd_width](out_idx, exp(chunk))
+
+            # Tail loop
+            for out_idx in range(vectorized_end, extent):
+                var src_idx = start_index + out_idx
+                out[out_idx] = exp(self[src_idx])
+
+            return out^
+
+        # For large arrays, parallelize
+        var num_cores = min(num_physical_cores(), 2)
+        var chunk_size = (extent + num_cores - 1) // num_cores
+
+        var src_data = self.data
+        var dst_data = out.data
+
+        @parameter
+        fn process_chunk(chunk_idx: Int):
+            var out_start = chunk_idx * chunk_size
+            var out_end = min(out_start + chunk_size, extent)
+
+            var src_start = start_index + out_start
+
+            var chunk_extent = out_end - out_start
+            var chunk_vectorized_end = (chunk_extent // simd_width) * simd_width
+
+            # SIMD loop
+            var i = 0
+            while i < chunk_vectorized_end:
+                var src_idx = src_start + i
+                var out_idx = out_start + i
+                var vec = src_data.load[width=simd_width](src_idx)
+                dst_data.store[width=simd_width](out_idx, exp(vec))
+                i += simd_width
+
+            # Tail loop
+            while i < chunk_extent:
+                var src_idx = src_start + i
+                var out_idx = out_start + i
+                dst_data[out_idx] = exp(src_data[src_idx])
+                i += 1
+
+        _ = """@parameter
+        fn process_chunk(chunk_idx: Int):
+
+            comptime simd = simd_width_of[Self.dtype]()
+
+            var out_start = chunk_idx * chunk_size
+            if out_start >= extent:
+                return
+
+            var out_end = min(out_start + chunk_size, extent)
+
+            var src_start = start_index + out_start
+            var n = out_end - out_start
+
+            var vec_end = (n // simd) * simd
+
+            var i = 0
+
+            while i < vec_end:
+                var v = self.load[simdwidth=simd](src_start + i)
+                out.store[simdwidth=simd](out_start + i, exp(v))
+                i += simd
+
+            while i < n:
+                out[out_start + i] = exp(self[src_start + i])
+                i += 1"""
+
+        parallelize[process_chunk](num_cores)
+
         return out^
 
     @always_inline
@@ -2524,7 +2599,7 @@ struct ElementIterator[
 
     @always_inline
     fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
-        return self.copy()
+        return self
 
     fn __next__(
         mut self,
@@ -2553,8 +2628,24 @@ struct ElementIterator[
 
         return (iter_len, {iter_len})
 
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        return self.__len__() > 0
+
+    fn __len__(self) -> Int:
+        @parameter
+        if Self.forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
+
 
 fn main():
-    comptime dtype = DType.float32
+    comptime dtype = DType.int32
     var buff = Buffer[dtype](1, 2, 3)
+    # var buff = Buffer[dtype]()
+    print(buff)
+    for ref e in buff:
+        print(e)
+        e += 10
     print(buff)

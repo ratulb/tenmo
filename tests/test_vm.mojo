@@ -16,7 +16,7 @@ fn main() raises:
     test_vector_matrix_asymmetric_shapes()
     test_vector_matrix_single_element()
     print("=" * 50)
-    print("ALL VECTOR-MATRIX TESTS PASSED! ✓")
+    print("ALL VECTOR-MATRIX TESTS PASSED!")
     print("=" * 50)
 
     # ===== BASIC VECTOR-MATRIX TESTS =====
@@ -51,7 +51,7 @@ fn main() raises:
     test_vector_matrix_high_dimensional_batch()
     test_matmul_nd_with_view_offset_grad()
 
-    print("All vector-matrix tests passed! ✓")
+    print("All vector-matrix tests passed!")
 
 
 # ===== BASIC VECTOR-MATRIX TESTS =====
@@ -92,7 +92,7 @@ fn test_vector_matrix_no_batch() raises:
             Tensor[dtype].d2([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
         )
     )
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_vector_matrix_batch_M_only() raises:
@@ -147,7 +147,7 @@ fn test_vector_matrix_batch_M_only() raises:
             )
         )
     )
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_vector_matrix_batch_v_only() raises:
@@ -183,7 +183,7 @@ fn test_vector_matrix_batch_v_only() raises:
     # For batch 1: contribution = [[0*1, 0*1], [1*1, 1*1]] = [[0,0], [1,1]]
     # grad_M = [[1,1], [0,0]] + [[0,0], [1,1]] = [[1,1], [1,1]]
     assert_true(M.grad().all_close(Tensor[dtype].d2([[1.0, 1.0], [1.0, 1.0]])))
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_vector_matrix_both_batched() raises:
@@ -241,7 +241,7 @@ fn test_vector_matrix_both_batched() raises:
             )
         )
     )
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_vector_matrix_broadcast_batch() raises:
@@ -351,7 +351,7 @@ fn test_vector_matrix_broadcast_batch() raises:
             )
         )
     )
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_vector_matrix_asymmetric_shapes() raises:
@@ -416,7 +416,7 @@ fn test_vector_matrix_asymmetric_shapes() raises:
             )
         )
     )
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_vector_matrix_single_element() raises:
@@ -444,7 +444,7 @@ fn test_vector_matrix_single_element() raises:
 
     # grad_M = [[2*1], [3*1], [4*1]] = [[2], [3], [4]]
     assert_true(M.grad().all_close(Tensor[dtype].d2([[2.0], [3.0], [4.0]])))
-    print("✓ PASSED\n")
+    print("PASSED\n")
 
 
 fn test_vector_matrix_1d_2d_basic() raises:

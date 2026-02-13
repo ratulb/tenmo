@@ -11,7 +11,7 @@ from utils import Variant
 from testing import assert_true
 from intarray import IntArray
 from random import randn_float64
-
+from ndbuffer import NDBuffer
 
 comptime LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 comptime log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -101,14 +101,14 @@ fn id[type: AnyType, //](t: type) -> Int:
 
 @always_inline
 fn addr[
-    mut: Bool, origin: Origin[mut], type: AnyType, //
+    mut: Bool, origin: Origin[mut=mut], type: AnyType, //
 ](t: type) -> UnsafePointer[type, origin]:
     return UnsafePointer(to=t).mut_cast[mut]().unsafe_origin_cast[origin]()
 
 
 @always_inline
 fn addrs[
-    mut: Bool, origin: Origin[mut], type: AnyType, //
+    mut: Bool, origin: Origin[mut=mut], type: AnyType, //
 ](*ts: type) -> List[UnsafePointer[type, origin]]:
     l = List[UnsafePointer[type, origin]](capacity=len(ts))
     for t in ts:
@@ -312,183 +312,6 @@ struct Slicer:
         return _start, _end, _step
 
 
-fn print_gradbox_recursive[
-    dtype: DType
-](
-    grad_ptr: UnsafePointer[Gradbox[dtype]],
-    mut indices: List[Int],
-    level: Int,
-    num_first: Int = 10,
-    num_last: Int = 10,
-):
-    if grad_ptr[].rank() == 0:  # Tensor with Shape ()
-        print(grad_ptr[][[]])
-        return
-    current_dim = len(indices)
-    indent = " " * (level * 2)
-
-    if current_dim >= grad_ptr[].rank():
-        print(
-            "ERROR: current_dim (",
-            current_dim,
-            ") >= ndim (",
-            grad_ptr[].rank(),
-            ")",
-        )
-        return
-
-    size = grad_ptr[].shape()[current_dim]
-
-    if size < 0 or size > 1_000_000:
-        print(
-            "ERROR: suspicious size: ",
-            size,
-            "at dim ",
-            current_dim,
-            grad_ptr[].shape().__str__(),
-        )
-        return
-
-    # Base case: last dimension (print actual elements)
-    if current_dim == grad_ptr[].rank() - 1:
-        print(indent + "[", end="")
-
-        for i in range(size):
-            if i < num_first:
-                indices.append(i)
-                print(grad_ptr[][indices], end="")
-                _ = indices.pop()
-                if i != size - 1:
-                    print(", ", end="")
-            elif i == num_first and size > num_first + num_last:
-                print("..., ", end="")
-            elif i >= size - num_last:
-                indices.append(i)
-                print(grad_ptr[][indices], end="")
-                _ = indices.pop()
-                if i != size - 1:
-                    print(", ", end="")
-
-        print("]", end="")
-
-    else:
-        print(indent + "[")
-        for i in range(size):
-            if i < num_first:
-                indices.append(i)
-                print_gradbox_recursive(
-                    grad_ptr, indices, level + 1, num_first, num_last
-                )
-                _ = indices.pop()
-            elif i == num_first and size > num_first + num_last:
-                print(indent + "  ...,")
-            elif i >= size - num_last:
-                indices.append(i)
-                print_gradbox_recursive(
-                    grad_ptr, indices, level + 1, num_first, num_last
-                )
-                _ = indices.pop()
-
-            # Print comma and newline for all but last element
-            if i != size - 1 and (i < num_first or i >= size - num_last):
-                print(",")
-            # Special case: last element needs newline before closing bracket
-            elif i == size - 1:
-                print()  # Newline before closing bracket
-
-        print(indent + "]", end="")
-
-
-fn print_tensor_recursive[
-    dtype: DType
-](
-    read tensor: Tensor[dtype],
-    mut indices: List[Int],
-    level: Int,
-    num_first: Int = 10,
-    num_last: Int = 10,
-):
-    if tensor._id == 0:
-        print("  Empty")
-        return
-    if tensor.rank() == 0:  # Tensor with Shape ()
-        print(tensor[[]])
-        return
-    current_dim = len(indices)
-    indent = " " * (level * 2)
-
-    if current_dim >= tensor.rank():
-        print(
-            "ERROR: current_dim (",
-            current_dim,
-            ") >= ndim (",
-            tensor.rank(),
-            ")",
-        )
-        return
-
-    size = tensor.shape()[current_dim]
-
-    if size < 0 or size > 1_000_000:
-        print(
-            "ERROR: suspicious size: ",
-            size,
-            "at dim ",
-            current_dim,
-            tensor.shape().__str__(),
-        )
-        return
-
-    # Base case: last dimension (print actual elements)
-    if current_dim == tensor.rank() - 1:
-        print(indent + "[", end="")
-
-        for i in range(size):
-            if i < num_first:
-                indices.append(i)
-                print(tensor[indices], end="")
-                _ = indices.pop()
-                if i != size - 1:
-                    print(", ", end="")
-            elif i == num_first and size > num_first + num_last:
-                print("..., ", end="")
-            elif i >= size - num_last:
-                indices.append(i)
-                print(tensor[indices], end="")
-                _ = indices.pop()
-                if i != size - 1:
-                    print(", ", end="")
-
-        print("]", end="")
-
-    else:
-        print(indent + "[")
-        for i in range(size):
-            if i < num_first:
-                indices.append(i)
-                print_tensor_recursive(
-                    tensor, indices, level + 1, num_first, num_last
-                )
-                _ = indices.pop()
-            elif i == num_first and size > num_first + num_last:
-                print(indent + "  ...,")
-            elif i >= size - num_last:
-                indices.append(i)
-                print_tensor_recursive(
-                    tensor, indices, level + 1, num_first, num_last
-                )
-                _ = indices.pop()
-
-            # Print comma and newline for all but last element
-            if i != size - 1 and (i < num_first or i >= size - num_last):
-                print(",")
-            # Special case: last element needs newline before closing bracket
-            elif i == size - 1:
-                print()  # Newline before closing bracket
-
-        print(indent + "]", end="")
-
-
 # Utility repeat function
 fn str_repeat(s: String, n: Int) -> String:
     if n <= 0:
@@ -501,7 +324,9 @@ fn str_repeat(s: String, n: Int) -> String:
 
 fn print_summary[
     dtype: DType
-](mod: Sequential[dtype], sample_input: Optional[Tensor[dtype]] = None):
+](
+    mod: Sequential[dtype], sample_input: Optional[Tensor[dtype]] = None
+) where dtype.is_floating_point():
     # Table headers
     var headers = List[String]()
     headers.append("Name")
@@ -607,6 +432,92 @@ fn print_summary[
     print("  Total params:        ", total_params)
     print("  Trainable params:    ", trainable_params)
     print("  Non-trainable params:", non_trainable_params)
+
+
+fn print_buffer[
+    dtype: DType
+](
+    read buffer: NDBuffer[dtype],
+    mut indices: List[Int],
+    level: Int,
+    num_first: Int = 10,
+    num_last: Int = 10,
+):
+    if buffer.buffer.size == 0:
+        print("  Empty")
+        return
+    if buffer.rank() == 0:  # Tensor with Shape ()
+        print(buffer[[]])
+        return
+    current_dim = len(indices)
+    indent = " " * (level * 2)
+
+    if current_dim >= buffer.rank():
+        print(
+            "ERROR: current_dim (",
+            current_dim,
+            ") >= ndim (",
+            buffer.rank(),
+            ")",
+        )
+        return
+
+    size = buffer.shape[current_dim]
+
+    if size < 0 or size > 1_000_000:
+        print(
+            "ERROR: suspicious size: ",
+            size,
+            "at dim ",
+            current_dim,
+            buffer.shape.__str__(),
+        )
+        return
+
+    # Base case: last dimension (print actual elements)
+    if current_dim == buffer.rank() - 1:
+        print(indent + "[", end="")
+
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                print(buffer[indices], end="")
+                _ = indices.pop()
+                if i != size - 1:
+                    print(", ", end="")
+            elif i == num_first and size > num_first + num_last:
+                print("..., ", end="")
+            elif i >= size - num_last:
+                indices.append(i)
+                print(buffer[indices], end="")
+                _ = indices.pop()
+                if i != size - 1:
+                    print(", ", end="")
+
+        print("]", end="")
+
+    else:
+        print(indent + "[")
+        for i in range(size):
+            if i < num_first:
+                indices.append(i)
+                print_buffer(buffer, indices, level + 1, num_first, num_last)
+                _ = indices.pop()
+            elif i == num_first and size > num_first + num_last:
+                print(indent + "  ...,")
+            elif i >= size - num_last:
+                indices.append(i)
+                print_buffer(buffer, indices, level + 1, num_first, num_last)
+                _ = indices.pop()
+
+            # Print comma and newline for all but last element
+            if i != size - 1 and (i < num_first or i >= size - num_last):
+                print(",")
+            # Special case: last element needs newline before closing bracket
+            elif i == size - 1:
+                print()  # Newline before closing bracket
+
+        print(indent + "]", end="")
 
 
 fn main():

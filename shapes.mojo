@@ -1,10 +1,12 @@
 from common_utils import panic
 from intarray import IntArray
 
+
 @register_passable
 struct Shape(
     Equatable,
     ImplicitlyCopyable,
+    Iterable,
     Movable,
     Representable,
     Sized,
@@ -115,18 +117,25 @@ struct Shape(
     fn __ne__(self, other: Self) -> Bool:
         return not (self.dims == other.dims)
 
+    @no_inline
     fn __str__(self) -> String:
         return "(" + self.dims.__str__()[1:-1] + ")"
 
+    @no_inline
     fn __repr__(self) -> String:
         return self.__str__()
 
+    @no_inline
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = ShapeIndexIterator[iterable_origin]
+
     @always_inline("nodebug")
-    fn __iter__(ref self) -> ShapeIndexIterator[origin_of(self)]:
-        return ShapeIndexIterator(Pointer(to=self))
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        return {Pointer(to=self).get_immutable()}
 
     @always_inline("nodebug")
     fn tolist(self) -> List[Int]:
@@ -289,11 +298,17 @@ struct Shape(
     fn product(self) -> Int:
         return self._numels
 
+
 @register_passable
 struct ShapeIndexIterator[origin: ImmutOrigin](
-    ImplicitlyCopyable
+    ImplicitlyCopyable & Iterable & Iterator & Sized
 ):
     """Iterator over IntArray coordinates of a shape."""
+
+    comptime Element = IntArray
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = Self
 
     var shape: Pointer[Shape, Self.origin]
     var current: IntArray
@@ -309,13 +324,14 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
         self.current = other.current
         self.index = other.index
 
-    fn __iter__(self) -> Self:
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    fn __next__(mut self) -> IntArray:
+    fn __next__(mut self) raises StopIteration -> Self.Element:
+        if not self.__has_next__():
+            raise StopIteration()
         var result = self.current
         self.index += 1
-        # This loop is hot - uses __setitem__ which is already optimized
         ref shape = self.shape[]
         var rank = shape.rank()
 
@@ -329,8 +345,14 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
     fn __len__(self) -> Int:
         return self.shape[].num_elements() - self.index
 
+    @always_inline
     fn __has_next__(self) -> Bool:
-        return self.index < self.shape[].num_elements()
+        return self.__len__() > 0
+
+    @always_inline
+    fn bounds(self) -> Tuple[Int, Optional[Int]]:
+        var iter_len = len(self)
+        return (iter_len, {iter_len})
 
 
 fn main():

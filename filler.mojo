@@ -122,7 +122,6 @@ struct Filler[dtype: DType](ImplicitlyCopyable & Movable):
             var broadcast_shape = ShapeBroadcaster.broadcast_shape[
                 validated=True
             ](source_shape, shape)
-            print("shapes: ", source_shape, shape)
             if broadcast_shape != shape:
                 panic(
                     "Filler → set: broadcast shape",
@@ -139,8 +138,12 @@ struct Filler[dtype: DType](ImplicitlyCopyable & Movable):
             var coord_iterator = shape.__iter__()
             ref dest_buffer = target.data_buffer()
             for index in index_iterator:
-                var coord = coord_iterator.__next__()
-                var source_coord = ShapeBroadcaster.translate_index(
-                    source_shape, coord, mask, shape
-                )
-                dest_buffer[index] = source[source_coord]
+                try:
+                    var coord = coord_iterator.__next__()
+                    var source_coord = ShapeBroadcaster.translate_index(
+                        source_shape, coord, mask, shape
+                    )
+                    dest_buffer[index] = source[source_coord]
+                except e:
+                    print(e)
+                    panic("Filler -> fill: raised `StopIteration` erorr")

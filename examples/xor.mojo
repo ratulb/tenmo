@@ -63,11 +63,11 @@ fn xor_classification() -> None:
 
             var loss_str = String(loss.item())
             if len(loss_str) > 8:
-                loss_str = loss_str[:8]
+                loss_str = loss_str[:8].__str__()
 
             var grad_str = String(sqrt(grad_norm_sq))
             if len(grad_str) > 8:
-                grad_str = grad_str[:8]
+                grad_str = grad_str[:8].__str__()
 
             print(
                 "Epoch "
@@ -90,11 +90,11 @@ fn xor_classification() -> None:
                     var pred_val = final_pred[i, 0]
                     var pred_str = String(pred_val)
                     if len(pred_str) > 6:
-                        pred_str = pred_str[:6]
+                        pred_str = pred_str[:6].__str__()
                     var err = abs(exp - pred_val)
                     var err_str = String(err)
                     if len(err_str) > 6:
-                        err_str = err_str[:6]
+                        err_str = err_str[:6].__str__()
 
                     print(
                         "  ("
@@ -111,7 +111,7 @@ fn xor_classification() -> None:
                     )
                 print()
 
-    var train_time = (perf_counter_ns() - start_time) / 1e9
+    var train_time = Float64(perf_counter_ns() - start_time) / 1e9
 
     # Final evaluation
     model.eval()

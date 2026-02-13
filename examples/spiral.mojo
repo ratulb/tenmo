@@ -93,7 +93,7 @@ fn generate_spiral_data(
         y[n_points + i, 0] = 1.0
 
     var end = perf_counter_ns()
-    print("generate_spiral_data took: ", (end - start) / 1e9, "secs")
+    print("generate_spiral_data took: ", Float64(end - start) / 1e9, "secs")
 
     return (X, y)
 
@@ -345,7 +345,7 @@ fn train_spiral_classifier():
             )
 
     var end_time = perf_counter_ns()
-    var training_time_minutes = (end_time - start_time) / (1e9 * 60)
+    var training_time_minutes = Float64(end_time - start_time) / (1e9 * 60)
 
     print()
     print("=" * 80)

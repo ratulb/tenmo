@@ -4,7 +4,7 @@ from buffers import Buffer
 from intarray import IntArray
 from indexhelper import IndexCalculator, IndexIterator
 from broadcasthelper import ShapeBroadcaster
-from common_utils import panic, log_warning
+from common_utils import panic, log_warning, print_buffer
 from memory import memcpy, AddressSpace
 from collections import Set
 from sys import simd_width_of
@@ -334,6 +334,21 @@ struct NDBuffer[dtype: DType](
         s += "]"
         return s
 
+    fn print(self, num_first: Int = 10, num_last: Int = 10):
+        print(
+            "\n",
+            self.__str__(),
+            end="\n",
+        )
+        empty = List[Int]()
+        print_buffer[Self.dtype](
+            self,
+            empty,
+            1,
+            num_first=num_first,
+            num_last=num_last,
+        )
+
     fn __repr__(self) -> String:
         return self.__str__()
 
@@ -427,6 +442,7 @@ struct NDBuffer[dtype: DType](
     fn __is__(self, other: NDBuffer[Self.dtype]) -> Bool:
         return self.data_ptr() == other.data_ptr()
 
+    @always_inline
     fn data_ptr[
         origin: Origin, address_space: AddressSpace, //
     ](ref [origin, address_space]self) -> UnsafePointer[
@@ -1280,14 +1296,5 @@ from tenmo import Tensor
 fn main():
     comptime dtype = DType.float32
     var buffer = Buffer[dtype].arange(5, 10, 1)
-    var ndb = NDBuffer[dtype](buffer, Shape(5))
-    print(buffer)
-    var data_ptr = ndb.data_ptr()
-    data_ptr[3] = 42
-    # print(data_ptr[3])
-    var a = Tensor(ndb)
-    a.print()
-    buffer[4] = 1919
-    a.print()
-    print(buffer)
-    _ = ndb
+    var ndb = NDBuffer[dtype](buffer, Shape(5, 1))
+    ndb.print()

@@ -13,7 +13,7 @@ from common_utils import (
     log_warning,
     now,
     Idx,
-    print_tensor_recursive,
+    print_buffer,
     panic,
     variadic1or2,
 )
@@ -29,6 +29,7 @@ from intarray import IntArray
 from broadcasthelper import ShapeBroadcaster
 from ndbuffer import NDBuffer
 from utilities import Utils
+from gpu.host import DeviceBuffer, HostBuffer
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -41,6 +42,7 @@ struct Tensor[dtype: DType = DType.float32](
     & Absable
     & Equatable
     & ImplicitlyCopyable
+    & Iterable
 ):
     comptime Row = List[Scalar[Self.dtype]]
     comptime Rows = List[Self.Row]
@@ -79,15 +81,22 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __init__(
         out self,
-        shape: Shape,
         ptr: UnsafePointer[Scalar[Self.dtype], MutAnyOrigin],
+        shape: Shape,
+        strides: Optional[Strides] = None,
+        offset: Int = 0,
         requires_grad: Bool = False,
         *,
         copy: Bool = True,
     ):
         self._id = IDGen.generate_id()
+        var num_elements = shape.num_elements()
+        var buffer = Buffer[Self.dtype](
+            num_elements, ptr + offset, copy=True
+        ) if copy else Buffer[Self.dtype](num_elements, ptr, copy=False)
+        var offset_adjusted = 0 if copy else offset
         self.buffer = NDBuffer[Self.dtype](
-            Buffer[Self.dtype](shape.num_elements(), ptr, copy), shape
+            buffer^, shape, strides, offset_adjusted
         )
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
@@ -107,6 +116,44 @@ struct Tensor[dtype: DType = DType.float32](
         self.ancestors = None
         self.backwardFn = None
         self.init_gradbox()
+
+    @staticmethod
+    fn from_host_buffer(
+        buffer: HostBuffer[Self.dtype],
+        shape: Optional[Shape] = None,
+        strides: Optional[Strides] = None,
+        offset: Int = 0,
+        requires_grad: Bool = False,
+    ) -> Tensor[Self.dtype]:
+        """Materialize a Tensor/View from HostBuffer."""
+        var shape_realized = shape.or_else(Shape(len(buffer)))
+        return Tensor[Self.dtype](
+            buffer.unsafe_ptr(),
+            shape_realized,
+            strides,
+            offset,
+            requires_grad,
+            copy=True,
+        )
+
+    @staticmethod
+    fn from_device_buffer(
+        buffer: DeviceBuffer[Self.dtype],
+        shape: Optional[Shape] = None,
+        strides: Optional[Strides] = None,
+        offset: Int = 0,
+        requires_grad: Bool = False,
+    ) -> Tensor[Self.dtype]:
+        """Materialize a Tensor/View from DeviceBuffer."""
+        var shape_realized = shape.or_else(Shape(len(buffer)))
+        return Tensor[Self.dtype](
+            buffer.unsafe_ptr(),
+            shape_realized,
+            strides,
+            offset,
+            requires_grad,
+            copy=True,
+        )
 
     @staticmethod
     fn build_view(
@@ -238,7 +285,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.buffer[indices]
 
     @always_inline
-    fn __getitem__(self, indices: IntArray) -> Scalar[Self.dtype]:
+    fn __getitem__(ref self, indices: IntArray) -> Scalar[Self.dtype]:
         if self.rank() == 0 and indices.size() != 0:  # Tensor with Shape ()
             panic(
                 "Tensor → __getitem__(IntArray): Scalar tensor expects no"
@@ -377,6 +424,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn item(self) -> Scalar[Self.dtype]:
         return self.buffer.item()
 
+    @no_inline
     fn __str__(self) -> String:
         rank = self.rank()
         s = String("[")
@@ -401,11 +449,27 @@ struct Tensor[dtype: DType = DType.float32](
         s += "]"
         return s
 
+    @no_inline
     fn __repr__(self) -> String:
         return self.__str__()
 
+    @no_inline
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
+
+    fn write_to_host_buffer(self, buffer: HostBuffer[Self.dtype]):
+        memcpy(
+            dest=buffer.unsafe_ptr(),
+            src=self.data_ptr() + self.offset(),
+            count=self.numels(),
+        )
+
+    fn write_to_device_buffer(self, buffer: DeviceBuffer[Self.dtype]):
+        memcpy(
+            dest=buffer.unsafe_ptr(),
+            src=self.data_ptr() + self.offset(),
+            count=self.numels(),
+        )
 
     # Check if it has a backward fn before calling this API
     @always_inline
@@ -1600,8 +1664,8 @@ struct Tensor[dtype: DType = DType.float32](
             end="\n",
         )
         empty = List[Int]()
-        print_tensor_recursive[Self.dtype](
-            self,
+        print_buffer[Self.dtype](
+            self.buffer,
             empty,
             1,
             num_first=num_first,
@@ -1725,8 +1789,12 @@ struct Tensor[dtype: DType = DType.float32](
         if requires_grad and not self.has_grad():
             self.init_gradbox()
 
-    fn __iter__(ref self) -> ElemIterator[Self.dtype, origin_of(self)]:
-        return ElemIterator[Self.dtype, origin_of(self)](Pointer(to=self))
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = ElemIterator[Self.dtype, iterable_origin]
+
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        return {Pointer(to=self).get_immutable()}
 
     fn element_at(self, index: Int) -> Scalar[Self.dtype]:
         return self.buffer.element_at(index)
@@ -2235,8 +2303,16 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
 
+@fieldwise_init
 @register_passable
-struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
+struct ElemIterator[dtype: DType, origin: ImmutOrigin](
+    ImplicitlyCopyable & Iterable & Iterator & Sized
+):
+    comptime Element = Tuple[IntArray, Scalar[Self.dtype]]
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = Self
+
     var src: Pointer[Tensor[Self.dtype], Self.origin]
     var index_itr: ShapeIndexIterator[ImmutAnyOrigin]
 
@@ -2246,10 +2322,10 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
             src[].shape().__iter__()
         )
 
-    fn __iter__(self) -> Self:
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
-    fn __next__(mut self) -> Tuple[IntArray, Scalar[Self.dtype]]:
+    fn __next__(mut self) raises StopIteration -> Self.Element:
         next = self.index_itr.__next__()
         return next, self.src[][next]
 
@@ -2259,6 +2335,12 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](ImplicitlyCopyable):
     fn __has_next__(self) -> Bool:
         return self.index_itr.__has_next__()
 
+    fn bounds(self) -> Tuple[Int, Optional[Int]]:
+        return self.index_itr.bounds()
+
 
 fn main() raises:
-    pass
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(10)
+    for idx, ref val in a:
+        print(idx, val)

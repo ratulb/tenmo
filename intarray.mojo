@@ -5,6 +5,7 @@ from memory import memcpy
 @register_passable
 struct IntArray(
     ImplicitlyCopyable,
+    Iterable,
     Representable,
     Sized,
     Stringable,
@@ -19,6 +20,10 @@ struct IntArray(
     var _data: UnsafePointer[Int, MutExternalOrigin]
     var _size: Int  # Current number of elements
     var _capacity: Int  # Allocated capacity
+
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = IntArrayIterator[iterable_origin, True]
 
     # ========== Construction ==========
 
@@ -170,7 +175,8 @@ struct IntArray(
         var index = idx if idx >= 0 else idx + self._size
         if index < 0 or index >= self._size:
             panic("IntArray: index out of bounds")
-        self._data[index] = value
+        # self._data[index] = value
+        (self._data + index)[] = value
 
     @always_inline("nodebug")
     fn __getitem__(self, slice: Slice) -> Self:
@@ -545,13 +551,9 @@ struct IntArray(
         return result^
 
     @always_inline("nodebug")
-    fn __iter__(ref self) -> IntArrayIterator[origin_of(self)]:
-        """Iterate over elements of the IntArray, returning immutable references.
-
-        Returns:
-            An iterator of immutable references to the IntArray elements.
-        """
-        return IntArrayIterator(0, Pointer(to=self))
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        """Iterate over elements of the IntArray."""
+        return {0, Pointer(to=self)}
 
     @always_inline("nodebug")
     fn __reversed__(
@@ -584,34 +586,53 @@ struct IntArray(
         )
 
 
+@fieldwise_init
 @register_passable
 struct IntArrayIterator[
-    origin: ImmutOrigin,
+    mut: Bool,
+    //,
+    origin: Origin[mut=mut],
     forward: Bool = True,
-](Sized & Copyable):
+](ImplicitlyCopyable, Iterable, Iterator, Sized):
+    comptime Element = Int
+
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = Self
+
     var index: Int
     var src: Pointer[IntArray, Self.origin]
 
-    fn __init__(out self, idx: Int, src: Pointer[IntArray, Self.origin]):
-        self.src = src
-        self.index = idx
+    @always_inline
+    fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
+        return self
 
-    @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
-        self.index = existing.index
-        self.src = existing.src
-
-    fn __iter__(self) -> Self:
-        return self.copy()
-
-    fn __next__(mut self) -> Int:
+    fn __next__(
+        mut self,
+    ) raises StopIteration -> ref [Self.origin] Self.Element:
         @parameter
         if Self.forward:
+            if self.index >= len(self.src[]):
+                raise StopIteration()
             self.index += 1
             return self.src[][self.index - 1]
         else:
+            if self.index <= 0:
+                raise StopIteration()
             self.index -= 1
             return self.src[][self.index]
+
+    @always_inline
+    fn bounds(self) -> Tuple[Int, Optional[Int]]:
+        var iter_len: Int
+
+        @parameter
+        if Self.forward:
+            iter_len = len(self.src[]) - self.index
+        else:
+            iter_len = self.index
+
+        return (iter_len, {iter_len})
 
     @always_inline
     fn __has_next__(self) -> Bool:
@@ -694,4 +715,7 @@ fn main():
     print(ia)
     ref sec = ia[1]
     sec += 10
+    print(ia)
+    for ref e in ia:
+        e *= 10
     print(ia)

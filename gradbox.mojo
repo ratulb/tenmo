@@ -15,7 +15,7 @@ from forwards import Mean, Sqrt
 from utilities import Utils
 from indexhelper import IndexIterator
 from filler import Filler
-from common_utils import Idx, panic, print_gradbox_recursive
+from common_utils import Idx, panic, print_buffer
 
 
 struct Gradbox[dtype: DType](
@@ -762,8 +762,8 @@ struct Gradbox[dtype: DType](
             end="\n",
         )
         empty = List[Int]()
-        print_gradbox_recursive[Self.dtype](
-            UnsafePointer(to=self),
+        print_buffer[Self.dtype](
+            self.buffer,
             empty,
             1,
             num_first=num_first,
@@ -784,4 +784,8 @@ struct Gradbox[dtype: DType](
 
 
 fn main():
-    pass
+    comptime dtype = DType.float32
+    var gb = Gradbox[dtype].arange(24)
+    var gb1 = gb.reshape(Shape(3, 2, 4))
+    gb.print()
+    gb1.print()

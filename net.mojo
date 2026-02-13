@@ -1009,10 +1009,12 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
 
             self.modules.append(m)
 
-    fn __call__(mut self, xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+    fn __call__(
+        mut self, xs: Tensor[Self.dtype]
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out = xs
         for i in range(len(self.modules)):
-            var ref m = self.modules[i]
+            ref m = self.modules[i]
             out = m(out)
         return out
 

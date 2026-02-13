@@ -86,7 +86,7 @@ fn from_ndarray[
         # Wrap external NumPy buffer (lifetime must be managed externally!)
         var data_ptr = ndarray_ptr[dtype](ndarray)
         return Tensor[dtype](
-            shape^, data_ptr, requires_grad=requires_grad, copy=False
+            data_ptr, shape^, requires_grad=requires_grad, copy=False
         )
 
 

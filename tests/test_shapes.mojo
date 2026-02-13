@@ -379,7 +379,7 @@ fn run_all_shape_tests() raises:
     test_shape_compute_output_shape_single_axis()
 
     print("\n" + "=" * 60)
-    print("ALL SHAPE TESTS PASSED ✓")
+    print("ALL SHAPE TESTS PASSED")
     print("=" * 60)
 
 
