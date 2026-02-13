@@ -45,18 +45,21 @@ fn main() raises:
 
     var A_src = Tensor[dtype].rand(blocks, threads)
     var B_src = Tensor[dtype].rand(threads, blocks)
-    with input_buffer_A.map_to_host() as A_host_buffer:
+    _="""with input_buffer_A.map_to_host() as A_host_buffer:
         memcpy(
             dest=A_host_buffer.unsafe_ptr(),
             src=A_src.data_ptr(),
             count=A_src.numels(),
-        )
-    with input_buffer_B.map_to_host() as B_host_buffer:
+        )"""
+    A_src.write_to_device_buffer(input_buffer_A)
+    _="""with input_buffer_B.map_to_host() as B_host_buffer:
         memcpy(
             dest=B_host_buffer.unsafe_ptr(),
             src=B_src.data_ptr(),
             count=B_src.numels(),
-        )
+        )"""
+
+    B_src.write_to_device_buffer(input_buffer_B)
     var A = Matrix_A(input_buffer_A)
     var B = Matrix_B(input_buffer_B)
     var C = Matrix_C(output_buffer_C)
@@ -75,15 +78,17 @@ fn main() raises:
     for _ in range(100):
         expect = A_src.matmul[track_grad=False](B_src)
     print("CPU matmul time: ", (now() - start) * 1000, "ms")
-    var actual = Tensor[dtype].zeros(blocks, blocks)
+    #var actual = Tensor[dtype].zeros(blocks, blocks)
+    var actual: Tensor[dtype]
 
-    with output_buffer_C.map_to_host() as C_host_buff:
+    _="""with output_buffer_C.map_to_host() as C_host_buff:
         memcpy(
             dest=actual.data_ptr(),
             src=C_host_buff.unsafe_ptr(),
             count=len(C_host_buff),
-        )
+        )"""
 
+    actual = Tensor[dtype].from_device_buffer(output_buffer_C)
     assert_true(actual.all_close(expect))
     # actual.print()
 

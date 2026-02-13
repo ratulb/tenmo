@@ -143,17 +143,20 @@ struct Tensor[dtype: DType = DType.float32](
         strides: Optional[Strides] = None,
         offset: Int = 0,
         requires_grad: Bool = False,
-    ) -> Tensor[Self.dtype]:
+    ) raises -> Tensor[Self.dtype]:
         """Materialize a Tensor/View from DeviceBuffer."""
-        var shape_realized = shape.or_else(Shape(len(buffer)))
-        return Tensor[Self.dtype](
-            buffer.unsafe_ptr(),
-            shape_realized,
-            strides,
-            offset,
-            requires_grad,
-            copy=True,
-        )
+        var out: Tensor[Self.dtype]
+        with buffer.map_to_host() as host_buffer:
+            var shape_realized = shape.or_else(Shape(len(host_buffer)))
+            out = Tensor[Self.dtype](
+                host_buffer.unsafe_ptr(),
+                shape_realized,
+                strides,
+                offset,
+                requires_grad,
+                copy=True,
+            )
+        return out
 
     @staticmethod
     fn build_view(
@@ -458,18 +461,35 @@ struct Tensor[dtype: DType = DType.float32](
         writer.write(self.__str__())
 
     fn write_to_host_buffer(self, buffer: HostBuffer[Self.dtype]):
-        memcpy(
-            dest=buffer.unsafe_ptr(),
-            src=self.data_ptr() + self.offset(),
-            count=self.numels(),
-        )
+        if self.is_contiguous():
+            memcpy(
+                dest=buffer.unsafe_ptr(),
+                src=self.data_ptr() + self.offset(),
+                count=self.numels(),
+            )
+        else:
+            var ptr = buffer.unsafe_ptr()
+            ref data_buffer = self.buffer.data_buffer()
+            var offset = 0
+            for index in self.index_iterator():
+                (ptr + offset)[] = data_buffer[index]
+                offset += 1
 
-    fn write_to_device_buffer(self, buffer: DeviceBuffer[Self.dtype]):
-        memcpy(
-            dest=buffer.unsafe_ptr(),
-            src=self.data_ptr() + self.offset(),
-            count=self.numels(),
-        )
+    fn write_to_device_buffer(self, buffer: DeviceBuffer[Self.dtype]) raises:
+        with buffer.map_to_host() as host_buffer:
+            if self.is_contiguous():
+                memcpy(
+                    dest=host_buffer.unsafe_ptr(),
+                    src=self.data_ptr() + self.offset(),
+                    count=self.numels(),
+                )
+            else:
+                var ptr = host_buffer.unsafe_ptr()
+                ref data_buffer = self.buffer.data_buffer()
+                var offset = 0
+                for index in self.index_iterator():
+                    (ptr + offset)[] = data_buffer[index]
+                    offset += 1
 
     # Check if it has a backward fn before calling this API
     @always_inline
