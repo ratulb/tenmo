@@ -1,6 +1,6 @@
 from memory import AddressSpace, stack_allocation
 from gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
-from gpu.host import DeviceContext
+from gpu.host import DeviceContext,  DeviceAttribute
 from os.atomic import Atomic, Consistency
 
 from tenmo import Tensor
@@ -9,7 +9,7 @@ from testing import assert_true
 from common_utils import panic
 from shapes import Shape
 
-
+# Kernel
 fn dot_product[
     dtype: DType,
     shared_mem_size: Int = 256,
@@ -40,10 +40,8 @@ fn dot_product[
         barrier()
         stride //= 2
 
-    # only thread 0 writes the final result
+    # only thread 0 of each block writes the final result
     if cache_index == 0:
-        # result[0] = cache[0]
-        # _= Atomic.fetch_add[ordering = Consistency.MONOTONIC](result, cache[0])
         _ = Atomic.fetch_add(result, cache[0])
 
 
@@ -53,6 +51,10 @@ fn launch[
     num_blocks: Int = 1,
     threads_per_block: Int = shared_mem_size,
 ](a: Tensor[dtype], b: Tensor[dtype]) raises -> Tensor[dtype]:
+    constrained[
+        shared_mem_size == threads_per_block,
+        "shared memory size should be equal to threads per block",
+    ]()
     var length = a.numels()
     if a.rank() != 1 or b.rank() != 1 or length != b.numels():
         panic("Either tensors are not 1D or or tensors length do not match")
@@ -69,14 +71,6 @@ fn launch[
     result_buffer.enqueue_fill(0)
     a.write_to_device_buffer(a_buffer)
     b.write_to_device_buffer(b_buffer)
-    _ = """ctx.enqueue_function[dot_product[dtype, shared_mem_size], dot_product[dtype, shared_mem_size]](
-        result_buffer,
-        a_buffer,
-        b_buffer,
-        UInt(length),
-        grid_dim=num_blocks,
-        block_dim=threads_per_block,
-    )"""
     ctx.enqueue_function(
         compiled_func,
         result_buffer,
@@ -88,6 +82,25 @@ fn launch[
     )
 
     ctx.synchronize()
+    print(ctx.name(), ctx.api(), ctx.id())
+    var attr = DeviceAttribute.MAX_BLOCKS_PER_MULTIPROCESSOR
+    var max_blocks = ctx.get_attribute(attr)
+    print("mx blocks: ", max_blocks)
+    var attr2 = DeviceAttribute.CLOCK_RATE
+    var clock_rate = ctx.get_attribute(attr2)
+    print("Clock rate: ", clock_rate)
+    var attr3 = DeviceAttribute.MAX_BLOCK_DIM_X
+    var max_thread_x = ctx.get_attribute(attr3)
+    print("max thread_x : ", max_thread_x)
+    var attr4 = DeviceAttribute.MAX_BLOCK_DIM_Y
+    var max_thread_y = ctx.get_attribute(attr4)
+    print("max thread_y : ", max_thread_y)
+    var attr5 = DeviceAttribute.MAX_BLOCK_DIM_Z
+    var max_thread_z = ctx.get_attribute(attr5)
+    print("max thread_z : ", max_thread_z)
+
+
+
     return Tensor[dtype].from_device_buffer(result_buffer, Shape())
 
 
