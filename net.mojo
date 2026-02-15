@@ -13,25 +13,29 @@ from forwards import (
     Padding,
     Conv2dFused,
     MaxPool2d,
+    Dropout,
 )
-from mnemonics import mm, mv, vm, dot
+from mnemonics import (
+    mm,
+    mv,
+    vm,
+    dot,
+    LINEAR,
+    LINEAR_BLAS,
+    RELU,
+    SIGMOID,
+    TANH,
+    DROPOUT,
+    CONV2D,
+    FLATTEN,
+    MAXPOOL2D,
+)
 from blashandle import BLASHandle, BLASHandleLite
 from utils.numerics import neg_inf
 from algorithm import parallelize
 from ndbuffer import NDBuffer
 from random import seed, random_float64
 from sys import simd_width_of
-
-comptime LINEAR = 0
-comptime LINEAR_BLAS = 1
-comptime RELU = 2
-comptime SIGMOID = 3
-comptime TANH = 4
-comptime DROPOUT = 5
-comptime CONV2D = 6
-comptime FLATTEN = 7
-comptime MAXPOOL2D = 8
-
 
 @fieldwise_init
 struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
@@ -584,140 +588,6 @@ struct ReLU[dtype: DType](ImplicitlyCopyable):
 
     fn eval(mut self):
         self.training = False
-
-    fn into(self) -> Module[Self.dtype]:
-        return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
-
-
-@fieldwise_init
-@register_passable
-struct Dropout[dtype: DType](ImplicitlyCopyable):
-    """
-    Optimized Dropout layer.
-
-    1. Direct buffer manipulation (no intermediate tensors)
-    2. SIMD vectorization
-    3. Fused mask generation and scaling
-    4. Fast random number generation
-    5. Zero overhead in eval mode
-    """
-
-    var training: Bool
-    var p: Scalar[Self.dtype]
-    var scale: Scalar[Self.dtype]
-    var seed: Int  # For reproducible randomness
-
-    comptime TAG = DROPOUT
-
-    fn __init__(out self, p: Scalar[Self.dtype] = Scalar[Self.dtype](0.5)):
-        """Initialize Dropout layer."""
-        if p < 0.0 or p >= 1.0:
-            panic("Dropout probability must be in [0, 1)")
-
-        self.training = True
-        self.p = p
-        self.scale = Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) - p)
-        self.seed = 42  # Default seed
-
-    fn __copyinit__(out self, other: Self):
-        self.training = other.training
-        self.p = other.p
-        self.scale = other.scale
-        self.seed = other.seed
-
-    fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        """Forward pass with optimized dropout."""
-
-        if not self.training or self.p == 0.0:
-            # Eval mode or no dropout
-            return x
-
-        if self.p == 1.0:
-            # Drop everything: return zeros
-            return Tensor[Self.dtype].zeros(x.shape())
-
-        # Training mode: Apply dropout
-        # 1. Generate random values
-        # 2. Compare with threshold
-        # 3. Scale survivors
-        # 4. Multiply with input
-        var output = Tensor[Self.dtype].zeros(x.shape())
-
-        var x_ptr = x.data_ptr()
-        var out_ptr = output.data_ptr()
-
-        var total_elements = x.numels()
-
-        comptime simd_w = simd_width_of[Self.dtype]()
-
-        # Vectorized constants
-        var threshold_vec = SIMD[Self.dtype, simd_w](self.p)
-        var scale_vec = SIMD[Self.dtype, simd_w](self.scale)
-        var zero_vec = SIMD[Self.dtype, simd_w](0)
-
-        # SIMD vectorized dropout
-        var i = 0
-        var vec_end = (total_elements // simd_w) * simd_w
-
-        for _ in range(vec_end // simd_w):
-            # Load input values
-            var x_vec = x_ptr.load[width=simd_w](i)
-
-            # Generate random values [0, 1)
-            var rand_vec = SIMD[Self.dtype, simd_w](0)
-
-            @parameter
-            for v in range(simd_w):
-                rand_vec[v] = random_float64(0.0, 1.0).cast[Self.dtype]()
-
-            # Create mask: 1 if rand > p, else 0
-            # Using select: selects scale if condition true, else 0
-            var mask_vec = (rand_vec.gt(threshold_vec)).select(
-                scale_vec, zero_vec
-            )
-
-            # Apply mask and scale in one operation
-            var result_vec = x_vec * mask_vec
-
-            # Store result
-            out_ptr.store[width=simd_w](i, result_vec)
-            i += simd_w
-
-        # Scalar tail
-        for j in range(vec_end, total_elements):
-            var x_val = x_ptr[j]
-            var rand_val = random_float64(0.0, 1.0).cast[Self.dtype]()
-
-            if rand_val > self.p:
-                out_ptr[j] = x_val * self.scale
-            else:
-                out_ptr[j] = 0.0
-
-        # Setup gradient tracking
-        if x.requires_grad:
-            output.requires_grad_(True)
-            # Dropout backward is handled automatically through multiplication
-
-        return output^
-
-    fn parameters(
-        ref self,
-    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
-        return List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
-
-    fn num_parameters(self) -> Int:
-        return 0
-
-    fn train(mut self):
-        self.training = True
-
-    fn eval(mut self):
-        self.training = False
-
-    fn set_seed(mut self, seed_val: Int):
-        """Set random seed for reproducibility."""
-        self.seed = seed_val
-        seed(seed_val)
 
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)

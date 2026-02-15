@@ -580,18 +580,18 @@ fn test_ce_spatial_3d() raises:
     )
     print("Spatial 3D test passed")
 
-
 fn test_ce_spatial_with_ignore_index() raises:
     """Test spatial dimensions with ignore index."""
     print("test_ce_spatial_with_ignore_index")
 
-    var logits = Tensor.d3(
+
+    var logits = Tensor[DType.float32].d3(
         [
             [[2.0, 1.0, 0.5], [1.0, 2.0, 1.5], [0.5, 0.5, 2.0]],
             [[1.5, 2.0, 1.0], [2.0, 1.0, 2.0], [0.5, 0.5, 0.5]],
         ],
         requires_grad=True,
-    ).float()
+    )
 
     var targets = Tensor[DType.int32].d2([[0, -100, 2], [1, 0, -100]])
 
@@ -612,6 +612,7 @@ fn test_ce_spatial_with_ignore_index() raises:
             + c.__str__()
             + " grad should be 0",
         )
+        print(logits.grad()[0, c, 1])
 
     # Batch 1, spatial position 2 is ignored (target=-100)
     # So gradients for all classes at [1, :, 2] should be zero
@@ -1120,7 +1121,7 @@ fn run_all_tests() raises:
     total_tests += 1
 
     try:
-        test_ce_spatial_with_ignore_index()
+        test_ce_spatial_with_ignore_index() #To be enabled
         passed_tests += 1
     except e:
         print("FAILED:", e)
@@ -1258,7 +1259,7 @@ fn run_all_tests() raises:
 
     if passed_tests == total_tests:
         print()
-        print("🎉 ALL TESTS PASSED! 🎉")
+        print("ALL TESTS PASSED!")
     else:
         print()
         print("❌ SOME TESTS FAILED ❌")
@@ -1454,7 +1455,7 @@ fn main() raises:
     test_ce_4d_spatial_1x2()
     test_ce_reduction_mean_1()
     test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig()
-
+    run_all_ce_tests_v2()
 
 fn test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig() raises:
     print("test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig")
@@ -2355,3 +2356,410 @@ fn test_ce_reduction_none_orig() raises:
     print("test_ce_reduction_none -> Total:            ", end - start)
 
     assert_true(loss.shape() == Shape([2]))  # per-sample loss
+
+fn test_ce_rank2_basic_v2() raises:
+    """Test rank-2 (no spatial dims) - baseline."""
+    print("test_ce_rank2_basic_v2")
+
+    var logits = Tensor[DType.float32].d2(
+        [[2.0, 1.0, 0.5], [1.5, 2.0, 1.0]],
+        requires_grad=True,
+    )
+    var targets = Tensor[DType.int32].d1([0, 1])
+
+    var criterion = CrossEntropyLoss[DType.float32](reduction="mean")
+    var loss = criterion(logits, targets)
+    loss.backward()
+
+    # All positions are valid - gradients should be non-zero
+    var has_nonzero = False
+    for i in range(2):
+        for c in range(3):
+            if abs(logits.grad()[i, c]) > 1e-6:
+                has_nonzero = True
+                break
+    assert_true(has_nonzero, "Rank-2: Should have non-zero gradients")
+    print("✓ Rank-2 basic test passed")
+
+
+fn test_ce_rank3_ignore_v2() raises:
+    """Test rank-3 with ignore_index - spatial dimensions."""
+    print("test_ce_rank3_ignore_v2")
+
+    var logits = Tensor[DType.float32].d3(
+        [
+            [[2.0, 1.0, 0.5], [1.0, 2.0, 1.5], [0.5, 0.5, 2.0]],
+            [[1.5, 2.0, 1.0], [2.0, 1.0, 2.0], [0.5, 0.5, 0.5]],
+        ],
+        requires_grad=True,
+    )
+    var targets = Tensor[DType.int32].d2([[0, -100, 2], [1, 0, -100]])
+
+    var criterion = CrossEntropyLoss[DType.float32](
+        ignore_index=-100, reduction="mean"
+    )
+    var loss = criterion(logits, targets)
+    loss.backward()
+
+    # Check ignored positions have zero gradient across ALL classes
+    # Batch 0, spatial position 1 is ignored (target=-100)
+    for c in range(3):
+        assert_true(
+            abs(logits.grad()[0, c, 1]) < 1e-10,
+            "Rank-3: Batch 0, pos 1, class " + c.__str__() + " grad should be 0",
+        )
+
+    # Batch 1, spatial position 2 is ignored (target=-100)
+    for c in range(3):
+        assert_true(
+            abs(logits.grad()[1, c, 2]) < 1e-10,
+            "Rank-3: Batch 1, pos 2, class " + c.__str__() + " grad should be 0",
+        )
+
+    # Non-ignored positions should have non-zero gradients
+    var has_nonzero_grad = False
+    for c in range(3):
+        if abs(logits.grad()[0, c, 0]) > 1e-6:
+            has_nonzero_grad = True
+            break
+    assert_true(
+        has_nonzero_grad, "Rank-3: Non-ignored position should have non-zero grads"
+    )
+
+    print("✓ Rank-3 with ignore_index test passed")
+
+
+fn test_ce_rank4_ignore_v2() raises:
+    """Test rank-4 (image-like) with ignore_index."""
+    print("test_ce_rank4_ignore_v2")
+
+    # Shape: [batch=2, classes=3, height=2, width=2]
+    var logits = Tensor[DType.float32].d4(
+        [
+            # Batch 0
+            [
+                # Class 0
+                [[2.0, 1.0], [1.5, 0.5]],
+                # Class 1
+                [[1.0, 2.0], [1.0, 1.5]],
+                # Class 2
+                [[0.5, 0.5], [2.0, 2.0]],
+            ],
+            # Batch 1
+            [
+                # Class 0
+                [[1.5, 2.0], [1.0, 0.5]],
+                # Class 1
+                [[2.0, 1.0], [2.0, 1.0]],
+                # Class 2
+                [[0.5, 0.5], [0.5, 2.0]],
+            ],
+        ],
+        requires_grad=True,
+    )
+
+    # Targets: [batch=2, height=2, width=2]
+    # Layout: targets[batch, height, width]
+    # Ignored positions:
+    #   - Batch 0, height=0, width=1: targets[0, 0, 1] = -100
+    #   - Batch 1, height=0, width=0: targets[1, 0, 0] = -100
+    var targets = Tensor[DType.int32].d3(
+        [
+            [[0, -100], [2, 1]],  # Batch 0: [0,0,0]=0, [0,0,1]=-100, [0,1,0]=2, [0,1,1]=1
+            [[-100, 1], [0, 2]],  # Batch 1: [1,0,0]=-100, [1,0,1]=1, [1,1,0]=0, [1,1,1]=2
+        ]
+    )
+
+    var criterion = CrossEntropyLoss[DType.float32](
+        ignore_index=-100, reduction="mean"
+    )
+    var loss = criterion(logits, targets)
+    loss.backward()
+
+    # Check ignored position [0, :, 0, 1] (batch 0, height 0, width 1)
+    # This corresponds to targets[0, 0, 1] = -100
+    for c in range(3):
+        var grad_val = logits.grad()[0, c, 0, 1]
+        assert_true(
+            abs(grad_val) < 1e-10,
+            "Rank-4: Batch 0, [0,1], class " + c.__str__() + " grad should be 0, got " + grad_val.__str__(),
+        )
+
+    # Check ignored position [1, :, 0, 0] (batch 1, height 0, width 0)
+    # This corresponds to targets[1, 0, 0] = -100
+    for c in range(3):
+        var grad_val = logits.grad()[1, c, 0, 0]
+        assert_true(
+            abs(grad_val) < 1e-10,
+            "Rank-4: Batch 1, [0,0], class " + c.__str__() + " grad should be 0, got " + grad_val.__str__(),
+        )
+
+    # Check non-ignored position [0, :, 0, 0] has non-zero grads
+    # This corresponds to targets[0, 0, 0] = 0 (valid)
+    var has_nonzero = False
+    for c in range(3):
+        if abs(logits.grad()[0, c, 0, 0]) > 1e-6:
+            has_nonzero = True
+            break
+    assert_true(
+        has_nonzero, "Rank-4: Non-ignored position should have non-zero grads"
+    )
+
+    print("✓ Rank-4 with ignore_index test passed")
+
+
+fn test_ce_rank3_no_ignore_v2() raises:
+    """Test rank-3 without ignore_index - all positions valid."""
+    print("test_ce_rank3_no_ignore_v2")
+
+    var logits = Tensor[DType.float32].d3(
+        [
+            [[2.0, 1.0, 0.5], [1.0, 2.0, 1.5], [0.5, 0.5, 2.0]],
+            [[1.5, 2.0, 1.0], [2.0, 1.0, 2.0], [0.5, 0.5, 0.5]],
+        ],
+        requires_grad=True,
+    )
+    var targets = Tensor[DType.int32].d2([[0, 1, 2], [1, 0, 2]])
+
+    var criterion = CrossEntropyLoss[DType.float32](reduction="mean")
+    var loss = criterion(logits, targets)
+    loss.backward()
+
+    # All positions should have non-zero gradients somewhere
+    var total_nonzero = 0
+    for b in range(2):
+        for s in range(3):
+            for c in range(3):
+                if abs(logits.grad()[b, c, s]) > 1e-6:
+                    total_nonzero += 1
+
+    assert_true(
+        total_nonzero > 0, "Rank-3: Should have at least some non-zero gradients"
+    )
+    print("✓ Rank-3 without ignore_index test passed")
+
+
+fn test_ce_rank4_all_valid_v2() raises:
+    """Test rank-4 with all valid positions."""
+    print("test_ce_rank4_all_valid_v2")
+
+    var logits = Tensor[DType.float32].d4(
+        [
+            [
+                [[2.0, 1.0], [1.5, 0.5]],
+                [[1.0, 2.0], [1.0, 1.5]],
+                [[0.5, 0.5], [2.0, 2.0]],
+            ],
+            [
+                [[1.5, 2.0], [1.0, 0.5]],
+                [[2.0, 1.0], [2.0, 1.0]],
+                [[0.5, 0.5], [0.5, 2.0]],
+            ],
+        ],
+        requires_grad=True,
+    )
+    var targets = Tensor[DType.int32].d3(
+        [
+            [[0, 1], [2, 1]],
+            [[1, 0], [0, 2]],
+        ]
+    )
+
+    var criterion = CrossEntropyLoss[DType.float32](reduction="mean")
+    var loss = criterion(logits, targets)
+    loss.backward()
+
+    # Should have non-zero gradients
+    var total_nonzero = 0
+    for b in range(2):
+        for h in range(2):
+            for w in range(2):
+                for c in range(3):
+                    if abs(logits.grad()[b, c, h, w]) > 1e-6:
+                        total_nonzero += 1
+
+    assert_true(
+        total_nonzero > 0, "Rank-4: Should have non-zero gradients"
+    )
+    print("✓ Rank-4 all valid test passed")
+
+fn test_ce_rank3_all_ignored_v2() raises:
+    """Test rank-3 where all positions are ignored."""
+    print("test_ce_rank3_all_ignored_v2")
+
+    var logits = Tensor[DType.float32].d3(
+        [
+            [[2.0, 1.0], [1.0, 2.0], [0.5, 0.5]],
+            [[1.5, 2.0], [2.0, 1.0], [0.5, 0.5]],
+        ],
+        requires_grad=True,
+    )
+    var targets = Tensor[DType.int32].d2([[-100, -100], [-100, -100]])
+
+    var criterion = CrossEntropyLoss[DType.float32](
+        ignore_index=-100, reduction="mean"
+    )
+    var loss = criterion(logits, targets)
+    loss.backward()
+
+    # ALL gradients should be zero
+    for b in range(2):
+        for c in range(3):
+            for s in range(2):
+                var grad_val = logits.grad()[b, c, s]
+                assert_true(
+                    abs(grad_val) < 1e-10,
+                    "Rank-3: All ignored - grad should be 0, got " + grad_val.__str__(),
+                )
+
+    # Loss should be 0 (no valid samples)
+    assert_true(abs(loss.item()) < 1e-10, "Rank-3: All ignored - loss should be 0")
+    print("✓ Rank-3 all ignored test passed")
+
+
+fn test_ce_rank4_partial_ignore_v2() raises:
+    """Test rank-4 with mix of valid and ignored positions."""
+    print("test_ce_rank4_partial_ignore_v2")
+
+    var logits = Tensor[DType.float32].d4(
+        [
+            [
+                [[2.0, 1.0, 0.5], [1.5, 1.0, 0.5]],
+                [[1.0, 2.0, 1.5], [1.0, 2.0, 1.0]],
+                [[0.5, 0.5, 2.0], [0.5, 0.5, 2.0]],
+            ],
+        ],
+        requires_grad=True,
+    )
+    # Shape: [1, 2, 3] - 1 batch, 2 height, 3 width
+    var targets = Tensor[DType.int32].d3([[[0, -100, 2], [1, 0, -100]]])
+
+    var criterion = CrossEntropyLoss[DType.float32](
+        ignore_index=-100, reduction="mean"
+    )
+    var loss = criterion(logits, targets)
+    loss.backward()
+
+    # Ignored: [0, :, 0, 1], [0, :, 1, 2]
+    # Check ignored position [0, :, 0, 1]
+    for c in range(3):
+        assert_true(
+            abs(logits.grad()[0, c, 0, 1]) < 1e-10,
+            "Rank-4: Ignored [0,1] class " + c.__str__() + " should be 0",
+        )
+
+    # Check ignored position [0, :, 1, 2]
+    for c in range(3):
+        assert_true(
+            abs(logits.grad()[0, c, 1, 2]) < 1e-10,
+            "Rank-4: Ignored [1,2] class " + c.__str__() + " should be 0",
+        )
+
+    # Check non-ignored [0, :, 0, 0] has non-zero
+    var has_nonzero = False
+    for c in range(3):
+        if abs(logits.grad()[0, c, 0, 0]) > 1e-6:
+            has_nonzero = True
+            break
+    assert_true(has_nonzero, "Rank-4: Valid position should have non-zero grads")
+
+    print("✓ Rank-4 partial ignore test passed")
+
+
+fn test_ce_rank3_label_smoothing_ignore_v2() raises:
+    """Test rank-3 with label smoothing and ignore_index."""
+    print("test_ce_rank3_label_smoothing_ignore_v2")
+
+    var logits = Tensor[DType.float32].d3(
+        [
+            [[2.0, 1.0, 0.5], [1.0, 2.0, 1.5], [0.5, 0.5, 2.0]],
+        ],
+        requires_grad=True,
+    )
+    var targets = Tensor[DType.int32].d2([[0, -100, 2]])
+
+    var criterion = CrossEntropyLoss[DType.float32](
+        ignore_index=-100,
+        reduction="mean",
+        label_smoothing=0.1,
+    )
+    var loss = criterion(logits, targets)
+    loss.backward()
+
+    # Ignored position should still have zero gradients even with smoothing
+    for c in range(3):
+        assert_true(
+            abs(logits.grad()[0, c, 1]) < 1e-10,
+            "Rank-3: Label smoothing + ignore - class " + c.__str__() + " should be 0",
+        )
+
+    # Non-ignored positions should have non-zero gradients
+    var has_nonzero = False
+    for c in range(3):
+        if abs(logits.grad()[0, c, 0]) > 1e-6:
+            has_nonzero = True
+            break
+    assert_true(
+        has_nonzero, "Rank-3: Label smoothing - valid pos should have non-zero grads"
+    )
+
+    print("✓ Rank-3 label smoothing + ignore test passed")
+
+
+fn test_ce_rank3_reduction_none_v2() raises:
+    """Test rank-3 with reduction='none'."""
+    print("test_ce_rank3_reduction_none_v2")
+
+    var logits = Tensor[DType.float32].d3(
+        [
+            [[2.0, 1.0], [1.0, 2.0], [0.5, 0.5]],
+        ],
+        requires_grad=True,
+    )
+    var targets = Tensor[DType.int32].d2([[0, -100]])
+
+    var criterion = CrossEntropyLoss[DType.float32](
+        ignore_index=-100,
+        reduction="none",
+    )
+    var loss = criterion(logits, targets)
+
+    # Loss shape should match target shape [1, 2]
+    assert_true(
+        loss.shape().rank() == 2 and loss.shape()[0] == 1 and loss.shape()[1] == 2,
+        "Rank-3: reduction=none should preserve target shape",
+    )
+
+    # Backward with ones
+    loss.backward()
+
+    # Ignored position should have zero gradient
+    for c in range(3):
+        assert_true(
+            abs(logits.grad()[0, c, 1]) < 1e-10,
+            "Rank-3: reduction=none - ignored class " + c.__str__() + " should be 0",
+        )
+
+    print("✓ Rank-3 reduction=none test passed")
+
+
+fn run_all_ce_tests_v2() raises:
+    """Run all CrossEntropy validation tests."""
+    print("\n" + "="*60)
+    print("Running CrossEntropy Loss Validation Tests (v2)")
+    print("="*60 + "\n")
+
+    test_ce_rank2_basic_v2()
+    test_ce_rank3_ignore_v2()
+    test_ce_rank4_ignore_v2()
+    test_ce_rank3_no_ignore_v2()
+    test_ce_rank4_all_valid_v2()
+    test_ce_rank3_all_ignored_v2()
+    test_ce_rank4_partial_ignore_v2()
+    test_ce_rank3_label_smoothing_ignore_v2()
+    test_ce_rank3_reduction_none_v2()
+
+    print("\n" + "="*60)
+    print("ALL CROSSENTROPY TESTS PASSED (v2)")
+    print("="*60 + "\n")
+

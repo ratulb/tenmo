@@ -8,6 +8,7 @@ from mnemonics import AddTensor
 from buffers import Buffer
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
+from intarray import IntArray
 
 
 @register_passable
@@ -124,6 +125,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
                 logits, target, validate
             )
 
+    @always_inline
     fn _forward_class_indices[
         track_grad: Bool
     ](
@@ -133,25 +135,55 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         validate: Bool,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """Optimized forward pass for class indices targets."""
-        # Validate inputs
-
         if validate:
             Self._validate_class_indices_inputs(
                 logits, target, self.ignore_index
             )
 
-        # Reshape to unified 2D format
         var logits_shape = logits.shape()
-        var target_shape = target.shape()
         var N = logits_shape[0]
         var C = logits_shape[1]
-        var spatial_dims = logits_shape[2:]
-        var total_spatial = (
-            spatial_dims.product() if spatial_dims.rank() > 0 else 1
-        )
+        var rank = logits_shape.rank()
+        if rank > 5:
+            panic(
+                "Unsupported rank: " + rank.__str__(),
+                ". Only rank upto 5 is supported",
+            )
+
+        # Calculate total spatial elements
+        var total_spatial = 1
+        if rank > 2:
+            for i in range(2, rank):
+                total_spatial *= logits_shape[i]
+
         var M = N * total_spatial
 
-        var logits_2d = logits.reshape[track_grad=False](Shape([M, C]))
+        # Transpose logits to move class dimension to end
+        # From: [N, C, spatial...] → To: [N, spatial..., C]
+        var logits_reordered: Tensor[Self.dtype]
+        if rank == 2:
+            # No spatial dimensions - already correct
+            logits_reordered = logits
+        elif rank == 3:
+            # [N, C, S] → [N, S, C]
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 1)
+            )
+        elif rank == 4:
+            # [N, C, H, W] → [N, H, W, C]
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 3, 1)
+            )
+        else:
+            # [N, C, D, H, W] → [N, D, H, W, C]
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 3, 4, 1)
+            )
+
+        # Now reshape: [N, spatial..., C] → [M, C]
+        var logits_2d = logits_reordered.reshape[track_grad=False](
+            Shape([M, C])
+        )
         var target_1d = target.reshape[track_grad=False](Shape([M]))
 
         # Precompute smoothing values
@@ -204,6 +236,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
                 losses[m] = -(logits_2d[m, class_idx] - log_sum_exp)
 
         # Apply reduction
+        var target_shape = target.shape()
         var out = self._apply_reduction(losses, target_shape, valid_count)
 
         # Setup autograd
@@ -240,14 +273,63 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         var logits_shape = logits.shape()
         var N = logits_shape[0]
         var C = logits_shape[1]
-        var spatial_dims = logits_shape[2:]
+        _ = """var spatial_dims = logits_shape[2:]
         var total_spatial = (
             spatial_dims.product() if spatial_dims.rank() > 0 else 1
         )
         var M = N * total_spatial
 
         var logits_2d = logits.reshape[track_grad=False](Shape([M, C]))
-        var target_2d = target.reshape[track_grad=False](Shape([M, C]))
+        var target_2d = target.reshape[track_grad=False](Shape([M, C]))"""
+        var rank = logits_shape.rank()
+        if rank > 5:
+            panic(
+                "Unsupported rank: " + rank.__str__(),
+                ". Only rank upto 5 is supported",
+            )
+
+        var total_spatial = 1
+        if rank > 2:
+            for i in range(2, rank):
+                total_spatial *= logits_shape[i]
+
+        var M = N * total_spatial
+
+        # Transpose to move class to end
+        var logits_reordered: Tensor[Self.dtype]
+        var target_reordered: Tensor[Self.dtype]
+
+        if rank == 2:
+            logits_reordered = logits
+            target_reordered = target
+        elif rank == 3:
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 1)
+            )
+            target_reordered = target.permute[track_grad=False](
+                IntArray(0, 2, 1)
+            )
+        elif rank == 4:
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 3, 1)
+            )
+            target_reordered = target.permute[track_grad=False](
+                IntArray(0, 2, 3, 1)
+            )
+        else:
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 3, 4, 1)
+            )
+            target_reordered = target.permute[track_grad=False](
+                IntArray(0, 2, 3, 4, 1)
+            )
+
+        var logits_2d = logits_reordered.reshape[track_grad=False](
+            Shape([M, C])
+        )
+        var target_2d = target_reordered.reshape[track_grad=False](
+            Shape([M, C])
+        )
 
         # Precompute smoothing
         var smoothing_active = self.label_smoothing > Scalar[Self.dtype](0)
@@ -472,6 +554,7 @@ struct CrossEntropyBackward[dtype: DType](
             var target = output.ancestry().get(1)
             return self._backward_probabilities(logits^, target^, gradients^)
 
+    @always_inline
     fn _backward_class_indices(
         self,
         var logits: Tensor[Self.dtype],
@@ -482,13 +565,46 @@ struct CrossEntropyBackward[dtype: DType](
         var logits_shape = logits.shape()
         var N = logits_shape[0]
         var C = logits_shape[1]
-        var spatial_dims = logits_shape[2:]
-        var total_spatial = (
-            spatial_dims.product() if spatial_dims.rank() > 0 else 1
-        )
+        var rank = logits_shape.rank()
+        if rank > 5:
+            panic(
+                "Unsupported rank: " + rank.__str__(),
+                ". Only rank upto 5 is supported",
+            )
+
+        # Calculate total spatial elements
+        var total_spatial = 1
+        if rank > 2:
+            for i in range(2, rank):
+                total_spatial *= logits_shape[i]
+
         var M = N * total_spatial
 
-        var logits_2d = logits.reshape[track_grad=False](Shape([M, C]))
+        # Transpose logits to move class dimension to end
+        # From: [N, C, spatial...] → To: [N, spatial..., C]
+        var logits_reordered: Tensor[Self.dtype]
+        if rank == 2:
+            logits_reordered = logits
+        elif rank == 3:
+            # [N, C, S] → [N, S, C]
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 1)
+            )
+        elif rank == 4:
+            # [N, C, H, W] → [N, H, W, C]
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 3, 1)
+            )
+        else:
+            # [N, C, D, H, W] → [N, D, H, W, C]
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 3, 4, 1)
+            )
+
+        # Reshape: [N, spatial..., C] → [M, C]
+        var logits_2d = logits_reordered.reshape[track_grad=False](
+            Shape([M, C])
+        )
         var target_1d = target.reshape[track_grad=False](Shape([M]))
 
         var grad_input_2d = Gradbox[Self.dtype].zeros(
@@ -513,6 +629,7 @@ struct CrossEntropyBackward[dtype: DType](
             var class_idx = target_1d[m].__int__()
 
             if class_idx == self.ignore_index:
+                # Gradients remain zero for ignored positions
                 continue
 
             valid_count += 1
@@ -543,14 +660,43 @@ struct CrossEntropyBackward[dtype: DType](
                     grad_input_2d[m, c] = softmax_prob - target_val
 
         # Apply reduction scaling
+        var target_shape = target.shape()
         grad_input_2d = self._apply_reduction_scaling(
-            grad_input_2d, upstream_grad, valid_count, M, target.shape()
+            grad_input_2d, upstream_grad, valid_count, M, target_shape
         )
 
-        var final_grad_input = grad_input_2d.reshape(logits_shape)
+        # Reshape back to [N, spatial..., C] then transpose to [N, C, spatial...]
+        var grad_reordered: Gradbox[Self.dtype]
+        if rank == 2:
+            # [M, C] → [N, C]
+            grad_reordered = grad_input_2d.reshape(logits_shape)
+        elif rank == 3:
+            # [M, C] → [N, S, C]
+            var intermediate_shape = Shape([N, total_spatial, C])
+            var grad_temp = grad_input_2d.reshape(intermediate_shape)
+            # [N, S, C] → [N, C, S]
+            grad_reordered = grad_temp.transpose(IntArray(0, 2, 1))
+        elif rank == 4:
+            # [M, C] → [N, H, W, C]
+            var H = logits_shape[2]
+            var W = logits_shape[3]
+            var intermediate_shape = Shape([N, H, W, C])
+            var grad_temp = grad_input_2d.reshape(intermediate_shape)
+            # [N, H, W, C] → [N, C, H, W]
+            grad_reordered = grad_temp.transpose(IntArray(0, 3, 1, 2))
+        else:
+            # [M, C] → [N, D, H, W, C]
+            var D = logits_shape[2]
+            var H = logits_shape[3]
+            var W = logits_shape[4]
+            var intermediate_shape = Shape([N, D, H, W, C])
+            var grad_temp = grad_input_2d.reshape(intermediate_shape)
+            # [N, D, H, W, C] → [N, C, D, H, W]
+            grad_reordered = grad_temp.transpose(IntArray(0, 4, 1, 2, 3))
 
-        return [(logits, final_grad_input^, AddTensor)]
+        return [(logits, grad_reordered^, AddTensor)]
 
+    @always_inline
     fn _backward_probabilities(
         self,
         var logits: Tensor[Self.dtype],
@@ -561,28 +707,66 @@ struct CrossEntropyBackward[dtype: DType](
         var logits_shape = logits.shape()
         var N = logits_shape[0]
         var C = logits_shape[1]
-        var spatial_dims = logits_shape[2:]
-        var total_spatial = (
-            spatial_dims.product() if spatial_dims.rank() > 0 else 1
-        )
+        var rank = logits_shape.rank()
+        if rank > 5:
+            panic(
+                "Unsupported rank: " + rank.__str__(),
+                ". Only rank upto 5 is supported",
+            )
+
+        var total_spatial = 1
+        if rank > 2:
+            for i in range(2, rank):
+                total_spatial *= logits_shape[i]
+
         var M = N * total_spatial
 
-        var logits_2d = logits.reshape[track_grad=False](Shape([M, C]))
-        var target_2d = target.reshape[track_grad=False](Shape([M, C]))
+        # Transpose to move class to end
+        var logits_reordered: Tensor[Self.dtype]
+        var target_reordered: Tensor[Self.dtype]
+
+        if rank == 2:
+            logits_reordered = logits
+            target_reordered = target
+        elif rank == 3:
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 1)
+            )
+            target_reordered = target.permute[track_grad=False](
+                IntArray(0, 2, 1)
+            )
+        elif rank == 4:
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 3, 1)
+            )
+            target_reordered = target.permute[track_grad=False](
+                IntArray(0, 2, 3, 1)
+            )
+        else:
+            logits_reordered = logits.permute[track_grad=False](
+                IntArray(0, 2, 3, 4, 1)
+            )
+            target_reordered = target.permute[track_grad=False](
+                IntArray(0, 2, 3, 4, 1)
+            )
+
+        var logits_2d = logits_reordered.reshape[track_grad=False](
+            Shape([M, C])
+        )
+        var target_2d = target_reordered.reshape[track_grad=False](
+            Shape([M, C])
+        )
 
         var grad_input_2d = Gradbox[Self.dtype].zeros(
             Shape([M, C]), share=False
         )
 
-        # Precompute smoothing
         var smoothing_active = self.label_smoothing > Scalar[Self.dtype](0)
         var uniform_val = Scalar[Self.dtype](0)
         if smoothing_active:
             uniform_val = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
 
-        # Fused softmax + gradient computation
         for m in range(M):
-            # Compute softmax for this row
             var max_val = logits_2d[m, 0]
             for c in range(1, C):
                 if logits_2d[m, c] > max_val:
@@ -592,7 +776,6 @@ struct CrossEntropyBackward[dtype: DType](
             for c in range(C):
                 sum_exp += exp(logits_2d[m, c] - max_val)
 
-            # Compute gradient
             for c in range(C):
                 var softmax_prob = exp(logits_2d[m, c] - max_val) / sum_exp
                 var target_prob = target_2d[m, c]
@@ -604,15 +787,35 @@ struct CrossEntropyBackward[dtype: DType](
 
                 grad_input_2d[m, c] = softmax_prob - target_prob
 
-        # Apply reduction scaling
         var valid_count = M
+        var target_shape = target.shape()
         grad_input_2d = self._apply_reduction_scaling(
-            grad_input_2d, upstream_grad, valid_count, M, target.shape()[0:-1]
+            grad_input_2d, upstream_grad, valid_count, M, target_shape[0:-1]
         )
 
-        var final_grad_input = grad_input_2d.reshape(logits_shape)
+        # Reshape and transpose back
+        var grad_reordered: Gradbox[Self.dtype]
+        if rank == 2:
+            grad_reordered = grad_input_2d.reshape(logits_shape)
+        elif rank == 3:
+            var intermediate_shape = Shape([N, total_spatial, C])
+            var grad_temp = grad_input_2d.reshape(intermediate_shape)
+            grad_reordered = grad_temp.transpose(IntArray(0, 2, 1))
+        elif rank == 4:
+            var H = logits_shape[2]
+            var W = logits_shape[3]
+            var intermediate_shape = Shape([N, H, W, C])
+            var grad_temp = grad_input_2d.reshape(intermediate_shape)
+            grad_reordered = grad_temp.transpose(IntArray(0, 3, 1, 2))
+        else:
+            var D = logits_shape[2]
+            var H = logits_shape[3]
+            var W = logits_shape[4]
+            var intermediate_shape = Shape([N, D, H, W, C])
+            var grad_temp = grad_input_2d.reshape(intermediate_shape)
+            grad_reordered = grad_temp.transpose(IntArray(0, 4, 1, 2, 3))
 
-        return [(logits, final_grad_input^, AddTensor)]
+        return [(logits, grad_reordered^, AddTensor)]
 
     fn _apply_reduction_scaling(
         self,

@@ -22,14 +22,11 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
         self, read output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
-        parent = output.ancestry().get(0)
-        # Compute inverse permutation
-        inverse = IntArray.filled(len(self.permutation), 0)
-        for i in range(len(self.permutation)):
-            inverse[self.permutation[i]] = i
+        var parent = output.ancestry().get(0)
+        var inverted = IntArray.invert_permutation(self.permutation)
 
         # Apply inverse permutation to gradients
-        var parent_gradbox = gradbox.permute(inverse)
+        var parent_gradbox = gradbox.permute(inverted^)
 
         return [
             (parent^, parent_gradbox^, AddTensor),
@@ -68,14 +65,6 @@ struct Permute[dtype: DType]:
             new_strides.append(self.strides()[axis])
 
         # Return new view with same base but reordered axes
-        _ = """out = View[Self.dtype].forward[track_grad=False](
-            self,
-            shape=Shape(new_shape),
-            strides=Strides(new_strides),
-            offset=self.offset(),  # Permute doesn't change offset
-            requires_grad=False,
-            validated=True,
-        )"""
         out = Tensor[Self.dtype].build_view(
             self,
             shape=Shape(new_shape),

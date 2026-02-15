@@ -52,3 +52,4 @@ from stack import StackBackward
 from pad import PadBackward
 from cnn import FusedCol2ImBackward
 from pooling import MaxPool2dBackward
+from dropout import DropoutBackward

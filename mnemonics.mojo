@@ -27,3 +27,15 @@ comptime vm = 23  # vector & tensor matmul
 comptime mv = 24  # tensor & vector matmul
 comptime mm = 25  # tensor & tensor matmul
 comptime invalid = 26  # Invalid case
+
+########net##############
+
+comptime LINEAR = 27
+comptime LINEAR_BLAS = 28
+comptime RELU = 29
+comptime SIGMOID = 30
+comptime TANH = 31
+comptime DROPOUT = 32
+comptime CONV2D = 33
+comptime FLATTEN = 34
+comptime MAXPOOL2D = 35

@@ -4,6 +4,8 @@ from utils import Variant
 from walkback import *
 from common_utils import panic
 from gradbox import Gradbox
+from buffers import Buffer
+from ndbuffer import NDBuffer
 
 # Centralized backward operation tags
 
@@ -56,6 +58,7 @@ comptime BACKWARD_STACK = 45
 comptime BACKWARD_PAD = 46
 comptime BACKWARD_FUSED_CONV = 47
 comptime BACKWARD_MAXPOOL2D = 48
+comptime BACKWARD_DROPOUT = 49
 # ========== Delegate (Variant) ==========
 
 comptime Delegate[dtype: DType] = Variant[
@@ -108,6 +111,7 @@ comptime Delegate[dtype: DType] = Variant[
     PadBackward[dtype],
     FusedCol2ImBackward[dtype],
     MaxPool2dBackward[dtype],
+    DropoutBackward[dtype],
 ]
 
 # ========== BackwardFn with Tag-Based Dispatch ==========
@@ -316,7 +320,14 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.tag == BACKWARD_MAXPOOL2D:
             return self.grad_fn[MaxPool2dBackward[Self.dtype]].backward(output)
 
+        elif self.tag == BACKWARD_DROPOUT:
+            return self.grad_fn[DropoutBackward[Self.dtype]].backward(output)
+
         else:
             panic("BackwardFn: Unknown backward tag: " + String(self.tag))
 
         return []
+
+
+fn main():
+    pass

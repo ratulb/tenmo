@@ -208,11 +208,6 @@ fn test_dropout_backward_simple() raises:
     """Test dropout backward pass - gradients should flow through non-dropped elements."""
     print("test_dropout_backward_simple")
 
-
-fn main() raises:
-    """Test dropout backward pass - gradients should flow through non-dropped elements."""
-    print("test_dropout_backward_simple")
-
     seed(100)
     var dropout = Dropout[DType.float32](p=0.5)
     dropout.train()
@@ -227,8 +222,6 @@ fn main() raises:
     var loss = out.sum()
     print(loss.has_backward_fn(), out.has_backward_fn(), out.requires_grad)
     loss.backward()
-    out.print()
-    x.grad().print()
 
     print()
     # Gradients should be:
@@ -240,13 +233,11 @@ fn main() raises:
             # Element was dropped, gradient should be 0
             var expected = Tensor[DType.float32].scalar(0)
             var actual = Tensor[DType.float32].scalar(grad[i])
-            print("Out zero", actual.item())
             assert_true(actual.all_close[atol=1e-6](expected))
         else:
             # Element was kept, gradient should be scale (2.0)
             var expected = Tensor[DType.float32].scalar(2)
             var actual = Tensor[DType.float32].scalar(grad[i])
-            print("Out not zero", actual.item())
             assert_true(actual.all_close[atol=1e-6](expected))
 
 
@@ -565,7 +556,7 @@ fn test_dropout_large_tensor_backward() raises:
 # MAIN TEST RUNNER
 # ============================================================================
 
-fn main_1() raises:
+fn main() raises:
     print("=" * 80)
     print("DROPOUT COMPREHENSIVE TEST SUITE")
     print("=" * 80)
