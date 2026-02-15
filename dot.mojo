@@ -59,10 +59,10 @@ fn launch[
         panic("Either tensors are not 1D or or tensors length do not match")
 
     var ctx = DeviceContext()
-    var compiled_func = ctx.compile_function[
+    _="""var compiled_func = ctx.compile_function[
         dot_product[dtype, shared_mem_size],
         dot_product[dtype, shared_mem_size],
-    ]()
+    ]()"""
 
     var a_buffer = ctx.enqueue_create_buffer[dtype](length)
     var b_buffer = ctx.enqueue_create_buffer[dtype](length)
@@ -70,8 +70,7 @@ fn launch[
     result_buffer.enqueue_fill(0)
     a.write_to_device_buffer(a_buffer)
     b.write_to_device_buffer(b_buffer)
-    ctx.enqueue_function(
-        compiled_func,
+    ctx.enqueue_function[dot_product[dtype, shared_mem_size], dot_product[dtype, shared_mem_size]](
         result_buffer,
         a_buffer,
         b_buffer,
