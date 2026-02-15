@@ -5,7 +5,7 @@ A simple neural network implementation for MNIST digit classification.
 
 from tenmo import Tensor
 from sgd import SGD
-from net import Linear, ReLU, Sequential, Conv2D, Flatten
+from net import Linear, ReLU, Sequential, Conv2D, Flatten, Dropout
 from forwards import MaxPool2d
 from crossentropy import CrossEntropyLoss
 from python import Python
@@ -171,9 +171,7 @@ fn train_mnist() raises:
             train_total += batch.batch_size
             batch_num += 1
 
-            if batch_num % 10 == 0:
-                print("Epoch: ", epoch + 1, "batch num: ", batch_num)
-        # --- Validation ---
+       # --- Validation ---
         model.eval()
         criterion.eval()
         var val_loss = Scalar[dtype](0.0)

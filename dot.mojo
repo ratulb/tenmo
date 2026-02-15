@@ -14,7 +14,7 @@ fn dot_product[
     size: UInt,
 ):
     var cache = stack_allocation[
-        BLOCK_SIZE, Scalar[dtype], address_space = AddressSpace.SHARED
+        Int(block_dim.x), Scalar[dtype], address_space = AddressSpace.SHARED
     ]()
     var cache_index = thread_idx.x
     var gtid = cache_index + block_dim.x * block_idx.x
@@ -26,7 +26,7 @@ fn dot_product[
     cache[cache_index] = accum
     barrier()
 
-    var stride = UInt(BLOCK_SIZE // 2)
+    var stride = UInt(block_dim.x // 2)
 
     while stride > 0:
         if cache_index < stride:
@@ -46,17 +46,22 @@ from testing import assert_equal, assert_almost_equal
 
 
 fn main() raises:
-    var SIZE = 8
+    var SIZE = 65536
     comptime dtype = DType.float32
     with DeviceContext() as ctx:
         var result = ctx.enqueue_create_buffer[dtype](1)
         result.enqueue_fill(0)
         var a = ctx.enqueue_create_buffer[dtype](SIZE)
         var b = ctx.enqueue_create_buffer[dtype](SIZE)
-        with a.map_to_host() as a_host, b.map_to_host() as b_host:
+        var tensor_a = Tensor[dtype].ones(SIZE)
+        var tensor_b = Tensor[dtype].ones(SIZE)
+        tensor_a.write_to_device_buffer(a)
+        tensor_b.write_to_device_buffer(b)
+
+        _="""with a.map_to_host() as a_host, b.map_to_host() as b_host:
             for i in range(SIZE):
                 a_host[i] = i
-                b_host[i] = i
+                b_host[i] = i"""
         var BLOCKS_PER_GRID = 1
 
         ctx.enqueue_function[dot_product[dtype], dot_product[dtype]](
@@ -67,10 +72,9 @@ fn main() raises:
             grid_dim=BLOCKS_PER_GRID,
             block_dim=BLOCK_SIZE,
         )
-
-        expected = ctx.enqueue_create_host_buffer[dtype](1)
-
         ctx.synchronize()
+        var tensor_dot = tensor_a.matmul[mode=dot](tensor_b)
+        expected = ctx.enqueue_create_host_buffer[dtype](1)
 
         with a.map_to_host() as a_host, b.map_to_host() as b_host:
             for i in range(SIZE):
@@ -78,14 +82,20 @@ fn main() raises:
 
         with result.map_to_host() as out_host:
             assert_equal(out_host[0], expected[0])
+            assert_equal(out_host[0], tensor_dot.item())
 
         SIZE = 4096
-        var tensor_a = Tensor[dtype].rand(SIZE)
-        var tensor_b = Tensor[dtype].rand(SIZE)
+        tensor_a = Tensor[dtype].rand(SIZE)
+        tensor_b = Tensor[dtype].rand(SIZE)
+        #result = ctx.enqueue_create_buffer[dtype](1)
         result = ctx.enqueue_create_buffer[dtype](1)
+        result.enqueue_fill(0)
         a = ctx.enqueue_create_buffer[dtype](SIZE)
         b = ctx.enqueue_create_buffer[dtype](SIZE)
-        with a.map_to_host() as a_host, b.map_to_host() as b_host:
+        tensor_a.write_to_device_buffer(a)
+        tensor_b.write_to_device_buffer(b)
+
+        _=""""with a.map_to_host() as a_host, b.map_to_host() as b_host:
             memcpy(
                 dest=a_host.unsafe_ptr(),
                 src=tensor_a.data_ptr(),
@@ -95,7 +105,7 @@ fn main() raises:
                 dest=b_host.unsafe_ptr(),
                 src=tensor_b.data_ptr(),
                 count=SIZE,
-            )
+            )"""
         ctx.enqueue_function[dot_product[dtype], dot_product[dtype]](
             result,
             a,
@@ -106,7 +116,7 @@ fn main() raises:
         )
 
         ctx.synchronize()
-        var dot_result = tensor_a.matmul[mode=dot](tensor_b)
+        tensor_dot = tensor_a.matmul[mode=dot](tensor_b)
         with result.map_to_host() as out_host:
-            assert_almost_equal(out_host[0], dot_result.item())
-            print(out_host[0], dot_result.item())
+            assert_almost_equal(out_host[0], tensor_dot.item())
+            print(out_host[0], tensor_dot.item())
