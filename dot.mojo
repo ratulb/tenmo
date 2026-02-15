@@ -7,6 +7,7 @@ from tenmo import Tensor
 from mnemonics import dot
 from testing import assert_true
 from common_utils import panic
+from shapes import Shape
 
 
 fn dot_product[
@@ -43,46 +44,51 @@ fn dot_product[
     if cache_index == 0:
         # result[0] = cache[0]
         # _= Atomic.fetch_add[ordering = Consistency.MONOTONIC](result, cache[0])
-        _ = Atomic.fetch_add[ordering = Consistency.SEQUENTIAL](
-            result, cache[0]
-        )
+        _ = Atomic.fetch_add(result, cache[0])
 
 
 fn launch[
     dtype: DType = DType.float32,
     shared_mem_size: Int = 256,
     num_blocks: Int = 1,
-    threads_per_block: Int = 512,
+    threads_per_block: Int = shared_mem_size,
 ](a: Tensor[dtype], b: Tensor[dtype]) raises -> Tensor[dtype]:
     var length = a.numels()
     if a.rank() != 1 or b.rank() != 1 or length != b.numels():
         panic("Either tensors are not 1D or or tensors length do not match")
 
-    var out: Tensor[dtype]
-    with DeviceContext() as ctx:
-        _="""var compiled_func = ctx.compile_function[
-            dot_product[dtype, shared_mem_size],
-            dot_product[dtype, shared_mem_size],
-        ]()"""
+    var ctx = DeviceContext()
+    var compiled_func = ctx.compile_function[
+        dot_product[dtype, shared_mem_size],
+        dot_product[dtype, shared_mem_size],
+    ]()
 
-        var a_buffer = ctx.enqueue_create_buffer[dtype](length)
-        var b_buffer = ctx.enqueue_create_buffer[dtype](length)
-        var result_buffer = ctx.enqueue_create_buffer[dtype](1)
-        result_buffer.enqueue_fill(0)
-        a.write_to_device_buffer(a_buffer)
-        b.write_to_device_buffer(b_buffer)
-        ctx.enqueue_function[dot_product[dtype, shared_mem_size], dot_product[dtype, shared_mem_size]](
-            result_buffer,
-            a_buffer,
-            b_buffer,
-            UInt(length),
-            grid_dim=num_blocks,
-            block_dim=threads_per_block,
-        )
-        ctx.synchronize()
-        out = Tensor[dtype].from_device_buffer(result_buffer)
+    var a_buffer = ctx.enqueue_create_buffer[dtype](length)
+    var b_buffer = ctx.enqueue_create_buffer[dtype](length)
+    var result_buffer = ctx.enqueue_create_buffer[dtype](1)
+    result_buffer.enqueue_fill(0)
+    a.write_to_device_buffer(a_buffer)
+    b.write_to_device_buffer(b_buffer)
+    _ = """ctx.enqueue_function[dot_product[dtype, shared_mem_size], dot_product[dtype, shared_mem_size]](
+        result_buffer,
+        a_buffer,
+        b_buffer,
+        UInt(length),
+        grid_dim=num_blocks,
+        block_dim=threads_per_block,
+    )"""
+    ctx.enqueue_function(
+        compiled_func,
+        result_buffer,
+        a_buffer,
+        b_buffer,
+        UInt(length),
+        grid_dim=num_blocks,
+        block_dim=threads_per_block,
+    )
 
-    return out
+    ctx.synchronize()
+    return Tensor[dtype].from_device_buffer(result_buffer, Shape())
 
 
 fn main() raises:
