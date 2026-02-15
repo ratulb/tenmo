@@ -75,6 +75,7 @@ fn launch[
         result_buffer,
         a_buffer,
         b_buffer,
+        UInt(length),
         grid_dim=num_blocks,
         block_dim=threads_per_block,
     )
