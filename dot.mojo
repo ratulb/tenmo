@@ -58,29 +58,31 @@ fn launch[
     if a.rank() != 1 or b.rank() != 1 or length != b.numels():
         panic("Either tensors are not 1D or or tensors length do not match")
 
-    var ctx = DeviceContext()
-    _="""var compiled_func = ctx.compile_function[
-        dot_product[dtype, shared_mem_size],
-        dot_product[dtype, shared_mem_size],
-    ]()"""
+    var out: Tensor[dtype]
+    with DeviceContext() as ctx:
+        _="""var compiled_func = ctx.compile_function[
+            dot_product[dtype, shared_mem_size],
+            dot_product[dtype, shared_mem_size],
+        ]()"""
 
-    var a_buffer = ctx.enqueue_create_buffer[dtype](length)
-    var b_buffer = ctx.enqueue_create_buffer[dtype](length)
-    var result_buffer = ctx.enqueue_create_buffer[dtype](1)
-    result_buffer.enqueue_fill(0)
-    a.write_to_device_buffer(a_buffer)
-    b.write_to_device_buffer(b_buffer)
-    ctx.enqueue_function[dot_product[dtype, shared_mem_size], dot_product[dtype, shared_mem_size]](
-        result_buffer,
-        a_buffer,
-        b_buffer,
-        UInt(length),
-        grid_dim=num_blocks,
-        block_dim=threads_per_block,
-    )
-    ctx.synchronize()
+        var a_buffer = ctx.enqueue_create_buffer[dtype](length)
+        var b_buffer = ctx.enqueue_create_buffer[dtype](length)
+        var result_buffer = ctx.enqueue_create_buffer[dtype](1)
+        result_buffer.enqueue_fill(0)
+        a.write_to_device_buffer(a_buffer)
+        b.write_to_device_buffer(b_buffer)
+        ctx.enqueue_function[dot_product[dtype, shared_mem_size], dot_product[dtype, shared_mem_size]](
+            result_buffer,
+            a_buffer,
+            b_buffer,
+            UInt(length),
+            grid_dim=num_blocks,
+            block_dim=threads_per_block,
+        )
+        ctx.synchronize()
+        out = Tensor[dtype].from_device_buffer(result_buffer)
 
-    return Tensor[dtype].from_device_buffer(result_buffer)
+    return out
 
 
 fn main() raises:
