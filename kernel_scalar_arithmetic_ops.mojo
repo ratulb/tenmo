@@ -106,38 +106,50 @@ fn launch[
 
     var numels = A.numels()
 
+    # ✅ Use optimal SIMD width
+    comptime optimal_simd = simd_width_of[dtype]()
+
+    # ✅ Better heuristics
     var threads_per_block: Int
     var num_blocks: Int
 
-    if numels < 10_000:
-        # Small arrays: Use fewer threads to avoid overhead
+    if numels < 4096:
         threads_per_block = 128
-        num_blocks = min(4, (numels + 127) // 128)
-    elif numels < 1_000_000:
-        # Medium arrays: Standard configuration
+        num_blocks = (numels + 127) // 128
+    elif numels < 65536:
         threads_per_block = 256
-        num_blocks = min(128, (numels + 255) // 256)
+        num_blocks = (numels + 255) // 256
     else:
-        # Large arrays: Maximize occupancy
-        threads_per_block = 512
-        # Cap at reasonable number to avoid diminishing returns
-        num_blocks = min(1024, (numels + 511) // 512)
+        threads_per_block = 256
+        # ✅ More accurate calculation
+        var total_chunks = (numels + (optimal_simd * 2 * optimal_simd - 1)) // (
+            optimal_simd * 2 * optimal_simd
+        )
+        num_blocks = min((total_chunks + 255) // 256, 512)  # Cap at 512 blocks
 
-    # ===================================================================
-    # Launch kernel
-    # ===================================================================
     var ctx = DeviceContext()
 
+    # ✅ Use optimal SIMD width, not hardcoded 4
     var compiled_func = ctx.compile_function[
-        scalar_ops[op_code=op_code, dtype=dtype, simd_width=4],
-        scalar_ops[op_code=op_code, dtype=dtype, simd_width=4],
+        scalar_ops[
+            op_code=op_code,
+            dtype=dtype,
+            simd_width=optimal_simd,  # ← Use optimal!
+            simd_vectors_per_thread = 2 * optimal_simd,
+        ],
+        scalar_ops[
+            op_code=op_code,
+            dtype=dtype,
+            simd_width=optimal_simd,
+            simd_vectors_per_thread = 2 * optimal_simd,
+        ],
     ]()
 
     var A_buffer = ctx.enqueue_create_buffer[dtype](numels)
     var result_buffer = ctx.enqueue_create_buffer[dtype](numels)
-
-    # No need to zero-fill result_buffer - we write all elements
+    var start = now()
     A.write_to_device_buffer(A_buffer)
+    print("Writing to buffer took: ", (now() - start) * 1000, "ms")
 
     ctx.enqueue_function(
         compiled_func,
@@ -150,8 +162,10 @@ fn launch[
     )
 
     ctx.synchronize()
-
-    return Tensor[dtype].from_device_buffer(result_buffer, A.shape())
+    start = now()
+    var out = Tensor[dtype].from_device_buffer(result_buffer, A.shape())
+    print("Reading from buffer took: ", (now() - start) * 1000, "ms")
+    return out^
 
 
 from testing import assert_true
