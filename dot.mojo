@@ -104,7 +104,7 @@ fn dot_product_warp[
 # Kernel
 fn dot_product[
     dtype: DType,
-    shared_memory_size: Int = 512,
+    BLOCK_SIZE: Int = 512,
 ](
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     a: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
@@ -112,7 +112,7 @@ fn dot_product[
     size: UInt,
 ):
     var block_shared_memory = stack_allocation[
-        shared_memory_size, Scalar[dtype], address_space = AddressSpace.SHARED
+        BLOCK_SIZE, Scalar[dtype], address_space = AddressSpace.SHARED
     ]()
     var cache_index = thread_idx.x
     var gtid = cache_index + block_dim.x * block_idx.x
@@ -141,41 +141,55 @@ fn dot_product[
 
 fn launch[
     dtype: DType = DType.float32,
-    shared_memory_size: Int = 512,
     num_blocks: Int = 1,
-    threads_per_block: Int = shared_memory_size,
-](a: Tensor[dtype], b: Tensor[dtype]) raises -> Tensor[dtype]:
+    threads_per_block: Int = 256,
+](A: Tensor[dtype], B: Tensor[dtype]) raises -> Tensor[dtype]:
     constrained[
-        shared_memory_size == threads_per_block,
-        "shared memory size should be equal to threads per block",
+        threads_per_block <= 512,
+        "Threads per block should be <= 512",
     ]()
-    var length = a.numels()
-    if a.rank() != 1 or b.rank() != 1 or length != b.numels():
-        panic("Either tensors are not 1D or or tensors length do not match")
+    var rank = A.rank()
+    if rank != 1 or B.rank() != 1:
+        panic(
+            "Dot product expects 1D tensors. Found",
+            "A rank: ",
+            rank.__str__(),
+            "and B rank: ",
+            B.rank().__str__(),
+        )
+    var numels = A.numels()
+    if numels != B.numels():
+        panic(
+            "Tensor lengths do not match.",
+            "A length: ",
+            numels.__str__(),
+            "B length: ",
+            B.numels().__str__(),
+        )
 
     var ctx = DeviceContext()
     _="""var compiled_func = ctx.compile_function[
-        dot_product[dtype, shared_memory_size],
-        dot_product[dtype, shared_memory_size],
+        dot_product_warp[dtype, BLOCK_SIZE=threads_per_block],
+        dot_product_warp[dtype, BLOCK_SIZE=threads_per_block],
     ]()"""
+
     var compiled_func = ctx.compile_function[
-        dot_product_warp[dtype, BLOCK_SIZE=256],
-        dot_product_warp[dtype, BLOCK_SIZE=256],
+        dot_product[dtype, BLOCK_SIZE=threads_per_block],
+        dot_product[dtype, BLOCK_SIZE=threads_per_block],
     ]()
 
-
-    var a_buffer = ctx.enqueue_create_buffer[dtype](length)
-    var b_buffer = ctx.enqueue_create_buffer[dtype](length)
+    var A_buffer = ctx.enqueue_create_buffer[dtype](numels)
+    var B_buffer = ctx.enqueue_create_buffer[dtype](numels)
     var result_buffer = ctx.enqueue_create_buffer[dtype](1)
     result_buffer.enqueue_fill(0)
-    a.write_to_device_buffer(a_buffer)
-    b.write_to_device_buffer(b_buffer)
+    A.write_to_device_buffer(A_buffer)
+    B.write_to_device_buffer(B_buffer)
     ctx.enqueue_function(
         compiled_func,
         result_buffer,
-        a_buffer,
-        b_buffer,
-        UInt(length),
+        A_buffer,
+        B_buffer,
+        UInt(numels),
         grid_dim=num_blocks,
         block_dim=threads_per_block,
     )
