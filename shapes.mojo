@@ -1,6 +1,6 @@
 from common_utils import panic
 from intarray import IntArray
-
+from builtin.device_passable import DevicePassable
 
 @register_passable
 struct Shape(
@@ -12,7 +12,10 @@ struct Shape(
     Sized,
     Stringable,
     Writable,
+    DevicePassable,
 ):
+    #comptime device_type = Self
+    comptime device_type: AnyType = Self
     """Shape of a tensor."""
 
     var dims: IntArray
@@ -27,6 +30,17 @@ struct Shape(
     @always_inline
     fn Unit() -> Shape:
         return Shape(1)
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return "Shape"
+
+    @staticmethod
+    fn get_device_type_name() -> String:
+        return Self.get_type_name()
+
+    fn _to_device_type(self, target: MutOpaquePointer[_]):
+        target.bitcast[Self.device_type]()[] = self
 
     @always_inline("nodebug")
     fn __init__(out self):
