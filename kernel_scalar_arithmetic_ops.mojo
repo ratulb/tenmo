@@ -14,7 +14,7 @@ from testing import assert_true
 from common_utils import panic
 from shapes import Shape
 
-from mnemonics import Multiply
+from mnemonics import Multiply, Add, Subtract, Divide, ReverseSubtract
 
 
 fn dot_product_warp[
@@ -120,7 +120,26 @@ fn scalar_ops[
     var gtid = tid + block_dim.x * block_idx.x
     if gtid < size:
         block_shared_memory[tid] = A[gtid]
-        block_shared_memory[tid] *= scalar
+
+        @parameter
+        if op_code == Add:
+            block_shared_memory[tid] += scalar
+
+        elif op_code == Subtract:
+            block_shared_memory[tid] -= scalar
+
+        elif op_code == ReverseSubtract:
+            block_shared_memory[tid] = scalar - block_shared_memory[tid]
+
+        elif op_code == Multiply:
+            block_shared_memory[tid] *= scalar
+
+        elif op_code == Divide:
+            block_shared_memory[tid] /= scalar
+
+        else:  # Reverse divide
+            block_shared_memory[tid] = scalar / block_shared_memory[tid]
+
         result[gtid] = block_shared_memory[tid]
 
 
@@ -177,7 +196,26 @@ fn main() raises:
     comptime dtype = DType.float32
     var tensor_a = Tensor[dtype].ones(SIZE)
     var expect = tensor_a * 42
-
+    # First test
     var result = launch[op_code=Multiply, threads_per_block=512](tensor_a, 42)
     assert_true(result.all_close(expect))
+
+    # Second test
+    tensor_a = Tensor[dtype].rand(SIZE // 2, 2)
+    var reshaped = tensor_a.reshape(2, SIZE // 2)
+    expect = reshaped * 1919
+
+    result = launch[op_code=Multiply, threads_per_block=512](reshaped, 1919)
+    assert_true(result.all_close(expect))
+
+    expect = reshaped / 89
+
+    result = launch[op_code=Divide, threads_per_block=768](reshaped, 89)
+    assert_true(result.all_close(expect))
+
+    expect = reshaped - 999
+
+    result = launch[op_code=Subtract, threads_per_block=768](reshaped, 999)
+    assert_true(result.all_close(expect))
+
     print("Launch success")
