@@ -155,33 +155,51 @@ fn launch[
 
 
 from testing import assert_true
+from common_utils import now
 
 
 fn main() raises:
-    var SIZE = 65536
+    var SIZE = 65536 * 10
     comptime dtype = DType.float32
     var tensor_a = Tensor[dtype].ones(SIZE)
+    var start = now()
     var expect = tensor_a * 42
+    print("CPU mul took: ", (now() - start) * 1000, "ms")
     # First test
+    start = now()
     var result = launch[op_code=Multiply, dtype=dtype](tensor_a, 42)
+    print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
     # Second test
     tensor_a = Tensor[dtype].rand(SIZE // 2, 2)
     var reshaped = tensor_a.reshape(2, SIZE // 2)
+    start = now()
     expect = reshaped * 1919
 
+    print("CPU mul took: ", (now() - start) * 1000, "ms")
+    start = now()
     result = launch[op_code=Multiply, dtype=dtype](reshaped, 1919)
-    assert_true(result.all_close(expect))
 
+    print("GPU mul took: ", (now() - start) * 1000, "ms")
+    assert_true(result.all_close(expect))
+    start = now()
     expect = reshaped / 89
 
+    print("CPU div took: ", (now() - start) * 1000, "ms")
+    start = now()
     result = launch[op_code=Divide, dtype=dtype](reshaped, 89)
-    assert_true(result.all_close(expect))
 
+    print("GPU div took: ", (now() - start) * 1000, "ms")
+    assert_true(result.all_close(expect))
+    start = now()
     expect = reshaped - 999
 
+    print("CPU subtract took: ", (now() - start) * 1000, "ms")
+    start = now()
     result = launch[op_code=Subtract, dtype=dtype](reshaped, 999)
+
+    print("GPU subtract took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
     print("Launch success")
