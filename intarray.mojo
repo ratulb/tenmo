@@ -1,5 +1,6 @@
 from common_utils import panic
 from memory import memcpy
+from builtin.device_passable import DevicePassable
 
 
 @register_passable
@@ -8,6 +9,7 @@ struct IntArray(
     Iterable,
     Representable,
     Sized,
+    DevicePassable,
     Stringable,
     Writable,
 ):
@@ -16,6 +18,18 @@ struct IntArray(
     Optimized for tensor indexing operations with minimal overhead.
     Uses capacity-based growth to avoid frequent reallocations.
     """
+    comptime device_type: AnyType = Self
+
+    @staticmethod
+    fn get_type_name() -> String:
+        return String("IntArray")
+
+    @staticmethod
+    fn get_device_type_name() -> String:
+        return Self.get_type_name()
+
+    fn _to_device_type(self, target: MutOpaquePointer[_]):
+        target.bitcast[Self.device_type]()[] = self
 
     var _data: UnsafePointer[Int, MutExternalOrigin]
     var _size: Int  # Current number of elements
