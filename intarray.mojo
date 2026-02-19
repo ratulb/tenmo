@@ -553,7 +553,7 @@ struct IntArray(
         with buffer.map_to_host() as host_buffer:
             self.write_to(host_buffer.unsafe_ptr())
 
-    fn get_buffer_write_length(self) -> Int:
+    fn write_length(self) -> Int:
         return len(self) + 2
 
     @staticmethod

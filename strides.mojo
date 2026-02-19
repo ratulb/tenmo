@@ -123,6 +123,9 @@ struct Strides(
     fn write_to(self, ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
         self.data.write_to(ptr)
 
+    fn write_length(self) -> Int:
+        return self.data.write_length()
+
     fn write_to(self, ptr:  UnsafePointer[Int, MutAnyOrigin]):
         self.data.write_to(ptr)
 

@@ -12,12 +12,39 @@ from common_utils import panic
 from shapes import Shape
 from strides import Strides
 from intarray import IntArray
+from indexhelper import IndexIterator
 
-fn pass_to_device[dtype: DType](shape: UnsafePointer[Scalar[DType.int64], MutAnyOrigin], strides: UnsafePointer[Int64, MutAnyOrigin], intarray: UnsafePointer[Int64, MutAnyOrigin], offset: Int = 2):
+
+fn pass_to_device[
+    dtype: DType
+](
+    # shape: UnsafePointer[Int64, MutAnyOrigin], # This is valid too
+    shape: UnsafePointer[Scalar[DType.int64], MutAnyOrigin],
+    strides: UnsafePointer[Int64, MutAnyOrigin],
+    intarray: UnsafePointer[Int64, MutAnyOrigin],
+    offset: Int = 2,
+):
     print("Shape: ", Shape.read_from(shape))
     print("Strides: ", Strides.read_from(strides))
     print("IntArray: ", IntArray.read_from(intarray))
     print("Offset: ", offset)
+
+    ######## Shape iteration ###########
+    var count = 0
+    for coord in Shape.read_from(shape):
+        print("Coord: ", coord)
+        count += 1
+        if count == 5:
+            break
+    count = 0
+    var index_iterator = IndexIterator(
+        Pointer(to=Shape.read_from(shape)),
+        Pointer(to=Strides.read_from(strides)),
+        offset,
+    )
+    for idx in index_iterator:
+        print("Index: ", idx)
+
 
 fn launch() raises:
     var ctx = DeviceContext()
@@ -28,13 +55,21 @@ fn launch() raises:
         pass_to_device[dtype],
     ]()
 
-    var shape = Shape(10, 3, 15)
-    var strides = Strides(45, 15, 1)
-    var intarray  = IntArray(5, 5, 10, 100)
+    var shape = Shape(1, 3, 2)
+    var strides = Strides(6, 2, 1)
+    var intarray = IntArray(5, 5, 10, 100)
     var offset = 3
-    var shape_buffer = ctx.enqueue_create_buffer[dtype](5)
-    var strides_buffer = ctx.enqueue_create_buffer[dtype](5)
-    var intarray_buffer = ctx.enqueue_create_buffer[dtype](intarray.get_buffer_write_length())
+
+    # .write_length() - better to use
+    var shape_buffer = ctx.enqueue_create_buffer[dtype](
+        5
+    )  # 5 because size and capacity needs to be acoounted for
+    var strides_buffer = ctx.enqueue_create_buffer[dtype](
+        5
+    )  # can use .write_length()
+    var intarray_buffer = ctx.enqueue_create_buffer[dtype](
+        intarray.write_length()
+    )
 
     shape.write_to_device_buffer(shape_buffer)
     strides.write_to_device_buffer(strides_buffer)

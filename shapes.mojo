@@ -174,8 +174,8 @@ struct Shape(
     fn write_to(self, ptr:  UnsafePointer[Int, MutAnyOrigin]):
         self.dims.write_to(ptr)
 
-        _="""fn write_to(self, ptr:  UnsafePointer[Int64, MutAnyOrigin]):
-        self.dims.write_to(ptr)"""
+    fn write_length(self) -> Int:
+        return self.dims.write_length()
 
     fn write_to_host_buffer(self, buffer: HostBuffer[DType.int64]):
         self.write_to(buffer.unsafe_ptr())
