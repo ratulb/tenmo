@@ -2,7 +2,7 @@ from common_utils import panic
 from intarray import IntArray
 from builtin.device_passable import DevicePassable
 from utils import IndexList, Index
-
+from gpu.host import DeviceBuffer, HostBuffer
 
 @register_passable
 struct Shape(
@@ -167,6 +167,32 @@ struct Shape(
     @no_inline
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
+
+    fn write_to(self, ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
+        self.dims.write_to(ptr)
+
+    fn write_to(self, ptr:  UnsafePointer[Int, MutAnyOrigin]):
+        self.dims.write_to(ptr)
+
+        _="""fn write_to(self, ptr:  UnsafePointer[Int64, MutAnyOrigin]):
+        self.dims.write_to(ptr)"""
+
+    fn write_to_host_buffer(self, buffer: HostBuffer[DType.int64]):
+        self.write_to(buffer.unsafe_ptr())
+
+    fn write_to_device_buffer(self, buffer: DeviceBuffer[DType.int64]) raises:
+        with buffer.map_to_host() as host_buffer:
+            self.write_to(host_buffer.unsafe_ptr())
+
+    @staticmethod
+    fn read_from(ptr:  UnsafePointer[Int, MutAnyOrigin]) -> Shape:
+        var data = IntArray.read_from(ptr)
+        return Shape(data^)
+
+    @staticmethod
+    fn read_from(ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]) -> Shape:
+        var data = IntArray.read_from(ptr)
+        return Shape(data^)
 
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
@@ -398,3 +424,6 @@ fn main():
     var index_list = Index(3, 40)
     var shape = Shape.from_indexlist(index_list)
     print(shape, shape.to_indexlist())
+    var written = alloc[Int](4)
+    shape.write_to(written)
+    print(Shape.read_from(written))

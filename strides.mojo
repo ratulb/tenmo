@@ -1,7 +1,7 @@
 from intarray import IntArray
 from shapes import Shape
 from layout.layout import IntTuple
-
+from gpu.host import DeviceBuffer, HostBuffer
 
 @register_passable
 struct Strides(
@@ -119,3 +119,34 @@ struct Strides(
     @always_inline
     fn with_capacity(capacity: Int) -> Strides:
         return Strides(IntArray.with_capacity(capacity))
+
+    fn write_to(self, ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
+        self.data.write_to(ptr)
+
+    fn write_to(self, ptr:  UnsafePointer[Int, MutAnyOrigin]):
+        self.data.write_to(ptr)
+
+    @staticmethod
+    fn read_from(ptr:  UnsafePointer[Int, MutAnyOrigin]) -> Strides:
+        var data = IntArray.read_from(ptr)
+        return Strides(data^)
+
+    @staticmethod
+    fn read_from(ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]) -> Strides:
+        var data = IntArray.read_from(ptr)
+        return Strides(data^)
+
+
+    fn write_to_host_buffer(self, buffer: HostBuffer[DType.int64]):
+        self.write_to(buffer.unsafe_ptr())
+
+    fn write_to_device_buffer(self, buffer: DeviceBuffer[DType.int64]) raises:
+        with buffer.map_to_host() as host_buffer:
+            self.write_to(host_buffer.unsafe_ptr())
+fn main():
+    var s = Strides(10, 5, 2)
+    var ptr = alloc[Int](5)
+    s.write_to(ptr)
+
+    var read_back = Strides.read_from(ptr)
+    print(read_back)

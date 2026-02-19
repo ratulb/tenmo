@@ -1,7 +1,7 @@
 from common_utils import panic
 from memory import memcpy
 from builtin.device_passable import DevicePassable
-
+from gpu.host import DeviceBuffer, HostBuffer
 
 @register_passable
 struct IntArray(
@@ -528,6 +528,53 @@ struct IntArray(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
+        _="""fn write_to(self, ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
+        ptr[] = self._capacity
+        (ptr+1)[] = self._size
+        for i in range(len(self)):
+            (ptr + i + 2)[] = self[i]"""
+
+    fn write_to(self, ptr:  UnsafePointer[Int, MutAnyOrigin]):
+        ptr[] = self._capacity
+        (ptr+1)[] = self._size
+        for i in range(len(self)):
+            (ptr + i + 2)[] = self[i]
+
+    fn write_to(self, ptr:  UnsafePointer[Int64, MutAnyOrigin]):
+        ptr[] = self._capacity
+        (ptr+1)[] = self._size
+        for i in range(len(self)):
+            (ptr + i + 2)[] = self[i]
+
+
+    fn write_to_host_buffer(self, buffer: HostBuffer[DType.int64]):
+        self.write_to(buffer.unsafe_ptr())
+
+    fn write_to_device_buffer(self, buffer: DeviceBuffer[DType.int64]) raises:
+        with buffer.map_to_host() as host_buffer:
+            self.write_to(host_buffer.unsafe_ptr())
+
+
+    @staticmethod
+    fn read_from(ptr:  UnsafePointer[Int, MutAnyOrigin]) -> IntArray:
+        var capacity = ptr[]
+        var size = (ptr + 1)[]
+        var out = IntArray.with_capacity(capacity)
+        for i in range(size):
+            out.append((ptr + 2 + i)[])
+        return out
+
+
+
+    @staticmethod
+    fn read_from(ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]) -> IntArray:
+        var capacity = Int(ptr[])
+        var size = Int((ptr + 1)[])
+        var out = IntArray.with_capacity(capacity)
+        for i in range(size):
+            out.append(Int((ptr + 2 + i)[]))
+        return out
+
     # ========== Math Operations ==========
 
     @always_inline("nodebug")
@@ -727,9 +774,8 @@ struct ZipIterator[
 fn main():
     var ia = IntArray(20, 30, 40)
     print(ia)
-    ref sec = ia[1]
-    sec += 10
-    print(ia)
-    for ref e in ia:
-        e *= 10
-    print(ia)
+    #var written = alloc[Scalar[DType.int64]](5)
+    var written = alloc[Int](5)
+    ia.write_to(written)
+    var read_from = IntArray.read_from(written)
+    print(read_from)
