@@ -116,8 +116,8 @@ fn arithmetic_ops_A_contiguous[
     var strides_B_local = stack_allocation[MAX_RANK, Int]()
 
     for i in range(rank):
-        shape_local[Int(i)] = Int(result_shape[Int(i)])
-        strides_B_local[Int(i)] = Int(B_strides[Int(i)])
+        shape_local[Int(i)] = Int(result_shape[Int(i) + 2])
+        strides_B_local[Int(i)] = Int(B_strides[Int(i) + 2])
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
@@ -685,10 +685,10 @@ fn main() raises:
     print("=" * 60)
 
     # Original tests
-    test_contiguous_same_shape()
+    # test_contiguous_same_shape()
+    test_non_contiguous()
     _ = """test_broadcasting()
     test_scalar_broadcast()
-    test_non_contiguous()
     test_complex_broadcasting()
     test_large_arrays()
 
@@ -764,14 +764,17 @@ fn test_non_contiguous() raises:
     print("\n=== Test 4: Non-Contiguous (Transpose) ===")
 
     comptime dtype = DType.float32
-    var a = Tensor[dtype].rand(10, 20)
-    var b = Tensor[dtype].rand(20, 10)
-
-    var a_t = a.transpose(0, 1)  # Non-contiguous view [20, 10]
-
+    var a = Tensor[dtype].rand(3, 2)
+    var b = Tensor[dtype].rand(2, 3)
+    a.print()
+    b.print()
+    var a_t = a.transpose(1, 0)  # Non-contiguous view [20, 10]
+    a_t.print()
     var gpu_result = launch[Add, dtype](a_t, b)
     var cpu_result = a_t + b
-
+    gpu_result.print()
+    print()
+    cpu_result.print()
     assert_true(gpu_result.all_close(cpu_result))
     print("  ✓ Passed")
 
