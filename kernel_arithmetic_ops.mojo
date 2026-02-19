@@ -230,8 +230,8 @@ fn arithmetic_ops_B_contiguous[
     var strides_A_local = stack_allocation[MAX_RANK, Int]()
 
     for i in range(rank):
-        shape_local[Int(i)] = Int(result_shape[Int(i)])
-        strides_A_local[Int(i)] = Int(A_strides[Int(i)])
+        shape_local[Int(i)] = Int(result_shape[Int(i) + 2])
+        strides_A_local[Int(i)] = Int(A_strides[Int(i) + 2])
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
