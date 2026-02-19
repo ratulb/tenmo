@@ -18,7 +18,9 @@ struct IntArray(
     Optimized for tensor indexing operations with minimal overhead.
     Uses capacity-based growth to avoid frequent reallocations.
     """
-    comptime device_type: AnyType = Self
+    comptime device_type: AnyType = LegacyUnsafePointer[
+        mut=True, Int
+    ]
 
     @staticmethod
     fn get_type_name() -> String:
@@ -29,7 +31,7 @@ struct IntArray(
         return Self.get_type_name()
 
     fn _to_device_type(self, target: MutOpaquePointer[_]):
-        target.bitcast[Self.device_type]()[] = self
+        target.bitcast[Self.device_type]()[] = self._data.as_legacy_pointer()
 
     var _data: UnsafePointer[Int, MutExternalOrigin]
     var _size: Int  # Current number of elements
@@ -617,7 +619,6 @@ struct IntArrayIterator[
     var index: Int
     var src: Pointer[IntArray, Self.origin]
 
-    @always_inline
     fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self
 
@@ -636,7 +637,6 @@ struct IntArrayIterator[
             self.index -= 1
             return self.src[][self.index]
 
-    @always_inline
     fn bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len: Int
 

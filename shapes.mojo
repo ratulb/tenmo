@@ -1,9 +1,12 @@
 from common_utils import panic
 from intarray import IntArray
 from builtin.device_passable import DevicePassable
+from utils import IndexList, Index
+
 
 @register_passable
 struct Shape(
+    DevicePassable,
     Equatable,
     ImplicitlyCopyable,
     Iterable,
@@ -12,9 +15,8 @@ struct Shape(
     Sized,
     Stringable,
     Writable,
-    DevicePassable,
 ):
-    #comptime device_type = Self
+    # comptime device_type = Self
     comptime device_type: AnyType = Self
     """Shape of a tensor."""
 
@@ -25,6 +27,29 @@ struct Shape(
     @always_inline
     fn Void() -> Shape:
         return Shape()
+
+    @staticmethod
+    fn from_indexlist(index_list: IndexList[_]) -> Self:
+        var length = len(index_list)
+        if length == 1:
+            return Shape(index_list[0])
+        elif length == 2:
+            return Shape(index_list[0], index_list[1])
+        elif length == 3:
+            return Shape(index_list[0], index_list[1], index_list[2])
+        elif length == 4:
+            return Shape(index_list[0], index_list[1], index_list[2], index_list[3])
+        elif length == 5:
+            return Shape(index_list[0], index_list[1], index_list[2], index_list[3], index_list[4])
+        else:
+            panic("Unsupported IndexList size for Shape")
+            return Shape(Int.MAX)
+
+    fn to_indexlist[size: Int = 2](self) -> IndexList[size]:
+        var index_list = IndexList[size]()
+        for i in range(size):
+            index_list[i] = self[i]
+        return index_list
 
     @staticmethod
     @always_inline
@@ -370,4 +395,6 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
 
 
 fn main():
-    pass
+    var index_list = Index(3, 40)
+    var shape = Shape.from_indexlist(index_list)
+    print(shape, shape.to_indexlist())

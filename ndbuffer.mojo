@@ -736,9 +736,23 @@ struct NDBuffer[dtype: DType](
 
                 @parameter
                 if overwrite:
-                    self.buffer[index] = other.buffer[iterator.__next__()]
+                    try:
+                        self.buffer[index] = other.buffer[iterator.__next__()]
+                    except e:
+                        print(e)
+                        panic(
+                            "Raised StopIteration in NDBuffer ->"
+                            " copy_from_alike"
+                        )
                 else:
-                    self.buffer[index] += other.buffer[iterator.__next__()]
+                    try:
+                        self.buffer[index] += other.buffer[iterator.__next__()]
+                    except e:
+                        print(e)
+                        panic(
+                            "Raised StopIteration in NDBuffer ->"
+                            " copy_from_alike"
+                        )
 
     fn fill(self, other: NDBuffer[Self.dtype]):
         if self.__is__(other):
@@ -844,8 +858,15 @@ struct NDBuffer[dtype: DType](
             else:
                 var iterator = other.index_iterator()
                 for index in self.index_iterator():
+                    var next_index = -1
+                    try:
+                        next_index = iterator.__next__()
+                    except e:
+                        print(e)
+                        panic("Raised StopIteration in NDBuffer -> inplace_ops")
+
                     self.buffer[index] = Self.scalar_fn[op_code](
-                        self.buffer[index], other.buffer[iterator.__next__()]
+                        self.buffer[index], other.buffer[next_index]
                     )
 
     @always_inline
@@ -944,8 +965,17 @@ struct NDBuffer[dtype: DType](
             else:
                 var iterator = other.index_iterator()
                 for idx in self.index_iterator():
+                    var next_index = -1
+                    try:
+                        next_index = iterator.__next__()
+                    except e:
+                        print(e)
+                        panic(
+                            "Raised StopIteration in NDBuffer -> arithmetic_ops"
+                        )
+
                     result_buffer[index] = Self.scalar_fn[op_code](
-                        self.buffer[idx], other.buffer[iterator.__next__()]
+                        self.buffer[idx], other.buffer[next_index]
                     )
                     index += 1
 
@@ -1163,7 +1193,14 @@ struct NDBuffer[dtype: DType](
             var iterator = other.index_iterator()
             for idx in self.index_iterator():
                 var self_val = self.buffer[idx]
-                var other_val = other.buffer[iterator.__next__()]
+                var next_index = -1
+                try:
+                    next_index = iterator.__next__()
+                except e:
+                    print(e)
+                    panic("Raised StopIteration in NDBuffer -> compare")
+
+                var other_val = other.buffer[next_index]
 
                 @parameter
                 if op_code == Equal:

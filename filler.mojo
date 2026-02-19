@@ -114,9 +114,15 @@ struct Filler[dtype: DType](ImplicitlyCopyable & Movable):
                     start_offset=absolute_offset,
                 )
                 while src_iter.__has_next__():
-                    dest_buffer[dest_iter.__next__()] = src_buffer[
-                        src_iter.__next__()
-                    ]
+                    var src_next_index = -1
+                    var dest_next_index = -1
+                    try:
+                        src_next_index = src_iter.__next__()
+                        dest_next_index = dest_iter.__next__()
+                    except e:
+                        print(e)
+                        panic("Raised StopIteration in Filler -> Fill")
+                    dest_buffer[dest_next_index] = src_buffer[src_next_index]
         else:
             # Source's shape != target's shape but broadcastable
             var broadcast_shape = ShapeBroadcaster.broadcast_shape[

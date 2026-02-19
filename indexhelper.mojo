@@ -7,8 +7,13 @@ from common_utils import panic
 @fieldwise_init
 @register_passable
 struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
-    ImplicitlyCopyable
+    ImplicitlyCopyable, Iterable, Iterator, Sized
 ):
+    comptime Element = Int
+    comptime IteratorType[
+        iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
+    ]: Iterator = Self
+
     var shape: Pointer[Shape, Self.shape_origin]
     var strides: Pointer[Strides, Self.strides_origin]
     var start_offset: Int
@@ -36,12 +41,14 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         self.coords = IntArray.filled(self.rank, 0)
         self.contiguous = self.strides[].is_contiguous(self.shape[])
 
-    @always_inline("nodebug")
-    fn __iter__(self) -> Self:
+    fn __iter__(
+        ref self,
+    ) -> Self.IteratorType[
+        origin_of(self, Self.shape_origin, Self.strides_origin)
+    ]:
         return self
 
-    @always_inline("nodebug")
-    fn __next__(mut self) -> Int:
+    fn __next__(mut self) raises StopIteration -> Self.Element:
         """
         Return next memory offset and advance iterator.
 
@@ -50,6 +57,9 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         Returns:
             Physical memory offset for current logical element.
         """
+        if not self.__has_next__():
+            raise StopIteration()
+
         var result = self.current_offset
 
         # Fast path: contiguous tensor
@@ -82,6 +92,10 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
     @always_inline("nodebug")
     fn __has_next__(self) -> Bool:
         return self.current_index < self.total_elements
+
+    fn bounds(self) -> Tuple[Int, Optional[Int]]:
+        var iter_len: Int = len(self)
+        return (iter_len, {iter_len})
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
