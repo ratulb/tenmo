@@ -546,7 +546,6 @@ struct IntArray(
         for i in range(len(self)):
             (ptr + i + 2)[] = self[i]
 
-
     fn write_to_host_buffer(self, buffer: HostBuffer[DType.int64]):
         self.write_to(buffer.unsafe_ptr())
 
@@ -554,6 +553,8 @@ struct IntArray(
         with buffer.map_to_host() as host_buffer:
             self.write_to(host_buffer.unsafe_ptr())
 
+    fn get_buffer_write_length(self) -> Int:
+        return len(self) + 2
 
     @staticmethod
     fn read_from(ptr:  UnsafePointer[Int, MutAnyOrigin]) -> IntArray:
@@ -563,8 +564,6 @@ struct IntArray(
         for i in range(size):
             out.append((ptr + 2 + i)[])
         return out
-
-
 
     @staticmethod
     fn read_from(ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]) -> IntArray:
