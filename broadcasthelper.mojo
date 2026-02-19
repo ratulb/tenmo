@@ -1,6 +1,7 @@
 from shapes import Shape
 from common_utils import panic
 from intarray import IntArray
+from strides import Strides
 
 
 @register_passable
@@ -189,3 +190,89 @@ struct ShapeBroadcaster:
                 )  # Normal dimension
 
         return source_indices^
+
+    @staticmethod
+    fn broadcast_strides(
+        input_shape: Shape,
+        input_strides: Strides,
+        broadcast_shape: Shape,
+    ) -> Strides:
+        var in_rank = input_shape.rank()
+        var out_rank = broadcast_shape.rank()
+
+        if in_rank > out_rank:
+            panic("Cannot broadcast: input rank greater than target rank")
+
+        var result = Strides.zeros(out_rank)
+
+        # Align dimensions from the right
+        var in_dim = in_rank - 1
+        var out_dim = out_rank - 1
+
+        while out_dim >= 0:
+            var out_size = broadcast_shape[out_dim]
+
+            if in_dim >= 0:
+                var in_size = input_shape[in_dim]
+
+                if in_size == out_size:
+                    # Same dimension → keep stride
+                    result[out_dim] = input_strides[in_dim]
+
+                elif in_size == 1:
+                    # Broadcast dimension → stride 0
+                    result[out_dim] = 0
+
+                else:
+                    panic(
+                        "Broadcast error: ",
+                        input_shape.__str__(),
+                        " → ",
+                        broadcast_shape.__str__(),
+                    )
+
+                in_dim -= 1
+
+            else:
+                # Input had no dimension here (implicit 1)
+                result[out_dim] = 0
+
+            out_dim -= 1
+
+        return result
+
+
+from memory import stack_allocation
+
+fn main() raises:
+    test_broadcast_strides()
+    shape = Shape(10, 1)
+    stack = stack_allocation[6144, Int]()
+    stack[6143] = shape[0]
+    print(stack[6143])
+
+from testing import assert_true
+
+
+fn test_broadcast_strides() raises:
+    print("test_broadcast_strides")
+    var input_shape = Shape(3)
+    var input_strides = Strides(1)
+    var target_shape = Shape(2, 3)
+
+    var result = ShapeBroadcaster.broadcast_strides(
+        input_shape, input_strides, target_shape
+    )
+    assert_true(result == Strides(0, 1))
+
+    input_shape = Shape(2, 1, 4)
+    input_strides = Strides(4, 4, 1)
+    target_shape = Shape(2, 3, 4)
+
+    result = ShapeBroadcaster.broadcast_strides(
+        input_shape, input_strides, target_shape
+    )
+    assert_true(result == Strides(4, 0, 1))
+
+
+

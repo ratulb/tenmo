@@ -1,5 +1,5 @@
 from gpu import thread_idx, block_dim, grid_dim, block_idx
-from gpu.host import DeviceContext
+from gpu.host import DeviceContext, DeviceBuffer
 from sys import simd_width_of
 
 from tenmo import Tensor
@@ -217,3 +217,64 @@ fn main() raises:
     assert_true(result.all_close(expect))
 
     print("Launch success")
+
+
+struct GPUTensor[dtype: DType]:
+    """Tensor that lives on GPU - avoid transfers."""
+
+    var gpu_buffer: DeviceBuffer[Self.dtype]
+    var shape: Shape
+    #var ctx: DeviceContext
+
+    fn __init__(
+        out self,
+        var buffer: DeviceBuffer[Self.dtype],
+        shape: Shape,
+        #ctx: DeviceContext,
+    ):
+        self.gpu_buffer = buffer^
+        self.shape = shape
+        #self.ctx = ctx
+
+    @staticmethod
+    fn from_cpu(tensor: Tensor[Self.dtype], ctx: DeviceContext) raises -> Self:
+        """Upload once, keep on GPU."""
+        var numels = tensor.numels()
+        var gpu_buf = ctx.enqueue_create_buffer[Self.dtype](numels)
+        tensor.write_to_device_buffer(gpu_buf)
+        #return GPUTensor(gpu_buf^, tensor.shape(), ctx)
+        return GPUTensor(gpu_buf^, tensor.shape())
+
+    fn to_cpu(self) raises -> Tensor[Self.dtype]:
+        """Download when needed."""
+        return Tensor[Self.dtype].from_device_buffer(
+            self.gpu_buffer, self.shape
+        )
+
+    fn scalar_op[
+        op_code: Int
+    ](self, scalar: Scalar[Self.dtype]) raises -> GPUTensor[Self.dtype]:
+        """GPU operation - no transfers."""
+        var numels = self.shape.num_elements()
+        var result_buffer = self.ctx.enqueue_create_buffer[Self.dtype](numels)
+
+        comptime optimal_simd = simd_width_of[Self.dtype]()
+        var threads_per_block = 256
+        var num_blocks = min((numels + 255) // 256, 512)
+
+        var compiled_func = self.ctx.compile_function[
+            scalar_ops[op_code, Self.dtype, optimal_simd, 2 * optimal_simd],
+            scalar_ops[op_code, Self.dtype, optimal_simd, 2 * optimal_simd],
+        ]()
+
+        self.ctx.enqueue_function(
+            compiled_func,
+            result_buffer,
+            self.gpu_buffer,  # Already on GPU!
+            scalar,
+            UInt(numels),
+            grid_dim=num_blocks,
+            block_dim=threads_per_block,
+        )
+
+        return GPUTensor(result_buffer^, self.shape, self.ctx)

@@ -16,11 +16,13 @@ struct Strides(
     var data: IntArray
 
     @staticmethod
-    @always_inline
     fn Zero() -> Strides:
         return Strides()
 
-    @always_inline("nodebug")
+    @staticmethod
+    fn zeros(rank: Int) -> Strides:
+        return Strides(IntArray.filled(rank, 0))
+
     fn __init__(out self):
         self.data = IntArray()
 
