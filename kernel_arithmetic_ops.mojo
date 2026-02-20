@@ -233,6 +233,8 @@ fn arithmetic_ops_B_contiguous[
         shape_local[Int(i)] = Int(result_shape[Int(i) + 2])
         strides_A_local[Int(i)] = Int(A_strides[Int(i) + 2])
 
+    print("shape_local: ", shape_local)
+    print("strides_A_local: ", strides_A_local)
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
@@ -258,6 +260,22 @@ fn arithmetic_ops_B_contiguous[
                         coords[dim] = remaining % shape_local[dim]
                         remaining //= shape_local[dim]
 
+                    # DEBUG: Print for first few elements
+                    if linear_idx < 6:
+                        print(
+                            (
+                                "linear=%d, coords=[%d,%d], shape=[%d,%d],"
+                                " strides=[%d,%d]\n"
+                            ),
+                            linear_idx,
+                            coords[0],
+                            coords[1],
+                            shape_local[0],
+                            shape_local[1],
+                            strides_A_local[0],
+                            strides_A_local[1],
+                        )
+
                     # Calculate A offset
                     var a_idx = A_offset
                     for dim in range(rank):
@@ -265,6 +283,14 @@ fn arithmetic_ops_B_contiguous[
 
                     var a_val = A[a_idx]  # Scalar load
                     var b_val = vec_b[lane]  # From vectorized load
+                    if linear_idx < 6:
+                        print(
+                            "  a_idx=%d, A[a_idx]=%f, B[%d]=%f\n",
+                            a_idx,
+                            Float32(A[a_idx]),
+                            B_offset + Int(linear_idx),
+                            Float32(B[B_offset + Int(linear_idx)]),
+                        )
 
                     @parameter
                     if op_code == Add:
@@ -522,7 +548,7 @@ fn launch[
         B.shape(), B.strides(), broadcast_shape
     )
     # var A_is_contiguous = A.is_contiguous() and A.shape() == broadcast_shape
-    #var B_is_contiguous = B.is_contiguous() and B.shape() == broadcast_shape
+    # var B_is_contiguous = B.is_contiguous() and B.shape() == broadcast_shape
 
     var A_is_contiguous = A.is_contiguous()
     var B_is_contiguous = B.is_contiguous()
@@ -591,6 +617,13 @@ fn launch[
             ],
         ]()
 
+        # Before launching kernel
+        print("Broadcast shape:", broadcast_shape)
+        print("A strides:", A_broadcast_strides)
+        print("B is contiguous:", B.is_contiguous())
+        print("Rank:", rank)
+        print("Output size:", output_size)
+
         var A_buffer = ctx.enqueue_create_buffer[dtype](A.numels())
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
@@ -606,6 +639,12 @@ fn launch[
         B.write_to_device_buffer(B_buffer)
         broadcast_shape.write_to_device_buffer(result_shape_buffer)
         A_broadcast_strides.write_to_device_buffer(A_strides_buffer)
+
+        # After writing to buffers, read back to verify
+        var shape_readback = Shape.read_from(result_shape_buffer.unsafe_ptr())
+        var strides_readback = Strides.read_from(A_strides_buffer.unsafe_ptr())
+        print("Shape readback:", shape_readback)
+        print("Strides readback:", strides_readback)
 
         ctx.enqueue_function(
             compiled_func,
