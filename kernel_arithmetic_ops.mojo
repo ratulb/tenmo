@@ -192,6 +192,121 @@ fn arithmetic_ops_B_contiguous[
     rank: Int,
 ):
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
+    var grid_stride = Int(block_dim.x * grid_dim.x)
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+
+    var shape_local = stack_allocation[
+        MAX_RANK, Int, address_space = AddressSpace.SHARED
+    ]()
+    var strides_A_local = stack_allocation[
+        MAX_RANK, Int, address_space = AddressSpace.SHARED
+    ]()
+    var coords = stack_allocation[
+        MAX_RANK, Int, address_space = AddressSpace.SHARED
+    ]()
+
+    for i in range(rank):
+        shape_local[i] = Int(result_shape[i + 2])
+        strides_A_local[i] = Int(A_strides[i + 2])
+
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+
+        # ---- compute starting coords once ----
+        var tmp = base_idx
+        var a_idx = A_offset
+
+        for dim in range(rank - 1, -1, -1):
+            coords[dim] = tmp % shape_local[dim]
+            tmp //= shape_local[dim]
+            a_idx += coords[dim] * strides_A_local[dim]
+
+        @parameter
+        for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i >= size:
+                break
+
+            if i + simd_width <= size:
+
+                var vec_b = B.load[width=simd_width](B_offset + i)
+                var vec_result: SIMD[dtype, simd_width] = 0
+
+                @parameter
+                for lane in range(simd_width):
+
+                    @parameter
+                    if op_code == Add:
+                        vec_result[lane] = A[a_idx] + vec_b[lane]
+                    elif op_code == Subtract:
+                        vec_result[lane] = A[a_idx] - vec_b[lane]
+                    elif op_code == Multiply:
+                        vec_result[lane] = A[a_idx] * vec_b[lane]
+                    else:
+                        vec_result[lane] = A[a_idx] / vec_b[lane]
+
+                    # increment odometer
+                    for dim in range(rank - 1, -1, -1):
+                        coords[dim] += 1
+                        a_idx += strides_A_local[dim]
+
+                        if coords[dim] < shape_local[dim]:
+                            break
+                        else:
+                            coords[dim] = 0
+                            a_idx -= strides_A_local[dim] * shape_local[dim]
+
+                result.store[width=simd_width](i, vec_result)
+
+            else:
+                for j in range(size - i):
+
+                    @parameter
+                    if op_code == Add:
+                        result[i + j] = A[a_idx] + B[B_offset + i + j]
+                    elif op_code == Subtract:
+                        result[i + j] = A[a_idx] - B[B_offset + i + j]
+                    elif op_code == Multiply:
+                        result[i + j] = A[a_idx] * B[B_offset + i + j]
+                    else:
+                        result[i + j] = A[a_idx] / B[B_offset + i + j]
+
+                    # increment odometer
+                    for dim in range(rank - 1, -1, -1):
+                        coords[dim] += 1
+                        a_idx += strides_A_local[dim]
+
+                        if coords[dim] < shape_local[dim]:
+                            break
+                        else:
+                            coords[dim] = 0
+                            a_idx -= strides_A_local[dim] * shape_local[dim]
+
+                break
+
+        base_idx += grid_stride * CHUNK_SIZE
+
+
+fn arithmetic_ops_B_contiguous_orig[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_offset: Int,
+    B_offset: Int,
+    size: Int,
+    rank: Int,
+):
+    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
     var grid_stride = Int(block_dim.x * grid_dim.x)  # total threads in grid
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
@@ -654,12 +769,12 @@ fn main() raises:
     test_complex_broadcasting()
     test_large_arrays()
 
-    # ✅ NEW: Offset-specific tests
+    # Offset-specific tests
     test_contiguous_view_with_offset()
     test_all_offset_scenarios()
 
     print("\n" + "=" * 60)
-    print("✅ ALL TESTS PASSED (Including Offset Tests)")
+    print("ALL TESTS PASSED (Including Offset Tests)")
     print("=" * 60)
 
 
@@ -686,7 +801,7 @@ fn test_contiguous_same_shape() raises:
     assert_true(gpu_result.all_close(cpu_result))
     print("  GPU:", gpu_time, "ms")
     print("  CPU:", cpu_time, "ms")
-    print("  ✓ Passed")
+    print("  Passed")
 
 
 fn test_broadcasting() raises:
@@ -703,7 +818,7 @@ fn test_broadcasting() raises:
     assert_true(gpu_result.shape() == Shape(3, 2, 4))
     assert_true(gpu_result.all_close(cpu_result))
     print("  Shape:", gpu_result.shape())
-    print("  ✓ Passed")
+    print("  Passed")
 
 
 fn test_scalar_broadcast() raises:
@@ -718,7 +833,7 @@ fn test_scalar_broadcast() raises:
     var cpu_result = a * b
 
     assert_true(gpu_result.all_close(cpu_result))
-    print("  ✓ Passed")
+    print("  Passed")
 
 
 fn test_non_contiguous() raises:
@@ -732,7 +847,7 @@ fn test_non_contiguous() raises:
     var gpu_result = launch[Add, dtype](a_t, b)
     var cpu_result = a_t + b
     assert_true(gpu_result.all_close(cpu_result))
-    print("  ✓ Passed")
+    print("  Passed")
 
 
 fn test_complex_broadcasting() raises:
@@ -749,7 +864,7 @@ fn test_complex_broadcasting() raises:
     assert_true(gpu_result.shape() == Shape(3, 5, 4, 7))
     assert_true(gpu_result.all_close(cpu_result))
     print("  Shape:", gpu_result.shape())
-    print("  ✓ Passed")
+    print("  Passed")
 
 
 fn test_large_arrays() raises:
@@ -774,7 +889,7 @@ fn test_large_arrays() raises:
     print("  GPU:", gpu_time, "ms")
     print("  CPU:", cpu_time, "ms")
     print("  Speedup:", cpu_time / gpu_time, "x")
-    print("  ✓ Passed")
+    print("  Passed")
 
 
 fn test_contiguous_view_with_offset() raises:
@@ -809,7 +924,7 @@ fn test_contiguous_view_with_offset() raises:
     print("  A offset:", a.buffer.offset)
     print("  B offset:", b.buffer.offset)
     print("  Result shape:", gpu_result.shape())
-    print("  ✓ Passed - Offsets handled correctly!")
+    print("  Passed - Offsets handled correctly!")
 
 
 fn test_all_offset_scenarios() raises:
@@ -826,7 +941,7 @@ fn test_all_offset_scenarios() raises:
     b1 = b1[50:550]
     var result1 = launch[Add, dtype](a1, b1)
     assert_true(result1.all_close(a1 + b1))
-    print("    ✓ Passed")
+    print("    Passed")
 
     # Scenario 2: Only A has offset
     print("  Scenario 2: Only A has offset")
@@ -835,7 +950,7 @@ fn test_all_offset_scenarios() raises:
     var b2 = Tensor[dtype].rand(500)  # No offset
     var result2 = launch[Subtract, dtype](a2, b2)
     assert_true(result2.all_close(a2 - b2))
-    print("    ✓ Passed")
+    print("    Passed")
 
     # Scenario 3: Only B has offset
     print("  Scenario 3: Only B has offset")
@@ -844,7 +959,7 @@ fn test_all_offset_scenarios() raises:
     b3 = b3[200:700]
     var result3 = launch[Multiply, dtype](a3, b3)
     assert_true(result3.all_close(a3 * b3))
-    print("    ✓ Passed")
+    print("    Passed")
 
     # Scenario 4: Neither has offset (original case)
     print("  Scenario 4: No offsets (baseline)")
@@ -852,6 +967,6 @@ fn test_all_offset_scenarios() raises:
     var b4 = Tensor[dtype].rand(500)
     var result4 = launch[Divide, dtype](a4, b4)
     assert_true(result4.all_close(a4 / b4))
-    print("    ✓ Passed")
+    print("    Passed")
 
-    print("  ✅ All offset scenarios passed!")
+    print("All offset scenarios passed!")
