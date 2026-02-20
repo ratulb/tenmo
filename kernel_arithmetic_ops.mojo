@@ -198,8 +198,127 @@ fn arithmetic_ops_A_contiguous[
         base_idx += stride * CHUNK_SIZE
 
 
-# Kernel 3: A Strided, B Contiguous
 fn arithmetic_ops_B_contiguous[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_offset: Int,
+    B_offset: Int,
+    size: UInt,
+    rank: UInt,
+):
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    # ✅ Early exit if this thread has no work
+    if base_idx >= size:
+        return
+
+    # Read metadata into stack
+    comptime MAX_RANK = 8
+    var coords = stack_allocation[MAX_RANK, Int]()
+    var shape_local = stack_allocation[MAX_RANK, Int]()
+    var strides_A_local = stack_allocation[MAX_RANK, Int]()
+
+    for i in range(rank):
+        shape_local[Int(i)] = Int(result_shape[Int(i) + 2])
+        strides_A_local[Int(i)] = Int(A_strides[Int(i) + 2])
+
+    # ✅ Process only elements assigned to this thread (no while loop)
+    @parameter
+    for item in range(simd_vectors_per_thread):
+        var i = base_idx + item * simd_width
+
+        # ✅ Stop if we've gone past the array
+        if i >= size:
+            return  # Or break - both work here
+
+        if i + simd_width <= size:
+            # ===================================================
+            # VECTORIZED PATH
+            # ===================================================
+            var vec_b = B.load[width=simd_width](B_offset + i)
+            var vec_result: SIMD[dtype, simd_width] = 0
+
+            @parameter
+            for lane in range(simd_width):
+                var linear_idx = i + lane
+
+                # Calculate coords
+                var remaining = Int(linear_idx)
+                for dim in range(Int(rank) - 1, -1, -1):
+                    coords[dim] = remaining % shape_local[dim]
+                    remaining //= shape_local[dim]
+
+                # Calculate A offset
+                var a_idx = A_offset
+                for dim in range(rank):
+                    a_idx += coords[Int(dim)] * strides_A_local[Int(dim)]
+
+                var a_val = A[a_idx]
+                var b_val = vec_b[lane]
+
+                @parameter
+                if op_code == Add:
+                    vec_result[lane] = a_val + b_val
+                elif op_code == Subtract:
+                    vec_result[lane] = a_val - b_val
+                elif op_code == Multiply:
+                    vec_result[lane] = a_val * b_val
+                else:
+                    vec_result[lane] = a_val / b_val
+
+            result.store[width=simd_width](i, vec_result)
+
+        else:
+            # ===================================================
+            # SCALAR TAIL
+            # ===================================================
+            for j in range(size - i):
+                var linear_idx = i + j
+
+                # Calculate coords
+                var remaining = Int(linear_idx)
+                for dim in range(Int(rank) - 1, -1, -1):
+                    coords[dim] = remaining % shape_local[dim]
+                    remaining //= shape_local[dim]
+
+                # Calculate A offset
+                var a_idx = A_offset
+                for dim in range(rank):
+                    a_idx += coords[Int(dim)] * strides_A_local[Int(dim)]
+
+                var a_val = A[a_idx]
+                var b_val = B[B_offset + linear_idx]
+                var res: Scalar[dtype]
+
+                @parameter
+                if op_code == Add:
+                    res = a_val + b_val
+                elif op_code == Subtract:
+                    res = a_val - b_val
+                elif op_code == Multiply:
+                    res = a_val * b_val
+                else:
+                    res = a_val / b_val
+
+                result[linear_idx] = res
+
+            # After scalar tail, we're done
+            return
+
+# Kernel 3: A Strided, B Contiguous
+fn arithmetic_ops_B_contiguous_1[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
