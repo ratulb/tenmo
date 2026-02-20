@@ -521,9 +521,11 @@ fn launch[
     var B_broadcast_strides = ShapeBroadcaster.broadcast_strides(
         B.shape(), B.strides(), broadcast_shape
     )
+    # var A_is_contiguous = A.is_contiguous() and A.shape() == broadcast_shape
+    #var B_is_contiguous = B.is_contiguous() and B.shape() == broadcast_shape
 
-    var A_is_contiguous = A.is_contiguous() and A.shape() == broadcast_shape
-    var B_is_contiguous = B.is_contiguous() and B.shape() == broadcast_shape
+    var A_is_contiguous = A.is_contiguous()
+    var B_is_contiguous = B.is_contiguous()
 
     # ================================================================
     # PATH 2: A contiguous, B strided
