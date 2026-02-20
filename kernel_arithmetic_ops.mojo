@@ -10,7 +10,7 @@ from broadcasthelper import ShapeBroadcaster
 
 
 # Kernel 1: Both contiguous
-fn arithmetic_ops_both_contiguous[
+fn arithmetic_ops_both_contiguous_worked[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -85,7 +85,7 @@ fn arithmetic_ops_both_contiguous[
 
 
 # Kernel 2: A contiguous, B strides
-fn arithmetic_ops_A_contiguous[
+fn arithmetic_ops_A_contiguous_doubtful[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -198,7 +198,7 @@ fn arithmetic_ops_A_contiguous[
         base_idx += stride * CHUNK_SIZE
 
 
-fn arithmetic_ops_B_contiguous[
+fn arithmetic_ops_B_contiguous_not_working[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -458,7 +458,7 @@ fn arithmetic_ops_B_contiguous_1[
 
 
 # Kernel 4: Both Strided (Slowest)
-fn arithmetic_ops_both_strided[
+fn arithmetic_ops_both_strided_not_tested[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -579,6 +579,444 @@ fn arithmetic_ops_both_strided[
 
         base_idx += stride * CHUNK_SIZE
 
+
+fn arithmetic_ops_both_contiguous[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    A_offset: Int,
+    B_offset: Int,
+    size: UInt,
+):
+    """
+    FASTEST: Both inputs contiguous.
+    Full SIMD vectorization on loads, compute, and stores.
+    """
+
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    # Early exit if this thread has no work
+    if base_idx >= size:
+        return
+
+    # Process only elements assigned to this thread
+    @parameter
+    for item in range(simd_vectors_per_thread):
+        var i = base_idx + item * simd_width
+
+        if i >= size:
+            return
+
+        if i + simd_width <= size:
+            # TRUE SIMD: Vectorized loads
+            var vec_a = A.load[width=simd_width](A_offset + i)
+            var vec_b = B.load[width=simd_width](B_offset + i)
+            var vec_result: SIMD[dtype, simd_width]
+
+            # TRUE SIMD: Vectorized arithmetic
+            @parameter
+            if op_code == Add:
+                vec_result = vec_a + vec_b
+            elif op_code == Subtract:
+                vec_result = vec_a - vec_b
+            elif op_code == Multiply:
+                vec_result = vec_a * vec_b
+            else:  # Divide
+                vec_result = vec_a / vec_b
+
+            # TRUE SIMD: Vectorized store
+            result.store[width=simd_width](i, vec_result)
+
+        else:
+            # Scalar tail
+            for j in range(size - i):
+                var idx = i + j
+                var a_val = A[A_offset + idx]
+                var b_val = B[B_offset + idx]
+                var res: Scalar[dtype]
+
+                @parameter
+                if op_code == Add:
+                    res = a_val + b_val
+                elif op_code == Subtract:
+                    res = a_val - b_val
+                elif op_code == Multiply:
+                    res = a_val * b_val
+                else:  # Divide
+                    res = a_val / b_val
+
+                result[idx] = res
+
+            return  # Done after tail
+
+
+fn arithmetic_ops_A_contiguous[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    A_offset: Int,
+    result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
+    B_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    B_offset: Int,
+    size: UInt,
+    rank: UInt,
+):
+    """
+    MEDIUM-FAST: A contiguous (vectorized load), B strided (scalar loads).
+    """
+
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    # Early exit if this thread has no work
+    if base_idx >= size:
+        return
+
+    # Read metadata into stack
+    comptime MAX_RANK = 8
+    var coords = stack_allocation[MAX_RANK, Int]()
+    var shape_local = stack_allocation[MAX_RANK, Int]()
+    var strides_B_local = stack_allocation[MAX_RANK, Int]()
+
+    for i in range(rank):
+        shape_local[Int(i)] = Int(result_shape[Int(i) + 2])
+        strides_B_local[Int(i)] = Int(B_strides[Int(i) + 2])
+
+    # Process only elements assigned to this thread
+    @parameter
+    for item in range(simd_vectors_per_thread):
+        var i = base_idx + item * simd_width
+
+        if i >= size:
+            return
+
+        if i + simd_width <= size:
+            # A: Vectorized load (contiguous)
+            var vec_a = A.load[width=simd_width](A_offset + i)
+            var vec_result: SIMD[dtype, simd_width] = 0
+
+            # B: Scalar loads (strided)
+            @parameter
+            for lane in range(simd_width):
+                var linear_idx = i + lane
+
+                # Calculate coords
+                var remaining = Int(linear_idx)
+                for dim in range(Int(rank) - 1, -1, -1):
+                    coords[dim] = remaining % shape_local[dim]
+                    remaining //= shape_local[dim]
+
+                # Calculate B offset
+                var b_idx = B_offset
+                for dim in range(rank):
+                    b_idx += coords[Int(dim)] * strides_B_local[Int(dim)]
+
+                var a_val = vec_a[lane]
+                var b_val = B[b_idx]
+
+                @parameter
+                if op_code == Add:
+                    vec_result[lane] = a_val + b_val
+                elif op_code == Subtract:
+                    vec_result[lane] = a_val - b_val
+                elif op_code == Multiply:
+                    vec_result[lane] = a_val * b_val
+                else:  # Divide
+                    vec_result[lane] = a_val / b_val
+
+            result.store[width=simd_width](i, vec_result)
+
+        else:
+            # Scalar tail
+            for j in range(size - i):
+                var linear_idx = i + j
+
+                var remaining = Int(linear_idx)
+                for dim in range(Int(rank) - 1, -1, -1):
+                    coords[dim] = remaining % shape_local[dim]
+                    remaining //= shape_local[dim]
+
+                var b_idx = B_offset
+                for dim in range(rank):
+                    b_idx += coords[Int(dim)] * strides_B_local[Int(dim)]
+
+                var a_val = A[A_offset + linear_idx]
+                var b_val = B[b_idx]
+                var res: Scalar[dtype]
+
+                @parameter
+                if op_code == Add:
+                    res = a_val + b_val
+                elif op_code == Subtract:
+                    res = a_val - b_val
+                elif op_code == Multiply:
+                    res = a_val * b_val
+                else:  # Divide
+                    res = a_val / b_val
+
+                result[linear_idx] = res
+
+            return  # Done after tail
+
+
+fn arithmetic_ops_B_contiguous[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_offset: Int,
+    B_offset: Int,
+    size: UInt,
+    rank: UInt,
+):
+    """
+    MEDIUM-FAST: A strided (scalar loads), B contiguous (vectorized load).
+    """
+
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    # Early exit if this thread has no work
+    if base_idx >= size:
+        return
+
+    # Read metadata into stack
+    comptime MAX_RANK = 8
+    var coords = stack_allocation[MAX_RANK, Int]()
+    var shape_local = stack_allocation[MAX_RANK, Int]()
+    var strides_A_local = stack_allocation[MAX_RANK, Int]()
+
+    for i in range(rank):
+        shape_local[Int(i)] = Int(result_shape[Int(i) + 2])
+        strides_A_local[Int(i)] = Int(A_strides[Int(i) + 2])
+
+    # Process only elements assigned to this thread
+    @parameter
+    for item in range(simd_vectors_per_thread):
+        var i = base_idx + item * simd_width
+
+        if i >= size:
+            return
+
+        if i + simd_width <= size:
+            # B: Vectorized load (contiguous)
+            var vec_b = B.load[width=simd_width](B_offset + i)
+            var vec_result: SIMD[dtype, simd_width] = 0
+
+            # A: Scalar loads (strided)
+            @parameter
+            for lane in range(simd_width):
+                var linear_idx = i + lane
+
+                # Calculate coords
+                var remaining = Int(linear_idx)
+                for dim in range(Int(rank) - 1, -1, -1):
+                    coords[dim] = remaining % shape_local[dim]
+                    remaining //= shape_local[dim]
+
+                # Calculate A offset
+                var a_idx = A_offset
+                for dim in range(rank):
+                    a_idx += coords[Int(dim)] * strides_A_local[Int(dim)]
+
+                var a_val = A[a_idx]
+                var b_val = vec_b[lane]
+
+                @parameter
+                if op_code == Add:
+                    vec_result[lane] = a_val + b_val
+                elif op_code == Subtract:
+                    vec_result[lane] = a_val - b_val
+                elif op_code == Multiply:
+                    vec_result[lane] = a_val * b_val
+                else:  # Divide
+                    vec_result[lane] = a_val / b_val
+
+            result.store[width=simd_width](i, vec_result)
+
+        else:
+            # Scalar tail
+            for j in range(size - i):
+                var linear_idx = i + j
+
+                var remaining = Int(linear_idx)
+                for dim in range(Int(rank) - 1, -1, -1):
+                    coords[dim] = remaining % shape_local[dim]
+                    remaining //= shape_local[dim]
+
+                var a_idx = A_offset
+                for dim in range(rank):
+                    a_idx += coords[Int(dim)] * strides_A_local[Int(dim)]
+
+                var a_val = A[a_idx]
+                var b_val = B[B_offset + linear_idx]
+                var res: Scalar[dtype]
+
+                @parameter
+                if op_code == Add:
+                    res = a_val + b_val
+                elif op_code == Subtract:
+                    res = a_val - b_val
+                elif op_code == Multiply:
+                    res = a_val * b_val
+                else:  # Divide
+                    res = a_val / b_val
+
+                result[linear_idx] = res
+
+            return  # Done after tail
+
+
+fn arithmetic_ops_both_strided[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    B_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_offset: Int,
+    B_offset: Int,
+    size: UInt,
+    rank: UInt,
+):
+    """
+    SLOWEST: Both inputs strided (both scalar loads).
+    Only vectorized store, no vectorized loads.
+    """
+
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    # Early exit if this thread has no work
+    if base_idx >= size:
+        return
+
+    # Read metadata into stack
+    comptime MAX_RANK = 8
+    var coords = stack_allocation[MAX_RANK, Int]()
+    var shape_local = stack_allocation[MAX_RANK, Int]()
+    var strides_A_local = stack_allocation[MAX_RANK, Int]()
+    var strides_B_local = stack_allocation[MAX_RANK, Int]()
+
+    for i in range(rank):
+        shape_local[Int(i)] = Int(result_shape[Int(i) + 2])
+        strides_A_local[Int(i)] = Int(A_strides[Int(i) + 2])
+        strides_B_local[Int(i)] = Int(B_strides[Int(i) + 2])
+
+    # Process only elements assigned to this thread
+    @parameter
+    for item in range(simd_vectors_per_thread):
+        var i = base_idx + item * simd_width
+
+        if i >= size:
+            return
+
+        if i + simd_width <= size:
+            var vec_result: SIMD[dtype, simd_width] = 0
+
+            # Both A and B: Scalar loads (strided)
+            @parameter
+            for lane in range(simd_width):
+                var linear_idx = i + lane
+
+                # Calculate coords
+                var remaining = Int(linear_idx)
+                for dim in range(Int(rank) - 1, -1, -1):
+                    coords[dim] = remaining % shape_local[dim]
+                    remaining //= shape_local[dim]
+
+                # Calculate A offset
+                var a_idx = A_offset
+                for dim in range(rank):
+                    a_idx += coords[Int(dim)] * strides_A_local[Int(dim)]
+
+                # Calculate B offset
+                var b_idx = B_offset
+                for dim in range(rank):
+                    b_idx += coords[Int(dim)] * strides_B_local[Int(dim)]
+
+                var a_val = A[a_idx]
+                var b_val = B[b_idx]
+
+                @parameter
+                if op_code == Add:
+                    vec_result[lane] = a_val + b_val
+                elif op_code == Subtract:
+                    vec_result[lane] = a_val - b_val
+                elif op_code == Multiply:
+                    vec_result[lane] = a_val * b_val
+                else:  # Divide
+                    vec_result[lane] = a_val / b_val
+
+            result.store[width=simd_width](i, vec_result)
+
+        else:
+            # Scalar tail
+            for j in range(size - i):
+                var linear_idx = i + j
+
+                var remaining = Int(linear_idx)
+                for dim in range(Int(rank) - 1, -1, -1):
+                    coords[dim] = remaining % shape_local[dim]
+                    remaining //= shape_local[dim]
+
+                var a_idx = A_offset
+                var b_idx = B_offset
+                for dim in range(rank):
+                    a_idx += coords[Int(dim)] * strides_A_local[Int(dim)]
+                    b_idx += coords[Int(dim)] * strides_B_local[Int(dim)]
+
+                var a_val = A[a_idx]
+                var b_val = B[b_idx]
+                var res: Scalar[dtype]
+
+                @parameter
+                if op_code == Add:
+                    res = a_val + b_val
+                elif op_code == Subtract:
+                    res = a_val - b_val
+                elif op_code == Multiply:
+                    res = a_val * b_val
+                else:  # Divide
+                    res = a_val / b_val
+
+                result[linear_idx] = res
+
+            return  # Done after tail
 
 fn launch[
     op_code: Int,
