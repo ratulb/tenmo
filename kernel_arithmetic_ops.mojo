@@ -618,12 +618,14 @@ fn launch[
         ]()
 
         # Before launching kernel
-        print("Broadcast shape:", broadcast_shape)
-        print("A strides:", A_broadcast_strides)
         print("B is contiguous:", B.is_contiguous())
         print("Rank:", rank)
         print("Output size:", output_size)
 
+        print("A original shape:", A.shape())
+        print("A original strides:", A.buffer.strides)
+        print("Broadcast shape:", broadcast_shape)
+        print("A broadcast strides:", A_broadcast_strides)
         var A_buffer = ctx.enqueue_create_buffer[dtype](A.numels())
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
