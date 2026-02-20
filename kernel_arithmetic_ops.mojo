@@ -445,10 +445,11 @@ fn launch[
         var A_buffer = ctx.enqueue_create_buffer[dtype](A.numels())
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
-
+        var start_data_write = now()
         A.write_to_device_buffer(A_buffer)
         B.write_to_device_buffer(B_buffer)
-
+        print("Data transfer time: ", (now() - start_data_write) * 1000, "ms")
+        var start_time = now()
         ctx.enqueue_function(
             compiled_func,
             result_buffer,
@@ -462,7 +463,17 @@ fn launch[
         )
 
         ctx.synchronize()
-        return Tensor[dtype].from_device_buffer(result_buffer, broadcast_shape)
+        print("GPU execution time: ", (now() - start_time) * 1000, "ms")
+        var data_retrieve_time = now()
+        var out = Tensor[dtype].from_device_buffer(
+            result_buffer, broadcast_shape
+        )
+        print(
+            "Data transfer back took: ",
+            (now() - data_retrieve_time) * 1000,
+            "ms",
+        )
+        return out^
 
     # Prepare for strided kernels
     var rank = broadcast_shape.rank()
@@ -636,9 +647,9 @@ fn main() raises:
     print("=" * 60)
 
     # Original tests
-    # test_contiguous_same_shape()
+    test_contiguous_same_shape()
     test_non_contiguous()
-    _ = """test_broadcasting()
+    test_broadcasting()
     test_scalar_broadcast()
     test_complex_broadcasting()
     test_large_arrays()
@@ -647,9 +658,9 @@ fn main() raises:
     test_contiguous_view_with_offset()
     test_all_offset_scenarios()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("✅ ALL TESTS PASSED (Including Offset Tests)")
-    print("="*60)"""
+    print("=" * 60)
 
 
 from common_utils import now
@@ -661,8 +672,8 @@ fn test_contiguous_same_shape() raises:
     print("=== Test 1: Contiguous Same Shape ===")
 
     comptime dtype = DType.float32
-    var a = Tensor[dtype].rand(1000, 1000)
-    var b = Tensor[dtype].rand(1000, 1000)
+    var a = Tensor[dtype].rand(1000, 10000)
+    var b = Tensor[dtype].rand(1000, 10000)
 
     var start = now()
     var gpu_result = launch[Multiply, dtype](a, b)
@@ -715,17 +726,11 @@ fn test_non_contiguous() raises:
     print("\n=== Test 4: Non-Contiguous (Transpose) ===")
 
     comptime dtype = DType.float32
-    var a = Tensor[dtype].rand(3, 2)
-    var b = Tensor[dtype].rand(2, 3)
-    a.print()
-    b.print()
+    var a = Tensor[dtype].rand(30, 20)
+    var b = Tensor[dtype].rand(20, 30)
     var a_t = a.transpose(1, 0)  # Non-contiguous view [20, 10]
-    a_t.print()
     var gpu_result = launch[Add, dtype](a_t, b)
     var cpu_result = a_t + b
-    gpu_result.print()
-    print()
-    cpu_result.print()
     assert_true(gpu_result.all_close(cpu_result))
     print("  ✓ Passed")
 
