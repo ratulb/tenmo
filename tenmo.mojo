@@ -503,8 +503,8 @@ struct Tensor[dtype: DType = DType.float32](
                 "vs",
                 len(buffer).__str__(),
             )
-
-            buffer.context().enqueue_copy(buffer, self.data_ptr())
+            var ptr_offset = self.data_ptr() + self.offset()
+            buffer.context().enqueue_copy(buffer, ptr_offset)
             #buffer.context().synchronize()
 
     # Check if it has a backward fn before calling this API
