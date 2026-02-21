@@ -213,7 +213,6 @@ fn arithmetic_ops_B_contiguous[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         # ---- compute starting coords once ----
         var tmp = base_idx
         var a_idx = A_offset
@@ -231,7 +230,6 @@ fn arithmetic_ops_B_contiguous[
                 break
 
             if i + simd_width <= size:
-
                 var vec_b = B.load[width=simd_width](B_offset + i)
                 var vec_result: SIMD[dtype, simd_width] = 0
 
@@ -561,8 +559,10 @@ fn launch[
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
         var start_data_write = now()
-        A.write_to_device_buffer(A_buffer)
-        B.write_to_device_buffer(B_buffer)
+        # A.write_to_device_buffer(A_buffer)
+        A.enqueue_copy(A_buffer)
+        # B.write_to_device_buffer(B_buffer)
+        B.enqueue_copy(B_buffer)
         print("Data transfer time: ", (now() - start_data_write) * 1000, "ms")
         var start_time = now()
         ctx.enqueue_function(
@@ -628,8 +628,10 @@ fn launch[
             B_broadcast_strides.write_length()
         )
 
-        A.write_to_device_buffer(A_buffer)
-        B.write_to_device_buffer(B_buffer)
+        # A.write_to_device_buffer(A_buffer)
+        A.enqueue_copy(A_buffer)
+        # B.write_to_device_buffer(B_buffer)
+        B.enqueue_copy(B_buffer)
         broadcast_shape.write_to_device_buffer(result_shape_buffer)
         B_broadcast_strides.write_to_device_buffer(B_strides_buffer)
 
@@ -677,8 +679,10 @@ fn launch[
             A_broadcast_strides.write_length()
         )
 
-        A.write_to_device_buffer(A_buffer)
-        B.write_to_device_buffer(B_buffer)
+        # A.write_to_device_buffer(A_buffer)
+        A.enqueue_copy(A_buffer)
+        # B.write_to_device_buffer(B_buffer)
+        B.enqueue_copy(B_buffer)
         broadcast_shape.write_to_device_buffer(result_shape_buffer)
         A_broadcast_strides.write_to_device_buffer(A_strides_buffer)
 
@@ -729,8 +733,10 @@ fn launch[
         B_broadcast_strides.write_length()
     )
 
-    A.write_to_device_buffer(A_buffer)
-    B.write_to_device_buffer(B_buffer)
+    # A.write_to_device_buffer(A_buffer)
+    A.enqueue_copy(A_buffer)
+    # B.write_to_device_buffer(B_buffer)
+    B.enqueue_copy(B_buffer)
     broadcast_shape.write_to_device_buffer(result_shape_buffer)
     A_broadcast_strides.write_to_device_buffer(A_strides_buffer)
     B_broadcast_strides.write_to_device_buffer(B_strides_buffer)
