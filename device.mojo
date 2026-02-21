@@ -23,7 +23,11 @@ struct CPU(Equatable, ImplicitlyCopyable, Movable):
     fn __ne__(self, other: Self) -> Bool:
         return False
 
+    fn into(self) -> Device:
+        return Device(self)
 
+
+@fieldwise_init
 struct GPU(Equatable, ImplicitlyCopyable, Movable):
     var device_context: ArcPointer[DeviceContext]
 

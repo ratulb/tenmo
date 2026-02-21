@@ -491,6 +491,20 @@ struct Tensor[dtype: DType = DType.float32](
                     (ptr + offset)[] = data_buffer[index]
                     offset += 1
 
+    fn enqueue_copy(
+        self, buffer: DeviceBuffer[Self.dtype]
+    ) raises:
+        """Copy contents to DeviceBuffer asyncronously."""
+
+        if not self.numels() == len(buffer):
+            panic(
+                "Size mismatch: ",
+                self.numels().__str__(),
+                "vs",
+                len(buffer).__str__(),
+            )
+            buffer.context().enqueue_copy(self.data_ptr(), buffer)
+
     # Check if it has a backward fn before calling this API
     @always_inline
     fn backward_fn(self) -> BackwardFn[Self.dtype]:
