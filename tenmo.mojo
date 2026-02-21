@@ -503,7 +503,9 @@ struct Tensor[dtype: DType = DType.float32](
                 "vs",
                 len(buffer).__str__(),
             )
+
             buffer.context().enqueue_copy(self.data_ptr(), buffer)
+            buffer.context().synchronize()
 
     # Check if it has a backward fn before calling this API
     @always_inline

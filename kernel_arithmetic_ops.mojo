@@ -7,7 +7,7 @@ from tenmo import Tensor
 from shapes import Shape
 from strides import Strides
 from broadcasthelper import ShapeBroadcaster
-
+from device import GPU
 
 comptime MAX_RANK = 8
 
@@ -510,7 +510,9 @@ fn launch[
     if not A.broadcastable(B):
         raise Error("Shape mismatch")
 
-    var ctx = DeviceContext()
+    #var ctx = DeviceContext()
+    var gpu = GPU()
+    var ctx = gpu()
     comptime width_of_simd = simd_width_of[dtype]()
 
     var broadcast_shape = ShapeBroadcaster.broadcast_shape(A.shape(), B.shape())
