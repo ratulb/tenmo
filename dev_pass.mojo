@@ -1,6 +1,8 @@
 from memory import AddressSpace, stack_allocation
 from gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
-from gpu.host import DeviceContext
+
+# from gpu.host import DeviceContext
+
 
 from gpu.primitives.id import lane_id, warp_id
 from gpu.primitives.warp import shuffle_down
@@ -46,11 +48,14 @@ fn pass_to_device[
         print("Index: ", idx)
 
 
+from device import GPU
+
+
 fn launch() raises:
-    var ctx = DeviceContext()
+    var device = GPU()
 
     comptime dtype = DType.int64
-    var compiled_func = ctx.compile_function[
+    var compiled_func = device.handle()[].compile_function[
         pass_to_device[dtype],
         pass_to_device[dtype],
     ]()
@@ -61,13 +66,13 @@ fn launch() raises:
     var offset = 3
 
     # .write_length() - better to use
-    var shape_buffer = ctx.enqueue_create_buffer[dtype](
+    var shape_buffer = device.handle()[].enqueue_create_buffer[dtype](
         5
     )  # 5 because size and capacity needs to be acoounted for
-    var strides_buffer = ctx.enqueue_create_buffer[dtype](
+    var strides_buffer = device.handle()[].enqueue_create_buffer[dtype](
         5
     )  # can use .write_length()
-    var intarray_buffer = ctx.enqueue_create_buffer[dtype](
+    var intarray_buffer = device.handle()[].enqueue_create_buffer[dtype](
         intarray.write_length()
     )
 
@@ -75,7 +80,7 @@ fn launch() raises:
     strides.write_to_device_buffer(strides_buffer)
     intarray.write_to_device_buffer(intarray_buffer)
 
-    ctx.enqueue_function(
+    device.handle()[].enqueue_function(
         compiled_func,
         shape_buffer,
         strides_buffer,
@@ -85,8 +90,8 @@ fn launch() raises:
         block_dim=1,
     )
 
-    ctx.synchronize()
-
+    device().synchronize()
+    print("Post synchonize")
 
 fn main() raises:
     launch()

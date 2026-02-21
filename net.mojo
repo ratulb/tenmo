@@ -670,10 +670,10 @@ struct Tanh[dtype: DType](ImplicitlyCopyable):
 # Refer to operators & matmul
 # Defined in operators
 
-# comptime dot = 28  # dot product
-# comptime vm = 29  # vector & tensor matmul
-# comptime mv = 30  # tensor & vector matmul
-# comptime mm = 31  # tensor & tensor matmul
+# comptime dot = ?  # dot product
+# comptime vm = ?  # vector & tensor matmul
+# comptime mv = ?  # tensor & vector matmul
+# comptime mm = ?  # tensor & tensor matmul
 
 comptime Layer[dtype: DType] = Variant[
     Linear[dtype, mm],
