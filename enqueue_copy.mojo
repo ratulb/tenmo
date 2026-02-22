@@ -35,6 +35,14 @@ fn launch[
         grid_dim=num_blocks,
         block_dim=threads_per_block,
     )
+    A.fill(42)
+    ctx.enqueue_function(
+        compiled_func,
+        A_buffer,
+        A.numels(),
+        grid_dim=num_blocks,
+        block_dim=threads_per_block,
+    )
 
     ctx.synchronize()
 
