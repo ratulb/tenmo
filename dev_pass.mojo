@@ -96,6 +96,7 @@ fn launch() raises:
 
     gpu().synchronize()
     A.to_cpu()
+    ctx.synchronize()
     A.print()
 
     print("Post synchonize")
