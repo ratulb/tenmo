@@ -30,8 +30,9 @@ fn pass_to_device[
     print("Strides: ", Strides.read_from(strides))
     print("IntArray: ", IntArray.read_from(intarray))
     print("Offset: ", offset)
-    memset(A, 42, 5)
-
+    #memset(A, 42, 5)
+    for i in range(5):
+        (A + i)[] = i + 99
     ######## Shape iteration ###########
     var count = 0
     for coord in Shape.read_from(shape):

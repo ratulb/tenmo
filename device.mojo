@@ -12,6 +12,25 @@ struct Device(Equatable, ImplicitlyCopyable, Movable):
 
     fn __init__(out self):
         self.kind = CPU()
+    fn __eq__(self, other: Self) -> Bool:
+        if self.kind.isa[CPU]():
+            if other.kind.isa[CPU]():
+                return True
+            else:
+                return False
+        else:
+            if other.kind.isa[CPU]():
+                return False
+            else:
+                var self_gpu = self.kind[GPU]
+                var other_gpu = other.kind[GPU]
+                return self_gpu == other_gpu
+
+    fn __ne__(self, other: Self) -> Bool:
+        return not self.__eq__(other)
+
+    fn into(self) -> Device:
+        return Device(self)
 
 
 @fieldwise_init
