@@ -6,6 +6,8 @@ from indexhelper import IndexCalculator, IndexIterator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic, log_warning, print_buffer
 from memory import memcpy, AddressSpace
+from gpu.host import DeviceBuffer
+from device import Device, CPU, GPU
 from collections import Set
 from sys import simd_width_of
 from mnemonics import (
@@ -38,6 +40,8 @@ struct NDBuffer[dtype: DType](
     var offset: Int
     var buffer: Buffer[Self.dtype]
     var _contiguous: Bool
+    var device_buffer: Optional[DeviceBuffer[Self.dtype]]
+    var device: Optional[Device]
 
     fn __init__(out self, *values: Scalar[Self.dtype]):
         buffer = Buffer[Self.dtype](len(values))
@@ -52,6 +56,8 @@ struct NDBuffer[dtype: DType](
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ):
+        self.device_buffer = None
+        self.device = None
         if buffer.size == 0:
             log_warning(
                 "NDBuffer →__init__(Buffer, ...): zero sized buffer - potential"
@@ -83,6 +89,8 @@ struct NDBuffer[dtype: DType](
         self.strides = strides.or_else(Strides.default(shape))
         self.offset = offset
         self._contiguous = False
+        self.device_buffer = None
+        self.device = None
         self._contiguous = self.is_contiguous()
 
     fn __moveinit__(out self, deinit other: Self):
@@ -91,6 +99,8 @@ struct NDBuffer[dtype: DType](
         self.strides = other.strides^
         self.offset = other.offset
         self._contiguous = other._contiguous
+        self.device_buffer = other.device_buffer^
+        self.device = other.device^
 
     fn __copyinit__(out self, other: Self):
         """Copy NDBuffer - Buffer handles ref counting automatically."""
@@ -101,12 +111,18 @@ struct NDBuffer[dtype: DType](
         self.strides = other.strides.copy()
         self.offset = other.offset
         self._contiguous = other._contiguous
+        self.device_buffer = other.device_buffer.copy()
+        self.device = other.device.copy()
 
     @staticmethod
     @always_inline
     fn zeros(shape: Shape) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
+
+    fn to_device(self, device: Device):
+        """Move this buffer to GPU or CPU."""
+        pass
 
     @staticmethod
     @always_inline

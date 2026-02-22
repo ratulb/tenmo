@@ -26,7 +26,7 @@ fn launch[
 
     var A_buffer = ctx.enqueue_create_buffer[dtype](A.numels())
 
-    A.enqueue_copy(A_buffer)
+    ctx.enqueue_copy(A_buffer, A.data_ptr())
 
     ctx.enqueue_function(
         compiled_func,

@@ -6,7 +6,6 @@ from utils import Variant
 
 comptime DeviceType = Variant[CPU, GPU]
 
-
 @fieldwise_init
 struct Device(Equatable, ImplicitlyCopyable, Movable):
     var kind: DeviceType
