@@ -120,20 +120,47 @@ struct NDBuffer[dtype: DType](
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
-    fn to_cpu(mut self, cpu: CPU = CPU()) raises:
-        self.to_device(cpu.into())
+    fn to_cpu(
+        mut self, cpu: CPU = CPU()
+    ) raises -> Optional[
+        Tuple[
+            DeviceBuffer[Self.dtype],
+            DeviceBuffer[DType.int64],
+            DeviceBuffer[DType.int64],
+            Int,
+        ]
+    ]:
+        return self.to_device(cpu.into())
 
-    fn to_gpu(mut self, gpu: GPU) raises:
-        self.to_device(gpu.into())
+    fn to_gpu(
+        mut self, gpu: GPU
+    ) raises -> Optional[
+        Tuple[
+            DeviceBuffer[Self.dtype],
+            DeviceBuffer[DType.int64],
+            DeviceBuffer[DType.int64],
+            Int,
+        ]
+    ]:
+        return self.to_device(gpu.into())
 
-    fn to_device(mut self, device: Device) raises:
+    fn to_device(
+        mut self, device: Device
+    ) raises -> Optional[
+        Tuple[
+            DeviceBuffer[Self.dtype],
+            DeviceBuffer[DType.int64],
+            DeviceBuffer[DType.int64],
+            Int,
+        ]
+    ]:
         """Move this buffer to GPU or CPU."""
         if self.device:  # We are already in a device
             if device != CPU().into():  # Device we want go to is not CPU
                 if self.device.value() != device:
                     # We currently stay only on one device
                     var device_context = device.kind[GPU]()
-                    device_buffer = device_context.enqueue_create_buffer[
+                    var device_buffer = device_context.enqueue_create_buffer[
                         Self.dtype
                     ](self.numels())
                     var offset = self.offset
@@ -141,6 +168,24 @@ struct NDBuffer[dtype: DType](
                     device_context.enqueue_copy(device_buffer, data_src)
                     self.device_buffer = device_buffer^
                     self.device = device.copy()
+
+                    var shape_buffer = device_context.enqueue_create_buffer[
+                        DType.int64
+                    ](self.shape.write_length())
+                    self.shape.write_to(shape_buffer)
+
+                    var strides_buffer = device_context.enqueue_create_buffer[
+                        DType.int64
+                    ](self.strides.write_length())
+                    self.strides.write_to(shape_buffer)
+
+                    return (
+                        self.device_buffer.value(),
+                        shape_buffer,
+                        strides_buffer,
+                        self.rank(),
+                    )
+
                 else:  # Are we re-synching to device?
                     var offset = self.offset
                     var data_src = self.data_ptr() + offset
@@ -148,6 +193,7 @@ struct NDBuffer[dtype: DType](
                     var device_buffer = self.device_buffer.value()
                     device_context.enqueue_copy(device_buffer, data_src)
                     self.device_buffer = device_buffer^
+                    return None
 
             else:  # We are pulling device data
                 var offset = self.offset
@@ -155,10 +201,12 @@ struct NDBuffer[dtype: DType](
                 var device_context = self.device.value().kind[GPU]()
                 var src_device_buffer = self.device_buffer.value()
                 device_context.enqueue_copy(data_dest, src_device_buffer)
+                return None
 
         else:
             if device == CPU().into():
-                pass  # We are already in CPU
+                # We are already in CPU
+                return None
             else:
                 var device_context = device.kind[GPU]()
                 var device_buffer = device_context.enqueue_create_buffer[
@@ -169,6 +217,23 @@ struct NDBuffer[dtype: DType](
                 device_context.enqueue_copy(device_buffer, data_src)
                 self.device_buffer = device_buffer^
                 self.device = device.copy()
+
+                var shape_buffer = device_context.enqueue_create_buffer[
+                    DType.int64
+                ](self.shape.write_length())
+                self.shape.write_to(shape_buffer)
+
+                var strides_buffer = device_context.enqueue_create_buffer[
+                    DType.int64
+                ](self.strides.write_length())
+                self.strides.write_to(shape_buffer)
+
+                return (
+                    self.device_buffer.value(),
+                    shape_buffer,
+                    strides_buffer,
+                    self.rank(),
+                )
 
     @staticmethod
     @always_inline

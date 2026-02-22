@@ -492,12 +492,29 @@ struct Tensor[dtype: DType = DType.float32](
                     (ptr + offset)[] = data_buffer[index]
                     offset += 1
 
-    fn to_cpu(mut self) raises:
-        self.buffer.to_cpu()
+    fn to_cpu(
+        mut self,
+    ) raises -> Optional[
+        Tuple[
+            DeviceBuffer[Self.dtype],
+            DeviceBuffer[DType.int64],
+            DeviceBuffer[DType.int64],
+            Int,
+        ]
+    ]:
+        return self.buffer.to_cpu()
 
-    fn to_gpu(mut self, gpu: GPU) raises -> DeviceBuffer[Self.dtype]:
-        self.buffer.to_gpu(gpu)
-        return self.buffer.device_buffer.value()
+    fn to_gpu(
+        mut self, gpu: GPU
+    ) raises -> Optional[
+        Tuple[
+            DeviceBuffer[Self.dtype],
+            DeviceBuffer[DType.int64],
+            DeviceBuffer[DType.int64],
+            Int,
+        ]
+    ]:
+        return self.buffer.to_gpu(gpu)
 
     # Check if it has a backward fn before calling this API
     @always_inline

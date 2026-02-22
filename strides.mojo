@@ -2,6 +2,8 @@ from intarray import IntArray
 from shapes import Shape
 from layout.layout import IntTuple
 from gpu.host import DeviceBuffer, HostBuffer
+from memory import AddressSpace
+
 
 @register_passable
 struct Strides(
@@ -45,6 +47,14 @@ struct Strides(
     @always_inline("nodebug")
     fn __len__(self) -> Int:
         return len(self.data)
+
+    @staticmethod
+    fn on_stack(
+        ptr: UnsafePointer[Int64, ImmutAnyOrigin]
+    ) -> UnsafePointer[
+        Int, ImmutAnyOrigin, address_space = AddressSpace.SHARED
+    ]:
+        return IntArray.on_stack(ptr)
 
     @always_inline("nodebug")
     fn __getitem__(self, i: Int) -> Int:
@@ -122,32 +132,32 @@ struct Strides(
     fn with_capacity(capacity: Int) -> Strides:
         return Strides(IntArray.with_capacity(capacity))
 
-    fn write_to(self, ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
+    fn write_to(self, ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
         self.data.write_to(ptr)
 
     fn write_length(self) -> Int:
         return self.data.write_length()
 
-    fn write_to(self, ptr:  UnsafePointer[Int, MutAnyOrigin]):
+    fn write_to(self, ptr: UnsafePointer[Int, MutAnyOrigin]):
         self.data.write_to(ptr)
 
     @staticmethod
-    fn read_from(ptr:  UnsafePointer[Int, MutAnyOrigin]) -> Strides:
+    fn read_from(ptr: UnsafePointer[Int, MutAnyOrigin]) -> Strides:
         var data = IntArray.read_from(ptr)
         return Strides(data^)
 
     @staticmethod
-    fn read_from(ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]) -> Strides:
+    fn read_from(
+        ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin]
+    ) -> Strides:
         var data = IntArray.read_from(ptr)
         return Strides(data^)
 
-
-    fn write_to_host_buffer(self, buffer: HostBuffer[DType.int64]):
-        self.write_to(buffer.unsafe_ptr())
-
-    fn write_to_device_buffer(self, buffer: DeviceBuffer[DType.int64]) raises:
+    fn write_to(self, buffer: DeviceBuffer[DType.int64]) raises:
         with buffer.map_to_host() as host_buffer:
             self.write_to(host_buffer.unsafe_ptr())
+
+
 fn main():
     var s = Strides(10, 5, 2)
     var ptr = alloc[Int](5)
@@ -155,3 +165,6 @@ fn main():
 
     var read_back = Strides.read_from(ptr)
     print(read_back)
+
+    var on_stack = Strides.on_stack(ptr.bitcast[Int64]())
+    print(on_stack[], on_stack[1], on_stack[2], on_stack[3])

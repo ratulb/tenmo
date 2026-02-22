@@ -3,6 +3,8 @@ from intarray import IntArray
 from builtin.device_passable import DevicePassable
 from utils import IndexList, Index
 from gpu.host import DeviceBuffer, HostBuffer
+from memory import AddressSpace
+
 
 @register_passable
 struct Shape(
@@ -38,9 +40,17 @@ struct Shape(
         elif length == 3:
             return Shape(index_list[0], index_list[1], index_list[2])
         elif length == 4:
-            return Shape(index_list[0], index_list[1], index_list[2], index_list[3])
+            return Shape(
+                index_list[0], index_list[1], index_list[2], index_list[3]
+            )
         elif length == 5:
-            return Shape(index_list[0], index_list[1], index_list[2], index_list[3], index_list[4])
+            return Shape(
+                index_list[0],
+                index_list[1],
+                index_list[2],
+                index_list[3],
+                index_list[4],
+            )
         else:
             panic("Unsupported IndexList size for Shape")
             return Shape(Int.MAX)
@@ -168,31 +178,39 @@ struct Shape(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn write_to(self, ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
+    fn write_to(self, ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
         self.dims.write_to(ptr)
 
-    fn write_to(self, ptr:  UnsafePointer[Int, MutAnyOrigin]):
+    fn write_to(self, ptr: UnsafePointer[Int, MutAnyOrigin]):
         self.dims.write_to(ptr)
 
     fn write_length(self) -> Int:
         return self.dims.write_length()
 
-    fn write_to_host_buffer(self, buffer: HostBuffer[DType.int64]):
-        self.write_to(buffer.unsafe_ptr())
-
-    fn write_to_device_buffer(self, buffer: DeviceBuffer[DType.int64]) raises:
+    fn write_to(self, buffer: DeviceBuffer[DType.int64]) raises:
         with buffer.map_to_host() as host_buffer:
             self.write_to(host_buffer.unsafe_ptr())
 
     @staticmethod
-    fn read_from(ptr:  UnsafePointer[Int, MutAnyOrigin]) -> Shape:
+    fn read_from(ptr: UnsafePointer[Int, MutAnyOrigin]) -> Shape:
         var data = IntArray.read_from(ptr)
         return Shape(data^)
 
     @staticmethod
-    fn read_from(ptr:  UnsafePointer[Scalar[DType.int64], MutAnyOrigin]) -> Shape:
+    fn read_from(
+        ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin]
+    ) -> Shape:
         var data = IntArray.read_from(ptr)
         return Shape(data^)
+
+    @staticmethod
+    fn on_stack(
+        ptr: UnsafePointer[Int64, ImmutAnyOrigin]
+    ) -> UnsafePointer[
+        Int, ImmutAnyOrigin, address_space = AddressSpace.SHARED
+    ]:
+        return IntArray.on_stack(ptr)
+
 
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
