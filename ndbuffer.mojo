@@ -120,9 +120,55 @@ struct NDBuffer[dtype: DType](
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
-    fn to_device(self, device: Device):
+    fn to_cpu(mut self, cpu: CPU = CPU()) raises:
+        self.to_device(cpu.into())
+
+    fn to_gpu(mut self, gpu: GPU) raises:
+        self.to_device(gpu.into())
+
+    fn to_device(mut self, device: Device) raises:
         """Move this buffer to GPU or CPU."""
-        pass
+        if self.device:  # We are already in a device
+            if device != CPU().into():  # Device we want go to is not CPU
+                if self.device.value() != device:
+                    # We currently stay only on one device
+                    var device_context = device.kind[GPU]()
+                    device_buffer = device_context.enqueue_create_buffer[
+                        Self.dtype
+                    ](self.numels())
+                    var offset = self.offset
+                    var data_src = self.data_ptr() + offset
+                    device_context.enqueue_copy(device_buffer, data_src)
+                    self.device_buffer = device_buffer^
+                    self.device = device.copy()
+                else:  # Are we re-synching to device?
+                    var offset = self.offset
+                    var data_src = self.data_ptr() + offset
+                    var device_context = self.device.value().kind[GPU]()
+                    var device_buffer = self.device_buffer.value()
+                    device_context.enqueue_copy(device_buffer, data_src)
+                    self.device_buffer = device_buffer^
+
+            else:  # We are pulling device data
+                var offset = self.offset
+                var data_dest = self.data_ptr() + offset
+                var device_context = self.device.value().kind[GPU]()
+                var src_device_buffer = self.device_buffer.value()
+                device_context.enqueue_copy(data_dest, src_device_buffer)
+
+        else:
+            if device == CPU().into():
+                pass  # We are already in CPU
+            else:
+                var device_context = device.kind[GPU]()
+                var device_buffer = device_context.enqueue_create_buffer[
+                    Self.dtype
+                ](self.numels())
+                var offset = self.offset
+                var data_src = self.data_ptr() + offset
+                device_context.enqueue_copy(device_buffer, data_src)
+                self.device_buffer = device_buffer^
+                self.device = device.copy()
 
     @staticmethod
     @always_inline

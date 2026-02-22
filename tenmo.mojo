@@ -30,6 +30,7 @@ from broadcasthelper import ShapeBroadcaster
 from ndbuffer import NDBuffer
 from utilities import Utils
 from gpu.host import DeviceBuffer, HostBuffer
+from device import GPU
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -460,7 +461,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn write_to_host_buffer(self, buffer: HostBuffer[Self.dtype]):
+    fn write_to(self, buffer: HostBuffer[Self.dtype]):
         if self.is_contiguous():
             memcpy(
                 dest=buffer.unsafe_ptr(),
@@ -475,7 +476,7 @@ struct Tensor[dtype: DType = DType.float32](
                 (ptr + offset)[] = data_buffer[index]
                 offset += 1
 
-    fn write_to_device_buffer(self, buffer: DeviceBuffer[Self.dtype]) raises:
+    fn write_to(self, buffer: DeviceBuffer[Self.dtype]) raises:
         with buffer.map_to_host() as host_buffer:
             if self.is_contiguous():
                 memcpy(
@@ -491,21 +492,12 @@ struct Tensor[dtype: DType = DType.float32](
                     (ptr + offset)[] = data_buffer[index]
                     offset += 1
 
-    fn enqueue_copy(
-        self, buffer: DeviceBuffer[Self.dtype]
-    ) raises:
-        """Copy contents to DeviceBuffer asyncronously."""
+    fn to_cpu(mut self) raises:
+        self.buffer.to_cpu()
 
-        if not self.numels() == len(buffer):
-            panic(
-                "Size mismatch: ",
-                self.numels().__str__(),
-                "vs",
-                len(buffer).__str__(),
-            )
-            var ptr_offset = self.data_ptr() + self.offset()
-            buffer.context().enqueue_copy(buffer, ptr_offset)
-            #buffer.context().synchronize()
+    fn to_gpu(mut self, gpu: GPU) raises -> DeviceBuffer[Self.dtype]:
+        self.buffer.to_gpu(gpu)
+        return self.buffer.device_buffer.value()
 
     # Check if it has a backward fn before calling this API
     @always_inline
