@@ -1,12 +1,9 @@
 from common_utils import panic
-from memory import memcpy, stack_allocation, AddressSpace
-from builtin.device_passable import DevicePassable
-from gpu.host import DeviceBuffer
+from memory import memcpy
 
 
 @register_passable
 struct IntArray(
-    DevicePassable,
     ImplicitlyCopyable,
     Iterable,
     Representable,
@@ -19,19 +16,6 @@ struct IntArray(
     Optimized for tensor indexing operations with minimal overhead.
     Uses capacity-based growth to avoid frequent reallocations.
     """
-
-    comptime device_type: AnyType = LegacyUnsafePointer[mut=True, Int]
-
-    @staticmethod
-    fn get_type_name() -> String:
-        return String("IntArray")
-
-    @staticmethod
-    fn get_device_type_name() -> String:
-        return Self.get_type_name()
-
-    fn _to_device_type(self, target: MutOpaquePointer[_]):
-        target.bitcast[Self.device_type]()[] = self._data.as_legacy_pointer()
 
     var _data: UnsafePointer[Int, MutExternalOrigin]
     var _size: Int  # Current number of elements
@@ -95,17 +79,6 @@ struct IntArray(
         """Free memory."""
         if self._data.__bool__():
             self._data.free()
-
-    fn data_ptr[
-        origin: Origin, address_space: AddressSpace, //
-    ](ref [origin, address_space]self) -> UnsafePointer[
-        Int, origin, address_space=address_space
-    ]:
-        return (
-            self._data.unsafe_mut_cast[origin.mut]()
-            .unsafe_origin_cast[origin]()
-            .address_space_cast[address_space]()
-        )
 
     # ========== Static Constructors ==========
 
@@ -539,63 +512,6 @@ struct IntArray(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn write_to(self, ptr: UnsafePointer[Int, MutAnyOrigin]):
-        """Plus 1 for size."""
-        ptr[] = len(self)
-        for i in range(len(self)):
-            (ptr + i + 1)[] = self[i]
-
-    fn write_to(self, ptr: UnsafePointer[Int64, MutAnyOrigin]):
-        """Plus 1 for size."""
-        ptr[] = len(self)
-        for i in range(len(self)):
-            (ptr + i + 1)[] = self[i]
-
-    fn write_to(self, buffer: DeviceBuffer[DType.int64]) raises:
-        with buffer.map_to_host() as host_buffer:
-            self.write_to(host_buffer.unsafe_ptr())
-
-    fn write_length(self) -> Int:
-        """Plus 1 for size."""
-        return len(self) + 1
-
-    # Max Shape/Strides support is 5
-    @staticmethod
-    fn on_stack[
-        max_len: Int = 6
-    ](ptr: UnsafePointer[Int64, ImmutAnyOrigin]) -> UnsafePointer[
-        Int, ImmutAnyOrigin, address_space = AddressSpace.SHARED
-    ]:
-        """Read IntArray values from UnsafePointer and put them on the stack. This is for passing Shape/Strides to kernels.
-        """
-        var array_on_stack = stack_allocation[
-            max_len, Int, address_space = AddressSpace.SHARED
-        ]()
-        var size = ptr[]
-        for i in range(size):
-            array_on_stack[i] = Int((ptr + i + 1)[])
-        return array_on_stack
-
-    @staticmethod
-    fn read_from(ptr: UnsafePointer[Int, MutAnyOrigin]) -> IntArray:
-        """Read the first slot for size."""
-        var size = ptr[]
-        var out = IntArray.with_capacity(size)
-        for i in range(size):
-            out.append((ptr + 1 + i)[])
-        return out
-
-    @staticmethod
-    fn read_from(
-        ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin]
-    ) -> IntArray:
-        """Read the first slot for size."""
-        var size = Int(ptr[])
-        var out = IntArray.with_capacity(size)
-        for i in range(size):
-            out.append(Int((ptr + 1 + i)[]))
-        return out
-
     # ========== Math Operations ==========
 
     @always_inline("nodebug")
@@ -795,8 +711,3 @@ struct ZipIterator[
 fn main():
     var ia = IntArray(20, 30, 40)
     print(ia)
-    # var written = alloc[Int64](5)
-    var written = alloc[Int](3)
-    ia.write_to(written)
-    var read_from = IntArray.read_from(written)
-    print(read_from)
