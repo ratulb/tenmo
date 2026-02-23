@@ -3,7 +3,8 @@ from shapes import Shape
 from layout.layout import IntTuple
 from gpu.host import DeviceBuffer, HostBuffer
 from memory import AddressSpace
-
+from utils import StaticTuple
+from common_utils import panic
 
 @register_passable
 struct Strides(
@@ -55,6 +56,15 @@ struct Strides(
         Int, ImmutAnyOrigin, address_space = AddressSpace.SHARED
     ]:
         return IntArray.on_stack(ptr)
+
+    fn static_tuple[max_size: Int = 8](self) -> StaticTuple[Int, max_size]:
+        if len(self) + 1 > max_size:
+            panic("Strides length exceeds max size: ", max_size.__str__())
+        var result = StaticTuple[Int, max_size]()
+        result[0] = len(self)
+        for i in range(len(self)):
+            result[i + 1] = self[i]
+        return result
 
     @always_inline("nodebug")
     fn __getitem__(self, i: Int) -> Int:
@@ -160,6 +170,8 @@ struct Strides(
 
 fn main():
     var s = Strides(10, 5, 2)
+    var tup = s.static_tuple()
+    print("The great tuple: ", tup[0], tup[1], tup[2], tup[3], tup[4])
     var ptr = alloc[Int](5)
     s.write_to(ptr)
 
