@@ -672,7 +672,8 @@ fn launch[
             B_buffer,
             0,  # A.offset(),
             broadcast_shape.array(),
-            B.strides().array(),
+            #B.strides().array(),
+            B_broadcast_strides.array(),
             0,  # B.offset(),
             output_size,
             rank,
@@ -721,7 +722,8 @@ fn launch[
             A_buffer,
             B_buffer,
             broadcast_shape.array(),
-            A.strides().array(),
+            #A.strides().array(),
+            A_broadcast_strides.array(),
             0,  # A.offset(),
             0,  # B.offset(),
             output_size,
@@ -776,8 +778,8 @@ fn launch[
         A_buffer,
         B_buffer,
         broadcast_shape.array(),
-        A.strides().array(),
-        B.strides().array(),
+        A_broadcast_strides.array(),
+        B_broadcast_strides.array(),
         0,  # A.offset(),
         0,  # B.offset(),
         output_size,
@@ -878,7 +880,7 @@ fn test_non_contiguous() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].rand(30, 20)
     var b = Tensor[dtype].rand(20, 30)
-    var a_t = a.transpose(1, 0)  # Non-contiguous view [20, 10]
+    var a_t = a.transpose(1, 0)  # Non-contiguous view [20, 30]
     var gpu_result = launch[Add, dtype](a_t, b)
     var cpu_result = a_t + b
     assert_true(gpu_result.all_close(cpu_result))
