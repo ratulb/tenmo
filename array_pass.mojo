@@ -15,10 +15,10 @@ from shapes import Shape
 from strides import Strides
 from intarray import IntArray
 from indexhelper import IndexIterator
-from array import Array
+from array2 import Array
 
 
-fn pass_to_device(array: Array[AddressSpace.GENERIC]):
+fn pass_to_device(array: Array):
     print("This guy came inside", array)
 
 
