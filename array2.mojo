@@ -60,6 +60,7 @@ struct Array(
         """Create from Shape(1, 2, 3)."""
         self = Self()
         self.size = shape.num_elements()
+        print("Shape num elems: ", shape.num_elements())
         for i in range(len(self)):
             self.storage[i] = shape[i]
 
