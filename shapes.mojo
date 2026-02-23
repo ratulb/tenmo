@@ -1,14 +1,10 @@
 from common_utils import panic
 from intarray import IntArray
-from builtin.device_passable import DevicePassable
-from utils import IndexList, Index
-from gpu.host import DeviceBuffer, HostBuffer
-from memory import AddressSpace
-
+from utils import StaticTuple
+from layout import Layout, print_layout
 
 @register_passable
 struct Shape(
-    DevicePassable,
     Equatable,
     ImplicitlyCopyable,
     Iterable,
@@ -18,10 +14,6 @@ struct Shape(
     Stringable,
     Writable,
 ):
-    # comptime device_type = Self
-    comptime device_type: AnyType = Self
-    """Shape of a tensor."""
-
     var dims: IntArray
     var _numels: Int
 
@@ -31,51 +23,9 @@ struct Shape(
         return Shape()
 
     @staticmethod
-    fn from_indexlist(index_list: IndexList[_]) -> Self:
-        var length = len(index_list)
-        if length == 1:
-            return Shape(index_list[0])
-        elif length == 2:
-            return Shape(index_list[0], index_list[1])
-        elif length == 3:
-            return Shape(index_list[0], index_list[1], index_list[2])
-        elif length == 4:
-            return Shape(
-                index_list[0], index_list[1], index_list[2], index_list[3]
-            )
-        elif length == 5:
-            return Shape(
-                index_list[0],
-                index_list[1],
-                index_list[2],
-                index_list[3],
-                index_list[4],
-            )
-        else:
-            panic("Unsupported IndexList size for Shape")
-            return Shape(Int.MAX)
-
-    fn to_indexlist[size: Int = 2](self) -> IndexList[size]:
-        var index_list = IndexList[size]()
-        for i in range(size):
-            index_list[i] = self[i]
-        return index_list
-
-    @staticmethod
     @always_inline
     fn Unit() -> Shape:
         return Shape(1)
-
-    @staticmethod
-    fn get_type_name() -> String:
-        return "Shape"
-
-    @staticmethod
-    fn get_device_type_name() -> String:
-        return Self.get_type_name()
-
-    fn _to_device_type(self, target: MutOpaquePointer[_]):
-        target.bitcast[Self.device_type]()[] = self
 
     @always_inline("nodebug")
     fn __init__(out self):
@@ -178,40 +128,6 @@ struct Shape(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn write_to(self, ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
-        self.dims.write_to(ptr)
-
-    fn write_to(self, ptr: UnsafePointer[Int, MutAnyOrigin]):
-        self.dims.write_to(ptr)
-
-    fn write_length(self) -> Int:
-        return self.dims.write_length()
-
-    fn write_to(self, buffer: DeviceBuffer[DType.int64]) raises:
-        with buffer.map_to_host() as host_buffer:
-            self.write_to(host_buffer.unsafe_ptr())
-
-    @staticmethod
-    fn read_from(ptr: UnsafePointer[Int, MutAnyOrigin]) -> Shape:
-        var data = IntArray.read_from(ptr)
-        return Shape(data^)
-
-    @staticmethod
-    fn read_from(
-        ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin]
-    ) -> Shape:
-        var data = IntArray.read_from(ptr)
-        return Shape(data^)
-
-    @staticmethod
-    fn on_stack(
-        ptr: UnsafePointer[Int64, ImmutAnyOrigin]
-    ) -> UnsafePointer[
-        Int, ImmutAnyOrigin, address_space = AddressSpace.SHARED
-    ]:
-        return IntArray.on_stack(ptr)
-
-
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
     ]: Iterator = ShapeIndexIterator[iterable_origin]
@@ -227,6 +143,15 @@ struct Shape(
     @always_inline("nodebug")
     fn intarray(self) -> IntArray:
         return self.dims
+
+    fn static_tuple[max_dim: Int = 8](self) -> StaticTuple[Int, max_dim]:
+        if len(self) + 1 > max_dim:
+            panic("Shape length exceeds max size: ", max_dim.__str__())
+        var result = StaticTuple[Int, max_dim]()
+        result[0] = len(self)
+        for i in range(len(self)):
+            result[i + 1] = self[i]
+        return result
 
     # ========== Operations ==========
 
@@ -437,11 +362,28 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
         var iter_len = len(self)
         return (iter_len, {iter_len})
 
+fn row_major(*dims: Int):
+    if len(dims) == 2:
+        var tup = StaticTuple[Int, 2](dims[0], dims[1])
+        var lo = Layout.row_major(tup[0], tup[1])
+        print_layout(lo)
 
+from utils import IndexList
+from sys import size_of, bit_width_of
+from utils import Variant
 fn main():
-    var index_list = Index(3, 40)
-    var shape = Shape.from_indexlist(index_list)
-    print(shape, shape.to_indexlist())
-    var written = alloc[Int](4)
-    shape.write_to(written)
-    print(Shape.read_from(written))
+    row_major(2, 3)
+    comptime Tuples = Variant[StaticTuple[Int, 3], StaticTuple[Int, 4], StaticTuple[Int, 5]]
+    comptime IndexLists = Variant[IndexList[3], IndexList[4], IndexList[5]]
+    print("StaticTuple1: ", size_of[StaticTuple[Int, 1]]())
+    print("StaticTuple2: ", size_of[StaticTuple[Int, 2]]())
+    print("StaticTuple2*****: ", bit_width_of[StaticTuple[Int, 20]]())
+    print("IndexList1: ", size_of[IndexList[1]]())
+    print("IndexList2*******: ", size_of[IndexList[2]]())
+    print("IndexList3: ", bit_width_of[IndexList[20]]())
+    print("Tuples: ", size_of[Tuples]())
+    print("IndexLists: ", size_of[IndexLists]())
+    var indices = IndexList[3]()
+    for i in range(3):
+        indices[i] = 99
+    print(indices)

@@ -1,10 +1,8 @@
 from intarray import IntArray
 from shapes import Shape
-from layout.layout import IntTuple
-from gpu.host import DeviceBuffer, HostBuffer
-from memory import AddressSpace
 from utils import StaticTuple
 from common_utils import panic
+
 
 @register_passable
 struct Strides(
@@ -49,18 +47,10 @@ struct Strides(
     fn __len__(self) -> Int:
         return len(self.data)
 
-    @staticmethod
-    fn on_stack(
-        ptr: UnsafePointer[Int64, ImmutAnyOrigin]
-    ) -> UnsafePointer[
-        Int, ImmutAnyOrigin, address_space = AddressSpace.SHARED
-    ]:
-        return IntArray.on_stack(ptr)
-
-    fn static_tuple[max_size: Int = 8](self) -> StaticTuple[Int, max_size]:
-        if len(self) + 1 > max_size:
-            panic("Strides length exceeds max size: ", max_size.__str__())
-        var result = StaticTuple[Int, max_size]()
+    fn static_tuple[max_dim: Int = 8](self) -> StaticTuple[Int, max_dim]:
+        if len(self) + 1 > max_dim:
+            panic("Strides length exceeds max size: ", max_dim.__str__())
+        var result = StaticTuple[Int, max_dim]()
         result[0] = len(self)
         for i in range(len(self)):
             result[i + 1] = self[i]
@@ -99,13 +89,6 @@ struct Strides(
         return self.data
 
     @always_inline
-    fn int_tuple(self) -> IntTuple:
-        var result = IntTuple()
-        for i in range(len(self)):
-            result.extend(self[i])
-        return result^
-
-    @always_inline
     fn permute(self, axes: IntArray) -> Self:
         """Reorder dimensions."""
         var result = IntArray.with_capacity(len(axes))
@@ -141,31 +124,6 @@ struct Strides(
     @always_inline
     fn with_capacity(capacity: Int) -> Strides:
         return Strides(IntArray.with_capacity(capacity))
-
-    fn write_to(self, ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin]):
-        self.data.write_to(ptr)
-
-    fn write_length(self) -> Int:
-        return self.data.write_length()
-
-    fn write_to(self, ptr: UnsafePointer[Int, MutAnyOrigin]):
-        self.data.write_to(ptr)
-
-    @staticmethod
-    fn read_from(ptr: UnsafePointer[Int, MutAnyOrigin]) -> Strides:
-        var data = IntArray.read_from(ptr)
-        return Strides(data^)
-
-    @staticmethod
-    fn read_from(
-        ptr: UnsafePointer[Scalar[DType.int64], MutAnyOrigin]
-    ) -> Strides:
-        var data = IntArray.read_from(ptr)
-        return Strides(data^)
-
-    fn write_to(self, buffer: DeviceBuffer[DType.int64]) raises:
-        with buffer.map_to_host() as host_buffer:
-            self.write_to(host_buffer.unsafe_ptr())
 
 
 fn main():
