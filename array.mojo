@@ -5,7 +5,8 @@ from gpu.host import DeviceBuffer
 
 
 @register_passable
-struct Array(
+struct Array[address_space: AddressSpace = AddressSpace.GENERIC](
+    Defaultable,
     DevicePassable,
     ImplicitlyCopyable,
     Representable,
@@ -32,7 +33,7 @@ struct Array(
     fn _to_device_type(self, target: MutOpaquePointer[_]):
         target.bitcast[Self.device_type]()[] = self
 
-    var _data: UnsafePointer[Scalar[DType.int], MutExternalOrigin]
+    var _data: UnsafePointer[Scalar[DType.int], MutAnyOrigin, address_space=Self.address_space]
     var _size: Int  # Current number of elements
     var _capacity: Int  # Allocated capacity
 
@@ -41,7 +42,7 @@ struct Array(
     @always_inline("nodebug")
     fn __init__(out self):
         """Create empty array."""
-        self._data = UnsafePointer[Scalar[DType.int], MutExternalOrigin]()
+        self._data = {}
         self._size = 0
         self._capacity = 0
 
@@ -49,7 +50,7 @@ struct Array(
     fn __init__(out self, *values: Int):
         """Create from variadic args: IntArray(1, 2, 3)."""
         var n = len(values)
-        self._data = alloc[Scalar[DType.int]](n)
+        self._data = alloc[Scalar[DType.int]](n).address_space_cast[Self.address_space]()
         self._size = n
         self._capacity = n
         for i in range(n):
@@ -61,27 +62,19 @@ struct Array(
         self._size = existing._size
         self._capacity = existing._capacity
         if existing._capacity > 0:
-            self._data = alloc[Scalar[DType.int]](existing._capacity)
-            memcpy(dest=self._data, src=existing._data, count=existing._size)
+            self._data = alloc[Scalar[DType.int]](existing._capacity).address_space_cast[Self.address_space]()
+            #memcpy(dest=self._data, src=existing._data, count=existing._size)
+            for i in range(len(self)):
+                (self._data + i)[] = (existing._data + i)[]
         else:
             self._data = {}
 
     @always_inline("nodebug")
     fn __del__(deinit self):
         """Free memory."""
-        if self._data.__bool__():
-            self._data.free()
-
-    fn data_ptr[
-        origin: Origin, address_space: AddressSpace, //
-    ](ref [origin, address_space]self) -> UnsafePointer[
-        Scalar[DType.int], origin, address_space=address_space
-    ]:
-        return (
-            self._data.unsafe_mut_cast[origin.mut]()
-            .unsafe_origin_cast[origin]()
-            .address_space_cast[address_space]()
-        )
+        if self._data:
+            if self.address_space != AddressSpace.SHARED and self.address_space != AddressSpace.CONSTANT and self.address_space != AddressSpace.LOCAL:
+                self._data.address_space_cast[AddressSpace.GENERIC]().free()
 
     # ========== Static Constructors ==========
 
@@ -89,7 +82,7 @@ struct Array(
     @always_inline("nodebug")
     fn filled(size: Int, value: Int) -> Self:
         """Create array filled with value."""
-        var result = Array.with_capacity(size)
+        var result = Array[Self.address_space].with_capacity(size)
         for _ in range(size):
             result.append(value)
         return result^
@@ -100,7 +93,7 @@ struct Array(
         """Create with capacity but zero size."""
         var result = Self()
         if capacity > 0:
-            result._data = alloc[Scalar[DType.int]](capacity)
+            result._data = alloc[Scalar[DType.int]](capacity).address_space_cast[Self.address_space]()
             result._capacity = capacity
         return result^
 
@@ -150,15 +143,18 @@ struct Array(
 
         # Grow by 1.5x or required, whichever is larger
         var new_cap = max(required, self._capacity * 3 // 2 + 1)
-        var new_data = alloc[Scalar[DType.int]](new_cap)
+        var new_data = alloc[Scalar[DType.int]](new_cap).address_space_cast[Self.address_space]()
 
         # Copy existing
         if self._size > 0:
-            memcpy(dest=new_data, src=self._data, count=self._size)
+            #memcpy(dest=new_data, src=self._data, count=self._size)
+            for i in range(len(self)):
+                (new_data + i)[] = (self._data + i)[]
 
         if self._data:
-            self._data.free()
-        self._data = new_data
+            if self.address_space != AddressSpace.SHARED and self.address_space != AddressSpace.CONSTANT and self.address_space != AddressSpace.LOCAL:
+                self._data.address_space_cast[AddressSpace.GENERIC]().free()
+        self._data = new_data.address_space_cast[Self.address_space]()
         self._capacity = new_cap
 
     @always_inline

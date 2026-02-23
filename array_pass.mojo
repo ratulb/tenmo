@@ -18,7 +18,7 @@ from indexhelper import IndexIterator
 from array import Array
 
 
-fn pass_to_device(array: Array):
+fn pass_to_device(array: Array[AddressSpace.GENERIC]):
     print("This guy came inside", array)
 
 
