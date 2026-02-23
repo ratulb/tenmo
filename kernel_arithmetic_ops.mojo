@@ -44,7 +44,7 @@ fn arithmetic_ops_both_contiguous[
             if i + simd_width <= size:
                 var vec_a = A.load[width=simd_width](A_offset + i)
                 var vec_b = B.load[width=simd_width](B_offset + i)
-                #var vec_result: SIMD[dtype, simd_width] = 0
+                var vec_result: SIMD[dtype, simd_width]
 
                 @parameter
                 if op_code == Add:
@@ -88,9 +88,7 @@ fn arithmetic_ops_A_contiguous[
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     A_offset: Int,
-    # result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
     result_shape: Array,
-    # B_strides: UnsafePointer[Int64, ImmutAnyOrigin],
     B_strides: Array,
     B_offset: Int,
     size: Int,
@@ -100,17 +98,6 @@ fn arithmetic_ops_A_contiguous[
     var grid_stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-
-    _ = """var shape_local = stack_allocation[
-        MAX_RANK, Int, address_space = AddressSpace.SHARED
-    ]()
-    var strides_B_local = stack_allocation[
-        MAX_RANK, Int, address_space = AddressSpace.SHARED
-    ]()
-
-    for i in range(rank):
-        shape_local[i] = Int(result_shape[i + 2])
-        strides_B_local[i] = Int(B_strides[i + 2])"""
 
     var base_idx = gtid * CHUNK_SIZE
 
@@ -134,11 +121,8 @@ fn arithmetic_ops_A_contiguous[
                     var b_idx = B_offset
 
                     for dim in range(rank - 1, -1, -1):
-                        # var coord = remaining % shape_local[dim]
                         var coord = remaining % result_shape[dim]
-                        # b_idx += coord * strides_B_local[dim]
                         b_idx += coord * B_strides[dim]
-                        # remaining //= shape_local[dim]
                         remaining //= result_shape[dim]
 
                     @parameter
@@ -160,11 +144,8 @@ fn arithmetic_ops_A_contiguous[
                     var b_idx = B_offset
 
                     for dim in range(rank - 1, -1, -1):
-                        # var coord = remaining % shape_local[dim]
                         var coord = remaining % result_shape[dim]
-                        # b_idx += coord * strides_B_local[dim]
                         b_idx += coord * B_strides[dim]
-                        # remaining //= shape_local[dim]
                         remaining //= result_shape[dim]
 
                     var res: Scalar[dtype] = 0
@@ -305,9 +286,7 @@ fn arithmetic_ops_B_contiguous[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    # result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
     result_shape: Array,
-    # A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
     A_strides: Array,
     A_offset: Int,
     B_offset: Int,
@@ -319,21 +298,6 @@ fn arithmetic_ops_B_contiguous[
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
 
-    # Read metadata into stack once per thread
-    _ = """var coords = stack_allocation[
-        MAX_RANK, Int, address_space = AddressSpace.SHARED
-    ]()
-    var shape_local = stack_allocation[
-        MAX_RANK, Int, address_space = AddressSpace.SHARED
-    ]()
-    var strides_A_local = stack_allocation[
-        MAX_RANK, Int, address_space = AddressSpace.SHARED
-    ]()
-
-    for i in range(rank):
-        shape_local[i] = Int(result_shape[i + 2])
-        strides_A_local[i] = Int(A_strides[i + 2])"""
-
     # Grid-stride loop over CHUNK_SIZE blocks
     var base_idx = gtid * CHUNK_SIZE
     while base_idx < size:
@@ -343,7 +307,7 @@ fn arithmetic_ops_B_contiguous[
             var i = base_idx + item * simd_width
 
             if i >= size:
-                break  # @parameter for allows break unlike return-mid-kernel
+                break
 
             if i + simd_width <= size:
                 # B: Vectorized load (contiguous)
@@ -358,11 +322,8 @@ fn arithmetic_ops_B_contiguous[
                     # Coordinate decomposition
                     var a_idx = A_offset
                     for dim in range(rank - 1, -1, -1):
-                        # var coord = remaining % shape_local[dim]
                         var coord = remaining % result_shape[dim]
-                        # a_idx += coord * strides_A_local[dim]
                         a_idx += coord * A_strides[dim]
-                        # remaining //= shape_local[dim]
                         remaining //= result_shape[dim]
 
                     @parameter
@@ -385,11 +346,8 @@ fn arithmetic_ops_B_contiguous[
                     var a_idx = A_offset
 
                     for dim in range(Int(rank) - 1, -1, -1):
-                        # var coord = remaining % shape_local[dim]
                         var coord = remaining % result_shape[dim]
-                        # a_idx += coord * strides_A_local[dim]
                         a_idx += coord * A_strides[dim]
-                        # remaining //= shape_local[dim]
                         remaining //= result_shape[dim]
 
                     var res: Scalar[dtype] = 0
@@ -418,11 +376,8 @@ fn arithmetic_ops_both_strided[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    # result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
     result_shape: Array,
-    # A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
     A_strides: Array,
-    # B_strides: UnsafePointer[Int64, ImmutAnyOrigin],
     B_strides: Array,
     A_offset: Int,
     B_offset: Int,
@@ -433,21 +388,6 @@ fn arithmetic_ops_both_strided[
     var grid_stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-
-    _ = """var shape_local = stack_allocation[
-        MAX_RANK, Int, address_space = AddressSpace.SHARED
-    ]()
-    var strides_A_local = stack_allocation[
-        MAX_RANK, Int, address_space = AddressSpace.SHARED
-    ]()
-    var strides_B_local = stack_allocation[
-        MAX_RANK, Int, address_space = AddressSpace.SHARED
-    ]()
-
-    for i in range(rank):
-        shape_local[i] = Int(result_shape[i + 2])
-        strides_A_local[i] = Int(A_strides[i + 2])
-        strides_B_local[i] = Int(B_strides[i + 2])"""
 
     var base_idx = gtid * CHUNK_SIZE
 
@@ -471,13 +411,9 @@ fn arithmetic_ops_both_strided[
                     var b_idx = B_offset
 
                     for dim in range(rank - 1, -1, -1):
-                        # var coord = remaining % shape_local[dim]
                         var coord = remaining % result_shape[dim]
-                        # a_idx += coord * strides_A_local[dim]
                         a_idx += coord * A_strides[dim]
-                        # b_idx += coord * strides_B_local[dim]
                         b_idx += coord * B_strides[dim]
-                        # remaining //= shape_local[dim]
                         remaining //= result_shape[dim]
 
                     @parameter
@@ -500,10 +436,6 @@ fn arithmetic_ops_both_strided[
                     var b_idx = B_offset
 
                     for dim in range(Int(rank) - 1, -1, -1):
-                        _ = """var coord = remaining % shape_local[dim]
-                        a_idx += coord * strides_A_local[dim]
-                        b_idx += coord * strides_B_local[dim]
-                        remaining //= shape_local[dim]"""
                         var coord = remaining % result_shape[dim]
                         a_idx += coord * A_strides[dim]
                         b_idx += coord * B_strides[dim]
@@ -651,19 +583,9 @@ fn launch[
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
 
-        _ = """var result_shape_buffer = ctx.enqueue_create_buffer[DType.int64](
-            #broadcast_shape.numels()
-            output_size
-        )
-        var B_strides_buffer = ctx.enqueue_create_buffer[DType.int64](
-            B_broadcast_strides.write_length()
-        )"""
 
         ctx.enqueue_copy(A_buffer, A.data_ptr() + A.offset())
         B.write_to(B_buffer)
-
-        # broadcast_shape.write_to_device_buffer(result_shape_buffer)
-        # B_broadcast_strides.write_to_device_buffer(B_strides_buffer)
 
         ctx.enqueue_function(
             compiled_func,
@@ -703,18 +625,9 @@ fn launch[
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
 
-        _ = """var result_shape_buffer = ctx.enqueue_create_buffer[DType.int64](
-            broadcast_shape.write_length()
-        )
-        var A_strides_buffer = ctx.enqueue_create_buffer[DType.int64](
-            A_broadcast_strides.write_length()
-        )"""
 
         A.write_to(A_buffer)
         ctx.enqueue_copy(B_buffer, B.data_ptr() + B.offset())
-
-        # broadcast_shape.write_to_device_buffer(result_shape_buffer)
-        # A_broadcast_strides.write_to_device_buffer(A_strides_buffer)
 
         ctx.enqueue_function(
             compiled_func,
@@ -722,7 +635,6 @@ fn launch[
             A_buffer,
             B_buffer,
             broadcast_shape.array(),
-            #A.strides().array(),
             A_broadcast_strides.array(),
             0,  # A.offset(),
             0,  # B.offset(),
@@ -755,22 +667,9 @@ fn launch[
 
     var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
 
-    _ = """var result_shape_buffer = ctx.enqueue_create_buffer[DType.int64](
-        broadcast_shape.write_length()
-    )
-    var A_strides_buffer = ctx.enqueue_create_buffer[DType.int64](
-        A_broadcast_strides.write_length()
-    )
-    var B_strides_buffer = ctx.enqueue_create_buffer[DType.int64](
-        B_broadcast_strides.write_length()
-    )"""
-
     A.write_to(A_buffer)
     B.write_to(B_buffer)
 
-    _ = """broadcast_shape.write_to_device_buffer(result_shape_buffer)
-    A_broadcast_strides.write_to_device_buffer(A_strides_buffer)
-    B_broadcast_strides.write_to_device_buffer(B_strides_buffer)"""
 
     ctx.enqueue_function(
         compiled_func,
@@ -878,9 +777,9 @@ fn test_non_contiguous() raises:
     print("\n=== Test 4: Non-Contiguous (Transpose) ===")
 
     comptime dtype = DType.float32
-    var a = Tensor[dtype].rand(30, 20)
-    var b = Tensor[dtype].rand(20, 30)
-    var a_t = a.transpose(1, 0)  # Non-contiguous view [20, 30]
+    var a = Tensor[dtype].rand(3000, 2000)
+    var b = Tensor[dtype].rand(2000, 3000)
+    var a_t = a.transpose(1, 0)  # Non-contiguous view [2000, 3000]
     var gpu_result = launch[Add, dtype](a_t, b)
     var cpu_result = a_t + b
     assert_true(gpu_result.all_close(cpu_result))
