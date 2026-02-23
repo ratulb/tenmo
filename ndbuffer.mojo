@@ -128,6 +128,7 @@ struct NDBuffer[dtype: DType](
             DeviceBuffer[DType.int64],
             DeviceBuffer[DType.int64],
             Int,
+            Int,
         ]
     ]:
         return self.to_device(cpu.into())
@@ -140,6 +141,7 @@ struct NDBuffer[dtype: DType](
             DeviceBuffer[DType.int64],
             DeviceBuffer[DType.int64],
             Int,
+            Int,
         ]
     ]:
         return self.to_device(gpu.into())
@@ -151,6 +153,7 @@ struct NDBuffer[dtype: DType](
             DeviceBuffer[Self.dtype],
             DeviceBuffer[DType.int64],
             DeviceBuffer[DType.int64],
+            Int,
             Int,
         ]
     ]:
@@ -183,6 +186,7 @@ struct NDBuffer[dtype: DType](
                         self.device_buffer.value(),
                         shape_buffer,
                         strides_buffer,
+                        self.offset,
                         self.rank(),
                     )
 
@@ -232,8 +236,12 @@ struct NDBuffer[dtype: DType](
                     self.device_buffer.value(),
                     shape_buffer,
                     strides_buffer,
+                    self.offset,
                     self.rank(),
                 )
+
+    fn is_on_gpu(self) -> Bool:
+        return not self.device == None and not self.device_buffer == None
 
     @staticmethod
     @always_inline

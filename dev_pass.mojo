@@ -23,10 +23,12 @@ fn pass_to_device[
     A: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     shape: UnsafePointer[Scalar[DType.int64], MutAnyOrigin],
     strides: UnsafePointer[Int64, MutAnyOrigin],
+    offset: Int,
     rank: Int,
 ):
     print("Shape: ", Shape.read_from(shape))
     print("Strides: ", Strides.read_from(strides))
+    print("Offset: ", offset)
     print("Rank: ", rank)
     #memset(A, 42, 5)
     for i in range(5):
@@ -61,7 +63,7 @@ fn launch() raises:
     ]()
 
     var A = Tensor[dtype].arange(7)
-    var (A_device_buffer, shape_buffer, strides_buffer, rank) = A.to_gpu(gpu).value()
+    var (A_device_buffer, shape_buffer, strides_buffer, offset, rank) = A.to_gpu(gpu).value()
     _="""var shape = Shape(1, 3, 2)
     var strides = Strides(6, 2, 1)
     var intarray = IntArray(5, 5, 10, 100)
@@ -87,6 +89,7 @@ fn launch() raises:
         A_device_buffer,
         shape_buffer,
         strides_buffer,
+        offset,
         rank,
         grid_dim=1,
         block_dim=1,

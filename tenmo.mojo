@@ -500,6 +500,7 @@ struct Tensor[dtype: DType = DType.float32](
             DeviceBuffer[DType.int64],
             DeviceBuffer[DType.int64],
             Int,
+            Int,
         ]
     ]:
         return self.buffer.to_cpu()
@@ -511,6 +512,7 @@ struct Tensor[dtype: DType = DType.float32](
             DeviceBuffer[Self.dtype],
             DeviceBuffer[DType.int64],
             DeviceBuffer[DType.int64],
+            Int,
             Int,
         ]
     ]:
