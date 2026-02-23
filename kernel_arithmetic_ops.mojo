@@ -44,7 +44,7 @@ fn arithmetic_ops_both_contiguous[
             if i + simd_width <= size:
                 var vec_a = A.load[width=simd_width](A_offset + i)
                 var vec_b = B.load[width=simd_width](B_offset + i)
-                var vec_result: SIMD[dtype, simd_width] = 0
+                #var vec_result: SIMD[dtype, simd_width] = 0
 
                 @parameter
                 if op_code == Add:
