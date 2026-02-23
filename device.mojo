@@ -8,6 +8,7 @@ comptime DeviceType = Variant[CPU, GPU]
 
 @fieldwise_init
 struct Device(Equatable, ImplicitlyCopyable, Movable):
+    comptime has_accelerator = has_accelerator()
     var kind: DeviceType
 
     fn __init__(out self):
@@ -32,6 +33,11 @@ struct Device(Equatable, ImplicitlyCopyable, Movable):
     fn into(self) -> Device:
         return Device(self)
 
+    fn is_cpu(self) -> Bool:
+        return self.kind.isa[CPU]()
+
+    fn is_gpu(self) -> Bool:
+        return self.kind.isa[GPU]()
 
 @fieldwise_init
 struct CPU(Equatable, ImplicitlyCopyable, Movable):
@@ -86,4 +92,4 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
 fn main() raises:
     var device = Device()
     # var device = Device(CPU())
-    print("passes")
+    print("passes", Device.has_accelerator)

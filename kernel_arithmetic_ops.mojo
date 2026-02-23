@@ -8,6 +8,7 @@ from shapes import Shape
 from strides import Strides
 from broadcasthelper import ShapeBroadcaster
 from device import GPU
+from array import Array
 
 comptime MAX_RANK = 8
 
@@ -43,7 +44,7 @@ fn arithmetic_ops_both_contiguous[
             if i + simd_width <= size:
                 var vec_a = A.load[width=simd_width](A_offset + i)
                 var vec_b = B.load[width=simd_width](B_offset + i)
-                var vec_result: SIMD[dtype, simd_width]
+                var vec_result: SIMD[dtype, simd_width] = 0
 
                 @parameter
                 if op_code == Add:
@@ -60,7 +61,7 @@ fn arithmetic_ops_both_contiguous[
             else:
                 for j in range(size - i):
                     var idx = i + j
-                    var res: Scalar[dtype]
+                    var res: Scalar[dtype] = 0
 
                     @parameter
                     if op_code == Add:
@@ -87,8 +88,10 @@ fn arithmetic_ops_A_contiguous[
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     A_offset: Int,
-    result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
-    B_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    # result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
+    result_shape: Array,
+    # B_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    B_strides: Array,
     B_offset: Int,
     size: Int,
     rank: Int,
@@ -98,7 +101,7 @@ fn arithmetic_ops_A_contiguous[
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
 
-    var shape_local = stack_allocation[
+    _ = """var shape_local = stack_allocation[
         MAX_RANK, Int, address_space = AddressSpace.SHARED
     ]()
     var strides_B_local = stack_allocation[
@@ -107,7 +110,7 @@ fn arithmetic_ops_A_contiguous[
 
     for i in range(rank):
         shape_local[i] = Int(result_shape[i + 2])
-        strides_B_local[i] = Int(B_strides[i + 2])
+        strides_B_local[i] = Int(B_strides[i + 2])"""
 
     var base_idx = gtid * CHUNK_SIZE
 
@@ -130,10 +133,13 @@ fn arithmetic_ops_A_contiguous[
                     var remaining = linear_idx
                     var b_idx = B_offset
 
-                    for dim in range(Int(rank) - 1, -1, -1):
-                        var coord = remaining % shape_local[dim]
-                        b_idx += coord * strides_B_local[dim]
-                        remaining //= shape_local[dim]
+                    for dim in range(rank - 1, -1, -1):
+                        # var coord = remaining % shape_local[dim]
+                        var coord = remaining % result_shape[dim]
+                        # b_idx += coord * strides_B_local[dim]
+                        b_idx += coord * B_strides[dim]
+                        # remaining //= shape_local[dim]
+                        remaining //= result_shape[dim]
 
                     @parameter
                     if op_code == Add:
@@ -153,10 +159,13 @@ fn arithmetic_ops_A_contiguous[
                     var remaining = linear_idx
                     var b_idx = B_offset
 
-                    for dim in range(Int(rank) - 1, -1, -1):
-                        var coord = remaining % shape_local[dim]
-                        b_idx += coord * strides_B_local[dim]
-                        remaining //= shape_local[dim]
+                    for dim in range(rank - 1, -1, -1):
+                        # var coord = remaining % shape_local[dim]
+                        var coord = remaining % result_shape[dim]
+                        # b_idx += coord * strides_B_local[dim]
+                        b_idx += coord * B_strides[dim]
+                        # remaining //= shape_local[dim]
+                        remaining //= result_shape[dim]
 
                     var res: Scalar[dtype] = 0
 
@@ -174,8 +183,7 @@ fn arithmetic_ops_A_contiguous[
 
         base_idx += grid_stride * CHUNK_SIZE
 
-
-fn arithmetic_ops_B_contiguous[
+        _ = """fn arithmetic_ops_B_contiguous[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -285,10 +293,10 @@ fn arithmetic_ops_B_contiguous[
 
                 break
 
-        base_idx += grid_stride * CHUNK_SIZE
+        base_idx += grid_stride * CHUNK_SIZE"""
 
 
-fn arithmetic_ops_B_contiguous_orig[
+fn arithmetic_ops_B_contiguous[
     op_code: Int,
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
@@ -297,8 +305,10 @@ fn arithmetic_ops_B_contiguous_orig[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
-    A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    # result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
+    result_shape: Array,
+    # A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_strides: Array,
     A_offset: Int,
     B_offset: Int,
     size: Int,
@@ -310,7 +320,7 @@ fn arithmetic_ops_B_contiguous_orig[
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
 
     # Read metadata into stack once per thread
-    var coords = stack_allocation[
+    _ = """var coords = stack_allocation[
         MAX_RANK, Int, address_space = AddressSpace.SHARED
     ]()
     var shape_local = stack_allocation[
@@ -322,7 +332,7 @@ fn arithmetic_ops_B_contiguous_orig[
 
     for i in range(rank):
         shape_local[i] = Int(result_shape[i + 2])
-        strides_A_local[i] = Int(A_strides[i + 2])
+        strides_A_local[i] = Int(A_strides[i + 2])"""
 
     # Grid-stride loop over CHUNK_SIZE blocks
     var base_idx = gtid * CHUNK_SIZE
@@ -347,10 +357,13 @@ fn arithmetic_ops_B_contiguous_orig[
 
                     # Coordinate decomposition
                     var a_idx = A_offset
-                    for dim in range(Int(rank) - 1, -1, -1):
-                        var coord = remaining % shape_local[dim]
-                        a_idx += coord * strides_A_local[dim]
-                        remaining //= shape_local[dim]
+                    for dim in range(rank - 1, -1, -1):
+                        # var coord = remaining % shape_local[dim]
+                        var coord = remaining % result_shape[dim]
+                        # a_idx += coord * strides_A_local[dim]
+                        a_idx += coord * A_strides[dim]
+                        # remaining //= shape_local[dim]
+                        remaining //= result_shape[dim]
 
                     @parameter
                     if op_code == Add:
@@ -372,9 +385,12 @@ fn arithmetic_ops_B_contiguous_orig[
                     var a_idx = A_offset
 
                     for dim in range(Int(rank) - 1, -1, -1):
-                        var coord = remaining % shape_local[dim]
-                        a_idx += coord * strides_A_local[dim]
-                        remaining //= shape_local[dim]
+                        # var coord = remaining % shape_local[dim]
+                        var coord = remaining % result_shape[dim]
+                        # a_idx += coord * strides_A_local[dim]
+                        a_idx += coord * A_strides[dim]
+                        # remaining //= shape_local[dim]
+                        remaining //= result_shape[dim]
 
                     var res: Scalar[dtype] = 0
 
@@ -402,9 +418,12 @@ fn arithmetic_ops_both_strided[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
-    A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
-    B_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    # result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
+    result_shape: Array,
+    # A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    A_strides: Array,
+    # B_strides: UnsafePointer[Int64, ImmutAnyOrigin],
+    B_strides: Array,
     A_offset: Int,
     B_offset: Int,
     size: Int,
@@ -415,7 +434,7 @@ fn arithmetic_ops_both_strided[
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
 
-    var shape_local = stack_allocation[
+    _ = """var shape_local = stack_allocation[
         MAX_RANK, Int, address_space = AddressSpace.SHARED
     ]()
     var strides_A_local = stack_allocation[
@@ -428,7 +447,7 @@ fn arithmetic_ops_both_strided[
     for i in range(rank):
         shape_local[i] = Int(result_shape[i + 2])
         strides_A_local[i] = Int(A_strides[i + 2])
-        strides_B_local[i] = Int(B_strides[i + 2])
+        strides_B_local[i] = Int(B_strides[i + 2])"""
 
     var base_idx = gtid * CHUNK_SIZE
 
@@ -451,11 +470,15 @@ fn arithmetic_ops_both_strided[
                     var a_idx = A_offset
                     var b_idx = B_offset
 
-                    for dim in range(Int(rank) - 1, -1, -1):
-                        var coord = remaining % shape_local[dim]
-                        a_idx += coord * strides_A_local[dim]
-                        b_idx += coord * strides_B_local[dim]
-                        remaining //= shape_local[dim]
+                    for dim in range(rank - 1, -1, -1):
+                        # var coord = remaining % shape_local[dim]
+                        var coord = remaining % result_shape[dim]
+                        # a_idx += coord * strides_A_local[dim]
+                        a_idx += coord * A_strides[dim]
+                        # b_idx += coord * strides_B_local[dim]
+                        b_idx += coord * B_strides[dim]
+                        # remaining //= shape_local[dim]
+                        remaining //= result_shape[dim]
 
                     @parameter
                     if op_code == Add:
@@ -477,10 +500,14 @@ fn arithmetic_ops_both_strided[
                     var b_idx = B_offset
 
                     for dim in range(Int(rank) - 1, -1, -1):
-                        var coord = remaining % shape_local[dim]
+                        _ = """var coord = remaining % shape_local[dim]
                         a_idx += coord * strides_A_local[dim]
                         b_idx += coord * strides_B_local[dim]
-                        remaining //= shape_local[dim]
+                        remaining //= shape_local[dim]"""
+                        var coord = remaining % result_shape[dim]
+                        a_idx += coord * A_strides[dim]
+                        b_idx += coord * B_strides[dim]
+                        remaining //= result_shape[dim]
 
                     var res: Scalar[dtype] = 0
 
@@ -510,7 +537,7 @@ fn launch[
     if not A.broadcastable(B):
         raise Error("Shape mismatch")
 
-    #var ctx = DeviceContext()
+    # var ctx = DeviceContext()
     var gpu = GPU()
     var ctx = gpu()
     comptime width_of_simd = simd_width_of[dtype]()
@@ -559,14 +586,13 @@ fn launch[
 
         var A_buffer = ctx.enqueue_create_buffer[dtype](A.numels())
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
+
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
         var start_data_write = now()
-        # A.write_to_device_buffer(A_buffer)
-        A.enqueue_copy(A_buffer)
-        #ctx.enqueue_copy(A.data_ptr(), A_buffer)
-        # B.write_to_device_buffer(B_buffer)
-        B.enqueue_copy(B_buffer)
-        #ctx.enqueue_copy(B.data_ptr(), B_buffer)
+
+        ctx.enqueue_copy(A_buffer, A.data_ptr() + A.offset())
+        ctx.enqueue_copy(B_buffer, B.data_ptr() + B.offset())
+
         print("Data transfer time: ", (now() - start_data_write) * 1000, "ms")
         var start_time = now()
         ctx.enqueue_function(
@@ -625,21 +651,19 @@ fn launch[
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
 
-        var result_shape_buffer = ctx.enqueue_create_buffer[DType.int64](
-            broadcast_shape.write_length()
+        _ = """var result_shape_buffer = ctx.enqueue_create_buffer[DType.int64](
+            #broadcast_shape.numels()
+            output_size
         )
         var B_strides_buffer = ctx.enqueue_create_buffer[DType.int64](
             B_broadcast_strides.write_length()
-        )
+        )"""
 
-        # A.write_to_device_buffer(A_buffer)
-        A.enqueue_copy(A_buffer)
-        #ctx.enqueue_copy(A.data_ptr(), A_buffer)
-        # B.write_to_device_buffer(B_buffer)
-        B.enqueue_copy(B_buffer)
-        #ctx.enqueue_copy(B.data_ptr(), B_buffer)
-        broadcast_shape.write_to_device_buffer(result_shape_buffer)
-        B_broadcast_strides.write_to_device_buffer(B_strides_buffer)
+        ctx.enqueue_copy(A_buffer, A.data_ptr() + A.offset())
+        B.write_to(B_buffer)
+
+        # broadcast_shape.write_to_device_buffer(result_shape_buffer)
+        # B_broadcast_strides.write_to_device_buffer(B_strides_buffer)
 
         ctx.enqueue_function(
             compiled_func,
@@ -647,8 +671,8 @@ fn launch[
             A_buffer,
             B_buffer,
             0,  # A.offset(),
-            result_shape_buffer,
-            B_strides_buffer,
+            broadcast_shape.array(),
+            B.strides().array(),
             0,  # B.offset(),
             output_size,
             rank,
@@ -678,29 +702,26 @@ fn launch[
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
 
-        var result_shape_buffer = ctx.enqueue_create_buffer[DType.int64](
+        _ = """var result_shape_buffer = ctx.enqueue_create_buffer[DType.int64](
             broadcast_shape.write_length()
         )
         var A_strides_buffer = ctx.enqueue_create_buffer[DType.int64](
             A_broadcast_strides.write_length()
-        )
+        )"""
 
-        # A.write_to_device_buffer(A_buffer)
-        A.enqueue_copy(A_buffer)
-        #ctx.enqueue_copy(A.data_ptr(), A_buffer)
-        # B.write_to_device_buffer(B_buffer)
-        B.enqueue_copy(B_buffer)
-        #ctx.enqueue_copy(B.data_ptr(), B_buffer)
-        broadcast_shape.write_to_device_buffer(result_shape_buffer)
-        A_broadcast_strides.write_to_device_buffer(A_strides_buffer)
+        A.write_to(A_buffer)
+        ctx.enqueue_copy(B_buffer, B.data_ptr() + B.offset())
+
+        # broadcast_shape.write_to_device_buffer(result_shape_buffer)
+        # A_broadcast_strides.write_to_device_buffer(A_strides_buffer)
 
         ctx.enqueue_function(
             compiled_func,
             result_buffer,
             A_buffer,
             B_buffer,
-            result_shape_buffer,
-            A_strides_buffer,
+            broadcast_shape.array(),
+            A.strides().array(),
             0,  # A.offset(),
             0,  # B.offset(),
             output_size,
@@ -729,9 +750,10 @@ fn launch[
 
     var A_buffer = ctx.enqueue_create_buffer[dtype](A.numels())
     var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
+
     var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
 
-    var result_shape_buffer = ctx.enqueue_create_buffer[DType.int64](
+    _ = """var result_shape_buffer = ctx.enqueue_create_buffer[DType.int64](
         broadcast_shape.write_length()
     )
     var A_strides_buffer = ctx.enqueue_create_buffer[DType.int64](
@@ -739,26 +761,23 @@ fn launch[
     )
     var B_strides_buffer = ctx.enqueue_create_buffer[DType.int64](
         B_broadcast_strides.write_length()
-    )
+    )"""
 
-    # A.write_to_device_buffer(A_buffer)
-    A.enqueue_copy(A_buffer)
-    #ctx.enqueue_copy(A.data_ptr(), A_buffer)
-    # B.write_to_device_buffer(B_buffer)
-    B.enqueue_copy(B_buffer)
-    #ctx.enqueue_copy(B.data_ptr(), B_buffer)
-    broadcast_shape.write_to_device_buffer(result_shape_buffer)
+    A.write_to(A_buffer)
+    B.write_to(B_buffer)
+
+    _ = """broadcast_shape.write_to_device_buffer(result_shape_buffer)
     A_broadcast_strides.write_to_device_buffer(A_strides_buffer)
-    B_broadcast_strides.write_to_device_buffer(B_strides_buffer)
+    B_broadcast_strides.write_to_device_buffer(B_strides_buffer)"""
 
     ctx.enqueue_function(
         compiled_func,
         result_buffer,
         A_buffer,
         B_buffer,
-        result_shape_buffer,
-        A_strides_buffer,
-        B_strides_buffer,
+        broadcast_shape.array(),
+        A.strides().array(),
+        B.strides().array(),
         0,  # A.offset(),
         0,  # B.offset(),
         output_size,

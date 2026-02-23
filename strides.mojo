@@ -1,11 +1,12 @@
 from intarray import IntArray
 from shapes import Shape
-from utils import StaticTuple
 from common_utils import panic
+from array import Array
 
 
 @register_passable
 struct Strides(
+    Defaultable,
     ImplicitlyCopyable,
     Representable,
     Sized,
@@ -47,14 +48,8 @@ struct Strides(
     fn __len__(self) -> Int:
         return len(self.data)
 
-    fn static_tuple[max_dim: Int = 8](self) -> StaticTuple[Int, max_dim]:
-        if len(self) + 1 > max_dim:
-            panic("Strides length exceeds max size: ", max_dim.__str__())
-        var result = StaticTuple[Int, max_dim]()
-        result[0] = len(self)
-        for i in range(len(self)):
-            result[i + 1] = self[i]
-        return result
+    fn array(self) -> Array:
+        return Array(self)
 
     @always_inline("nodebug")
     fn __getitem__(self, i: Int) -> Int:
@@ -127,14 +122,6 @@ struct Strides(
 
 
 fn main():
-    var s = Strides(10, 5, 2)
-    var tup = s.static_tuple()
-    print("The great tuple: ", tup[0], tup[1], tup[2], tup[3], tup[4])
-    var ptr = alloc[Int](5)
-    s.write_to(ptr)
-
-    var read_back = Strides.read_from(ptr)
-    print(read_back)
-
-    var on_stack = Strides.on_stack(ptr.bitcast[Int64]())
-    print(on_stack[], on_stack[1], on_stack[2], on_stack[3])
+    var s = Strides(10, 5, 2, 3, 8, 7, 1, 1)
+    var array = s.array()
+    print(array)

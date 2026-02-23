@@ -1,7 +1,7 @@
 from common_utils import panic
 from intarray import IntArray
-from utils import StaticTuple
-from layout import Layout, print_layout
+from array import Array
+
 
 @register_passable
 struct Shape(
@@ -144,14 +144,8 @@ struct Shape(
     fn intarray(self) -> IntArray:
         return self.dims
 
-    fn static_tuple[max_dim: Int = 8](self) -> StaticTuple[Int, max_dim]:
-        if len(self) + 1 > max_dim:
-            panic("Shape length exceeds max size: ", max_dim.__str__())
-        var result = StaticTuple[Int, max_dim]()
-        result[0] = len(self)
-        for i in range(len(self)):
-            result[i + 1] = self[i]
-        return result
+    fn array(self) -> Array:
+        return Array(self)
 
     # ========== Operations ==========
 
@@ -362,28 +356,7 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
         var iter_len = len(self)
         return (iter_len, {iter_len})
 
-fn row_major(*dims: Int):
-    if len(dims) == 2:
-        var tup = StaticTuple[Int, 2](dims[0], dims[1])
-        var lo = Layout.row_major(tup[0], tup[1])
-        print_layout(lo)
 
-from utils import IndexList
-from sys import size_of, bit_width_of
-from utils import Variant
 fn main():
-    row_major(2, 3)
-    comptime Tuples = Variant[StaticTuple[Int, 3], StaticTuple[Int, 4], StaticTuple[Int, 5]]
-    comptime IndexLists = Variant[IndexList[3], IndexList[4], IndexList[5]]
-    print("StaticTuple1: ", size_of[StaticTuple[Int, 1]]())
-    print("StaticTuple2: ", size_of[StaticTuple[Int, 2]]())
-    print("StaticTuple2*****: ", bit_width_of[StaticTuple[Int, 20]]())
-    print("IndexList1: ", size_of[IndexList[1]]())
-    print("IndexList2*******: ", size_of[IndexList[2]]())
-    print("IndexList3: ", bit_width_of[IndexList[20]]())
-    print("Tuples: ", size_of[Tuples]())
-    print("IndexLists: ", size_of[IndexLists]())
-    var indices = IndexList[3]()
-    for i in range(3):
-        indices[i] = 99
-    print(indices)
+    array = Shape(4, 2, 1).array()
+    print(array)

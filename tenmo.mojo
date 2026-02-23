@@ -30,7 +30,8 @@ from broadcasthelper import ShapeBroadcaster
 from ndbuffer import NDBuffer
 from utilities import Utils
 from gpu.host import DeviceBuffer, HostBuffer
-from device import GPU
+from device import Device, CPU, GPU
+from sys.info import has_accelerator
 
 
 struct Tensor[dtype: DType = DType.float32](
@@ -461,21 +462,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    fn write_to(self, buffer: HostBuffer[Self.dtype]):
-        if self.is_contiguous():
-            memcpy(
-                dest=buffer.unsafe_ptr(),
-                src=self.data_ptr() + self.offset(),
-                count=self.numels(),
-            )
-        else:
-            var ptr = buffer.unsafe_ptr()
-            ref data_buffer = self.buffer.data_buffer()
-            var offset = 0
-            for index in self.index_iterator():
-                (ptr + offset)[] = data_buffer[index]
-                offset += 1
-
     fn write_to(self, buffer: DeviceBuffer[Self.dtype]) raises:
         with buffer.map_to_host() as host_buffer:
             if self.is_contiguous():
@@ -492,31 +478,35 @@ struct Tensor[dtype: DType = DType.float32](
                     (ptr + offset)[] = data_buffer[index]
                     offset += 1
 
+    fn to_device(mut self, device: Device) raises:
+        if device.is_cpu():
+            if self.buffer.is_on_cpu():
+                print("Tensor is already on CPU")
+                return
+            else:
+                _ = self.buffer.to_cpu()
+        else:
+            if self.buffer.is_on_gpu():
+                print("Tensor is already on GPU")
+                return
+            else:
+                _ = self.buffer.to_gpu(device.kind[GPU])
+
     fn to_cpu(
         mut self,
-    ) raises -> Optional[
-        Tuple[
-            DeviceBuffer[Self.dtype],
-            DeviceBuffer[DType.int64],
-            DeviceBuffer[DType.int64],
-            Int,
-            Int,
-        ]
-    ]:
-        return self.buffer.to_cpu()
+    ) raises:
+        return self.to_device(Device())
 
-    fn to_gpu(
-        mut self, gpu: GPU
-    ) raises -> Optional[
-        Tuple[
-            DeviceBuffer[Self.dtype],
-            DeviceBuffer[DType.int64],
-            DeviceBuffer[DType.int64],
-            Int,
-            Int,
-        ]
-    ]:
-        return self.buffer.to_gpu(gpu)
+    fn to_gpu(mut self, gpu: Optional[GPU] = None) raises:
+        if gpu:
+            self.to_device(gpu.value().into())
+        else:
+
+            @parameter
+            if has_accelerator():
+                self.to_device(GPU().into())
+            else:
+                print("System does not have any accelerator device")
 
     # Check if it has a backward fn before calling this API
     @always_inline
@@ -2389,5 +2379,4 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
 fn main() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10)
-    for idx, ref val in a:
-        print(idx, val)
+    a.to_gpu()
