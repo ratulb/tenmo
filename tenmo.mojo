@@ -559,6 +559,12 @@ struct Tensor[dtype: DType = DType.float32](
     fn is_scalar(self) -> Bool:
         return self.buffer.is_scalar()
 
+    fn is_on_gpu(self) -> Bool:
+        return self.buffer.is_on_gpu()
+
+    fn is_on_cpu(self) -> Bool:
+        return self.buffer.is_on_cpu()
+
     fn __eq__(self, scalar: Scalar[Self.dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.buffer.compare_scalar[Equal](scalar))
 
@@ -2378,5 +2384,9 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
 
 fn main() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(10)
-    a.to_gpu()
+    var a = Tensor[dtype].arange(10, requires_grad=True)
+    var b = a * a * a
+    #a.to_gpu()
+    b.print()
+    b.backward()
+    a.grad().print()

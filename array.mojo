@@ -4,6 +4,7 @@ from utils import StaticTuple
 from intarray import IntArray
 from shapes import Shape
 from strides import Strides
+from mnemonics import max_rank
 
 
 @register_passable
@@ -16,12 +17,11 @@ struct Array(
     Stringable,
     Writable,
 ):
-    comptime max_dim = 8
     comptime device_type: AnyType = Self
 
     @staticmethod
     fn get_type_name() -> String:
-        return String("Array[" + Self.max_dim.__str__() + "]")
+        return String("Array[max_rank:" + max_rank.__str__() + "]")
 
     @staticmethod
     fn get_device_type_name() -> String:
@@ -30,13 +30,13 @@ struct Array(
     fn _to_device_type(self, target: MutOpaquePointer[_]):
         target.bitcast[Self.device_type]()[] = self
 
-    var storage: StaticTuple[Int, Self.max_dim]
+    var storage: StaticTuple[Int, max_rank]
     var size: Int
     # ========== Construction ==========
 
     @always_inline("nodebug")
     fn __init__(out self):
-        self.storage = StaticTuple[Int, Self.max_dim]()
+        self.storage = StaticTuple[Int, max_rank]()
         self.size = 0
 
     @always_inline("nodebug")
@@ -51,10 +51,10 @@ struct Array(
     fn __init__(out self, intarray: IntArray):
         """Create from IntArray(1, 2, 3)."""
         var length = len(intarray)
-        if length > Self.max_dim:
+        if length > max_rank:
             panic(
                 "Only dims upto",
-                Self.max_dim.__str__(),
+                max_rank.__str__(),
                 "is supported.",
                 "IntArray size exceeds that",
             )
@@ -68,10 +68,10 @@ struct Array(
     fn __init__(out self, shape: Shape):
         """Create from Shape(1, 2, 3)."""
         var length = len(shape)
-        if length > Self.max_dim:
+        if length > max_rank:
             panic(
                 "Only dims upto",
-                Self.max_dim.__str__(),
+                max_rank.__str__(),
                 "is supported.",
                 "Shape dim exceeds that",
             )
@@ -85,10 +85,10 @@ struct Array(
     fn __init__(out self, strides: Strides):
         """Create from Strides(1, 2, 3)."""
         var length = len(strides)
-        if length > Self.max_dim:
+        if length > max_rank:
             panic(
                 "Only dims upto",
-                Self.max_dim.__str__(),
+                max_rank.__str__(),
                 "is supported.",
                 "Strides length exceeds that",
             )
@@ -112,7 +112,7 @@ struct Array(
     @always_inline("nodebug")
     fn capacity(self) -> Int:
         """Allocated capacity."""
-        return Self.max_dim
+        return max_rank
 
     @always_inline("nodebug")
     fn is_empty(self) -> Bool:

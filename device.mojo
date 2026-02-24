@@ -1,10 +1,12 @@
 from common_utils import panic
-from gpu.host import DeviceContext
+from gpu.host import DeviceContext, DeviceBuffer
 from memory import ArcPointer
 from sys import has_accelerator
 from utils import Variant
+from ndbuffer import NDBuffer
 
 comptime DeviceType = Variant[CPU, GPU]
+
 
 @fieldwise_init
 struct Device(Equatable, ImplicitlyCopyable, Movable):
@@ -13,6 +15,7 @@ struct Device(Equatable, ImplicitlyCopyable, Movable):
 
     fn __init__(out self):
         self.kind = CPU()
+
     fn __eq__(self, other: Self) -> Bool:
         if self.kind.isa[CPU]():
             if other.kind.isa[CPU]():
@@ -38,6 +41,7 @@ struct Device(Equatable, ImplicitlyCopyable, Movable):
 
     fn is_gpu(self) -> Bool:
         return self.kind.isa[GPU]()
+
 
 @fieldwise_init
 struct CPU(Equatable, ImplicitlyCopyable, Movable):
@@ -89,7 +93,76 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
         return self.device_context.copy()[]
 
 
+@fieldwise_init
+struct BufferDeviceState[dtype: DType](
+    Equatable & ImplicitlyCopyable & Movable
+):
+    var device_buffer: DeviceBuffer[Self.dtype]
+    var gpu: GPU
+    var synched_back: Bool
+
+    fn __init__(
+        out self,
+        ref nd_buffer: NDBuffer[Self.dtype],
+        gpu: Optional[GPU] = None,
+    ) raises:
+        var buffer_gpu = gpu.or_else(GPU())
+        var numels = nd_buffer.numels()
+        var device_buffer = buffer_gpu().enqueue_create_buffer[Self.dtype](
+            numels
+        )
+        self.device_buffer = device_buffer^
+        self.gpu = buffer_gpu^
+        self.synched_back = False
+        self.to_gpu(nd_buffer)
+
+    fn __copyinit__(out self, existing: Self):
+        self.device_buffer = existing.device_buffer.copy()
+        self.gpu = existing.gpu.copy()
+        self.synched_back = existing.synched_back
+
+    fn __moveinit__(out self, deinit existing: Self):
+        self.device_buffer = existing.device_buffer^
+        self.gpu = existing.gpu^
+        self.synched_back = existing.synched_back
+
+    fn __eq__(self, other: Self) -> Bool:
+        return self.gpu == other.gpu
+
+    fn __ne__(self, other: Self) -> Bool:
+        return not (self == other)
+
+    fn to_gpu(mut self, ref nd_buffer: NDBuffer[Self.dtype]) raises:
+        if nd_buffer.is_contiguous():
+            var offset = nd_buffer.offset
+            var data_src = nd_buffer.data_ptr() + offset
+            self.gpu().enqueue_copy(self.device_buffer, data_src)
+        else:
+            with self.device_buffer.map_to_host() as host_buffer:
+                var ptr = host_buffer.unsafe_ptr()
+                ref data_buffer = nd_buffer.data_buffer()
+                var offset = 0
+                for index in nd_buffer.index_iterator():
+                    (ptr + offset)[] = data_buffer[index]
+                    offset += 1
+        self.synched_back = False
+
+    fn to_cpu(mut self, mut nd_buffer: NDBuffer[Self.dtype]) raises:
+        if nd_buffer.is_contiguous():
+            var offset = nd_buffer.offset
+            var data_dest = nd_buffer.data_ptr() + offset
+            self.gpu().enqueue_copy(data_dest, self.device_buffer)
+        else:
+            with self.device_buffer.map_to_host() as host_buffer:
+                var ptr = host_buffer.unsafe_ptr()
+                ref data_buffer = nd_buffer.data_buffer()
+                var offset = 0
+                for index in nd_buffer.index_iterator():
+                    data_buffer[index] = (ptr + offset)[]
+                    offset += 1
+        self.synched_back = True
+
+
 fn main() raises:
-    var device = Device()
     # var device = Device(CPU())
     print("passes", Device.has_accelerator)

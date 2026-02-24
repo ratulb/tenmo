@@ -7,7 +7,7 @@ from broadcasthelper import ShapeBroadcaster
 from common_utils import panic, log_warning, print_buffer
 from memory import memcpy, AddressSpace
 from gpu.host import DeviceBuffer
-from device import Device, CPU, GPU
+from device import Device, CPU, GPU, BufferDeviceState
 from collections import Set
 from sys import simd_width_of
 from mnemonics import (
@@ -40,8 +40,7 @@ struct NDBuffer[dtype: DType](
     var offset: Int
     var buffer: Buffer[Self.dtype]
     var _contiguous: Bool
-    var device_buffer: Optional[DeviceBuffer[Self.dtype]]
-    var device: Optional[Device]
+    var device_state: Optional[BufferDeviceState[Self.dtype]]
 
     fn __init__(out self, *values: Scalar[Self.dtype]):
         buffer = Buffer[Self.dtype](len(values))
@@ -56,8 +55,8 @@ struct NDBuffer[dtype: DType](
         strides: Optional[Strides] = None,
         offset: Int = 0,
     ):
-        self.device_buffer = None
-        self.device = None
+        self.device_state = None
+
         if buffer.size == 0:
             log_warning(
                 "NDBuffer →__init__(Buffer, ...): zero sized buffer - potential"
@@ -89,8 +88,7 @@ struct NDBuffer[dtype: DType](
         self.strides = strides.or_else(Strides.default(shape))
         self.offset = offset
         self._contiguous = False
-        self.device_buffer = None
-        self.device = None
+        self.device_state = None
         self._contiguous = self.is_contiguous()
 
     fn __moveinit__(out self, deinit other: Self):
@@ -99,8 +97,7 @@ struct NDBuffer[dtype: DType](
         self.strides = other.strides^
         self.offset = other.offset
         self._contiguous = other._contiguous
-        self.device_buffer = other.device_buffer^
-        self.device = other.device^
+        self.device_state = other.device_state^
 
     fn __copyinit__(out self, other: Self):
         """Copy NDBuffer - Buffer handles ref counting automatically."""
@@ -111,8 +108,7 @@ struct NDBuffer[dtype: DType](
         self.strides = other.strides.copy()
         self.offset = other.offset
         self._contiguous = other._contiguous
-        self.device_buffer = other.device_buffer.copy()
-        self.device = other.device.copy()
+        self.device_state = other.device_state.copy()
 
     @staticmethod
     @always_inline
@@ -120,109 +116,66 @@ struct NDBuffer[dtype: DType](
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
-    fn to_cpu(
-        mut self, cpu: CPU = CPU()
-    ) raises -> Optional[DeviceBuffer[Self.dtype]]:
-        return self.to_device(cpu.into())
+    fn to_cpu(mut self, cpu: CPU = CPU()) raises:
+        self.to_device(cpu.into())
 
-    fn to_gpu(mut self, gpu: GPU) raises -> Optional[DeviceBuffer[Self.dtype]]:
-        return self.to_device(gpu.into())
+    fn to_gpu(mut self, gpu: GPU, force: Bool = False) raises:
+        self.to_device(gpu.into(), force)
 
-    fn to_device(
-        mut self, device: Device
-    ) raises -> Optional[DeviceBuffer[Self.dtype]]:
+    fn to_device(mut self, device: Device, force: Bool = False) raises:
         """Move this buffer to GPU or CPU."""
-        if self.device:  # We are already in a device
-            if device != CPU().into():  # Device we want go to is not CPU
-                if self.device.value() != device:
-                    # We currently stay only on one device
-                    var device_context = device.kind[GPU]()
-                    var device_buffer = device_context.enqueue_create_buffer[
-                        Self.dtype
-                    ](self.numels())
-                    if self.is_contiguous():
-                        var offset = self.offset
-                        var data_src = self.data_ptr() + offset
-                        device_context.enqueue_copy(device_buffer, data_src)
-                    else:
-                        with device_buffer.map_to_host() as host_buffer:
-                            var ptr = host_buffer.unsafe_ptr()
-                            ref data_buffer = self.data_buffer()
-                            var offset = 0
-                            for index in self.index_iterator():
-                                (ptr + offset)[] = data_buffer[index]
-                                offset += 1
-                    self.device_buffer = device_buffer^
-                    self.device = device.copy()
+        # No device state yet (buffer is on CPU)
+        if not self.device_state:
+            if device.is_gpu():
+                # First time moving to GPU
+                self.device_state = BufferDeviceState[Self.dtype](
+                    self, device.kind[GPU]
+                )
+            # else: already on CPU, nothing to do
+            return
 
-                    return self.device_buffer.value()
+        # Buffer already has device state
+        var device_state = self.device_state.value()
+        ref curr_gpu = device_state.gpu
+        var is_synched = device_state.synched_back
 
-                else:  # Are we re-synching to device?
-                    if self.is_contiguous():
-                        pass
-                        _ = """var offset = self.offset
-                        var data_src = self.data_ptr() + offset
-                        var device_context = device.kind[GPU]()
-                        var device_buffer = self.device_buffer.value()
-                        device_context.enqueue_copy(device_buffer, data_src)
-                        #Old DeviceBuffer old would be discarded?
-                        self.device_buffer = device_buffer^
-                        self.device = device.copy()"""
-                    else:
-                        pass
-                    return None
+        if device.is_gpu():
+            # Target is GPU
+            ref new_gpu = device.kind[GPU]
 
-            else:  # We are pulling device data
-                if self.is_contiguous():
-                    var offset = self.offset
-                    var data_dest = self.data_ptr() + offset
-                    var device_context = self.device.value().kind[GPU]()
-                    src_device_buffer = self.device_buffer.value()
-                    device_context.enqueue_copy(data_dest, src_device_buffer)
-                else:
-                    with self.device_buffer.value().map_to_host() as host_buffer:
-                        var ptr = host_buffer.unsafe_ptr()
-                        ref data_buffer = self.data_buffer()
-                        var offset = 0
-                        for index in self.index_iterator():
-                            # Iteration should match Device/Host Buffer length
-                            data_buffer[index] = (ptr + offset)[]
-                            offset += 1
+            if curr_gpu == new_gpu:
+                # Same GPU - check if resync needed
+                if not is_synched or force:
+                    device_state.to_gpu(self)
+                # else: already synched and not forced, nothing to do
 
-                return None
+            elif not is_synched and not force:
+                # Different GPU with unsynced data - need force
+                raise Error(
+                    "Cannot move to GPU ",
+                    new_gpu().id(),
+                    "without syncing data. Current GPU: ",
+                    curr_gpu().id(),
+                    ". Use force=True to override.",
+                )
+            else:
+                # Different GPU with synced data or forced
+                self.device_state = BufferDeviceState[Self.dtype](self, new_gpu)
 
         else:
-            if device == CPU().into():
-                # We are already in CPU
-                return None
-            else:  # We are copying to GPU
-                var device_context = device.kind[GPU]()
-                var device_buffer = device_context.enqueue_create_buffer[
-                    Self.dtype
-                ](self.numels())
-                if self.is_contiguous():
-                    var offset = self.offset
-                    var data_src = self.data_ptr() + offset
-                    device_context.enqueue_copy(device_buffer, data_src)
-                else:
-                    with device_buffer.map_to_host() as host_buffer:
-                        var ptr = host_buffer.unsafe_ptr()
-                        ref data_buffer = self.data_buffer()
-                        var offset = 0
-                        for index in self.index_iterator():
-                            (ptr + offset)[] = data_buffer[index]
-                            offset += 1
-
-                self.device_buffer = device_buffer^
-                self.device = device.copy()
-
-                return self.device_buffer.value()
+            # Target is CPU
+            if is_synched and not force:
+                # Already synched to CPU and not forced - nothing to do
+                return
+            else:
+                # Need to sync to CPU
+                device_state.to_cpu(self)
 
     fn is_on_gpu(self) -> Bool:
-        return not self.device == None and not self.device_buffer == None
+        return not self.device_state == None
 
     fn is_on_cpu(self) -> Bool:
-        return self.device == None and self.device_buffer == None
+        return self.device_state == None
 
     @staticmethod
     @always_inline

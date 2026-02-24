@@ -39,3 +39,5 @@ comptime DROPOUT = 32
 comptime CONV2D = 33
 comptime FLATTEN = 34
 comptime MAXPOOL2D = 35
+#####################
+comptime max_rank = 8 # Change this to extend/reduce max supported dimension
