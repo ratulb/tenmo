@@ -140,43 +140,79 @@ struct NDBuffer[dtype: DType](
                     var device_buffer = device_context.enqueue_create_buffer[
                         Self.dtype
                     ](self.numels())
-                    var offset = self.offset
-                    var data_src = self.data_ptr() + offset
-                    device_context.enqueue_copy(device_buffer, data_src)
+                    if self.is_contiguous():
+                        var offset = self.offset
+                        var data_src = self.data_ptr() + offset
+                        device_context.enqueue_copy(device_buffer, data_src)
+                    else:
+                        with device_buffer.map_to_host() as host_buffer:
+                            var ptr = host_buffer.unsafe_ptr()
+                            ref data_buffer = self.data_buffer()
+                            var offset = 0
+                            for index in self.index_iterator():
+                                (ptr + offset)[] = data_buffer[index]
+                                offset += 1
                     self.device_buffer = device_buffer^
                     self.device = device.copy()
 
                     return self.device_buffer.value()
 
                 else:  # Are we re-synching to device?
-                    var offset = self.offset
-                    var data_src = self.data_ptr() + offset
-                    var device_context = self.device.value().kind[GPU]()
-                    var device_buffer = self.device_buffer.value()
-                    device_context.enqueue_copy(device_buffer, data_src)
-                    self.device_buffer = device_buffer^
+                    if self.is_contiguous():
+                        pass
+                        _ = """var offset = self.offset
+                        var data_src = self.data_ptr() + offset
+                        var device_context = device.kind[GPU]()
+                        var device_buffer = self.device_buffer.value()
+                        device_context.enqueue_copy(device_buffer, data_src)
+                        #Old DeviceBuffer old would be discarded?
+                        self.device_buffer = device_buffer^
+                        self.device = device.copy()"""
+                    else:
+                        pass
                     return None
 
             else:  # We are pulling device data
-                var offset = self.offset
-                var data_dest = self.data_ptr() + offset
-                var device_context = self.device.value().kind[GPU]()
-                var src_device_buffer = self.device_buffer.value()
-                device_context.enqueue_copy(data_dest, src_device_buffer)
+                if self.is_contiguous():
+                    var offset = self.offset
+                    var data_dest = self.data_ptr() + offset
+                    var device_context = self.device.value().kind[GPU]()
+                    src_device_buffer = self.device_buffer.value()
+                    device_context.enqueue_copy(data_dest, src_device_buffer)
+                else:
+                    with self.device_buffer.value().map_to_host() as host_buffer:
+                        var ptr = host_buffer.unsafe_ptr()
+                        ref data_buffer = self.data_buffer()
+                        var offset = 0
+                        for index in self.index_iterator():
+                            # Iteration should match Device/Host Buffer length
+                            data_buffer[index] = (ptr + offset)[]
+                            offset += 1
+
                 return None
 
         else:
             if device == CPU().into():
                 # We are already in CPU
                 return None
-            else:
+            else:  # We are copying to GPU
                 var device_context = device.kind[GPU]()
                 var device_buffer = device_context.enqueue_create_buffer[
                     Self.dtype
                 ](self.numels())
-                var offset = self.offset
-                var data_src = self.data_ptr() + offset
-                device_context.enqueue_copy(device_buffer, data_src)
+                if self.is_contiguous():
+                    var offset = self.offset
+                    var data_src = self.data_ptr() + offset
+                    device_context.enqueue_copy(device_buffer, data_src)
+                else:
+                    with device_buffer.map_to_host() as host_buffer:
+                        var ptr = host_buffer.unsafe_ptr()
+                        ref data_buffer = self.data_buffer()
+                        var offset = 0
+                        for index in self.index_iterator():
+                            (ptr + offset)[] = data_buffer[index]
+                            offset += 1
+
                 self.device_buffer = device_buffer^
                 self.device = device.copy()
 

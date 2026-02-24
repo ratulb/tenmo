@@ -1,6 +1,5 @@
 from sys import simd_width_of
 from gpu import thread_idx, block_idx, block_dim, grid_dim
-from gpu.host import DeviceContext
 from memory import stack_allocation, AddressSpace
 from mnemonics import Add, Multiply, Subtract, Divide
 from tenmo import Tensor
@@ -469,7 +468,6 @@ fn launch[
     if not A.broadcastable(B):
         raise Error("Shape mismatch")
 
-    # var ctx = DeviceContext()
     var gpu = GPU()
     var ctx = gpu()
     comptime width_of_simd = simd_width_of[dtype]()
