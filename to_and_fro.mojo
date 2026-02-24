@@ -16,13 +16,16 @@ from strides import Strides
 from intarray import IntArray
 from indexhelper import IndexIterator
 from array import Array
+from buffers import Buffer
 
 fn pass_to_device[
     dtype: DType
 ](A: UnsafePointer[Scalar[dtype], MutAnyOrigin], shape: Array):
-    for i in range(5):
-        (A + i)[] = i * 99
-    print("The incoming shape is: ", shape)
+    for i in range(9):
+        (A + i)[] = (A + i)[] * 99
+    #print("The incoming shape is: ", shape)
+    #in_kernel = Buffer[dtype](9,A,copy=True)
+    #print(in_kernel)
 
 from device import GPU
 
@@ -49,14 +52,15 @@ fn launch() raises:
     )
 
     ctx.synchronize()
-    #A.print()
-    #B.print()
-    #C.print()
-    print("Before syncing\n")
+    C.to_cpu()
+    A.print()
+    B.print()
+    C.print()
+    #print("Before syncing\n")
     #C.to_cpu()
     #C.print()
-    with C.buffer.device_buffer.value().map_to_host() as dv:
-        print("The good dv is: ", dv)
+    #with C.buffer.device_buffer.value().map_to_host() as dv:
+    #    print("The good dv is: ", dv)
 
     print("Post synchonize")
 
