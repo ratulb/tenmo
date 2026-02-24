@@ -15,14 +15,14 @@ from shapes import Shape
 from strides import Strides
 from intarray import IntArray
 from indexhelper import IndexIterator
-
+from array import Array
 
 fn pass_to_device[
     dtype: DType
-](A: UnsafePointer[Scalar[dtype], MutAnyOrigin],):
+](A: UnsafePointer[Scalar[dtype], MutAnyOrigin], shape: Array):
     for i in range(5):
-        (A + i)[] = i + 99
-
+        (A + i)[] = i * 99
+    print("The incoming shape is: ", shape)
 
 from device import GPU
 
@@ -30,9 +30,11 @@ from device import GPU
 fn launch() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].arange(12)
-    A.to_gpu()
-    ctx = A.buffer.device.value().kind[GPU]()
-    ref device_buffer = A.buffer.device_buffer.value()
+    var B = A[3:]
+    var C = B.reshape(3, 3)	
+    C.to_gpu()
+    ctx = C.buffer.device.value().kind[GPU]()
+    var device_buffer = C.buffer.device_buffer.value()
     var compiled_func = ctx.compile_function[
         pass_to_device[dtype],
         pass_to_device[dtype],
@@ -41,13 +43,20 @@ fn launch() raises:
     ctx.enqueue_function(
         compiled_func,
         device_buffer,
+        C.shape().array(),
         grid_dim=1,
         block_dim=1,
     )
 
     ctx.synchronize()
-    _ = A.to_cpu()
-    A.print()
+    #A.print()
+    #B.print()
+    #C.print()
+    print("Before syncing\n")
+    #C.to_cpu()
+    #C.print()
+    with C.buffer.device_buffer.value().map_to_host() as dv:
+        print("The good dv is: ", dv)
 
     print("Post synchonize")
 
