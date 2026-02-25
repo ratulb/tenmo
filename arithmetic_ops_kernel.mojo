@@ -723,9 +723,10 @@ fn test_contiguous_same_shape() raises:
     b.to_gpu()
 
     var start = now()
-    var gpu_result = ArithmeticOpsKernel[dtype].launch[Multiply](a, b)
+    var gpu_result = a * b
     var gpu_time = (now() - start) * 1000
-
+    a.to_cpu()
+    b.to_cpu()
     start = now()
     var cpu_result = a * b
     var cpu_time = (now() - start) * 1000
@@ -747,9 +748,9 @@ fn test_broadcasting() raises:
     a.to_gpu()
     b.to_gpu()
 
-    var gpu_result = ArithmeticOpsKernel[dtype].launch[Add](
-        a, b
-    )  # Result: [3, 2, 4]
+    var gpu_result = a + b
+    a.to_cpu()
+    b.to_cpu()
     var cpu_result = a + b
 
     assert_true(gpu_result.shape() == Shape(3, 2, 4))
@@ -769,7 +770,9 @@ fn test_scalar_broadcast() raises:
     a.to_gpu()
     b.to_gpu()
 
-    var gpu_result = ArithmeticOpsKernel[dtype].launch[Multiply](a, b)
+    var gpu_result = a * b
+    a.to_cpu()
+    b.to_cpu()
     var cpu_result = a * b
 
     assert_true(gpu_result.all_close(cpu_result))
@@ -788,7 +791,10 @@ fn test_non_contiguous() raises:
     a_t.to_gpu()
     b.to_gpu()
 
-    var gpu_result = ArithmeticOpsKernel[dtype].launch[Add](a_t, b)
+    var gpu_result = a_t+ b
+    a_t.to_cpu()
+    b.to_cpu()
+
     var cpu_result = a_t + b
     assert_true(gpu_result.all_close(cpu_result))
     print("  Passed")
@@ -805,9 +811,10 @@ fn test_complex_broadcasting() raises:
     a.to_gpu()
     b.to_gpu()
 
-    var gpu_result = ArithmeticOpsKernel[dtype].launch[Multiply](
-        a, b
-    )  # Result: [3, 5, 4, 7]
+    var gpu_result = a * b
+    a.to_cpu()
+    b.to_cpu()
+
     var cpu_result = a * b
 
     assert_true(gpu_result.shape() == Shape(3, 5, 4, 7))
@@ -829,8 +836,10 @@ fn test_large_arrays() raises:
     b.to_gpu()
 
     var start = now()
-    var gpu_result = ArithmeticOpsKernel[dtype].launch[Add](a, b)
+    var gpu_result = a + b
     var gpu_time = (now() - start) * 1000
+    a.to_cpu()
+    b.to_cpu()
 
     start = now()
     var cpu_result = a + b
@@ -869,7 +878,9 @@ fn test_contiguous_view_with_offset() raises:
     b.to_gpu()
 
     # GPU computation
-    var gpu_result = ArithmeticOpsKernel[dtype].launch[Multiply](a, b)
+    var gpu_result = a * b
+    a.to_cpu()
+    b.to_cpu()
 
     # CPU reference
     var cpu_result = a * b
@@ -898,7 +909,10 @@ fn test_all_offset_scenarios() raises:
     a1.to_gpu()
     b1.to_gpu()
 
-    var result1 = ArithmeticOpsKernel[dtype].launch[Add](a1, b1)
+    var result1 = a1 + b1
+    a1.to_cpu()
+    b1.to_cpu()
+
     assert_true(result1.all_close(a1 + b1))
     print("    Passed")
 
@@ -911,7 +925,10 @@ fn test_all_offset_scenarios() raises:
     a2.to_gpu()
     b2.to_gpu()
 
-    var result2 = ArithmeticOpsKernel[dtype].launch[Subtract](a2, b2)
+    var result2 = a2 - b2
+    a2.to_cpu()
+    b2.to_cpu()
+
     assert_true(result2.all_close(a2 - b2))
     print("    Passed")
 
@@ -924,7 +941,10 @@ fn test_all_offset_scenarios() raises:
     a3.to_gpu()
     b3.to_gpu()
 
-    var result3 = ArithmeticOpsKernel[dtype].launch[Multiply](a3, b3)
+    var result3 = a3 * b3
+    a3.to_cpu()
+    b3.to_cpu()
+
     assert_true(result3.all_close(a3 * b3))
     print("    Passed")
 
@@ -936,7 +956,10 @@ fn test_all_offset_scenarios() raises:
     a4.to_gpu()
     b4.to_gpu()
 
-    var result4 = ArithmeticOpsKernel[dtype].launch[Divide](a4, b4)
+    var result4 = a4 / b4
+    a4.to_cpu()
+    b4.to_cpu()
+
     assert_true(result4.all_close(a4 / b4))
     print("    Passed")
 
