@@ -137,7 +137,7 @@ struct Tensor[dtype: DType = DType.float32](
                 strides,
                 offset,
                 requires_grad,
-                copy=True,
+                copy=False,
             )
         return out
 

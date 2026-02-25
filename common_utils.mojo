@@ -133,11 +133,11 @@ fn copy[
     dest: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     count: Int,
 ):
-    print("Utils copy")
     """
     General-purpose optimized copy with smart defaults.
     """
 
+    print("Utils copy")
     if count <= 0:
         return
 
