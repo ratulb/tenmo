@@ -208,19 +208,20 @@ struct Multiplicator[dtype: DType]:
 
 
 from common_utils import now
-
+from testing import assert_true
 
 fn main() raises:
     comptime dtype = DType.float32
     a = Tensor[dtype].arange(5000000)
     b = Tensor[dtype].arange(5000000)
     start = now()
-    _r = a * b
+    r1 = a * b
     print("CPU took: ", (now() - start) * 1000, "ms")
     start = now()
     a.to_gpu()
     b.to_gpu()
     print("to_gpu took: ", (now() - start) * 1000, "ms")
     start = now()
-    _r = a * b
+    r2 = a * b
     print("Overall GPU took: ", (now() - start) * 1000, "ms")
+    assert_true(r1.all_close(r2))
