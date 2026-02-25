@@ -162,11 +162,11 @@ struct BufferDeviceState[dtype: DType](
                     offset += 1
         self.synched_back = True
 
-    fn enqueue_create_buffer(self, size: Int) raises -> DeviceBuffer[Self.dtype]:
-        return self.gpu().enqueue_create_buffer[Self.dtype](size)
-
-    fn device_buffer(ref self) -> ref [self.buffer_state] DeviceBuffer[Self.dtype]:
+    fn device_buffer(
+        ref self,
+    ) -> ref [self.buffer_state] DeviceBuffer[Self.dtype]:
         return self.buffer_state
+
 
 fn main() raises:
     # var device = Device(CPU())

@@ -5,12 +5,11 @@ from intarray import IntArray
 from indexhelper import IndexCalculator, IndexIterator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic, log_warning, print_buffer
-from memory import memcpy, AddressSpace
-from gpu.host import DeviceBuffer
+from memory import memcpy, AddressSpace, ArcPointer
+from gpu.host import DeviceBuffer, DeviceContext
 from device import Device, CPU, GPU, BufferDeviceState
 from collections import Set
-from sys import simd_width_of
-from sys import has_accelerator
+from sys import simd_width_of, has_accelerator
 from mnemonics import (
     Multiply,
     Add,
@@ -141,6 +140,16 @@ struct NDBuffer[dtype: DType](
     fn to_gpu(mut self, gpu: GPU, force: Bool = False) raises:
         self.to_device(gpu.into(), force)
 
+    fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                return self.device_state.value().gpu[]
+            else:
+                return None
+        else:
+            return None
+
     fn to_device(mut self, device: Device, force: Bool = False) raises:
         """Move this buffer to GPU or CPU."""
         # No device state yet (buffer is on CPU)
@@ -191,7 +200,6 @@ struct NDBuffer[dtype: DType](
                 device_state.to_cpu(self)
 
     fn is_on_gpu(self) -> Bool:
-        print("Are you coming here?")
         @parameter
         if has_accelerator():
             return not self.device_state == None
@@ -1432,3 +1440,4 @@ fn main():
     var buffer = Buffer[dtype].arange(5, 10, 1)
     var ndb = NDBuffer[dtype](buffer, Shape(5, 1))
     ndb.print()
+    _ = ndb.device_context()

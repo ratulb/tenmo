@@ -10,6 +10,8 @@ from mnemonics import AddTensor, Multiply
 from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
+from sys import has_accelerator
+from arithmetic_ops_kernel import ArithmeticOpsKernel
 
 
 @fieldwise_init
@@ -135,17 +137,43 @@ struct Multiplicator[dtype: DType]:
     ]:
         if not self.broadcastable(other):
             panic(
-                "Tensor → __mul__(self * other) → dimension mismatch: "
+                "Tensor multiplication dimension mismatch: cannot broadcast"
+                " shape "
                 + self.shape().__str__()
-                + " <=> "
+                + " with "
                 + other.shape().__str__(),
-                "at Multiplicator → forward",
+                "at Multiplicator.forward",
             )
 
-        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
-            self.buffer.arithmetic_ops[Multiply](other.buffer),
-            requires_grad=False,
-        )
+        var out: Tensor[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu() and other.is_on_gpu():
+                try:
+                    out = ArithmeticOpsKernel[Self.dtype].launch[Multiply](
+                        self, other
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "Multiplicator - GPU operation failed. Failling back"
+                        " on CPU"
+                    )
+                    out = Tensor[Self.dtype](
+                        self.buffer.arithmetic_ops[Multiply](other.buffer),
+                        requires_grad=False,
+                    )
+            else:
+                out = Tensor[Self.dtype](
+                    self.buffer.arithmetic_ops[Multiply](other.buffer),
+                    requires_grad=False,
+                )
+        else:
+            out = Tensor[Self.dtype](
+                self.buffer.arithmetic_ops[Multiply](other.buffer),
+                requires_grad=False,
+            )
 
         @parameter
         if track_grad:
@@ -177,3 +205,22 @@ struct Multiplicator[dtype: DType]:
     ) -> Gradbox[Self.dtype]:
         var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer)
         return Gradbox[Self.dtype](nd_buffer^, share=False)
+
+
+from common_utils import now
+
+
+fn main() raises:
+    comptime dtype = DType.float32
+    a = Tensor[dtype].arange(5000000)
+    b = Tensor[dtype].arange(5000000)
+    start = now()
+    _r = a * b
+    print("CPU took: ", (now() - start) * 1000, "ms")
+    start = now()
+    a.to_gpu()
+    b.to_gpu()
+    print("to_gpu took: ", (now() - start) * 1000, "ms")
+    start = now()
+    _r = a * b
+    print("Overall GPU took: ", (now() - start) * 1000, "ms")

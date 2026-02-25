@@ -1552,14 +1552,14 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     @staticmethod
     fn arange[
-        max_arange_elements: Int = 1000000  # Safety limit to prevent infinite loops with very small steps
+        max_arange_elements: Int = 10000000  # Safety limit to prevent infinite loops with very small steps
     ](*args: Scalar[Self.dtype]) -> Buffer[Self.dtype]:
         return Self.arange[max_arange_elements](args)
 
     @always_inline
     @staticmethod
     fn arange[
-        max_arange_elements: Int = 1000000  # Safety limit to prevent infinite loops with very small steps
+        max_arange_elements: Int = 10000000  # Safety limit to prevent infinite loops with very small steps
     ](args: VariadicList[Scalar[Self.dtype]]) -> Buffer[Self.dtype]:
         constrained[
             Self.dtype.is_numeric(),

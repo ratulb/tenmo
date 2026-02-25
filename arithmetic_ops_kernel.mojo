@@ -7,6 +7,7 @@ from strides import Strides
 from broadcasthelper import ShapeBroadcaster
 from device import BufferDeviceState
 from array import Array
+from device import GPU
 
 
 fn arithmetic_ops_both_contiguous[
@@ -467,13 +468,15 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
         """
         Select the optimal kernel based on memory layout.
         """
-        if not A.is_on_gpu() and not B.is_on_gpu():
-            raise Error("ArithmeticOpsKernel -> launch: Tensors must be on GPU")
+        debug_assert(
+            A.broadcastable(B), "ArithmeticOpsKernel -> launch: shape mismatch"
+        )
 
-        if not A.broadcastable(B):
-            raise Error("Shape mismatch")
-
-        comptime width_of_simd = simd_width_of[Self.dtype]()
+        debug_assert(
+            A.is_on_gpu() and B.is_on_gpu(),
+            "ArithmeticOpsKernel -> launch: Tensors must be on GPU",
+        )
+        comptime simdwidth = simd_width_of[Self.dtype]()
 
         var broadcast_shape = ShapeBroadcaster.broadcast_shape(
             A.shape(), B.shape()
@@ -491,9 +494,10 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
         ref A_device_state = A.buffer.device_state.value()
         ref B_device_state = B.buffer.device_state.value()
 
-        var ctx = A_device_state.gpu()
-        #var result_buffer = ctx.enqueue_create_buffer[Self.dtype](output_size)
-        var result_buffer = A_device_state.enqueue_create_buffer(output_size)
+        var device_context = A_device_state.gpu()
+        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            output_size
+        )
 
         ref A_buffer = A_device_state.device_buffer()
         ref B_buffer = B_device_state.device_buffer()
@@ -508,17 +512,19 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
             and not needs_broadcasting
         ):
             print("[GPU] Using Kernel 1: Both contiguous")
-
-            var compiled_func = ctx.compile_function[
+            start = now()
+            var compiled_func = device_context.compile_function[
                 arithmetic_ops_both_contiguous[
-                    op_code, Self.dtype, width_of_simd, 2 * width_of_simd
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
                 arithmetic_ops_both_contiguous[
-                    op_code, Self.dtype, width_of_simd, 2 * width_of_simd
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
             ]()
 
-            ctx.enqueue_function(
+            print("GPU compilation took: ", (now() - start)* 1000, "ms")
+            start = now()
+            device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
                 A_buffer,
@@ -530,10 +536,13 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
                 block_dim=threads_per_block,
             )
 
-            ctx.synchronize()
+            device_context.synchronize()
+            print("GPU enqueueing and sync took: ", (now() - start) * 1000, "ms")
+            start = now()
             var out = Tensor[Self.dtype].from_device_buffer(
                 result_buffer, broadcast_shape
             )
+            print("Copying result from GPU took: ", (now() - start)*1000, "ms")
             return out^
 
         # Prepare for strided kernels
@@ -554,16 +563,16 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
         if A_is_contiguous and not B_is_contiguous:
             print("[GPU] Using Kernel 2: A contiguous, B strided")
 
-            var compiled_func = ctx.compile_function[
+            var compiled_func = device_context.compile_function[
                 arithmetic_ops_A_contiguous[
-                    op_code, Self.dtype, width_of_simd, 2 * width_of_simd
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
                 arithmetic_ops_A_contiguous[
-                    op_code, Self.dtype, width_of_simd, 2 * width_of_simd
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
             ]()
 
-            ctx.enqueue_function(
+            device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
                 A_buffer,
@@ -579,7 +588,7 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
                 block_dim=threads_per_block,
             )
 
-            ctx.synchronize()
+            device_context.synchronize()
             return Tensor[Self.dtype].from_device_buffer(
                 result_buffer, broadcast_shape
             )
@@ -590,16 +599,16 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
         if not A_is_contiguous and B_is_contiguous:
             print("[GPU] Using Kernel 3: A strided, B contiguous (MEDIUM-FAST)")
 
-            var compiled_func = ctx.compile_function[
+            var compiled_func = device_context.compile_function[
                 arithmetic_ops_B_contiguous[
-                    op_code, Self.dtype, width_of_simd, 2 * width_of_simd
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
                 arithmetic_ops_B_contiguous[
-                    op_code, Self.dtype, width_of_simd, 2 * width_of_simd
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
                 ],
             ]()
 
-            ctx.enqueue_function(
+            device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
                 A_buffer,
@@ -614,7 +623,7 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
                 block_dim=threads_per_block,
             )
 
-            ctx.synchronize()
+            device_context.synchronize()
             return Tensor[Self.dtype].from_device_buffer(
                 result_buffer, broadcast_shape
             )
@@ -625,16 +634,16 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
 
         print("[GPU] Using Kernel 4: Both strided")
 
-        var compiled_func = ctx.compile_function[
+        var compiled_func = device_context.compile_function[
             arithmetic_ops_both_strided[
-                op_code, Self.dtype, width_of_simd, 2 * width_of_simd
+                op_code, Self.dtype, simdwidth, 2 * simdwidth
             ],
             arithmetic_ops_both_strided[
-                op_code, Self.dtype, width_of_simd, 2 * width_of_simd
+                op_code, Self.dtype, simdwidth, 2 * simdwidth
             ],
         ]()
 
-        ctx.enqueue_function(
+        device_context.enqueue_function(
             compiled_func,
             result_buffer,
             A_buffer,
@@ -650,7 +659,7 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        ctx.synchronize()
+        device_context.synchronize()
         return Tensor[Self.dtype].from_device_buffer(
             result_buffer, broadcast_shape
         )
@@ -700,6 +709,7 @@ fn main() raises:
 from common_utils import now
 from testing import assert_true
 from shapes import Shape
+
 
 fn test_contiguous_same_shape() raises:
     """Test fast path: contiguous, same shape."""

@@ -123,10 +123,11 @@ struct Adder[dtype: DType](Copyable):
     ]:
         if not self.broadcastable(other):
             panic(
-                "Shape mismatch: ",
-                self.shape().__str__(),
-                "vs",
-                other.shape().__str__(),
+                "Tensor addition dimension mismatch: cannot broadcast shape "
+                + self.shape().__str__()
+                + " with "
+                + other.shape().__str__(),
+                "at Adder.forward",
             )
 
         var out: Tensor[Self.dtype]

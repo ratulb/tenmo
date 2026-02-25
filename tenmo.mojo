@@ -4,7 +4,7 @@ from math import exp, floor, log, cos, sin, sqrt, pi
 from random import seed, random_float64
 from sys import simd_width_of
 from utils.numerics import min_finite
-from memory import memcpy, memset, memset_zero, AddressSpace
+from memory import memcpy, memset, memset_zero, AddressSpace, ArcPointer
 from shapes import Shape, ShapeIndexIterator
 from ancestry import Ancestors
 from strides import Strides
@@ -29,7 +29,7 @@ from intarray import IntArray
 from broadcasthelper import ShapeBroadcaster
 from ndbuffer import NDBuffer
 from utilities import Utils
-from gpu.host import DeviceBuffer, HostBuffer
+from gpu.host import DeviceBuffer, DeviceContext
 from device import Device, CPU, GPU
 from sys.info import has_accelerator
 
@@ -487,6 +487,9 @@ struct Tensor[dtype: DType = DType.float32](
                 self.to_device(GPU().into())
         else:
             print("System does not have any accelerator device")
+
+    fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+        return self.buffer.device_context()
 
     # Check if it has a backward fn before calling this API
     @always_inline
@@ -2365,7 +2368,8 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
 fn main() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, requires_grad=True)
-    #var b = Tensor[dtype].arange(10, requires_grad=True)
+    # var b = Tensor[dtype].arange(10, requires_grad=True)
+    print(a.is_on_gpu())
     a.to_gpu()
     var r = a + a
     r.print()
