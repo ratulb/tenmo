@@ -1,6 +1,7 @@
 from shapes import Shape
 from tenmo import Tensor
 from gradbox import Gradbox
+from sys import simd_width_of
 from sys.param_env import env_get_string
 from logger import Level, Logger
 from net import Sequential, Linear, ReLU
@@ -12,6 +13,8 @@ from testing import assert_true
 from intarray import IntArray
 from random import randn_float64
 from ndbuffer import NDBuffer
+
+from sys import prefetch, PrefetchOptions
 
 comptime LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 comptime log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -85,7 +88,10 @@ fn log_warning(msg: String, color: String = YELLOW):
 
 
 @always_inline("nodebug")
-fn panic[S: Stringable, //,](*s: S):
+fn panic[
+    S: Stringable,
+    //,
+](*s: S):
     var message = String(capacity=len(s))
     if len(s) > 0:
         var start = s[0].__str__()
@@ -118,6 +124,72 @@ fn addrs[
             UnsafePointer(to=t).mut_cast[mut]().unsafe_origin_cast[origin]()
         )
     return l^
+
+
+fn copy[
+    is_mut: Bool, origin: Origin[mut=is_mut], dtype: DType, //
+](
+    src: UnsafePointer[Scalar[dtype], origin],
+    dest: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    count: Int,
+):
+    print("Utils copy")
+    """
+    General-purpose optimized copy with smart defaults.
+    """
+
+    if count <= 0:
+        return
+
+    comptime simd_width = simd_width_of[dtype]()
+
+    # For small copies, skip prefetching overhead
+    if count < 1024:
+        var i = 0
+        var vec_end = (count // simd_width) * simd_width
+
+        while i < vec_end:
+            dest.store[width=simd_width](i, src.load[width=simd_width](i))
+            i += simd_width
+
+        while i < count:
+            dest[i] = src[i]
+            i += 1
+
+        return
+
+    # For large copies, use prefetching
+    comptime unrolled = 8
+    comptime chunk_size = simd_width * unrolled
+    comptime prefetch_ahead = chunk_size * 4
+    comptime prefetch_opts = PrefetchOptions().for_read().low_locality().to_data_cache()
+
+    var i = 0
+    var end = (count // chunk_size) * chunk_size
+
+    while i < end:
+        if i + prefetch_ahead < count:
+            prefetch[prefetch_opts](src + i + prefetch_ahead)
+
+        @parameter
+        for j in range(unrolled):
+            var offset = i + j * simd_width
+            dest.store[width=simd_width](
+                offset, src.load[width=simd_width](offset)
+            )
+
+        i += chunk_size
+
+    # Vectorized remainder
+    var vec_end = (count // simd_width) * simd_width
+    while i < vec_end:
+        dest.store[width=simd_width](i, src.load[width=simd_width](i))
+        i += simd_width
+
+    # Scalar tail
+    while i < count:
+        dest[i] = src[i]
+        i += 1
 
 
 fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
@@ -520,6 +592,11 @@ fn print_buffer[
                 print()  # Newline before closing bracket
 
         print(indent + "]", end="")
+
+
+from gpu.host import DeviceBuffer
+from buffers import Buffer
+
 
 
 fn main():

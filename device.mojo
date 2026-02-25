@@ -1,4 +1,4 @@
-from common_utils import panic
+from common_utils import panic, copy
 from gpu.host import DeviceContext, DeviceBuffer
 from memory import ArcPointer
 from sys import has_accelerator
@@ -135,8 +135,11 @@ struct BufferDeviceState[dtype: DType](
     fn to_gpu(mut self, ref nd_buffer: NDBuffer[Self.dtype]) raises:
         if nd_buffer.is_contiguous():
             var offset = nd_buffer.offset
-            var data_src = nd_buffer.data_ptr() + offset
-            self.gpu().enqueue_copy(self.buffer_state, data_src)
+            var src_ptr = nd_buffer.data_ptr() + offset
+            #self.gpu().enqueue_copy(self.buffer_state, src_ptr)
+            with self.buffer_state.map_to_host() as host_buffer:
+                dest_ptr = host_buffer.unsafe_ptr()
+                copy(src_ptr, dest_ptr, nd_buffer.numels())
         else:
             with self.buffer_state.map_to_host() as host_buffer:
                 var ptr = host_buffer.unsafe_ptr()
