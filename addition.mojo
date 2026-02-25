@@ -127,7 +127,7 @@ struct Adder[dtype: DType](Copyable):
                 + self.shape().__str__()
                 + " with "
                 + other.shape().__str__(),
-                "at Adder.forward",
+                "at Adder → forward",
             )
 
         var out: Tensor[Self.dtype]

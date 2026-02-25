@@ -142,7 +142,7 @@ struct Multiplicator[dtype: DType]:
                 + self.shape().__str__()
                 + " with "
                 + other.shape().__str__(),
-                "at Multiplicator.forward",
+                "at Multiplicator → forward",
             )
 
         var out: Tensor[Self.dtype]

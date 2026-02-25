@@ -1,4 +1,4 @@
-from common_utils import panic, copy, now
+from common_utils import panic, now
 from gpu.host import DeviceContext, DeviceBuffer
 from memory import ArcPointer, memcpy
 from sys import has_accelerator
@@ -136,11 +136,10 @@ struct BufferDeviceState[dtype: DType](
         if nd_buffer.is_contiguous():
             var offset = nd_buffer.offset
             var src_ptr = nd_buffer.data_ptr() + offset
-            #self.gpu().enqueue_copy(self.buffer_state, src_ptr)
+            # self.gpu().enqueue_copy(self.buffer_state, src_ptr)
             with self.buffer_state.map_to_host() as host_buffer:
                 var start = now()
                 dest_ptr = host_buffer.unsafe_ptr()
-                #copy(src_ptr, dest_ptr, nd_buffer.numels())
                 memcpy(dest=dest_ptr, src=src_ptr, count=nd_buffer.numels())
                 print("to_gpu copy took: ", (now() - start) * 1000, "ms")
         else:

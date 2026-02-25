@@ -9,6 +9,8 @@ from backpropagation import (
 from mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
 from gradbox import Gradbox
+from sys import has_accelerator
+from arithmetic_ops_kernel import ArithmeticOpsKernel
 
 
 @fieldwise_init
@@ -196,14 +198,41 @@ struct Divider[dtype: DType]:
     ]:
         if not self.broadcastable(other):
             panic(
-                "Tensor →__truediv__(self * other): dimension mismatch: "
+                "Tensor division dimension mismatch: cannot broadcast shape "
                 + self.shape().__str__()
-                + " <=> "
+                + " with "
                 + other.shape().__str__(),
                 "at Divider → forward",
             )
-        nd_buffer = self.buffer.arithmetic_ops[Divide](other.buffer)
-        var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
+
+        var out: Tensor[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu() and other.is_on_gpu():
+                try:
+                    out = ArithmeticOpsKernel[Self.dtype].launch[Divide](
+                        self, other
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "Divider - GPU operation failed. Failling back on CPU"
+                    )
+                    out = Tensor[Self.dtype](
+                        self.buffer.arithmetic_ops[Divide](other.buffer),
+                        requires_grad=False,
+                    )
+            else:
+                out = Tensor[Self.dtype](
+                    self.buffer.arithmetic_ops[Divide](other.buffer),
+                    requires_grad=False,
+                )
+        else:
+            out = Tensor[Self.dtype](
+                self.buffer.arithmetic_ops[Divide](other.buffer),
+                requires_grad=False,
+            )
 
         @parameter
         if track_grad:
@@ -215,3 +244,26 @@ struct Divider[dtype: DType]:
                 out.add_ancestry(self, other)
 
         return out^
+
+
+from common_utils import now
+from testing import assert_true
+
+
+fn main() raises:
+    comptime dtype = DType.float32
+    a1 = Tensor[dtype].rand(5000, 1000)
+    b1 = Tensor[dtype].rand(5000, 1000)
+    a = a1.transpose(0, 1)
+    b = b1.transpose(0, 1)
+    start = now()
+    r1 = a / b
+    print("CPU divide took: ", (now() - start) * 1000, "ms")
+    start = now()
+    a.to_gpu()
+    b.to_gpu()
+    print("Transfer to gpu took: ", (now() - start) * 1000, "ms")
+    start = now()
+    r2 = a / b
+    print("Overall GPU took: ", (now() - start) * 1000, "ms")
+    assert_true(r1.all_close(r2))
