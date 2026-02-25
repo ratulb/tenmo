@@ -10,6 +10,8 @@ from mnemonics import AddTensor, Add
 from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
+from sys import has_accelerator
+from arithmetic_ops_kernel import ArithmeticOpsKernel
 
 
 @fieldwise_init
@@ -108,6 +110,8 @@ struct AddScalar[dtype: DType](Copyable):
 
 
 # Element wise addition of two tensors - would broadcast if required
+
+
 @fieldwise_init
 @register_passable
 struct Adder[dtype: DType](Copyable):
@@ -117,42 +121,58 @@ struct Adder[dtype: DType](Copyable):
     ](self: Tensor[Self.dtype], other: Tensor[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        if id(self) == id(other):
-            return self.__mul__(Scalar[Self.dtype](2))
         if not self.broadcastable(other):
             panic(
-                "Tensor__add__(self, other): dimension mismatch: "
-                + self.shape().__str__()
-                + " <=> "
-                + other.shape().__str__(),
-                "at Addition → forward",
+                "Shape mismatch: ",
+                self.shape().__str__(),
+                "vs",
+                other.shape().__str__(),
             )
 
-        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
-            self.buffer.arithmetic_ops[Add](other.buffer),
-            requires_grad=False,
-        )
+        var out: Tensor[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu() and other.is_on_gpu():
+                try:
+                    out = ArithmeticOpsKernel[Self.dtype].launch[Add](
+                        self, other
+                    )
+                except e:
+                    print(e)
+                    print("Adder - GPU operation failed. Failling back on CPU")
+                    out = Tensor[Self.dtype](
+                        self.buffer.arithmetic_ops[Add](other.buffer),
+                        requires_grad=False,
+                    )
+            else:
+                out = Tensor[Self.dtype](
+                    self.buffer.arithmetic_ops[Add](other.buffer),
+                    requires_grad=False,
+                )
+        else:
+            out = Tensor[Self.dtype](
+                self.buffer.arithmetic_ops[Add](other.buffer),
+                requires_grad=False,
+            )
 
         @parameter
         if track_grad:
-            requires_grad = self.requires_grad or other.requires_grad
-            if requires_grad:
+            if self.requires_grad or other.requires_grad:
                 out.requires_grad_(True)
-                # No broadcasting happened
+
                 if self.shape() == other.shape():
-                    backward_fn = AddBackward[Self.dtype]().into_backward_fn()
-                    out.backwardFn = Optional(backward_fn^)
+                    var bwd = AddBackward[Self.dtype]().into_backward_fn()
+                    out.backwardFn = Optional(bwd^)
                     if self.requires_grad:
                         out.add_ancestry(self)
                     if other.requires_grad:
                         out.add_ancestry(other)
                 else:
-                    # Broadcasting happened
-                    backward_fn = AddBroadcastBackward[
+                    var bwd = AddBroadcastBackward[
                         Self.dtype
                     ]().into_backward_fn()
-
-                    out.backwardFn = Optional(backward_fn^)
+                    out.backwardFn = Optional(bwd^)
                     out.add_ancestry(self, other)
 
         return out^

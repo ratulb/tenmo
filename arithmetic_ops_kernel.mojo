@@ -3,10 +3,9 @@ from gpu import thread_idx, block_idx, block_dim, grid_dim
 from memory import stack_allocation, AddressSpace
 from mnemonics import Add, Multiply, Subtract, Divide, max_rank
 from tenmo import Tensor
-from shapes import Shape
 from strides import Strides
 from broadcasthelper import ShapeBroadcaster
-from device import BufferDeviceState, GPU
+from device import BufferDeviceState
 from array import Array
 
 
@@ -462,7 +461,9 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
     @staticmethod
     fn launch[
         op_code: Int,
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) raises -> Tensor[Self.dtype]:
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) raises -> Tensor[
+        Self.dtype
+    ]:
         """
         Select the optimal kernel based on memory layout.
         """
@@ -472,8 +473,6 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
         if not A.broadcastable(B):
             raise Error("Shape mismatch")
 
-        #var gpu = GPU()
-        #var ctx = gpu()
         comptime width_of_simd = simd_width_of[Self.dtype]()
 
         var broadcast_shape = ShapeBroadcaster.broadcast_shape(
@@ -482,18 +481,7 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
         var output_size = broadcast_shape.product()
 
         # Launch configuration
-        var threads_per_block: Int
-        var num_blocks: Int
-
-        if output_size < 4096:
-            threads_per_block = 128
-            num_blocks = (output_size + 127) // 128
-        elif output_size < 65536:
-            threads_per_block = 256
-            num_blocks = min((output_size + 255) // 256, 128)
-        else:
-            threads_per_block = 512
-            num_blocks = min((output_size + 511) // 512, 512)
+        var (threads_per_block, num_blocks) = Self.launch_config(output_size)
 
         # Check if broadcasting is needed
         var needs_broadcasting = (
@@ -504,11 +492,11 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
         ref B_device_state = B.buffer.device_state.value()
 
         var ctx = A_device_state.gpu()
-        var result_buffer = ctx.enqueue_create_buffer[Self.dtype](output_size)
+        #var result_buffer = ctx.enqueue_create_buffer[Self.dtype](output_size)
+        var result_buffer = A_device_state.enqueue_create_buffer(output_size)
 
-        ref A_buffer = A_device_state.device_buffer
-        ref B_buffer = B_device_state.device_buffer
-
+        ref A_buffer = A_device_state.device_buffer()
+        ref B_buffer = B_device_state.device_buffer()
 
         # ================================================================
         # PATH 1: Both contiguous, same shape, no broadcasting
@@ -530,23 +518,6 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
                 ],
             ]()
 
-            #var A_buffer = ctx.enqueue_create_buffer[Self.dtype](A.numels())
-            #var B_buffer = ctx.enqueue_create_buffer[Self.dtype](B.numels())
-
-            #ref A_buffer = A_device_state.device_buffer
-            #ref B_buffer = B_device_state.device_buffer
-
-
-            #var result_buffer = ctx.enqueue_create_buffer[Self.dtype](output_size)
-            var start_data_write = now()
-
-            #ctx.enqueue_copy(A_buffer, A.data_ptr() + A.offset())
-            #ctx.enqueue_copy(B_buffer, B.data_ptr() + B.offset())
-
-            print(
-                "Data transfer time: ", (now() - start_data_write) * 1000, "ms"
-            )
-            var start_time = now()
             ctx.enqueue_function(
                 compiled_func,
                 result_buffer,
@@ -560,15 +531,8 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
             )
 
             ctx.synchronize()
-            print("GPU execution time: ", (now() - start_time) * 1000, "ms")
-            var data_retrieve_time = now()
             var out = Tensor[Self.dtype].from_device_buffer(
                 result_buffer, broadcast_shape
-            )
-            print(
-                "Data transfer back took: ",
-                (now() - data_retrieve_time) * 1000,
-                "ms",
             )
             return out^
 
@@ -598,13 +562,6 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
                     op_code, Self.dtype, width_of_simd, 2 * width_of_simd
                 ],
             ]()
-
-            #var A_buffer = ctx.enqueue_create_buffer[Self.dtype](A.numels())
-            #var B_buffer = ctx.enqueue_create_buffer[Self.dtype](B.numels())
-            #var result_buffer = ctx.enqueue_create_buffer[Self.dtype](output_size)
-
-            #ctx.enqueue_copy(A_buffer, A.data_ptr() + A.offset())
-            #B.write_to(B_buffer)
 
             ctx.enqueue_function(
                 compiled_func,
@@ -642,13 +599,6 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
                 ],
             ]()
 
-            #var A_buffer = ctx.enqueue_create_buffer[Self.dtype](A.numels())
-            #var B_buffer = ctx.enqueue_create_buffer[Self.dtype](B.numels())
-            #var result_buffer = ctx.enqueue_create_buffer[Self.dtype](output_size)
-
-            #A.write_to(A_buffer)
-            #ctx.enqueue_copy(B_buffer, B.data_ptr() + B.offset())
-
             ctx.enqueue_function(
                 compiled_func,
                 result_buffer,
@@ -684,14 +634,6 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
             ],
         ]()
 
-        #var A_buffer = ctx.enqueue_create_buffer[Self.dtype](A.numels())
-        #var B_buffer = ctx.enqueue_create_buffer[Self.dtype](B.numels())
-
-        #var result_buffer = ctx.enqueue_create_buffer[Self.dtype](output_size)
-
-        #A.write_to(A_buffer)
-        #B.write_to(B_buffer)
-
         ctx.enqueue_function(
             compiled_func,
             result_buffer,
@@ -709,7 +651,27 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
         )
 
         ctx.synchronize()
-        return Tensor[Self.dtype].from_device_buffer(result_buffer, broadcast_shape)
+        return Tensor[Self.dtype].from_device_buffer(
+            result_buffer, broadcast_shape
+        )
+
+    @staticmethod
+    fn launch_config(output_size: Int) -> Tuple[Int, Int]:
+        """Launch configuration."""
+        var threads_per_block: Int
+        var num_blocks: Int
+
+        if output_size < 4096:
+            threads_per_block = 128
+            num_blocks = (output_size + 127) // 128
+        elif output_size < 65536:
+            threads_per_block = 256
+            num_blocks = min((output_size + 255) // 256, 128)
+        else:
+            threads_per_block = 512
+            num_blocks = min((output_size + 511) // 512, 512)
+
+        return num_blocks, threads_per_block
 
 
 fn main() raises:
@@ -737,7 +699,7 @@ fn main() raises:
 
 from common_utils import now
 from testing import assert_true
-
+from shapes import Shape
 
 fn test_contiguous_same_shape() raises:
     """Test fast path: contiguous, same shape."""
@@ -775,7 +737,9 @@ fn test_broadcasting() raises:
     a.to_gpu()
     b.to_gpu()
 
-    var gpu_result = ArithmeticOpsKernel[dtype].launch[Add](a, b)  # Result: [3, 2, 4]
+    var gpu_result = ArithmeticOpsKernel[dtype].launch[Add](
+        a, b
+    )  # Result: [3, 2, 4]
     var cpu_result = a + b
 
     assert_true(gpu_result.shape() == Shape(3, 2, 4))
@@ -794,7 +758,6 @@ fn test_scalar_broadcast() raises:
 
     a.to_gpu()
     b.to_gpu()
-
 
     var gpu_result = ArithmeticOpsKernel[dtype].launch[Multiply](a, b)
     var cpu_result = a * b
@@ -815,8 +778,6 @@ fn test_non_contiguous() raises:
     a_t.to_gpu()
     b.to_gpu()
 
-
-
     var gpu_result = ArithmeticOpsKernel[dtype].launch[Add](a_t, b)
     var cpu_result = a_t + b
     assert_true(gpu_result.all_close(cpu_result))
@@ -834,8 +795,9 @@ fn test_complex_broadcasting() raises:
     a.to_gpu()
     b.to_gpu()
 
-
-    var gpu_result = ArithmeticOpsKernel[dtype].launch[Multiply](a, b)  # Result: [3, 5, 4, 7]
+    var gpu_result = ArithmeticOpsKernel[dtype].launch[Multiply](
+        a, b
+    )  # Result: [3, 5, 4, 7]
     var cpu_result = a * b
 
     assert_true(gpu_result.shape() == Shape(3, 5, 4, 7))
@@ -896,7 +858,6 @@ fn test_contiguous_view_with_offset() raises:
     a.to_gpu()
     b.to_gpu()
 
-
     # GPU computation
     var gpu_result = ArithmeticOpsKernel[dtype].launch[Multiply](a, b)
 
@@ -926,7 +887,6 @@ fn test_all_offset_scenarios() raises:
 
     a1.to_gpu()
     b1.to_gpu()
-
 
     var result1 = ArithmeticOpsKernel[dtype].launch[Add](a1, b1)
     assert_true(result1.all_close(a1 + b1))

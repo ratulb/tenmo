@@ -97,7 +97,7 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
 struct BufferDeviceState[dtype: DType](
     Equatable & ImplicitlyCopyable & Movable
 ):
-    var device_buffer: DeviceBuffer[Self.dtype]
+    var buffer_state: DeviceBuffer[Self.dtype]
     var gpu: GPU
     var synched_back: Bool
 
@@ -108,21 +108,21 @@ struct BufferDeviceState[dtype: DType](
     ) raises:
         var buffer_gpu = gpu.or_else(GPU())
         var numels = nd_buffer.numels()
-        var device_buffer = buffer_gpu().enqueue_create_buffer[Self.dtype](
+        var buffer_state = buffer_gpu().enqueue_create_buffer[Self.dtype](
             numels
         )
-        self.device_buffer = device_buffer^
+        self.buffer_state = buffer_state^
         self.gpu = buffer_gpu^
         self.synched_back = False
         self.to_gpu(nd_buffer)
 
     fn __copyinit__(out self, existing: Self):
-        self.device_buffer = existing.device_buffer.copy()
+        self.buffer_state = existing.buffer_state.copy()
         self.gpu = existing.gpu.copy()
         self.synched_back = existing.synched_back
 
     fn __moveinit__(out self, deinit existing: Self):
-        self.device_buffer = existing.device_buffer^
+        self.buffer_state = existing.buffer_state^
         self.gpu = existing.gpu^
         self.synched_back = existing.synched_back
 
@@ -136,9 +136,9 @@ struct BufferDeviceState[dtype: DType](
         if nd_buffer.is_contiguous():
             var offset = nd_buffer.offset
             var data_src = nd_buffer.data_ptr() + offset
-            self.gpu().enqueue_copy(self.device_buffer, data_src)
+            self.gpu().enqueue_copy(self.buffer_state, data_src)
         else:
-            with self.device_buffer.map_to_host() as host_buffer:
+            with self.buffer_state.map_to_host() as host_buffer:
                 var ptr = host_buffer.unsafe_ptr()
                 ref data_buffer = nd_buffer.data_buffer()
                 var offset = 0
@@ -151,9 +151,9 @@ struct BufferDeviceState[dtype: DType](
         if nd_buffer.is_contiguous():
             var offset = nd_buffer.offset
             var data_dest = nd_buffer.data_ptr() + offset
-            self.gpu().enqueue_copy(data_dest, self.device_buffer)
+            self.gpu().enqueue_copy(data_dest, self.buffer_state)
         else:
-            with self.device_buffer.map_to_host() as host_buffer:
+            with self.buffer_state.map_to_host() as host_buffer:
                 var ptr = host_buffer.unsafe_ptr()
                 ref data_buffer = nd_buffer.data_buffer()
                 var offset = 0
@@ -162,6 +162,11 @@ struct BufferDeviceState[dtype: DType](
                     offset += 1
         self.synched_back = True
 
+    fn enqueue_create_buffer(self, size: Int) raises -> DeviceBuffer[Self.dtype]:
+        return self.gpu().enqueue_create_buffer[Self.dtype](size)
+
+    fn device_buffer(ref self) -> ref [self.buffer_state] DeviceBuffer[Self.dtype]:
+        return self.buffer_state
 
 fn main() raises:
     # var device = Device(CPU())

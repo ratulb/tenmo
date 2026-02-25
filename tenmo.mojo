@@ -120,25 +120,6 @@ struct Tensor[dtype: DType = DType.float32](
         self.init_gradbox()
 
     @staticmethod
-    fn from_host_buffer(
-        buffer: HostBuffer[Self.dtype],
-        shape: Optional[Shape] = None,
-        strides: Optional[Strides] = None,
-        offset: Int = 0,
-        requires_grad: Bool = False,
-    ) -> Tensor[Self.dtype]:
-        """Materialize a Tensor/View from HostBuffer."""
-        var shape_realized = shape.or_else(Shape(len(buffer)))
-        return Tensor[Self.dtype](
-            buffer.unsafe_ptr(),
-            shape_realized,
-            strides,
-            offset,
-            requires_grad,
-            copy=True,
-        )
-
-    @staticmethod
     fn from_device_buffer(
         buffer: DeviceBuffer[Self.dtype],
         shape: Optional[Shape] = None,
@@ -484,13 +465,13 @@ struct Tensor[dtype: DType = DType.float32](
                 print("Tensor is already on CPU")
                 return
             else:
-                _ = self.buffer.to_cpu()
+                self.buffer.to_cpu()
         else:
             if self.buffer.is_on_gpu():
                 print("Tensor is already on GPU")
                 return
             else:
-                _ = self.buffer.to_gpu(device.kind[GPU])
+                self.buffer.to_gpu(device.kind[GPU])
 
     fn to_cpu(
         mut self,
@@ -498,15 +479,14 @@ struct Tensor[dtype: DType = DType.float32](
         return self.to_device(Device())
 
     fn to_gpu(mut self, gpu: Optional[GPU] = None) raises:
-        if gpu:
-            self.to_device(gpu.value().into())
-        else:
-
-            @parameter
-            if has_accelerator():
-                self.to_device(GPU().into())
+        @parameter
+        if has_accelerator():
+            if gpu:
+                self.to_device(gpu.value().into())
             else:
-                print("System does not have any accelerator device")
+                self.to_device(GPU().into())
+        else:
+            print("System does not have any accelerator device")
 
     # Check if it has a backward fn before calling this API
     @always_inline
@@ -2385,8 +2365,9 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
 fn main() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, requires_grad=True)
-    var b = a * a * a
-    #a.to_gpu()
-    b.print()
-    b.backward()
+    #var b = Tensor[dtype].arange(10, requires_grad=True)
+    a.to_gpu()
+    var r = a + a
+    r.print()
+    r.backward()
     a.grad().print()

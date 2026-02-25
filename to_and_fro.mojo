@@ -34,7 +34,7 @@ fn launch() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].arange(12)
     var B = A[3:]
-    var C = B.reshape(3, 3)	
+    var C = B.reshape(3, 3)
     C.to_gpu()
     ctx = C.buffer.device.value().kind[GPU]()
     var device_buffer = C.buffer.device_buffer.value()

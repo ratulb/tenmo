@@ -10,6 +10,7 @@ from gpu.host import DeviceBuffer
 from device import Device, CPU, GPU, BufferDeviceState
 from collections import Set
 from sys import simd_width_of
+from sys import has_accelerator
 from mnemonics import (
     Multiply,
     Add,
@@ -87,6 +88,24 @@ struct NDBuffer[dtype: DType](
         self.shape = shape
         self.strides = strides.or_else(Strides.default(shape))
         self.offset = offset
+        self._contiguous = False
+        self.device_state = None
+        self._contiguous = self.is_contiguous()
+
+    fn __init__(
+        out self,
+        device_buffer: DeviceBuffer[Self.dtype],
+        shape: Shape,
+    ) raises:
+        var buffer: Buffer[Self.dtype]
+        with device_buffer.map_to_host() as host_buffer:
+            buffer = Buffer[Self.dtype](
+                shape.num_elements(), host_buffer.unsafe_ptr(), copy=True
+            )
+        self.buffer = buffer^
+        self.shape = shape
+        self.strides = Strides.default(shape)
+        self.offset = 0
         self._contiguous = False
         self.device_state = None
         self._contiguous = self.is_contiguous()
@@ -172,10 +191,19 @@ struct NDBuffer[dtype: DType](
                 device_state.to_cpu(self)
 
     fn is_on_gpu(self) -> Bool:
-        return not self.device_state == None
+        print("Are you coming here?")
+        @parameter
+        if has_accelerator():
+            return not self.device_state == None
+        else:
+            return False
 
     fn is_on_cpu(self) -> Bool:
-        return self.device_state == None
+        @parameter
+        if has_accelerator():
+            return self.device_state == None
+        else:
+            return True
 
     @staticmethod
     @always_inline

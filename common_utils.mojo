@@ -85,7 +85,7 @@ fn log_warning(msg: String, color: String = YELLOW):
 
 
 @always_inline("nodebug")
-fn panic[S: Stringable & IntableRaising, //,](*s: S):
+fn panic[S: Stringable, //,](*s: S):
     var message = String(capacity=len(s))
     if len(s) > 0:
         var start = s[0].__str__()
