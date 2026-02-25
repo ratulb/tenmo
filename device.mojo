@@ -153,7 +153,7 @@ struct BufferDeviceState[dtype: DType](
         self.synched_back = False
 
     fn to_cpu(mut self, mut nd_buffer: NDBuffer[Self.dtype]) raises:
-        if nd_buffer.is_contiguous():
+        _="""if nd_buffer.is_contiguous():
             var offset = nd_buffer.offset
             var data_dest = nd_buffer.data_ptr() + offset
             self.gpu().enqueue_copy(data_dest, self.buffer_state)
@@ -164,7 +164,7 @@ struct BufferDeviceState[dtype: DType](
                 var offset = 0
                 for index in nd_buffer.index_iterator():
                     data_buffer[index] = (ptr + offset)[]
-                    offset += 1
+                    offset += 1"""
         self.synched_back = True
 
     fn device_buffer(

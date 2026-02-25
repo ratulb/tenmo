@@ -135,7 +135,8 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[Self.dtype](buffer^, shape)
 
     fn to_cpu(mut self, cpu: CPU = CPU()) raises:
-        self.to_device(cpu.into())
+        #self.to_device(cpu.into())
+        self.device_state = None
 
     fn to_gpu(mut self, gpu: GPU, force: Bool = False) raises:
         self.to_device(gpu.into(), force)
