@@ -182,7 +182,7 @@ from common_utils import now
 
 
 fn main() raises:
-    var SIZE = 65536 * 10
+    var SIZE = 65536 * 1000
     comptime dtype = DType.float32
     var tensor_a = Tensor[dtype].ones(SIZE)
     var start = now()
