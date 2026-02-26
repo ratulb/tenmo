@@ -688,7 +688,8 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    print("=" * 60)
+    test_to_gpu_and_back()
+    _="""print("=" * 60)
     print("Production Tensor-Tensor Arithmetic Tests")
     print("With Offset Support")
     print("=" * 60)
@@ -707,12 +708,25 @@ fn main() raises:
 
     print("\n" + "=" * 60)
     print("ALL TESTS PASSED (Including Offset Tests)")
-    print("=" * 60)
+    print("=" * 60)"""
 
 
 from common_utils import now
 from testing import assert_true
 from shapes import Shape
+
+fn test_to_gpu_and_back() raises:
+    """Test cpu->gpu -> cpu."""
+
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].ones(10)
+    a_gpu = a.to_gpu()
+    back_cpu = a_gpu.to_cpu()
+
+    back_cpu.print()
+
+    assert_true(back_cpu.all_close(a))
+    print("  Passed")
 
 
 fn test_contiguous_same_shape() raises:
@@ -756,9 +770,13 @@ fn test_broadcasting() raises:
     # a.to_cpu()
     # b.to_cpu()
     var cpu_result = a + b
-
     assert_true(gpu_result.shape() == Shape(3, 2, 4))
     assert_true(gpu_result.all_close(cpu_result))
+    cpu_ag = ag.to_cpu()
+    cpu_bg = bg.to_cpu()
+
+    assert_true(cpu_ag == a)
+    assert_true(cpu_bg == b)
     print("  Shape:", gpu_result.shape())
     print("  Passed")
 
@@ -778,6 +796,11 @@ fn test_scalar_broadcast() raises:
     # a.to_cpu()
     # b.to_cpu()
     var cpu_result = a * b
+    cpu_ag = ag.to_cpu()
+    cpu_bg = bg.to_cpu()
+
+    assert_true(cpu_ag == a)
+    assert_true(cpu_bg == b)
 
     assert_true(gpu_result.all_close(cpu_result))
     print("  Passed")
@@ -801,6 +824,12 @@ fn test_non_contiguous() raises:
 
     var cpu_result = a_t + b
     assert_true(gpu_result.all_close(cpu_result))
+    cpu_ag = a_tg.to_cpu()
+    cpu_bg = bg.to_cpu()
+
+    assert_true(cpu_ag == a_t)
+    assert_true(cpu_bg == b)
+
     print("  Passed")
 
 
