@@ -218,10 +218,10 @@ fn main() raises:
     r1 = a * b
     print("CPU took: ", (now() - start) * 1000, "ms")
     start = now()
-    a.to_gpu()
-    b.to_gpu()
+    ag = a.to_gpu()
+    bg = b.to_gpu()
     print("to_gpu took: ", (now() - start) * 1000, "ms")
     start = now()
-    r2 = a * b
+    r2 = ag * bg
     print("Overall GPU took: ", (now() - start) * 1000, "ms")
     assert_true(r1.all_close(r2))

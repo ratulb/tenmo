@@ -177,3 +177,22 @@ struct Adder[dtype: DType](Copyable):
                     out.add_ancestry(self, other)
 
         return out^
+
+from common_utils import now
+from testing import assert_true
+
+fn main() raises:
+    comptime dtype = DType.float32
+    a = Tensor[dtype].arange(5000000)
+    b = Tensor[dtype].arange(5000000)
+    start = now()
+    r1 = a - b
+    print("CPU took: ", (now() - start) * 1000, "ms")
+    start = now()
+    ag = a.to_gpu()
+    bg = b.to_gpu()
+    print("to_gpu took: ", (now() - start) * 1000, "ms")
+    start = now()
+    r2 = ag - bg
+    print("Overall GPU took: ", (now() - start) * 1000, "ms")
+    assert_true(r1.all_close(r2))
