@@ -137,13 +137,13 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
             ],
         ]()
 
-        #var A_buffer = device_context.enqueue_create_buffer[Self.dtype](numels)
+        # var A_buffer = device_context.enqueue_create_buffer[Self.dtype](numels)
         ref A_buffer = A_device_state.device_buffer()
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
             numels
         )
         var start = now()
-        #A.write_to(A_buffer)
+        # A.write_to(A_buffer)
         print("Writing to buffer took: ", (now() - start) * 1000, "ms")
 
         device_context.enqueue_function(
@@ -200,7 +200,7 @@ fn main() raises:
     print("CPU mul took: ", (now() - start) * 1000, "ms")
     # First test
     start = now()
-    #var result = ScalarOpsKernel[dtype].launch[op_code=Multiply](tensor_a, 42)
+    # var result = ScalarOpsKernel[dtype].launch[op_code=Multiply](tensor_a, 42)
     var result = tensor_a * 42
     print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
@@ -237,5 +237,24 @@ fn main() raises:
     print("GPU subtract took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
-    print("Launch success")
+    start = now()
+    expect = 999 - reshaped
 
+    print("CPU reverse subtract took: ", (now() - start) * 1000, "ms")
+    start = now()
+    result = 999 - tensor_a
+
+    print("GPU reverse subtract took: ", (now() - start) * 1000, "ms")
+    assert_true(result.all_close(expect))
+
+    start = now()
+    expect = 999 / reshaped
+
+    print("CPU reverse divide took: ", (now() - start) * 1000, "ms")
+    start = now()
+    result = 999 / tensor_a
+
+    print("GPU reverse divide took: ", (now() - start) * 1000, "ms")
+    assert_true(result.all_close(expect))
+
+    print("Launch success")
