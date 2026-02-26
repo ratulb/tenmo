@@ -106,38 +106,23 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
     ](A: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) raises -> Tensor[
         Self.dtype
     ]:
+        debug_assert(
+            A.is_on_gpu(), "ScalarOpsKernel -> launch: Tensors must be on GPU"
+        )
         if op_code == Divide and scalar == Scalar[Self.dtype](0):
             raise Error("Divide by zero")
 
         var numels = A.numels()
 
-        # ✅ Use optimal SIMD width
         comptime simdwidth = simd_width_of[Self.dtype]()
 
-        # ✅ Better heuristics
-        var threads_per_block: Int
-        var num_blocks: Int
+        var (threads_per_block, num_blocks) = Self.launch_config(
+            numels, simdwidth
+        )
+        ref A_device_state = A.buffer.device_state.value()
+        var device_context = A_device_state.gpu()
 
-        if numels < 4096:
-            threads_per_block = 128
-            num_blocks = (numels + 127) // 128
-        elif numels < 65536:
-            threads_per_block = 256
-            num_blocks = (numels + 255) // 256
-        else:
-            threads_per_block = 256
-            # ✅ More accurate calculation
-            var total_chunks = (numels + (simdwidth * 2 * simdwidth - 1)) // (
-                simdwidth * 2 * simdwidth
-            )
-            num_blocks = min(
-                (total_chunks + 255) // 256, 512
-            )  # Cap at 512 blocks
-
-        var ctx = DeviceContext()
-
-        # ✅ Use optimal SIMD width, not hardcoded 4
-        var compiled_func = ctx.compile_function[
+        var compiled_func = device_context.compile_function[
             scalar_ops[
                 op_code=op_code,
                 dtype = Self.dtype,
@@ -152,13 +137,16 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
             ],
         ]()
 
-        var A_buffer = ctx.enqueue_create_buffer[Self.dtype](numels)
-        var result_buffer = ctx.enqueue_create_buffer[Self.dtype](numels)
+        #var A_buffer = device_context.enqueue_create_buffer[Self.dtype](numels)
+        ref A_buffer = A_device_state.device_buffer()
+        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            numels
+        )
         var start = now()
-        A.write_to(A_buffer)
+        #A.write_to(A_buffer)
         print("Writing to buffer took: ", (now() - start) * 1000, "ms")
 
-        ctx.enqueue_function(
+        device_context.enqueue_function(
             compiled_func,
             result_buffer,
             A_buffer,
@@ -168,13 +156,34 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
             block_dim=threads_per_block,
         )
 
-        ctx.synchronize()
+        device_context.synchronize()
         start = now()
         var out = Tensor[Self.dtype].from_device_buffer(
             result_buffer, A.shape()
         )
         print("Reading from buffer took: ", (now() - start) * 1000, "ms")
         return out^
+
+    @staticmethod
+    fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
+        threads_per_block: Int
+        num_blocks: Int
+
+        if numels < 4096:
+            threads_per_block = 128
+            num_blocks = (numels + 127) // 128
+        elif numels < 65536:
+            threads_per_block = 256
+            num_blocks = (numels + 255) // 256
+        else:
+            threads_per_block = 256
+            var total_chunks = (numels + (simdwidth * 2 * simdwidth - 1)) // (
+                simdwidth * 2 * simdwidth
+            )
+            num_blocks = min(
+                (total_chunks + 255) // 256, 512
+            )  # Cap at 512 blocks
+        return threads_per_block, num_blocks
 
 
 from testing import assert_true
