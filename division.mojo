@@ -10,7 +10,7 @@ from mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
 from gradbox import Gradbox
 from sys import has_accelerator
-from arithmetic_ops_kernel import ArithmeticOpsKernel
+from binary_ops_kernel import BinaryOpsKernel
 
 
 @fieldwise_init
@@ -211,7 +211,7 @@ struct Divider[dtype: DType]:
         if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
-                    out = ArithmeticOpsKernel[Self.dtype].launch[Divide](
+                    out = BinaryOpsKernel[Self.dtype].launch[Divide](
                         self, other
                     )
                 except e:

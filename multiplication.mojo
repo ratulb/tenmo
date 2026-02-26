@@ -11,7 +11,7 @@ from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
-from arithmetic_ops_kernel import ArithmeticOpsKernel
+from binary_ops_kernel import BinaryOpsKernel
 
 
 @fieldwise_init
@@ -151,7 +151,7 @@ struct Multiplicator[dtype: DType]:
         if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
-                    out = ArithmeticOpsKernel[Self.dtype].launch[Multiply](
+                    out = BinaryOpsKernel[Self.dtype].launch[Multiply](
                         self, other
                     )
                 except e:
