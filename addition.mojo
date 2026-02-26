@@ -12,6 +12,7 @@ from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
 from binary_ops_kernel import BinaryOpsKernel
+from scalar_ops_kernel import ScalarOpsKernel
 
 
 @fieldwise_init
@@ -94,9 +95,33 @@ struct AddScalar[dtype: DType](Copyable):
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
-            self.buffer.scalar_ops[Add](scalar), requires_grad=False
-        )
+        var out: Tensor[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = ScalarOpsKernel[Self.dtype].launch[Add](self, scalar)
+                except e:
+                    print(e)
+                    print(
+                        "AddScalar - GPU operation failed. Failling back on CPU"
+                    )
+                    out = Tensor[Self.dtype](
+                        self.buffer.scalar_ops[Add](scalar),
+                        requires_grad=False,
+                    )
+
+            else:
+                out = Tensor[Self.dtype](
+                    self.buffer.scalar_ops[Add](scalar),
+                    requires_grad=False,
+                )
+
+        else:
+            out = Tensor[Self.dtype](
+                self.buffer.scalar_ops[Add](scalar), requires_grad=False
+            )
 
         @parameter
         if track_grad:
@@ -136,9 +161,7 @@ struct Adder[dtype: DType](Copyable):
         if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
-                    out = BinaryOpsKernel[Self.dtype].launch[Add](
-                        self, other
-                    )
+                    out = BinaryOpsKernel[Self.dtype].launch[Add](self, other)
                 except e:
                     print(e)
                     print("Adder - GPU operation failed. Failling back on CPU")
@@ -178,8 +201,10 @@ struct Adder[dtype: DType](Copyable):
 
         return out^
 
+
 from common_utils import now
 from testing import assert_true
+
 
 fn main() raises:
     comptime dtype = DType.float32

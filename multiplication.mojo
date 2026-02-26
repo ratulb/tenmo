@@ -12,6 +12,7 @@ from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
 from binary_ops_kernel import BinaryOpsKernel
+from scalar_ops_kernel import ScalarOpsKernel
 
 
 @fieldwise_init
@@ -108,14 +109,41 @@ struct MultiplyScalar[dtype: DType]:
     ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
-            self.buffer.scalar_ops[Multiply](factor), requires_grad=False
-        )
+        var out: Tensor[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = ScalarOpsKernel[Self.dtype].launch[Multiply](
+                        self, factor
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "MultiplyScalar - GPU operation failed. Failling back"
+                        " on CPU"
+                    )
+                    out = Tensor[Self.dtype](
+                        self.buffer.scalar_ops[Multiply](factor),
+                        requires_grad=False,
+                    )
+
+            else:
+                out = Tensor[Self.dtype](
+                    self.buffer.scalar_ops[Multiply](factor),
+                    requires_grad=False,
+                )
+
+        else:
+            out = Tensor[Self.dtype](
+                self.buffer.scalar_ops[Multiply](factor), requires_grad=False
+            )
 
         @parameter
         if track_grad:
-            out.requires_grad_(True)
             if self.requires_grad:
+                out.requires_grad_(True)
                 backward_fn = MultiplyBackwardScalar[Self.dtype](
                     factor
                 ).into_backward_fn()
@@ -209,6 +237,7 @@ struct Multiplicator[dtype: DType]:
 
 from common_utils import now
 from testing import assert_true
+
 
 fn main() raises:
     comptime dtype = DType.float32

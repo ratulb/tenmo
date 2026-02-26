@@ -11,6 +11,7 @@ from common_utils import panic
 from gradbox import Gradbox
 from sys import has_accelerator
 from binary_ops_kernel import BinaryOpsKernel
+from scalar_ops_kernel import ScalarOpsKernel
 
 
 @fieldwise_init
@@ -136,8 +137,37 @@ struct DivideScalar[dtype: DType]:
             "Tensor → __rtruediv__ is for numeric data types only",
         ]()
 
-        nd_buffer = self.buffer.scalar_ops[ReverseDivide](scalar)
-        var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
+        var out: Tensor[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = ScalarOpsKernel[Self.dtype].launch[ReverseDivide](
+                        self, scalar
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "DivideScalar - GPU operation failed. Failling back"
+                        " on CPU"
+                    )
+                    out = Tensor[Self.dtype](
+                        self.buffer.scalar_ops[ReverseDivide](scalar),
+                        requires_grad=False,
+                    )
+
+            else:
+                out = Tensor[Self.dtype](
+                    self.buffer.scalar_ops[ReverseDivide](scalar),
+                    requires_grad=False,
+                )
+
+        else:
+            out = Tensor[Self.dtype](
+                self.buffer.scalar_ops[ReverseDivide](scalar),
+                requires_grad=False,
+            )
 
         @parameter
         if track_grad:
@@ -169,8 +199,36 @@ struct DivideByScalar[dtype: DType]:
         if scalar == Scalar[Self.dtype](0):
             panic("Tensor → __truediv__ : canot divide by " + scalar.__str__())
 
-        nd_buffer = self.buffer.scalar_ops[Divide](scalar)
-        var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
+        var out: Tensor[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = ScalarOpsKernel[Self.dtype].launch[Divide](
+                        self, scalar
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "DivideByScalar - GPU operation failed. Failling back"
+                        " on CPU"
+                    )
+                    out = Tensor[Self.dtype](
+                        self.buffer.scalar_ops[Divide](scalar),
+                        requires_grad=False,
+                    )
+
+            else:
+                out = Tensor[Self.dtype](
+                    self.buffer.scalar_ops[Divide](scalar),
+                    requires_grad=False,
+                )
+
+        else:
+            out = Tensor[Self.dtype](
+                self.buffer.scalar_ops[Divide](scalar), requires_grad=False
+            )
 
         @parameter
         if track_grad:

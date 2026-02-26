@@ -13,6 +13,7 @@ from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
 from binary_ops_kernel import BinaryOpsKernel
+from scalar_ops_kernel import ScalarOpsKernel
 
 
 @register_passable
@@ -95,9 +96,36 @@ struct SubtractScalar[dtype: DType]:
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out = Tensor[Self.dtype](
-            self.buffer.scalar_ops[Subtract](scalar), requires_grad=False
-        )
+        var out: Tensor[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = ScalarOpsKernel[Self.dtype].launch[Subtract](
+                        self, scalar
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "SubtractScalar - GPU operation failed. Failling back"
+                        " on CPU"
+                    )
+                    out = Tensor[Self.dtype](
+                        self.buffer.scalar_ops[Subtract](scalar),
+                        requires_grad=False,
+                    )
+
+            else:
+                out = Tensor[Self.dtype](
+                    self.buffer.scalar_ops[Subtract](scalar),
+                    requires_grad=False,
+                )
+
+        else:
+            out = Tensor[Self.dtype](
+                self.buffer.scalar_ops[Subtract](scalar), requires_grad=False
+            )
 
         @parameter
         if track_grad:
@@ -120,9 +148,37 @@ struct SubtractFromScalar[dtype: DType]:
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out = Tensor[Self.dtype](
-            self.buffer.scalar_ops[ReverseSubtract](scalar), requires_grad=False
-        )
+        var out: Tensor[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = ScalarOpsKernel[Self.dtype].launch[ReverseSubtract](
+                        self, scalar
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "SubtractFromScalar - GPU operation failed. Failling"
+                        " back on CPU"
+                    )
+                    out = Tensor[Self.dtype](
+                        self.buffer.scalar_ops[ReverseSubtract](scalar),
+                        requires_grad=False,
+                    )
+
+            else:
+                out = Tensor[Self.dtype](
+                    self.buffer.scalar_ops[ReverseSubtract](scalar),
+                    requires_grad=False,
+                )
+
+        else:
+            out = Tensor[Self.dtype](
+                self.buffer.scalar_ops[ReverseSubtract](scalar),
+                requires_grad=False,
+            )
 
         @parameter
         if track_grad:
