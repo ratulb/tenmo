@@ -7,7 +7,6 @@ from strides import Strides
 from broadcasthelper import ShapeBroadcaster
 from device import DeviceState
 from array import Array
-from device import GPU
 
 
 fn arithmetic_ops_both_contiguous[
@@ -688,13 +687,13 @@ struct BinaryOpsKernel[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    test_to_gpu_and_back()
-    _="""print("=" * 60)
+    print("=" * 60)
     print("Production Tensor-Tensor Arithmetic Tests")
     print("With Offset Support")
     print("=" * 60)
 
     # Original tests
+    test_to_gpu_and_back()
     test_contiguous_same_shape()
     test_non_contiguous()
     test_broadcasting()
@@ -708,12 +707,13 @@ fn main() raises:
 
     print("\n" + "=" * 60)
     print("ALL TESTS PASSED (Including Offset Tests)")
-    print("=" * 60)"""
+    print("=" * 60)
 
 
 from common_utils import now
 from testing import assert_true
 from shapes import Shape
+
 
 fn test_to_gpu_and_back() raises:
     """Test cpu->gpu -> cpu."""
