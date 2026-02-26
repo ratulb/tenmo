@@ -459,37 +459,50 @@ struct Tensor[dtype: DType = DType.float32](
                     (ptr + offset)[] = data_buffer[index]
                     offset += 1
 
-    fn to_device(mut self, device: Device) raises:
+
+    fn to_device(
+        mut self,
+        device: Device,
+        requires_grad: Bool = False
+    ) raises -> Self:
+
         if device.is_cpu():
             if self.buffer.is_on_cpu():
-                print("Tensor is already on CPU")
-                return
-            else:
-                self.buffer.to_cpu()
-        else:
-            if self.buffer.is_on_gpu():
-                print("Tensor is already on GPU")
-                return
-            else:
-                self.buffer.to_gpu(device.kind[GPU])
+                return self
+            return Self(
+                self.buffer.to_cpu(),
+                requires_grad=requires_grad
+            )
+
+        # GPU case
+        if self.buffer.is_on_gpu():
+            return self
+
+        return Self(
+            self.buffer.to_gpu(device.kind[GPU]),
+            requires_grad=requires_grad
+        )
 
     fn to_cpu(
         mut self,
-    ) raises:
-        return self.to_device(Device())
+    ) raises -> Self:
+        return self.to_device(CPU().into())
 
-    fn to_gpu(mut self, gpu: Optional[GPU] = None) raises:
+    fn to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Self:
         @parameter
         if has_accelerator():
             if gpu:
-                self.to_device(gpu.value().into())
+                return self.to_device(gpu.value().into())
             else:
-                self.to_device(GPU().into())
+                return self.to_device(GPU().into())
         else:
-            print("System does not have any accelerator device")
+            raise Error("Can not move to GPU. System does not have any accelerator device")
 
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
-        return self.buffer.device_context()
+        @parameter
+        if has_accelerator():
+            return self.buffer.device_context()
+        return None
 
     # Check if it has a backward fn before calling this API
     @always_inline
@@ -2369,9 +2382,5 @@ fn main() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, requires_grad=True)
     # var b = Tensor[dtype].arange(10, requires_grad=True)
-    print(a.is_on_gpu())
-    a.to_gpu()
-    var r = a + a
-    r.print()
-    r.backward()
-    a.grad().print()
+    _c = a.to_cpu()
+    _ = a.device_context()

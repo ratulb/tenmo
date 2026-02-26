@@ -7,7 +7,7 @@ from broadcasthelper import ShapeBroadcaster
 from common_utils import panic, log_warning, print_buffer
 from memory import memcpy, AddressSpace, ArcPointer
 from gpu.host import DeviceBuffer, DeviceContext
-from device import Device, CPU, GPU, BufferDeviceState
+from device import Device, CPU, GPU, DeviceState
 from collections import Set
 from sys import simd_width_of, has_accelerator
 from mnemonics import (
@@ -40,7 +40,7 @@ struct NDBuffer[dtype: DType](
     var offset: Int
     var buffer: Buffer[Self.dtype]
     var _contiguous: Bool
-    var device_state: Optional[BufferDeviceState[Self.dtype]]
+    var device_state: Optional[DeviceState[Self.dtype]]
 
     fn __init__(out self, *values: Scalar[Self.dtype]):
         buffer = Buffer[Self.dtype](len(values))
@@ -63,9 +63,9 @@ struct NDBuffer[dtype: DType](
                 " danger"
             )
             self.buffer = buffer^
-            self.shape = Shape()
-            self.strides = Strides.Zero()
-            self.offset = 0
+            self.shape = shape.or_else(Shape())
+            self.strides = strides.or_else(Strides.Zero())
+            self.offset = offset
             self._contiguous = True
 
         else:
@@ -95,11 +95,13 @@ struct NDBuffer[dtype: DType](
         out self,
         device_buffer: DeviceBuffer[Self.dtype],
         shape: Shape,
+        *,
+        copy: Bool = False,
     ) raises:
         var buffer: Buffer[Self.dtype]
         with device_buffer.map_to_host() as host_buffer:
             buffer = Buffer[Self.dtype](
-                shape.num_elements(), host_buffer.unsafe_ptr(), copy=True
+                shape.num_elements(), host_buffer.unsafe_ptr(), copy=copy
             )
         self.buffer = buffer^
         self.shape = shape
@@ -134,71 +136,87 @@ struct NDBuffer[dtype: DType](
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
-    fn to_cpu(mut self, cpu: CPU = CPU()) raises:
-        #self.to_device(cpu.into())
-        self.device_state = None
+    fn to_cpu(
+        mut self, cpu: CPU = CPU(), delete: Bool = False
+    ) raises -> Self:
+        var nd_buffer = self.to_device(cpu.into())
+        if delete:
+            self.device_state = None
+        return nd_buffer^
 
-    fn to_gpu(mut self, gpu: GPU, force: Bool = False) raises:
-        self.to_device(gpu.into(), force)
+    fn to_gpu(self, gpu: GPU) raises -> Self:
+        return self.to_device(gpu.into())
 
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu():
-                return self.device_state.value().gpu[]
-            else:
-                return None
-        else:
-            return None
+        if self.is_on_gpu():
+            return self.device_state.value().gpu[]
+        return None
 
-    fn to_device(mut self, device: Device, force: Bool = False) raises:
-        """Move this buffer to GPU or CPU."""
-        # No device state yet (buffer is on CPU)
+    fn to_device(self, device: Device) raises -> NDBuffer[Self.dtype]:
+        """
+        Materialize this buffer onto another device.
+
+        Returns:
+            - None if already on target device.
+            - New NDBuffer if transfer occurs.
+        """
+
+        # 1) Currently on CPU
+
         if not self.device_state:
-            if device.is_gpu():
-                # First time moving to GPU
-                self.device_state = BufferDeviceState[Self.dtype](
-                    self, device.kind[GPU]
-                )
-            # else: already on CPU, nothing to do
-            return
+            if device.is_cpu():
+                print("NDBuffer -> to_device: already on CPU")
+                return self
 
-        # Buffer already has device state
-        var device_state = self.device_state.value()
-        ref curr_gpu = device_state.gpu
-        var is_synched = device_state.synched_back
+            # CPU -> GPU
+            var gpu = device.kind[GPU]
+            # Allocate device storage
+            var new_device_state = DeviceState[Self.dtype](self.numels(), gpu)
+            # Fill from logical view (handles offset/strides)
+            new_device_state.fill(self)
+            # Create new NDBuffer:
+            #   - contiguous
+            #   - offset = 0
+            #   - no CPU buffer
+            var empty_cpu_buffer = Buffer[Self.dtype]()  # uninitialized
+            var result = NDBuffer[Self.dtype](
+                empty_cpu_buffer^,
+                shape=self.shape,
+                strides=Strides.default(self.shape),
+                offset=0,
+            )
+
+            result.device_state = new_device_state^
+
+            return result^
+
+        # 2) Currently on GPU
+        var curr_state = self.device_state.value()
+        var curr_gpu = curr_state.gpu
 
         if device.is_gpu():
-            # Target is GPU
-            ref new_gpu = device.kind[GPU]
+            var new_gpu = device.kind[GPU]
 
             if curr_gpu == new_gpu:
-                # Same GPU - check if resync needed
-                if not is_synched or force:
-                    device_state.to_gpu(self)
-                # else: already synched and not forced, nothing to do
+                print("NDBuffer -> to_device: current and new device is same")
+                # Already on this GPU
+                return self
 
-            elif not is_synched and not force:
-                # Different GPU with unsynced data - need force
-                raise Error(
-                    "Cannot move to GPU ",
-                    new_gpu().id(),
-                    "without syncing data. Current GPU: ",
-                    curr_gpu().id(),
-                    ". Use force=True to override.",
-                )
-            else:
-                # Different GPU with synced data or forced
-                self.device_state = BufferDeviceState[Self.dtype](self, new_gpu)
+            # GPU -> different GPU
+            # We materialize through CPU
 
-        else:
-            # Target is CPU
-            if is_synched and not force:
-                # Already synched to CPU and not forced - nothing to do
-                return
-            else:
-                # Need to sync to CPU
-                device_state.to_cpu(self)
+            # First bring to CPU
+            var cpu_buffer = curr_state.into(self.shape)
+
+            # Then move CPU -> new GPU
+            return cpu_buffer.to_device(device)
+
+        # ---------------------------------------
+        # 3) GPU -> CPU
+        # ---------------------------------------
+        # Materialize contiguous CPU buffer
+
+        return curr_state.into(self.shape)
 
     fn is_on_gpu(self) -> Bool:
         @parameter

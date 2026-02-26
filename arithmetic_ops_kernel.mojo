@@ -5,7 +5,7 @@ from mnemonics import Add, Multiply, Subtract, Divide, max_rank
 from tenmo import Tensor
 from strides import Strides
 from broadcasthelper import ShapeBroadcaster
-from device import BufferDeviceState
+from device import DeviceState
 from array import Array
 from device import GPU
 
@@ -522,7 +522,7 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
                 ],
             ]()
 
-            print("GPU compilation took: ", (now() - start)* 1000, "ms")
+            print("GPU compilation took: ", (now() - start) * 1000, "ms")
             start = now()
             device_context.enqueue_function(
                 compiled_func,
@@ -537,12 +537,16 @@ struct ArithmeticOpsKernel[dtype: DType = DType.float32](
             )
 
             device_context.synchronize()
-            print("GPU enqueueing and sync took: ", (now() - start) * 1000, "ms")
+            print(
+                "GPU enqueueing and sync took: ", (now() - start) * 1000, "ms"
+            )
             start = now()
             var out = Tensor[Self.dtype].from_device_buffer(
                 result_buffer, broadcast_shape
             )
-            print("Copying result from GPU took: ", (now() - start)*1000, "ms")
+            print(
+                "Copying result from GPU took: ", (now() - start) * 1000, "ms"
+            )
             return out^
 
         # Prepare for strided kernels
@@ -719,14 +723,14 @@ fn test_contiguous_same_shape() raises:
     var a = Tensor[dtype].rand(1000, 10000)
     var b = Tensor[dtype].rand(1000, 10000)
 
-    a.to_gpu()
-    b.to_gpu()
+    ag = a.to_gpu()
+    bg = b.to_gpu()
 
     var start = now()
-    var gpu_result = a * b
+    var gpu_result = ag * bg
     var gpu_time = (now() - start) * 1000
-    a.to_cpu()
-    b.to_cpu()
+    # a.to_cpu()
+    # b.to_cpu()
     start = now()
     var cpu_result = a * b
     var cpu_time = (now() - start) * 1000
@@ -745,12 +749,12 @@ fn test_broadcasting() raises:
     var a = Tensor[dtype].rand(3, 1, 4)  # [3, 1, 4]
     var b = Tensor[dtype].rand(1, 2, 4)  # [1, 2, 4]
 
-    a.to_gpu()
-    b.to_gpu()
+    ag = a.to_gpu()
+    bg = b.to_gpu()
 
-    var gpu_result = a + b
-    a.to_cpu()
-    b.to_cpu()
+    var gpu_result = ag + bg
+    # a.to_cpu()
+    # b.to_cpu()
     var cpu_result = a + b
 
     assert_true(gpu_result.shape() == Shape(3, 2, 4))
@@ -767,12 +771,12 @@ fn test_scalar_broadcast() raises:
     var a = Tensor[dtype].rand(100, 100)
     var b = Tensor[dtype].ones(1, 1) * 42  # Broadcasts to [100, 100]
 
-    a.to_gpu()
-    b.to_gpu()
+    ag = a.to_gpu()
+    bg = b.to_gpu()
 
-    var gpu_result = a * b
-    a.to_cpu()
-    b.to_cpu()
+    var gpu_result = ag * bg
+    # a.to_cpu()
+    # b.to_cpu()
     var cpu_result = a * b
 
     assert_true(gpu_result.all_close(cpu_result))
@@ -788,12 +792,12 @@ fn test_non_contiguous() raises:
     var b = Tensor[dtype].rand(2000, 3000)
     var a_t = a.transpose(1, 0)  # Non-contiguous view [2000, 3000]
 
-    a_t.to_gpu()
-    b.to_gpu()
+    a_tg = a_t.to_gpu()
+    bg = b.to_gpu()
 
-    var gpu_result = a_t+ b
-    a_t.to_cpu()
-    b.to_cpu()
+    var gpu_result = a_tg + bg
+    # a_t.to_cpu()
+    # b.to_cpu()
 
     var cpu_result = a_t + b
     assert_true(gpu_result.all_close(cpu_result))
@@ -808,12 +812,12 @@ fn test_complex_broadcasting() raises:
     var a = Tensor[dtype].rand(1, 5, 1, 7)  # [1, 5, 1, 7]
     var b = Tensor[dtype].rand(3, 1, 4, 1)  # [3, 1, 4, 1]
 
-    a.to_gpu()
-    b.to_gpu()
+    ag = a.to_gpu()
+    bg = b.to_gpu()
 
-    var gpu_result = a * b
-    a.to_cpu()
-    b.to_cpu()
+    var gpu_result = ag * bg
+    # a.to_cpu()
+    # b.to_cpu()
 
     var cpu_result = a * b
 
@@ -832,14 +836,14 @@ fn test_large_arrays() raises:
     var a = Tensor[dtype].rand(size)
     var b = Tensor[dtype].rand(size)
 
-    a.to_gpu()
-    b.to_gpu()
+    ag = a.to_gpu()
+    bg = b.to_gpu()
 
     var start = now()
-    var gpu_result = a + b
+    var gpu_result = ag + bg
     var gpu_time = (now() - start) * 1000
-    a.to_cpu()
-    b.to_cpu()
+    # a.to_cpu()
+    # b.to_cpu()
 
     start = now()
     var cpu_result = a + b
@@ -874,13 +878,13 @@ fn test_contiguous_view_with_offset() raises:
     assert_true(a.buffer.offset == 100, "A offset should be 100")
     assert_true(b.buffer.offset == 200, "B offset should be 200")
 
-    a.to_gpu()
-    b.to_gpu()
+    ag = a.to_gpu()
+    bg = b.to_gpu()
 
     # GPU computation
-    var gpu_result = a * b
-    a.to_cpu()
-    b.to_cpu()
+    var gpu_result = ag * bg
+    # a.to_cpu()
+    # b.to_cpu()
 
     # CPU reference
     var cpu_result = a * b
@@ -906,12 +910,12 @@ fn test_all_offset_scenarios() raises:
     var b1 = Tensor[dtype].rand(1000)
     b1 = b1[50:550]
 
-    a1.to_gpu()
-    b1.to_gpu()
+    a1g = a1.to_gpu()
+    b1g = b1.to_gpu()
 
-    var result1 = a1 + b1
-    a1.to_cpu()
-    b1.to_cpu()
+    var result1 = a1g + b1g
+    # a1.to_cpu()
+    # b1.to_cpu()
 
     assert_true(result1.all_close(a1 + b1))
     print("    Passed")
@@ -922,14 +926,14 @@ fn test_all_offset_scenarios() raises:
     a2 = a2[100:600]
     var b2 = Tensor[dtype].rand(500)  # No offset
 
-    a2.to_gpu()
-    b2.to_gpu()
+    a2g = a2.to_gpu()
+    b2g = b2.to_gpu()
 
-    var result2 = a2 - b2
-    a2.to_cpu()
-    b2.to_cpu()
+    var result2 = a2g - b2g
+    # a2.to_cpu()
+    # b2.to_cpu()
 
-    assert_true(result2.all_close(a2 - b2))
+    assert_true(result2.all_close(a2g - b2g))
     print("    Passed")
 
     # Scenario 3: Only B has offset
@@ -938,12 +942,12 @@ fn test_all_offset_scenarios() raises:
     var b3 = Tensor[dtype].rand(1000)
     b3 = b3[200:700]
 
-    a3.to_gpu()
-    b3.to_gpu()
+    a3g = a3.to_gpu()
+    b3g = b3.to_gpu()
 
-    var result3 = a3 * b3
-    a3.to_cpu()
-    b3.to_cpu()
+    var result3 = a3g * b3g
+    # a3.to_cpu()
+    # b3.to_cpu()
 
     assert_true(result3.all_close(a3 * b3))
     print("    Passed")
@@ -953,12 +957,12 @@ fn test_all_offset_scenarios() raises:
     var a4 = Tensor[dtype].rand(500)
     var b4 = Tensor[dtype].rand(500)
 
-    a4.to_gpu()
-    b4.to_gpu()
+    a4g = a4.to_gpu()
+    b4g = b4.to_gpu()
 
-    var result4 = a4 / b4
-    a4.to_cpu()
-    b4.to_cpu()
+    var result4 = a4g / b4g
+    # a4.to_cpu()
+    # b4.to_cpu()
 
     assert_true(result4.all_close(a4 / b4))
     print("    Passed")

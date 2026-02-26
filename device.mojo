@@ -4,6 +4,7 @@ from memory import ArcPointer, memcpy
 from sys import has_accelerator
 from utils import Variant
 from ndbuffer import NDBuffer
+from shapes import Shape
 
 comptime DeviceType = Variant[CPU, GPU]
 
@@ -57,6 +58,8 @@ struct CPU(Equatable, ImplicitlyCopyable, Movable):
 
 @fieldwise_init
 struct GPU(Equatable, ImplicitlyCopyable, Movable):
+    """Essentially a shared DeviceContext."""
+
     var device_context: ArcPointer[DeviceContext]
 
     fn into(self) -> Device:
@@ -94,37 +97,27 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
 
 
 @fieldwise_init
-struct BufferDeviceState[dtype: DType](
-    Equatable & ImplicitlyCopyable & Movable
-):
-    var buffer_state: DeviceBuffer[Self.dtype]
+struct DeviceState[dtype: DType](Equatable & ImplicitlyCopyable & Movable):
+    var buffer: DeviceBuffer[Self.dtype]
     var gpu: GPU
-    var synched_back: Bool
 
     fn __init__(
         out self,
-        ref nd_buffer: NDBuffer[Self.dtype],
+        size: Int,
         gpu: Optional[GPU] = None,
     ) raises:
-        var buffer_gpu = gpu.or_else(GPU())
-        var numels = nd_buffer.numels()
-        var buffer_state = buffer_gpu().enqueue_create_buffer[Self.dtype](
-            numels
-        )
-        self.buffer_state = buffer_state^
-        self.gpu = buffer_gpu^
-        self.synched_back = False
-        self.to_gpu(nd_buffer)
+        var device_ctx = gpu.or_else(GPU())
+        var device_buffer = device_ctx().enqueue_create_buffer[Self.dtype](size)
+        self.buffer = device_buffer^
+        self.gpu = device_ctx^
 
     fn __copyinit__(out self, existing: Self):
-        self.buffer_state = existing.buffer_state.copy()
+        self.buffer = existing.buffer.copy()
         self.gpu = existing.gpu.copy()
-        self.synched_back = existing.synched_back
 
     fn __moveinit__(out self, deinit existing: Self):
-        self.buffer_state = existing.buffer_state^
+        self.buffer = existing.buffer^
         self.gpu = existing.gpu^
-        self.synched_back = existing.synched_back
 
     fn __eq__(self, other: Self) -> Bool:
         return self.gpu == other.gpu
@@ -132,45 +125,36 @@ struct BufferDeviceState[dtype: DType](
     fn __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    fn to_gpu(mut self, ref nd_buffer: NDBuffer[Self.dtype]) raises:
-        if nd_buffer.is_contiguous():
-            var offset = nd_buffer.offset
-            var src_ptr = nd_buffer.data_ptr() + offset
-            # self.gpu().enqueue_copy(self.buffer_state, src_ptr)
-            with self.buffer_state.map_to_host() as host_buffer:
-                var start = now()
-                dest_ptr = host_buffer.unsafe_ptr()
-                memcpy(dest=dest_ptr, src=src_ptr, count=nd_buffer.numels())
-                print("to_gpu copy took: ", (now() - start) * 1000, "ms")
-        else:
-            with self.buffer_state.map_to_host() as host_buffer:
-                var ptr = host_buffer.unsafe_ptr()
-                ref data_buffer = nd_buffer.data_buffer()
-                var offset = 0
-                for index in nd_buffer.index_iterator():
-                    (ptr + offset)[] = data_buffer[index]
-                    offset += 1
-        self.synched_back = False
+    fn fill(self, ref source: NDBuffer[Self.dtype]) raises:
+        with self.buffer.map_to_host() as host_buffer:
+            var device_ptr = host_buffer.unsafe_ptr()
+            var src_ptr = source.data_ptr()
 
-    fn to_cpu(mut self, mut nd_buffer: NDBuffer[Self.dtype]) raises:
-        _="""if nd_buffer.is_contiguous():
-            var offset = nd_buffer.offset
-            var data_dest = nd_buffer.data_ptr() + offset
-            self.gpu().enqueue_copy(data_dest, self.buffer_state)
-        else:
-            with self.buffer_state.map_to_host() as host_buffer:
-                var ptr = host_buffer.unsafe_ptr()
-                ref data_buffer = nd_buffer.data_buffer()
-                var offset = 0
-                for index in nd_buffer.index_iterator():
-                    data_buffer[index] = (ptr + offset)[]
-                    offset += 1"""
-        self.synched_back = True
+            if source.is_contiguous():
+                var src_offset = source.offset
+                # Take care of contiguous views with offset
+                var src_ptr = source.data_ptr() + src_offset
+                memcpy(dest=device_ptr, src=src_ptr, count=source.numels())
+                # self.gpu().enqueue_copy(self.buffer, src_ptr)
+            else:
+                var next_index = 0
+                # Iterate strided indices
+                for index in source.index_iterator():
+                    (device_ptr + next_index)[] = (src_ptr + index)[]
+                    next_index += 1
+
+    fn into(
+        self, shape: Shape, *, copy: Bool = False
+    ) raises -> NDBuffer[Self.dtype]:
+        """Copy the DeviceState content to realize a filled NDBuffer.
+        The NDBuffer is contiguous with 0 offset.
+        """
+        return NDBuffer[Self.dtype](self.buffer, shape, copy=copy)
 
     fn device_buffer(
         ref self,
-    ) -> ref [self.buffer_state] DeviceBuffer[Self.dtype]:
-        return self.buffer_state
+    ) -> ref [self.buffer] DeviceBuffer[Self.dtype]:
+        return self.buffer
 
 
 fn main() raises:
