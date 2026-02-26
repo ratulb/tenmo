@@ -1,5 +1,4 @@
 from gpu import thread_idx, block_dim, grid_dim, block_idx
-from gpu.host import DeviceContext, DeviceBuffer
 from sys import simd_width_of
 
 from tenmo import Tensor
@@ -126,7 +125,7 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
             scalar_ops[
                 op_code=op_code,
                 dtype = Self.dtype,
-                simd_width=simdwidth,  # ← Use optimal!
+                simd_width=simdwidth,
                 simd_vectors_per_thread = 2 * simdwidth,
             ],
             scalar_ops[
@@ -137,13 +136,11 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
             ],
         ]()
 
-        # var A_buffer = device_context.enqueue_create_buffer[Self.dtype](numels)
         ref A_buffer = A_device_state.device_buffer()
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
             numels
         )
         var start = now()
-        # A.write_to(A_buffer)
         print("Writing to buffer took: ", (now() - start) * 1000, "ms")
 
         device_context.enqueue_function(
@@ -200,7 +197,6 @@ fn main() raises:
     print("CPU mul took: ", (now() - start) * 1000, "ms")
     # First test
     start = now()
-    # var result = ScalarOpsKernel[dtype].launch[op_code=Multiply](tensor_a, 42)
     var result = tensor_a * 42
     print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))

@@ -144,7 +144,7 @@ struct DeviceState[dtype: DType](Equatable & ImplicitlyCopyable & Movable):
                     next_index += 1
 
     fn into(
-        self, shape: Shape, *, copy: Bool = False
+        self, shape: Shape, *, copy: Bool = True
     ) raises -> NDBuffer[Self.dtype]:
         """Copy the DeviceState content to realize a filled NDBuffer.
         The NDBuffer is contiguous with 0 offset.
