@@ -193,25 +193,28 @@ from common_utils import now
 fn main() raises:
     var SIZE = 65536 * 1000
     comptime dtype = DType.float32
-    var tensor_a = Tensor[dtype].ones(SIZE)
+    var tensor_A = Tensor[dtype].ones(SIZE)
+    var tensor_a = tensor_A.to_gpu()
     var start = now()
     var expect = tensor_a * 42
     print("CPU mul took: ", (now() - start) * 1000, "ms")
     # First test
     start = now()
-    var result = ScalarOpsKernel[dtype].launch[op_code=Multiply](tensor_a, 42)
+    #var result = ScalarOpsKernel[dtype].launch[op_code=Multiply](tensor_a, 42)
+    var result = tensor_a * 42
     print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
     # Second test
-    tensor_a = Tensor[dtype].rand(SIZE // 2, 2)
-    var reshaped = tensor_a.reshape(2, SIZE // 2)
+    tensor_A = Tensor[dtype].rand(SIZE // 2, 2)
+    var reshaped = tensor_A.reshape(2, SIZE // 2)
     start = now()
     expect = reshaped * 1919
 
     print("CPU mul took: ", (now() - start) * 1000, "ms")
     start = now()
-    result = ScalarOpsKernel[dtype].launch[op_code=Multiply](reshaped, 1919)
+    tensor_a = reshaped.to_gpu()
+    result = tensor_a * 1919
 
     print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
@@ -220,7 +223,7 @@ fn main() raises:
 
     print("CPU div took: ", (now() - start) * 1000, "ms")
     start = now()
-    result = ScalarOpsKernel[dtype].launch[Divide](reshaped, 89)
+    result = tensor_a / 89
 
     print("GPU div took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
@@ -229,70 +232,10 @@ fn main() raises:
 
     print("CPU subtract took: ", (now() - start) * 1000, "ms")
     start = now()
-    result = ScalarOpsKernel[dtype].launch[op_code=Subtract](reshaped, 999)
+    result = tensor_a - 999
 
     print("GPU subtract took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
     print("Launch success")
 
-
-struct GPUTensor[dtype: DType]:
-    """Tensor that lives on GPU - avoid transfers."""
-
-    var gpu_buffer: DeviceBuffer[Self.dtype]
-    var shape: Shape
-    var ctx: DeviceContext
-
-    fn __init__(
-        out self,
-        var buffer: DeviceBuffer[Self.dtype],
-        shape: Shape,
-        ctx: DeviceContext,
-    ):
-        self.gpu_buffer = buffer^
-        self.shape = shape
-        self.ctx = ctx
-
-    @staticmethod
-    fn from_cpu(tensor: Tensor[Self.dtype], ctx: DeviceContext) raises -> Self:
-        """Upload once, keep on GPU."""
-        var numels = tensor.numels()
-        var gpu_buf = ctx.enqueue_create_buffer[Self.dtype](numels)
-        tensor.write_to(gpu_buf)
-        return GPUTensor(gpu_buf^, tensor.shape(), ctx)
-        # return GPUTensor(gpu_buf^, tensor.shape())
-
-    fn to_cpu(self) raises -> Tensor[Self.dtype]:
-        """Download when needed."""
-        return Tensor[Self.dtype].from_device_buffer(
-            self.gpu_buffer, self.shape
-        )
-
-    fn scalar_op[
-        op_code: Int
-    ](self, scalar: Scalar[Self.dtype]) raises -> GPUTensor[Self.dtype]:
-        """GPU operation - no transfers."""
-        var numels = self.shape.num_elements()
-        var result_buffer = self.ctx.enqueue_create_buffer[Self.dtype](numels)
-
-        comptime simdwidth = simd_width_of[Self.dtype]()
-        var threads_per_block = 256
-        var num_blocks = min((numels + 255) // 256, 512)
-
-        var compiled_func = self.ctx.compile_function[
-            scalar_ops[op_code, Self.dtype, simdwidth, 2 * simdwidth],
-            scalar_ops[op_code, Self.dtype, simdwidth, 2 * simdwidth],
-        ]()
-
-        self.ctx.enqueue_function(
-            compiled_func,
-            result_buffer,
-            self.gpu_buffer,  # Already on GPU!
-            scalar,
-            UInt(numels),
-            grid_dim=num_blocks,
-            block_dim=threads_per_block,
-        )
-
-        return GPUTensor(result_buffer^, self.shape, self.ctx)
