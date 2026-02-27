@@ -11,8 +11,8 @@ from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
-from binary_ops_kernel import BinaryOpsKernel
-from scalar_ops_kernel import ScalarOpsKernel
+from scalar_forward import ScalarOperation
+from binary_forward import BinaryOperation
 
 
 @fieldwise_init
@@ -102,43 +102,14 @@ comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
 
 @fieldwise_init
 @register_passable
-struct MultiplyScalar[dtype: DType]:
+struct MultiplyScalar[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out: Tensor[Self.dtype]
-
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    out = ScalarOpsKernel[Self.dtype].launch[Multiply](
-                        self, factor
-                    )
-                except e:
-                    print(e)
-                    print(
-                        "MultiplyScalar - GPU operation failed. Failling back"
-                        " on CPU"
-                    )
-                    out = Tensor[Self.dtype](
-                        self.buffer.scalar_ops[Multiply](factor),
-                        requires_grad=False,
-                    )
-
-            else:
-                out = Tensor[Self.dtype](
-                    self.buffer.scalar_ops[Multiply](factor),
-                    requires_grad=False,
-                )
-
-        else:
-            out = Tensor[Self.dtype](
-                self.buffer.scalar_ops[Multiply](factor), requires_grad=False
-            )
+        var out = ScalarOperation[Self.dtype].forward[Multiply](self, factor)
 
         @parameter
         if track_grad:
@@ -173,35 +144,7 @@ struct Multiplicator[dtype: DType]:
                 "at Multiplicator → forward",
             )
 
-        var out: Tensor[Self.dtype]
-
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu() and other.is_on_gpu():
-                try:
-                    out = BinaryOpsKernel[Self.dtype].launch[Multiply](
-                        self, other
-                    )
-                except e:
-                    print(e)
-                    print(
-                        "Multiplicator - GPU operation failed. Failling back"
-                        " on CPU"
-                    )
-                    out = Tensor[Self.dtype](
-                        self.buffer.arithmetic_ops[Multiply](other.buffer),
-                        requires_grad=False,
-                    )
-            else:
-                out = Tensor[Self.dtype](
-                    self.buffer.arithmetic_ops[Multiply](other.buffer),
-                    requires_grad=False,
-                )
-        else:
-            out = Tensor[Self.dtype](
-                self.buffer.arithmetic_ops[Multiply](other.buffer),
-                requires_grad=False,
-            )
+        var out = BinaryOperation[Self.dtype].forward[Multiply](self, other)
 
         @parameter
         if track_grad:

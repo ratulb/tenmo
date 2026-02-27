@@ -12,8 +12,8 @@ from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
-from binary_ops_kernel import BinaryOpsKernel
-from scalar_ops_kernel import ScalarOpsKernel
+from binary_forward import BinaryOperation
+from scalar_forward import ScalarOperation
 
 
 @register_passable
@@ -88,44 +88,16 @@ comptime SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[
 ]
 
 
+@fieldwise_init
 @register_passable
-struct SubtractScalar[dtype: DType]:
+struct SubtractScalar[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out: Tensor[Self.dtype]
-
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    out = ScalarOpsKernel[Self.dtype].launch[Subtract](
-                        self, scalar
-                    )
-                except e:
-                    print(e)
-                    print(
-                        "SubtractScalar - GPU operation failed. Failling back"
-                        " on CPU"
-                    )
-                    out = Tensor[Self.dtype](
-                        self.buffer.scalar_ops[Subtract](scalar),
-                        requires_grad=False,
-                    )
-
-            else:
-                out = Tensor[Self.dtype](
-                    self.buffer.scalar_ops[Subtract](scalar),
-                    requires_grad=False,
-                )
-
-        else:
-            out = Tensor[Self.dtype](
-                self.buffer.scalar_ops[Subtract](scalar), requires_grad=False
-            )
+        var out = ScalarOperation[Self.dtype].forward[Subtract](self, scalar)
 
         @parameter
         if track_grad:
@@ -140,45 +112,18 @@ struct SubtractScalar[dtype: DType]:
         return out^
 
 
+@fieldwise_init
 @register_passable
-struct SubtractFromScalar[dtype: DType]:
+struct SubtractFromScalar[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out: Tensor[Self.dtype]
-
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    out = ScalarOpsKernel[Self.dtype].launch[ReverseSubtract](
-                        self, scalar
-                    )
-                except e:
-                    print(e)
-                    print(
-                        "SubtractFromScalar - GPU operation failed. Failling"
-                        " back on CPU"
-                    )
-                    out = Tensor[Self.dtype](
-                        self.buffer.scalar_ops[ReverseSubtract](scalar),
-                        requires_grad=False,
-                    )
-
-            else:
-                out = Tensor[Self.dtype](
-                    self.buffer.scalar_ops[ReverseSubtract](scalar),
-                    requires_grad=False,
-                )
-
-        else:
-            out = Tensor[Self.dtype](
-                self.buffer.scalar_ops[ReverseSubtract](scalar),
-                requires_grad=False,
-            )
+        var out = ScalarOperation[Self.dtype].forward[ReverseSubtract](
+            self, scalar
+        )
 
         @parameter
         if track_grad:
@@ -193,8 +138,9 @@ struct SubtractFromScalar[dtype: DType]:
         return out^
 
 
+@fieldwise_init
 @register_passable
-struct Subtractor[dtype: DType]:
+struct Subtractor[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -203,41 +149,14 @@ struct Subtractor[dtype: DType]:
     ]:
         if not self.broadcastable(other):
             panic(
-                "Tensor →__sub__(self, other): dimension mismatch: "
+                "Tensor subtraction dimension mismatch: cannot broadcast shape "
                 + self.shape().__str__()
-                + " <=> "
+                + " with "
                 + other.shape().__str__(),
-                "→ at Subtractor → forward",
+                "at Subtractor → forward",
             )
 
-        var out: Tensor[Self.dtype]
-
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu() and other.is_on_gpu():
-                try:
-                    out = BinaryOpsKernel[Self.dtype].launch[Subtract](
-                        self, other
-                    )
-                except e:
-                    print(e)
-                    print(
-                        "Subtract - GPU operation failed. Failling back on CPU"
-                    )
-                    out = Tensor[Self.dtype](
-                        self.buffer.arithmetic_ops[Subtract](other.buffer),
-                        requires_grad=False,
-                    )
-            else:
-                out = Tensor[Self.dtype](
-                    self.buffer.arithmetic_ops[Subtract](other.buffer),
-                    requires_grad=False,
-                )
-        else:
-            out = Tensor[Self.dtype](
-                self.buffer.arithmetic_ops[Subtract](other.buffer),
-                requires_grad=False,
-            )
+        var out = BinaryOperation[Self.dtype].forward[Subtract](self, other)
 
         @parameter
         if track_grad:
