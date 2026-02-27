@@ -12,7 +12,7 @@ from gpu.primitives.id import lane_id, warp_id
 from gpu.primitives.warp import shuffle_down
 from gpu.globals import WARP_SIZE
 
-# from gpu.host import DeviceContext
+from sys import simd_width_of
 
 
 @fieldwise_init
@@ -287,26 +287,48 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         var device_context = A_device_state.gpu()
 
-        var compiled_func = device_context.compile_function[
-            dot_product_64[Self.dtype, BLOCK_SIZE=threads_per_block],
-            dot_product_64[Self.dtype, BLOCK_SIZE=threads_per_block],
-        ]()
-
         ref A_buffer = A_device_state.device_buffer()
         ref B_buffer = B_device_state.device_buffer()
 
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](1)
         result_buffer.enqueue_fill(0)
 
-        device_context.enqueue_function(
-            compiled_func,
-            result_buffer,
-            A_buffer,
-            B_buffer,
-            UInt(numels),
-            grid_dim=num_blocks,
-            block_dim=threads_per_block,
-        )
+        # Warp possibly would not work for DType.float64 in NVIDIA GPU
+        comptime use_32_kernel = True if simd_width_of[
+            Self.dtype
+        ]() > 8 else False
+
+        @parameter
+        if use_32_kernel:
+            var compiled_func = device_context.compile_function[
+                dot_product_32[Self.dtype, BLOCK_SIZE=threads_per_block],
+                dot_product_32[Self.dtype, BLOCK_SIZE=threads_per_block],
+            ]()
+
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                B_buffer,
+                UInt(numels),
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+        else:
+            var compiled_func = device_context.compile_function[
+                dot_product_64[Self.dtype, BLOCK_SIZE=threads_per_block],
+                dot_product_64[Self.dtype, BLOCK_SIZE=threads_per_block],
+            ]()
+
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                B_buffer,
+                UInt(numels),
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
 
         device_context.synchronize()
 
