@@ -592,7 +592,7 @@ struct NDBuffer[dtype: DType](
             var ptr = self.data_ptr().unsafe_mut_cast[True]()
             for index in self.index_iterator():
                 # buffer[index] = value
-                ptr[index] = value
+                (ptr + index)[] = value
 
     fn contiguous(
         self, new_shape: Optional[Shape] = None

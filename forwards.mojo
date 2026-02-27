@@ -39,3 +39,4 @@ from cnn import Conv2dFused
 from filler import Filler
 from pooling import MaxPool2d
 from dropout import Dropout
+from exponential import Exponential

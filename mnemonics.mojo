@@ -20,24 +20,30 @@ comptime ReLUForwardOp = 18
 comptime ReLUBackwardOp = 19
 comptime SqrtForwardOp = 20
 comptime SqrtBackwardOp = 21
+comptime LOG = 22
 ###################
 ### matul ###########
-comptime dot = 22  # dot product
-comptime vm = 23  # vector & tensor matmul
-comptime mv = 24  # tensor & vector matmul
-comptime mm = 25  # tensor & tensor matmul
-comptime invalid = 26  # Invalid case
+comptime dot = 23  # dot product
+comptime vm = 24  # vector & tensor matmul
+comptime mv = 25  # tensor & vector matmul
+comptime mm = 26  # tensor & tensor matmul
+comptime invalid = 27  # Invalid case
 
 ########net##############
 
-comptime LINEAR = 27
-comptime LINEAR_BLAS = 28
-comptime RELU = 29
-comptime SIGMOID = 30
-comptime TANH = 31
-comptime DROPOUT = 32
-comptime CONV2D = 33
-comptime FLATTEN = 34
-comptime MAXPOOL2D = 35
+comptime LINEAR = 28
+comptime LINEAR_BLAS = 29
+comptime RELU = 30
+comptime SIGMOID = 31
+comptime TANH = 32
+comptime DROPOUT = 33
+comptime CONV2D = 34
+comptime FLATTEN = 35
+comptime MAXPOOL2D = 36
+
 #####################
 comptime max_rank = 8 # Change this to extend/reduce max supported dimension
+comptime EXP = 37
+comptime SQRT = 38
+comptime NEGATE = 39
+comptime ABS = 40

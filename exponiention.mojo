@@ -59,3 +59,35 @@ struct Exponentiator[dtype: DType](Copyable):
                 out.add_ancestry(self)
 
         return out^
+
+
+from shapes import Shape
+
+fn main() raises:
+    test_exponentiation()
+    test_negation()
+    print("Did pass")
+
+from testing import assert_true
+
+fn test_exponentiation() raises:
+    print("test_exponentiation")
+    comptime dtype = DType.float32
+    A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
+    a = A.to_gpu()
+    expected = Tensor[dtype].full(Shape.of(3, 3), 7.389056)
+    b = a.exp(True)
+    assert_true(b.all_close(expected), "exponentiation assertion failed")
+    b.backward()
+    a.grad().print()
+
+fn test_negation() raises:
+    print("test_negation")
+    comptime dtype = DType.float32
+    A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
+    a = A.to_gpu()
+    expected = Tensor[dtype].full(Shape.of(3, 3), -2)
+    b = -a
+    assert_true(b.all_close(expected), "negation assertion failed")
+    b.backward()
+    a.grad().print()

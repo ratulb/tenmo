@@ -1565,17 +1565,13 @@ struct Tensor[dtype: DType = DType.float32](
             unit = Scalar[Self.dtype](1),
         ]()
 
-    fn exp(self) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+    fn exp[track_grad: Bool = True](self, requires_grad: Bool=False) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         constrained[
             Self.dtype.is_floating_point(),
             "Tensor → exp is for floating point data types only",
         ]()
 
-        var buffer = self.buffer.map[
-            Utils[Self.dtype].exp_buffer, Utils[Self.dtype].exp_scalar
-        ]()
-        var nd_buffer = NDBuffer[Self.dtype](buffer^, self.buffer.shape)
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=False)
+        return Exponential[Self.dtype].forward[track_grad](self, requires_grad=True)
 
     fn __neg__(self) -> Tensor[Self.dtype]:
         constrained[
