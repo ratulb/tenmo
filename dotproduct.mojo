@@ -82,9 +82,12 @@ struct Dot[dtype: DType](ImplicitlyCopyable & Movable):
         if has_accelerator():
             if lhs.is_on_gpu() and rhs.is_on_gpu():
                 try:
+                    start = now()
                     out = DotproductKernel[Self.dtype].launch[
                         suppress_validation=True
                     ](lhs, rhs)
+
+                    print("GPU dot took: ", (now() - start) * 1000, "ms")
                 except e:
                     print(e)
                     print("Dot - GPU operation failed. Failling back on CPU")
@@ -123,7 +126,7 @@ struct Dot[dtype: DType](ImplicitlyCopyable & Movable):
         return out^
 
 
-fn dot_product[
+fn dot_product_32[
     dtype: DType, BLOCK_SIZE: Int = 512
 ](
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
@@ -207,6 +210,43 @@ fn dot_product[
             _ = Atomic.fetch_add(result, accum)
 
 
+fn dot_product_64[
+    dtype: DType,
+    BLOCK_SIZE: Int = 512,
+](
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    a: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    b: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    size: UInt,
+):
+    var block_shared_memory = stack_allocation[
+        BLOCK_SIZE, Scalar[dtype], address_space = AddressSpace.SHARED
+    ]()
+    var cache_index = thread_idx.x
+    var gtid = cache_index + block_dim.x * block_idx.x
+    var accum: Scalar[dtype] = 0
+    # Grid-stride loop
+    for i in range(gtid, size, block_dim.x * grid_dim.x):
+        accum += a[i] * b[i]
+
+    block_shared_memory[cache_index] = accum
+    barrier()
+
+    var stride = UInt(block_dim.x // 2)
+
+    while stride > 0:
+        if cache_index < stride:
+            block_shared_memory[cache_index] += block_shared_memory[
+                cache_index + stride
+            ]
+        barrier()
+        stride //= 2
+
+    # only thread 0 of each block writes the final result
+    if cache_index == 0:
+        _ = Atomic.fetch_add(result, block_shared_memory[0])
+
+
 struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     fn launch[
@@ -248,8 +288,8 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var device_context = A_device_state.gpu()
 
         var compiled_func = device_context.compile_function[
-            dot_product[Self.dtype, BLOCK_SIZE=threads_per_block],
-            dot_product[Self.dtype, BLOCK_SIZE=threads_per_block],
+            dot_product_64[Self.dtype, BLOCK_SIZE=threads_per_block],
+            dot_product_64[Self.dtype, BLOCK_SIZE=threads_per_block],
         ]()
 
         ref A_buffer = A_device_state.device_buffer()
@@ -275,6 +315,7 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
 from mnemonics import dot
 from testing import assert_true
+from common_utils import now
 
 
 fn main() raises:
@@ -282,12 +323,15 @@ fn main() raises:
     comptime dtype = DType.float32
     var tensor_a = Tensor[dtype].ones(SIZE)
     var tensor_b = Tensor[dtype].ones(SIZE)
+    start = now()
     var expect = tensor_a.matmul[mode=dot](tensor_b)
+    print("CPU dot took: ", (now() - start) * 1000, "ms")
 
     var tensor_A = tensor_a.to_gpu()
     var tensor_B = tensor_b.to_gpu()
 
-    var result = tensor_A * tensor_B
+    var result = tensor_A.dot(tensor_B)
+
     print(expect.item(), result.item())
     assert_true(result.all_close(expect))
 
@@ -295,19 +339,22 @@ fn main() raises:
     assert_true(tensor_B.to_cpu() == tensor_b)
 
     SIZE = 2 << 24
-    tensor_a = Tensor[dtype].rand(SIZE)
-    tensor_b = Tensor[dtype].rand(SIZE)
-    expect = tensor_a.matmul[mode=dot](tensor_b)
+    comptime dtype2 = DType.float64
+    tensor_a2 = Tensor[dtype2].rand(SIZE)
+    tensor_b2 = Tensor[dtype2].rand(SIZE)
+    start = now()
+    expect2 = tensor_a2.matmul[mode=dot](tensor_b2)
+    print("CPU dot took: ", (now() - start) * 1000, "ms")
 
-    tensor_A = tensor_a.to_gpu()
-    tensor_B = tensor_b.to_gpu()
+    tensor_A2 = tensor_a2.to_gpu()
+    tensor_B2 = tensor_b2.to_gpu()
 
-    result = tensor_A * tensor_B
+    result2 = tensor_A2.dot(tensor_B2)
 
-    print(expect.item(), result.item())
-    assert_true(result.all_close(expect))
+    print(expect2.item(), result2.item())
+    assert_true(result2.all_close(expect2))
 
-    assert_true(tensor_A.to_cpu() == tensor_a)
-    assert_true(tensor_B.to_cpu() == tensor_b)
+    assert_true(tensor_A2.to_cpu() == tensor_a2)
+    assert_true(tensor_B2.to_cpu() == tensor_b2)
 
     print("Launch success")
