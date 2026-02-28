@@ -463,30 +463,35 @@ struct Tensor[dtype: DType = DType.float32](
     fn to_device(
         mut self,
         device: Device,
-        requires_grad: Bool = False
+        requires_grad: Optional[Bool] = None
     ) raises -> Self:
 
         if device.is_cpu():
-            if self.buffer.is_on_cpu():
+            if self.is_on_cpu():
                 return self
             return Self(
                 self.buffer.to_cpu(),
-                requires_grad=requires_grad
+                requires_grad=requires_grad.or_else(self.requires_grad)
             )
 
         # GPU case
-        if self.buffer.is_on_gpu():
+        if self.is_on_gpu():
             return self
 
-        return Self(
+        var gpu_tensor = Self(
             self.buffer.to_gpu(device.kind[GPU]),
-            requires_grad=requires_grad
+            requires_grad=requires_grad.or_else(self.requires_grad)
         )
+        gpu_tensor.add_origin(self)
+        return gpu_tensor
 
     fn to_cpu(
         mut self,
     ) raises -> Self:
-        return self.to_device(CPU().into())
+        @parameter
+        if has_accelerator():
+            return self.to_device(CPU().into())
+        raise Error("System does not have any accelerator")
 
     fn to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Self:
         @parameter
@@ -556,10 +561,13 @@ struct Tensor[dtype: DType = DType.float32](
         return self.buffer.is_scalar()
 
     fn is_on_gpu(self) -> Bool:
-        return self.buffer.is_on_gpu()
+        @parameter
+        if has_accelerator():
+            return self.buffer.is_on_gpu()
+        return False
 
     fn is_on_cpu(self) -> Bool:
-        return self.buffer.is_on_cpu()
+        return self.is_on_gpu() == False
 
     fn __eq__(self, scalar: Scalar[Self.dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.buffer.compare_scalar[Equal](scalar))
@@ -642,6 +650,14 @@ struct Tensor[dtype: DType = DType.float32](
         ref ancestors = self.ancestors.value()
         for parent in parents:
             ancestors.append(parent)
+
+    fn add_origin(mut self, origin: Tensor[Self.dtype]):
+        # Initialize ancestors if needed
+        if not self.ancestors:
+            self.ancestors = Optional(Ancestors[Self.dtype].untracked())
+
+        ref ancestors = self.ancestors.value()
+        ancestors.set_origin(origin)
 
     fn has_ancestry(self) -> Bool:
         return self.ancestors != None
@@ -1571,9 +1587,9 @@ struct Tensor[dtype: DType = DType.float32](
             "Tensor → exp is for floating point data types only",
         ]()
 
-        return Exponential[Self.dtype].forward[track_grad](self, requires_grad=True)
+        return Exponential[Self.dtype].forward[track_grad=track_grad](self, requires_grad=True)
 
-    fn __neg__(self) -> Tensor[Self.dtype]:
+    fn __neg__[track_grad: Bool = True](self) -> Tensor[Self.dtype]:
         constrained[
             Self.dtype.is_numeric(),
             "Tensor → __neg__ is for numeric data types only",
@@ -1582,7 +1598,7 @@ struct Tensor[dtype: DType = DType.float32](
         var zeros = Tensor[Self.dtype].zeros_like(self)
 
         # Use subtraction: 0 - self
-        return Subtractor[Self.dtype].forward[True](zeros, self)
+        return Subtractor[Self.dtype].forward[track_grad=track_grad](zeros, self)
 
     fn __invert__(self: Tensor[DType.bool]) -> Tensor[DType.bool]:
         var buffer = self.buffer.map[

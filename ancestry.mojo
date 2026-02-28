@@ -4,16 +4,20 @@ from tenmo import Tensor
 
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     var ancestors: List[Tensor[Self.dtype]]
+    var gpu_origin: List[Tensor[Self.dtype]]
 
     fn __init__(out self):
-        self.ancestors = List[Tensor[Self.dtype]]()
+        self.ancestors = {}
+        self.gpu_origin = {}
 
     @always_inline("nodebug")
     fn __copyinit__(out self, existing: Self):
         self.ancestors = existing.ancestors.copy()
+        self.gpu_origin = existing.gpu_origin.copy()
 
     fn __moveinit__(out self, deinit existing: Self):
         self.ancestors = existing.ancestors^
+        self.gpu_origin = existing.gpu_origin^
 
     @staticmethod
     fn untracked() -> Ancestors[Self.dtype]:
@@ -22,9 +26,16 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     @always_inline
     fn __del__(deinit self):
         self.ancestors.clear()
+        self.gpu_origin.clear()
 
     fn get(ref self, idx: Int) -> ref [self.ancestors] Tensor[Self.dtype]:
         return self.ancestors[idx]
+
+    fn origin(ref self) -> ref [self.gpu_origin] Tensor[Self.dtype]:
+        return self.gpu_origin[0]
+
+    fn set_origin(mut self, var origin: Tensor[Self.dtype]):
+        self.gpu_origin.insert(0, origin^)
 
     fn __len__(self) -> Int:
         return len(self.ancestors)

@@ -103,7 +103,10 @@ struct AddScalar[dtype: DType](Copyable):
                 out.requires_grad_(True)
                 backward_fn = AddBackwardScalar[Self.dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
-                out.add_ancestry(self)
+                if self.is_on_cpu():
+                    out.add_ancestry(self)
+                else:
+                    out.add_ancestry(self.ancestry().origin())
 
         return out^
 
@@ -153,7 +156,7 @@ struct Adder[dtype: DType](Copyable):
 
 from common_utils import now
 from testing import assert_true
-
+from shapes import Shape
 
 fn main() raises:
     comptime dtype = DType.float32
@@ -170,3 +173,13 @@ fn main() raises:
     r2 = ag - bg
     print("Overall GPU took: ", (now() - start) * 1000, "ms")
     assert_true(r1.all_close(r2))
+    print()
+    print("The meaty part")
+
+    A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
+    a = A.to_gpu()
+    expected = Tensor[dtype].full(Shape.of(3, 3), 2) + 42
+    b = a * 42
+    assert_true(b.all_close(expected), "Scalar add assertion failed")
+    b.backward()
+    a.grad().print()

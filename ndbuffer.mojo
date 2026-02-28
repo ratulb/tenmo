@@ -137,9 +137,9 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[Self.dtype](buffer^, shape)
 
     fn to_cpu(
-        mut self, cpu: CPU = CPU(), delete: Bool = False
+        mut self, delete: Bool = False
     ) raises -> Self:
-        var nd_buffer = self.to_device(cpu.into())
+        var nd_buffer = self.to_device(CPU().into())
         if delete:
             self.device_state = None
         return nd_buffer^
@@ -215,22 +215,17 @@ struct NDBuffer[dtype: DType](
         # 3) GPU -> CPU
         # ---------------------------------------
         # Materialize contiguous CPU buffer
-
+        # New NDBuffer alltogether!
         return curr_state.into(self.shape)
 
     fn is_on_gpu(self) -> Bool:
         @parameter
         if has_accelerator():
             return not self.device_state == None
-        else:
-            return False
+        return False
 
     fn is_on_cpu(self) -> Bool:
-        @parameter
-        if has_accelerator():
-            return self.device_state == None
-        else:
-            return True
+        return self.is_on_gpu() == False
 
     @staticmethod
     @always_inline
