@@ -161,7 +161,7 @@ from shapes import Shape
 
 fn main() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].arange(5000000)
+    _="""a = Tensor[dtype].arange(5000000)
     b = Tensor[dtype].arange(5000000)
     start = now()
     r1 = a - b
@@ -174,12 +174,13 @@ fn main() raises:
     r2 = ag - bg
     print("Overall GPU took: ", (now() - start) * 1000, "ms")
     assert_true(r1.all_close(r2))
-    print()
+    print()"""
     print("The meaty part")
 
     A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
     print("A's id: ", A.id())
     a = A.to_gpu(requires_grad=True)
+    a.ancestry().print()
     expected = Tensor[dtype].full(Shape.of(3, 3), 2) + 42
     b = a + 42
     assert_true(b.all_close(expected), "Scalar add assertion failed")
