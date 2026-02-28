@@ -180,7 +180,8 @@ fn main() raises:
     A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
     print("A's id: ", A.id())
     a = A.to_gpu(requires_grad=True)
-    a.ancestry().print()
+    a.ancestry().origin().print()
+
     expected = Tensor[dtype].full(Shape.of(3, 3), 2) + 42
     b = a + 42
     assert_true(b.all_close(expected), "Scalar add assertion failed")
