@@ -493,13 +493,13 @@ struct Tensor[dtype: DType = DType.float32](
             return self.to_device(CPU().into())
         raise Error("System does not have any accelerator")
 
-    fn to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Self:
+    fn to_gpu(mut self, gpu: Optional[GPU] = None, requires_grad: Optional[Bool] =None) raises -> Self:
         @parameter
         if has_accelerator():
             if gpu:
-                return self.to_device(gpu.value().into())
+                return self.to_device(gpu.value().into(), requires_grad=requires_grad)
             else:
-                return self.to_device(GPU().into())
+                return self.to_device(GPU().into(), requires_grad=requires_grad)
         else:
             raise Error("Can not move to GPU. System does not have any accelerator device")
 

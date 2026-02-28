@@ -156,7 +156,7 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
         device_context.synchronize()
         start = now()
         var out = Tensor[Self.dtype].from_device_buffer(
-            result_buffer, A.shape()
+            result_buffer, A.shape(), requires_grad=A.requires_grad
         )
         print("Reading from buffer took: ", (now() - start) * 1000, "ms")
         return out^
