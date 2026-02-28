@@ -11,7 +11,6 @@ comptime DeviceType = Variant[CPU, GPU]
 
 @fieldwise_init
 struct Device(Equatable, ImplicitlyCopyable, Movable):
-    comptime has_accelerator = has_accelerator()
     var kind: DeviceType
 
     fn __init__(out self):
@@ -157,6 +156,19 @@ struct DeviceState[dtype: DType](Equatable & ImplicitlyCopyable & Movable):
         return self.buffer
 
 
+from tenmo import Tensor
+
 fn main() raises:
     # var device = Device(CPU())
-    print("passes", Device.has_accelerator)
+    comptime dtype = DType.float32
+    var ctx1 = DeviceContext()
+    var ctx2 = DeviceContext()
+    print(ctx1.id() == ctx2.id())
+
+    var device_buffer = ctx1.enqueue_create_buffer[dtype](32)
+    var a = Tensor[dtype].arange(32)
+    ctx2.enqueue_copy(device_buffer, a.data_ptr())
+    print(device_buffer)
+    with device_buffer.map_to_host() as host_buffer:
+        print(host_buffer)
+
