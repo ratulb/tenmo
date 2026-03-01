@@ -970,7 +970,7 @@ fn test_contiguous_same_shape() raises:
     var cpu_result = a * b
     var cpu_time = (now() - start) * 1000
 
-    assert_true(gpu_result.all_close(cpu_result))
+    assert_true(gpu_result.to_cpu().all_close(cpu_result))
     print("  GPU:", gpu_time, "ms")
     print("  CPU:", cpu_time, "ms")
     print("  Passed")
@@ -990,7 +990,7 @@ fn test_broadcasting() raises:
     var gpu_result = ag + bg
     var cpu_result = a + b
     assert_true(gpu_result.shape() == Shape(3, 2, 4))
-    assert_true(gpu_result.all_close(cpu_result))
+    assert_true(gpu_result.to_cpu().all_close(cpu_result))
     cpu_ag = ag.to_cpu()
     cpu_bg = bg.to_cpu()
 
@@ -1019,7 +1019,7 @@ fn test_scalar_broadcast() raises:
     assert_true(cpu_ag == a)
     assert_true(cpu_bg == b)
 
-    assert_true(gpu_result.all_close(cpu_result))
+    assert_true(gpu_result.to_cpu().all_close(cpu_result))
     print("  Passed")
 
 
@@ -1038,7 +1038,7 @@ fn test_non_contiguous() raises:
     var gpu_result = a_tg + bg
 
     var cpu_result = a_t + b
-    assert_true(gpu_result.all_close(cpu_result))
+    assert_true(gpu_result.to_cpu().all_close(cpu_result))
     cpu_ag = a_tg.to_cpu()
     cpu_bg = bg.to_cpu()
 
@@ -1064,7 +1064,7 @@ fn test_complex_broadcasting() raises:
     var cpu_result = a * b
 
     assert_true(gpu_result.shape() == Shape(3, 5, 4, 7))
-    assert_true(gpu_result.all_close(cpu_result))
+    assert_true(gpu_result.to_cpu().all_close(cpu_result))
     print("  Shape:", gpu_result.shape())
     print("  Passed")
 
@@ -1089,7 +1089,7 @@ fn test_large_arrays() raises:
     var cpu_result = a + b
     var cpu_time = (now() - start) * 1000
 
-    assert_true(gpu_result.all_close(cpu_result))
+    assert_true(gpu_result.to_cpu().all_close(cpu_result))
     print("  Size:", size, "elements")
     print("  GPU:", gpu_time, "ms")
     print("  CPU:", cpu_time, "ms")
@@ -1128,7 +1128,7 @@ fn test_contiguous_view_with_offset() raises:
     var cpu_result = a * b
 
     # Verify
-    assert_true(gpu_result.all_close(cpu_result))
+    assert_true(gpu_result.to_cpu().all_close(cpu_result))
     print("  A offset:", a.buffer.offset)
     print("  B offset:", b.buffer.offset)
     print("  Result shape:", gpu_result.shape())
@@ -1153,7 +1153,7 @@ fn test_all_offset_scenarios() raises:
 
     var result1 = a1g + b1g
 
-    assert_true(result1.all_close(a1 + b1))
+    assert_true(result1.to_cpu().all_close(a1 + b1))
     print("    Passed")
 
     # Scenario 2: Only A has offset
@@ -1167,7 +1167,7 @@ fn test_all_offset_scenarios() raises:
 
     var result2 = a2g - b2g
 
-    assert_true(result2.all_close(a2g - b2g))
+    assert_true(result2.to_cpu().all_close(a2 - b2))
     print("    Passed")
 
     # Scenario 3: Only B has offset
@@ -1181,7 +1181,7 @@ fn test_all_offset_scenarios() raises:
 
     var result3 = a3g * b3g
 
-    assert_true(result3.all_close(a3 * b3))
+    assert_true(result3.to_cpu().all_close(a3 * b3))
     print("    Passed")
 
     # Scenario 4: Neither has offset (original case)
@@ -1194,7 +1194,7 @@ fn test_all_offset_scenarios() raises:
 
     var result4 = a4g / b4g
 
-    assert_true(result4.all_close(a4 / b4))
+    assert_true(result4.to_cpu().all_close(a4 / b4))
     print("    Passed")
 
     print("All offset scenarios passed!")
