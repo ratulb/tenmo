@@ -196,17 +196,19 @@ from common_utils import now
 
 
 fn main() raises:
-    var SIZE = 65536 * 1000
+    var SIZE = 65536 * 10
     comptime dtype = DType.float32
     var tensor_A = Tensor[dtype].ones(SIZE)
     var tensor_a = tensor_A.to_gpu()
     var start = now()
-    var expect = (tensor_a * 42)
+    var expect = tensor_A * 42
     print("CPU mul took: ", (now() - start) * 1000, "ms")
     # First test
     start = now()
     var result = tensor_a * 42
     result = result.to_cpu()
+    print("Result\n")
+    result.print()
     print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
