@@ -103,11 +103,7 @@ struct AddScalar[dtype: DType](Copyable):
                 out.requires_grad_(True)
                 backward_fn = AddBackwardScalar[Self.dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
-                if self.is_on_cpu():
-                    out.add_ancestry(self)
-                else:
-                    print("GPU tensor origin is being added")
-                    out.add_ancestry(self.ancestry().origin())
+                out.add_ancestry(self)
 
         return out^
 

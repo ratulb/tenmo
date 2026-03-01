@@ -50,7 +50,7 @@ struct NDBuffer[dtype: DType](
 
     fn __init__(
         out self,
-        var buffer: Buffer[Self.dtype],
+        var buffer: Buffer[Self.dtype] = Buffer[Self.dtype](),
         shape: Optional[Shape] = None,
         strides: Optional[Strides] = None,
         offset: Int = 0,
@@ -129,6 +129,15 @@ struct NDBuffer[dtype: DType](
         self.offset = other.offset
         self._contiguous = other._contiguous
         self.device_state = other.device_state.copy()
+
+    @staticmethod
+    @always_inline
+    fn with_device_state(
+        var device_state: DeviceState[Self.dtype], shape: Shape
+    ) -> NDBuffer[Self.dtype]:
+        var ndb = NDBuffer[Self.dtype](shape)
+        ndb.device_state = device_state^
+        return ndb
 
     @staticmethod
     @always_inline
@@ -1456,3 +1465,4 @@ fn main():
     var ndb = NDBuffer[dtype](buffer, Shape(5, 1))
     ndb.print()
     _ = ndb.device_context()
+    ndb = NDBuffer[dtype](Shape(1, 1))

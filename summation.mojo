@@ -15,7 +15,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
     var keepdims: Bool
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)

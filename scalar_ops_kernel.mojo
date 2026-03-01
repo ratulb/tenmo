@@ -5,7 +5,8 @@ from tenmo import Tensor
 from common_utils import panic
 from shapes import Shape
 from mnemonics import Multiply, Add, Subtract, Divide, ReverseSubtract
-
+from device import DeviceState
+from ndbuffer import NDBuffer
 
 # Kernel template for various arithmetic ops involving ND Tensor and a single scalar
 # Simplification - views becomes contiguous when copied to device and offset becomes 0
@@ -119,7 +120,8 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
             numels, simdwidth
         )
         ref A_device_state = A.buffer.device_state.value()
-        var device_context = A_device_state.gpu()
+        ref gpu = A_device_state.get_gpu()
+        var device_context = gpu()
 
         var compiled_func = device_context.compile_function[
             scalar_ops[
@@ -155,9 +157,15 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
 
         device_context.synchronize()
         start = now()
-        var out = Tensor[Self.dtype].from_device_buffer(
-            result_buffer, A.shape(), requires_grad=A.requires_grad
+        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var ndb = NDBuffer[Self.dtype].with_device_state(
+            device_state^, A.shape()
         )
+        var out = Tensor[Self.dtype](ndb^, requires_grad=A.requires_grad)
+
+        _ = """var out = Tensor[Self.dtype].from_device_buffer(
+            result_buffer, A.shape(), requires_grad=A.requires_grad
+        )"""
         print("Reading from buffer took: ", (now() - start) * 1000, "ms")
         return out^
 
@@ -193,11 +201,12 @@ fn main() raises:
     var tensor_A = Tensor[dtype].ones(SIZE)
     var tensor_a = tensor_A.to_gpu()
     var start = now()
-    var expect = tensor_a * 42
+    var expect = (tensor_a * 42)
     print("CPU mul took: ", (now() - start) * 1000, "ms")
     # First test
     start = now()
     var result = tensor_a * 42
+    result = result.to_cpu()
     print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
@@ -208,10 +217,13 @@ fn main() raises:
     expect = reshaped * 1919
 
     print("CPU mul took: ", (now() - start) * 1000, "ms")
+
+    print("CPU mul took: ", (now() - start) * 1000, "ms")
     start = now()
     tensor_a = reshaped.to_gpu()
     result = tensor_a * 1919
 
+    result = result.to_cpu()
     print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
     start = now()
@@ -221,6 +233,7 @@ fn main() raises:
     start = now()
     result = tensor_a / 89
 
+    result = result.to_cpu()
     print("GPU div took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
     start = now()
@@ -230,6 +243,7 @@ fn main() raises:
     start = now()
     result = tensor_a - 999
 
+    result = result.to_cpu()
     print("GPU subtract took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
@@ -240,6 +254,7 @@ fn main() raises:
     start = now()
     result = 999 - tensor_a
 
+    result = result.to_cpu()
     print("GPU reverse subtract took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
@@ -250,6 +265,7 @@ fn main() raises:
     start = now()
     result = 999 / tensor_a
 
+    result = result.to_cpu()
     print("GPU reverse divide took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 

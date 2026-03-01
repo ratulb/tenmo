@@ -478,12 +478,10 @@ struct Tensor[dtype: DType = DType.float32](
         if self.is_on_gpu():
             return self
 
-        var gpu_tensor = Self(
+        return Self(
             self.buffer.to_gpu(device.kind[GPU]),
             requires_grad=requires_grad.or_else(self.requires_grad)
         )
-        gpu_tensor.add_origin(self)
-        return gpu_tensor
 
     fn to_cpu(
         mut self,
@@ -650,14 +648,6 @@ struct Tensor[dtype: DType = DType.float32](
         ref ancestors = self.ancestors.value()
         for parent in parents:
             ancestors.append(parent)
-
-    fn add_origin(mut self, origin: Tensor[Self.dtype]):
-        # Initialize ancestors if needed
-        if not self.ancestors:
-            self.ancestors = Optional(Ancestors[Self.dtype].untracked())
-
-        ref ancestors = self.ancestors.value()
-        ancestors.set_origin(origin)
 
     fn has_ancestry(self) -> Bool:
         return self.ancestors != None

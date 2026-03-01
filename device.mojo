@@ -162,6 +162,11 @@ struct DeviceState[dtype: DType](Equatable & ImplicitlyCopyable & Movable):
     ) -> ref [self.buffer] DeviceBuffer[Self.dtype]:
         return self.buffer
 
+    fn get_gpu(
+        ref self,
+    ) -> ref [self.gpu] GPU:
+        return self.gpu
+
 
 from tenmo import Tensor
 
