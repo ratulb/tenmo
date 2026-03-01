@@ -11,7 +11,6 @@ from common_utils import panic
 from gradbox import Gradbox
 from sys import has_accelerator
 from binary_forward import BinaryOperation
-from scalar_forward import ScalarOperation
 
 
 @fieldwise_init
@@ -137,8 +136,8 @@ struct DivideScalar[dtype: DType](ImplicitlyCopyable):
             "Tensor → __rtruediv__ is for numeric data types only",
         ]()
 
-        var out = ScalarOperation[Self.dtype].forward[ReverseDivide](
-            self, scalar
+        var out = Tensor[Self.dtype](
+            self.buffer.scalar_ops[ReverseDivide](scalar), requires_grad=False
         )
 
         @parameter
@@ -171,7 +170,9 @@ struct DivideByScalar[dtype: DType](ImplicitlyCopyable):
         if scalar == Scalar[Self.dtype](0):
             panic("Tensor → __truediv__ : canot divide by " + scalar.__str__())
 
-        var out = ScalarOperation[Self.dtype].forward[Divide](self, scalar)
+        var out = Tensor[Self.dtype](
+            self.buffer.scalar_ops[Divide](scalar), requires_grad=False
+        )
 
         @parameter
         if track_grad:

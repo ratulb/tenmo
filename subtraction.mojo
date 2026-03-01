@@ -13,8 +13,6 @@ from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
 from binary_forward import BinaryOperation
-from scalar_forward import ScalarOperation
-
 
 @register_passable
 struct SubBackward[dtype: DType](ImplicitlyCopyable):
@@ -97,7 +95,9 @@ struct SubtractScalar[dtype: DType](ImplicitlyCopyable):
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out = ScalarOperation[Self.dtype].forward[Subtract](self, scalar)
+        var out = Tensor[Self.dtype](
+            self.buffer.scalar_ops[Subtract](scalar), requires_grad=False
+        )
 
         @parameter
         if track_grad:
@@ -121,8 +121,8 @@ struct SubtractFromScalar[dtype: DType](ImplicitlyCopyable):
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out = ScalarOperation[Self.dtype].forward[ReverseSubtract](
-            self, scalar
+        var out = Tensor[Self.dtype](
+            self.buffer.scalar_ops[ReverseSubtract](scalar), requires_grad=False
         )
 
         @parameter

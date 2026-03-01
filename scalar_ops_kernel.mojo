@@ -191,6 +191,85 @@ struct ScalarOpsKernel[dtype: DType = DType.float32](
         return threads_per_block, num_blocks
 
 
+struct ScalarOperations[dtype: DType = DType.float32](
+    ImplicitlyCopyable & Movable
+):
+    @staticmethod
+    fn launch[
+        op_code: Int,
+    ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) raises -> NDBuffer[
+        Self.dtype
+    ]:
+
+        var numels = A.numels()
+
+        comptime simdwidth = simd_width_of[Self.dtype]()
+
+        var (threads_per_block, num_blocks) = Self.launch_config(
+            numels, simdwidth
+        )
+        ref A_device_state = A.device_state.value()
+        ref gpu = A_device_state.get_gpu()
+        var device_context = gpu()
+
+        var compiled_func = device_context.compile_function[
+            scalar_ops[
+                op_code=op_code,
+                dtype = Self.dtype,
+                simd_width=simdwidth,
+                simd_vectors_per_thread = 2 * simdwidth,
+            ],
+            scalar_ops[
+                op_code=op_code,
+                dtype = Self.dtype,
+                simd_width=simdwidth,
+                simd_vectors_per_thread = 2 * simdwidth,
+            ],
+        ]()
+
+        ref A_buffer = A_device_state.device_buffer()
+        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            numels
+        )
+
+        device_context.enqueue_function(
+            compiled_func,
+            result_buffer,
+            A_buffer,
+            scalar,
+            UInt(numels),
+            grid_dim=num_blocks,
+            block_dim=threads_per_block,
+        )
+
+        device_context.synchronize()
+        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var out = NDBuffer[Self.dtype].with_device_state(device_state^, A.shape)
+
+        return out^
+
+    @staticmethod
+    fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
+        threads_per_block: Int
+        num_blocks: Int
+
+        if numels < 4096:
+            threads_per_block = 128
+            num_blocks = (numels + 127) // 128
+        elif numels < 65536:
+            threads_per_block = 256
+            num_blocks = (numels + 255) // 256
+        else:
+            threads_per_block = 256
+            var total_chunks = (numels + (simdwidth * 2 * simdwidth - 1)) // (
+                simdwidth * 2 * simdwidth
+            )
+            num_blocks = min(
+                (total_chunks + 255) // 256, 512
+            )  # Cap at 512 blocks
+        return threads_per_block, num_blocks
+
+
 from testing import assert_true
 from common_utils import now
 
@@ -201,13 +280,13 @@ fn main() raises:
     var tensor_A = Tensor[dtype].ones(SIZE, requires_grad=True)
     var tensor_a = tensor_A.to_gpu()
     var start = now()
-    #var expect = (tensor_A * 42) + 2
-    var expect = tensor_A  + 2
+    # var expect = (tensor_A * 42) + 2
+    var expect = tensor_A + 2
     print("CPU mul took: ", (now() - start) * 1000, "ms")
     # First test
     start = now()
-    #var result = (tensor_a * 42) + 2
-    var result = tensor_a  + 2
+    # var result = (tensor_a * 42) + 2
+    var result = tensor_a + 2
     result = result.to_cpu()
     print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))

@@ -11,7 +11,6 @@ from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
-from scalar_forward import ScalarOperation
 from binary_forward import BinaryOperation
 
 
@@ -95,7 +94,9 @@ struct AddScalar[dtype: DType](Copyable):
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out = ScalarOperation[Self.dtype].forward[Add](self, scalar)
+        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
+            self.buffer.scalar_ops[Add](scalar), requires_grad=False
+        )
 
         @parameter
         if track_grad:
@@ -155,9 +156,10 @@ from common_utils import now
 from testing import assert_true
 from shapes import Shape
 
+
 fn main() raises:
     comptime dtype = DType.float32
-    _="""a = Tensor[dtype].arange(5000000)
+    _ = """a = Tensor[dtype].arange(5000000)
     b = Tensor[dtype].arange(5000000)
     start = now()
     r1 = a - b
@@ -177,8 +179,8 @@ fn main() raises:
     print("A's id: ", A.id())
     a = A.to_gpu(requires_grad=True)
 
-    expected = (A * 42) + 2*A
-    b = (a * 42) + 2*a
+    expected = (A * 42) + 2 * A
+    b = (a * 42) + 2 * a
     b_cpu = b.to_cpu()
     assert_true(b_cpu.all_close(expected), "Scalar add assertion failed")
     b_cpu.ancestry().print()

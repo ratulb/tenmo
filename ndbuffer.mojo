@@ -10,6 +10,7 @@ from gpu.host import DeviceBuffer, DeviceContext
 from device import Device, CPU, GPU, DeviceState
 from collections import Set
 from sys import simd_width_of, has_accelerator
+from scalar_ops_kernel import ScalarOperations
 from mnemonics import (
     Multiply,
     Add,
@@ -1226,6 +1227,40 @@ struct NDBuffer[dtype: DType](
             if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → scalar_ops: cannot divide by zero")
 
+        var out: NDBuffer[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = ScalarOperations[Self.dtype].launch[op_code](
+                        self, scalar
+                    )
+                except e:
+                    print(e)
+                    print(
+                        (
+                            "NDBuffer scalar_ops - GPU operation failed for"
+                            " opcode: "
+                        ),
+                        op_code,
+                        ". Failling back on CPU",
+                    )
+                    out = self.scalar_ops_cpu[op_code](scalar)
+            else:
+                out = self.scalar_ops_cpu[op_code](scalar)
+        else:
+            out = self.scalar_ops_cpu[op_code](scalar)
+
+        return out^
+
+    @always_inline
+    fn scalar_ops_cpu[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ]:
+
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
@@ -1465,4 +1500,4 @@ fn main():
     var ndb = NDBuffer[dtype](buffer, Shape(5, 1))
     ndb.print()
     _ = ndb.device_context()
-    ndb = NDBuffer[dtype](Shape(1, 1))
+    _ndb = NDBuffer[dtype](Shape(1, 1))

@@ -11,7 +11,6 @@ from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
-from scalar_forward import ScalarOperation
 from binary_forward import BinaryOperation
 
 
@@ -109,7 +108,9 @@ struct MultiplyScalar[dtype: DType](ImplicitlyCopyable):
     ](self: Tensor[Self.dtype], factor: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out = ScalarOperation[Self.dtype].forward[Multiply](self, factor)
+        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
+            self.buffer.scalar_ops[Multiply](factor), requires_grad=False
+        )
 
         @parameter
         if track_grad:
