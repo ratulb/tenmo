@@ -97,100 +97,6 @@ fn scalar_ops[
         base_idx += stride * CHUNK_SIZE
 
 
-struct ScalarOpsKernel[dtype: DType = DType.float32](
-    ImplicitlyCopyable & Movable
-):
-    @staticmethod
-    fn launch[
-        op_code: Int,
-    ](A: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) raises -> Tensor[
-        Self.dtype
-    ]:
-        debug_assert(
-            A.is_on_gpu(), "ScalarOpsKernel -> launch: Tensors must be on GPU"
-        )
-        if op_code == Divide and scalar == Scalar[Self.dtype](0):
-            raise Error("Divide by zero")
-
-        var numels = A.numels()
-
-        comptime simdwidth = simd_width_of[Self.dtype]()
-
-        var (threads_per_block, num_blocks) = Self.launch_config(
-            numels, simdwidth
-        )
-        ref A_device_state = A.buffer.device_state.value()
-        ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
-
-        var compiled_func = device_context.compile_function[
-            scalar_ops[
-                op_code=op_code,
-                dtype = Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread = 2 * simdwidth,
-            ],
-            scalar_ops[
-                op_code=op_code,
-                dtype = Self.dtype,
-                simd_width=simdwidth,
-                simd_vectors_per_thread = 2 * simdwidth,
-            ],
-        ]()
-
-        ref A_buffer = A_device_state.device_buffer()
-        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
-            numels
-        )
-        var start = now()
-        print("Writing to buffer took: ", (now() - start) * 1000, "ms")
-
-        device_context.enqueue_function(
-            compiled_func,
-            result_buffer,
-            A_buffer,
-            scalar,
-            UInt(numels),
-            grid_dim=num_blocks,
-            block_dim=threads_per_block,
-        )
-
-        device_context.synchronize()
-        start = now()
-        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        var ndb = NDBuffer[Self.dtype].with_device_state(
-            device_state^, A.shape()
-        )
-        var out = Tensor[Self.dtype](ndb^, requires_grad=A.requires_grad)
-
-        _ = """var out = Tensor[Self.dtype].from_device_buffer(
-            result_buffer, A.shape(), requires_grad=A.requires_grad
-        )"""
-        print("Reading from buffer took: ", (now() - start) * 1000, "ms")
-        return out^
-
-    @staticmethod
-    fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
-        threads_per_block: Int
-        num_blocks: Int
-
-        if numels < 4096:
-            threads_per_block = 128
-            num_blocks = (numels + 127) // 128
-        elif numels < 65536:
-            threads_per_block = 256
-            num_blocks = (numels + 255) // 256
-        else:
-            threads_per_block = 256
-            var total_chunks = (numels + (simdwidth * 2 * simdwidth - 1)) // (
-                simdwidth * 2 * simdwidth
-            )
-            num_blocks = min(
-                (total_chunks + 255) // 256, 512
-            )  # Cap at 512 blocks
-        return threads_per_block, num_blocks
-
-
 struct ScalarOperations[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
@@ -200,7 +106,6 @@ struct ScalarOperations[dtype: DType = DType.float32](
     ](A: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) raises -> NDBuffer[
         Self.dtype
     ]:
-
         var numels = A.numels()
 
         comptime simdwidth = simd_width_of[Self.dtype]()
