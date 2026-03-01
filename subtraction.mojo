@@ -210,4 +210,4 @@ fn main() raises:
     start = now()
     r2 = ag - bg
     print("Overall GPU took: ", (now() - start) * 1000, "ms")
-    assert_true(r1.all_close(r2))
+    assert_true(r1.all_close(r2.to_cpu()))
