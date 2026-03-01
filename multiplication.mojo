@@ -11,7 +11,6 @@ from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
-from binary_forward import BinaryOperation
 
 
 @fieldwise_init
@@ -145,7 +144,10 @@ struct Multiplicator[dtype: DType]:
                 "at Multiplicator → forward",
             )
 
-        var out = BinaryOperation[Self.dtype].forward[Multiply](self, other)
+        var out = Tensor[Self.dtype](
+            self.buffer.arithmetic_ops[Multiply](other.buffer),
+            requires_grad=False,
+        )
 
         @parameter
         if track_grad:

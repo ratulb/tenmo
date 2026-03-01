@@ -10,8 +10,6 @@ from mnemonics import AddTensor, Add
 from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
-from sys import has_accelerator
-from binary_forward import BinaryOperation
 
 
 @fieldwise_init
@@ -94,7 +92,7 @@ struct AddScalar[dtype: DType](Copyable):
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        var out: Tensor[Self.dtype] = Tensor[Self.dtype](
+        var out = Tensor[Self.dtype](
             self.buffer.scalar_ops[Add](scalar), requires_grad=False
         )
 
@@ -128,7 +126,10 @@ struct Adder[dtype: DType](Copyable):
                 "at Adder → forward",
             )
 
-        var out = BinaryOperation[Self.dtype].forward[Add](self, other)
+        var out = Tensor[Self.dtype](
+            self.buffer.arithmetic_ops[Add](other.buffer),
+            requires_grad=False,
+        )
 
         @parameter
         if track_grad:

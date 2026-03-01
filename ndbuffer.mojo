@@ -11,6 +11,7 @@ from device import Device, CPU, GPU, DeviceState
 from collections import Set
 from sys import simd_width_of, has_accelerator
 from scalar_ops_kernel import ScalarOperations
+from binary_ops_kernel import BinaryOperations
 from mnemonics import (
     Multiply,
     Add,
@@ -1048,15 +1049,39 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
-        # Broadcast validation
-        if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
-            panic(
-                "NDBuffer → arithmetic_ops(self, other): dimension mismatch: "
-                + self.shape.__str__()
-                + ", "
-                + other.shape.__str__()
-            )
+        var out: NDBuffer[Self.dtype]
 
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu() and other.is_on_gpu():
+                try:
+                    out = BinaryOperations[Self.dtype].launch[op_code](
+                        self, other
+                    )
+                except e:
+                    print(e)
+                    print(
+                        (
+                            "NDBuffer arithmetic_ops - GPU operation failed for"
+                            " opcode: "
+                        ),
+                        op_code,
+                        ". Failling back on CPU",
+                    )
+                    out = self.arithmetic_ops_cpu[op_code](other)
+            else:
+                out = self.arithmetic_ops_cpu[op_code](other)
+        else:
+            out = self.arithmetic_ops_cpu[op_code](other)
+
+        return out^
+
+    @always_inline
+    fn arithmetic_ops_cpu[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ]:
         # Handle broadcasting case
         if self.shape != other.shape:
             return self.broadcast_buffer[op_code](other)
@@ -1260,7 +1285,6 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
-
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()

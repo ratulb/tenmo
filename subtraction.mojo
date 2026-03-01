@@ -12,7 +12,7 @@ from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 from sys import has_accelerator
-from binary_forward import BinaryOperation
+
 
 @register_passable
 struct SubBackward[dtype: DType](ImplicitlyCopyable):
@@ -156,7 +156,10 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable):
                 "at Subtractor → forward",
             )
 
-        var out = BinaryOperation[Self.dtype].forward[Subtract](self, other)
+        var out = Tensor[Self.dtype](
+            self.buffer.arithmetic_ops[Subtract](other.buffer),
+            requires_grad=False,
+        )
 
         @parameter
         if track_grad:

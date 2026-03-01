@@ -10,7 +10,6 @@ from mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
 from gradbox import Gradbox
 from sys import has_accelerator
-from binary_forward import BinaryOperation
 
 
 @fieldwise_init
@@ -207,7 +206,10 @@ struct Divider[dtype: DType](ImplicitlyCopyable):
                 "at Divider → forward",
             )
 
-        var out = BinaryOperation[Self.dtype].forward[Divide](self, other)
+        var out = Tensor[Self.dtype](
+            self.buffer.arithmetic_ops[Divide](other.buffer),
+            requires_grad=False,
+        )
 
         @parameter
         if track_grad:

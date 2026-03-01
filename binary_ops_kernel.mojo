@@ -7,6 +7,7 @@ from strides import Strides
 from broadcasthelper import ShapeBroadcaster
 from device import DeviceState
 from array import Array
+from ndbuffer import NDBuffer
 
 
 fn arithmetic_ops_both_contiguous[
@@ -455,6 +456,7 @@ fn arithmetic_ops_both_strided[
 
 
 @fieldwise_init
+@register_passable
 struct BinaryOpsKernel[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
@@ -666,6 +668,227 @@ struct BinaryOpsKernel[dtype: DType = DType.float32](
         return Tensor[Self.dtype].from_device_buffer(
             result_buffer, broadcast_shape
         )
+
+    @staticmethod
+    fn launch_config(output_size: Int) -> Tuple[Int, Int]:
+        """Launch configuration."""
+        var threads_per_block: Int
+        var num_blocks: Int
+
+        if output_size < 4096:
+            threads_per_block = 128
+            num_blocks = (output_size + 127) // 128
+        elif output_size < 65536:
+            threads_per_block = 256
+            num_blocks = min((output_size + 255) // 256, 128)
+        else:
+            threads_per_block = 512
+            num_blocks = min((output_size + 511) // 512, 512)
+
+        return num_blocks, threads_per_block
+
+
+@fieldwise_init
+@register_passable
+struct BinaryOperations[dtype: DType = DType.float32](
+    ImplicitlyCopyable & Movable
+):
+    @staticmethod
+    fn launch[
+        op_code: Int,
+    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) raises -> NDBuffer[
+        Self.dtype
+    ]:
+        comptime simdwidth = simd_width_of[Self.dtype]()
+        var A_shape = A.shape
+        var B_shape = B.shape
+
+        var broadcast_shape = ShapeBroadcaster.broadcast_shape(A_shape, B_shape)
+        var output_size = broadcast_shape.product()
+
+        # Launch configuration
+        var (threads_per_block, num_blocks) = Self.launch_config(output_size)
+
+        # Check if broadcasting is needed
+        var needs_broadcasting = (
+            A_shape != broadcast_shape or B_shape != broadcast_shape
+        )
+
+        ref A_device_state = A.device_state.value()
+        ref B_device_state = B.device_state.value()
+        ref gpu = A_device_state.get_gpu()
+        var device_context = gpu()
+        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            output_size
+        )
+
+        ref A_buffer = A_device_state.device_buffer()
+        ref B_buffer = B_device_state.device_buffer()
+
+        # ================================================================
+        # PATH 1: Both contiguous, same shape, no broadcasting
+        # ================================================================
+        if (
+            A_shape == B_shape
+            and A.is_contiguous()
+            and B.is_contiguous()
+            and not needs_broadcasting
+        ):
+            print("[GPU] Using Kernel 1: Both contiguous")
+            var compiled_func = device_context.compile_function[
+                arithmetic_ops_both_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+                arithmetic_ops_both_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+            ]()
+
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                B_buffer,
+                0,  # A.offset(),
+                0,  # B.offset(),
+                output_size,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+
+            device_context.synchronize()
+            var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+            var out = NDBuffer[Self.dtype].with_device_state(
+                device_state^, broadcast_shape
+            )
+
+            return out^
+
+        # Prepare for strided kernels
+        var rank = broadcast_shape.rank()
+        var A_broadcast_strides = ShapeBroadcaster.broadcast_strides(
+            A_shape, Strides.default(A_shape), broadcast_shape
+        )
+        var B_broadcast_strides = ShapeBroadcaster.broadcast_strides(
+            B_shape, Strides.default(B_shape), broadcast_shape
+        )
+
+        var A_is_contiguous = A.is_contiguous()
+        var B_is_contiguous = B.is_contiguous()
+
+        # ================================================================
+        # PATH 2: A contiguous, B strided
+        # ================================================================
+        if A_is_contiguous and not B_is_contiguous:
+            print("[GPU] Using Kernel 2: A contiguous, B strided")
+
+            var compiled_func = device_context.compile_function[
+                arithmetic_ops_A_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+                arithmetic_ops_A_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+            ]()
+
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                B_buffer,
+                0,  # A.offset(),
+                broadcast_shape.array(),
+                # B.strides().array(),
+                B_broadcast_strides.array(),
+                0,  # B.offset(),
+                output_size,
+                rank,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+
+            device_context.synchronize()
+            var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+            var out = NDBuffer[Self.dtype].with_device_state(
+                device_state^, broadcast_shape
+            )
+
+            return out^
+        # ================================================================
+        # PATH 3: A strided, B contiguous
+        # ================================================================
+        if not A_is_contiguous and B_is_contiguous:
+            print("[GPU] Using Kernel 3: A strided, B contiguous (MEDIUM-FAST)")
+
+            var compiled_func = device_context.compile_function[
+                arithmetic_ops_B_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+                arithmetic_ops_B_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+            ]()
+
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                B_buffer,
+                broadcast_shape.array(),
+                A_broadcast_strides.array(),
+                0,  # A.offset(),
+                0,  # B.offset(),
+                output_size,
+                rank,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+
+            device_context.synchronize()
+            var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+            var out = NDBuffer[Self.dtype].with_device_state(
+                device_state^, broadcast_shape
+            )
+
+            return out^
+        # ================================================================
+        # PATH 4: Both strided (or broadcasting)
+        # ================================================================
+
+        print("[GPU] Using Kernel 4: Both strided")
+
+        var compiled_func = device_context.compile_function[
+            arithmetic_ops_both_strided[
+                op_code, Self.dtype, simdwidth, 2 * simdwidth
+            ],
+            arithmetic_ops_both_strided[
+                op_code, Self.dtype, simdwidth, 2 * simdwidth
+            ],
+        ]()
+
+        device_context.enqueue_function(
+            compiled_func,
+            result_buffer,
+            A_buffer,
+            B_buffer,
+            broadcast_shape.array(),
+            A_broadcast_strides.array(),
+            B_broadcast_strides.array(),
+            0,  # A.offset(),
+            0,  # B.offset(),
+            output_size,
+            rank,
+            grid_dim=num_blocks,
+            block_dim=threads_per_block,
+        )
+
+        device_context.synchronize()
+        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        var out = NDBuffer[Self.dtype].with_device_state(
+            device_state^, broadcast_shape
+        )
+
+        return out^
 
     @staticmethod
     fn launch_config(output_size: Int) -> Tuple[Int, Int]:
