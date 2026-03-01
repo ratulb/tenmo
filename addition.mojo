@@ -52,7 +52,7 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
         count = len(output.ancestry())
@@ -176,11 +176,11 @@ fn main() raises:
     A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
     print("A's id: ", A.id())
     a = A.to_gpu(requires_grad=True)
-    a.ancestry().origin().print()
 
     expected = Tensor[dtype].full(Shape.of(3, 3), 2) + 42
     b = a + 42
+    b_cpu = b.to_cpu()
     assert_true(b.all_close(expected), "Scalar add assertion failed")
-    b.ancestry().print()
-    b.backward()
-    a.grad().print()
+    b_cpu.ancestry().print()
+    b_cpu.backward()
+    A.grad().print()
