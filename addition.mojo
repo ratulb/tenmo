@@ -177,10 +177,10 @@ fn main() raises:
     print("A's id: ", A.id())
     a = A.to_gpu(requires_grad=True)
 
-    expected = Tensor[dtype].full(Shape.of(3, 3), 2) + 42
-    b = a + 42
+    expected = (A * 42) + 2*A
+    b = (a * 42) + 2*a
     b_cpu = b.to_cpu()
-    assert_true(b.all_close(expected), "Scalar add assertion failed")
+    assert_true(b_cpu.all_close(expected), "Scalar add assertion failed")
     b_cpu.ancestry().print()
     b_cpu.backward()
     A.grad().print()
