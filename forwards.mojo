@@ -40,3 +40,4 @@ from filler import Filler
 from pooling import MaxPool2d
 from dropout import Dropout
 from exponential import Exponential
+from device_transfer import DeviceTransfer

@@ -469,19 +469,21 @@ struct Tensor[dtype: DType = DType.float32](
         if device.is_cpu():
             if self.is_on_cpu():
                 return self
-            return Self(
+            _="""return Self(
                 self.buffer.to_cpu(),
                 requires_grad=requires_grad.or_else(self.requires_grad)
-            )
+            )"""
+            return DeviceTransfer[Self.dtype].forward[True](self, device, requires_grad)
 
         # GPU case
         if self.is_on_gpu():
             return self
 
-        return Self(
+        _="""return Self(
             self.buffer.to_gpu(device.kind[GPU]),
             requires_grad=requires_grad.or_else(self.requires_grad)
-        )
+        )"""
+        return DeviceTransfer[Self.dtype].forward[True](self, device, requires_grad)
 
     fn to_cpu(
         mut self,
