@@ -7,7 +7,7 @@ from backpropagation import (
 from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
-from sys import has_accelerator
+from device import Device
 
 
 @fieldwise_init
@@ -52,9 +52,12 @@ struct DeviceTransfer[dtype: DType](Copyable):
 
         @parameter
         if track_grad:
-            if self.requires_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
                 out.requires_grad_(True)
-                backward_fn = DeviceTransferBackward[Self.dtype]().into_backward_fn()
+                backward_fn = DeviceTransferBackward[
+                    Self.dtype
+                ]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
 
@@ -64,6 +67,11 @@ struct DeviceTransfer[dtype: DType](Copyable):
 from common_utils import now
 from testing import assert_true
 from shapes import Shape
+
+from gpu.host import DeviceContext
+from device import GPU
+from random import random_si64
+from common_utils import now
 
 
 fn main() raises:
@@ -84,7 +92,7 @@ fn main() raises:
     print()"""
     print("The meaty part")
 
-    A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
+    _ = """A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
     print("A's id: ", A.id())
     a = A.to_gpu(requires_grad=True)
 
@@ -93,4 +101,39 @@ fn main() raises:
     assert_true(b.all_close(expected), "Scalar add assertion failed")
     b.ancestry().print()
     b.backward()
-    A.grad().print()
+    A.grad().print()"""
+    var times = 1000
+    var start = now()
+    var s = random_si64(10, 20)
+    for _ in range(times):
+        ctx = DeviceContext()
+        sn = random_si64(10, 20)
+        same = s == sn
+        print(same)
+
+    end1 = now() - start
+
+    start = now()
+
+    ctx = DeviceContext()
+    for _ in range(times):
+        sn = random_si64(10, 20)
+        same = s == sn
+        ctx1 = ctx
+        print(same, ctx1.id())
+
+    end2 = now() - start
+
+    start = now()
+    device = GPU()
+    for _ in range(times):
+        sn = random_si64(10, 20)
+        same = s == sn
+        device1 = device
+        print(same, device1.id)
+
+    end3 = now() - start
+
+    print("Time taken for ctx creation: ", end1 * 1000, "ms")
+    print("Time taken for ctx copy: ", end2 * 1000, "ms")
+    print("Time taken for Device copy: ", end3 * 1000, "ms")
