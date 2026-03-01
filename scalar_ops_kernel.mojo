@@ -201,17 +201,18 @@ fn main() raises:
     var tensor_A = Tensor[dtype].ones(SIZE, requires_grad=True)
     var tensor_a = tensor_A.to_gpu()
     var start = now()
-    var expect = (tensor_A * 42) + 2
+    #var expect = (tensor_A * 42) + 2
+    var expect = tensor_A  + 2
     print("CPU mul took: ", (now() - start) * 1000, "ms")
     # First test
     start = now()
-    var result = (tensor_a * 42) + 2
+    #var result = (tensor_a * 42) + 2
+    var result = tensor_a  + 2
     result = result.to_cpu()
-    print("Result\n")
-    result.print()
     print("GPU mul took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
-
+    result.backward()
+    tensor_A.grad().print()
     # Second test
     tensor_A = Tensor[dtype].rand(SIZE // 2, 2)
     var reshaped = tensor_A.reshape(2, SIZE // 2)
