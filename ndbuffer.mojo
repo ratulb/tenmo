@@ -136,23 +136,23 @@ struct NDBuffer[dtype: DType](
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
-    fn to_cpu(
-        mut self, delete: Bool = False
-    ) raises -> Self:
-        var nd_buffer = self.to_device(CPU().into())
+    fn to_cpu(mut self, delete: Bool = False) raises -> Self:
+        var _, nd_buffer = self.to_device(CPU().into())
         if delete:
             self.device_state = None
         return nd_buffer^
 
     fn to_gpu(self, gpu: GPU) raises -> Self:
-        return self.to_device(gpu.into())
+        return self.to_device(gpu.into())[1]
 
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
         if self.is_on_gpu():
             return self.device_state.value().gpu[]
         return None
 
-    fn to_device(self, device: Device) raises -> NDBuffer[Self.dtype]:
+    fn to_device(
+        self, device: Device
+    ) raises -> Tuple[Int, NDBuffer[Self.dtype]]:
         """
         Materialize this buffer onto another device.
 
@@ -166,7 +166,7 @@ struct NDBuffer[dtype: DType](
         if not self.device_state:
             if device.is_cpu():
                 print("NDBuffer -> to_device: already on CPU")
-                return self
+                return -1, self
 
             # CPU -> GPU
             var gpu = device.kind[GPU]
@@ -188,7 +188,7 @@ struct NDBuffer[dtype: DType](
 
             result.device_state = new_device_state^
 
-            return result^
+            return 0, result^
 
         # 2) Currently on GPU
         var curr_state = self.device_state.value()
@@ -200,23 +200,24 @@ struct NDBuffer[dtype: DType](
             if curr_gpu == new_gpu:
                 print("NDBuffer -> to_device: current and new device is same")
                 # Already on this GPU
-                return self
+                return -1, self
 
             # GPU -> different GPU
             # We materialize through CPU
 
             # First bring to CPU
-            var cpu_buffer = curr_state.into(self.shape)
+            var ndb_buffer = curr_state.into(self.shape)
 
             # Then move CPU -> new GPU
-            return cpu_buffer.to_device(device)
+            # This would return 0, NDBuffer
+            return ndb_buffer.to_device(device)
 
         # ---------------------------------------
         # 3) GPU -> CPU
         # ---------------------------------------
         # Materialize contiguous CPU buffer
         # New NDBuffer alltogether!
-        return curr_state.into(self.shape)
+        return 0, curr_state.into(self.shape)
 
     fn is_on_gpu(self) -> Bool:
         @parameter

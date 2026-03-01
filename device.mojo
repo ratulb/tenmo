@@ -60,21 +60,28 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
     """Essentially a shared DeviceContext."""
 
     var device_context: ArcPointer[DeviceContext]
+    var id: Int64
 
     fn into(self) -> Device:
         return Device(self)
 
     fn __init__(out self, device_id: Int = 0) raises:
         self.device_context = ArcPointer(DeviceContext(device_id))
+        self.id = device_id
 
     fn __copyinit__(out self, existing: Self):
         self.device_context = existing.device_context.copy()
+        self.id = existing.id
 
     fn __moveinit__(out self, deinit existing: Self):
         self.device_context = existing.device_context^
+        self.id = existing.id
 
     fn __eq__(self, other: Self) -> Bool:
-        return self.device_context.__is__(other.device_context)
+        return (
+            self.device_context.__is__(other.device_context)
+            or self.id == other.id
+        )
 
     fn __ne__(self, other: Self) -> Bool:
         return not (self == other)
@@ -158,6 +165,7 @@ struct DeviceState[dtype: DType](Equatable & ImplicitlyCopyable & Movable):
 
 from tenmo import Tensor
 
+
 fn main() raises:
     # var device = Device(CPU())
     comptime dtype = DType.float32
@@ -171,4 +179,3 @@ fn main() raises:
     print(device_buffer)
     with device_buffer.map_to_host() as host_buffer:
         print(host_buffer)
-
