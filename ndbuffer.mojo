@@ -161,6 +161,13 @@ struct NDBuffer[dtype: DType](
             return self.device_state.value().gpu[]
         return None
 
+    fn get_device_state(
+        ref self,
+    ) raises -> ref [self.device_state.value()] DeviceState[Self.dtype]:
+        if self.is_on_gpu():
+            return self.device_state.value()
+        raise "Not on any device"
+
     fn to_device(
         self, device: Device
     ) raises -> Tuple[Int, NDBuffer[Self.dtype]]:
