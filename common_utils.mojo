@@ -517,7 +517,8 @@ fn print_buffer[
     num_first: Int = 10,
     num_last: Int = 10,
 ):
-    if buffer.buffer.size == 0:
+    #if buffer.buffer.size == 0:
+    if buffer.numels() == 0:
         print("  Empty")
         return
     if buffer.rank() == 0:  # Tensor with Shape ()

@@ -524,6 +524,7 @@ struct NDBuffer[dtype: DType](
         s += ", Offset : " + self.offset.__str__()
         s += ", Contiguous : " + self.is_contiguous().__str__()
         s += ", Buffer size : " + self.size().__str__()
+        s += ", Device : " + "gpu" if self.is_on_gpu() else ", Device : " + "cpu"
         s += "]"
         return s
 
@@ -1582,8 +1583,8 @@ from tenmo import Tensor
 
 fn main() raises:
     comptime dtype = DType.float32
-    var buffer = Buffer[dtype].arange(5, 10)
-    var ndb = NDBuffer[dtype](buffer, Shape(5, 1))
+    var buffer = Buffer[dtype].arange(5, 50)
+    var ndb = NDBuffer[dtype](buffer^, Shape(5, 9))
     ndb.print()
     var ndbg = ndb.to_gpu(GPU())
     ndbg.store[1](0, 0, 10)
