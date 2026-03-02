@@ -161,12 +161,36 @@ struct NDBuffer[dtype: DType](
             return self.device_state.value().gpu[]
         return None
 
+    fn get(self, index: Int) -> Scalar[Self.dtype]:
+        if self.is_on_gpu():
+            ref device_state = self.device_state.value()
+            try:
+                return device_state[index]
+            except e:
+                print(e)
+                panic("Error in NDBuffer - get: ", e.__str__())
+                # Unreachable
+                return Scalar[Self.dtype](0)
+        return self.data_ptr()[index]
+
     fn get_device_state(
         ref self,
     ) raises -> ref [self.device_state.value()] DeviceState[Self.dtype]:
         if self.is_on_gpu():
             return self.device_state.value()
         raise "Not on any device"
+
+    fn set(self, index: Int, value: Scalar[Self.dtype]):
+        if self.is_on_gpu():
+            ref device_state = self.device_state.value()
+            try:
+                device_state[index] = value
+            except e:
+                print(e)
+                panic("Error in NDBuffer - set: ", e.__str__())
+        else:
+            var ptr = self.data_ptr().unsafe_mut_cast[True]()
+            ptr[index] = value
 
     fn to_device(
         self, device: Device
@@ -301,45 +325,51 @@ struct NDBuffer[dtype: DType](
             self.shape, indices, self.strides, self.offset
         )
         # return self.buffer[index]
-        return self.data_ptr()[index]
+        # return self.data_ptr()[index]
+        return self.get(index)
 
     fn __setitem__(self, indices: IntArray, value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         # self.buffer[index] = value
-        var ptr = self.data_ptr().unsafe_mut_cast[True]()
-        ptr[index] = value
+        _ = """var ptr = self.data_ptr().unsafe_mut_cast[True]()
+        ptr[index] = value"""
+        self.set(index, value)
 
     fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         # return self.buffer[index]
-        return self.data_ptr()[index]
+        # return self.data_ptr()[index]
+        return self.get(index)
 
     fn __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         # self.buffer[index] = value
-        var ptr = self.data_ptr().unsafe_mut_cast[True]()
-        ptr[index] = value
+        _ = """var ptr = self.data_ptr().unsafe_mut_cast[True]()
+        ptr[index] = value"""
+        self.set(index, value)
 
     fn __getitem__(self, indices: VariadicList[Int]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         # return self.buffer[index]
-        return self.data_ptr()[index]
+        # return self.data_ptr()[index]
+        return self.get(index)
 
     fn __setitem__(self, indices: VariadicList[Int], value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         # self.buffer[index] = value
-        var ptr = self.data_ptr().unsafe_mut_cast[True]()
-        ptr[index] = value
+        _ = """var ptr = self.data_ptr().unsafe_mut_cast[True]()
+        ptr[index] = value"""
+        self.set(index, value)
 
     @always_inline
     fn item(self) -> Scalar[Self.dtype]:
@@ -353,7 +383,8 @@ struct NDBuffer[dtype: DType](
             return self[IntArray(0)]
         else:
             return self[IntArray()]"""
-        return self.data_ptr()[]
+        # return self.data_ptr()[]
+        return self.get(0)
 
     @always_inline
     fn load[
@@ -365,6 +396,8 @@ struct NDBuffer[dtype: DType](
             simdwidth.is_power_of_two(),
             "NDBuffer → load: SIMD width must be a power of 2",
         ]()
+        if simdwidth > self.numels():
+            panic("NDBuffer - load: buffer size is less than simd width")
 
         @parameter
         if not validated:
@@ -405,6 +438,16 @@ struct NDBuffer[dtype: DType](
 
         var addr = row * self.strides[0] + col * self.strides[1] + self.offset
         # return self.buffer.load[simdwidth](addr)
+        # return self.data_ptr().load[width=simdwidth](addr)
+        if self.is_on_gpu():
+            ref device_state = self.device_state.value()
+            try:
+                return device_state.load[simdwidth=simdwidth](addr)
+            except e:
+                print(e)
+                panic("Error in NDBuffer - get: ", e.__str__())
+                # Unreachable
+                return SIMD[Self.dtype, simdwidth](0)
         return self.data_ptr().load[width=simdwidth](addr)
 
     @always_inline
@@ -417,6 +460,8 @@ struct NDBuffer[dtype: DType](
             simdwidth.is_power_of_two(),
             "NDBuffer → store: SIMD width must be a power of 2",
         ]()
+        if simdwidth > self.numels():
+            panic("NDBuffer - store: buffer size is less than simd width")
 
         @parameter
         if not validated:
@@ -457,8 +502,18 @@ struct NDBuffer[dtype: DType](
 
         var addr = row * self.strides[0] + col * self.strides[1] + self.offset
         # self.buffer.store[simdwidth](addr, value)
-        var ptr = self.data_ptr().unsafe_mut_cast[True]()
-        ptr.store[width=simdwidth](addr, value)
+        # var ptr = self.data_ptr().unsafe_mut_cast[True]()
+        # ptr.store[width=simdwidth](addr, value)
+        if self.is_on_gpu():
+            ref device_state = self.device_state.value()
+            try:
+                device_state.store[simdwidth=simdwidth](addr, value)
+            except e:
+                print(e)
+                panic("Error in NDBuffer - store: ", e.__str__())
+        else:
+            var ptr = self.data_ptr().unsafe_mut_cast[True]()
+            ptr.store[width=simdwidth](addr, value)
 
     fn __str__(self) -> String:
         s = String("NDBuffer [")
@@ -1525,10 +1580,13 @@ struct NDBuffer[dtype: DType](
 from tenmo import Tensor
 
 
-fn main():
+fn main() raises:
     comptime dtype = DType.float32
-    var buffer = Buffer[dtype].arange(5, 10, 1)
+    var buffer = Buffer[dtype].arange(5, 10)
     var ndb = NDBuffer[dtype](buffer, Shape(5, 1))
     ndb.print()
-    _ = ndb.device_context()
-    _ndb = NDBuffer[dtype](Shape(1, 1))
+    var ndbg = ndb.to_gpu(GPU())
+    ndbg.store[1](0, 0, 10)
+    ndbg.print()
+    r = ndbg.load[1](0, 0)
+    print(r)

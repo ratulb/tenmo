@@ -25,7 +25,7 @@ fn pass_to_device[
     print("The size: ", size, shape[0])
     for i in range(shape[0]):
         (A + i)[] = (A + i)[] * 42
-        print("Here: ", A[i])	
+        print("Here: ", A[i])
 
 from device import GPU
 

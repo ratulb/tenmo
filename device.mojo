@@ -1,7 +1,7 @@
 from common_utils import panic, now
 from gpu.host import DeviceContext, DeviceBuffer
 from memory import ArcPointer, memcpy
-from sys import has_accelerator
+from sys import has_accelerator, simd_width_of
 from utils import Variant
 from ndbuffer import NDBuffer
 from shapes import Shape
@@ -166,6 +166,28 @@ struct DeviceState[dtype: DType](Equatable & ImplicitlyCopyable & Movable):
         ref self,
     ) -> ref [self.gpu] GPU:
         return self.gpu
+
+    fn __getitem__(self, index: Int) raises -> Scalar[Self.dtype]:
+        with self.buffer.map_to_host() as host_buffer:
+            return host_buffer[index]
+
+    fn __setitem__(self, index: Int, value: Scalar[Self.dtype]) raises:
+        with self.buffer.map_to_host() as host_buffer:
+            host_buffer[index] = value
+
+    fn load[
+        simdwidth: Int = simd_width_of[Self.dtype]()
+    ](self, addr: Int) raises -> SIMD[Self.dtype, simdwidth]:
+        with self.buffer.map_to_host() as host_buffer:
+            var device_ptr = host_buffer.unsafe_ptr()
+            return device_ptr.load[width=simdwidth](addr)
+
+    fn store[
+        simdwidth: Int = simd_width_of[Self.dtype]()
+    ](self, addr: Int, value: SIMD[Self.dtype, simdwidth]) raises:
+        with self.buffer.map_to_host() as host_buffer:
+            var device_ptr = host_buffer.unsafe_ptr()
+            device_ptr.store[width=simdwidth](addr, value)
 
 
 from tenmo import Tensor
