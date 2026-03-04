@@ -4960,7 +4960,7 @@ fn test_element_at() raises:
     a = Tensor[dtype].arange(Scalar[DType.float32](10))
     v = a[s(2, 8, 2)]
     assert_true(
-        v.max_index() == 6 and v.element_at(-4) == 2,
+        v.max_index() == 6 and v.get(-4) == 2,
         "max_index and element_at assertion failed",
     )
 

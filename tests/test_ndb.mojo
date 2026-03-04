@@ -2144,7 +2144,7 @@ fn test_element_at() raises:
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     shared = ndb.share(Shape(3, 1), offset=3)
     assert_true(
-        shared.max_index() == 5 and shared.element_at(shared.max_index()) == 6
+        shared.max_index() == 5 and shared.get(shared.max_index()) == 6
     )
 
 

@@ -12,6 +12,7 @@ from collections import Set
 from sys import simd_width_of, has_accelerator
 from scalar_ops_kernel import ScalarOperations
 from binary_ops_kernel import BinaryOperations
+from compare_kernel import AllClose
 from mnemonics import (
     Multiply,
     Add,
@@ -162,16 +163,25 @@ struct NDBuffer[dtype: DType](
         return None
 
     fn get(self, index: Int) -> Scalar[Self.dtype]:
+        idx = index + self.max_index() if index < 0 else index
+        if idx < 0 or idx > self.max_index():
+            panic(
+                "NDBuffer → element_at: index out of bounds.",
+                "NDBuffer max index",
+                self.max_index().__str__(),
+                ", provided index",
+                index.__str__(),
+            )
         if self.is_on_gpu():
             ref device_state = self.device_state.value()
             try:
-                return device_state[index]
+                return device_state[idx]
             except e:
                 print(e)
                 panic("Error in NDBuffer - get: ", e.__str__())
                 # Unreachable
                 return Scalar[Self.dtype](0)
-        return self.data_ptr()[index]
+        return self.data_ptr()[idx]
 
     fn get_device_state(
         ref self,
@@ -181,16 +191,26 @@ struct NDBuffer[dtype: DType](
         raise "Not on any device"
 
     fn set(self, index: Int, value: Scalar[Self.dtype]):
+        idx = index + self.max_index() if index < 0 else index
+        if idx < 0 or idx > self.max_index():
+            panic(
+                "NDBuffer → set_element_at: index out of bounds.",
+                "NDBuffer max index",
+                self.max_index().__str__(),
+                ", provided index",
+                index.__str__(),
+            )
+
         if self.is_on_gpu():
             ref device_state = self.device_state.value()
             try:
-                device_state[index] = value
+                device_state[idx] = value
             except e:
                 print(e)
                 panic("Error in NDBuffer - set: ", e.__str__())
         else:
             var ptr = self.data_ptr().unsafe_mut_cast[True]()
-            ptr[index] = value
+            ptr[idx] = value
 
     fn to_device(
         self, device: Device
@@ -524,7 +544,9 @@ struct NDBuffer[dtype: DType](
         s += ", Offset : " + self.offset.__str__()
         s += ", Contiguous : " + self.is_contiguous().__str__()
         s += ", Buffer size : " + self.size().__str__()
-        s += ", Device : " + "gpu" if self.is_on_gpu() else ", Device : " + "cpu"
+        s += (
+            ", Device : " + "gpu" if self.is_on_gpu() else ", Device : " + "cpu"
+        )
         s += "]"
         return s
 
@@ -1526,39 +1548,34 @@ struct NDBuffer[dtype: DType](
                 + "≠"
                 + other.shape.__str__()
             )
+        var result: Bool
 
-        return self.contiguous_buffer().all_close[rtol=rtol, atol=atol](
-            other.contiguous_buffer()
-        )
-
-    @always_inline
-    fn element_at(self, index: Int) -> Scalar[Self.dtype]:
-        idx = index + self.max_index() if index < 0 else index
-        if idx < 0 or idx > self.max_index():
-            panic(
-                "NDBuffer → element_at: index out of bounds.",
-                "NDBuffer max index",
-                self.max_index().__str__(),
-                ", provided index",
-                index.__str__(),
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu() and other.is_on_gpu():
+                try:
+                    result = AllClose[Self.dtype].launch[rtol=rtol, atol=atol](
+                        self, other
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "NDBuffer all_close - GPU operation failed. Failling"
+                        " back on CPU"
+                    )
+                    result = self.contiguous_buffer().all_close[
+                        rtol=rtol, atol=atol
+                    ](other.contiguous_buffer())
+            else:
+                result = self.contiguous_buffer().all_close[
+                    rtol=rtol, atol=atol
+                ](other.contiguous_buffer())
+        else:
+            result = self.contiguous_buffer().all_close[rtol=rtol, atol=atol](
+                other.contiguous_buffer()
             )
-        # return self.buffer[idx]
-        return self.data_ptr()[idx]
 
-    @always_inline
-    fn set_element_at(self, index: Int, value: Scalar[Self.dtype]):
-        idx = index + self.max_index() if index < 0 else index
-        if idx < 0 or idx > self.max_index():
-            panic(
-                "NDBuffer → set_element_at: index out of bounds.",
-                "NDBuffer max index",
-                self.max_index().__str__(),
-                ", provided index",
-                index.__str__(),
-            )
-        # self.buffer[idx] = value
-        var ptr = self.data_ptr().unsafe_mut_cast[True]()
-        ptr[idx] = value
+        return result
 
     @always_inline
     fn sum_over_broadcasted_axes(

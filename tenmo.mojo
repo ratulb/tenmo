@@ -1839,8 +1839,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return {Pointer(to=self).get_immutable()}
 
-    fn element_at(self, index: Int) -> Scalar[Self.dtype]:
-        return self.buffer.element_at(index)
+    fn get(self, index: Int) -> Scalar[Self.dtype]:
+        return self.buffer.get(index)
 
     fn view[
         track_grad: Bool = True
@@ -2382,9 +2382,18 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
         return self.index_itr.bounds()
 
 
+from testing import assert_true
 fn main() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, requires_grad=True)
-    # var b = Tensor[dtype].arange(10, requires_grad=True)
-    _c = a.to_cpu()
-    _ = a.device_context()
+    var b = Tensor[dtype].arange(10, requires_grad=True)
+    ag = a.to_gpu()
+    bg = b.to_gpu()
+
+    assert_true(a.all_close(b))
+    print("cpu")
+    assert_true(ag.all_close(bg))
+    print("gpu")
+    print("cpu")
+
+

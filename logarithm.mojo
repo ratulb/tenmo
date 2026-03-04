@@ -45,7 +45,7 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
             var parent_gradbox_data = parent_gradbox.data_ptr()
             var grad_output_data = grad_output.data_ptr()
             for idx in parent.index_iterator():
-                var input_value = parent.element_at(idx)  # Original input
+                var input_value = parent.get(idx)  # Original input
                 var input_value_safe = max(input_value, self.epsilon)
                 parent_gradbox_data[index] = (
                     grad_output_data[index] / input_value_safe

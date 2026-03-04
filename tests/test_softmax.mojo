@@ -286,7 +286,7 @@ fn test_softmax_numerical_stability() raises:
 
     # All values should be between 0 and 1
     for i in range(output.numels()):
-        var val = output.element_at(i)
+        var val = output.get(i)
         assert_true(val >= 0.0 and val <= 1.0)
 
 

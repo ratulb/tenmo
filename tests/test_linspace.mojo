@@ -52,7 +52,7 @@ fn test_tensor_linspace_precision() raises:
     # Should be exactly [0.0, 0.1, 0.2, ..., 1.0]
     for i in range(11):
         var expected_val = Scalar[dtype](i) / Scalar[dtype](10)
-        assert_true(abs(many_points.element_at(i) - expected_val) < 1e-6)
+        assert_true(abs(many_points.get(i) - expected_val) < 1e-6)
 
     print("Passed linspace precision test")
 

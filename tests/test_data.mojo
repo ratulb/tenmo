@@ -19,7 +19,7 @@ fn assert_tensors_equal[
     if t1.shape() != t2.shape():
         raise Error("Shape mismatch")
     for i in range(t1.numels()):
-        if t1.element_at(i) != t2.element_at(i):
+        if t1.get(i) != t2.get(i):
             raise Error("Tensor values not equal")
 
 
