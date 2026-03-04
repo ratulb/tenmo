@@ -193,6 +193,7 @@ struct AllClose[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu()
         var result_buffer = device_context.enqueue_create_buffer[DType.uint8](1)
+        result_buffer.enqueue_fill(1)
 
         ref A_buffer = A_device_state.device_buffer()
         ref B_buffer = B_device_state.device_buffer()
