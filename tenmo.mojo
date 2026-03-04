@@ -2395,5 +2395,7 @@ fn main() raises:
     assert_true(ag.all_close(bg))
     print("gpu")
     print("cpu")
+    bg[0] = 42
 
+    (bg == ag).print()
 

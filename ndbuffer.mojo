@@ -12,7 +12,7 @@ from collections import Set
 from sys import simd_width_of, has_accelerator
 from scalar_ops_kernel import ScalarOperations
 from binary_ops_kernel import BinaryOperations
-from compare_kernel import AllClose
+from compare_kernel import AllClose, Compare, CompareScalar
 from mnemonics import (
     Multiply,
     Add,
@@ -1451,7 +1451,33 @@ struct NDBuffer[dtype: DType](
                 + "≠"
                 + other.shape.__str__()
             )
+        var result: NDBuffer[DType.bool]
 
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu() and other.is_on_gpu():
+                try:
+                    result = Compare[Self.dtype].launch[op_code](self, other)
+                except e:
+                    print(e)
+                    print(
+                        "NDBuffer compare - GPU operation failed. Failling"
+                        " back on CPU"
+                    )
+                    result = self.compare_cpu[op_code](other)
+            else:
+                result = self.compare_cpu[op_code](other)
+        else:
+            result = self.compare_cpu[op_code](other)
+
+        return result^
+
+    @always_inline
+    fn compare_cpu[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+        DType.bool
+    ]:
         if self.is_contiguous() and other.is_contiguous():
             var self_contiguous = self.contiguous_buffer()
             var other_contiguous = other.contiguous_buffer()
@@ -1495,6 +1521,35 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn compare_scalar[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
+        DType.bool
+    ]:
+        var result: NDBuffer[DType.bool]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    result = CompareScalar[Self.dtype].launch[op_code](
+                        self, scalar
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "NDBuffer compare_scalar - GPU operation failed."
+                        " Failling back on CPU"
+                    )
+                    result = self.compare_scalar_cpu[op_code](scalar)
+            else:
+                result = self.compare_scalar_cpu[op_code](scalar)
+        else:
+            result = self.compare_scalar_cpu[op_code](scalar)
+
+        return result^
+
+    @always_inline
+    fn compare_scalar_cpu[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
         DType.bool
