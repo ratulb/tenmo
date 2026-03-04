@@ -432,6 +432,12 @@ struct Tensor[dtype: DType = DType.float32](
             s += ", offset: " + self.offset().__str__()
         s += ", Type: " + Self.dtype.__str__()
         s += ", requires_grad: " + String(self.requires_grad)
+        s += (
+            ", Device : "
+            + "gpu: "
+            + self.buffer.gpu_id().__str__() if self.is_on_gpu() else ", Device : "
+            + "cpu"
+        )
         s += "]"
         return s
 
@@ -459,31 +465,31 @@ struct Tensor[dtype: DType = DType.float32](
                     (ptr + offset)[] = data_buffer[index]
                     offset += 1
 
-
     fn to_device(
-        mut self,
-        device: Device,
-        requires_grad: Optional[Bool] = None
+        mut self, device: Device, requires_grad: Optional[Bool] = None
     ) raises -> Self:
-
         if device.is_cpu():
             if self.is_on_cpu():
                 return self
-            _="""return Self(
+            _ = """return Self(
                 self.buffer.to_cpu(),
                 requires_grad=requires_grad.or_else(self.requires_grad)
             )"""
-            return DeviceTransfer[Self.dtype].forward[True](self, device, requires_grad)
+            return DeviceTransfer[Self.dtype].forward[True](
+                self, device, requires_grad
+            )
 
         # GPU case
         if self.is_on_gpu():
             return self
 
-        _="""return Self(
+        _ = """return Self(
             self.buffer.to_gpu(device.kind[GPU]),
             requires_grad=requires_grad.or_else(self.requires_grad)
         )"""
-        return DeviceTransfer[Self.dtype].forward[True](self, device, requires_grad)
+        return DeviceTransfer[Self.dtype].forward[True](
+            self, device, requires_grad
+        )
 
     fn to_cpu(
         mut self,
@@ -493,15 +499,24 @@ struct Tensor[dtype: DType = DType.float32](
             return self.to_device(CPU().into())
         raise Error("System does not have any accelerator")
 
-    fn to_gpu(mut self, gpu: Optional[GPU] = None, requires_grad: Optional[Bool] =None) raises -> Self:
+    fn to_gpu(
+        mut self,
+        gpu: Optional[GPU] = None,
+        requires_grad: Optional[Bool] = None,
+    ) raises -> Self:
         @parameter
         if has_accelerator():
             if gpu:
-                return self.to_device(gpu.value().into(), requires_grad=requires_grad)
+                return self.to_device(
+                    gpu.value().into(), requires_grad=requires_grad
+                )
             else:
                 return self.to_device(GPU().into(), requires_grad=requires_grad)
         else:
-            raise Error("Can not move to GPU. System does not have any accelerator device")
+            raise Error(
+                "Can not move to GPU. System does not have any accelerator"
+                " device"
+            )
 
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
         @parameter
@@ -561,10 +576,10 @@ struct Tensor[dtype: DType = DType.float32](
         return self.buffer.is_scalar()
 
     fn is_on_gpu(self) -> Bool:
-        @parameter
-        if has_accelerator():
-            return self.buffer.is_on_gpu()
-        return False
+        _ = """@parameter
+        if has_accelerator():"""
+        return self.buffer.is_on_gpu()
+        # return False
 
     fn is_on_cpu(self) -> Bool:
         return self.is_on_gpu() == False
@@ -1573,13 +1588,19 @@ struct Tensor[dtype: DType = DType.float32](
             unit = Scalar[Self.dtype](1),
         ]()
 
-    fn exp[track_grad: Bool = True](self, requires_grad: Bool=False) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+    fn exp[
+        track_grad: Bool = True
+    ](self, requires_grad: Bool = False) -> Tensor[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
         constrained[
             Self.dtype.is_floating_point(),
             "Tensor → exp is for floating point data types only",
         ]()
 
-        return Exponential[Self.dtype].forward[track_grad=track_grad](self, requires_grad=True)
+        return Exponential[Self.dtype].forward[track_grad=track_grad](
+            self, requires_grad=True
+        )
 
     fn __neg__[track_grad: Bool = True](self) -> Tensor[Self.dtype]:
         constrained[
@@ -1590,7 +1611,9 @@ struct Tensor[dtype: DType = DType.float32](
         var zeros = Tensor[Self.dtype].zeros_like(self)
 
         # Use subtraction: 0 - self
-        return Subtractor[Self.dtype].forward[track_grad=track_grad](zeros, self)
+        return Subtractor[Self.dtype].forward[track_grad=track_grad](
+            zeros, self
+        )
 
     fn __invert__(self: Tensor[DType.bool]) -> Tensor[DType.bool]:
         var buffer = self.buffer.map[
@@ -2383,10 +2406,14 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
 
 
 from testing import assert_true
+
+
 fn main() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].arange(10, requires_grad=True)
     var b = Tensor[dtype].arange(10, requires_grad=True)
+    print(a.is_on_gpu())
+    b.print()
     ag = a.to_gpu()
     bg = b.to_gpu()
 
@@ -2397,5 +2424,4 @@ fn main() raises:
     print("cpu")
     bg[0] = 42
 
-    (bg == ag).print()
-
+    (bg.eq(ag)).print()

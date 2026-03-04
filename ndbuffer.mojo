@@ -287,6 +287,11 @@ struct NDBuffer[dtype: DType](
             return not self.device_state == None
         return False
 
+    fn gpu_id(self) -> Int64:
+        if self.is_on_gpu():
+            return self.device_state.value().get_gpu().id
+        return -1
+
     fn is_on_cpu(self) -> Bool:
         return self.is_on_gpu() == False
 
@@ -545,7 +550,10 @@ struct NDBuffer[dtype: DType](
         s += ", Contiguous : " + self.is_contiguous().__str__()
         s += ", Buffer size : " + self.size().__str__()
         s += (
-            ", Device : " + "gpu" if self.is_on_gpu() else ", Device : " + "cpu"
+            ", Device : "
+            + "gpu: "
+            + self.gpu_id().__str__() if self.is_on_gpu() else ", Device : "
+            + "cpu"
         )
         s += "]"
         return s
