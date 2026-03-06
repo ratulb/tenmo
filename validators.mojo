@@ -76,9 +76,42 @@ struct Validator:
                     " point types. "
                 )
 
-    # ============================================
-    # OPTIMIZED VALIDATOR METHODS USING INTARRAY
-    # ============================================
+    @staticmethod
+    fn normalize_reduction_axes(shape: Shape, axes: IntArray) -> IntArray:
+        """Normalize reduction axes: handle empty list, negative indices, sort, and deduplicate.
+        """
+        var rank = shape.rank()
+
+        # Empty axes list means reduce over all dimensions
+        if len(axes) == 0:
+            return IntArray.range(start=0, end=rank, step=1)
+
+        # Normalize negative indices and validate bounds
+        var normalized = IntArray.with_capacity(len(axes))
+        for axis in axes:
+            var norm_axis = axis
+            if norm_axis < 0:
+                norm_axis = rank + norm_axis
+            if norm_axis < 0 or norm_axis >= rank:
+                panic(
+                    "Reduction axis out of bounds: "
+                    + axis.__str__()
+                    + " for rank "
+                    + rank.__str__()
+                )
+            normalized.append(norm_axis)
+
+        # Sort and remove duplicates
+        normalized.sort(asc=True)
+        var result = IntArray.with_capacity(len(normalized))
+        var prev = -1
+        for axis in normalized:
+            if axis != prev:
+                result.append(axis)
+                prev = axis
+
+        return result^
+
     @always_inline
     @staticmethod
     fn validate_and_normalize_axes(
@@ -728,3 +761,6 @@ struct Validator:
             required_stride *= shape[dim]
 
         return True
+
+fn main():
+    pass

@@ -77,8 +77,10 @@ struct Summer[dtype: DType](Copyable):
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        shape = tensor.shape()
-        reduction_axes = Validator.validate_and_normalize_axes(shape, axes)
+        var shape = tensor.shape()
+        #reduction_axes = Validator.validate_and_normalize_axes(shape, axes)
+        #var nd_buffer = tensor.buffer.sum(reduction_axes, keepdims)
+        var reduction_axes = Validator.normalize_reduction_axes(shape, axes)
         var nd_buffer = tensor.buffer.sum(reduction_axes, keepdims)
         var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 

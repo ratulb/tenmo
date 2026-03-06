@@ -119,7 +119,18 @@ struct Array(
         """Check if empty."""
         return self.size == 0
 
+    fn __contains__(self, value: Int) -> Bool:
+        for i in range(len(self)):
+            if value == self[i]:
+                return True
+        return False
     # ========== Access ==========
+
+    fn product(self) -> Int:
+        var result = 1
+        for i in range(len(self)):
+            result *= self[i]
+        return result
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
@@ -169,4 +180,5 @@ struct Array(
 
 fn main():
     a = Array(3, 4, 5)
-    print(a)
+    print(4 in a, 1 in a, a.product())
+

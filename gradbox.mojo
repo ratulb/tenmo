@@ -305,7 +305,8 @@ struct Gradbox[dtype: DType](
     fn sum(
         self, axes: IntArray = IntArray(), keepdims: Bool = False
     ) -> Gradbox[Self.dtype]:
-        var nd_buffer = self.buffer.sum(reduction_axes=axes, keepdims=keepdims)
+        #var nd_buffer = self.buffer.sum(reduction_axes=axes, keepdims=keepdims)
+        var nd_buffer = self.buffer.sum(normalized_axes=axes, keepdims=keepdims)
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @always_inline

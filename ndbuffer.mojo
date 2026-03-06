@@ -5,6 +5,7 @@ from intarray import IntArray
 from indexhelper import IndexCalculator, IndexIterator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic, log_warning, print_buffer
+from validators import Validator
 from memory import memcpy, AddressSpace, ArcPointer
 from gpu.host import DeviceBuffer, DeviceContext
 from device import Device, CPU, GPU, DeviceState
@@ -13,6 +14,7 @@ from sys import simd_width_of, has_accelerator
 from scalar_ops_kernel import ScalarOperations
 from binary_ops_kernel import BinaryOperations
 from compare_kernel import AllClose, Compare, CompareScalar
+from reduction_kernel import SumReduction
 from mnemonics import (
     Multiply,
     Add,
@@ -753,10 +755,43 @@ struct NDBuffer[dtype: DType](
             return accum_sum
 
     fn sum(
-        self, reduction_axes: IntArray, keepdims: Bool
+        self, normalized_axes: IntArray, keepdims: Bool
     ) -> NDBuffer[Self.dtype]:
-        # Step 1: Normalize and validate reduction axes
-        var normalized_axes = self._normalize_reduction_axes(reduction_axes)
+        var out: NDBuffer[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = SumReduction[Self.dtype].launch(
+                        self, normalized_axes, keepdims
+                    )
+                except e:
+                    print(e)
+                    print(
+                        (
+                            "NDBuffer sum - GPU operation failed for"
+                            ". Failling back on CPU"
+                        ),
+                    )
+                    out = self.sum_cpu(normalized_axes, keepdims)
+            else:
+                out = self.sum_cpu(normalized_axes, keepdims)
+        else:
+            out = self.sum_cpu(normalized_axes, keepdims)
+
+        return out^
+
+    fn sum_cpu(
+        # self, reduction_axes: IntArray, keepdims: Bool
+        self,
+        normalized_axes: IntArray,
+        keepdims: Bool,
+    ) -> NDBuffer[Self.dtype]:
+        # Step 1: Normalize and validate reduction axes - no longer required
+        # var normalized_axes = self._normalize_reduction_axes(reduction_axes)
+        # var normalized_axes = Validator.normalize_reduction_axes(self.shape, reduction_axes)
+        # var normalized_axes = reduction_axes
 
         # Step 2: Compute output shape with pre-validated axes
         var out_shape = self.shape.compute_output_shape(
@@ -787,7 +822,7 @@ struct NDBuffer[dtype: DType](
 
         return out^
 
-    fn _normalize_reduction_axes(self, axes: IntArray) -> IntArray:
+    fn _normalize_reduction_axes_1(self, axes: IntArray) -> IntArray:
         """Normalize reduction axes: handle empty list, negative indices, sort, and deduplicate.
         """
         var rank = self.rank()
@@ -1648,12 +1683,14 @@ struct NDBuffer[dtype: DType](
         current_shape = extended_buffer.shape
         # Sum over extra leading dimensions
         while len(current_shape) > len(target_shape):
-            result = result.sum(reduction_axes=IntArray(0), keepdims=False)
+            # result = result.sum(reduction_axes=IntArray(0), keepdims=False)
+            result = result.sum(normalized_axes=IntArray(0), keepdims=False)
             current_shape = result.shape
         # Sum over mismatched dimensions
         for i in range(len(target_shape)):
             if current_shape[i] != target_shape[i] and current_shape[i] > 1:
-                result = result.sum(reduction_axes=IntArray(i), keepdims=True)
+                # result = result.sum(reduction_axes=IntArray(i), keepdims=True)
+                result = result.sum(normalized_axes=IntArray(i), keepdims=True)
                 current_shape = result.shape
         return result^
 
