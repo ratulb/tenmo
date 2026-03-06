@@ -189,11 +189,14 @@ fn test_sum_all() raises:
     assert_true(cpu_result == Tensor[dtype].scalar(24))
     var a_gpu = a.to_gpu()
     var gpu_result = a_gpu.sum()
+    var cpu_result_gpu = cpu_result.to_gpu()
     gpu_result.print()
-    assert_true(cpu_result.all_close(gpu_result))
+    assert_true(cpu_result_gpu.all_close(gpu_result))
 
     cpu_result = a.sum(keepdims=True)
     gpu_result = a_gpu.sum(keepdims=True)
     cpu_result.print()
     gpu_result.print()
-    assert_true(cpu_result.all_close(gpu_result))
+
+    assert_true(cpu_result.to_gpu().all_close(gpu_result))
+    assert_true(cpu_result.all_close(gpu_result.to_cpu()))
