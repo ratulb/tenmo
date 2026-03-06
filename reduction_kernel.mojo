@@ -197,6 +197,7 @@ fn test_sum_all() raises:
     gpu_result = a_gpu.sum(keepdims=True)
     cpu_result.print()
     gpu_result.print()
-
+    cpu_result_gpu = cpu_result.to_gpu()
+    assert_true(cpu_result_gpu== gpu_result)
     assert_true(cpu_result.to_gpu().all_close(gpu_result))
     assert_true(cpu_result.all_close(gpu_result.to_cpu()))
