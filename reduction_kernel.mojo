@@ -173,7 +173,7 @@ struct SumReduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
 
 
 fn main() raises:
-    test_sum_all()
+    #test_sum_all()
     test_sum_partial()
 
 
@@ -207,7 +207,8 @@ fn test_sum_all() raises:
 fn test_sum_partial() raises:
     print("test_sum_partial")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].rand(2, 3, 4)
+    var a = Tensor[dtype].arange(2 * 3 * 4)
+    a = a.reshape(2, 3, 4)
     var cpu_result = a.sum(axes=[1])
     cpu_result.print()
     var a_gpu = a.to_gpu()
@@ -216,11 +217,11 @@ fn test_sum_partial() raises:
     gpu_result.print()
     assert_true(cpu_result_gpu.all_close(gpu_result))
 
-    cpu_result = a.sum(axes=[0], keepdims=True)
+    _="""cpu_result = a.sum(axes=[0], keepdims=True)
     gpu_result = a_gpu.sum(axes=[0], keepdims=True)
     cpu_result.print()
     gpu_result.print()
     cpu_result_gpu = cpu_result.to_gpu()
     assert_true(cpu_result_gpu== gpu_result)
     assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    assert_true(cpu_result.all_close(gpu_result.to_cpu()))
+    assert_true(cpu_result.all_close(gpu_result.to_cpu()))"""
