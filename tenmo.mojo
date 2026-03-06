@@ -614,13 +614,15 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     fn __eq__(self, other: Tensor[Self.dtype]) -> Bool:
-        return self.eq(other).buffer.buffer.all_true()
+        #return self.eq(other).buffer.buffer.all_true()
+        return self.buffer == other.buffer
 
     fn eq(self, other: Tensor[Self.dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.buffer.compare[Equal](other.buffer))
 
     fn __ne__(self, other: Tensor[Self.dtype]) -> Bool:
-        return self.ne(other).buffer.buffer.all_true()
+        #return self.ne(other).buffer.buffer.all_true()
+        return self.buffer != other.buffer
 
     fn ne(self, other: Tensor[Self.dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.buffer.compare[NotEqual](other.buffer))
