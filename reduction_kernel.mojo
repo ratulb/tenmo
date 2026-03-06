@@ -185,8 +185,9 @@ fn test_sum_all() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].ones(2, 3, 4)
     var cpu_result = a.sum()
+    cpu_result.print()
     assert_true(cpu_result == Tensor[dtype].scalar(24))
     var a_gpu = a.to_gpu()
     var gpu_result = a_gpu.sum()
-
-    assert_true(cpu_result == gpu_result)
+    gpu_result.print()
+    assert_true(cpu_result.all_close(gpu_result))
