@@ -191,3 +191,9 @@ fn test_sum_all() raises:
     var gpu_result = a_gpu.sum()
     gpu_result.print()
     assert_true(cpu_result.all_close(gpu_result))
+
+    cpu_result = a.sum(keepdims=True)
+    gpu_result = a_gpu.sum(keepdims=True)
+    cpu_result.print()
+    gpu_result.print()
+    assert_true(cpu_result.all_close(gpu_result))
