@@ -169,11 +169,11 @@ struct SumReduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
             if block_size >= max_block_size:
                 block_size = max_block_size
                 break
-        return (total_output, block_size)
+        return (block_size, total_output)
 
 
 fn main() raises:
-    #test_sum_all()
+    test_sum_all()
     test_sum_partial()
 
 
@@ -217,11 +217,11 @@ fn test_sum_partial() raises:
     gpu_result.print()
     assert_true(cpu_result_gpu.all_close(gpu_result))
 
-    _="""cpu_result = a.sum(axes=[0], keepdims=True)
+    cpu_result = a.sum(axes=[0], keepdims=True)
     gpu_result = a_gpu.sum(axes=[0], keepdims=True)
     cpu_result.print()
     gpu_result.print()
     cpu_result_gpu = cpu_result.to_gpu()
-    assert_true(cpu_result_gpu== gpu_result)
+    #assert_true(cpu_result_gpu== gpu_result)
     assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    assert_true(cpu_result.all_close(gpu_result.to_cpu()))"""
+    assert_true(cpu_result.all_close(gpu_result.to_cpu()))
