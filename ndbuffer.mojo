@@ -1476,10 +1476,18 @@ struct NDBuffer[dtype: DType](
                 )
 
     fn __eq__(self, other: Self) -> Bool:
-        return self.compare[Equal](other).buffer.all_true()
+        #return self.compare[Equal](other).buffer.all_true()
+        var ndb = self.compare[Equal](other)
+        if ndb.is_on_cpu():
+            return ndb.buffer.all_true()
+        return ndb.device_state.value().all_true()
 
     fn __ne__(self, other: Self) -> Bool:
-        return self.compare[NotEqual](other).buffer.all_true()
+        #return self.compare[NotEqual](other).buffer.all_true()
+        var ndb = self.compare[NotEqual](other)
+        if ndb.is_on_cpu():
+            return ndb.buffer.all_true()
+        return ndb.device_state.value().all_true()
 
     @always_inline
     fn compare[

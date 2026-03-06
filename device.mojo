@@ -103,7 +103,9 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
 
 
 @fieldwise_init
-struct DeviceState[dtype: DType](Equatable & ImplicitlyCopyable & Movable):
+struct DeviceState[dtype: DType](
+    Equatable & ImplicitlyCopyable & Movable & Sized
+):
     var buffer: DeviceBuffer[Self.dtype]
     var gpu: GPU
 
@@ -130,6 +132,9 @@ struct DeviceState[dtype: DType](Equatable & ImplicitlyCopyable & Movable):
 
     fn __ne__(self, other: Self) -> Bool:
         return not (self == other)
+
+    fn __len__(self) -> Int:
+        return len(self.buffer)
 
     fn fill(self, ref source: NDBuffer[Self.dtype]) raises:
         with self.buffer.map_to_host() as host_buffer:
@@ -188,6 +193,20 @@ struct DeviceState[dtype: DType](Equatable & ImplicitlyCopyable & Movable):
         with self.buffer.map_to_host() as host_buffer:
             var device_ptr = host_buffer.unsafe_ptr()
             device_ptr.store[width=simdwidth](addr, value)
+
+    fn all_true(self: DeviceState[DType.bool]) -> Bool:
+        try:
+            var length = len(self)
+            if length == 0:
+                return True
+            with self.buffer.map_to_host() as host_buffer:
+                for i in range(length):
+                    if not host_buffer[i]:
+                        return False
+            return True
+        except e:
+            print(e)
+            return False
 
 
 from tenmo import Tensor

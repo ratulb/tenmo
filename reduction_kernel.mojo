@@ -120,7 +120,7 @@ struct SumReduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
 
-        # Launch configuration
+        # Launch configuration - num_blocks represent output size/total_output
         var (threads_per_block, num_blocks) = Self.launch_config[
             max_block_width
         ](total_output, reduced_volume)
@@ -169,6 +169,7 @@ struct SumReduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
             if block_size >= max_block_size:
                 block_size = max_block_size
                 break
+        # total_output -> num_blocks
         return (block_size, total_output)
 
 
@@ -222,6 +223,6 @@ fn test_sum_partial() raises:
     cpu_result.print()
     gpu_result.print()
     cpu_result_gpu = cpu_result.to_gpu()
-    #assert_true(cpu_result_gpu== gpu_result)
+    assert_true(cpu_result_gpu== gpu_result)
     assert_true(cpu_result.to_gpu().all_close(gpu_result))
     assert_true(cpu_result.all_close(gpu_result.to_cpu()))
