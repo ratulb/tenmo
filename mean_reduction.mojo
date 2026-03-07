@@ -140,11 +140,16 @@ struct Mean[dtype: DType](Copyable):
 
 from testing import assert_true
 
-fn main():
+fn main() raises:
     a = Tensor[DType.float32].arange(5, 50)
     a = a.reshape(5, 9)
+    a_gpu = a.to_gpu()
+    gpu_mean = a_gpu.mean(keepdims=True)
+    gpu_mean.print()
+
     cpu_mean = a.mean(keepdims=True)
-    a_gpu = a.to_cpu()
-    gpu_mean = a_gpu.mean()
-    assert_true(gpu_mean.all_close(cpu_mean.to_gpu()))
+    cpu_mean.print()
+    cpu_mean_to_gpu = cpu_mean.to_gpu()
+    cpu_mean_to_gpu.print()
+    assert_true(gpu_mean.all_close(cpu_mean_to_gpu))
 

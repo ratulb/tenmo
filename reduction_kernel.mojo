@@ -63,17 +63,18 @@ fn sum_hybrid[
     ]()
 
     var constant: UnsafePointer[
-        Scalar[dtype], MutAnyOrigin, address_space = AddressSpace.CONSTANT
+        Scalar[dtype], MutAnyOrigin, address_space = AddressSpace.SHARED
     ] = {}
 
     @parameter
     if mean:
         constant = stack_allocation[
-            1, Scalar[dtype], address_space = AddressSpace.CONSTANT
+            1, Scalar[dtype], address_space = AddressSpace.SHARED
         ]()
         constant[] = Scalar[dtype](1) if reduced_volume == 0 else Scalar[dtype](
             reduced_volume
         )
+        print("constant: ", constant[], reduced_volume)
 
     var tid = Int(thread_idx.x)
     var block_size = Int(block_dim.x)
