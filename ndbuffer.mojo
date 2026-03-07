@@ -157,6 +157,8 @@ struct NDBuffer[dtype: DType](
         return nd_buffer^
 
     fn to_gpu(self, gpu: GPU) raises -> Self:
+        if self.buffer.size == 0:
+            raise "NDBuffer -> to_gpu(): Empty buffer"
         return self.to_device(gpu.into())[1]
 
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
