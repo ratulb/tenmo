@@ -100,7 +100,7 @@ struct Mean[dtype: DType](Copyable):
         var out = DivideByScalar[Self.dtype].forward[track_grad=False](
             total, count
         )"""
-        var ndb = tensor.buffer.sum[mean=True](normalized_axes, keepdims)
+        var ndb = tensor.buffer.reduce[mean=True](normalized_axes, keepdims)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         @parameter
@@ -133,7 +133,7 @@ struct Mean[dtype: DType](Copyable):
         out = gradbox.sum(axes=normalized_axes, keepdims=keepdims) / Scalar[
             Self.dtype
         ](count)"""
-        var ndb = gradbox.buffer.sum[mean=True](normalized_axes, keepdims)
+        var ndb = gradbox.buffer.reduce[mean=True](normalized_axes, keepdims)
         var out = Gradbox[Self.dtype](ndb^, share=False)
 
         return out^

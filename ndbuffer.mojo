@@ -14,7 +14,7 @@ from sys import simd_width_of, has_accelerator
 from scalar_ops_kernel import ScalarOperations
 from binary_ops_kernel import BinaryOperations
 from compare_kernel import AllClose, Compare, CompareScalar
-from reduction_kernel import SumReduction
+from reduction_kernel import Reduction
 from mnemonics import (
     Multiply,
     Add,
@@ -756,8 +756,8 @@ struct NDBuffer[dtype: DType](
                 accum_sum += self.buffer[index]
             return accum_sum
 
-    fn sum[mean: Bool=False](
-            self, normalized_axes: IntArray, keepdims: Bool
+    fn reduce[mean: Bool=False](
+            self, normalized_axes: IntArray, keepdims: Bool = False
     ) -> NDBuffer[Self.dtype]:
         """Axes must be already normalized."""
 
@@ -767,7 +767,7 @@ struct NDBuffer[dtype: DType](
         if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    out = SumReduction[Self.dtype].launch[mean=mean](
+                    out = Reduction[Self.dtype].launch[mean=mean](
                         self, normalized_axes, keepdims
                     )
                 except e:
@@ -1678,13 +1678,13 @@ struct NDBuffer[dtype: DType](
         # Sum over extra leading dimensions
         while len(current_shape) > len(target_shape):
             # result = result.sum(reduction_axes=IntArray(0), keepdims=False)
-            result = result.sum(normalized_axes=IntArray(0), keepdims=False)
+            result = result.reduce(normalized_axes=IntArray(0), keepdims=False)
             current_shape = result.shape
         # Sum over mismatched dimensions
         for i in range(len(target_shape)):
             if current_shape[i] != target_shape[i] and current_shape[i] > 1:
                 # result = result.sum(reduction_axes=IntArray(i), keepdims=True)
-                result = result.sum(normalized_axes=IntArray(i), keepdims=True)
+                result = result.reduce(normalized_axes=IntArray(i), keepdims=True)
                 current_shape = result.shape
         return result^
 
@@ -1702,7 +1702,7 @@ fn main() raises:
     _="""var buffer = Buffer[dtype].arange(5, 50)
     var ndb = NDBuffer[dtype](buffer^, Shape(5, 9))
     ndb.print()
-    s= ndb.sum[mean=True](IntArray(0, 1), False)
+    s= ndb.reduce[mean=True](IntArray(0, 1), False)
     s.print()"""
 
     _="""var ndbg = ndb.to_gpu(GPU())

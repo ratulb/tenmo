@@ -1593,7 +1593,7 @@ fn test_ndbuffer_sum_axis() raises:
                 val += 1
 
         # Sum over axis 0 (rows) -> shape (3,)
-        var result = ndb.sum(IntArray(0), keepdims=False)
+        var result = ndb.reduce(IntArray(0), keepdims=False)
         assert_true(result.shape == Shape(3), "Sum axis 0 shape")
         assert_true(result[IntArray(0)] == 5, "Sum col 0: 1+4=5")
         assert_true(result[IntArray(1)] == 7, "Sum col 1: 2+5=7")
@@ -1613,7 +1613,7 @@ fn test_ndbuffer_sum_axis_keepdims() raises:
             ndb[IntArray(i, j)] = val
             val += 1
 
-    var result = ndb.sum(IntArray(0), keepdims=True)
+    var result = ndb.reduce(IntArray(0), keepdims=True)
     assert_true(result.shape == Shape(1, 3), "Sum keepdims shape")
     print("test_ndbuffer_sum_axis_keepdims passed")
 
@@ -1914,20 +1914,20 @@ fn test_buffer_sum() raises:
 
     buffer = Buffer[dtype](l)
     ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
-    result = ndb.sum(IntArray(0), True)
+    result = ndb.reduce(IntArray(0), True)
     assert_true(
         result.data_buffer() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39])
     )
 
-    result = ndb.sum(IntArray(0), False)
+    result = ndb.reduce(IntArray(0), False)
     assert_true(
         result.data_buffer() == Buffer[dtype]([21, 24, 27, 30, 33, 36, 39])
     )
 
-    result = ndb.sum(IntArray(0, 1), True)
+    result = ndb.reduce(IntArray(0, 1), True)
     assert_true(result.data_buffer() == Buffer[dtype]([210]))
 
-    result = ndb.sum(IntArray(1), True)
+    result = ndb.reduce(IntArray(1), True)
     assert_true(result.data_buffer() == Buffer[dtype]([21, 70, 119]))
 
 
