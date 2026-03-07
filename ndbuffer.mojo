@@ -754,16 +754,18 @@ struct NDBuffer[dtype: DType](
                 accum_sum += self.buffer[index]
             return accum_sum
 
-    fn sum(
-        self, normalized_axes: IntArray, keepdims: Bool
+    fn sum[mean: Bool=False](
+            self, normalized_axes: IntArray, keepdims: Bool
     ) -> NDBuffer[Self.dtype]:
+        """Axes must be already normalized."""
+
         var out: NDBuffer[Self.dtype]
 
         @parameter
         if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    out = SumReduction[Self.dtype].launch(
+                    out = SumReduction[Self.dtype].launch[mean=mean](
                         self, normalized_axes, keepdims
                     )
                 except e:
@@ -774,15 +776,15 @@ struct NDBuffer[dtype: DType](
                             ". Failling back on CPU"
                         ),
                     )
-                    out = self.sum_cpu(normalized_axes, keepdims)
+                    out = self.reduce_cpu[mean=mean](normalized_axes, keepdims)
             else:
-                out = self.sum_cpu(normalized_axes, keepdims)
+                out = self.reduce_cpu[mean=mean](normalized_axes, keepdims)
         else:
-            out = self.sum_cpu(normalized_axes, keepdims)
+            out = self.reduce_cpu[mean=mean](normalized_axes, keepdims)
 
         return out^
 
-    fn sum_cpu(
+    fn reduce_cpu[mean: Bool=False](
         # self, reduction_axes: IntArray, keepdims: Bool
         self,
         normalized_axes: IntArray,
@@ -794,6 +796,13 @@ struct NDBuffer[dtype: DType](
         # var normalized_axes = reduction_axes
 
         # Step 2: Compute output shape with pre-validated axes
+        var reduced_volume = Scalar[Self.dtype](1)
+        @parameter
+        if mean:
+            var volume = self.shape.reduced_shape(normalized_axes).product()
+            #print("Volume: ", volume, self.shape, self.shape.reduced_shape(normalized_axes), normalized_axes)
+            reduced_volume = reduced_volume if volume == 0 else Scalar[Self.dtype](volume)
+
         var out_shape = self.shape.compute_output_shape(
             normalized_axes, keepdims, validated=True
         )
@@ -803,7 +812,11 @@ struct NDBuffer[dtype: DType](
         # Step 3: Handle scalar output cases
         if out_shape == Shape():
             # This covers both scalar input AND full reduction cases
-            out[IntArray()] = self.sum_all()
+            @parameter
+            if mean:
+                out[IntArray()] = self.sum_all()/ reduced_volume
+            else:
+                out[IntArray()] = self.sum_all()
         else:
             # Step 4: Handle partial reduction with proper coordinate mapping
             reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
@@ -818,44 +831,15 @@ struct NDBuffer[dtype: DType](
                         normalized_axes, red_coord
                     )
                     accum_sum += self[self_coord]
-                out[out_coord] = accum_sum
+                #out[out_coord] = accum_sum
+                @parameter
+                if mean:
+                    out[out_coord] = accum_sum/ reduced_volume
+                else:
+                    out[out_coord] = accum_sum
+
 
         return out^
-
-    fn _normalize_reduction_axes_1(self, axes: IntArray) -> IntArray:
-        """Normalize reduction axes: handle empty list, negative indices, sort, and deduplicate.
-        """
-        var rank = self.rank()
-
-        # Empty axes list means reduce over all dimensions
-        if len(axes) == 0:
-            return IntArray.range(start=0, end=rank, step=1)
-
-        # Normalize negative indices and validate bounds
-        var normalized = IntArray.with_capacity(len(axes))
-        for axis in axes:
-            var norm_axis = axis
-            if norm_axis < 0:
-                norm_axis = rank + norm_axis
-            if norm_axis < 0 or norm_axis >= rank:
-                panic(
-                    "Reduction axis out of bounds: "
-                    + axis.__str__()
-                    + " for rank "
-                    + rank.__str__()
-                )
-            normalized.append(norm_axis)
-
-        # Sort and remove duplicates
-        normalized.sort(asc=True)
-        var result = IntArray.with_capacity(len(normalized))
-        var prev = -1
-        for axis in normalized:
-            if axis != prev:
-                result.append(axis)
-                prev = axis
-
-        return result^
 
     fn flatten(
         self,
@@ -1711,8 +1695,16 @@ fn main() raises:
     var buffer = Buffer[dtype].arange(5, 50)
     var ndb = NDBuffer[dtype](buffer^, Shape(5, 9))
     ndb.print()
-    var ndbg = ndb.to_gpu(GPU())
+    s= ndb.sum[mean=True](IntArray(0, 1), False)
+    s.print()
+    _="""var ndbg = ndb.to_gpu(GPU())
     ndbg.store[1](0, 0, 10)
     ndbg.print()
     r = ndbg.load[1](0, 0)
-    print(r)
+    print(r)"""
+    _="""var a = Tensor[dtype].arange(5, 50)
+    #var ndb = NDBuffer[dtype](buffer^, Shape(5, 9))
+    #ndb.print()
+    ss= a.mean()
+    print(ss.item())"""
+

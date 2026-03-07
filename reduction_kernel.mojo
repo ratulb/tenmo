@@ -42,7 +42,9 @@ fn rank_to_reduced_offset(
 
 
 fn sum_hybrid[
-    dtype: DType, max_block_size: Int = 512  # Needs to be power of 2
+    dtype: DType,
+    max_block_size: Int = 512,  # Needs to be power of 2
+    mean: Bool = False,
 ](
     out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     in_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
@@ -59,6 +61,19 @@ fn sum_hybrid[
     var smem = stack_allocation[
         max_block_size, Scalar[dtype], address_space = AddressSpace.SHARED
     ]()
+
+    var constant: UnsafePointer[
+        Scalar[dtype], MutAnyOrigin, address_space = AddressSpace.CONSTANT
+    ] = {}
+
+    @parameter
+    if mean:
+        constant = stack_allocation[
+            1, Scalar[dtype], address_space = AddressSpace.CONSTANT
+        ]()
+        constant[] = Scalar[dtype](1) if reduced_volume == 0 else Scalar[dtype](
+            reduced_volume
+        )
 
     var tid = Int(thread_idx.x)
     var block_size = Int(block_dim.x)
@@ -96,7 +111,12 @@ fn sum_hybrid[
         stride >>= 1
 
     if tid == 0:
-        (out_buffer + out_idx)[] = smem[0]
+
+        @parameter
+        if mean:
+            (out_buffer + out_idx)[] = smem[0] / constant[]
+        else:
+            (out_buffer + out_idx)[] = smem[0]
 
 
 @fieldwise_init
@@ -104,7 +124,7 @@ fn sum_hybrid[
 struct SumReduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
     @staticmethod
     fn launch[
-        max_block_width: Int = 512,
+        max_block_width: Int = 512, mean: Bool = False
     ](
         A: NDBuffer[Self.dtype], normalized_axes: IntArray, keepdims: Bool
     ) raises -> NDBuffer[Self.dtype]:
@@ -135,8 +155,8 @@ struct SumReduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         ref A_buffer = A_device_state.device_buffer()
 
         var compiled_func = device_context.compile_function[
-            sum_hybrid[Self.dtype, max_block_width],
-            sum_hybrid[Self.dtype, max_block_width],
+            sum_hybrid[Self.dtype, max_block_width, mean],
+            sum_hybrid[Self.dtype, max_block_width, mean],
         ]()
 
         device_context.enqueue_function(
@@ -200,7 +220,7 @@ fn test_sum_all() raises:
     cpu_result.print()
     gpu_result.print()
     cpu_result_gpu = cpu_result.to_gpu()
-    assert_true(cpu_result_gpu== gpu_result)
+    assert_true(cpu_result_gpu == gpu_result)
     assert_true(cpu_result.to_gpu().all_close(gpu_result))
     assert_true(cpu_result.all_close(gpu_result.to_cpu()))
 
@@ -223,6 +243,11 @@ fn test_sum_partial() raises:
     cpu_result.print()
     gpu_result.print()
     cpu_result_gpu = cpu_result.to_gpu()
-    assert_true(cpu_result_gpu== gpu_result)
+    assert_true(cpu_result_gpu == gpu_result)
     assert_true(cpu_result.to_gpu().all_close(gpu_result))
     assert_true(cpu_result.all_close(gpu_result.to_cpu()))
+
+fn test_mean() raises:
+    print("test_mean")
+    comptime dtype = DType.float32
+
