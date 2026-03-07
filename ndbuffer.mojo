@@ -1692,11 +1692,17 @@ from tenmo import Tensor
 
 fn main() raises:
     comptime dtype = DType.float32
-    var buffer = Buffer[dtype].arange(5, 50)
+    var ndb = NDBuffer[dtype]()
+    ndb.print()
+    var ndb_gpu = ndb.to_gpu(GPU())
+    ndb_gpu.print()
+
+    _="""var buffer = Buffer[dtype].arange(5, 50)
     var ndb = NDBuffer[dtype](buffer^, Shape(5, 9))
     ndb.print()
     s= ndb.sum[mean=True](IntArray(0, 1), False)
-    s.print()
+    s.print()"""
+
     _="""var ndbg = ndb.to_gpu(GPU())
     ndbg.store[1](0, 0, 10)
     ndbg.print()
