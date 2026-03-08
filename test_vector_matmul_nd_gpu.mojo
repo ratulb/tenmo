@@ -8,10 +8,11 @@ from mnemonics import vm
 # ═══════════════════════════════════════════════════════════════════════════════
 
 fn close_enough[dtype: DType](
-    mut a: Tensor[dtype], mut b: Tensor[dtype]
+    mut a: Tensor[dtype], b: Tensor[dtype]
 ) raises -> Bool:
     var a_gpu = a.to_gpu()
-    return a_gpu.all_close(b.to_gpu())
+    #return a_gpu.all_close(b.to_gpu())
+    return a_gpu.all_close(b)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -157,6 +158,9 @@ fn test_vmnd_batched_2d_v_3d_M() raises:
         var v_gpu = v.to_gpu()
         var M_gpu = M.to_gpu()
         var gpu_result = v_gpu.matmul[mode=vm](M_gpu)
+        #result_cpu = gpu_result.to_cpu()
+        cpu_result.print()
+        gpu_result.print()
         assert_true(close_enough(cpu_result, gpu_result))
     print("test_vmnd_batched_2d_v_3d_M passed")
 
