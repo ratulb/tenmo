@@ -471,10 +471,6 @@ struct Tensor[dtype: DType = DType.float32](
         if device.is_cpu():
             if self.is_on_cpu():
                 return self
-            _ = """return Self(
-                self.buffer.to_cpu(),
-                requires_grad=requires_grad.or_else(self.requires_grad)
-            )"""
             return DeviceTransfer[Self.dtype].forward[True](
                 self, device, requires_grad
             )
@@ -482,11 +478,6 @@ struct Tensor[dtype: DType = DType.float32](
         # GPU case
         if self.is_on_gpu():
             return self
-
-        _ = """return Self(
-            self.buffer.to_gpu(device.kind[GPU]),
-            requires_grad=requires_grad.or_else(self.requires_grad)
-        )"""
         return DeviceTransfer[Self.dtype].forward[True](
             self, device, requires_grad
         )
@@ -576,10 +567,7 @@ struct Tensor[dtype: DType = DType.float32](
         return self.buffer.is_scalar()
 
     fn is_on_gpu(self) -> Bool:
-        _ = """@parameter
-        if has_accelerator():"""
         return self.buffer.is_on_gpu()
-        # return False
 
     fn is_on_cpu(self) -> Bool:
         return self.is_on_gpu() == False
@@ -614,14 +602,12 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     fn __eq__(self, other: Tensor[Self.dtype]) -> Bool:
-        #return self.eq(other).buffer.buffer.all_true()
         return self.buffer == other.buffer
 
     fn eq(self, other: Tensor[Self.dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](self.buffer.compare[Equal](other.buffer))
 
     fn __ne__(self, other: Tensor[Self.dtype]) -> Bool:
-        #return self.ne(other).buffer.buffer.all_true()
         return self.buffer != other.buffer
 
     fn ne(self, other: Tensor[Self.dtype]) -> Tensor[DType.bool]:
@@ -1520,7 +1506,6 @@ struct Tensor[dtype: DType = DType.float32](
             gradbox.__imul__(incoming)
         if opcode == AddTensor:
             gradbox.__iadd__(incoming)
-            # self.grad().buffer.fill_equal_shape(incoming.buffer)
         if opcode == SubtractTensor:
             gradbox.__isub__(incoming)
         if opcode == ZeroGrad:
