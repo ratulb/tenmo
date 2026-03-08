@@ -10,6 +10,7 @@ from sys import has_accelerator
 # Tensor.sum — CPU
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 fn test_v2_tensor_sum_scalar_input() raises:
     print("test_v2_tensor_sum_scalar_input")
     comptime dtype = DType.float32
@@ -90,9 +91,12 @@ fn test_v2_tensor_sum_3d_axis0() raises:
     a = a.reshape(2, 3, 4)
     var s = a.sum(axes=[0])
     # row i: (0..3 + 12..15), (4..7 + 16..19), (8..11 + 20..23)
-    assert_true(s == Tensor[dtype].d2(
-        [[12, 14, 16, 18], [20, 22, 24, 26], [28, 30, 32, 34]]
-    ))
+    assert_true(
+        s
+        == Tensor[dtype].d2(
+            [[12, 14, 16, 18], [20, 22, 24, 26], [28, 30, 32, 34]]
+        )
+    )
     print("test_v2_tensor_sum_3d_axis0 passed")
 
 
@@ -165,6 +169,7 @@ fn test_v2_tensor_sum_negative_values() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tensor.mean — CPU
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 fn test_v2_tensor_mean_1d() raises:
     print("test_v2_tensor_mean_1d")
@@ -246,6 +251,7 @@ fn test_v2_tensor_mean_uniform() raises:
 # ═══════════════════════════════════════════════════════════════════════════════
 # NDBuffer.reduce (CPU) — sum and mean via reduce[mean=False/True]
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 fn test_v2_ndbuffer_sum_1d() raises:
     print("test_v2_ndbuffer_sum_1d")
@@ -344,7 +350,9 @@ fn test_v2_ndbuffer_mean_keepdims() raises:
             ndb[IntArray(i, j)] = val
             val += 1
     # keepdims -> shape (2, 1)
-    var result = ndb.reduce[mean=True](normalized_axes=IntArray(1), keepdims=True)
+    var result = ndb.reduce[mean=True](
+        normalized_axes=IntArray(1), keepdims=True
+    )
     assert_true(result[IntArray(0, 0)] == 2.0)
     assert_true(result[IntArray(1, 0)] == 5.0)
     print("test_v2_ndbuffer_mean_keepdims passed")
@@ -354,8 +362,10 @@ fn test_v2_ndbuffer_mean_keepdims() raises:
 # GPU tests — Tensor.sum and Tensor.mean
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 fn test_v2_gpu_tensor_sum_1d() raises:
     print("test_v2_gpu_tensor_sum_1d")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -369,6 +379,7 @@ fn test_v2_gpu_tensor_sum_1d() raises:
 
 fn test_v2_gpu_tensor_sum_2d_axis0() raises:
     print("test_v2_gpu_tensor_sum_2d_axis0")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -382,6 +393,7 @@ fn test_v2_gpu_tensor_sum_2d_axis0() raises:
 
 fn test_v2_gpu_tensor_sum_2d_axis1() raises:
     print("test_v2_gpu_tensor_sum_2d_axis1")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -395,6 +407,7 @@ fn test_v2_gpu_tensor_sum_2d_axis1() raises:
 
 fn test_v2_gpu_tensor_sum_3d_axis1() raises:
     print("test_v2_gpu_tensor_sum_3d_axis1")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -409,6 +422,7 @@ fn test_v2_gpu_tensor_sum_3d_axis1() raises:
 
 fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
     print("test_v2_gpu_tensor_sum_3d_axes_0_2")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -423,6 +437,7 @@ fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
 
 fn test_v2_gpu_tensor_sum_keepdims() raises:
     print("test_v2_gpu_tensor_sum_keepdims")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -437,6 +452,7 @@ fn test_v2_gpu_tensor_sum_keepdims() raises:
 
 fn test_v2_gpu_tensor_sum_all_axes() raises:
     print("test_v2_gpu_tensor_sum_all_axes")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -450,6 +466,7 @@ fn test_v2_gpu_tensor_sum_all_axes() raises:
 
 fn test_v2_gpu_tensor_mean_2d_axis0() raises:
     print("test_v2_gpu_tensor_mean_2d_axis0")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -463,6 +480,7 @@ fn test_v2_gpu_tensor_mean_2d_axis0() raises:
 
 fn test_v2_gpu_tensor_mean_2d_axis1() raises:
     print("test_v2_gpu_tensor_mean_2d_axis1")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -476,6 +494,7 @@ fn test_v2_gpu_tensor_mean_2d_axis1() raises:
 
 fn test_v2_gpu_tensor_mean_3d_axis1() raises:
     print("test_v2_gpu_tensor_mean_3d_axis1")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -490,6 +509,7 @@ fn test_v2_gpu_tensor_mean_3d_axis1() raises:
 
 fn test_v2_gpu_tensor_mean_keepdims() raises:
     print("test_v2_gpu_tensor_mean_keepdims")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -504,6 +524,7 @@ fn test_v2_gpu_tensor_mean_keepdims() raises:
 
 fn test_v2_gpu_tensor_mean_all_axes() raises:
     print("test_v2_gpu_tensor_mean_all_axes")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -520,16 +541,16 @@ fn test_v2_gpu_tensor_mean_all_axes() raises:
 # GPU tests — NDBuffer.reduce
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
     print("test_v2_gpu_ndbuffer_sum_2d_axis1")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
         var a_gpu = a.to_gpu()
-        #var cpu_ndb = a.buffer
         var gpu_ndb = a_gpu.buffer
-        #var cpu_result = cpu_ndb.reduce(normalized_axes=IntArray(1))
         var gpu_result = gpu_ndb.reduce[mean=False](IntArray(1), keepdims=False)
         var tensor = Tensor[dtype].d1([6, 15])
         var g_tensor = tensor.to_gpu()
@@ -539,6 +560,7 @@ fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
 
 fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
     print("test_v2_gpu_ndbuffer_mean_2d_axis0")
+
     @parameter
     if has_accelerator():
         comptime dtype = DType.float32
@@ -548,15 +570,14 @@ fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
         var gpu_result = gpu_ndb.reduce[mean=True](IntArray(0), keepdims=False)
         var expected = Tensor[dtype].d1([2, 3, 4])
         expected = expected.to_gpu()
-        assert_true(
-            expected.buffer.all_close(gpu_result)
-        )
+        assert_true(expected.buffer.all_close(gpu_result))
     print("test_v2_gpu_ndbuffer_mean_2d_axis0 passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Entry point
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 fn main() raises:
     # CPU — sum

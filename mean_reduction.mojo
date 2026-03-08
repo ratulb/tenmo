@@ -5,7 +5,6 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_MEAN
 from validators import Validator
 from gradbox import Gradbox
-#from forwards import DivideByScalar
 
 
 @register_passable
@@ -90,16 +89,6 @@ struct Mean[dtype: DType](Copyable):
         normalized_axes = Validator.validate_and_normalize_axes(
             tensor.shape(), axes
         )
-        _="""var count = tensor.shape().reduced_shape(normalized_axes).product()
-        print("count start : ", count, tensor.shape().reduced_shape(normalized_axes))
-        count = count if count > 0 else 1
-        print("count : ", count, normalized_axes)
-        total = tensor.sum[track_grad=False](
-            axes=normalized_axes, keepdims=keepdims
-        )
-        var out = DivideByScalar[Self.dtype].forward[track_grad=False](
-            total, count
-        )"""
         var ndb = tensor.buffer.reduce[mean=True](normalized_axes, keepdims)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
@@ -128,17 +117,14 @@ struct Mean[dtype: DType](Copyable):
         normalized_axes = Validator.validate_and_normalize_axes(
             gradbox_shape, axes
         )
-        _="""var count = gradbox_shape.reduced_shape(normalized_axes).product()
-        count = count if count > 0 else 1
-        out = gradbox.sum(axes=normalized_axes, keepdims=keepdims) / Scalar[
-            Self.dtype
-        ](count)"""
         var ndb = gradbox.buffer.reduce[mean=True](normalized_axes, keepdims)
         var out = Gradbox[Self.dtype](ndb^, share=False)
 
         return out^
 
+
 from testing import assert_true
+
 
 fn main() raises:
     a = Tensor[DType.float32].arange(5, 50)
@@ -152,4 +138,3 @@ fn main() raises:
     cpu_mean_to_gpu = cpu_mean.to_gpu()
     cpu_mean_to_gpu.print()
     assert_true(gpu_mean.all_close(cpu_mean_to_gpu))
-

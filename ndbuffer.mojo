@@ -353,51 +353,36 @@ struct NDBuffer[dtype: DType](
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        # return self.buffer[index]
-        # return self.data_ptr()[index]
         return self.get(index)
 
     fn __setitem__(self, indices: IntArray, value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        # self.buffer[index] = value
-        _ = """var ptr = self.data_ptr().unsafe_mut_cast[True]()
-        ptr[index] = value"""
         self.set(index, value)
 
     fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        # return self.buffer[index]
-        # return self.data_ptr()[index]
         return self.get(index)
 
     fn __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        # self.buffer[index] = value
-        _ = """var ptr = self.data_ptr().unsafe_mut_cast[True]()
-        ptr[index] = value"""
         self.set(index, value)
 
     fn __getitem__(self, indices: VariadicList[Int]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        # return self.buffer[index]
-        # return self.data_ptr()[index]
         return self.get(index)
 
     fn __setitem__(self, indices: VariadicList[Int], value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
-        # self.buffer[index] = value
-        _ = """var ptr = self.data_ptr().unsafe_mut_cast[True]()
-        ptr[index] = value"""
         self.set(index, value)
 
     @always_inline
@@ -408,11 +393,6 @@ struct NDBuffer[dtype: DType](
                 " buffer/singleton, got shape: "
                 + self.shape.__str__()
             )
-        _ = """if self.shape == Shape(1):
-            return self[IntArray(0)]
-        else:
-            return self[IntArray()]"""
-        # return self.data_ptr()[]
         return self.get(0)
 
     @always_inline
@@ -466,8 +446,6 @@ struct NDBuffer[dtype: DType](
                 )
 
         var addr = row * self.strides[0] + col * self.strides[1] + self.offset
-        # return self.buffer.load[simdwidth](addr)
-        # return self.data_ptr().load[width=simdwidth](addr)
         if self.is_on_gpu():
             ref device_state = self.device_state.value()
             try:
@@ -530,9 +508,6 @@ struct NDBuffer[dtype: DType](
                 )
 
         var addr = row * self.strides[0] + col * self.strides[1] + self.offset
-        # self.buffer.store[simdwidth](addr, value)
-        # var ptr = self.data_ptr().unsafe_mut_cast[True]()
-        # ptr.store[width=simdwidth](addr, value)
         if self.is_on_gpu():
             ref device_state = self.device_state.value()
             try:
@@ -695,7 +670,6 @@ struct NDBuffer[dtype: DType](
         else:
             var ptr = self.data_ptr().unsafe_mut_cast[True]()
             for index in self.index_iterator():
-                # buffer[index] = value
                 (ptr + index)[] = value
 
     fn contiguous(
@@ -756,9 +730,11 @@ struct NDBuffer[dtype: DType](
                 accum_sum += self.buffer[index]
             return accum_sum
 
-    fn reduce[mean: Bool=False](
-            self, normalized_axes: IntArray, keepdims: Bool = False
-    ) -> NDBuffer[Self.dtype]:
+    fn reduce[
+        mean: Bool = False
+    ](self, normalized_axes: IntArray, keepdims: Bool = False) -> NDBuffer[
+        Self.dtype
+    ]:
         """Axes must be already normalized."""
 
         var out: NDBuffer[Self.dtype]
@@ -786,24 +762,17 @@ struct NDBuffer[dtype: DType](
 
         return out^
 
-    fn reduce_cpu[mean: Bool=False](
-        # self, reduction_axes: IntArray, keepdims: Bool
-        self,
-        normalized_axes: IntArray,
-        keepdims: Bool,
-    ) -> NDBuffer[Self.dtype]:
-        # Step 1: Normalize and validate reduction axes - no longer required
-        # var normalized_axes = self._normalize_reduction_axes(reduction_axes)
-        # var normalized_axes = Validator.normalize_reduction_axes(self.shape, reduction_axes)
-        # var normalized_axes = reduction_axes
-
-        # Step 2: Compute output shape with pre-validated axes
+    fn reduce_cpu[
+        mean: Bool = False
+    ](self, normalized_axes: IntArray, keepdims: Bool,) -> NDBuffer[Self.dtype]:
         var reduced_volume = Scalar[Self.dtype](1)
+
         @parameter
         if mean:
             var volume = self.shape.reduced_shape(normalized_axes).product()
-            #print("Volume: ", volume, self.shape, self.shape.reduced_shape(normalized_axes), normalized_axes)
-            reduced_volume = reduced_volume if volume == 0 else Scalar[Self.dtype](volume)
+            reduced_volume = reduced_volume if volume == 0 else Scalar[
+                Self.dtype
+            ](volume)
 
         var out_shape = self.shape.compute_output_shape(
             normalized_axes, keepdims, validated=True
@@ -816,7 +785,7 @@ struct NDBuffer[dtype: DType](
             # This covers both scalar input AND full reduction cases
             @parameter
             if mean:
-                out[IntArray()] = self.sum_all()/ reduced_volume
+                out[IntArray()] = self.sum_all() / reduced_volume
             else:
                 out[IntArray()] = self.sum_all()
         else:
@@ -833,13 +802,12 @@ struct NDBuffer[dtype: DType](
                         normalized_axes, red_coord
                     )
                     accum_sum += self[self_coord]
-                #out[out_coord] = accum_sum
+
                 @parameter
                 if mean:
-                    out[out_coord] = accum_sum/ reduced_volume
+                    out[out_coord] = accum_sum / reduced_volume
                 else:
                     out[out_coord] = accum_sum
-
 
         return out^
 
@@ -1462,14 +1430,14 @@ struct NDBuffer[dtype: DType](
                 )
 
     fn __eq__(self, other: Self) -> Bool:
-        #return self.compare[Equal](other).buffer.all_true()
+        # return self.compare[Equal](other).buffer.all_true()
         var ndb = self.compare[Equal](other)
         if ndb.is_on_cpu():
             return ndb.buffer.all_true()
         return ndb.device_state.value().all_true()
 
     fn __ne__(self, other: Self) -> Bool:
-        #return self.compare[NotEqual](other).buffer.all_true()
+        # return self.compare[NotEqual](other).buffer.all_true()
         var ndb = self.compare[NotEqual](other)
         if ndb.is_on_cpu():
             return ndb.buffer.all_true()
@@ -1677,14 +1645,14 @@ struct NDBuffer[dtype: DType](
         current_shape = extended_buffer.shape
         # Sum over extra leading dimensions
         while len(current_shape) > len(target_shape):
-            # result = result.sum(reduction_axes=IntArray(0), keepdims=False)
             result = result.reduce(normalized_axes=IntArray(0), keepdims=False)
             current_shape = result.shape
         # Sum over mismatched dimensions
         for i in range(len(target_shape)):
             if current_shape[i] != target_shape[i] and current_shape[i] > 1:
-                # result = result.sum(reduction_axes=IntArray(i), keepdims=True)
-                result = result.reduce(normalized_axes=IntArray(i), keepdims=True)
+                result = result.reduce(
+                    normalized_axes=IntArray(i), keepdims=True
+                )
                 current_shape = result.shape
         return result^
 
@@ -1693,26 +1661,4 @@ from tenmo import Tensor
 
 
 fn main() raises:
-    comptime dtype = DType.float32
-    var ndb = NDBuffer[dtype]()
-    ndb.print()
-    var ndb_gpu = ndb.to_gpu(GPU())
-    ndb_gpu.print()
-
-    _="""var buffer = Buffer[dtype].arange(5, 50)
-    var ndb = NDBuffer[dtype](buffer^, Shape(5, 9))
-    ndb.print()
-    s= ndb.reduce[mean=True](IntArray(0, 1), False)
-    s.print()"""
-
-    _="""var ndbg = ndb.to_gpu(GPU())
-    ndbg.store[1](0, 0, 10)
-    ndbg.print()
-    r = ndbg.load[1](0, 0)
-    print(r)"""
-    _="""var a = Tensor[dtype].arange(5, 50)
-    #var ndb = NDBuffer[dtype](buffer^, Shape(5, 9))
-    #ndb.print()
-    ss= a.mean()
-    print(ss.item())"""
-
+    pass
