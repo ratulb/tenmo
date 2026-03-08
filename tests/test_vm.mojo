@@ -4,9 +4,6 @@ from testing import assert_true
 from strides import Strides
 from mnemonics import vm
 
-# comptime vm = 1
-
-
 fn main() raises:
     test_vector_matrix_no_batch()
     test_vector_matrix_batch_M_only()

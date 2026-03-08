@@ -4,7 +4,9 @@ from mnemonics import AddTensor
 from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic
-from sys import simd_width_of
+from sys import simd_width_of, has_accelerator
+from ndbuffer import NDBuffer
+from vectormatrix_kernel import VectorMatmulNdGpu
 
 
 @fieldwise_init
@@ -12,16 +14,16 @@ from sys import simd_width_of
 struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
-        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
-    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        var v_shape = v.shape()
-        var M_shape = M.shape()
+        simdwidth: Int = simd_width_of[Self.dtype]()
+    ](v: NDBuffer[Self.dtype], M: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+        var v_shape = v.shape
+        var M_shape = M.shape
 
         # Validate: v[..., k] × M[..., k, n] → out[..., n]
         if v_shape.rank() < 1:
-            panic("VectorMatmulNd: vector must have at least 1 dimension")
+            panic("VectorMatmulNd: vector must have rank >= 1")
         if M_shape.rank() < 2:
-            panic("VectorMatmulNd: matrix must have at least 2 dimensions")
+            panic("VectorMatmulNd: matrix must have rank >= 2")
 
         var k = v_shape[-1]
         var k_M = M_shape[-2]
@@ -31,28 +33,28 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
             panic("VectorMatmulNd: inner dimensions must match")
 
         # Broadcast batch dimensions
-        var v_batch_dims = v_shape[:-1]
-        var M_batch_dims = M_shape[:-2]
+        var v_batch_shape = v_shape[:-1]
+        var M_batch_shape = M_shape[:-2]
         var batch_shape = ShapeBroadcaster.broadcast_shape(
-            v_batch_dims, M_batch_dims
+            v_batch_shape, M_batch_shape
         )
 
         var out_shape = batch_shape + [n]
-        var result = Tensor[Self.dtype].zeros(out_shape)
+        var result = NDBuffer[Self.dtype](out_shape)
 
         # Hoist metadata for vector and matrix
-        var v_stride = v.buffer.strides[-1]
-        var v_offset = v.buffer.offset
+        var v_stride = v.strides[-1]
+        var v_offset = v.offset
         var v_data = v.data_ptr()
 
-        var M_stride0 = M.buffer.strides[-2]
-        var M_stride1 = M.buffer.strides[-1]
-        var M_offset = M.buffer.offset
+        var M_stride0 = M.strides[-2]
+        var M_stride1 = M.strides[-1]
+        var M_offset = M.offset
         var M_data = M.data_ptr()
         var M_contiguous = M.is_contiguous()
 
-        var result_stride = result.buffer.strides[-1]
-        var result_offset = result.buffer.offset
+        var result_stride = result.strides[-1]
+        var result_offset = result.offset
         var result_data = (
             result.data_ptr()
             .unsafe_mut_cast[True]()
@@ -62,24 +64,24 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
         # Process each batch element
         for indices in batch_shape:
             var v_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, v_batch_dims
+                indices, batch_shape, v_batch_shape
             )
             var M_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, M_batch_dims
+                indices, batch_shape, M_batch_shape
             )
 
             # Calculate base offsets for this batch
             var v_base = v_offset
             for i in range(v_indices.size()):
-                v_base += v_indices[i] * v.buffer.strides[i]
+                v_base += v_indices[i] * v.strides[i]
 
             var M_base = M_offset
             for i in range(M_indices.size()):
-                M_base += M_indices[i] * M.buffer.strides[i]
+                M_base += M_indices[i] * M.strides[i]
 
             var result_base = result_offset
             for i in range(indices.size()):
-                result_base += indices[i] * result.buffer.strides[i]
+                result_base += indices[i] * result.strides[i]
 
             # Optimized vector-matrix multiply: result[n] = v[k] @ M[k, n]
             if M_contiguous:
@@ -137,6 +139,34 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
 
                     result_data[result_base + j * result_stride] = accumulator
 
+        return result
+
+    @staticmethod
+    fn forward[
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
+    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        var out: NDBuffer[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if v.is_on_gpu() and M.is_on_gpu():
+                try:
+                    out = VectorMatmulNdGpu[Self.dtype].launch[block_size=256](
+                        v.buffer, M.buffer
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "VectorMatmulNd - GPU vector matrix multiplication",
+                    )
+                    out = Self.forward[simdwidth=simdwidth](v.buffer, M.buffer)
+            else:
+                out = Self.forward[simdwidth=simdwidth](v.buffer, M.buffer)
+        else:
+            out = Self.forward[simdwidth=simdwidth](v.buffer, M.buffer)
+
+        var result = Tensor[Self.dtype](out^, requires_grad=False)
+
         # Setup backward
         @parameter
         if track_grad:
@@ -173,10 +203,10 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
         var k = v_shape[-1]
         var n = M_shape[-1]
 
-        var v_batch_dims = v_shape[:-1]
-        var M_batch_dims = M_shape[:-2]
+        var v_batch_shape = v_shape[:-1]
+        var M_batch_shape = M_shape[:-2]
         var batch_shape = ShapeBroadcaster.broadcast_shape(
-            v_batch_dims, M_batch_dims
+            v_batch_shape, M_batch_shape
         )
 
         var results = List[
@@ -203,10 +233,10 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
             for indices in batch_shape:
                 var v_indices = ShapeBroadcaster.broadcasted_indices(
-                    indices, batch_shape, v_batch_dims
+                    indices, batch_shape, v_batch_shape
                 )
                 var M_indices = ShapeBroadcaster.broadcasted_indices(
-                    indices, batch_shape, M_batch_dims
+                    indices, batch_shape, M_batch_shape
                 )
 
                 # Calculate bases
@@ -262,10 +292,10 @@ struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
             for indices in batch_shape:
                 var v_indices = ShapeBroadcaster.broadcasted_indices(
-                    indices, batch_shape, v_batch_dims
+                    indices, batch_shape, v_batch_shape
                 )
                 var M_indices = ShapeBroadcaster.broadcasted_indices(
-                    indices, batch_shape, M_batch_dims
+                    indices, batch_shape, M_batch_shape
                 )
 
                 var v_base = v_offset

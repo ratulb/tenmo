@@ -150,10 +150,10 @@ struct NDBuffer[dtype: DType](
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
-    fn to_cpu(mut self, delete: Bool = False) raises -> Self:
+    fn to_cpu(self, delete: Bool = False) raises -> Self:
         var _, nd_buffer = self.to_device(CPU().into())
-        if delete:
-            self.device_state = None
+        _="""if delete:
+            self.device_state = None"""
         return nd_buffer^
 
     fn to_gpu(self, gpu: GPU) raises -> Self:
