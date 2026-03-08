@@ -780,7 +780,7 @@ struct NDBuffer[dtype: DType](
 
         var out = NDBuffer[Self.dtype].zeros(out_shape)
 
-        # Step 3: Handle scalar output cases
+        # Handle scalar output cases
         if out_shape == Shape():
             # This covers both scalar input AND full reduction cases
             @parameter
@@ -789,7 +789,7 @@ struct NDBuffer[dtype: DType](
             else:
                 out[IntArray()] = self.sum_all()
         else:
-            # Step 4: Handle partial reduction with proper coordinate mapping
+            # Handle partial reduction with proper coordinate mapping
             reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
 
             for out_coord in out_shape:
