@@ -138,7 +138,7 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
         #var M_full_strides = Strides.default(M_shape).array()
         #var M_batch_strides = M_full_strides[: len(M_batch_shape)]
 
-        var M_full_strides = Strides.default(M_shape).array()
+        _="""var M_full_strides = Strides.default(M_shape).array()
         var M_batch_rank   = M_shape.rank() - 2
         var M_batch_strides = Array()
         M_batch_strides.size = M_batch_rank
@@ -150,7 +150,9 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
         var v_batch_strides = Array()
         v_batch_strides.size = v_batch_rank
         for i in range(v_batch_rank):
-            v_batch_strides[i] = v_full_strides[i]
+            v_batch_strides[i] = v_full_strides[i]"""
+        var v_batch_strides = v.strides[:-1].array()
+        var M_batch_strides = M.strides[:-2].array()
 
         # Convert batch shapes to Array for kernel
         var batch_shape_arr = batch_shape.array()
