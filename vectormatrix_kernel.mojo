@@ -128,29 +128,6 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
 
         # ── Strides (row-major, contiguous — to_gpu() guarantee) ─────────────
         var batch_strides = Strides.default(batch_shape).array()
-        #var v_batch_strides = Strides.default(v_batch_shape).array()
-        # Same for v — first (rank - 1) entries
-        #var v_full_strides = Strides.default(v_shape).array()
-        #var v_batch_strides = v_full_strides[: len(v_batch_shape)]
-        #var M_batch_strides = Strides.default(M_batch_shape).array()
-        # Full M strides from shape (2, 3, 3) → [9, 3, 1]
-        # M_batch_strides = first (rank - 2) entries = [9]
-        #var M_full_strides = Strides.default(M_shape).array()
-        #var M_batch_strides = M_full_strides[: len(M_batch_shape)]
-
-        _="""var M_full_strides = Strides.default(M_shape).array()
-        var M_batch_rank   = M_shape.rank() - 2
-        var M_batch_strides = Array()
-        M_batch_strides.size = M_batch_rank
-        for i in range(M_batch_rank):
-            M_batch_strides[i] = M_full_strides[i]
-
-        var v_full_strides  = Strides.default(v_shape).array()
-        var v_batch_rank    = v_shape.rank() - 1
-        var v_batch_strides = Array()
-        v_batch_strides.size = v_batch_rank
-        for i in range(v_batch_rank):
-            v_batch_strides[i] = v_full_strides[i]"""
         var v_batch_strides = v.strides[:-1].array()
         var M_batch_strides = M.strides[:-2].array()
 
