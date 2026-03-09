@@ -935,6 +935,14 @@ struct Tensor[dtype: DType = DType.float32](
         return Self.zeros(Shape(axes_spans), requires_grad=requires_grad)
 
     @staticmethod
+    fn eye(n: Int, requires_grad: Bool = False) -> Tensor[Self.dtype]:
+        var out = Self.zeros(Shape(n, n), requires_grad=requires_grad)
+        for i, j in zip(range(n), range(n)):
+            if i == j:
+                out[i, j] = Scalar[Self.dtype](1)
+        return out^
+
+    @staticmethod
     fn zeros(
         *axes_spans: Int, requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
@@ -2401,7 +2409,7 @@ fn main() raises:
     var b = Tensor[dtype].arange(10, requires_grad=True)
     print(a.is_on_gpu())
     b.print()
-    ag = a.to_gpu()
+    _ = """ag = a.to_gpu()
     bg = b.to_gpu()
 
     assert_true(a.all_close(b))
@@ -2411,4 +2419,5 @@ fn main() raises:
     print("cpu")
     bg[0] = 42
 
-    (bg.eq(ag)).print()
+    (bg.eq(ag)).print()"""
+    Tensor[dtype].eye(4).print()

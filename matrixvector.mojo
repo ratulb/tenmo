@@ -5,17 +5,101 @@ from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic
 from matmul import Matmul2d, MatmulNd
-from sys import simd_width_of
-
+from sys import simd_width_of, has_accelerator
+from ndbuffer import NDBuffer
+from matrixvector_kernel import MatrixVectorNdGpu
 
 @fieldwise_init
 @register_passable
 struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
+
+    @staticmethod
+    fn forward[
+        simdwidth: Int = simd_width_of[Self.dtype]()
+    ](M: NDBuffer[Self.dtype], v: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+        var M_shape = M.shape
+        var v_shape = v.shape
+
+        # Validate: M[..., m, k] × v[..., k] → out[..., m]
+        if M_shape.rank() < 2:
+            panic("MatrixVectorMulNd: matrix must have at least 2 dimensions")
+        if v_shape.rank() < 1:
+            panic("MatrixVectorMulNd: vector must have at least 1 dimension")
+
+        var k = M_shape[-1]
+        var k_v = v_shape[-1]
+        var m = M_shape[-2]
+
+        if k != k_v:
+            panic("MatrixVectorMulNd: inner dimensions must match")
+
+        # Broadcast batch dimensions
+        var M_batch_dims = M_shape[:-2]
+        var v_batch_dims = v_shape[:-1]
+        var batch_shape = ShapeBroadcaster.broadcast_shape(
+            M_batch_dims, v_batch_dims
+        )
+
+        var out_shape = batch_shape + [m]
+        var result = NDBuffer[Self.dtype](out_shape)
+
+        # Hoist metadata
+        var M_stride0 = M.strides[-2]
+        var M_stride1 = M.strides[-1]
+        var M_offset = M.offset
+        var M_data = M.data_ptr()
+
+        var v_stride = v.strides[-1]
+        var v_offset = v.offset
+        var v_data = v.data_ptr()
+
+        var result_stride = result.strides[-1]
+        var result_offset = result.offset
+        var result_data = result.data_ptr()
+
+        # Process each batch element
+        for indices in batch_shape:
+            var M_indices = ShapeBroadcaster.broadcasted_indices(
+                indices, batch_shape, M_batch_dims
+            )
+            var v_indices = ShapeBroadcaster.broadcasted_indices(
+                indices, batch_shape, v_batch_dims
+            )
+
+            # Calculate base offsets
+            var M_base = M_offset
+            for i in range(M_indices.size()):
+                M_base += M_indices[i] * M.strides[i]
+
+            var v_base = v_offset
+            for i in range(v_indices.size()):
+                v_base += v_indices[i] * v.strides[i]
+
+            var result_base = result_offset
+            for i in range(indices.size()):
+                result_base += indices[i] * result.strides[i]
+
+            # Optimized matrix-vector multiply: result[m] = M[m, k] @ v[k]
+            # For each output element: result[i] = sum_j(M[i,j] * v[j])
+            for i in range(m):
+                var accumulator: Scalar[Self.dtype] = 0
+                var M_row_base = M_base + i * M_stride0
+
+                # Dot product over k dimension
+                for j in range(k):
+                    var m_val = M_data[M_row_base + j * M_stride1]
+                    var v_val = v_data[v_base + j * v_stride]
+                    accumulator += m_val * v_val
+
+                result_data[result_base + i * result_stride] = accumulator
+
+        return result
+
     @staticmethod
     fn forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
     ](M: Tensor[Self.dtype], v: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        var M_shape = M.shape()
+        _="""var M_shape = M.shape()
         var v_shape = v.shape()
 
         # Validate: M[..., m, k] × v[..., k] → out[..., m]
@@ -89,7 +173,32 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
                     var v_val = v_data[v_base + j * v_stride]
                     accumulator += m_val * v_val
 
-                result_data[result_base + i * result_stride] = accumulator
+                result_data[result_base + i * result_stride] = accumulator"""
+
+        var out: NDBuffer[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if M.is_on_gpu() and v.is_on_gpu():
+                try:
+                    out = MatrixVectorNdGpu[Self.dtype].launch[block_size=256](
+                        M.buffer, v.buffer
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "MatrixVectorMulNd - GPU vector matrix multiplication failed",
+                    )
+                    out = Self.forward[simdwidth=simdwidth](M.buffer, v.buffer)
+            else:
+                out = Self.forward[simdwidth=simdwidth](M.buffer, v.buffer)
+        else:
+            out = Self.forward[simdwidth=simdwidth](M.buffer, v.buffer)
+
+        var result = Tensor[Self.dtype](out^, requires_grad=False)
+
+        #var ndb = Self.forward[simdwidth=simdwidth](M.buffer, v.buffer)
+        #var result = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         # Setup backward
         @parameter
