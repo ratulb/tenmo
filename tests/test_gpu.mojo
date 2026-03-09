@@ -1426,17 +1426,6 @@ fn test_matrix_vector_multiplications() raises:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Helpers
-# ═══════════════════════════════════════════════════════════════════════════════
-
-fn close_enough_1[dtype: DType](
-    mut a: Tensor[dtype], mut b: Tensor[dtype]
-) raises -> Bool:
-    var a_gpu = a.to_gpu()
-    return a_gpu.all_close(b.to_gpu())
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # Basic correctness — no batch dims
 # ═══════════════════════════════════════════════════════════════════════════════
 
