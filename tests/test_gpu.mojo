@@ -4,7 +4,7 @@ from intarray import IntArray
 from shapes import Shape
 from testing import assert_true
 from sys import has_accelerator
-from mnemonics import vm
+from mnemonics import vm, mv
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1026,20 +1026,6 @@ fn test_vector_matrix_mul_tests() raises:
 
 
 
-from tenmo import Tensor
-from testing import assert_true
-from sys import has_accelerator
-from mnemonics import mv
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Helpers
-# ═══════════════════════════════════════════════════════════════════════════════
-
-fn close_enough1[dtype: DType](
-    mut a: Tensor[dtype], mut b: Tensor[dtype]
-) raises -> Bool:
-    var a_gpu = a.to_gpu()
-    return a_gpu.all_close(b.to_gpu())
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
