@@ -643,6 +643,9 @@ fn main() raises:
     # matrix vector multiplication
     test_matrix_vector_multiplications()
 
+    # Tensor tensor multiplication
+    test_tensor_tensor_multiplications()
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1420,3 +1423,503 @@ fn test_matrix_vector_multiplications() raises:
     test_mvnd_broadcast_size1_batch()
     test_mvnd_broadcast_known_values()
     test_mvnd_broadcast_large_batch()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Helpers
+# ═══════════════════════════════════════════════════════════════════════════════
+
+fn close_enough_1[dtype: DType](
+    mut a: Tensor[dtype], mut b: Tensor[dtype]
+) raises -> Bool:
+    var a_gpu = a.to_gpu()
+    return a_gpu.all_close(b.to_gpu())
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Basic correctness — no batch dims
+# ═══════════════════════════════════════════════════════════════════════════════
+
+fn test_mmnd_2d_known_values() raises:
+    """Hand-computed 2D matmul verified directly against GPU."""
+    print("test_mmnd_2d_known_values")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        # A = [[1,2],[3,4]], B = [[5,6],[7,8]]
+        # C[0,0]=1*5+2*7=19, C[0,1]=1*6+2*8=22
+        # C[1,0]=3*5+4*7=43, C[1,1]=3*6+4*8=50
+        var A = Tensor[dtype].d2([[1, 2], [3, 4]])
+        var B = Tensor[dtype].d2([[5, 6], [7, 8]])
+        var expected = Tensor[dtype].d2([[19, 22], [43, 50]])
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(expected, gpu_result))
+    print("test_mmnd_2d_known_values passed")
+
+
+fn test_mmnd_2d_identity() raises:
+    """A @ I = A."""
+    print("test_mmnd_2d_identity")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].arange(9)
+        A = A.reshape(3, 3)
+        var I = Tensor[dtype].eye(3)
+        var cpu_result = A.matmul(I)
+        var a_gpu = A.to_gpu()
+        var i_gpu = I.to_gpu()
+        var gpu_result = a_gpu.matmul(i_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_identity passed")
+
+
+fn test_mmnd_2d_zero_matrix() raises:
+    """A @ zeros = zeros."""
+    print("test_mmnd_2d_zero_matrix")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].arange(12)
+        A = A.reshape(3, 4)
+        var B = Tensor[dtype].zeros(4, 5)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_zero_matrix passed")
+
+
+fn test_mmnd_2d_ones() raises:
+    """Ones @ ones = matrix of k."""
+    print("test_mmnd_2d_ones")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var k = 8
+        var A = Tensor[dtype].ones(4, k)
+        var B = Tensor[dtype].ones(k, 5)
+        # every output element = k
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_ones passed")
+
+
+fn test_mmnd_2d_rectangular() raises:
+    """Non-square matrices: (m, k) @ (k, n) where m != k != n."""
+    print("test_mmnd_2d_rectangular")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].arange(15)
+        A = A.reshape(3, 5)    # (3, 5)
+        var B = Tensor[dtype].arange(20)
+        B = B.reshape(5, 4)    # (5, 4)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_rectangular passed")
+
+
+fn test_mmnd_2d_negative_values() raises:
+    """Negative values in both A and B."""
+    print("test_mmnd_2d_negative_values")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d2([[-1, 2], [3, -4]])
+        var B = Tensor[dtype].d2([[1, -2], [-3, 4]])
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_negative_values passed")
+
+
+fn test_mmnd_2d_single_element() raises:
+    """(1, k) @ (k, 1) → (1, 1): inner product as matmul."""
+    print("test_mmnd_2d_single_element")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].d2([[1, 2, 3, 4]])   # (1, 4)
+        var B = Tensor[dtype].d2([[1], [2], [3], [4]])  # (4, 1)
+        # result = [[1+4+9+16]] = [[30]]
+        var expected = Tensor[dtype].d2([[30]])
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(expected, gpu_result))
+    print("test_mmnd_2d_single_element passed")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Tile boundary stress — sizes not multiples of TILE_SIZE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+fn test_mmnd_2d_non_tile_multiple_m() raises:
+    """M(m) not a multiple of TILE_SIZE."""
+    print("test_mmnd_2d_non_tile_multiple_m")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(17, 16)   # m=17, not multiple of 16
+        var B = Tensor[dtype].ones(16, 16)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_non_tile_multiple_m passed")
+
+
+fn test_mmnd_2d_non_tile_multiple_n() raises:
+    """N(n) not a multiple of TILE_SIZE."""
+    print("test_mmnd_2d_non_tile_multiple_n")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(16, 16)
+        var B = Tensor[dtype].ones(16, 19)   # n=19, not multiple of 16
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_non_tile_multiple_n passed")
+
+
+fn test_mmnd_2d_non_tile_multiple_k() raises:
+    """K(k) not a multiple of TILE_SIZE."""
+    print("test_mmnd_2d_non_tile_multiple_k")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(16, 13)   # k=13, not multiple of 16
+        var B = Tensor[dtype].ones(13, 16)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_non_tile_multiple_k passed")
+
+
+fn test_mmnd_2d_all_non_tile_multiples() raises:
+    """M(m), k, n all non-multiples of TILE_SIZE simultaneously."""
+    print("test_mmnd_2d_all_non_tile_multiples")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].arange(17 * 13)
+        A = A.reshape(17, 13)
+        var B = Tensor[dtype].arange(13 * 19)
+        B = B.reshape(13, 19)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_all_non_tile_multiples passed")
+
+
+fn test_mmnd_2d_smaller_than_tile() raises:
+    """M(m), k, n all smaller than TILE_SIZE."""
+    print("test_mmnd_2d_smaller_than_tile")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].arange(12)
+        A = A.reshape(3, 4)    # both < 16
+        var B = Tensor[dtype].arange(8)
+        B = B.reshape(4, 2)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_smaller_than_tile passed")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Large matrices — stress multi-block coverage
+# ═══════════════════════════════════════════════════════════════════════════════
+
+fn test_mmnd_2d_large_square() raises:
+    """Large square matrices well beyond tile size."""
+    print("test_mmnd_2d_large_square")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(128, 128)
+        var B = Tensor[dtype].ones(128, 128)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_large_square passed")
+
+
+fn test_mmnd_2d_large_rectangular() raises:
+    """Large rectangular matrices with non-tile-multiple dimensions."""
+    print("test_mmnd_2d_large_rectangular")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(65, 100)
+        var B = Tensor[dtype].ones(100, 70)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_2d_large_rectangular passed")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Batched — same batch shape, no broadcast
+# ═══════════════════════════════════════════════════════════════════════════════
+
+fn test_mmnd_batched_3d_known_values() raises:
+    """Hand-computed batched matmul verified directly against GPU."""
+    print("test_mmnd_batched_3d_known_values")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        # batch 0: [[1,0],[0,1]] @ [[2,3],[4,5]] = [[2,3],[4,5]]
+        # batch 1: [[1,1],[1,1]] @ [[1,0],[0,1]] = [[1,1],[1,1]]
+        var A = Tensor[dtype].d3([[[1,0],[0,1]], [[1,1],[1,1]]])
+        var B = Tensor[dtype].d3([[[2,3],[4,5]], [[1,0],[0,1]]])
+        var expected = Tensor[dtype].d3([[[2,3],[4,5]], [[1,1],[1,1]]])
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(expected, gpu_result))
+    print("test_mmnd_batched_3d_known_values passed")
+
+
+fn test_mmnd_batched_3d_arange() raises:
+    """A[b, m, k] @ B[b, k, n] with arange values."""
+    print("test_mmnd_batched_3d_arange")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].arange(24)
+        A = A.reshape(2, 3, 4)    # (2, 3, 4)
+        var B = Tensor[dtype].arange(24)
+        B = B.reshape(2, 4, 3)    # (2, 4, 3)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_batched_3d_arange passed")
+
+
+fn test_mmnd_batched_4d() raises:
+    """A[a, b, m, k] @ B[a, b, k, n] — 4D batch."""
+    print("test_mmnd_batched_4d")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(2, 3, 4, 5)    # (2, 3, 4, 5)
+        var B = Tensor[dtype].ones(2, 3, 5, 4)    # (2, 3, 5, 4)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_batched_4d passed")
+
+
+fn test_mmnd_batched_large_batch() raises:
+    """Many batch elements to stress grid.z coverage."""
+    print("test_mmnd_batched_large_batch")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(32, 16, 8)    # 32 batch elements
+        var B = Tensor[dtype].ones(32, 8, 16)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_batched_large_batch passed")
+
+
+fn test_mmnd_batched_non_tile_multiples() raises:
+    """Batched with m, k, n not multiples of TILE_SIZE."""
+    print("test_mmnd_batched_non_tile_multiples")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].arange(2 * 11 * 7)
+        A = A.reshape(2, 11, 7)
+        var B = Tensor[dtype].arange(2 * 7 * 13)
+        B = B.reshape(2, 7, 13)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_batched_non_tile_multiples passed")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Broadcast — different batch ranks
+# ═══════════════════════════════════════════════════════════════════════════════
+
+fn test_mmnd_broadcast_3d_A_2d_B() raises:
+    """A[b, m, k] @ B[k, n] — B broadcasts across batch."""
+    print("test_mmnd_broadcast_3d_A_2d_B")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].arange(24)
+        A = A.reshape(2, 3, 4)    # (2, 3, 4)
+        var B = Tensor[dtype].arange(12)
+        B = B.reshape(4, 3)       # (4, 3) — no batch, broadcasts
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_broadcast_3d_A_2d_B passed")
+
+
+fn test_mmnd_broadcast_2d_A_3d_B() raises:
+    """A[m, k] @ B[b, k, n] — A broadcasts across batch."""
+    print("test_mmnd_broadcast_2d_A_3d_B")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].arange(12)
+        A = A.reshape(3, 4)       # (3, 4) — no batch, broadcasts
+        var B = Tensor[dtype].arange(24)
+        B = B.reshape(2, 4, 3)    # (2, 4, 3)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_broadcast_2d_A_3d_B passed")
+
+
+fn test_mmnd_broadcast_4d_A_3d_B() raises:
+    """A[a, b, m, k] @ B[b, k, n] — B missing leading batch dim."""
+    print("test_mmnd_broadcast_4d_A_3d_B")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(2, 3, 4, 5)    # (2, 3, 4, 5)
+        var B = Tensor[dtype].ones(3, 5, 4)        # (3, 5, 4) — broadcasts over dim 0
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_broadcast_4d_A_3d_B passed")
+
+
+fn test_mmnd_broadcast_size1_batch_dim() raises:
+    """Size-1 batch dim in A broadcasts across B's batch."""
+    print("test_mmnd_broadcast_size1_batch_dim")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(1, 4, 5)    # (1, 4, 5) → broadcasts to (3, 4, 5)
+        var B = Tensor[dtype].ones(3, 5, 4)    # (3, 5, 4)
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_broadcast_size1_batch_dim passed")
+
+
+fn test_mmnd_broadcast_known_values() raises:
+    """Hand-computed broadcast result verified directly against GPU."""
+    print("test_mmnd_broadcast_known_values")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        # A = [[1,0],[0,1]] (identity, no batch)
+        # B[0] = [[2,3],[4,5]], B[1] = [[6,7],[8,9]]
+        # out[0] = I @ B[0] = [[2,3],[4,5]]
+        # out[1] = I @ B[1] = [[6,7],[8,9]]
+        var A = Tensor[dtype].d2([[1, 0], [0, 1]])
+        var B = Tensor[dtype].d3([[[2,3],[4,5]], [[6,7],[8,9]]])
+        var expected = Tensor[dtype].d3([[[2,3],[4,5]], [[6,7],[8,9]]])
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(expected, gpu_result))
+    print("test_mmnd_broadcast_known_values passed")
+
+
+fn test_mmnd_broadcast_large() raises:
+    """Large broadcast batch to stress multi-block and multi-z coverage."""
+    print("test_mmnd_broadcast_large")
+    @parameter
+    if has_accelerator():
+        comptime dtype = DType.float32
+        var A = Tensor[dtype].ones(16, 32, 32)   # (16, 32, 32)
+        var B = Tensor[dtype].ones(32, 32)        # (32, 32) — broadcasts over 16
+        var cpu_result = A.matmul(B)
+        var a_gpu = A.to_gpu()
+        var b_gpu = B.to_gpu()
+        var gpu_result = a_gpu.matmul(b_gpu)
+        assert_true(close_enough(cpu_result, gpu_result))
+    print("test_mmnd_broadcast_large passed")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Entry point
+# ═══════════════════════════════════════════════════════════════════════════════
+
+fn test_tensor_tensor_multiplications() raises:
+    # Basic correctness
+    test_mmnd_2d_known_values()
+    test_mmnd_2d_identity()
+    test_mmnd_2d_zero_matrix()
+    test_mmnd_2d_ones()
+    test_mmnd_2d_rectangular()
+    test_mmnd_2d_negative_values()
+    test_mmnd_2d_single_element()
+
+    # Tile boundary stress
+    test_mmnd_2d_non_tile_multiple_m()
+    test_mmnd_2d_non_tile_multiple_n()
+    test_mmnd_2d_non_tile_multiple_k()
+    test_mmnd_2d_all_non_tile_multiples()
+    test_mmnd_2d_smaller_than_tile()
+
+    # Large matrices
+    test_mmnd_2d_large_square()
+    test_mmnd_2d_large_rectangular()
+
+    # Batched same shape
+    test_mmnd_batched_3d_known_values()
+    test_mmnd_batched_3d_arange()
+    test_mmnd_batched_4d()
+    test_mmnd_batched_large_batch()
+    test_mmnd_batched_non_tile_multiples()
+
+    # Broadcast
+    test_mmnd_broadcast_3d_A_2d_B()
+    test_mmnd_broadcast_2d_A_3d_B()
+    test_mmnd_broadcast_4d_A_3d_B()
+    test_mmnd_broadcast_size1_batch_dim()
+    test_mmnd_broadcast_known_values()
+    test_mmnd_broadcast_large()

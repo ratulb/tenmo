@@ -41,7 +41,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
         )
 
         var out_shape = batch_shape + [m]
-        var result = NDBuffer[Self.dtype](out_shape)
+        var result = NDBuffer[Self.dtype].zeros(out_shape)
 
         # Hoist metadata
         var M_stride0 = M.strides[-2]

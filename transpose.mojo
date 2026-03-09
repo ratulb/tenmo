@@ -43,8 +43,8 @@ struct Transpose[dtype: DType](Copyable):
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        shape = self.shape()
-        normalized_axes = (
+        ref shape = self.shape()
+        var normalized_axes = (
             Validator.validate_and_normalize_axes(
                 shape, axes, ordered=False, fill_missing=True
             ) if len(axes)
@@ -56,7 +56,7 @@ struct Transpose[dtype: DType](Copyable):
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides().permute(normalized_axes)
 
-        out = Tensor[Self.dtype].build_view(
+        var out = Tensor[Self.dtype].build_view(
             self,
             new_shape,
             new_strides,

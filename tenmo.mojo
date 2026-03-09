@@ -151,7 +151,7 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Tensor[Self.dtype]:
         ref tensor_buffer = tensor.buffer
 
-        buffer = tensor_buffer.share(shape, strides, offset)
+        var buffer = tensor_buffer.share(shape, strides, offset)
         return Tensor[Self.dtype](buffer=buffer^, requires_grad=requires_grad)
 
     fn as_gradbox(

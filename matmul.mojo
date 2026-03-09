@@ -16,7 +16,7 @@ from vectormatrix import VectorMatmulNd
 from matrixvector import MatrixVectorMulNd
 from algorithm import parallelize
 from sys.info import num_logical_cores as num_physical_cores
-
+from ndbuffer import NDBuffer
 
 comptime TILE_SIZE = 32
 
@@ -53,12 +53,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             var grad_A = Gradbox[Self.dtype].zeros(Shape([m, n]))
 
             # Hoist all metadata
-            _ = """ref grad_out_strides = grad_out.strides()
-
-            var grad_out_stride0 = grad_out.strides[0]
-            var grad_out_stride1 = grad_out.strides[1]
-
-            var grad_out_data = grad_out.data_ptr()"""
 
             ref B_strides = B.strides()
             var B_stride0 = B_strides[0]
@@ -155,11 +149,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
             var A_offset = A.offset()
             var A_data = A.data_ptr()
 
-            _ = """ref grad_out_strides = grad_out.strides()
-            var grad_out_stride0 = grad_out_strides[0]
-            var grad_out_stride1 = grad_out_strides[1]
-            var grad_out_data = grad_out.data_ptr()"""
-
             ref grad_B_strides = grad_B.strides()
 
             var grad_B_stride0 = grad_B_strides[0]
@@ -253,11 +242,130 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     @always_inline
     fn forward[
+        simdwidth: Int = simd_width_of[Self.dtype](),
+        tile_size: Int = TILE_SIZE,
+    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+        ref A_shape = A.shape
+        ref B_shape = B.shape
+        var m = A_shape[0]
+        var n = A_shape[1]
+        var p = B_shape[1]
+
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+        var C = NDBuffer[Self.dtype].zeros(Shape([m, p]))
+
+        # Hoist metadata
+        ref A_strides = A.strides
+        var A_stride0 = A_strides[0]
+        var A_stride1 = A_strides[1]
+        var A_offset = A.offset
+        var A_data = A.data_ptr()
+
+        ref B_strides = B.strides
+        var B_stride0 = B_strides[0]
+        var B_stride1 = B_strides[1]
+        var B_offset = B.offset
+        var B_data = B.data_ptr()
+        var B_contiguous = B.is_contiguous()
+
+        ref C_strides = C.strides
+        var C_stride0 = C_strides[0]
+        var C_stride1 = C_strides[1]
+        var C_offset = C.offset
+        var C_data = C.data_ptr()
+
+        if B_contiguous:
+            # ========================================
+            # PARALLELIZED TILED MATMUL
+            # ========================================
+            var num_tiles_i = (m + tile_size - 1) // tile_size
+
+            @parameter
+            fn process_row_tile(tile_idx: Int):
+                var i_tile = tile_idx * tile_size
+                var i_end = min(i_tile + tile_size, m)
+
+                for j_tile in range(0, p, tile_size):
+                    for k_tile in range(0, n, tile_size):
+                        var j_end = min(j_tile + tile_size, p)
+                        var k_end = min(k_tile + tile_size, n)
+
+                        for i in range(i_tile, i_end):
+                            var a_row_base = i * A_stride0 + A_offset
+                            var c_row_base = i * C_stride0 + C_offset
+
+                            var j = j_tile
+
+                            # Main vectorized loop
+                            while j + simdwidth <= j_end:
+                                var c_addr = c_row_base + j * C_stride1
+                                var accumulator = C_data.load[width=simdwidth](
+                                    c_addr
+                                )
+
+                                for k in range(k_tile, k_end):
+                                    var a_addr = a_row_base + k * A_stride1
+                                    var a_ik = A_data[a_addr]
+
+                                    var b_addr = (
+                                        k * B_stride0 + B_offset + j * B_stride1
+                                    )
+                                    var b_vec = B_data.load[width=simdwidth](
+                                        b_addr
+                                    )
+
+                                    accumulator += a_ik * b_vec
+
+                                C_data.store[width=simdwidth](
+                                    c_addr, accumulator
+                                )
+                                j += simdwidth
+
+                            # Tail handling
+                            while j < j_end:
+                                var c_addr = c_row_base + j * C_stride1
+                                var accumulator = C_data[c_addr]
+
+                                for k in range(k_tile, k_end):
+                                    var a_addr = a_row_base + k * A_stride1
+                                    var b_addr = (
+                                        k * B_stride0 + B_offset + j * B_stride1
+                                    )
+                                    accumulator += (
+                                        A_data[a_addr] * B_data[b_addr]
+                                    )
+
+                                C_data[c_addr] = accumulator
+                                j += 1
+
+            parallelize[process_row_tile](num_tiles_i, num_physical_cores())
+
+        else:
+            # Non-contiguous path (scalar)
+            for i in range(m):
+                var a_row_base = i * A_stride0 + A_offset
+                var c_row_base = i * C_stride0 + C_offset
+
+                for j in range(p):
+                    var accumulator: Scalar[Self.dtype] = 0
+
+                    for k in range(n):
+                        var a_addr = a_row_base + k * A_stride1
+                        var b_addr = k * B_stride0 + B_offset + j * B_stride1
+                        accumulator += A_data[a_addr] * B_data[b_addr]
+
+                    var c_addr = c_row_base + j * C_stride1
+                    C_data[c_addr] = accumulator
+        return C^
+
+    @staticmethod
+    @always_inline
+    fn forward[
         track_grad: Bool = True,
         simdwidth: Int = simd_width_of[Self.dtype](),
         tile_size: Int = TILE_SIZE,
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        ref A_shape = A.shape()
+        _="""ref A_shape = A.shape()
         ref B_shape = B.shape()
         var m = A_shape[0]
         var n = A_shape[1]
@@ -367,9 +475,11 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                         accumulator += A_data[a_addr] * B_data[b_addr]
 
                     var c_addr = c_row_base + j * C_stride1
-                    C_data[c_addr] = accumulator
+                    C_data[c_addr] = accumulator"""
+        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](A.buffer, B.buffer)
+        var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        @parameter
+        _="""@parameter
         if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
@@ -379,7 +489,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                 ]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn^)
                 C.add_ancestry(A)
-                C.add_ancestry(B)
+                C.add_ancestry(B)"""
 
         return C^
 
@@ -388,7 +498,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     fn forward[
         simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
     ](A: Tensor[Self.dtype], B: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
-        var m = A.shape()[0]
+        _="""var m = A.shape()[0]
         var n = A.shape()[1]
         var p = B.shape()[1]
 
@@ -463,7 +573,10 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                             C_data[c_addr] = accumulator
                             j += 1
 
-        parallelize[process_row_tile](num_tiles_i, num_physical_cores())
+        parallelize[process_row_tile](num_tiles_i, num_physical_cores())"""
+        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](A.buffer, B.buffer)
+        var C = Gradbox[Self.dtype](ndb^)
+
 
         return C^
 
@@ -472,7 +585,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     fn forward[
         simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
     ](A: Gradbox[Self.dtype], B: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
-        var m = A.shape()[0]
+        _="""var m = A.shape()[0]
         var n = A.shape()[1]
         var p = B.shape()[1]
 
@@ -591,7 +704,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                         accumulator += A_data[a_addr] * B_data[b_addr]
 
                     var c_addr = c_row_base + j * C_stride1
-                    C_data[c_addr] = accumulator
+                    C_data[c_addr] = accumulator"""
+        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](A.buffer, B.buffer)
+        var C = Gradbox[Self.dtype](ndb^)
 
         return C^
 
@@ -643,13 +758,68 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
+from matmul_kernel import MatmulNdGpu
+from sys import has_accelerator
 
 @fieldwise_init
 @register_passable
 struct MatmulNd[dtype: DType](ImplicitlyCopyable):
+
     @always_inline
     @staticmethod
     fn forward[
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
+    ](mut A: Tensor[Self.dtype], mut B: Tensor[Self.dtype]) -> Tensor[
+        Self.dtype
+    ]:
+        var C: Tensor[Self.dtype]
+        @parameter
+        if has_accelerator():
+            if A.is_on_gpu() and B.is_on_gpu():
+                try:
+                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
+                        A.buffer, B.buffer
+                    )
+                    C = Tensor[Self.dtype](ndb^, requires_grad=False)
+                except e:
+                    print(e)
+                    print(
+                        "MatmulNd forward - GPU operation failed. Failling"
+                        " back on CPU"
+                    )
+                    C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](A, B)
+            else:
+                C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](A, B)
+        else:
+            C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](A, B)
+
+        @parameter
+        if track_grad:
+            var requires_grad = A.requires_grad or B.requires_grad
+            if requires_grad:
+                ref A_shape = A.shape()
+                ref B_shape = B.shape()
+
+
+                C.requires_grad_(True)
+                var backward_fn: BackwardFn[Self.dtype]
+
+                if A_shape.rank() == 2 and B_shape.rank() == 2:
+                    backward_fn = Matmul2dBackward[Self.dtype]().into_backward_fn()
+                else:
+                    backward_fn = MatmulNdBackward[
+                    Self.dtype
+                    ]().into_backward_fn()
+                C.backwardFn = Optional(backward_fn^)
+                C.add_ancestry(A)
+                C.add_ancestry(B)
+
+        return C^
+
+
+    @always_inline
+    @staticmethod
+    fn forward_cpu[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
     ](mut A: Tensor[Self.dtype], mut B: Tensor[Self.dtype]) -> Tensor[
         Self.dtype
@@ -658,22 +828,22 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         ref B_shape = B.shape()
 
         # Short-circuit for pure 2D case
-        if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[Self.dtype].forward[track_grad](A, B)
+        _="""if A_shape.rank() == 2 and B_shape.rank() == 2:
+            return Matmul2d[Self.dtype].forward[track_grad](A, B)"""
 
         MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
         batch_shape = ShapeBroadcaster.broadcast_shape(
             A_shape[0:-2], B_shape[0:-2]
         )
 
-        m = A_shape[-2]
-        n = B_shape[-1]
+        var m = A_shape[-2]
+        var n = B_shape[-1]
 
-        batch_dims_a = A_shape[:-2]
-        batch_dims_b = B_shape[:-2]
+        var batch_dims_a = A_shape[:-2]
+        var batch_dims_b = B_shape[:-2]
 
-        out_shape = batch_shape + [m, n]
-        C = Tensor[Self.dtype].zeros(out_shape)
+        var out_shape = batch_shape + [m, n]
+        var C = Tensor[Self.dtype].zeros(out_shape)
 
         for indices in batch_shape:
             A_indices = ShapeBroadcaster.broadcasted_indices(
@@ -691,14 +861,32 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             )
             C_slice.buffer.copy_from_alike[overwrite=True](result.buffer)
 
+        _="""@parameter
+        if track_grad:
+            var requires_grad = A.requires_grad or B.requires_grad
+            if requires_grad:
+                C.requires_grad_(True)
+                var backward_fn = Matmul2dBackward[
+                    Self.dtype
+                ]().into_backward_fn()
+                C.backwardFn = Optional(backward_fn^)
+                C.add_ancestry(A)
+                C.add_ancestry(B)
+                """
+
         @parameter
         if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var backward_fn = MatmulNdBackward[
+                var backward_fn: BackwardFn[Self.dtype]
+
+                if A_shape.rank() == 2 and B_shape.rank() == 2:
+                    backward_fn = Matmul2dBackward[Self.dtype]().into_backward_fn()
+                else:
+                    backward_fn = MatmulNdBackward[
                     Self.dtype
-                ]().into_backward_fn()
+                    ]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
@@ -850,13 +1038,6 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
         A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         return MatmulNd[Self.dtype].forward(A, B)
-
-
-# comptime dot = 0  # dot product
-# comptime vm = 1  # vector & tensor matmul
-# comptime mv = 2  # tensor & vector matmul
-# comptime mm = 3  # tensor & tensor matmul
-# comptime invalid = 4  # Invalid case
 
 
 fn classify_matmul(a: Shape, b: Shape) -> Int:

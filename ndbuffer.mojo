@@ -152,7 +152,7 @@ struct NDBuffer[dtype: DType](
 
     fn to_cpu(self, delete: Bool = False) raises -> Self:
         var _, nd_buffer = self.to_device(CPU().into())
-        _="""if delete:
+        _ = """if delete:
             self.device_state = None"""
         return nd_buffer^
 
@@ -328,6 +328,13 @@ struct NDBuffer[dtype: DType](
         var buffer = Buffer[Self.dtype].arange(args)
         var shape = Shape(buffer.size)
         return NDBuffer[Self.dtype](buffer^, shape^)
+
+    @staticmethod
+    @always_inline
+    fn arange(
+        *args: Scalar[Self.dtype],
+    ) -> NDBuffer[Self.dtype]:
+        return Self.arange(args)
 
     @staticmethod
     @always_inline
@@ -628,18 +635,56 @@ struct NDBuffer[dtype: DType](
         Create shared view of this buffer.
         First call enables ref counting. Subsequent calls just create views.
         """
+        _ = """var new_shape: Shape
+        if shape:
+            new_shape = Validator.validate_and_construct_new_shape(self.shape, shape.value().intarray())
+        else:
+            new_shape = self.shape"""
         # Enable ref counting if not already shared
         if not self.shared():
             self.buffer.shared()
-
-        new_shape = shape.or_else(self.shape)
-        new_strides = strides.or_else(Strides.default(new_shape))
+        var size = len(self.buffer)
+        var new_shape = shape.or_else(self.shape)
+        if new_shape.numels() > size:
+            panic(
+                "NDBuffer -> share: invalid shape and offset.",
+                new_shape.__str__(),
+                self.shape.__str__(),
+                offset.__str__(),
+                self.offset.__str__(),
+                size.__str__(),
+            )
+        var new_strides = strides.or_else(Strides.default(new_shape))
         return NDBuffer[Self.dtype](
             buffer=self.buffer.copy(),
             shape=new_shape,
             strides=new_strides,
             offset=offset,
         )
+
+    fn transpose(
+        mut self,
+        axes: IntArray = IntArray(),
+    ) -> NDBuffer[Self.dtype]:
+        ref shape = self.shape
+        var normalized_axes = (
+            Validator.validate_and_normalize_axes(
+                shape, axes, ordered=False, fill_missing=True
+            ) if len(axes)
+            > 0 else IntArray.range(0, shape.rank()).reversed()
+        )
+
+        # Permute shape and create default strides and permute
+
+        var new_shape = shape.permute(normalized_axes)
+        var new_strides = self.strides.permute(normalized_axes)
+
+        var out = self.share(
+            new_shape,
+            new_strides,
+            self.offset,
+        )
+        return out^
 
     @always_inline
     fn __is__(self, other: NDBuffer[Self.dtype]) -> Bool:
@@ -1661,4 +1706,10 @@ from tenmo import Tensor
 
 
 fn main() raises:
-    pass
+    comptime dtype = DType.float32
+    var ndb = NDBuffer[dtype].arange(36)
+    ndb.print()
+    var reshaped = ndb.share(Shape(3, 4, 3))
+    reshaped.print()
+    var transposed = reshaped.transpose(IntArray(-1, -2))
+    transposed.print()

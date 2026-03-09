@@ -739,11 +739,11 @@ struct Gradbox[dtype: DType](
     fn reshape(
         self, new_shape: Shape, validated: Bool = False, share: Bool = True
     ) -> Gradbox[Self.dtype]:
-        shape = new_shape if validated else Validator.validate_and_construct_new_shape(
+        var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             self.shape(), new_shape.intarray()
         )
-        buffer = self.buffer.contiguous_buffer()
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape^)
+        var buffer = self.buffer.contiguous_buffer()
+        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape^)
 
         return Gradbox[Self.dtype](nd_buffer^, share=share)
 

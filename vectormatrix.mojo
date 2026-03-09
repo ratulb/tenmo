@@ -40,7 +40,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
         )
 
         var out_shape = batch_shape + [n]
-        var result = NDBuffer[Self.dtype](out_shape)
+        var result = NDBuffer[Self.dtype].zeros(out_shape)
 
         # Hoist metadata for vector and matrix
         var v_stride = v.strides[-1]
