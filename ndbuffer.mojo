@@ -635,11 +635,6 @@ struct NDBuffer[dtype: DType](
         Create shared view of this buffer.
         First call enables ref counting. Subsequent calls just create views.
         """
-        _ = """var new_shape: Shape
-        if shape:
-            new_shape = Validator.validate_and_construct_new_shape(self.shape, shape.value().intarray())
-        else:
-            new_shape = self.shape"""
         # Enable ref counting if not already shared
         if not self.shared():
             self.buffer.shared()
@@ -647,11 +642,9 @@ struct NDBuffer[dtype: DType](
         var new_shape = shape.or_else(self.shape)
         if new_shape.numels() > size:
             panic(
-                "NDBuffer -> share: invalid shape and offset.",
+                "NDBuffer -> share: invalid shape.",
                 new_shape.__str__(),
                 self.shape.__str__(),
-                offset.__str__(),
-                self.offset.__str__(),
                 size.__str__(),
             )
         var new_strides = strides.or_else(Strides.default(new_shape))

@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from sys import simd_width_of
+from sys import simd_width_of, has_accelerator
 from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import (
     Delegate,
@@ -17,6 +17,7 @@ from matrixvector import MatrixVectorMulNd
 from algorithm import parallelize
 from sys.info import num_logical_cores as num_physical_cores
 from ndbuffer import NDBuffer
+from matmul_kernel import MatmulNdGpu
 
 comptime TILE_SIZE = 32
 
@@ -577,7 +578,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
         var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](A.buffer, B.buffer)
         var C = Gradbox[Self.dtype](ndb^)
 
-
         return C^
 
     @staticmethod
@@ -758,8 +758,6 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
-from matmul_kernel import MatmulNdGpu
-from sys import has_accelerator
 
 @fieldwise_init
 @register_passable
