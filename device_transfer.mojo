@@ -182,3 +182,4 @@ fn main() raises:
     var B = A_g * 42
     B.backward()
     B.grad().print()
+    A.grad().print()

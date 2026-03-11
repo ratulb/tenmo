@@ -1930,12 +1930,16 @@ struct Tensor[dtype: DType = DType.float32](
         except e:
             print(e)
 
+
     fn requires_grad_(mut self, requires_grad: Bool = True):
+        print("requires_grad_ -> self.is_on_gpu():", self.is_on_gpu())
+        print("requires_grad_ -> self.buffer.device_state is None:",
+              self.buffer.device_state == None)
         self.requires_grad = requires_grad
         if requires_grad and not self.has_grad():
-            self.init_gradbox(self.is_on_gpu())  # resolve device BEFORE passing to init
+            self.init_gradbox(self.is_on_gpu())
 
-    fn requires_grad_1(mut self, requires_grad: Bool = True):
+    fn requires_grad_11(mut self, requires_grad: Bool = True):
         # Note cleaning up existing gradbox
         self.requires_grad = requires_grad
         if requires_grad and not self.has_grad():
