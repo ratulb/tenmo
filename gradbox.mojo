@@ -516,6 +516,12 @@ struct Gradbox[dtype: DType](
             )
         return self.buffer.compare[NotEqual](other.buffer).buffer.all_true()
 
+    fn is_on_gpu(self) -> Bool:
+        return self.buffer.is_on_gpu()
+
+    fn is_on_cpu(self) -> Bool:
+        return self.is_on_gpu() == False
+
     fn __str__(self) -> String:
         rank = self.rank()
         s = String("[")
@@ -536,6 +542,12 @@ struct Gradbox[dtype: DType](
         s += ", Shared : " + self.shared().__str__()
         s += ", Strides : " + self.strides().__str__()
         s += ", Offset : " + self.offset().__str__()
+        s += (
+            ", Device : "
+            + "gpu: "
+            + self.buffer.gpu_id().__str__() if self.is_on_gpu() else ", Device : "
+            + "cpu"
+        )
         s += "]"
         return s
 

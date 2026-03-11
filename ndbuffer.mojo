@@ -14,6 +14,7 @@ from sys import simd_width_of, has_accelerator
 from scalar_ops_kernel import ScalarOperations
 from scalar_inplace_ops_kernel import InplaceScalarOperations
 from binary_ops_kernel import BinaryOperations
+from binary_inplace_ops_kernel import BinaryInplaceOperations
 from compare_kernel import AllClose, Compare, CompareScalar
 from reduction_kernel import Reduction
 from mnemonics import (
@@ -1118,6 +1119,40 @@ struct NDBuffer[dtype: DType](
                 + other.shape.__str__()
             )
 
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu() and other.is_on_gpu():
+                try:
+                    BinaryInplaceOperations[Self.dtype].launch[op_code](
+                        self, other
+                    )
+                except e:
+                    print(e)
+                    print(
+                        (
+                            "NDBuffer inplace_ops - GPU operation failed for"
+                            " opcode: "
+                        ),
+                        op_code.__str__(),
+                    )
+            else:
+                self.inplace_ops_cpu[op_code](other)
+        else:
+            self.inplace_ops_cpu[op_code](other)
+
+    @always_inline
+    fn inplace_ops_cpu[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
+        # Broadcast validation
+        if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
+            panic(
+                "NDBuffer → inplace_ops: dimension mismatch: "
+                + self.shape.__str__()
+                + ", "
+                + other.shape.__str__()
+            )
+
         # Handle broadcasting case
         if self.shape != other.shape:
             broadcast_shape = ShapeBroadcaster.broadcast_shape(
@@ -1259,6 +1294,15 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
+        # Broadcast validation
+        if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
+            panic(
+                "NDBuffer → arithmetic_ops: dimension mismatch: "
+                + self.shape.__str__()
+                + ", "
+                + other.shape.__str__()
+            )
+
         var out: NDBuffer[Self.dtype]
 
         @parameter
@@ -1277,6 +1321,7 @@ struct NDBuffer[dtype: DType](
                         ),
                         op_code.__str__(),
                     )
+                    # Unreachable
                     out = NDBuffer[Self.dtype](Shape())
             else:
                 out = self.arithmetic_ops_cpu[op_code](other)
