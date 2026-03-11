@@ -198,6 +198,32 @@ struct Tensor[dtype: DType = DType.float32](
     fn id(self) -> UInt:
         return self._id
 
+    fn make_gradbox(self, on_gpu: Bool) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
+        var gradbox: Gradbox[Self.dtype]
+        @parameter
+        if has_accelerator():
+            if on_gpu:
+                try:
+                    var device_state = self.buffer.device_state.value().new(
+                        self.numels(), Scalar[Self.dtype](0)
+                    )
+                    var ndb = NDBuffer[Self.dtype].with_device_state(
+                        device_state^, self.shape()
+                    )
+                    gradbox = Gradbox[Self.dtype](ndb^)
+                except e:
+                    panic("make_gradbox: failed to allocate GPU gradbox: " + e.__str__())
+                    gradbox = Gradbox[Self.dtype](self.shape())  # unreachable
+            else:
+                gradbox = Gradbox[Self.dtype](self.shape())
+                gradbox.zero_grad()
+        else:
+            gradbox = Gradbox[Self.dtype](self.shape())
+            gradbox.zero_grad()
+        var ptr = alloc[Gradbox[Self.dtype]](1)
+        ptr.init_pointee_move(gradbox^)
+        return ptr
+
     fn init_gradbox(mut self, on_gpu: Bool = False):
         if (
             self.requires_grad
@@ -1930,8 +1956,13 @@ struct Tensor[dtype: DType = DType.float32](
         except e:
             print(e)
 
-
     fn requires_grad_(mut self, requires_grad: Bool = True):
+        self.requires_grad = requires_grad
+        if requires_grad and not self.has_grad():
+            var ptr = self.make_gradbox(self.is_on_gpu())
+            self.gradbox = ptr
+
+    fn requires_grad_12(mut self, requires_grad: Bool = True):
         print("requires_grad_ -> self.is_on_gpu():", self.is_on_gpu())
         print("requires_grad_ -> self.buffer.device_state is None:",
               self.buffer.device_state == None)
