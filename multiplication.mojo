@@ -110,7 +110,6 @@ struct MultiplyScalar[dtype: DType](ImplicitlyCopyable):
         var out: Tensor[Self.dtype] = Tensor[Self.dtype](
             self.buffer.scalar_ops[Multiply](factor), requires_grad=False
         )
-
         @parameter
         if track_grad:
             if self.requires_grad:
@@ -120,6 +119,12 @@ struct MultiplyScalar[dtype: DType](ImplicitlyCopyable):
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
+
+        print("out is on gpu after construction:", out.is_on_gpu())
+        out.requires_grad_(True)
+        print("out gradbox is on gpu after requires_grad_:", out.gradbox[].is_on_gpu())
+
+
 
         return out^
 
