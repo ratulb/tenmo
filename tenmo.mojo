@@ -198,8 +198,43 @@ struct Tensor[dtype: DType = DType.float32](
     fn id(self) -> UInt:
         return self._id
 
+    fn init_gradbox(mut self, on_gpu: Bool = False):
+        if (
+            self.requires_grad
+            and self.gradbox
+            == UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
+        ):
+            var gradbox: Gradbox[Self.dtype]
+
+            @parameter
+            if has_accelerator():
+                if on_gpu:             # ← use passed flag, not self.is_on_gpu()
+                    try:
+                        var device_state = self.buffer.device_state.value().new(
+                            self.numels(), Scalar[Self.dtype](0)
+                        )
+                        var ndb = NDBuffer[Self.dtype].with_device_state(
+                            device_state^, self.shape()
+                        )
+                        gradbox = Gradbox[Self.dtype](ndb^)
+                    except e:
+                        print(e)
+                        panic(
+                            "init_gradbox: failed to allocate GPU gradbox: "
+                            + e.__str__()
+                        )
+                        gradbox = Gradbox[Self.dtype](self.shape())  # unreachable
+                else:
+                    gradbox = Gradbox[Self.dtype](self.shape())
+                    gradbox.zero_grad()
+            else:
+                gradbox = Gradbox[Self.dtype](self.shape())
+                gradbox.zero_grad()
+            self.gradbox = alloc[Gradbox[Self.dtype]](1)
+            self.gradbox.init_pointee_move(gradbox^)
+
     @always_inline
-    fn init_gradbox(mut self):
+    fn init_gradbox_1(mut self):
         if (
             self.requires_grad
             and self.gradbox
@@ -1896,6 +1931,11 @@ struct Tensor[dtype: DType = DType.float32](
             print(e)
 
     fn requires_grad_(mut self, requires_grad: Bool = True):
+        self.requires_grad = requires_grad
+        if requires_grad and not self.has_grad():
+            self.init_gradbox(self.is_on_gpu())  # resolve device BEFORE passing to init
+
+    fn requires_grad_1(mut self, requires_grad: Bool = True):
         # Note cleaning up existing gradbox
         self.requires_grad = requires_grad
         if requires_grad and not self.has_grad():
