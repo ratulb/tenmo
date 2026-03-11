@@ -145,6 +145,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable):
         @parameter
         if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
+            print("DeviceTransfer -> grad_required: ", grad_required, "self.requires_grad: ", self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
                 var backward_fn: DeviceTransferBackward[Self.dtype]
@@ -176,6 +177,8 @@ fn main() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].arange(10, requires_grad=True)
     var A_g = A.to_gpu()
+    print("A_g.requires_grad:", A_g.requires_grad)
+    print("A_g is on gpu:", A_g.is_on_gpu())
     var B = A_g * 42
     B.backward()
     B.grad().print()
