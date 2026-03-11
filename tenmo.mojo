@@ -1874,6 +1874,15 @@ struct Tensor[dtype: DType = DType.float32](
                             fanin[target_id] -= 1
                             if fanin[target_id] == 0:
                                 var target_idx = id_to_index[target_id]
+                                ref current_node = node_list[target_idx]
+                                @parameter
+                                if has_accelerator():
+                                    if current_node.is_on_gpu():
+                                        try:
+                                            current_node.device_context().value()[].synchronize()
+                                        except e:
+                                            print(e)
+
                                 if node_list[target_idx].has_backward_fn():
                                     ready_queue.append(target_id)
         except e:
