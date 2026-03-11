@@ -1885,6 +1885,13 @@ struct Tensor[dtype: DType = DType.float32](
 
                                 if node_list[target_idx].has_backward_fn():
                                     ready_queue.append(target_id)
+            @parameter
+            if has_accelerator():
+                if output.is_on_gpu():
+                    try:
+                        output.device_context().value()[].synchronize()
+                    except e:
+                        print(e)
         except e:
             print(e)
 
