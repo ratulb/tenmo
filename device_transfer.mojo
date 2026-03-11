@@ -174,10 +174,8 @@ from common_utils import now
 
 fn main() raises:
     comptime dtype = DType.float32
-    var SIZE = 10
-
-    var T = Tensor[dtype].arange(SIZE, requires_grad=True)
-    var T_g = T.to_gpu()
-    var R = T_g * 42
-    R.backward()
-    T.grad().print()
+    var A = Tensor[dtype].arange(10, requires_grad=True)
+    var A_g = A.to_gpu()
+    var B = A_g * 42
+    B.backward()
+    B.grad().print()

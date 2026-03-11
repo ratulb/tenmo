@@ -577,7 +577,7 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → grad(self): called on a tensor that does not require"
                 " grad or grad not initialized"
             )
-        return self.gradbox[].unshared()
+        return self.gradbox[].detach()
 
     fn rows(self) -> Int:
         if not self.rank() == 2:

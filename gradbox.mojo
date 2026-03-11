@@ -295,8 +295,22 @@ struct Gradbox[dtype: DType](
         )
 
     @always_inline
-    fn unshared(self) -> Gradbox[Self.dtype]:
-        return Gradbox[Self.dtype](self.buffer.contiguous(), share=False)
+    fn detach(self) -> Gradbox[Self.dtype]:
+        if self.is_on_cpu():
+            return Gradbox[Self.dtype](self.buffer.contiguous(), share=False)
+        else:
+            try:
+                return Gradbox[Self.dtype](
+                    self.buffer.device_state.value().into(self.shape()),
+                    share=False,
+                )
+            except e:
+                print(e)
+                panic("Gradbox → detach: failed.", e.__str__())
+                # Unreachable
+                return Gradbox[Self.dtype](
+                    NDBuffer[Self.dtype](Shape()), share=False
+                )
 
     fn shared(self) -> Bool:
         return self.buffer.shared()
@@ -677,27 +691,26 @@ struct Gradbox[dtype: DType](
     @always_inline
     fn __imul__(self, incoming: Gradbox[Self.dtype]):
         self.buffer.inplace_ops[Multiply](incoming.buffer)
-        _="""var multiplied = self.buffer.buffer * incoming.buffer.buffer
+        _ = """var multiplied = self.buffer.buffer * incoming.buffer.buffer
         var numels = self.buffer.buffer.size
         self.buffer.buffer.overwrite(multiplied, 0, numels)"""
 
     @always_inline
     fn __iadd__(self, incoming: Gradbox[Self.dtype]):
         self.buffer.inplace_ops[Add](incoming.buffer)
-        _="""var added = self.buffer.buffer + incoming.buffer.buffer
+        _ = """var added = self.buffer.buffer + incoming.buffer.buffer
         var numels = self.buffer.buffer.size
         self.buffer.buffer.overwrite(added, 0, numels)"""
 
     @always_inline
     fn __isub__(self, incoming: Gradbox[Self.dtype]):
         self.buffer.inplace_ops[Subtract](incoming.buffer)
-        _="""var subtracted = self.buffer.buffer - incoming.buffer.buffer
+        _ = """var subtracted = self.buffer.buffer - incoming.buffer.buffer
         var numels = self.buffer.buffer.size
         self.buffer.buffer.overwrite(subtracted, 0, numels)"""
 
     @always_inline
     fn __itruediv__(self, incoming: Gradbox[Self.dtype]):
-        #self.buffer.inplace_ops[Divide](incoming.buffer)
         self.buffer.inplace_ops[Divide](incoming.buffer)
 
     fn all_close[
@@ -750,13 +763,23 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn reshape(
-        self, new_shape: Shape, validated: Bool = False, share: Bool = True
+        self, new_shape: Shape, validated: Bool = False, share: Bool = False
     ) -> Gradbox[Self.dtype]:
         var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             self.shape(), new_shape.intarray()
         )
-        var buffer = self.buffer.contiguous_buffer()
-        var nd_buffer = NDBuffer[Self.dtype](buffer^, shape^)
+        var nd_buffer: NDBuffer[Self.dtype]
+        if self.is_on_cpu():
+            var buffer = self.buffer.contiguous_buffer()
+            nd_buffer = NDBuffer[Self.dtype](buffer^, shape^)
+        else:
+            try:
+                nd_buffer = self.buffer.device_state.value().into(shape^)
+            except e:
+                print(e)
+                panic("NDBuffer → rehape: failed.", e.__str__())
+                # Unreachable
+                nd_buffer = NDBuffer[Self.dtype](Shape())
 
         return Gradbox[Self.dtype](nd_buffer^, share=share)
 
@@ -800,7 +823,8 @@ struct Gradbox[dtype: DType](
 
 fn main():
     comptime dtype = DType.float32
-    var gb = Gradbox[dtype].arange(24)
-    var gb1 = gb.reshape(Shape(3, 2, 4))
-    gb.print()
-    gb1.print()
+    var gb = Gradbox[dtype].arange(10)
+    x = gb.detach()
+    x.print()
+    x = x.reshape(Shape(2, 5))
+    x.print()
