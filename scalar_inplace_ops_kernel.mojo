@@ -176,6 +176,7 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
 from testing import assert_true
 from common_utils import now
 
+from device import GPU
 
 fn main() raises:
     var SIZE = 10
@@ -183,3 +184,18 @@ fn main() raises:
     var A = NDBuffer[dtype].arange(SIZE)
     A *= 2
     A.print()
+
+    var A_g = A.to_gpu(GPU())
+    A_g *= 42
+
+    A_g.print()
+
+    _="""var T = Tensor[dtype].arange(SIZE, requires_grad=True)
+
+    var T_g = T.to_gpu()
+
+    var R = T_g * 42
+
+    R.backward()
+
+    T.grad().print()"""
