@@ -12,6 +12,7 @@ from device import Device, CPU, GPU, DeviceState
 from collections import Set
 from sys import simd_width_of, has_accelerator
 from scalar_ops_kernel import ScalarOperations
+from scalar_inplace_ops_kernel import InplaceScalarOperations
 from binary_ops_kernel import BinaryOperations
 from compare_kernel import AllClose, Compare, CompareScalar
 from reduction_kernel import Reduction
@@ -150,10 +151,8 @@ struct NDBuffer[dtype: DType](
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
-    fn to_cpu(self, delete: Bool = False) raises -> Self:
+    fn to_cpu(self) raises -> Self:
         var _, nd_buffer = self.to_device(CPU().into())
-        _ = """if delete:
-            self.device_state = None"""
         return nd_buffer^
 
     fn to_gpu(self, gpu: GPU) raises -> Self:
@@ -605,6 +604,21 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[NewType](new_buffer^, self.shape)
 
     @always_inline
+    fn __imul__(self, factor: Scalar[Self.dtype]):
+        self.inplace_scalar_ops[Multiply](factor)
+
+    @always_inline
+    fn __iadd__(self, scalar: Scalar[Self.dtype]):
+        self.inplace_scalar_ops[Add](scalar)
+
+    @always_inline
+    fn __isub__(self, scalar: Scalar[Self.dtype]):
+        self.inplace_scalar_ops[Subtract](scalar)
+
+    fn __itruediv__(self, scalar: Scalar[Self.dtype]):
+        self.inplace_scalar_ops[Divide](scalar)
+
+    @always_inline
     fn __imul__(self, other: NDBuffer[Self.dtype]):
         self.inplace_ops[Multiply](other)
 
@@ -624,7 +638,6 @@ struct NDBuffer[dtype: DType](
         """Check if underlying buffer is shared."""
         return self.buffer.is_shared()
 
-    @always_inline
     fn share(
         mut self,
         shape: Optional[Shape] = None,
@@ -640,14 +653,24 @@ struct NDBuffer[dtype: DType](
             self.buffer.shared()
         var size = len(self.buffer)
         var new_shape = shape.or_else(self.shape)
-        if new_shape.numels() > size:
-            panic(
-                "NDBuffer -> share: invalid shape.",
-                new_shape.__str__(),
-                self.shape.__str__(),
-                size.__str__(),
-            )
         var new_strides = strides.or_else(Strides.default(new_shape))
+        var max_index = IndexCalculator.max_index(
+            new_shape, new_strides, offset
+        )
+        if max_index > size:
+            panic(
+                "NDBuffer::share: invalid view [max_index="
+                + max_index.__str__()
+                + " > buffer_size="
+                + size.__str__()
+                + "] shape="
+                + new_shape.__str__()
+                + " strides="
+                + new_strides.__str__()
+                + " offset="
+                + offset.__str__()
+            )
+
         return NDBuffer[Self.dtype](
             buffer=self.buffer.copy(),
             shape=new_shape,
@@ -702,6 +725,21 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn fill(self, value: Scalar[Self.dtype]):
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    self.device_state.value().fill(value)
+                except e:
+                    print(e)
+                    panic("Error filling NDBuffer value: ", value.__str__())
+            else:
+                self.fill_cpu(value)
+        else:
+            self.fill_cpu(value)
+
+    @always_inline
+    fn fill_cpu(self, value: Scalar[Self.dtype]):
         ref buffer = self.data_buffer()
         if self.is_contiguous():
             buffer.fill(value, self.offset, self.offset + self.numels())
@@ -1005,15 +1043,33 @@ struct NDBuffer[dtype: DType](
                             " copy_from_alike"
                         )
 
-    fn fill(self, other: NDBuffer[Self.dtype]):
-        if self.__is__(other):
-            panic("NDBuffer → fill: cannot fill with self")
-
-        if other.is_scalar() or other.shape == Shape.Unit():
+    fn fill(self, cpu_buffer: NDBuffer[Self.dtype]):
+        """Fill this NDBuffer from a CPU NDBuffer."""
+        if cpu_buffer.is_scalar() or cpu_buffer.shape == Shape.Unit():
             self.fill(
-                other.item()
+                cpu_buffer.item()
             )  # Scalar/Singleton NDBuffer - shared or otherwise
             return
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    self.device_state.value().fill(cpu_buffer)
+                except e:
+                    print(e)
+                    panic(
+                        "NDBuffer -> fill: error filling GPU buffer from CPU"
+                        " buffer"
+                    )
+            else:
+                self.fill_cpu(cpu_buffer)
+        else:
+            self.fill_cpu(cpu_buffer)
+
+    fn fill_cpu(self, other: NDBuffer[Self.dtype]):
+        if self.__is__(other):
+            panic("NDBuffer → fill_cpu: cannot fill with self")
 
         if self.shape == other.shape:
             self.copy_from_alike[overwrite=True, validate=True](other)
@@ -1021,7 +1077,10 @@ struct NDBuffer[dtype: DType](
             # Handle broadcast
             if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
                 panic(
-                    "NDBuffer → fill(other): dimension mismatch: self shape",
+                    (
+                        "NDBuffer → fill_cpu(other): dimension mismatch: self"
+                        " shape"
+                    ),
                     self.shape.__str__(),
                     "≠",
                     "other shape",
@@ -1032,7 +1091,7 @@ struct NDBuffer[dtype: DType](
             )
             if broadcast_shape != self.shape:
                 panic(
-                    "NDBuffer → fill: broadcasted shape must match receiver"
+                    "NDBuffer → fill_cpu: broadcasted shape must match receiver"
                     " shape"
                 )
 
@@ -1129,6 +1188,37 @@ struct NDBuffer[dtype: DType](
             if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
 
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    InplaceScalarOperations[Self.dtype].launch[op_code](
+                        self, scalar
+                    )
+                except e:
+                    print(e)
+                    panic(
+                        (
+                            "NDBuffer inplace_scalar_ops - GPU operation failed"
+                            " for opcode: "
+                        ),
+                        op_code.__str__(),
+                    )
+                    # Unreacahble
+            else:
+                self.inplace_scalar_ops_cpu[op_code](scalar)
+        else:
+            self.inplace_scalar_ops_cpu[op_code](scalar)
+
+    @always_inline
+    fn inplace_scalar_ops_cpu[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]):
+        @parameter
+        if op_code == Divide:
+            if scalar == Scalar[Self.dtype](0):
+                panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
+
         if self.is_contiguous():
             start = self.offset
             end = start + self.numels()
@@ -1185,10 +1275,9 @@ struct NDBuffer[dtype: DType](
                             "NDBuffer arithmetic_ops - GPU operation failed for"
                             " opcode: "
                         ),
-                        op_code,
-                        ". Failling back on CPU",
+                        op_code.__str__(),
                     )
-                    out = self.arithmetic_ops_cpu[op_code](other)
+                    out = NDBuffer[Self.dtype](Shape())
             else:
                 out = self.arithmetic_ops_cpu[op_code](other)
         else:
@@ -1383,15 +1472,15 @@ struct NDBuffer[dtype: DType](
                     )
                 except e:
                     print(e)
-                    print(
+                    panic(
                         (
                             "NDBuffer scalar_ops - GPU operation failed for"
                             " opcode: "
                         ),
-                        op_code,
-                        ". Failling back on CPU",
+                        op_code.__str__(),
                     )
-                    out = self.scalar_ops_cpu[op_code](scalar)
+                    # Unreacahble
+                    out = NDBuffer[Self.dtype](Shape())
             else:
                 out = self.scalar_ops_cpu[op_code](scalar)
         else:
@@ -1503,11 +1592,9 @@ struct NDBuffer[dtype: DType](
                     result = Compare[Self.dtype].launch[op_code](self, other)
                 except e:
                     print(e)
-                    print(
-                        "NDBuffer compare - GPU operation failed. Failling"
-                        " back on CPU"
-                    )
-                    result = self.compare_cpu[op_code](other)
+                    panic("NDBuffer compare - GPU operation failed")
+                    # Not reachable
+                    result = NDBuffer[DType.bool](Shape())
             else:
                 result = self.compare_cpu[op_code](other)
         else:

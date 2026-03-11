@@ -371,3 +371,11 @@ struct IndexCalculator:
             indices[i] = remaining % dim
             remaining //= dim
         return indices^
+
+    @staticmethod
+    @always_inline
+    fn max_index(shape: Shape, strides: Strides, offset: Int) -> Int:
+        var max_index = offset
+        for i in range(shape.rank()):
+            max_index += (shape[i] - 1) * strides[i]
+        return max_index

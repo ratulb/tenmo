@@ -136,7 +136,19 @@ struct DeviceState[dtype: DType](
     fn __len__(self) -> Int:
         return len(self.buffer)
 
+    fn new(
+        self, size: Int, value: Scalar[Self.dtype] = Scalar[Self.dtype](0)
+    ) raises -> Self:
+        var device_state = Self(size, self.gpu)
+        device_state.buffer.enqueue_fill(value)
+        return device_state
+
+    fn fill(self, value: Scalar[Self.dtype]) raises:
+        with self.buffer.map_to_host() as host_buffer:
+            host_buffer.enqueue_fill(value)
+
     fn fill(self, ref source: NDBuffer[Self.dtype]) raises:
+        """Fill the DeviceBuffer from the source NDBuffer."""
         with self.buffer.map_to_host() as host_buffer:
             var device_ptr = host_buffer.unsafe_ptr()
             var src_ptr = source.data_ptr()
