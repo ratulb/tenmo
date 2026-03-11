@@ -65,7 +65,10 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         @parameter
         if has_accelerator():
-            return self.backward_gpu(output)
+            if output.is_on_gpu():
+                return self.backward_gpu(output)
+            else:
+                return self.backward_cpu(output)
         else:
             return self.backward_cpu(output)
 
@@ -171,65 +174,10 @@ from common_utils import now
 
 fn main() raises:
     comptime dtype = DType.float32
-    _ = """a = Tensor[dtype].arange(5000000)
-    b = Tensor[dtype].arange(5000000)
-    start = now()
-    r1 = a - b
-    print("CPU took: ", (now() - start) * 1000, "ms")
-    start = now()
-    ag = a.to_gpu()
-    bg = b.to_gpu()
-    print("to_gpu took: ", (now() - start) * 1000, "ms")
-    start = now()
-    r2 = ag - bg
-    print("Overall GPU took: ", (now() - start) * 1000, "ms")
-    assert_true(r1.all_close(r2))
-    print()"""
-    print("The meaty part")
+    var SIZE = 10
 
-    _ = """A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
-    print("A's id: ", A.id())
-    a = A.to_gpu(requires_grad=True)
-
-    expected = Tensor[dtype].full(Shape.of(3, 3), 2) + 42
-    b = a + 42
-    assert_true(b.all_close(expected), "Scalar add assertion failed")
-    b.ancestry().print()
-    b.backward()
-    A.grad().print()"""
-    _ = """var times = 1000
-    var start = now()
-    var s = random_si64(10, 20)
-    for _ in range(times):
-        ctx = DeviceContext()
-        sn = random_si64(10, 20)
-        same = s == sn
-        print(same)
-
-    end1 = now() - start
-
-    start = now()
-
-    ctx = DeviceContext()
-    for _ in range(times):
-        sn = random_si64(10, 20)
-        same = s == sn
-        ctx1 = ctx
-        print(same, ctx1.id())
-
-    end2 = now() - start
-
-    start = now()
-    device = GPU()
-    for _ in range(times):
-        sn = random_si64(10, 20)
-        same = s == sn
-        device1 = device
-        print(same, device1.id)
-
-    end3 = now() - start
-
-    print("Time taken for ctx creation: ", end1 * 1000, "ms")
-    print("Time taken for ctx copy: ", end2 * 1000, "ms")
-    print("Time taken for Device copy: ", end3 * 1000, "ms")"""
-    pass
+    var T = Tensor[dtype].arange(SIZE, requires_grad=True)
+    var T_g = T.to_gpu()
+    var R = T_g * 42
+    R.backward()
+    T.grad().print()
