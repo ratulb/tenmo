@@ -1534,6 +1534,9 @@ struct Tensor[dtype: DType = DType.float32](
         return Divider[Self.dtype].forward[track_grad](self, other)
 
     fn update_grad[opcode: Int](self, incoming: Gradbox[Self.dtype]):
+        print("update_grad -> self.id:", self._id,
+          "gradbox ptr:", self.gradbox.__int__(),
+          "incoming is_on_gpu:", incoming.buffer.is_on_gpu())
         ref gradbox = self.gradbox[]
         if opcode == MulTensor:
             gradbox.__imul__(incoming)
@@ -1850,14 +1853,16 @@ struct Tensor[dtype: DType = DType.float32](
                     panic(key_err.__str__())
                 var node_idx = id_to_index[node_id]
                 ref node = node_list[node_idx]
-
+                if node_idx == 1:
+                    print("node_idx == 1, node.gradbox.__int__: ", node.gradbox.__int__())
                 if node.has_backward_fn():
                     for result in node.backward_fn()(node):
                         ref target_node = result[0]
                         ref grad = result[1]
                         var op_code = result[2]
                         var target_id = target_node.id()
-
+                        if node_idx == 1:
+                            print("node_idx == 1, target_id, target_node.id(), target_node.gradbox: ", target_id, target_node.id(), target_node.gradbox.__int__())
                         if target_id in id_to_index:
                             var target_idx = id_to_index[target_id]
                             if op_code == AddTensor:
