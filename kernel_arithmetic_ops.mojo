@@ -503,7 +503,7 @@ fn launch[
         and B.is_contiguous()
         and not needs_broadcasting
     ):
-        print("[GPU] Using Kernel 1: Both contiguous")
+        #print("[GPU] Using Kernel 1: Both contiguous")
 
         var compiled_func = ctx.compile_function[
             arithmetic_ops_both_contiguous[
@@ -518,13 +518,13 @@ fn launch[
         var B_buffer = ctx.enqueue_create_buffer[dtype](B.numels())
 
         var result_buffer = ctx.enqueue_create_buffer[dtype](output_size)
-        var start_data_write = now()
+        #var start_data_write = now()
 
         ctx.enqueue_copy(A_buffer, A.data_ptr() + A.offset())
         ctx.enqueue_copy(B_buffer, B.data_ptr() + B.offset())
 
-        print("Data transfer time: ", (now() - start_data_write) * 1000, "ms")
-        var start_time = now()
+        #print("Data transfer time: ", (now() - start_data_write) * 1000, "ms")
+        #var start_time = now()
         ctx.enqueue_function(
             compiled_func,
             result_buffer,
@@ -538,16 +538,16 @@ fn launch[
         )
 
         ctx.synchronize()
-        print("GPU execution time: ", (now() - start_time) * 1000, "ms")
-        var data_retrieve_time = now()
+        #print("GPU execution time: ", (now() - start_time) * 1000, "ms")
+        #var data_retrieve_time = now()
         var out = Tensor[dtype].from_device_buffer(
             result_buffer, broadcast_shape
         )
-        print(
+        _="""print(
             "Data transfer back took: ",
             (now() - data_retrieve_time) * 1000,
             "ms",
-        )
+        )"""
         return out^
 
     # Prepare for strided kernels
@@ -566,7 +566,7 @@ fn launch[
     # PATH 2: A contiguous, B strided
     # ================================================================
     if A_is_contiguous and not B_is_contiguous:
-        print("[GPU] Using Kernel 2: A contiguous, B strided")
+        #print("[GPU] Using Kernel 2: A contiguous, B strided")
 
         var compiled_func = ctx.compile_function[
             arithmetic_ops_A_contiguous[
@@ -608,7 +608,7 @@ fn launch[
     # PATH 3: A strided, B contiguous
     # ================================================================
     if not A_is_contiguous and B_is_contiguous:
-        print("[GPU] Using Kernel 3: A strided, B contiguous (MEDIUM-FAST)")
+        #print("[GPU] Using Kernel 3: A strided, B contiguous (MEDIUM-FAST)")
 
         var compiled_func = ctx.compile_function[
             arithmetic_ops_B_contiguous[
@@ -649,7 +649,7 @@ fn launch[
     # PATH 4: Both strided (or broadcasting)
     # ================================================================
 
-    print("[GPU] Using Kernel 4: Both strided")
+    #print("[GPU] Using Kernel 4: Both strided")
 
     var compiled_func = ctx.compile_function[
         arithmetic_ops_both_strided[
@@ -712,7 +712,7 @@ fn main() raises:
     print("=" * 60)
 
 
-from common_utils import now
+#from common_utils import now
 from testing import assert_true
 
 
@@ -724,17 +724,17 @@ fn test_contiguous_same_shape() raises:
     var a = Tensor[dtype].rand(1000, 10000)
     var b = Tensor[dtype].rand(1000, 10000)
 
-    var start = now()
+    #var start = now()
     var gpu_result = launch[Multiply, dtype](a, b)
-    var gpu_time = (now() - start) * 1000
+    #var gpu_time = (now() - start) * 1000
 
-    start = now()
+    #start = now()
     var cpu_result = a * b
-    var cpu_time = (now() - start) * 1000
+    #var cpu_time = (now() - start) * 1000
 
     assert_true(gpu_result.all_close(cpu_result))
-    print("  GPU:", gpu_time, "ms")
-    print("  CPU:", cpu_time, "ms")
+    #print("  GPU:", gpu_time, "ms")
+    #print("  CPU:", cpu_time, "ms")
     print("  Passed")
 
 
@@ -810,19 +810,19 @@ fn test_large_arrays() raises:
     var a = Tensor[dtype].rand(size)
     var b = Tensor[dtype].rand(size)
 
-    var start = now()
+    #var start = now()
     var gpu_result = launch[Add, dtype](a, b)
-    var gpu_time = (now() - start) * 1000
+    #var gpu_time = (now() - start) * 1000
 
-    start = now()
+    #start = now()
     var cpu_result = a + b
-    var cpu_time = (now() - start) * 1000
+    #var cpu_time = (now() - start) * 1000
 
     assert_true(gpu_result.all_close(cpu_result))
-    print("  Size:", size, "elements")
-    print("  GPU:", gpu_time, "ms")
-    print("  CPU:", cpu_time, "ms")
-    print("  Speedup:", cpu_time / gpu_time, "x")
+    #print("  Size:", size, "elements")
+    #print("  GPU:", gpu_time, "ms")
+    #print("  CPU:", cpu_time, "ms")
+    #print("  Speedup:", cpu_time / gpu_time, "x")
     print("  Passed")
 
 

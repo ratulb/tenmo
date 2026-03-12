@@ -501,7 +501,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
             and B.is_contiguous()
             and not needs_broadcasting
         ):
-            print("[GPU] Using Kernel 1: Both contiguous")
+            #print("[GPU] Using Kernel 1: Both contiguous")
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_both_contiguous[
                     op_code, Self.dtype, simdwidth, 2 * simdwidth
@@ -547,7 +547,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # PATH 2: A contiguous, B strided
         # ================================================================
         if A_is_contiguous and not B_is_contiguous:
-            print("[GPU] Using Kernel 2: A contiguous, B strided")
+            #print("[GPU] Using Kernel 2: A contiguous, B strided")
 
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_A_contiguous[
@@ -585,7 +585,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # PATH 3: A strided, B contiguous
         # ================================================================
         if not A_is_contiguous and B_is_contiguous:
-            print("[GPU] Using Kernel 3: A strided, B contiguous (MEDIUM-FAST)")
+            #print("[GPU] Using Kernel 3: A strided, B contiguous (MEDIUM-FAST)")
 
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_B_contiguous[
@@ -622,7 +622,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
         # PATH 4: Both strided (or broadcasting)
         # ================================================================
 
-        print("[GPU] Using Kernel 4: Both strided")
+        #print("[GPU] Using Kernel 4: Both strided")
 
         var compiled_func = device_context.compile_function[
             arithmetic_ops_both_strided[
