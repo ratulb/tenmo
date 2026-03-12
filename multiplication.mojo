@@ -46,6 +46,8 @@ struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
         else:
             output.gradients()[].print()
             scaled_gradbox.print()"""
+        print("Scaled gradbox going out from multiplication")
+        scaled_gradbox.print()
         return [
             (
                 ancestor^,
