@@ -558,7 +558,8 @@ struct Tensor[dtype: DType = DType.float32](
     @always_inline
     fn zero_grad(self):
         if self.requires_grad and self.has_grad():
-            self.gradbox[].zero_grad()
+            ref gradbox = self.gradbox[]
+            gradbox.zero_grad()
 
     @always_inline
     fn gradients(self) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
@@ -1533,17 +1534,23 @@ struct Tensor[dtype: DType = DType.float32](
     ](self, other: Self) -> Tensor[Self.dtype]:
         return Divider[Self.dtype].forward[track_grad](self, other)
 
-    fn update_grad[opcode: Int](self, incoming: Gradbox[Self.dtype]):
-        print("update_grad -> self.id:", self._id,
-          "gradbox ptr:", self.gradbox.__int__(),
-          "incoming is_on_gpu:", incoming.buffer.is_on_gpu())
-        ref gradbox = self.gradbox[]
+    fn update_grad[opcode: Int](mut self, incoming: Gradbox[Self.dtype]):
+        _ = """ref gradbox = self.gradbox[]
         if opcode == MulTensor:
             gradbox.__imul__(incoming)
         if opcode == AddTensor:
             gradbox.__iadd__(incoming)
         if opcode == SubtractTensor:
             gradbox.__isub__(incoming)
+        if opcode == ZeroGrad:
+            self.zero_grad()"""
+        ref gradbox = self.gradbox[]
+        if opcode == MulTensor:
+            gradbox *= incoming
+        if opcode == AddTensor:
+            gradbox += incoming
+        if opcode == SubtractTensor:
+            gradbox -= incoming
         if opcode == ZeroGrad:
             self.zero_grad()
 
@@ -1842,15 +1849,6 @@ struct Tensor[dtype: DType = DType.float32](
                             id_to_index[parent_id] = new_idx
                             dfs_stack.append(parent_id)
 
-            # After DFS, before backward execution loop
-            for i in range(len(node_list)):
-                if node_list[i].is_on_gpu():
-                    try:
-                        print("node", i, "gradbox initial value:")
-                        node_list[i].gradbox[].buffer.to_cpu().print()
-                    except e:
-                        print(e)
-
             # Execute backward
             var ready_queue = Deque[UInt](capacity=graph_size)
             ready_queue.append(output.id())
@@ -1862,18 +1860,12 @@ struct Tensor[dtype: DType = DType.float32](
                     panic(key_err.__str__())
                 var node_idx = id_to_index[node_id]
                 ref node = node_list[node_idx]
-                print("node_list[0] gradbox GPU ptr:", node_list[0].gradbox[].buffer.device_state.value().buffer.unsafe_ptr().__int__())
-                print("node_list[1] gradbox GPU ptr:",  node_list[1].gradbox[].buffer.device_state.value().buffer.unsafe_ptr().__int__())
-                if node_idx == 1:
-                    print("node_idx == 1, node.gradbox.__int__: ", node.gradbox.__int__())
                 if node.has_backward_fn():
                     for result in node.backward_fn()(node):
                         ref target_node = result[0]
                         ref grad = result[1]
                         var op_code = result[2]
                         var target_id = target_node.id()
-                        if node_idx == 1:
-                            print("node_idx == 1, target_id, target_node.id(), target_node.gradbox: ", target_id, target_node.id(), target_node.gradbox.__int__())
                         if target_id in id_to_index:
                             var target_idx = id_to_index[target_id]
                             if op_code == AddTensor:
@@ -2455,19 +2447,18 @@ from testing import assert_true
 
 fn main() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(10, requires_grad=True)
-    var b = Tensor[dtype].arange(10, requires_grad=True)
-    print(a.is_on_gpu())
-    b.print()
-    _ = """ag = a.to_gpu()
-    bg = b.to_gpu()
 
-    assert_true(a.all_close(b))
-    print("cpu")
-    assert_true(ag.all_close(bg))
-    print("gpu")
-    print("cpu")
-    bg[0] = 42
+    a = Tensor[dtype].d2(
+        [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], requires_grad=True
+    )
 
-    (bg.eq(ag)).print()"""
-    Tensor[dtype].eye(4).print()
+    v1 = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
+    v2 = v1.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
+    v3 = v2.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=0)
+    c = v3.contiguous()
+    s = c.mean()
+    print(s.has_backward_fn())
+    s.backward(42)
+    grad = a.grad().as_tensor()
+    result = grad[Slice(0, 1, None), Slice(2, None, None)]
+    assert_true(result == Tensor[dtype].d2([[10.5, 10.5]]))
