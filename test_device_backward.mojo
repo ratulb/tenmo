@@ -3,7 +3,7 @@ from device_transfer import DeviceTransfer
 from sys import has_accelerator
 from device import GPU
 from multiplication import MultiplyScalar, MultiplyBackwardScalar
-
+from mnemonics import AddTensor
 
 fn main() raises:
     comptime dtype = DType.float32
@@ -40,4 +40,7 @@ fn main() raises:
 
         print(A_gpu.id(), receiver.id())
 
-
+        receiver.update_grad[AddTensor](gradbox)
+        print("===========Post update grad========")
+        receiver.gradbox[].print()
+        A_gpu.gradbox[].print()
