@@ -28,15 +28,15 @@ struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * self.factor
-        print("MultiplyBackwardScalar.backward -> scale factor: ", self.factor, "\n")
-        print("MultiplyBackwardScalar.backward -> B.gradbox actual (to_cpu):\n")
+        print("MultiplyBackwardScalar.backward -> scale factor: ", self.factor)
+        print("MultiplyBackwardScalar.backward -> B.gradbox actual (to_cpu):")
 
         if output.is_on_gpu():
             try:
                 @parameter
                 if has_accelerator():
                     output.gradients()[].buffer.to_cpu().print()
-                    print("\nscaled_gradbox\n")
+                    print("scaled_gradbox")
                     scaled_gradbox.buffer.to_cpu().print()
                 else:
                     pass
