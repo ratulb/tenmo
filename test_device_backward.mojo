@@ -2,6 +2,7 @@ from tenmo import Tensor
 from device_transfer import DeviceTransfer
 from sys import has_accelerator
 from device import GPU
+from multiplication import MultiplyScalar
 
 
 fn main() raises:
@@ -22,4 +23,10 @@ fn main() raises:
         print("A_gpu has gradbox: ", A_gpu.has_grad())
         print("A_gpu's gradbox is on gpu: ", A_gpu.gradbox[].is_on_gpu())
         A_gpu.gradbox[].print()
+        var B_gpu = MultiplyScalar[dtype].forward(A_gpu, 91)
+        print("=============B_gpu============")
+        B_gpu.print()
+        B_gpu.gradbox[].print()
+
+
 
