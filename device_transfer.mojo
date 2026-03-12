@@ -61,6 +61,14 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         @parameter
         if has_accelerator():
+            print("DeviceTransferBackward.backward -> A_g.gradbox actual (to_cpu)\n")
+            try:
+                output.gradients()[].buffer.to_cpu().print()
+            except e:
+                print(e)
+
+        @parameter
+        if has_accelerator():
             if output.is_on_gpu():
                 return self.backward_gpu(output)
             else:
