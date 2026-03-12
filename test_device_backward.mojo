@@ -2,7 +2,7 @@ from tenmo import Tensor
 from device_transfer import DeviceTransfer
 from sys import has_accelerator
 from device import GPU
-from multiplication import MultiplyScalar
+from multiplication import MultiplyScalar, MultiplyBackwardScalar
 
 
 fn main() raises:
@@ -27,6 +27,13 @@ fn main() raises:
         print("=============B_gpu============")
         B_gpu.print()
         B_gpu.gradbox[].print()
+        B_gpu.seed_grad(1)
+        var backward_handler = MultiplyBackwardScalar[dtype](91)
+        var backward_result = backward_handler.backward(B_gpu)
+        var receiver = backward_result[0][0]
+        var gradbox = backward_result[0][1]
+        receiver.print()
+        gradbox.print()
 
 
 
