@@ -35,10 +35,6 @@ struct Flow(Equatable, ImplicitlyCopyable):
     fn __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-    fn value(self) -> Int:
-        return self.direction
-
-
 struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     var flow: Flow
     var gpu: Optional[GPU]
@@ -182,4 +178,5 @@ fn main() raises:
     var B = A_g * 42
     B.backward()
     B.grad().print()
+    A_g.grad().print()
     A.grad().print()

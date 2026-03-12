@@ -144,7 +144,7 @@ struct NDBuffer[dtype: DType](
     ) -> NDBuffer[Self.dtype]:
         var ndb = NDBuffer[Self.dtype](shape)
         ndb.device_state = device_state^
-        return ndb
+        return ndb^
 
     @staticmethod
     @always_inline

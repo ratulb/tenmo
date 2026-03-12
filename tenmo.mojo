@@ -198,69 +198,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn id(self) -> UInt:
         return self._id
 
-    fn make_gradbox(self, on_gpu: Bool) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
-        var gradbox: Gradbox[Self.dtype]
-        @parameter
-        if has_accelerator():
-            if on_gpu:
-                try:
-                    var device_state = self.buffer.device_state.value().new(
-                        self.numels(), Scalar[Self.dtype](0)
-                    )
-                    var ndb = NDBuffer[Self.dtype].with_device_state(
-                        device_state^, self.shape()
-                    )
-                    gradbox = Gradbox[Self.dtype](ndb^)
-                except e:
-                    panic("make_gradbox: failed to allocate GPU gradbox: " + e.__str__())
-                    gradbox = Gradbox[Self.dtype](self.shape())  # unreachable
-            else:
-                gradbox = Gradbox[Self.dtype](self.shape())
-                gradbox.zero_grad()
-        else:
-            gradbox = Gradbox[Self.dtype](self.shape())
-            gradbox.zero_grad()
-        var ptr = alloc[Gradbox[Self.dtype]](1)
-        ptr.init_pointee_move(gradbox^)
-        return ptr
-
-    fn init_gradbox(mut self, on_gpu: Bool = False):
-        if (
-            self.requires_grad
-            and self.gradbox
-            == UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
-        ):
-            var gradbox: Gradbox[Self.dtype]
-
-            @parameter
-            if has_accelerator():
-                if on_gpu:             # ← use passed flag, not self.is_on_gpu()
-                    try:
-                        var device_state = self.buffer.device_state.value().new(
-                            self.numels(), Scalar[Self.dtype](0)
-                        )
-                        var ndb = NDBuffer[Self.dtype].with_device_state(
-                            device_state^, self.shape()
-                        )
-                        gradbox = Gradbox[Self.dtype](ndb^)
-                    except e:
-                        print(e)
-                        panic(
-                            "init_gradbox: failed to allocate GPU gradbox: "
-                            + e.__str__()
-                        )
-                        gradbox = Gradbox[Self.dtype](self.shape())  # unreachable
-                else:
-                    gradbox = Gradbox[Self.dtype](self.shape())
-                    gradbox.zero_grad()
-            else:
-                gradbox = Gradbox[Self.dtype](self.shape())
-                gradbox.zero_grad()
-            self.gradbox = alloc[Gradbox[Self.dtype]](1)
-            self.gradbox.init_pointee_move(gradbox^)
-
-    @always_inline
-    fn init_gradbox_1(mut self):
+    fn init_gradbox(mut self):
         if (
             self.requires_grad
             and self.gradbox
@@ -278,7 +216,7 @@ struct Tensor[dtype: DType = DType.float32](
                         var ndb = NDBuffer[Self.dtype].with_device_state(
                             device_state^, self.shape()
                         )
-                        gradbox = Gradbox[Self.dtype](ndb^)
+                        gradbox = Gradbox[Self.dtype](ndb^, share=False)
                     except e:
                         print(e)
                         panic(
@@ -1612,7 +1550,7 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __iadd__(self, other): can not perform in-place"
                 " operation on a leaf tensor requiring grad."
             )
-        #self.buffer.inplace_ops[Add](other.buffer)
+        # self.buffer.inplace_ops[Add](other.buffer)
         self.buffer.__iadd__(other.buffer)
 
     fn __isub__(self, other: Self):
@@ -1622,11 +1560,11 @@ struct Tensor[dtype: DType = DType.float32](
                 " operation on a leaf tensor requiring grad."
             )
 
-        #self.buffer.inplace_ops[Subtract](other.buffer)
+        # self.buffer.inplace_ops[Subtract](other.buffer)
         self.buffer.__isub__(other.buffer)
 
     fn __isub__(self, other: Gradbox[Self.dtype]):
-        #self.buffer.inplace_ops[Subtract](other.buffer)
+        # self.buffer.inplace_ops[Subtract](other.buffer)
         self.buffer.__isub__(other.buffer)
 
     fn __imul__(self, other: Self):
@@ -1636,7 +1574,7 @@ struct Tensor[dtype: DType = DType.float32](
                 " operation on a leaf tensor requiring grad."
             )
 
-        #self.buffer.inplace_ops[Multiply](other.buffer)
+        # self.buffer.inplace_ops[Multiply](other.buffer)
         self.buffer.__imul__(other.buffer)
 
     fn __itruediv__(self, other: Self):
@@ -1646,7 +1584,7 @@ struct Tensor[dtype: DType = DType.float32](
                 " operation on a leaf tensor requiring grad."
             )
 
-        #self.buffer.inplace_ops[Divide](other.buffer)
+        # self.buffer.inplace_ops[Divide](other.buffer)
         self.buffer.__itruediv__(other.buffer)
 
     fn unique(self) -> Tensor[Self.dtype]:
@@ -1784,7 +1722,7 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __iadd__: can not perform in-place operation on a"
                 " leaf tensor requiring grad."
             )
-        #self.buffer.inplace_scalar_ops[Add](scalar)
+        # self.buffer.inplace_scalar_ops[Add](scalar)
         self.buffer.__iadd__(scalar)
 
     fn __isub__(self, scalar: Scalar[Self.dtype]):
@@ -1793,7 +1731,7 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __isub__: can not perform in-place operation on a"
                 " leaf tensor requiring grad."
             )
-        #self.buffer.inplace_scalar_ops[Subtract](scalar)
+        # self.buffer.inplace_scalar_ops[Subtract](scalar)
         self.buffer.__isub__(scalar)
 
     fn __imul__(self, scalar: Scalar[Self.dtype]):
@@ -1802,7 +1740,7 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __imul__: can not perform in-place operation on a"
                 " leaf tensor requiring grad."
             )
-        #self.buffer.inplace_scalar_ops[Multiply](scalar)
+        # self.buffer.inplace_scalar_ops[Multiply](scalar)
         self.buffer.__imul__(scalar)
 
     fn __itruediv__(self, scalar: Scalar[Self.dtype]):
@@ -1811,7 +1749,7 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __itruediv__: can not perform in-place operation on a"
                 " leaf tensor requiring grad."
             )
-        #self.buffer.inplace_scalar_ops[Divide](scalar)
+        # self.buffer.inplace_scalar_ops[Divide](scalar)
         self.buffer.__itruediv__(scalar)
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
@@ -1935,42 +1873,12 @@ struct Tensor[dtype: DType = DType.float32](
                             fanin[target_id] -= 1
                             if fanin[target_id] == 0:
                                 var target_idx = id_to_index[target_id]
-                                ref current_node = node_list[target_idx]
-                                @parameter
-                                if has_accelerator():
-                                    if current_node.is_on_gpu():
-                                        try:
-                                            current_node.device_context().value()[].synchronize()
-                                        except e:
-                                            print(e)
-
                                 if node_list[target_idx].has_backward_fn():
                                     ready_queue.append(target_id)
-            @parameter
-            if has_accelerator():
-                if output.is_on_gpu():
-                    try:
-                        output.device_context().value()[].synchronize()
-                    except e:
-                        print(e)
         except e:
             print(e)
 
     fn requires_grad_(mut self, requires_grad: Bool = True):
-        self.requires_grad = requires_grad
-        if requires_grad and not self.has_grad():
-            var ptr = self.make_gradbox(self.is_on_gpu())
-            self.gradbox = ptr
-
-    fn requires_grad_12(mut self, requires_grad: Bool = True):
-        print("requires_grad_ -> self.is_on_gpu():", self.is_on_gpu())
-        print("requires_grad_ -> self.buffer.device_state is None:",
-              self.buffer.device_state == None)
-        self.requires_grad = requires_grad
-        if requires_grad and not self.has_grad():
-            self.init_gradbox(self.is_on_gpu())
-
-    fn requires_grad_11(mut self, requires_grad: Bool = True):
         # Note cleaning up existing gradbox
         self.requires_grad = requires_grad
         if requires_grad and not self.has_grad():
