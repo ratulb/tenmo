@@ -1842,6 +1842,15 @@ struct Tensor[dtype: DType = DType.float32](
                             id_to_index[parent_id] = new_idx
                             dfs_stack.append(parent_id)
 
+            # After DFS, before backward execution loop
+            for i in range(len(node_list)):
+                if node_list[i].is_on_gpu():
+                    try:
+                        print("node", i, "gradbox initial value:")
+                        node_list[i].gradbox[].buffer.to_cpu().print()
+                    except e:
+                        print(e)
+
             # Execute backward
             var ready_queue = Deque[UInt](capacity=graph_size)
             ready_queue.append(output.id())

@@ -61,7 +61,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         @parameter
         if has_accelerator():
-            print("DeviceTransferBackward.backward -> A_g.gradbox actual (to_cpu)\n")
+            print("Incoming DeviceTransferBackward.backward -> A_g.gradbox actual (to_cpu)\n")
             try:
                 output.gradients()[].buffer.to_cpu().print()
             except e:
@@ -152,7 +152,6 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable):
         @parameter
         if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
-            print("DeviceTransfer -> grad_required: ", grad_required, "self.requires_grad: ", self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
                 var backward_fn: DeviceTransferBackward[Self.dtype]
