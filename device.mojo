@@ -120,8 +120,20 @@ struct DeviceState[dtype: DType](
         self.gpu = device_ctx^
 
     fn __copyinit__(out self, existing: Self):
-        self.buffer = existing.buffer.copy()
+        # self.buffer = existing.buffer.copy()
         self.gpu = existing.gpu.copy()
+        try:
+            var new_state = Self(len(existing), existing.gpu)
+            existing.buffer.enqueue_copy_to(new_state.buffer)
+            self.buffer = new_state.buffer^
+        except e:
+            panic(
+                "DeviceState.__copyinit__: failed to deep copy GPU buffer: "
+                + e.__str__()
+            )
+            self.buffer = (
+                existing.buffer.copy()
+            )  # unreachable, satisfies compiler
 
     fn __moveinit__(out self, deinit existing: Self):
         self.buffer = existing.buffer^
