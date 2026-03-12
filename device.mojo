@@ -121,7 +121,8 @@ struct DeviceState[dtype: DType](
 
     fn __copyinit__(out self, existing: Self):
         self.gpu = existing.gpu.copy()
-        try:
+        self.buffer = existing.buffer.copy()
+        _="""try:
             var new_buffer = existing.gpu().enqueue_create_buffer[Self.dtype](
                 len(existing.buffer)
             )
@@ -134,7 +135,7 @@ struct DeviceState[dtype: DType](
             )
             self.buffer = (
                 existing.buffer.copy()
-            )  # unreachable, satisfies compiler
+            )  # unreachable, satisfies compiler"""
 
     fn __moveinit__(out self, deinit existing: Self):
         self.buffer = existing.buffer^
