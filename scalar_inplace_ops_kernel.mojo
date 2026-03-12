@@ -62,14 +62,10 @@ fn inplace_scalar_ops[
                     vec_result = vec_a + scalar
                 elif op_code == Subtract:
                     vec_result = vec_a - scalar
-                    _ = """elif op_code == ReverseSubtract:
-                    vec_result = scalar - vec_a"""
                 elif op_code == Multiply:
                     vec_result = vec_a * scalar
                 else:  # op_code == Divide:
                     vec_result = vec_a / scalar
-                    _ = """else:
-                    vec_result = scalar / vec_a"""
 
                 A.store[width=simd_width](i, vec_result)
             elif i < size:
@@ -83,14 +79,10 @@ fn inplace_scalar_ops[
                         res = val + scalar
                     elif op_code == Subtract:
                         res = val - scalar
-                        _ = """elif op_code == ReverseSubtract:
-                        res = scalar - val"""
                     elif op_code == Multiply:
                         res = val * scalar
                     else:  # op_code == Divide:
                         res = val / scalar
-                        _ = """else:
-                        res = scalar / val"""
 
                     A[i + j] = res
 

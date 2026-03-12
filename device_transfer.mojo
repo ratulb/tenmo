@@ -187,6 +187,7 @@ fn main() raises:
     print("A_g.requires_grad:", A_g.requires_grad)
     print("A_g is on gpu:", A_g.is_on_gpu())
     var B = A_g * 42
+    print("B gradbox GPU ptr:", B.gradbox[].buffer.device_state.value().buffer.unsafe_ptr().__int__())
     B.backward()
     B.grad().print()
     A_g.grad().print()

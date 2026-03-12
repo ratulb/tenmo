@@ -1853,6 +1853,8 @@ struct Tensor[dtype: DType = DType.float32](
                     panic(key_err.__str__())
                 var node_idx = id_to_index[node_id]
                 ref node = node_list[node_idx]
+                print("node_list[0] gradbox GPU ptr:", node_list[0].gradbox[].buffer.device_state.value().buffer.unsafe_ptr().__int__())
+                print("node_list[1] gradbox GPU ptr:",  node_list[1].gradbox[].buffer.device_state.value().buffer.unsafe_ptr().__int__())
                 if node_idx == 1:
                     print("node_idx == 1, node.gradbox.__int__: ", node.gradbox.__int__())
                 if node.has_backward_fn():
