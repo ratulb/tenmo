@@ -103,7 +103,10 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
             parent_gradbox = gradbox^
         elif self.flow == Flow.Cpu2Gpu:
             try:
-                parent_gradbox = Gradbox[Self.dtype](gradbox^.buffer^.to_cpu())
+                #parent_gradbox = Gradbox[Self.dtype](gradbox.buffer.to_cpu())
+                parent_gradbox = Gradbox[Self.dtype](gradbox.buffer.device_state.value().into(ancestor.shape()), share=False)
+                print("converted parent's gradbox at DeviceTransfer backward")
+                parent_gradbox.print()
             except e:
                 print(e)
                 panic(
@@ -115,7 +118,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
         else:
             try:
                 parent_gradbox = Gradbox[Self.dtype](
-                    gradbox^.buffer^.to_gpu(self.gpu.value())
+                    gradbox.buffer.to_gpu(self.gpu.value()), share=False
                 )
             except e:
                 print(e)
