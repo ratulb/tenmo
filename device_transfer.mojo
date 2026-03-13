@@ -8,7 +8,6 @@ from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
 from device import Device, GPU
-from common_utils import panic
 from sys import has_accelerator
 
 
@@ -61,66 +60,55 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var gradbox = output.gradients()[]
+        var ancestor = output.ancestry().get(0)
+        debug_assert(
+            ancestor.shape() == gradbox.shape(),
+            "DeviceTransferBackward: gradbox shape and ancestor shape mismatch",
+        )
+
+        if self.flow == Flow.UnMoved:
+            return [(ancestor^, gradbox, AddTensor)]
+
         @parameter
         if has_accelerator():
-            if output.is_on_gpu():
-                return self.backward_gpu(output)
+            if self.flow == Flow.Cpu2Gpu:
+                # Forward was CPU→GPU, backward transfers grad GPU→CPU
+                try:
+                    return [
+                        (
+                            ancestor^,
+                            Gradbox[Self.dtype](gradbox.buffer.to_cpu()),
+                            AddTensor,
+                        )
+                    ]
+                except e:
+                    panic(
+                        "DeviceTransferBackward: GPU→CPU transfer failed: "
+                        + e.__str__()
+                    )
+                    return [(ancestor^, gradbox, AddTensor)]  # unreachable
             else:
-                return self.backward_cpu(output)
-        else:
-            return self.backward_cpu(output)
-
-    fn backward_cpu(
-        self, output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        debug_assert(
-            ancestor.shape() != gradbox.shape(),
-            "DeviceTransferBackward: gradbox shape and ancestor shape mismatch",
-        )
+                # Forward was GPU→CPU, backward transfers grad CPU→GPU
+                try:
+                    return [
+                        (
+                            ancestor^,
+                            Gradbox[Self.dtype](
+                                gradbox.buffer.to_gpu(self.gpu.value()),
+                                share=False,
+                            ),
+                            AddTensor,
+                        )
+                    ]
+                except e:
+                    panic(
+                        "DeviceTransferBackward: CPU→GPU transfer failed: "
+                        + e.__str__()
+                    )
+                    return [(ancestor^, gradbox, AddTensor)]  # unreachable
 
         return [(ancestor^, gradbox, AddTensor)]
-
-    fn backward_gpu(
-        self, output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        debug_assert(
-            ancestor.shape() != gradbox.shape(),
-            "DeviceTransferBackward: gradbox shape and ancestor shape mismatch",
-        )
-        var parent_gradbox: Gradbox[Self.dtype]
-        if self.flow == Flow.UnMoved:
-            # Just pass through incoming grad
-            parent_gradbox = gradbox^
-        elif self.flow == Flow.Cpu2Gpu:
-            try:
-                parent_gradbox = Gradbox[Self.dtype](gradbox.buffer.to_cpu())
-            except e:
-                print(e)
-                panic(
-                    "DeviceTransferBackward -> backward: error transferring"
-                    " gradbox from GPU to CPU"
-                )
-                parent_gradbox = gradbox
-                # Not reachable - make the compiler happy
-        else:
-            try:
-                parent_gradbox = Gradbox[Self.dtype](
-                    gradbox.buffer.to_gpu(self.gpu.value()), share=False
-                )
-            except e:
-                print(e)
-                panic(
-                    "DeviceTransferBackward -> backward: error transferring"
-                    " gradbox from CPU to GPU"
-                )
-                parent_gradbox = gradbox
-                # Not reachable - make the compiler happy
-
-        return [(ancestor^, parent_gradbox, AddTensor)]
 
 
 @fieldwise_init
@@ -135,7 +123,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable):
         requires_grad: Optional[Bool] = None,
     ) raises -> Tensor[Self.dtype]:
         var (code, ndb) = self.buffer.to_device(device)
-        # Either CPU -> CPU or GPU -> GPU - but same devices
+        # Either CPU→CPU or GPU→GPU on same device — no transfer needed
         if code == -1:
             return self
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
@@ -147,10 +135,13 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable):
                 out.requires_grad_(True)
                 var backward_fn: DeviceTransferBackward[Self.dtype]
                 if device.is_cpu():
+                    # Forward was GPU→CPU
                     backward_fn = DeviceTransferBackward[Self.dtype](
-                        Flow.Gpu2Cpu, self.buffer.device_state.value().get_gpu()
+                        Flow.Gpu2Cpu,
+                        self.buffer.device_state.value().get_gpu(),
                     )
                 else:
+                    # Forward was CPU→GPU
                     backward_fn = DeviceTransferBackward[Self.dtype](
                         Flow.Cpu2Gpu
                     )
@@ -160,28 +151,5 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable):
         return out^
 
 
-from common_utils import now
-from testing import assert_true
-from shapes import Shape
-
-from gpu.host import DeviceContext
-from device import GPU
-from random import random_si64
-from common_utils import now
-
-
 fn main() raises:
-    comptime dtype = DType.float32
-    var A = Tensor[dtype].arange(10, requires_grad=True)
-    var A_g = A.to_gpu()
-    print("A_g.requires_grad:", A_g.requires_grad)
-    print("A_g is on gpu:", A_g.is_on_gpu())
-    var B = A_g * 23
-    print(
-        "B gradbox GPU ptr:",
-        B.gradbox[].buffer.device_state.value().buffer.unsafe_ptr().__int__(),
-    )
-    B.backward()
-    B.grad().print()
-    A_g.grad().print()
-    A.grad().print()
+    pass

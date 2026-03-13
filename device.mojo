@@ -33,9 +33,6 @@ struct Device(Equatable, ImplicitlyCopyable, Movable):
     fn __ne__(self, other: Self) -> Bool:
         return not self.__eq__(other)
 
-    fn into(self) -> Device:
-        return Device(self)
-
     fn is_cpu(self) -> Bool:
         return self.kind.isa[CPU]()
 
@@ -87,10 +84,14 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
         return not (self == other)
 
     fn __enter__(mut self) -> Self:
-        return self.copy()
+        return self
 
     fn __exit__(mut self):
-        print("Context exit")
+        try:
+            self.device_context[].synchronize()
+        except e:
+            print(e)
+            print("Error synchronizing GPU device context: ", e.__str__())
 
     fn __getitem__(self) -> ArcPointer[DeviceContext]:
         return self.device_context.copy()
@@ -157,7 +158,7 @@ struct DeviceState[dtype: DType](
             if source.is_contiguous():
                 var src_offset = source.offset
                 # Take care of contiguous views with offset
-                var src_ptr = source.data_ptr() + src_offset
+                src_ptr = src_ptr + src_offset
                 memcpy(dest=device_ptr, src=src_ptr, count=source.numels())
             else:
                 var next_index = 0
