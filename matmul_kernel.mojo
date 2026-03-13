@@ -1,4 +1,5 @@
 from gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
+from gpu.host import Dim
 from memory import AddressSpace, stack_allocation
 
 from array import Array
@@ -35,7 +36,7 @@ from broadcasthelper import ShapeBroadcaster
 
 fn matmul_2d_tiled[
     dtype: DType,
-    TILE_SIZE: Int = 16,
+    TILE_SIZE: Int = 32,
 ](
     out_buffer: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A_buffer: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
@@ -244,9 +245,10 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
 
         # ── Launch config ─────────────────────────────────────────────────────
         # grid.x = tiles across n, grid.y = tiles across m, grid.z = batch
-        var grid_x = (n + tile_size - 1) // tile_size
-        var grid_y = (m + tile_size - 1) // tile_size
-        var grid_z = total_batch
+        #var grid_x = (n + tile_size - 1) // tile_size
+        #var grid_y = (m + tile_size - 1) // tile_size
+        #var grid_z = total_batch
+        var (grid_dim, block_dim) = Self.launch_config[tile_size](m, n, total_batch)
 
         # ── Compile and enqueue ───────────────────────────────────────────────
         var compiled_func = device_context.compile_function[
@@ -264,8 +266,10 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
             m,
             k,
             n,
-            grid_dim=(grid_x, grid_y, grid_z),
-            block_dim=(tile_size, tile_size, 1),
+            #grid_dim=(grid_x, grid_y, grid_z),
+            grid_dim=grid_dim,
+            #block_dim=(tile_size, tile_size, 1),
+            block_dim=block_dim,
         )
 
         device_context.synchronize()
@@ -276,6 +280,31 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         )
         return out^
 
+    @staticmethod
+    fn launch_config[tile_size: Int](
+        m: Int, n: Int, total_batch: Int
+    ) -> Tuple[Dim, Dim]:
+        """Returns (grid_dim, block_dim) for the tiled matmul kernel."""
+        var block = Dim(tile_size, tile_size, 1)
+        var grid = Dim(
+            (n + tile_size - 1) // tile_size,
+            #ceildiv(n, TILE_SIZE),
+            #ceildiv(m, TILE_SIZE),
+            (m + tile_size - 1) // tile_size,
+            total_batch,
+        )
+        return grid, block
+
+from tenmo import Tensor
+from testing import assert_true
 
 fn main() raises:
-    pass
+    comptime dtype = DType.float32
+    var A = Tensor[dtype].rand(3, 4, 5, 9, 8)
+    var B = Tensor[dtype].rand(4, 1, 8, 20)
+
+    C = A.matmul(B)
+    var A_gpu = A.to_gpu()
+    var B_gpu = B.to_gpu()
+    var C_gpu = A_gpu.matmul(B_gpu)
+    assert_true(C.all_close(C_gpu.to_cpu()))

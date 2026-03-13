@@ -366,7 +366,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
         simdwidth: Int = simd_width_of[Self.dtype](),
         tile_size: Int = TILE_SIZE,
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        _="""ref A_shape = A.shape()
+        _ = """ref A_shape = A.shape()
         ref B_shape = B.shape()
         var m = A_shape[0]
         var n = A_shape[1]
@@ -477,10 +477,12 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
                     var c_addr = c_row_base + j * C_stride1
                     C_data[c_addr] = accumulator"""
-        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](A.buffer, B.buffer)
+        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](
+            A.buffer, B.buffer
+        )
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        _="""@parameter
+        _ = """@parameter
         if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
@@ -499,7 +501,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     fn forward[
         simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
     ](A: Tensor[Self.dtype], B: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
-        _="""var m = A.shape()[0]
+        _ = """var m = A.shape()[0]
         var n = A.shape()[1]
         var p = B.shape()[1]
 
@@ -575,7 +577,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                             j += 1
 
         parallelize[process_row_tile](num_tiles_i, num_physical_cores())"""
-        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](A.buffer, B.buffer)
+        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](
+            A.buffer, B.buffer
+        )
         var C = Gradbox[Self.dtype](ndb^)
 
         return C^
@@ -585,7 +589,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     fn forward[
         simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
     ](A: Gradbox[Self.dtype], B: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
-        _="""var m = A.shape()[0]
+        _ = """var m = A.shape()[0]
         var n = A.shape()[1]
         var p = B.shape()[1]
 
@@ -705,7 +709,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
                     var c_addr = c_row_base + j * C_stride1
                     C_data[c_addr] = accumulator"""
-        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](A.buffer, B.buffer)
+        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](
+            A.buffer, B.buffer
+        )
         var C = Gradbox[Self.dtype](ndb^)
 
         return C^
@@ -762,7 +768,6 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct MatmulNd[dtype: DType](ImplicitlyCopyable):
-
     @always_inline
     @staticmethod
     fn forward[
@@ -771,6 +776,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         Self.dtype
     ]:
         var C: Tensor[Self.dtype]
+
         @parameter
         if has_accelerator():
             if A.is_on_gpu() and B.is_on_gpu():
@@ -781,13 +787,31 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
                     C = Tensor[Self.dtype](ndb^, requires_grad=False)
                 except e:
                     print(e)
-                    print(
-                        "MatmulNd forward - GPU operation failed. Failling"
-                        " back on CPU"
+                    panic("MatmulNd forward - GPU operation failed")
+                    # Unreachable - make the compiler happy
+                    C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](
+                        A, B
                     )
-                    C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](A, B)
+            elif (A.is_on_gpu() and not B.is_on_gpu()) or (
+                not A.is_on_gpu() and B.is_on_gpu()
+            ):
+                panic(
+                    (
+                        "MatmulNd forward - both tensors must be on gpu. A is"
+                        " on gpu?"
+                    ),
+                    A.is_on_gpu().__str__(),
+                    ", B is on gpu?",
+                    B.is_on_gpu().__str__(),
+                )
+                C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](
+                    A, B
+                )
+
             else:
-                C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](A, B)
+                C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](
+                    A, B
+                )
         else:
             C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](A, B)
 
@@ -798,22 +822,22 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
                 ref A_shape = A.shape()
                 ref B_shape = B.shape()
 
-
                 C.requires_grad_(True)
                 var backward_fn: BackwardFn[Self.dtype]
 
                 if A_shape.rank() == 2 and B_shape.rank() == 2:
-                    backward_fn = Matmul2dBackward[Self.dtype]().into_backward_fn()
+                    backward_fn = Matmul2dBackward[
+                        Self.dtype
+                    ]().into_backward_fn()
                 else:
                     backward_fn = MatmulNdBackward[
-                    Self.dtype
+                        Self.dtype
                     ]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
 
         return C^
-
 
     @always_inline
     @staticmethod
@@ -826,7 +850,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         ref B_shape = B.shape()
 
         # Short-circuit for pure 2D case
-        _="""if A_shape.rank() == 2 and B_shape.rank() == 2:
+        _ = """if A_shape.rank() == 2 and B_shape.rank() == 2:
             return Matmul2d[Self.dtype].forward[track_grad](A, B)"""
 
         MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
@@ -859,7 +883,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
             )
             C_slice.buffer.copy_from_alike[overwrite=True](result.buffer)
 
-        _="""@parameter
+        _ = """@parameter
         if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
@@ -872,7 +896,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
                 C.add_ancestry(B)
                 """
 
-        @parameter
+        _ = """@parameter
         if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
@@ -880,14 +904,16 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
                 var backward_fn: BackwardFn[Self.dtype]
 
                 if A_shape.rank() == 2 and B_shape.rank() == 2:
-                    backward_fn = Matmul2dBackward[Self.dtype]().into_backward_fn()
+                    backward_fn = Matmul2dBackward[
+                        Self.dtype
+                    ]().into_backward_fn()
                 else:
                     backward_fn = MatmulNdBackward[
-                    Self.dtype
+                        Self.dtype
                     ]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn^)
                 C.add_ancestry(A)
-                C.add_ancestry(B)
+                C.add_ancestry(B)"""
 
         return C^
 
