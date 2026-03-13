@@ -1602,14 +1602,12 @@ struct NDBuffer[dtype: DType](
                 )
 
     fn __eq__(self, other: Self) -> Bool:
-        # return self.compare[Equal](other).buffer.all_true()
         var ndb = self.compare[Equal](other)
         if ndb.is_on_cpu():
             return ndb.buffer.all_true()
         return ndb.device_state.value().all_true()
 
     fn __ne__(self, other: Self) -> Bool:
-        # return self.compare[NotEqual](other).buffer.all_true()
         var ndb = self.compare[NotEqual](other)
         if ndb.is_on_cpu():
             return ndb.buffer.all_true()
@@ -1789,13 +1787,8 @@ struct NDBuffer[dtype: DType](
                     )
                 except e:
                     print(e)
-                    print(
-                        "NDBuffer all_close - GPU operation failed. Failling"
-                        " back on CPU"
-                    )
-                    result = self.contiguous_buffer().all_close[
-                        rtol=rtol, atol=atol
-                    ](other.contiguous_buffer())
+                    panic("NDBuffer all_close - GPU operation failed")
+                    result = False
             else:
                 result = self.contiguous_buffer().all_close[
                     rtol=rtol, atol=atol

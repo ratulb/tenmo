@@ -122,20 +122,6 @@ struct DeviceState[dtype: DType](
     fn __copyinit__(out self, existing: Self):
         self.gpu = existing.gpu.copy()
         self.buffer = existing.buffer.copy()
-        _="""try:
-            var new_buffer = existing.gpu().enqueue_create_buffer[Self.dtype](
-                len(existing.buffer)
-            )
-            existing.buffer.enqueue_copy_to(new_buffer)
-            self.buffer = new_buffer^
-        except e:
-            panic(
-                "DeviceState.__copyinit__: failed to deep copy GPU buffer: "
-                + e.__str__()
-            )
-            self.buffer = (
-                existing.buffer.copy()
-            )  # unreachable, satisfies compiler"""
 
     fn __moveinit__(out self, deinit existing: Self):
         self.buffer = existing.buffer^
@@ -173,7 +159,6 @@ struct DeviceState[dtype: DType](
                 # Take care of contiguous views with offset
                 var src_ptr = source.data_ptr() + src_offset
                 memcpy(dest=device_ptr, src=src_ptr, count=source.numels())
-                # self.gpu().enqueue_copy(self.buffer, src_ptr)
             else:
                 var next_index = 0
                 # Iterate strided indices

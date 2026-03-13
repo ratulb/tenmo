@@ -46,8 +46,6 @@ struct Contiguous[dtype: DType](Copyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                if self.requires_grad and self.has_grad():
-                    out.update_grad[AddTensor](self.grad())
                 backward_fn = ContiguousBackward[
                     Self.dtype
                 ]().into_backward_fn()

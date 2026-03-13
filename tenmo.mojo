@@ -1535,15 +1535,6 @@ struct Tensor[dtype: DType = DType.float32](
         return Divider[Self.dtype].forward[track_grad](self, other)
 
     fn update_grad[opcode: Int](mut self, incoming: Gradbox[Self.dtype]):
-        _ = """ref gradbox = self.gradbox[]
-        if opcode == MulTensor:
-            gradbox.__imul__(incoming)
-        if opcode == AddTensor:
-            gradbox.__iadd__(incoming)
-        if opcode == SubtractTensor:
-            gradbox.__isub__(incoming)
-        if opcode == ZeroGrad:
-            self.zero_grad()"""
         ref gradbox = self.gradbox[]
         if opcode == MulTensor:
             gradbox *= incoming
@@ -1560,7 +1551,6 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __iadd__(self, other): can not perform in-place"
                 " operation on a leaf tensor requiring grad."
             )
-        # self.buffer.inplace_ops[Add](other.buffer)
         self.buffer.__iadd__(other.buffer)
 
     fn __isub__(self, other: Self):
@@ -1570,11 +1560,9 @@ struct Tensor[dtype: DType = DType.float32](
                 " operation on a leaf tensor requiring grad."
             )
 
-        # self.buffer.inplace_ops[Subtract](other.buffer)
         self.buffer.__isub__(other.buffer)
 
     fn __isub__(self, other: Gradbox[Self.dtype]):
-        # self.buffer.inplace_ops[Subtract](other.buffer)
         self.buffer.__isub__(other.buffer)
 
     fn __imul__(self, other: Self):
@@ -1584,7 +1572,6 @@ struct Tensor[dtype: DType = DType.float32](
                 " operation on a leaf tensor requiring grad."
             )
 
-        # self.buffer.inplace_ops[Multiply](other.buffer)
         self.buffer.__imul__(other.buffer)
 
     fn __itruediv__(self, other: Self):
@@ -1594,7 +1581,6 @@ struct Tensor[dtype: DType = DType.float32](
                 " operation on a leaf tensor requiring grad."
             )
 
-        # self.buffer.inplace_ops[Divide](other.buffer)
         self.buffer.__itruediv__(other.buffer)
 
     fn unique(self) -> Tensor[Self.dtype]:
@@ -1732,7 +1718,6 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __iadd__: can not perform in-place operation on a"
                 " leaf tensor requiring grad."
             )
-        # self.buffer.inplace_scalar_ops[Add](scalar)
         self.buffer.__iadd__(scalar)
 
     fn __isub__(self, scalar: Scalar[Self.dtype]):
@@ -1741,7 +1726,6 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __isub__: can not perform in-place operation on a"
                 " leaf tensor requiring grad."
             )
-        # self.buffer.inplace_scalar_ops[Subtract](scalar)
         self.buffer.__isub__(scalar)
 
     fn __imul__(self, scalar: Scalar[Self.dtype]):
@@ -1750,7 +1734,6 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __imul__: can not perform in-place operation on a"
                 " leaf tensor requiring grad."
             )
-        # self.buffer.inplace_scalar_ops[Multiply](scalar)
         self.buffer.__imul__(scalar)
 
     fn __itruediv__(self, scalar: Scalar[Self.dtype]):
@@ -1759,7 +1742,6 @@ struct Tensor[dtype: DType = DType.float32](
                 "Tensor → __itruediv__: can not perform in-place operation on a"
                 " leaf tensor requiring grad."
             )
-        # self.buffer.inplace_scalar_ops[Divide](scalar)
         self.buffer.__itruediv__(scalar)
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):

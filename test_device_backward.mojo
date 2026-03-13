@@ -46,7 +46,7 @@ fn main() raises:
 
         print(A_gpu.id(), receiver.id())
 
-        receiver.update_grad[AddTensor](gradbox)
+        A_gpu.update_grad[AddTensor](gradbox)
         print("===========Post update grad========")
         receiver.gradbox[].print()
         A_gpu.gradbox[].print()

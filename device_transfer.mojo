@@ -11,6 +11,7 @@ from device import Device, GPU
 from common_utils import panic
 from sys import has_accelerator
 
+
 @register_passable
 struct Flow(Equatable, ImplicitlyCopyable):
     var direction: Int
@@ -34,6 +35,7 @@ struct Flow(Equatable, ImplicitlyCopyable):
 
     fn __ne__(self, other: Self) -> Bool:
         return not (self == other)
+
 
 struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     var flow: Flow
@@ -59,14 +61,6 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        @parameter
-        if has_accelerator():
-            print("Incoming DeviceTransferBackward.backward -> A_g.gradbox actual (to_cpu)\n")
-            try:
-                output.gradients()[].buffer.to_cpu().print()
-            except e:
-                print(e)
-
         @parameter
         if has_accelerator():
             if output.is_on_gpu():
@@ -103,10 +97,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
             parent_gradbox = gradbox^
         elif self.flow == Flow.Cpu2Gpu:
             try:
-                #parent_gradbox = Gradbox[Self.dtype](gradbox.buffer.to_cpu())
-                parent_gradbox = Gradbox[Self.dtype](gradbox.buffer.device_state.value().into(ancestor.shape()), share=False)
-                print("converted parent's gradbox at DeviceTransfer backward")
-                parent_gradbox.print()
+                parent_gradbox = Gradbox[Self.dtype](gradbox.buffer.to_cpu())
             except e:
                 print(e)
                 panic(
@@ -186,7 +177,10 @@ fn main() raises:
     print("A_g.requires_grad:", A_g.requires_grad)
     print("A_g is on gpu:", A_g.is_on_gpu())
     var B = A_g * 23
-    print("B gradbox GPU ptr:", B.gradbox[].buffer.device_state.value().buffer.unsafe_ptr().__int__())
+    print(
+        "B gradbox GPU ptr:",
+        B.gradbox[].buffer.device_state.value().buffer.unsafe_ptr().__int__(),
+    )
     B.backward()
     B.grad().print()
     A_g.grad().print()
