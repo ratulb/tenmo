@@ -155,6 +155,7 @@ struct DeviceState[dtype: DType](
     ) raises -> Self:
         var device_state = Self(size, self.gpu)
         device_state.buffer.enqueue_fill(value)
+        self.gpu().synchronize()
         return device_state
 
     fn fill(self, value: Scalar[Self.dtype]) raises:
