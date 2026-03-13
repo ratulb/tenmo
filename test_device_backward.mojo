@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from device_transfer import DeviceTransfer
+from device_transfer import DeviceTransfer, DeviceTransferBackward
 from sys import has_accelerator
 from device import GPU
 from multiplication import MultiplyScalar, MultiplyBackwardScalar
@@ -24,13 +24,19 @@ fn main() raises:
         print("A_gpu's gradbox is on gpu: ", A_gpu.gradbox[].is_on_gpu())
         A_gpu.gradbox[].print()
         var B_gpu = MultiplyScalar[dtype].forward(A_gpu, 91)
+        print("printing A_gpu.gradbox[] after multiply forward: ")
+        A_gpu.gradbox[].print()
         print("=============B_gpu============")
         B_gpu.print()
         B_gpu.gradbox[].print()
         B_gpu.seed_grad(1)
+        print("printing A_gpu.gradbox[] after B_gpu seeding")
+        A_gpu.gradbox[].print()
 
         var backward_handler = MultiplyBackwardScalar[dtype](91)
         var backward_result = backward_handler.backward(B_gpu)
+        print("A_gpu.gradbox[] after backward")
+        A_gpu.gradbox[].print()
         print("=============Calling multiply backward======")
 
         var receiver = backward_result[0][0]
