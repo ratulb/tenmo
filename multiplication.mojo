@@ -26,8 +26,12 @@ struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
+        print("ancestor gradbox BEFORE mul:")
+        output.ancestry().get(0).gradbox[].print()
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * self.factor
+        print("ancestor gradbox AFTER mul:")
+        output.ancestry().get(0).gradbox[].print()
         _="""print("MultiplyBackwardScalar.backward -> scale factor: ", self.factor)
         print("MultiplyBackwardScalar.backward -> B.gradbox actual (to_cpu):")
 
