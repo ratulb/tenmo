@@ -448,7 +448,7 @@ struct BinaryInplaceOperations[dtype: DType = DType.float32](
         # ================================================================
         # PATH 3: A strided, B contiguous
         # ================================================================
-        if not A_is_contiguous and B_is_contiguous:
+        elif not A_is_contiguous and B_is_contiguous:
             #print("[GPU] Using Kernel 3: A strided, B contiguous (MEDIUM-FAST)")
 
             var compiled_func = device_context.compile_function[
@@ -480,32 +480,32 @@ struct BinaryInplaceOperations[dtype: DType = DType.float32](
         # ================================================================
 
         #print("[GPU] Using Kernel 4: Both strided")
+        else:
+            var compiled_func = device_context.compile_function[
+                arithmetic_ops_both_strided[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+                arithmetic_ops_both_strided[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+            ]()
 
-        var compiled_func = device_context.compile_function[
-            arithmetic_ops_both_strided[
-                op_code, Self.dtype, simdwidth, 2 * simdwidth
-            ],
-            arithmetic_ops_both_strided[
-                op_code, Self.dtype, simdwidth, 2 * simdwidth
-            ],
-        ]()
+            device_context.enqueue_function(
+                compiled_func,
+                A_buffer,
+                B_buffer,
+                broadcast_shape.array(),
+                A_broadcast_strides.array(),
+                B_broadcast_strides.array(),
+                0,
+                0,
+                output_size,
+                rank,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
 
-        device_context.enqueue_function(
-            compiled_func,
-            A_buffer,
-            B_buffer,
-            broadcast_shape.array(),
-            A_broadcast_strides.array(),
-            B_broadcast_strides.array(),
-            0,
-            0,
-            output_size,
-            rank,
-            grid_dim=num_blocks,
-            block_dim=threads_per_block,
-        )
-
-        device_context.synchronize()
+            device_context.synchronize()
 
     @staticmethod
     fn launch_config(output_size: Int) -> Tuple[Int, Int]:
