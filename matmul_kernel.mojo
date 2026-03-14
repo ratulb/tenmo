@@ -301,8 +301,6 @@ from testing import assert_true
 
 fn main_1() raises:
     comptime dtype = DType.float32
-    # var A = Tensor[dtype].rand(3, 4, 5, 9, 80)
-    # var B = Tensor[dtype].rand(4, 1, 80, 20)
     var A = Tensor[dtype].rand(9, 80, requires_grad=True)
     var B = Tensor[dtype].rand(80, 20)
 
@@ -323,42 +321,63 @@ fn main_1() raises:
 
 from intarray import IntArray
 
-fn main() raises:
+fn main_2() raises:
     comptime dtype = DType.float32
 
-    # Simple 2D case — known values
-    var A_o = Tensor[dtype].arange(6)
-    A = A_o.reshape(Shape(2, 3))# [[0,1,2],[3,4,5]]
-    var B_o = Tensor[dtype].arange(6)
-    var B = B_o.reshape(Shape(3, 2))  # [[0,1],[2,3],[4,5]]
+    # Exact backward dimensions
+    var grad_out = Tensor[dtype].rand(9, 20)   # grad_out
+    var B = Tensor[dtype].rand(80, 20)          # B
 
-    # CPU result
-    var C_cpu = A.matmul(B)
-    print("CPU C:")
-    C_cpu.print()
-    # Expected: [[10,13],[28,40]]
+    # CPU: grad_A = grad_out @ B.T
+    var BT_cpu = B.transpose(axes=IntArray(-1, -2))  # (20, 80)
+    var grad_A_cpu = grad_out.matmul(BT_cpu)          # (9, 80)
+    print("CPU grad_A:")
+    grad_A_cpu.print()
 
-    # Transposed case — A.T @ B
-    var AT = A.transpose(axes=IntArray(-1, -2))  # (3,2)
-    var AT_gpu = AT.to_gpu()
-    #var C2_cpu = AT.matmul(B)     # (3,2)@(3,2) — invalid, just testing transpose read
+    # GPU
+    var grad_out_gpu = grad_out.to_gpu()
+    var B_gpu = B.to_gpu()
+    var BT_gpu = B_gpu.buffer.transpose(axes=IntArray(-1, -2))
 
+    print("BT_gpu shape:", BT_gpu.shape.__str__())
+    print("BT_gpu strides:", BT_gpu.strides.__str__())
 
-    # GPU result
+    var grad_A_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
+        grad_out_gpu.buffer, BT_gpu
+    )
+    var grad_A_gpu = Tensor[dtype](grad_A_ndb^)
+    print("GPU grad_A:")
+    grad_A_gpu.to_cpu().print()
+
+    # Compare
+    assert_true(grad_A_cpu.all_close(grad_A_gpu.to_cpu()))
+    print("PASSED")
+
+fn main() raises:
+    comptime dtype = DType.float32
+    var A = Tensor[dtype].rand(9, 80, requires_grad=True)
+    var B = Tensor[dtype].rand(80, 20)
     var A_gpu = A.to_gpu()
     var B_gpu = B.to_gpu()
-    var C_gpu = A_gpu.matmul(B_gpu)
-    print("GPU C:")
-    C_gpu.to_cpu().print()
 
-    # Valid: B.T(2,3) @ A.T(3,2) = (2,2)
-    var BT = B.transpose(axes=IntArray(-1, -2))  # (2,3)
-    var BT_gpu = BT.to_gpu()
-    var A_transposed = A.transpose(axes=IntArray(-1,-2))
-    #var C3_cpu = BT.matmul(A.transpose(axes=IntArray(-1,-2)))
-    var C3_cpu = BT.matmul(A_transposed)
-    print("CPU BT @ AT:")
-    C3_cpu.print()
-    var C3_gpu = BT_gpu.matmul(AT_gpu)
-    print("GPU BT @ AT:")
-    C3_gpu.to_cpu().print()
+    # Verify B_gpu matches B exactly
+    var B_back = B_gpu.to_cpu()
+    assert_true(B.all_close(B_back))
+    print("B transfer verified")
+
+    # Now matmul backward manually
+    var grad_out = Tensor[dtype].ones(9, 20)
+    var grad_out_gpu = grad_out.to_gpu()
+    var BT = B.transpose(axes=IntArray(-1, -2))
+    var BT_gpu_buf = B_gpu.buffer.transpose(axes=IntArray(-1, -2))
+
+    var grad_A_cpu = grad_out.matmul(BT)
+    var grad_A_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
+        grad_out_gpu.buffer, BT_gpu_buf
+    )
+    var grad_A = Tensor[dtype](grad_A_ndb^)
+    var grad_A_gpu = grad_A.to_cpu()
+    assert_true(grad_A_cpu.all_close(grad_A_gpu))
+    print("Manual backward verified")
+
+

@@ -1793,6 +1793,14 @@ struct NDBuffer[dtype: DType](
                     print(e)
                     panic("NDBuffer all_close - GPU operation failed")
                     result = False
+            elif (self.is_on_gpu() and other.is_on_cpu()) or (
+                self.is_on_cpu() and other.is_on_gpu()
+            ):
+                panic(
+                    "NDBuffer all_close - both buffers must be on the same"
+                    " device"
+                )
+                result = False
             else:
                 result = self.contiguous_buffer().all_close[
                     rtol=rtol, atol=atol
@@ -1825,6 +1833,7 @@ struct NDBuffer[dtype: DType](
 
 
 from tenmo import Tensor
+from gradbox import Gradbox
 
 
 fn main() raises:
@@ -1835,3 +1844,5 @@ fn main() raises:
     reshaped.print()
     var transposed = reshaped.transpose(IntArray(-1, -2))
     transposed.print()
+    var gb = Gradbox[dtype](transposed, share=False)
+    gb.print()
