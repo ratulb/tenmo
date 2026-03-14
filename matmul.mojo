@@ -48,9 +48,12 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         @parameter
         if has_accelerator():
             if A.requires_grad:
+                print("grad_out on gpu:", grad_out.buffer.is_on_gpu())
+                print("B on gpu:", B.buffer.is_on_gpu())
                 var B_buffer_transposed = B.buffer.transpose(
                     axes=IntArray(-1, -2)
                 )
+                print("B_transposed on gpu:", B_buffer_transposed.is_on_gpu())
                 try:
                     var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
                         grad_out.buffer, B_buffer_transposed^
