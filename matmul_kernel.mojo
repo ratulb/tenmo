@@ -299,7 +299,7 @@ from tenmo import Tensor
 from testing import assert_true
 
 
-fn main() raises:
+fn main_1() raises:
     comptime dtype = DType.float32
     # var A = Tensor[dtype].rand(3, 4, 5, 9, 80)
     # var B = Tensor[dtype].rand(4, 1, 80, 20)
@@ -320,3 +320,45 @@ fn main() raises:
 
     assert_true(A.grad().all_close(A_cpu_grad))
     print("Here I am ok")
+
+from intarray import IntArray
+
+fn main() raises:
+    comptime dtype = DType.float32
+
+    # Simple 2D case — known values
+    var A_o = Tensor[dtype].arange(6)
+    A = A_o.reshape(Shape(2, 3))# [[0,1,2],[3,4,5]]
+    var B_o = Tensor[dtype].arange(6)
+    var B = B_o.reshape(Shape(3, 2))  # [[0,1],[2,3],[4,5]]
+
+    # CPU result
+    var C_cpu = A.matmul(B)
+    print("CPU C:")
+    C_cpu.print()
+    # Expected: [[10,13],[28,40]]
+
+    # Transposed case — A.T @ B
+    var AT = A.transpose(axes=IntArray(-1, -2))  # (3,2)
+    var AT_gpu = AT.to_gpu()
+    #var C2_cpu = AT.matmul(B)     # (3,2)@(3,2) — invalid, just testing transpose read
+
+
+    # GPU result
+    var A_gpu = A.to_gpu()
+    var B_gpu = B.to_gpu()
+    var C_gpu = A_gpu.matmul(B_gpu)
+    print("GPU C:")
+    C_gpu.to_cpu().print()
+
+    # Valid: B.T(2,3) @ A.T(3,2) = (2,2)
+    var BT = B.transpose(axes=IntArray(-1, -2))  # (2,3)
+    var BT_gpu = BT.to_gpu()
+    var A_transposed = A.transpose(axes=IntArray(-1,-2))
+    #var C3_cpu = BT.matmul(A.transpose(axes=IntArray(-1,-2)))
+    var C3_cpu = BT.matmul(A_transposed)
+    print("CPU BT @ AT:")
+    C3_cpu.print()
+    var C3_gpu = BT_gpu.matmul(AT_gpu)
+    print("GPU BT @ AT:")
+    C3_gpu.to_cpu().print()
