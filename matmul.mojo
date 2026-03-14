@@ -7,7 +7,7 @@ from backpropagation import (
     BACKWARD_MATMUL_ND,
     BACKWARD_MATMUL_2D,
 )
-from mnemonics import AddTensor, mm, vm, mv, dot, invalid
+from mnemonics import AddTensor, mm, vm, mv, dot, invalid, Multiply
 from gradbox import Gradbox
 from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
@@ -55,9 +55,10 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                 )
                 print("B_transposed on gpu:", B_buffer_transposed.is_on_gpu())
                 try:
-                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
+                    _="""var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
                         grad_out.buffer, B_buffer_transposed^
-                    )
+                    )"""
+                    var ndb = grad_out.buffer.arithmetic_ops[Multiply](B_buffer_transposed^)
                     var grad_A = Gradbox[Self.dtype](ndb^, share=False)
                     result.append((A, grad_A^, AddTensor))
                 except e:
