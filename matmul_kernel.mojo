@@ -32,6 +32,11 @@ from broadcasthelper import ShapeBroadcaster
 #
 # Each thread (ty, tx) owns output element (row, col) = (block_row + ty, block_col + tx).
 # It steps over k in chunks of TILE_SIZE, accumulating the dot product.
+# TILE SIZE — 32x32 = 1024 threads per block
+# Each thread computes one output element
+# smem_A: 32*32*4 = 4096 bytes
+# smem_B: 32*32*4 = 4096 bytes
+# Total smem: 8192 bytes — well within 48KB limit
 
 
 fn matmul_2d_tiled[
@@ -133,6 +138,12 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
     ) raises -> NDBuffer[
         Self.dtype
     ]:
+        """ND batched matrix multiply with broadcasting.
+
+        A: [..., m, k]
+        B: [..., k, n]
+        out: [..., m, n]
+        """
         # ── Shape extraction ──────────────────────────────────────────────────
         var A_shape = A.shape
         var B_shape = B.shape
@@ -244,10 +255,6 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         ref B_buf = B.device_state.value().device_buffer()
 
         # ── Launch config ─────────────────────────────────────────────────────
-        # grid.x = tiles across n, grid.y = tiles across m, grid.z = batch
-        #var grid_x = (n + tile_size - 1) // tile_size
-        #var grid_y = (m + tile_size - 1) // tile_size
-        #var grid_z = total_batch
         var (grid_dim, block_dim) = Self.launch_config[tile_size](m, n, total_batch)
 
         # ── Compile and enqueue ───────────────────────────────────────────────
@@ -266,9 +273,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
             m,
             k,
             n,
-            #grid_dim=(grid_x, grid_y, grid_z),
             grid_dim=grid_dim,
-            #block_dim=(tile_size, tile_size, 1),
             block_dim=block_dim,
         )
 
@@ -288,8 +293,6 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         var block = Dim(tile_size, tile_size, 1)
         var grid = Dim(
             (n + tile_size - 1) // tile_size,
-            #ceildiv(n, TILE_SIZE),
-            #ceildiv(m, TILE_SIZE),
             (m + tile_size - 1) // tile_size,
             total_batch,
         )
@@ -300,11 +303,22 @@ from testing import assert_true
 
 fn main() raises:
     comptime dtype = DType.float32
-    var A = Tensor[dtype].rand(3, 4, 5, 9, 8)
-    var B = Tensor[dtype].rand(4, 1, 8, 20)
+    #var A = Tensor[dtype].rand(3, 4, 5, 9, 80)
+    #var B = Tensor[dtype].rand(4, 1, 80, 20)
+    var A = Tensor[dtype].rand(9, 80, requires_grad=True)
+    var B = Tensor[dtype].rand(80, 20)
 
     C = A.matmul(B)
     var A_gpu = A.to_gpu()
     var B_gpu = B.to_gpu()
     var C_gpu = A_gpu.matmul(B_gpu)
     assert_true(C.all_close(C_gpu.to_cpu()))
+
+    C.backward()
+    var A_cpu_grad = A.grad().copy()
+    A.zero_grad()
+
+    C_gpu.backward()
+
+    assert_true(A.grad().all_close(A_cpu_grad))
+    print("Here I am ok")

@@ -649,10 +649,12 @@ struct NDBuffer[dtype: DType](
         Create shared view of this buffer.
         First call enables ref counting. Subsequent calls just create views.
         """
+        var size = len(self.buffer) if self.is_on_cpu() else len(
+            self.device_state.value()
+        )
         # Enable ref counting if not already shared
-        if not self.shared():
+        if self.is_on_cpu() and size > 0 and not self.shared():
             self.buffer.shared()
-        var size = len(self.buffer)
         var new_shape = shape.or_else(self.shape)
         var new_strides = strides.or_else(Strides.default(new_shape))
         var max_index = IndexCalculator.max_index(
@@ -672,12 +674,14 @@ struct NDBuffer[dtype: DType](
                 + offset.__str__()
             )
 
-        return NDBuffer[Self.dtype](
+        var ndb = NDBuffer[Self.dtype](
             buffer=self.buffer.copy(),
             shape=new_shape,
             strides=new_strides,
             offset=offset,
         )
+        ndb.device_state = self.device_state.copy()
+        return ndb^
 
     fn transpose(
         mut self,

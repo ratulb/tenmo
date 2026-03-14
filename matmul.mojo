@@ -18,6 +18,7 @@ from algorithm import parallelize
 from sys.info import num_logical_cores as num_physical_cores
 from ndbuffer import NDBuffer
 from matmul_kernel import MatmulNdGpu
+from intarray import IntArray
 
 comptime TILE_SIZE = 32
 
@@ -29,6 +30,61 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
     @always_inline
     fn backward[
+        simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
+    ](self, output: Tensor[Self.dtype]) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+    ]:
+        if output.is_on_cpu():
+            return self.backward_cpu[simdwidth=simdwidth, tile_size=tile_size](
+                output
+            )
+
+        ref grad_out = output.gradients()[]
+        var A = output.ancestry().get(0)
+        var B = output.ancestry().get(1)
+
+        var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
+
+        @parameter
+        if has_accelerator():
+            if A.requires_grad:
+                var B_buffer_transposed = B.buffer.transpose(
+                    axes=IntArray(-1, -2)
+                )
+                try:
+                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
+                        grad_out.buffer, B_buffer_transposed^
+                    )
+                    var grad_A = Gradbox[Self.dtype](ndb^, share=False)
+                    result.append((A, grad_A^, AddTensor))
+                except e:
+                    print(e)
+                    panic(
+                        "Matmul2dBackward backward - GPU operation failed for"
+                        " A's grad"
+                    )
+
+            if B.requires_grad:
+                var A_buffer_transposed = A.buffer.transpose(
+                    axes=IntArray(-1, -2)
+                )
+                try:
+                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
+                        A_buffer_transposed^, grad_out.buffer
+                    )
+                    var grad_B = Gradbox[Self.dtype](ndb^, share=False)
+                    result.append((B, grad_B^, AddTensor))
+                except e:
+                    print(e)
+                    panic(
+                        "Matmul2dBackward backward - GPU operation failed for"
+                        " B's grad"
+                    )
+
+        return result^
+
+    @always_inline
+    fn backward_cpu[
         simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
     ](self, output: Tensor[Self.dtype]) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -922,6 +978,50 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     fn forward(
         mut A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
+        var C: Gradbox[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if A.is_on_gpu() and B.is_on_gpu():
+                try:
+                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
+                        A.buffer, B.buffer
+                    )
+                    C = Gradbox[Self.dtype](ndb^, share=False)
+                except e:
+                    print(e)
+                    panic(
+                        "MatmulNd forward(Tensor, Gradbox) - GPU operation"
+                        " failed"
+                    )
+                    # Unreachable - make the compiler happy
+                    C = Self.forward_cpu(A, B)
+            elif (A.is_on_gpu() and not B.is_on_gpu()) or (
+                not A.is_on_gpu() and B.is_on_gpu()
+            ):
+                panic(
+                    (
+                        "MatmulNd forward - both, tensor and gradbox must be on"
+                        " gpu. A is on gpu?"
+                    ),
+                    A.is_on_gpu().__str__(),
+                    ", B is on gpu?",
+                    B.is_on_gpu().__str__(),
+                )
+                C = Self.forward_cpu(A, B)
+
+            else:
+                C = Self.forward_cpu(A, B)
+        else:
+            C = Self.forward_cpu(A, B)
+
+        return C^
+
+    @always_inline
+    @staticmethod
+    fn forward_cpu(
+        mut A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
 
@@ -963,6 +1063,50 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward(
+        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
+        var C: Gradbox[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if A.is_on_gpu() and B.is_on_gpu():
+                try:
+                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
+                        A.buffer, B.buffer
+                    )
+                    C = Gradbox[Self.dtype](ndb^, share=False)
+                except e:
+                    print(e)
+                    panic(
+                        "MatmulNd forward(Gradbox, Tensor) - GPU operation"
+                        " failed"
+                    )
+                    # Unreachable - make the compiler happy
+                    C = Self.forward_cpu(A, B)
+            elif (A.is_on_gpu() and not B.is_on_gpu()) or (
+                not A.is_on_gpu() and B.is_on_gpu()
+            ):
+                panic(
+                    (
+                        "MatmulNd forward - both, gradbox and tensor must be on"
+                        " gpu. A is on gpu?"
+                    ),
+                    A.is_on_gpu().__str__(),
+                    ", B is on gpu?",
+                    B.is_on_gpu().__str__(),
+                )
+                C = Self.forward_cpu(A, B)
+
+            else:
+                C = Self.forward_cpu(A, B)
+        else:
+            C = Self.forward_cpu(A, B)
+
+        return C^
+
+    @always_inline
+    @staticmethod
+    fn forward_cpu(
         A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         ref A_shape = A.shape()
