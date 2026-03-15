@@ -175,7 +175,10 @@ struct DeviceState[dtype: DType](
         """Copy the DeviceState content to realize a filled NDBuffer.
         The NDBuffer is contiguous with 0 offset.
         """
-        return NDBuffer[Self.dtype](self.buffer, shape, copy=copy)
+        var ndb = NDBuffer[Self.dtype](self.buffer, shape, copy=copy)
+        self.gpu().synchronize()
+        return ndb^
+
 
     fn device_buffer(
         ref self,
