@@ -255,6 +255,16 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
             matmul_2d_tiled[Self.dtype, tile_size],
             matmul_2d_tiled[Self.dtype, tile_size],
         ]()
+        print("MatmulNdGpu.launch:")
+        print("  m=", m, "n=", n, "k=", k)
+        print("  A_row_stride=", A_row_stride, "A_col_stride=", A_col_stride)
+        print("  B_row_stride=", B_row_stride, "B_col_stride=", B_col_stride)
+        print("  total_batch=", total_batch)
+        print("  A_offsets[0]=", A_offsets[0])
+        print("  B_offsets[0]=", B_offsets[0])
+        print("  A buf ptr=", A_buf.unsafe_ptr())
+        print("  B buf ptr=", B_buf.unsafe_ptr())
+        print("  result_buffer ptr=", result_buffer.unsafe_ptr())
 
         device_context.enqueue_function(
             compiled_func,
@@ -299,14 +309,18 @@ from tenmo import Tensor
 from testing import assert_true
 
 
-fn main_1() raises:
+fn main() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].rand(9, 80, requires_grad=True)
     var B = Tensor[dtype].rand(80, 20)
+    print("B.sum(): in stand alone", B.sum())
+    print("B[0,0]:", B[[0,0]])
 
     C = A.matmul(B)
     var A_gpu = A.to_gpu()
     var B_gpu = B.to_gpu()
+    print("B_gpu.sum():", B_gpu.sum())
+    print("B_gpu[0,0]:", B_gpu[[0,0]])
     var C_gpu = A_gpu.matmul(B_gpu)
     assert_true(C.all_close(C_gpu.to_cpu()))
 
@@ -353,7 +367,7 @@ fn main_2() raises:
     assert_true(grad_A_cpu.all_close(grad_A_gpu.to_cpu()))
     print("PASSED")
 
-fn main() raises:
+fn main_good() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].rand(9, 80, requires_grad=True)
     var B = Tensor[dtype].rand(80, 20)
