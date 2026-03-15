@@ -52,17 +52,11 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                     axes=IntArray(-1, -2)
                 )
                 try:
-                    _="""print("grad_out values:")
-                    grad_out.buffer.to_cpu().print()
+                    print("B ancestry device ptr:",  B.buffer.device_state.value().buffer.unsafe_ptr())
+                    print("grad_out CPU buffer size:", len(grad_out.buffer.buffer))
+                    print("grad_out GPU buffer size:", len(grad_out.buffer.device_state.value().buffer))
+                    print("grad_out device ptr:", grad_out.buffer.device_state.value().buffer.unsafe_ptr())
 
-                    print("grad_out shape:", grad_out.buffer.shape.__str__())
-                    print("B_transposed shape:", B_buffer_transposed.shape.__str__())
-                    print("m=", grad_out.buffer.shape[-2], "k=", grad_out.buffer.shape[-1], "n=", B_buffer_transposed.shape[-1])"""
-                    print("grad_out values (first row):")
-                    var cpu = grad_out.buffer.to_cpu()
-                    for i in range(cpu.shape[-1]):
-                        print(cpu[[0, i]], end=" ")
-                    print()
 
                     var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
                         grad_out.buffer, B_buffer_transposed^

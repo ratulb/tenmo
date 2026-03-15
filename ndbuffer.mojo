@@ -139,10 +139,24 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn with_device_state(
+    fn with_device_state_1(
         var device_state: DeviceState[Self.dtype], shape: Shape
     ) -> NDBuffer[Self.dtype]:
         var ndb = NDBuffer[Self.dtype](shape)
+        ndb.device_state = device_state^
+        return ndb^
+
+    @staticmethod
+    fn with_device_state(
+        var device_state: DeviceState[Self.dtype], shape: Shape
+    ) -> NDBuffer[Self.dtype]:
+        var empty_cpu_buffer = Buffer[Self.dtype]()  # ← empty, like NDBuffer.to_device does
+        var ndb = NDBuffer[Self.dtype](
+            empty_cpu_buffer^,
+            shape=shape,
+            strides=Strides.default(shape),
+            offset=0,
+        )
         ndb.device_state = device_state^
         return ndb^
 
