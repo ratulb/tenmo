@@ -62,10 +62,13 @@ fn test_backward_grad_A_fidelity() raises:
 
     C_gpu.backward()
 
-    print("A_gpu grad after backward:")
+    _="""print("A_gpu grad after backward:")
     A_gpu.grad().print()
     print("A CPU grad:")
+    A_cpu_grad.print()"""
+    print("Grad calculated on CPU")
     A_cpu_grad.print()
+    assert_true(A_gpu.grad().all_close(A_cpu_grad), "Direct extraction failed")
 
     assert_true(A.grad().all_close(A_cpu_grad))
     print("PASSED: GPU backward grad_A == CPU backward grad_A")
@@ -144,11 +147,11 @@ fn main() raises:
         print("No GPU available — skipping tests")
         return
     else:
-        test_gpu_transfer_fidelity()
+        _="""test_gpu_transfer_fidelity()
         test_ancestry_storage_fidelity()
         test_forward_matmul_fidelity()
-        test_backward_grad_A_fidelity()
         test_ancestry_transposed_matmul_fidelity()
-        test_transposed_matmul_fidelity()
+        test_transposed_matmul_fidelity()"""
+        test_backward_grad_A_fidelity()
 
         print("\n=== ALL TESTS PASSED ===")

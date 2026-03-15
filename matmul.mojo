@@ -42,9 +42,6 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
-        print("B.sum() inside backward:")  # Should match original B_gpu.sum()
-        B.sum().print()
-        print("B[0,0]:", B[[0,0]])
         var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
 
         @parameter
@@ -54,16 +51,14 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
                     axes=IntArray(-1, -2)
                 )
                 try:
-                    print("B ancestry device ptr:",  B.buffer.device_state.value().buffer.unsafe_ptr())
-                    print("grad_out CPU buffer size:", len(grad_out.buffer.buffer))
-                    print("grad_out GPU buffer size:", len(grad_out.buffer.device_state.value().buffer))
-                    print("grad_out device ptr:", grad_out.buffer.device_state.value().buffer.unsafe_ptr())
-
 
                     var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
                         grad_out.buffer, B_buffer_transposed^
                     )
                     var grad_A = Gradbox[Self.dtype](ndb^, share=False)
+                    print("Grad calculated inside backward")
+                    grad_A.print()
+                    print("=====***********========")
                     result.append((A, grad_A^, AddTensor))
                 except e:
                     print(e)
