@@ -309,7 +309,7 @@ from tenmo import Tensor
 from testing import assert_true
 
 
-fn main() raises:
+fn main_failing() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].rand(9, 80, requires_grad=True)
     var B = Tensor[dtype].rand(80, 20)
@@ -401,4 +401,113 @@ fn main_good() raises:
 
     print("Manual backward verified")
 
+fn main() raises:
+    comptime dtype = DType.float32
 
+    # ── Test 1: Transfer fidelity ─────────────────────────────────────────────
+    print("=== Test 1: GPU transfer fidelity ===")
+    var B = Tensor[dtype].rand(80, 20)
+    var B_gpu = B.to_gpu()
+    var B_back = B_gpu.to_cpu()
+    assert_true(B.all_close(B_back))
+    print("PASSED: B == B_gpu.to_cpu()")
+
+    # ── Test 2: Ancestry storage and retrieval ────────────────────────────────
+    print("=== Test 2: Ancestry storage fidelity ===")
+    var A = Tensor[dtype].rand(9, 80, requires_grad=True)
+    var A_gpu = A.to_gpu()
+    var B2 = Tensor[dtype].rand(80, 20)
+    var B2_gpu = B2.to_gpu()
+    var C_gpu = A_gpu.matmul(B2_gpu)
+
+    # Retrieve B from ancestry and verify data
+    var B_from_ancestry = C_gpu.ancestry().get(1)
+    var B_ancestry_back = B_from_ancestry.to_cpu()
+    assert_true(B2.all_close(B_ancestry_back))
+    print("PASSED: B from ancestry == original B")
+
+    # ── Test 3: Forward matmul fidelity ───────────────────────────────────────
+    print("=== Test 3: Forward matmul fidelity ===")
+    var C_cpu = A.matmul(B2)
+    assert_true(C_cpu.all_close(C_gpu.to_cpu()))
+    print("PASSED: CPU matmul == GPU matmul")
+
+    # ── Test 4: Backward grad_A fidelity ─────────────────────────────────────
+    print("=== Test 4: Backward grad_A fidelity ===")
+    C_cpu.backward()
+    var A_cpu_grad = A.grad().copy()
+    A.zero_grad()
+
+    # Verify A_gpu gradbox starts at zero
+    var A_gpu_grad_before = A_gpu.grad()
+    print("A_gpu grad before backward (should be 0):")
+    A_gpu_grad_before.print()
+
+    C_gpu.backward()
+
+    # Verify A_gpu grad
+    print("A_gpu grad after backward:")
+    A_gpu.grad().print()
+    print("A CPU grad:")
+    A_cpu_grad.print()
+
+    assert_true(A.grad().all_close(A_cpu_grad))
+    print("PASSED: GPU backward grad_A == CPU backward grad_A")
+
+    # ── Test 5: Matmul with transposed inputs ─────────────────────────────────
+    print("=== Test 5: Transposed matmul fidelity ===")
+    var B3 = Tensor[dtype].rand(80, 20)
+    var B3_gpu = B3.to_gpu()
+    var BT_cpu = B3.transpose(axes=IntArray(-1, -2))   # (20, 80)
+    var BT_gpu = B3_gpu.buffer.transpose(axes=IntArray(-1, -2))
+
+    # grad_out ones
+    var grad_out = Tensor[dtype].ones(9, 20)
+    var grad_out_gpu = grad_out.to_gpu()
+
+    # CPU: grad_out @ B.T
+    var grad_A_cpu = grad_out.matmul(BT_cpu)
+
+    # GPU: MatmulNdGpu directly
+    var grad_A_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
+        grad_out_gpu.buffer, BT_gpu
+    )
+    var grad_A_GPU = Tensor[dtype](grad_A_ndb^)
+    var grad_A_gpu = grad_A_GPU.to_cpu()
+
+    print("CPU grad_A row 0:")
+    for i in range(min(8, grad_A_cpu.shape()[-1])):
+        print(grad_A_cpu.buffer[[0, i]], end=" ")
+    print()
+    print("GPU grad_A row 0:")
+    for i in range(min(8, grad_A_gpu.shape()[-1])):
+        print(grad_A_gpu.buffer[[0, i]], end=" ")
+    print()
+
+    assert_true(grad_A_cpu.all_close(grad_A_gpu))
+    print("PASSED: GPU transposed matmul == CPU")
+
+    # ── Test 6: B from ancestry transposed matmul ─────────────────────────────
+    print("=== Test 6: B from ancestry transposed matmul ===")
+    var B_anc = C_gpu.ancestry().get(1)
+    var BT_anc = B_anc.buffer.transpose(axes=IntArray(-1, -2))
+
+    var grad_A_anc_ndb = MatmulNdGpu[dtype].launch[tile_size=32](
+        grad_out_gpu.buffer, BT_anc
+    )
+    var grad_A_ANC = Tensor[dtype](grad_A_anc_ndb^)
+    var grad_A_anc = grad_A_ANC.to_cpu()
+
+    print("CPU grad_A row 0:")
+    for i in range(min(8, grad_A_cpu.shape()[-1])):
+        print(grad_A_cpu.buffer[[0, i]], end=" ")
+    print()
+    print("GPU grad_A from ancestry row 0:")
+    for i in range(min(8, grad_A_anc.shape()[-1])):
+        print(grad_A_anc.buffer[[0, i]], end=" ")
+    print()
+
+    assert_true(grad_A_cpu.all_close(grad_A_anc))
+    print("PASSED: B from ancestry transposed matmul == CPU")
+
+    print("\n=== ALL TESTS PASSED ===")
