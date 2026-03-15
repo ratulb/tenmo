@@ -148,6 +148,7 @@ struct DeviceState[dtype: DType](
     fn fill(self, value: Scalar[Self.dtype]) raises:
         with self.buffer.map_to_host() as host_buffer:
             host_buffer.enqueue_fill(value)
+        self.gpu().synchronize()
 
     fn fill(self, ref source: NDBuffer[Self.dtype]) raises:
         """Fill the DeviceBuffer from the source NDBuffer."""
@@ -166,6 +167,7 @@ struct DeviceState[dtype: DType](
                 for index in source.index_iterator():
                     (device_ptr + next_index)[] = (src_ptr + index)[]
                     next_index += 1
+        self.gpu().synchronize()
 
     fn into(
         self, shape: Shape, *, copy: Bool = True
