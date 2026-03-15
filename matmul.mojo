@@ -42,7 +42,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
-        print("B.sum():", B.sum())  # Should match original B_gpu.sum()
+        print("B.sum() inside backward:")  # Should match original B_gpu.sum()
+        B.sum().print()
         print("B[0,0]:", B[[0,0]])
         var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
 

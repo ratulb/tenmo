@@ -313,13 +313,15 @@ fn main() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].rand(9, 80, requires_grad=True)
     var B = Tensor[dtype].rand(80, 20)
-    print("B.sum(): in stand alone", B.sum())
+    print("B.sum(): in driver program")
+    B.sum().print()
     print("B[0,0]:", B[[0,0]])
 
     C = A.matmul(B)
     var A_gpu = A.to_gpu()
     var B_gpu = B.to_gpu()
-    print("B_gpu.sum():", B_gpu.sum())
+    print("B_gpu.sum() in same driver program:")
+    B_gpu.sum().print()
     print("B_gpu[0,0]:", B_gpu[[0,0]])
     var C_gpu = A_gpu.matmul(B_gpu)
     assert_true(C.all_close(C_gpu.to_cpu()))
