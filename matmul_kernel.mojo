@@ -378,6 +378,11 @@ fn main() raises:
     var grad_A = Tensor[dtype](grad_A_ndb^)
     var grad_A_gpu = grad_A.to_cpu()
     assert_true(grad_A_cpu.all_close(grad_A_gpu))
+
+    print("grad_out_gpu CPU buffer size:", len(grad_out_gpu.buffer.buffer))
+    print("grad_out_gpu GPU buffer size:", len(grad_out_gpu.buffer.device_state.value().buffer))
+    print("grad_out_gpu device ptr:", grad_out_gpu.buffer.device_state.value().buffer.unsafe_ptr())
+
     print("Manual backward verified")
 
 
