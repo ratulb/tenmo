@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from sys import simd_width_of, has_accelerator
+from sys import simd_width_of
 from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import (
     Delegate,
@@ -15,12 +15,8 @@ from common_utils import il, s, panic, log_debug
 from vectormatrix import VectorMatmulNd
 from matrixvector import MatrixVectorMulNd
 from algorithm import parallelize
-from sys.info import num_logical_cores as num_physical_cores
-from ndbuffer import NDBuffer
-from matmul_kernel import MatmulNdGpu
+from sys.info import num_physical_cores
 from intarray import IntArray
-
-comptime TILE_SIZE = 32
 
 
 @fieldwise_init
@@ -29,264 +25,29 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
     comptime TAG = BACKWARD_MATMUL_2D
 
     @always_inline
-    fn backward[
-        simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
-    ](self, output: Tensor[Self.dtype]) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
-        if output.is_on_cpu():
-            return self.backward_cpu[simdwidth=simdwidth, tile_size=tile_size](
-                output
-            )
-
-        ref grad_out = output.gradients()[]
-        var A = output.ancestry().get(0)
-        var B = output.ancestry().get(1)
-        var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
-
-        @parameter
-        if has_accelerator():
-            if A.requires_grad:
-                var B_buffer_transposed = B.buffer.transpose(
-                    axes=IntArray(-1, -2)
-                )
-                try:
-
-                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
-                        grad_out.buffer, B_buffer_transposed^
-                    )
-                    var grad_A = Gradbox[Self.dtype](ndb^, share=False)
-                    print("Grad calculated inside backward")
-                    grad_A.print()
-                    print("=====***********========")
-                    result.append((A, grad_A^, AddTensor))
-                except e:
-                    print(e)
-                    panic(
-                        "Matmul2dBackward backward - GPU operation failed for"
-                        " A's grad"
-                    )
-
-            if B.requires_grad:
-                var A_buffer_transposed = A.buffer.transpose(
-                    axes=IntArray(-1, -2)
-                )
-                try:
-                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
-                        A_buffer_transposed^, grad_out.buffer
-                    )
-                    var grad_B = Gradbox[Self.dtype](ndb^, share=False)
-                    result.append((B, grad_B^, AddTensor))
-                except e:
-                    print(e)
-                    panic(
-                        "Matmul2dBackward backward - GPU operation failed for"
-                        " B's grad"
-                    )
-
-        return result^
-
-    @always_inline
-    fn backward_cpu[
-        simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
-    ](self, output: Tensor[Self.dtype]) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
+    fn backward(
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
 
-        ref A_shape = A.shape()
-        var m = A_shape[0]
-        var n = A_shape[1]
-        var p = B.shape()[1]
-
         var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
-
-        ref grad_out_strides = grad_out.strides()
-        var grad_out_stride0 = grad_out_strides[0]
-        var grad_out_stride1 = grad_out_strides[1]
-        var grad_out_data = grad_out.data_ptr()
 
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
         if A.requires_grad:
-            var grad_A = Gradbox[Self.dtype].zeros(Shape([m, n]))
-
-            # Hoist all metadata
-
-            ref B_strides = B.strides()
-            var B_stride0 = B_strides[0]
-            var B_stride1 = B_strides[1]
-            var B_offset = B.offset()
-            var B_data = B.data_ptr()
-
-            ref grad_A_strides = grad_A.strides()
-            var grad_A_stride0 = grad_A_strides[0]
-            var grad_A_stride1 = grad_A_strides[1]
-            var grad_A_data = grad_A.data_ptr()
-
-            # PARALLELIZED TILED computation
-            var num_tiles_i = (m + tile_size - 1) // tile_size
-
-            @parameter
-            fn process_row_tile_A(tile_idx: Int):
-                var i_tile = tile_idx * tile_size
-                var i_end = min(i_tile + tile_size, m)
-
-                for j_tile in range(0, n, tile_size):
-                    for k_tile in range(0, p, tile_size):
-                        var j_end = min(j_tile + tile_size, n)
-                        var k_end = min(k_tile + tile_size, p)
-
-                        for i in range(i_tile, i_end):
-                            var grad_out_row_base = i * grad_out_stride0
-                            var grad_A_row_base = i * grad_A_stride0
-
-                            var j = j_tile
-
-                            # Main vectorized loop
-                            while j + simdwidth <= j_end:
-                                var grad_A_addr = (
-                                    grad_A_row_base + j * grad_A_stride1
-                                )
-                                var accumulator = grad_A_data.load[
-                                    width=simdwidth
-                                ](grad_A_addr)
-
-                                for k in range(k_tile, k_end):
-                                    var grad_addr = (
-                                        grad_out_row_base + k * grad_out_stride1
-                                    )
-                                    var grad_ik = grad_out_data[grad_addr]
-
-                                    var b_addr = (
-                                        j * B_stride0 + B_offset + k * B_stride1
-                                    )
-                                    var b_vec = B_data.load[width=simdwidth](
-                                        b_addr
-                                    )
-
-                                    accumulator += grad_ik * b_vec
-
-                                grad_A_data.store[width=simdwidth](
-                                    grad_A_addr, accumulator
-                                )
-                                j += simdwidth
-
-                            # Tail handling
-                            while j < j_end:
-                                var grad_A_addr = (
-                                    grad_A_row_base + j * grad_A_stride1
-                                )
-                                var accumulator = grad_A_data[grad_A_addr]
-
-                                for k in range(k_tile, k_end):
-                                    var grad_addr = (
-                                        grad_out_row_base + k * grad_out_stride1
-                                    )
-                                    var b_addr = (
-                                        j * B_stride0 + B_offset + k * B_stride1
-                                    )
-                                    accumulator += (
-                                        grad_out_data[grad_addr]
-                                        * B_data[b_addr]
-                                    )
-
-                                grad_A_data[grad_A_addr] = accumulator
-                                j += 1
-
-            parallelize[process_row_tile_A](num_tiles_i, num_physical_cores())
+            var ndb = grad_out.buffer.matmul_2d(
+                B.buffer.transpose(IntArray(-1, -2))
+            )
+            var grad_A = Gradbox[Self.dtype](ndb^, share=False)
 
             result.append((A, grad_A^, AddTensor))
 
         # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
         if B.requires_grad:
-            var grad_B = Gradbox[Self.dtype].zeros(Shape([n, p]))
-
-            ref A_strides = A.strides()
-            var A_stride0 = A_strides[0]
-            var A_stride1 = A_strides[1]
-            var A_offset = A.offset()
-            var A_data = A.data_ptr()
-
-            ref grad_B_strides = grad_B.strides()
-
-            var grad_B_stride0 = grad_B_strides[0]
-            var grad_B_stride1 = grad_B_strides[1]
-            var grad_B_data = grad_B.data_ptr()
-
-            # PARALLELIZED TILED computation
-            var num_tiles_j = (n + tile_size - 1) // tile_size
-
-            @parameter
-            fn process_row_tile_B(tile_idx: Int):
-                var j_tile = tile_idx * tile_size
-                var j_end = min(j_tile + tile_size, n)
-
-                for k_tile in range(0, p, tile_size):
-                    for i_tile in range(0, m, tile_size):
-                        var k_end = min(k_tile + tile_size, p)
-                        var i_end = min(i_tile + tile_size, m)
-
-                        for j in range(j_tile, j_end):
-                            var grad_B_row_base = j * grad_B_stride0
-
-                            var k = k_tile
-
-                            # Main vectorized loop
-                            while k + simdwidth <= k_end:
-                                var grad_B_addr = (
-                                    grad_B_row_base + k * grad_B_stride1
-                                )
-                                var accumulator = grad_B_data.load[
-                                    width=simdwidth
-                                ](grad_B_addr)
-
-                                for i in range(i_tile, i_end):
-                                    var a_addr = (
-                                        i * A_stride0 + A_offset + j * A_stride1
-                                    )
-                                    var a_ij = A_data[a_addr]
-
-                                    var grad_addr = (
-                                        i * grad_out_stride0
-                                        + k * grad_out_stride1
-                                    )
-                                    var grad_vec = grad_out_data.load[
-                                        width=simdwidth
-                                    ](grad_addr)
-
-                                    accumulator += a_ij * grad_vec
-
-                                grad_B_data.store[width=simdwidth](
-                                    grad_B_addr, accumulator
-                                )
-                                k += simdwidth
-
-                            # Tail handling
-                            while k < k_end:
-                                var grad_B_addr = (
-                                    grad_B_row_base + k * grad_B_stride1
-                                )
-                                var accumulator = grad_B_data[grad_B_addr]
-
-                                for i in range(i_tile, i_end):
-                                    var a_addr = (
-                                        i * A_stride0 + A_offset + j * A_stride1
-                                    )
-                                    var grad_addr = (
-                                        i * grad_out_stride0
-                                        + k * grad_out_stride1
-                                    )
-                                    accumulator += (
-                                        A_data[a_addr]
-                                        * grad_out_data[grad_addr]
-                                    )
-
-                                grad_B_data[grad_B_addr] = accumulator
-                                k += 1
-
-            parallelize[process_row_tile_B](num_tiles_j, num_physical_cores())
+            var A_buffer_transposed = A.buffer.transpose(IntArray(-1, -2))
+            var ndb = A_buffer_transposed.matmul_2d(grad_out.buffer)
+            var grad_B = Gradbox[Self.dtype](ndb^, share=False)
 
             result.append((B^, grad_B^, AddTensor))
 
@@ -302,246 +63,12 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     @always_inline
     fn forward[
-        simdwidth: Int = simd_width_of[Self.dtype](),
-        tile_size: Int = TILE_SIZE,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
-        ref A_shape = A.shape
-        ref B_shape = B.shape
-        var m = A_shape[0]
-        var n = A_shape[1]
-        var p = B_shape[1]
-
-        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
-        var C = NDBuffer[Self.dtype].zeros(Shape([m, p]))
-
-        # Hoist metadata
-        ref A_strides = A.strides
-        var A_stride0 = A_strides[0]
-        var A_stride1 = A_strides[1]
-        var A_offset = A.offset
-        var A_data = A.data_ptr()
-
-        ref B_strides = B.strides
-        var B_stride0 = B_strides[0]
-        var B_stride1 = B_strides[1]
-        var B_offset = B.offset
-        var B_data = B.data_ptr()
-        var B_contiguous = B.is_contiguous()
-
-        ref C_strides = C.strides
-        var C_stride0 = C_strides[0]
-        var C_stride1 = C_strides[1]
-        var C_offset = C.offset
-        var C_data = C.data_ptr()
-
-        if B_contiguous:
-            # ========================================
-            # PARALLELIZED TILED MATMUL
-            # ========================================
-            var num_tiles_i = (m + tile_size - 1) // tile_size
-
-            @parameter
-            fn process_row_tile(tile_idx: Int):
-                var i_tile = tile_idx * tile_size
-                var i_end = min(i_tile + tile_size, m)
-
-                for j_tile in range(0, p, tile_size):
-                    for k_tile in range(0, n, tile_size):
-                        var j_end = min(j_tile + tile_size, p)
-                        var k_end = min(k_tile + tile_size, n)
-
-                        for i in range(i_tile, i_end):
-                            var a_row_base = i * A_stride0 + A_offset
-                            var c_row_base = i * C_stride0 + C_offset
-
-                            var j = j_tile
-
-                            # Main vectorized loop
-                            while j + simdwidth <= j_end:
-                                var c_addr = c_row_base + j * C_stride1
-                                var accumulator = C_data.load[width=simdwidth](
-                                    c_addr
-                                )
-
-                                for k in range(k_tile, k_end):
-                                    var a_addr = a_row_base + k * A_stride1
-                                    var a_ik = A_data[a_addr]
-
-                                    var b_addr = (
-                                        k * B_stride0 + B_offset + j * B_stride1
-                                    )
-                                    var b_vec = B_data.load[width=simdwidth](
-                                        b_addr
-                                    )
-
-                                    accumulator += a_ik * b_vec
-
-                                C_data.store[width=simdwidth](
-                                    c_addr, accumulator
-                                )
-                                j += simdwidth
-
-                            # Tail handling
-                            while j < j_end:
-                                var c_addr = c_row_base + j * C_stride1
-                                var accumulator = C_data[c_addr]
-
-                                for k in range(k_tile, k_end):
-                                    var a_addr = a_row_base + k * A_stride1
-                                    var b_addr = (
-                                        k * B_stride0 + B_offset + j * B_stride1
-                                    )
-                                    accumulator += (
-                                        A_data[a_addr] * B_data[b_addr]
-                                    )
-
-                                C_data[c_addr] = accumulator
-                                j += 1
-
-            parallelize[process_row_tile](num_tiles_i, num_physical_cores())
-
-        else:
-            # Non-contiguous path (scalar)
-            for i in range(m):
-                var a_row_base = i * A_stride0 + A_offset
-                var c_row_base = i * C_stride0 + C_offset
-
-                for j in range(p):
-                    var accumulator: Scalar[Self.dtype] = 0
-
-                    for k in range(n):
-                        var a_addr = a_row_base + k * A_stride1
-                        var b_addr = k * B_stride0 + B_offset + j * B_stride1
-                        accumulator += A_data[a_addr] * B_data[b_addr]
-
-                    var c_addr = c_row_base + j * C_stride1
-                    C_data[c_addr] = accumulator
-        return C^
-
-    @staticmethod
-    @always_inline
-    fn forward[
         track_grad: Bool = True,
-        simdwidth: Int = simd_width_of[Self.dtype](),
-        tile_size: Int = TILE_SIZE,
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        _ = """ref A_shape = A.shape()
-        ref B_shape = B.shape()
-        var m = A_shape[0]
-        var n = A_shape[1]
-        var p = B_shape[1]
-
-        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
-        var C = Tensor[Self.dtype].zeros(Shape([m, p]))
-
-        # Hoist metadata
-        ref A_strides = A.strides()
-        var A_stride0 = A_strides[0]
-        var A_stride1 = A_strides[1]
-        var A_offset = A.offset()
-        var A_data = A.data_ptr()
-
-        ref B_strides = B.strides()
-        var B_stride0 = B_strides[0]
-        var B_stride1 = B_strides[1]
-        var B_offset = B.offset()
-        var B_data = B.data_ptr()
-        var B_contiguous = B.is_contiguous()
-
-        ref C_strides = C.strides()
-        var C_stride0 = C_strides[0]
-        var C_stride1 = C_strides[1]
-        var C_offset = C.offset()
-        var C_data = C.data_ptr()
-
-        if B_contiguous:
-            # ========================================
-            # PARALLELIZED TILED MATMUL
-            # ========================================
-            var num_tiles_i = (m + tile_size - 1) // tile_size
-
-            @parameter
-            fn process_row_tile(tile_idx: Int):
-                var i_tile = tile_idx * tile_size
-                var i_end = min(i_tile + tile_size, m)
-
-                for j_tile in range(0, p, tile_size):
-                    for k_tile in range(0, n, tile_size):
-                        var j_end = min(j_tile + tile_size, p)
-                        var k_end = min(k_tile + tile_size, n)
-
-                        for i in range(i_tile, i_end):
-                            var a_row_base = i * A_stride0 + A_offset
-                            var c_row_base = i * C_stride0 + C_offset
-
-                            var j = j_tile
-
-                            # Main vectorized loop
-                            while j + simdwidth <= j_end:
-                                var c_addr = c_row_base + j * C_stride1
-                                var accumulator = C_data.load[width=simdwidth](
-                                    c_addr
-                                )
-
-                                for k in range(k_tile, k_end):
-                                    var a_addr = a_row_base + k * A_stride1
-                                    var a_ik = A_data[a_addr]
-
-                                    var b_addr = (
-                                        k * B_stride0 + B_offset + j * B_stride1
-                                    )
-                                    var b_vec = B_data.load[width=simdwidth](
-                                        b_addr
-                                    )
-
-                                    accumulator += a_ik * b_vec
-
-                                C_data.store[width=simdwidth](
-                                    c_addr, accumulator
-                                )
-                                j += simdwidth
-
-                            # Tail handling
-                            while j < j_end:
-                                var c_addr = c_row_base + j * C_stride1
-                                var accumulator = C_data[c_addr]
-
-                                for k in range(k_tile, k_end):
-                                    var a_addr = a_row_base + k * A_stride1
-                                    var b_addr = (
-                                        k * B_stride0 + B_offset + j * B_stride1
-                                    )
-                                    accumulator += (
-                                        A_data[a_addr] * B_data[b_addr]
-                                    )
-
-                                C_data[c_addr] = accumulator
-                                j += 1
-
-            parallelize[process_row_tile](num_tiles_i, num_physical_cores())
-
-        else:
-            # Non-contiguous path (scalar)
-            for i in range(m):
-                var a_row_base = i * A_stride0 + A_offset
-                var c_row_base = i * C_stride0 + C_offset
-
-                for j in range(p):
-                    var accumulator: Scalar[Self.dtype] = 0
-
-                    for k in range(n):
-                        var a_addr = a_row_base + k * A_stride1
-                        var b_addr = k * B_stride0 + B_offset + j * B_stride1
-                        accumulator += A_data[a_addr] * B_data[b_addr]
-
-                    var c_addr = c_row_base + j * C_stride1
-                    C_data[c_addr] = accumulator"""
-        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](
-            A.buffer, B.buffer
-        )
+        var ndb = A.buffer.matmul_2d(B.buffer)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        _ = """@parameter
+        @parameter
         if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
@@ -551,228 +78,26 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
                 ]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn^)
                 C.add_ancestry(A)
-                C.add_ancestry(B)"""
+                C.add_ancestry(B)
 
         return C^
 
     @staticmethod
     @always_inline
-    fn forward[
-        simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
-    ](A: Tensor[Self.dtype], B: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
-        _ = """var m = A.shape()[0]
-        var n = A.shape()[1]
-        var p = B.shape()[1]
-
-        var C = Gradbox[Self.dtype].zeros(Shape([m, p]))
-
-        # Hoist metadata
-        ref A_strides = A.strides()
-        var A_stride0 = A_strides[0]
-        var A_stride1 = A_strides[1]
-        var A_offset = A.offset()
-        var A_data = A.data_ptr()
-
-        ref B_strides = B.strides()
-        var B_stride0 = B_strides[0]
-        var B_stride1 = B_strides[1]
-        var B_data = B.data_ptr()
-
-        ref C_strides = C.strides()
-        var C_stride0 = C_strides[0]
-        var C_stride1 = C_strides[1]
-        var C_offset = C.offset()
-        var C_data = C.data_ptr()
-
-        # ========================================
-        # PARALLELIZED TILED MATMUL
-        # ========================================
-        var num_tiles_i = (m + tile_size - 1) // tile_size
-
-        @parameter
-        fn process_row_tile(tile_idx: Int):
-            var i_tile = tile_idx * tile_size
-            var i_end = min(i_tile + tile_size, m)
-
-            for j_tile in range(0, p, tile_size):
-                for k_tile in range(0, n, tile_size):
-                    var j_end = min(j_tile + tile_size, p)
-                    var k_end = min(k_tile + tile_size, n)
-
-                    for i in range(i_tile, i_end):
-                        var a_row_base = i * A_stride0 + A_offset
-                        var c_row_base = i * C_stride0 + C_offset
-
-                        var j = j_tile
-
-                        while j + simdwidth <= j_end:
-                            var c_addr = c_row_base + j * C_stride1
-                            var accumulator = C_data.load[width=simdwidth](
-                                c_addr
-                            )
-
-                            for k in range(k_tile, k_end):
-                                var a_addr = a_row_base + k * A_stride1
-                                var a_ik = A_data[a_addr]
-
-                                var b_addr = k * B_stride0 + j * B_stride1
-                                var b_vec = B_data.load[width=simdwidth](b_addr)
-
-                                accumulator += a_ik * b_vec
-
-                            C_data.store[width=simdwidth](c_addr, accumulator)
-                            j += simdwidth
-
-                        while j < j_end:
-                            var c_addr = c_row_base + j * C_stride1
-                            var accumulator = C_data[c_addr]
-
-                            for k in range(k_tile, k_end):
-                                var a_addr = a_row_base + k * A_stride1
-                                var b_addr = k * B_stride0 + j * B_stride1
-                                accumulator += A_data[a_addr] * B_data[b_addr]
-
-                            C_data[c_addr] = accumulator
-                            j += 1
-
-        parallelize[process_row_tile](num_tiles_i, num_physical_cores())"""
-        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](
-            A.buffer, B.buffer
-        )
-        var C = Gradbox[Self.dtype](ndb^)
-
+    fn forward(
+        A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
+        var ndb = A.buffer.matmul_2d(B.buffer)
+        var C = Gradbox[Self.dtype](ndb^, share=False)
         return C^
 
     @staticmethod
     @always_inline
-    fn forward[
-        simdwidth: Int = simd_width_of[Self.dtype](), tile_size: Int = TILE_SIZE
-    ](A: Gradbox[Self.dtype], B: Tensor[Self.dtype]) -> Gradbox[Self.dtype]:
-        _ = """var m = A.shape()[0]
-        var n = A.shape()[1]
-        var p = B.shape()[1]
-
-        var C = Gradbox[Self.dtype].zeros(Shape([m, p]))
-        var contiguous = B.is_contiguous()
-
-        if contiguous:
-            # Hoist metadata
-            ref A_strides = A.strides()
-            var A_stride0 = A_strides[0]
-            var A_stride1 = A_strides[1]
-            var A_data = A.data_ptr()
-
-            ref B_strides = B.strides()
-            var B_stride0 = B_strides[0]
-            var B_stride1 = B_strides[1]
-            var B_offset = B.offset()
-            var B_data = B.data_ptr()
-
-            ref C_strides = C.strides()
-            var C_stride0 = C_strides[0]
-            var C_stride1 = C_strides[1]
-            var C_data = C.data_ptr()
-
-            # ========================================
-            # PARALLELIZED TILED MATMUL
-            # ========================================
-            var num_tiles_i = (m + tile_size - 1) // tile_size
-
-            @parameter
-            fn process_row_tile(tile_idx: Int):
-                var i_tile = tile_idx * tile_size
-                var i_end = min(i_tile + tile_size, m)
-
-                for j_tile in range(0, p, tile_size):
-                    for k_tile in range(0, n, tile_size):
-                        var j_end = min(j_tile + tile_size, p)
-                        var k_end = min(k_tile + tile_size, n)
-
-                        for i in range(i_tile, i_end):
-                            var a_row_base = i * A_stride0
-                            var c_row_base = i * C_stride0
-
-                            var j = j_tile
-
-                            while j + simdwidth <= j_end:
-                                var c_addr = c_row_base + j * C_stride1
-                                var accumulator = C_data.load[width=simdwidth](
-                                    c_addr
-                                )
-
-                                for k in range(k_tile, k_end):
-                                    var a_addr = a_row_base + k * A_stride1
-                                    var a_ik = A_data[a_addr]
-
-                                    var b_addr = (
-                                        k * B_stride0 + B_offset + j * B_stride1
-                                    )
-                                    var b_vec = B_data.load[width=simdwidth](
-                                        b_addr
-                                    )
-
-                                    accumulator += a_ik * b_vec
-
-                                C_data.store[width=simdwidth](
-                                    c_addr, accumulator
-                                )
-                                j += simdwidth
-
-                            while j < j_end:
-                                var c_addr = c_row_base + j * C_stride1
-                                var accumulator = C_data[c_addr]
-
-                                for k in range(k_tile, k_end):
-                                    var a_addr = a_row_base + k * A_stride1
-                                    var b_addr = (
-                                        k * B_stride0 + B_offset + j * B_stride1
-                                    )
-                                    accumulator += (
-                                        A_data[a_addr] * B_data[b_addr]
-                                    )
-
-                                C_data[c_addr] = accumulator
-                                j += 1
-
-            parallelize[process_row_tile](num_tiles_i, num_physical_cores())
-
-        else:
-            # Non-contiguous fallback (scalar path)
-            ref A_strides = A.strides()
-            var A_stride0 = A_strides[0]
-            var A_stride1 = A_strides[1]
-            var A_data = A.data_ptr()
-
-            ref B_strides = B.strides()
-            var B_stride0 = B_strides[0]
-            var B_stride1 = B_strides[1]
-            var B_offset = B.offset()
-            var B_data = B.data_ptr()
-
-            ref C_strides = C.strides()
-            var C_stride0 = C_strides[0]
-            var C_stride1 = C_strides[1]
-            var C_data = C.data_ptr()
-
-            for i in range(m):
-                var a_row_base = i * A_stride0
-                var c_row_base = i * C_stride0
-
-                for j in range(p):
-                    var accumulator: Scalar[Self.dtype] = 0
-
-                    for k in range(n):
-                        var a_addr = a_row_base + k * A_stride1
-                        var b_addr = k * B_stride0 + B_offset + j * B_stride1
-                        accumulator += A_data[a_addr] * B_data[b_addr]
-
-                    var c_addr = c_row_base + j * C_stride1
-                    C_data[c_addr] = accumulator"""
-        var ndb = Self.forward[simdwidth=simdwidth, tile_size=tile_size](
-            A.buffer, B.buffer
-        )
-        var C = Gradbox[Self.dtype](ndb^)
-
+    fn forward(
+        A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
+    ) -> Gradbox[Self.dtype]:
+        var ndb = A.buffer.matmul_2d(B.buffer)
+        var C = Gradbox[Self.dtype](ndb^, share=False)
         return C^
 
 
@@ -781,11 +106,9 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
     comptime TAG = BACKWARD_MATMUL_ND
 
-    fn backward[
-        simdwidth: Int = simd_width_of[Self.dtype]()
-    ](self, output: Tensor[Self.dtype]) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
+    fn backward(
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
@@ -830,200 +153,51 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
-        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
-    ](mut A: Tensor[Self.dtype], mut B: Tensor[Self.dtype]) -> Tensor[
-        Self.dtype
-    ]:
-        var C: Tensor[Self.dtype]
-
-        @parameter
-        if has_accelerator():
-            if A.is_on_gpu() and B.is_on_gpu():
-                try:
-                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
-                        A.buffer, B.buffer
-                    )
-                    C = Tensor[Self.dtype](ndb^, requires_grad=False)
-                except e:
-                    print(e)
-                    panic("MatmulNd forward - GPU operation failed")
-                    # Unreachable - make the compiler happy
-                    C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](
-                        A, B
-                    )
-            elif (A.is_on_gpu() and not B.is_on_gpu()) or (
-                not A.is_on_gpu() and B.is_on_gpu()
-            ):
-                panic(
-                    (
-                        "MatmulNd forward - both tensors must be on gpu. A is"
-                        " on gpu?"
-                    ),
-                    A.is_on_gpu().__str__(),
-                    ", B is on gpu?",
-                    B.is_on_gpu().__str__(),
-                )
-                C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](
-                    A, B
-                )
-
-            else:
-                C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](
-                    A, B
-                )
-        else:
-            C = Self.forward_cpu[track_grad=False, simdwidth=simdwidth](A, B)
-
-        @parameter
-        if track_grad:
-            var requires_grad = A.requires_grad or B.requires_grad
-            if requires_grad:
-                ref A_shape = A.shape()
-                ref B_shape = B.shape()
-
-                C.requires_grad_(True)
-                var backward_fn: BackwardFn[Self.dtype]
-
-                if A_shape.rank() == 2 and B_shape.rank() == 2:
-                    backward_fn = Matmul2dBackward[
-                        Self.dtype
-                    ]().into_backward_fn()
-                else:
-                    backward_fn = MatmulNdBackward[
-                        Self.dtype
-                    ]().into_backward_fn()
-                C.backwardFn = Optional(backward_fn^)
-                C.add_ancestry(A)
-                C.add_ancestry(B)
-
-        return C^
-
-    @always_inline
-    @staticmethod
-    fn forward_cpu[
-        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
-    ](mut A: Tensor[Self.dtype], mut B: Tensor[Self.dtype]) -> Tensor[
-        Self.dtype
-    ]:
+        track_grad: Bool = True
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
 
         # Short-circuit for pure 2D case
-        _ = """if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[Self.dtype].forward[track_grad](A, B)"""
+        if A_shape.rank() == 2 and B_shape.rank() == 2:
+            return Matmul2d[Self.dtype].forward[track_grad](A, B)
 
-        MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
-        batch_shape = ShapeBroadcaster.broadcast_shape(
-            A_shape[0:-2], B_shape[0:-2]
-        )
+        var ndb = A.buffer.matmul_nd(B.buffer)
+        var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        var m = A_shape[-2]
-        var n = B_shape[-1]
-
-        var batch_dims_a = A_shape[:-2]
-        var batch_dims_b = B_shape[:-2]
-
-        var out_shape = batch_shape + [m, n]
-        var C = Tensor[Self.dtype].zeros(out_shape)
-
-        for indices in batch_shape:
-            A_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, batch_dims_a
-            )
-            B_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, batch_dims_b
-            )
-            A_slice = A.__getitem__[track_grad=False](il(A_indices), s(), s())
-            B_slice = B.__getitem__[track_grad=False](il(B_indices), s(), s())
-            C_slice = C.__getitem__[track_grad=False](il(indices), s(), s())
-
-            result = Matmul2d[Self.dtype].forward[track_grad=False](
-                A_slice, B_slice
-            )
-            C_slice.buffer.copy_from_alike[overwrite=True](result.buffer)
-
-        _ = """@parameter
+        @parameter
         if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var backward_fn = Matmul2dBackward[
+                var backward_fn = MatmulNdBackward[
                     Self.dtype
                 ]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
-                """
-
-        _ = """@parameter
-        if track_grad:
-            var requires_grad = A.requires_grad or B.requires_grad
-            if requires_grad:
-                C.requires_grad_(True)
-                var backward_fn: BackwardFn[Self.dtype]
-
-                if A_shape.rank() == 2 and B_shape.rank() == 2:
-                    backward_fn = Matmul2dBackward[
-                        Self.dtype
-                    ]().into_backward_fn()
-                else:
-                    backward_fn = MatmulNdBackward[
-                        Self.dtype
-                    ]().into_backward_fn()
-                C.backwardFn = Optional(backward_fn^)
-                C.add_ancestry(A)
-                C.add_ancestry(B)"""
 
         return C^
 
     @always_inline
     @staticmethod
     fn forward(
-        mut A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
+        A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
-        var C: Gradbox[Self.dtype]
+        ref A_shape = A.shape()
+        ref B_shape = B.shape()
 
-        @parameter
-        if has_accelerator():
-            if A.is_on_gpu() and B.is_on_gpu():
-                try:
-                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
-                        A.buffer, B.buffer
-                    )
-                    C = Gradbox[Self.dtype](ndb^, share=False)
-                except e:
-                    print(e)
-                    panic(
-                        "MatmulNd forward(Tensor, Gradbox) - GPU operation"
-                        " failed"
-                    )
-                    # Unreachable - make the compiler happy
-                    C = Self.forward_cpu(A, B)
-            elif (A.is_on_gpu() and not B.is_on_gpu()) or (
-                not A.is_on_gpu() and B.is_on_gpu()
-            ):
-                panic(
-                    (
-                        "MatmulNd forward - both, tensor and gradbox must be on"
-                        " gpu. A is on gpu?"
-                    ),
-                    A.is_on_gpu().__str__(),
-                    ", B is on gpu?",
-                    B.is_on_gpu().__str__(),
-                )
-                C = Self.forward_cpu(A, B)
-
-            else:
-                C = Self.forward_cpu(A, B)
-        else:
-            C = Self.forward_cpu(A, B)
+        if A_shape.rank() == 2 and B_shape.rank() == 2:
+            return Matmul2d[Self.dtype].forward(A, B)
+        var ndb = A.buffer.matmul_nd(B.buffer)
+        var C = Gradbox[Self.dtype](ndb^, share=False)
 
         return C^
 
     @always_inline
     @staticmethod
-    fn forward_cpu(
-        mut A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
+    fn forward(
+        A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         ref A_shape = A.shape()
         ref B_shape = B.shape()
@@ -1031,122 +205,9 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
         if A_shape.rank() == 2 and B_shape.rank() == 2:
             return Matmul2d[Self.dtype].forward(A, B)
 
-        MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
+        var ndb = A.buffer.matmul_nd(B.buffer)
+        var C = Gradbox[Self.dtype](ndb^, share=False)
 
-        batch_shape = ShapeBroadcaster.broadcast_shape(
-            A_shape[0:-2], B_shape[0:-2]
-        )
-        m = A_shape[-2]
-        n = B_shape[-1]
-        batch_dims_a = A_shape[:-2]
-        batch_dims_b = B_shape[:-2]
-
-        out_shape = batch_shape + [m, n]
-        var C = Gradbox[Self.dtype].zeros(out_shape, share=True)
-
-        for indices in batch_shape:
-            var A_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, batch_dims_a
-            )
-            var B_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, batch_dims_b
-            )
-
-            var A_slice = A.__getitem__[track_grad=False](
-                il(A_indices), s(), s()
-            )
-            var B_slice = B[il(B_indices), s(), s()]
-            var C_slice = C[il(indices), s(), s()]
-
-            var result = Matmul2d[Self.dtype].forward(A_slice, B_slice)
-            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer^)
-
-        return C^
-
-    @always_inline
-    @staticmethod
-    fn forward(
-        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
-    ) -> Gradbox[Self.dtype]:
-        var C: Gradbox[Self.dtype]
-
-        @parameter
-        if has_accelerator():
-            if A.is_on_gpu() and B.is_on_gpu():
-                try:
-                    var ndb = MatmulNdGpu[Self.dtype].launch[tile_size=32](
-                        A.buffer, B.buffer
-                    )
-                    C = Gradbox[Self.dtype](ndb^, share=False)
-                except e:
-                    print(e)
-                    panic(
-                        "MatmulNd forward(Gradbox, Tensor) - GPU operation"
-                        " failed"
-                    )
-                    # Unreachable - make the compiler happy
-                    C = Self.forward_cpu(A, B)
-            elif (A.is_on_gpu() and not B.is_on_gpu()) or (
-                not A.is_on_gpu() and B.is_on_gpu()
-            ):
-                panic(
-                    (
-                        "MatmulNd forward - both, gradbox and tensor must be on"
-                        " gpu. A is on gpu?"
-                    ),
-                    A.is_on_gpu().__str__(),
-                    ", B is on gpu?",
-                    B.is_on_gpu().__str__(),
-                )
-                C = Self.forward_cpu(A, B)
-
-            else:
-                C = Self.forward_cpu(A, B)
-        else:
-            C = Self.forward_cpu(A, B)
-
-        return C^
-
-    @always_inline
-    @staticmethod
-    fn forward_cpu(
-        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
-    ) -> Gradbox[Self.dtype]:
-        ref A_shape = A.shape()
-        ref B_shape = B.shape()
-
-        if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[Self.dtype].forward(A, B)
-
-        MatrixShapeValidator.validate_matrix_shapes_nd(A_shape, B_shape)
-
-        batch_shape = ShapeBroadcaster.broadcast_shape(
-            A_shape[0:-2], B_shape[0:-2]
-        )
-        m = A_shape[-2]
-        n = B_shape[-1]
-        batch_dims_a = A_shape[:-2]
-        batch_dims_b = B_shape[:-2]
-
-        out_shape = batch_shape + [m, n]
-        var C = Gradbox[Self.dtype].zeros(out_shape, share=True)
-
-        for indices in batch_shape:
-            var A_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, batch_dims_a
-            )
-            var B_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, batch_dims_b
-            )
-
-            var A_slice = A[il(A_indices), s(), s()]
-            var B_slice = B.__getitem__[track_grad=False](
-                il(B_indices), s(), s()
-            )
-            var C_slice = C[il(indices), s(), s()]
-
-            var result = Matmul2d[Self.dtype].forward(A_slice, B_slice)
-            C_slice.buffer.copy_from_alike[overwrite=False](result.buffer^)
         return C^
 
 
@@ -1157,9 +218,7 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True, mode: Int = mm
-    ](mut A: Tensor[Self.dtype], mut B: Tensor[Self.dtype]) -> Tensor[
-        Self.dtype
-    ]:
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         @parameter
         if mode == mm:
             # Step 1: Pure analysis - get the opcode
@@ -1199,14 +258,14 @@ struct Matmul[dtype: DType](ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward(
-        mut A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
+        A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         return MatmulNd[Self.dtype].forward(A, B)
 
     @always_inline
     @staticmethod
     fn forward(
-        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
+        A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         return MatmulNd[Self.dtype].forward(A, B)
 

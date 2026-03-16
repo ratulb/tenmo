@@ -15,7 +15,7 @@ struct MatrixShapeValidator:
     fn validate_matrix_shapes_nd(A_shape: Shape, B_shape: Shape):
         if len(A_shape) < 2 or len(B_shape) < 2:
             panic(
-                "Tensor → validate_matrix_shapes_nd: matmul_nd expects rank >="
+                "MatrixShapeValidator → validate_matrix_shapes_nd: matmul_nd expects rank >="
                 " 2. Got A = "
                 + A_shape.__str__()
                 + ", B = "
@@ -24,7 +24,7 @@ struct MatrixShapeValidator:
 
         if A_shape[-1] != B_shape[-2]:
             panic(
-                "Tensor → validate_matrix_shapes_nd: inner dimensions"
+                "MatrixShapeValidator → validate_matrix_shapes_nd: inner dimensions"
                 " mismatch: "
                 + "A(...,"
                 + A_shape[-1].__str__()
@@ -49,7 +49,7 @@ struct MatrixShapeValidator:
     fn validate_matrix_shapes_2d(A_shape: Shape, B_shape: Shape):
         if len(A_shape) != 2 or len(B_shape) != 2:
             panic(
-                "Tensor → validate_matrix_shapes_2d: matmul_2d expects rank =="
+                "MatrixShapeValidator → validate_matrix_shapes_2d: matmul_2d expects rank =="
                 " 2. Got A = "
                 + A_shape.__str__()
                 + ", B = "
@@ -58,7 +58,7 @@ struct MatrixShapeValidator:
 
         if A_shape[1] != B_shape[0]:
             panic(
-                "Tensor → validate_matrix_shapes_2d: inner dimensions mismatch"
+                "MatrixShapeValidator → validate_matrix_shapes_2d: inner dimensions mismatch"
                 " in matmul_2d: "
                 + "A(m,"
                 + A_shape[1].__str__()

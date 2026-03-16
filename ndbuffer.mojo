@@ -3,11 +3,14 @@ from strides import Strides
 from buffers import Buffer
 from intarray import IntArray
 from indexhelper import IndexCalculator, IndexIterator
+from matrixshapevalidator import MatrixShapeValidator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic, log_warning, print_buffer
 from validators import Validator
 from memory import memcpy, AddressSpace, ArcPointer
 from gpu.host import DeviceBuffer, DeviceContext
+from algorithm import parallelize
+from sys.info import num_physical_cores
 from device import Device, CPU, GPU, DeviceState
 from collections import Set
 from sys import simd_width_of, has_accelerator
@@ -15,6 +18,7 @@ from scalar_ops_kernel import ScalarOperations
 from scalar_inplace_ops_kernel import InplaceScalarOperations
 from binary_ops_kernel import BinaryOperations
 from binary_inplace_ops_kernel import BinaryInplaceOperations
+from matmul_kernel import MatmulNdGpu
 from compare_kernel import AllClose, Compare, CompareScalar
 from reduction_kernel import Reduction
 from mnemonics import (
@@ -32,6 +36,8 @@ from mnemonics import (
     GreaterThan,
     GreaterThanEqual,
 )
+
+comptime TILE_SIZE = 32
 
 
 struct NDBuffer[dtype: DType](
@@ -138,19 +144,10 @@ struct NDBuffer[dtype: DType](
         self.device_state = other.device_state.copy()
 
     @staticmethod
-    @always_inline
-    fn with_device_state_1(
-        var device_state: DeviceState[Self.dtype], shape: Shape
-    ) -> NDBuffer[Self.dtype]:
-        var ndb = NDBuffer[Self.dtype](shape)
-        ndb.device_state = device_state^
-        return ndb^
-
-    @staticmethod
     fn with_device_state(
         var device_state: DeviceState[Self.dtype], shape: Shape
     ) -> NDBuffer[Self.dtype]:
-        var empty_cpu_buffer = Buffer[Self.dtype]()  # ← empty, like NDBuffer.to_device does
+        var empty_cpu_buffer = Buffer[Self.dtype]()
         var ndb = NDBuffer[Self.dtype](
             empty_cpu_buffer^,
             shape=shape,
@@ -258,7 +255,7 @@ struct NDBuffer[dtype: DType](
             #   - contiguous
             #   - offset = 0
             #   - no CPU buffer
-            var empty_cpu_buffer = Buffer[Self.dtype]()  # uninitialized
+            _ = """var empty_cpu_buffer = Buffer[Self.dtype]()  # uninitialized
             var result = NDBuffer[Self.dtype](
                 empty_cpu_buffer^,
                 shape=self.shape,
@@ -266,8 +263,10 @@ struct NDBuffer[dtype: DType](
                 offset=0,
             )
 
-            result.device_state = new_device_state^
-
+            result.device_state = new_device_state^"""
+            var result = NDBuffer[Self.dtype].with_device_state(
+                new_device_state, self.shape
+            )
             return 0, result^
 
         # 2) Currently on GPU
@@ -1830,8 +1829,14 @@ struct NDBuffer[dtype: DType](
     fn sum_over_broadcasted_axes(
         extended_buffer: NDBuffer[Self.dtype], target_shape: Shape
     ) -> NDBuffer[Self.dtype]:
-        result = extended_buffer.contiguous()
-        current_shape = extended_buffer.shape
+        if extended_buffer.shape == target_shape:
+            return extended_buffer
+        var result: NDBuffer[Self.dtype]
+        if extended_buffer.is_on_cpu():
+            result = extended_buffer.contiguous()
+        else:
+            result = extended_buffer
+        var current_shape = result.shape
         # Sum over extra leading dimensions
         while len(current_shape) > len(target_shape):
             result = result.reduce(normalized_axes=IntArray(0), keepdims=False)
@@ -1845,6 +1850,429 @@ struct NDBuffer[dtype: DType](
                 current_shape = result.shape
         return result^
 
+    fn matmul_2d(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        ref A_shape = A.shape
+        ref B_shape = B.shape
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+
+        var C: NDBuffer[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if A.is_on_gpu() and B.is_on_gpu():
+                try:
+                    C = MatmulNdGpu[Self.dtype].launch[tile_size=TILE_SIZE](
+                        A, B
+                    )
+                except e:
+                    print(e)
+                    panic("NDBuffer matmaul_2d - GPU operation failed")
+                    # Unreachable - make the compiler happy
+                    C = NDBuffer[Self.dtype](Shape())
+            elif (A.is_on_gpu() and B.is_on_cpu()) or (
+                A.is_on_cpu() and B.is_on_gpu()
+            ):
+                panic(
+                    (
+                        " NDBuffer matmaul_2d - both buffers must be on gpu. A"
+                        " is on gpu?"
+                    ),
+                    A.is_on_gpu().__str__(),
+                    ", B is on gpu?",
+                    B.is_on_gpu().__str__(),
+                )
+                C = NDBuffer[Self.dtype](Shape())
+
+            else:
+                C = A.matmul_2d_cpu(B)
+        else:
+            C = A.matmul_2d_cpu(B)
+
+        return C^
+
+    fn matmul_2d_cpu(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        ref A_shape = A.shape
+        ref B_shape = B.shape
+        MatrixShapeValidator.validate_matrix_shapes_2d(A_shape, B_shape)
+
+        comptime tile_size = TILE_SIZE
+        comptime simdwidth = simd_width_of[Self.dtype]()
+
+        var m = A_shape[0]
+        var n = A_shape[1]
+        var p = B_shape[1]
+
+        var C = NDBuffer[Self.dtype].zeros(Shape([m, p]))
+
+        # Hoist metadata
+        ref A_strides = A.strides
+        var A_stride0 = A_strides[0]
+        var A_stride1 = A_strides[1]
+        var A_offset = A.offset
+        var A_data = A.data_ptr()
+
+        ref B_strides = B.strides
+        var B_stride0 = B_strides[0]
+        var B_stride1 = B_strides[1]
+        var B_offset = B.offset
+        var B_data = B.data_ptr()
+        var C_data = C.data_ptr()
+
+        if B.is_contiguous():
+            # ========================================
+            # PARALLELIZED TILED MATMUL
+            # ========================================
+            var num_tiles_i = (m + tile_size - 1) // tile_size
+
+            @parameter
+            fn process_row_tile(tile_idx: Int):
+                var i_tile = tile_idx * tile_size
+                var i_end = min(i_tile + tile_size, m)
+
+                for j_tile in range(0, p, tile_size):
+                    for k_tile in range(0, n, tile_size):
+                        var j_end = min(j_tile + tile_size, p)
+                        var k_end = min(k_tile + tile_size, n)
+
+                        for i in range(i_tile, i_end):
+                            var a_row_base = i * A_stride0 + A_offset
+                            # C.offset = 0, C_stride0 = p
+                            # var c_row_base = i * C_stride0 + C_offset
+                            var c_row_base = i * p
+
+                            var j = j_tile
+
+                            # Main vectorized loop
+                            while j + simdwidth <= j_end:
+                                # var c_addr = c_row_base + j * C_stride1, C_stride1 = 1
+                                var c_addr = c_row_base + j
+                                var accumulator = C_data.load[width=simdwidth](
+                                    c_addr
+                                )
+
+                                for k in range(k_tile, k_end):
+                                    var a_addr = a_row_base + k * A_stride1
+                                    var a_ik = A_data[a_addr]
+
+                                    var b_addr = (
+                                        k * B_stride0 + B_offset + j * B_stride1
+                                    )
+                                    var b_vec = B_data.load[width=simdwidth](
+                                        b_addr
+                                    )
+
+                                    accumulator += a_ik * b_vec
+
+                                C_data.store[width=simdwidth](
+                                    c_addr, accumulator
+                                )
+                                j += simdwidth
+
+                            # Tail handling
+                            while j < j_end:
+                                # var c_addr = c_row_base + j * C_stride1, C_stride1 =1
+                                var c_addr = c_row_base + j
+                                var accumulator = C_data[c_addr]
+
+                                for k in range(k_tile, k_end):
+                                    var a_addr = a_row_base + k * A_stride1
+                                    var b_addr = (
+                                        k * B_stride0 + B_offset + j * B_stride1
+                                    )
+                                    accumulator += (
+                                        A_data[a_addr] * B_data[b_addr]
+                                    )
+
+                                C_data[c_addr] = accumulator
+                                j += 1
+
+            parallelize[process_row_tile](num_tiles_i, num_physical_cores())
+
+        else:
+            # Non-contiguous path (scalar)
+            for i in range(m):
+                var a_row_base = i * A_stride0 + A_offset
+                # C_stride0 = p, C_offset = 0
+                # var c_row_base = i * C_stride0 + C_offset
+                var c_row_base = i * p
+
+                for j in range(p):
+                    var accumulator: Scalar[Self.dtype] = 0
+
+                    for k in range(n):
+                        var a_addr = a_row_base + k * A_stride1
+                        var b_addr = k * B_stride0 + B_offset + j * B_stride1
+                        accumulator += A_data[a_addr] * B_data[b_addr]
+
+                    # var c_addr = c_row_base + j * C_stride1, C_stride1
+                    var c_addr = c_row_base + j
+                    C_data[c_addr] = accumulator
+
+        return C^
+
+    fn matmul_nd(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        var A_shape = A.shape
+        var B_shape = B.shape
+
+        # ── Validate inner dims ───────────────────────────────────────────────────
+        var A_rank = A_shape.rank()
+        var B_rank = B_shape.rank()
+
+        if A_rank < 2 or B_rank < 2:
+            panic("NDBuffer.matmul_nd: inputs must be at least 2D")
+
+        var k_A = A_shape[A_rank - 1]
+        var k_B = B_shape[B_rank - 2]
+
+        if k_A != k_B:
+            panic(
+                "NDBuffer.matmul_nd: inner dims must match, got "
+                + k_A.__str__()
+                + " and "
+                + k_B.__str__()
+            )
+
+        var C: NDBuffer[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if A.is_on_gpu() and B.is_on_gpu():
+                try:
+                    C = MatmulNdGpu[Self.dtype].launch[tile_size=TILE_SIZE](
+                        A, B
+                    )
+                except e:
+                    print(e)
+                    panic("NDBuffer matmaul_nd - GPU operation failed")
+                    # Unreachable - make the compiler happy
+                    C = NDBuffer[Self.dtype](Shape())
+            elif (A.is_on_gpu() and B.is_on_cpu()) or (
+                A.is_on_cpu() and B.is_on_gpu()
+            ):
+                panic(
+                    (
+                        " NDBuffer matmaul_nd - both buffers must be on gpu. A"
+                        " is on gpu?"
+                    ),
+                    A.is_on_gpu().__str__(),
+                    ", B is on gpu?",
+                    B.is_on_gpu().__str__(),
+                )
+                C = NDBuffer[Self.dtype](Shape())
+
+            else:
+                C = A.matmul_nd_cpu(B)
+        else:
+            C = A.matmul_nd_cpu(B)
+
+        return C^
+
+    fn matmul_nd_cpu(
+        A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        var A_shape = A.shape
+        var B_shape = B.shape
+
+        # ── Validate inner dims ───────────────────────────────────────────────────
+        var A_rank = A_shape.rank()
+        var B_rank = B_shape.rank()
+
+        var m = A_shape[A_rank - 2]
+        var k_A = A_shape[A_rank - 1]
+        var k_B = B_shape[B_rank - 2]
+        var p = B_shape[B_rank - 1]
+
+        if k_A != k_B:
+            panic(
+                "NDBuffer.matmul_nd: inner dims must match, got "
+                + k_A.__str__()
+                + " and "
+                + k_B.__str__()
+            )
+
+        comptime tile_size = TILE_SIZE
+        comptime simdwidth = simd_width_of[Self.dtype]()
+
+        var k = k_A
+
+        # ── Batch shapes and broadcasting ─────────────────────────────────────────
+        var A_batch_shape = A_shape[:-2]
+        var B_batch_shape = B_shape[:-2]
+
+        if not ShapeBroadcaster.broadcastable(A_batch_shape, B_batch_shape):
+            panic(
+                "NDBuffer.matmul_nd: batch shapes not broadcastable: "
+                + A_batch_shape.__str__()
+                + " vs "
+                + B_batch_shape.__str__()
+            )
+
+        var batch_shape = ShapeBroadcaster.broadcast_shape(
+            A_batch_shape, B_batch_shape
+        )
+        var total_batch = batch_shape.product()
+        if total_batch == 0:
+            total_batch = 1
+
+        # ── Output ────────────────────────────────────────────────────────────────
+        var out_shape = batch_shape + Shape(m, p)
+        var C = NDBuffer[Self.dtype].zeros(out_shape)
+
+        # ── Hoist metadata ────────────────────────────────────────────────────────
+        var A_batch_rank = A_batch_shape.rank()
+        var B_batch_rank = B_batch_shape.rank()
+        var batch_rank = batch_shape.rank()
+
+        var A_batch_strides = A.strides[:-2]
+        var B_batch_strides = B.strides[:-2]
+
+        var A_row_stride = A.strides[A_rank - 2]
+        var A_col_stride = A.strides[A_rank - 1]
+        var B_row_stride = B.strides[B_rank - 2]
+        var B_col_stride = B.strides[B_rank - 1]
+
+        var A_offset = A.offset
+        var B_offset = B.offset
+
+        var A_data = A.data_ptr()
+        var B_data = B.data_ptr()
+        var C_data = C.data_ptr()
+        # C is always contiguous, offset 0
+        # C strides: batch dims row-major, then (p, 1) for inner dims
+
+        var B_contiguous = B.is_contiguous()
+
+        # ── Parallelise over batch × m tiles ──────────────────────────────────────
+        var num_tiles_i = (m + tile_size - 1) // tile_size
+        var total_tiles = total_batch * num_tiles_i
+
+        @parameter
+        fn process_tile(flat_idx: Int):
+            var batch = flat_idx // num_tiles_i
+            var tile_idx = flat_idx % num_tiles_i
+
+            # ── Recover batch coords and compute A/B base offsets ─────────────────
+            var A_base_off = A_offset
+            var B_base_off = B_offset
+
+            if batch_rank > 0:
+                var coords = List[Int](capacity=batch_rank)
+                for _ in range(batch_rank):
+                    coords.append(0)
+                var remaining = batch
+                for dim in reversed(range(batch_rank)):
+                    coords[dim] = remaining % batch_shape[dim]
+                    remaining //= batch_shape[dim]
+
+                # Right-aligned broadcast clamping for A
+                var A_rank_off = batch_rank - A_batch_rank
+                for i in range(A_batch_rank):
+                    var coord = (
+                        coords[A_rank_off + i] if A_batch_shape[i] > 1 else 0
+                    )
+                    A_base_off += coord * A_batch_strides[i]
+
+                # Right-aligned broadcast clamping for B
+                var B_rank_off = batch_rank - B_batch_rank
+                for i in range(B_batch_rank):
+                    var coord = (
+                        coords[B_rank_off + i] if B_batch_shape[i] > 1 else 0
+                    )
+                    B_base_off += coord * B_batch_strides[i]
+
+            # C base offset for this batch — C is contiguous row-major
+            var C_base_off = batch * m * p
+
+            # ── Tiled matmul for this batch slice ─────────────────────────────────
+            var i_tile = tile_idx * tile_size
+            var i_end = min(i_tile + tile_size, m)
+
+            if B_contiguous:
+                for j_tile in range(0, p, tile_size):
+                    for k_tile in range(0, k, tile_size):
+                        var j_end = min(j_tile + tile_size, p)
+                        var k_end = min(k_tile + tile_size, k)
+
+                        for i in range(i_tile, i_end):
+                            var a_row_base = A_base_off + i * A_row_stride
+                            var c_row_base = C_base_off + i * p
+
+                            var j = j_tile
+
+                            # Vectorised loop
+                            while j + simdwidth <= j_end:
+                                var c_addr = c_row_base + j
+                                var accumulator = C_data.load[width=simdwidth](
+                                    c_addr
+                                )
+
+                                for kk in range(k_tile, k_end):
+                                    var a_addr = a_row_base + kk * A_col_stride
+                                    var a_ik = A_data[a_addr]
+                                    var b_addr = (
+                                        B_base_off
+                                        + kk * B_row_stride
+                                        + j * B_col_stride
+                                    )
+                                    var b_vec = B_data.load[width=simdwidth](
+                                        b_addr
+                                    )
+                                    accumulator += a_ik * b_vec
+
+                                C_data.store[width=simdwidth](
+                                    c_addr, accumulator
+                                )
+                                j += simdwidth
+
+                            # Tail
+                            while j < j_end:
+                                var c_addr = c_row_base + j
+                                var accumulator = C_data[c_addr]
+
+                                for kk in range(k_tile, k_end):
+                                    var a_addr = a_row_base + kk * A_col_stride
+                                    var b_addr = (
+                                        B_base_off
+                                        + kk * B_row_stride
+                                        + j * B_col_stride
+                                    )
+                                    accumulator += (
+                                        A_data[a_addr] * B_data[b_addr]
+                                    )
+
+                                C_data[c_addr] = accumulator
+                                j += 1
+
+            else:
+                # Non-contiguous B — scalar path
+                for i in range(i_tile, i_end):
+                    var a_row_base = A_base_off + i * A_row_stride
+                    var c_row_base = C_base_off + i * p
+
+                    for j in range(p):
+                        var accumulator = Scalar[Self.dtype](0)
+
+                        for kk in range(k):
+                            var a_addr = a_row_base + kk * A_col_stride
+                            var b_addr = (
+                                B_base_off
+                                + kk * B_row_stride
+                                + j * B_col_stride
+                            )
+                            accumulator += A_data[a_addr] * B_data[b_addr]
+
+                        C_data[c_row_base + j] = accumulator
+
+        parallelize[process_tile](total_tiles, num_physical_cores())
+
+        return C^
+
 
 from tenmo import Tensor
 from gradbox import Gradbox
@@ -1852,11 +2280,23 @@ from gradbox import Gradbox
 
 fn main() raises:
     comptime dtype = DType.float32
-    var ndb = NDBuffer[dtype].arange(36)
+    _ = """var ndb = NDBuffer[dtype].arange(36)
     ndb.print()
     var reshaped = ndb.share(Shape(3, 4, 3))
     reshaped.print()
     var transposed = reshaped.transpose(IntArray(-1, -2))
     transposed.print()
     var gb = Gradbox[dtype](transposed, share=False)
-    gb.print()
+    gb.print()"""
+    # var ndb = NDBuffer[dtype](Shape(3, 4))
+    # print(ndb.strides[0], ndb.strides[1])
+    var buffer = Buffer[dtype].arange(24)
+    # var ndb1 = NDBuffer[dtype](buffer, Shape(3, 8))
+    var ndb1 = NDBuffer[dtype](buffer, Shape(8, 3))
+    ndb4 = ndb1.transpose(IntArray())
+    # var ndb2 = NDBuffer[dtype](buffer, Shape(8, 3))
+    var ndb2 = NDBuffer[dtype](buffer, Shape(3, 8))
+    var ndb3 = ndb2.transpose(IntArray())
+
+    var result = ndb4.matmul_2d(ndb3)
+    result.print()
