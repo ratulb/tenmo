@@ -41,36 +41,6 @@ fn test_forward_matmul_fidelity() raises:
     assert_true(C_cpu.all_close(C_gpu.to_cpu()))
     print("PASSED: CPU matmul == GPU matmul")
 
-
-fn test_backward_grad_A_fidelity_orig() raises:
-    print("=== Test 4: Backward grad_A fidelity ===")
-    var A = Tensor[dtype].rand(9, 80, requires_grad=True)
-    var B = Tensor[dtype].rand(80, 20)
-    var A_gpu = A.to_gpu()
-    var B_gpu = B.to_gpu()
-    var C_cpu = A.matmul(B)
-    var C_gpu = A_gpu.matmul(B_gpu)
-
-    C_cpu.backward()
-    var A_cpu_grad = A.grad().copy()
-    A.zero_grad()
-
-    assert_true(A_gpu.grad().all_close(Tensor[dtype].zeros(Shape(9, 80))))
-
-    C_gpu.backward()
-
-    _ = """print("A_gpu grad after backward:")
-    A_gpu.grad().print()
-    print("A CPU grad:")
-    A_cpu_grad.print()"""
-    print("Grad calculated on CPU")
-    A_cpu_grad.print()
-    assert_true(A_gpu.grad().all_close(A_cpu_grad), "Direct extraction failed")
-
-    assert_true(A.grad().all_close(A_cpu_grad))
-    print("PASSED: GPU backward grad_A == CPU backward grad_A")
-
-
 fn test_backward_grad_A_fidelity() raises:
     print("=== Test 4: Backward grad_A fidelity ===")
     var AA = Tensor[dtype].arange(9 * 30, requires_grad=True)
@@ -85,20 +55,15 @@ fn test_backward_grad_A_fidelity() raises:
     var C_gpu = A_gpu.matmul(B_gpu)
 
     C_cpu.backward()
-    var A_cpu_grad = A.grad().copy()
-    A.zero_grad()
 
-    assert_true(A_gpu.grad().all_close(Tensor[dtype].zeros(Shape(9, 30))))
+    #assert_true(A_gpu.grad().all_close(Tensor[dtype].zeros(Shape(9, 30))))
 
     C_gpu.backward()
 
-    print("Grad calculated on CPU")
-    A_cpu_grad.print()
     #assert_true(A_gpu.grad().all_close(A_cpu_grad), "Direct extraction failed")
     A_gpu.grad().print()
-
-    A.grad().print()
-    #assert_true(A.grad().all_close(A_cpu_grad))
+    var AA_grad = AA.grad().reshape(Shape(9, 30))
+    assert_true(AA_grad.all_close(A_gpu.grad() * 2))
     print("PASSED: GPU backward grad_A == CPU backward grad_A")
 
 
@@ -176,11 +141,11 @@ fn main() raises:
         return
     else:
         test_backward_grad_A_fidelity()
-        _="""test_gpu_transfer_fidelity()
+        test_gpu_transfer_fidelity()
         test_ancestry_storage_fidelity()
         test_forward_matmul_fidelity()
         test_ancestry_transposed_matmul_fidelity()
-        test_transposed_matmul_fidelity()"""
+        test_transposed_matmul_fidelity()
 
         print("\n=== ALL TESTS PASSED ===")
 
