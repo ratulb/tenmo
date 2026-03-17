@@ -309,7 +309,7 @@ from tenmo import Tensor
 from testing import assert_true
 
 
-fn main_failing() raises:
+fn main() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].rand(9, 80, requires_grad=True)
     var B = Tensor[dtype].rand(80, 20)
@@ -337,7 +337,7 @@ fn main_failing() raises:
 
 from intarray import IntArray
 
-fn main_2() raises:
+fn main_200() raises:
     comptime dtype = DType.float32
 
     # Exact backward dimensions
@@ -401,7 +401,7 @@ fn main_good() raises:
 
     print("Manual backward verified")
 
-fn main() raises:
+fn main_100() raises:
     comptime dtype = DType.float32
 
     # ── Test 1: Transfer fidelity ─────────────────────────────────────────────
