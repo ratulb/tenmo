@@ -534,7 +534,8 @@ struct Tensor[dtype: DType = DType.float32](
                 " device"
             )
 
-    fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+    #fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+    fn device_context(self) -> Optional[DeviceContext]:
         @parameter
         if has_accelerator():
             return self.buffer.device_context()

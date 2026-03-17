@@ -172,9 +172,11 @@ struct NDBuffer[dtype: DType](
             raise "NDBuffer -> to_gpu(): Empty buffer"
         return self.to_device(gpu.into())[1]
 
-    fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+    #fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+    fn device_context(self) -> Optional[DeviceContext]:
         if self.is_on_gpu():
-            return self.device_state.value().gpu[]
+            #return self.device_state.value().gpu[]
+            return self.device_state.value().gpu()
         return None
 
     fn get(self, index: Int) -> Scalar[Self.dtype]:
