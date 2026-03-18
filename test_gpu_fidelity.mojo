@@ -43,11 +43,8 @@ fn test_forward_matmul_fidelity() raises:
 
 fn test_backward_grad_A_fidelity() raises:
     print("=== Test 4: Backward grad_A fidelity ===")
-    var AA = Tensor[dtype].arange(9 * 30, requires_grad=True)
-    var BB = Tensor[dtype].arange(30 * 5)
-
-    var A = AA.reshape(Shape(9, 30), requires_grad=True)
-    var B = BB.reshape(Shape(30, 5))
+    var A = Tensor[dtype].arange(9 * 30, requires_grad=True).reshape(9, 30)
+    var B = Tensor[dtype].arange(30 * 5).reshape(30, 5)
 
     var A_gpu = A.to_gpu()
     var B_gpu = B.to_gpu()
@@ -56,14 +53,12 @@ fn test_backward_grad_A_fidelity() raises:
 
     C_cpu.backward()
 
-    #assert_true(A_gpu.grad().all_close(Tensor[dtype].zeros(Shape(9, 30))))
+    assert_true(A_gpu.grad().all_close(Tensor[dtype].zeros(Shape(9, 30))))
 
     C_gpu.backward()
 
-    #assert_true(A_gpu.grad().all_close(A_cpu_grad), "Direct extraction failed")
     A_gpu.grad().print()
-    var AA_grad = AA.grad().reshape(Shape(9, 30))
-    assert_true(AA_grad.all_close(A_gpu.grad() * 2))
+    assert_true(A.grad().all_close(A_gpu.grad() * 2))
     print("PASSED: GPU backward grad_A == CPU backward grad_A")
 
 
