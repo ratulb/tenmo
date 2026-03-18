@@ -36,7 +36,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
         if A.requires_grad:
-            var ndb = grad_out.buffer.matmul_2d(
+            #var ndb = grad_out.buffer.matmul_2d(
+            var ndb = grad_out.buffer.matmul_nd(
                 B.buffer.transpose(IntArray(-1, -2))
             )
             var grad_A = Gradbox[Self.dtype](ndb^, share=False)
@@ -46,7 +47,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
         # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
         if B.requires_grad:
             var A_buffer_transposed = A.buffer.transpose(IntArray(-1, -2))
-            var ndb = A_buffer_transposed.matmul_2d(grad_out.buffer)
+            #var ndb = A_buffer_transposed.matmul_2d(grad_out.buffer)
+            var ndb = A_buffer_transposed.matmul_nd(grad_out.buffer)
             var grad_B = Gradbox[Self.dtype](ndb^, share=False)
 
             result.append((B^, grad_B^, AddTensor))
@@ -65,7 +67,8 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     fn forward[
         track_grad: Bool = True,
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        var ndb = A.buffer.matmul_2d(B.buffer)
+        #var ndb = A.buffer.matmul_2d(B.buffer)
+        var ndb = A.buffer.matmul_nd(B.buffer)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         @parameter
@@ -73,7 +76,8 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var backward_fn = Matmul2dBackward[
+                #var backward_fn = Matmul2dBackward[
+                var backward_fn = MatmulNdBackward[
                     Self.dtype
                 ]().into_backward_fn()
                 C.backwardFn = Optional(backward_fn^)
@@ -87,7 +91,8 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     fn forward(
         A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
-        var ndb = A.buffer.matmul_2d(B.buffer)
+        #var ndb = A.buffer.matmul_2d(B.buffer)
+        var ndb = A.buffer.matmul_nd(B.buffer)
         var C = Gradbox[Self.dtype](ndb^, share=False)
         return C^
 
@@ -96,7 +101,8 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
     fn forward(
         A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
-        var ndb = A.buffer.matmul_2d(B.buffer)
+        #var ndb = A.buffer.matmul_2d(B.buffer)
+        var ndb = A.buffer.matmul_nd(B.buffer)
         var C = Gradbox[Self.dtype](ndb^, share=False)
         return C^
 
@@ -155,12 +161,12 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     fn forward[
         track_grad: Bool = True
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        ref A_shape = A.shape()
-        ref B_shape = B.shape()
+        #ref A_shape = A.shape()
+        #ref B_shape = B.shape()
 
         # Short-circuit for pure 2D case
-        if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[Self.dtype].forward[track_grad](A, B)
+        #if A_shape.rank() == 2 and B_shape.rank() == 2:
+            #return Matmul2d[Self.dtype].forward[track_grad](A, B)
 
         var ndb = A.buffer.matmul_nd(B.buffer)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
@@ -184,11 +190,11 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     fn forward(
         A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
-        ref A_shape = A.shape()
-        ref B_shape = B.shape()
+        #ref A_shape = A.shape()
+        #ref B_shape = B.shape()
 
-        if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[Self.dtype].forward(A, B)
+        #if A_shape.rank() == 2 and B_shape.rank() == 2:
+            #return Matmul2d[Self.dtype].forward(A, B)
         var ndb = A.buffer.matmul_nd(B.buffer)
         var C = Gradbox[Self.dtype](ndb^, share=False)
 
@@ -199,11 +205,11 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
     fn forward(
         A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
-        ref A_shape = A.shape()
-        ref B_shape = B.shape()
+        #ref A_shape = A.shape()
+        #ref B_shape = B.shape()
 
-        if A_shape.rank() == 2 and B_shape.rank() == 2:
-            return Matmul2d[Self.dtype].forward(A, B)
+        #if A_shape.rank() == 2 and B_shape.rank() == 2:
+            #return Matmul2d[Self.dtype].forward(A, B)
 
         var ndb = A.buffer.matmul_nd(B.buffer)
         var C = Gradbox[Self.dtype](ndb^, share=False)

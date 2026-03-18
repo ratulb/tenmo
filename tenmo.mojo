@@ -1342,7 +1342,8 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn reshape[
         track_grad: Bool = True
-    ](mut self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
+    #](mut self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
         if self.numels() != 1:
             panic(
                 "Tensor → reshape: only tensor with single element can be"
@@ -1354,7 +1355,8 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn reshape[
         track_grad: Bool = True
-    ](mut self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
+    #](mut self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
+    ](self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
         if len(newdims) == 1 and newdims[0] == 0:
@@ -1369,7 +1371,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn reshape[
         track_grad: Bool = True
     ](
-        mut self, shape: List[Int], requires_grad: Optional[Bool] = None
+        #mut self, shape: List[Int], requires_grad: Optional[Bool] = None
+        self, shape: List[Int], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
         new_shape = Validator.validate_and_construct_new_shape(
             self.shape(), IntArray(shape)
@@ -1381,7 +1384,8 @@ struct Tensor[dtype: DType = DType.float32](
     fn reshape[
         track_grad: Bool = True
     ](
-        mut self,
+        #mut self,
+        self,
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
@@ -2305,7 +2309,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn matmul[
         track_grad: Bool = True, mode: Int = mnemonics.mm
-    ](mut A: Tensor[Self.dtype], mut B: Tensor[Self.dtype]) -> Tensor[
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
         return Matmul[Self.dtype].forward[track_grad=track_grad, mode=mode](
@@ -2313,7 +2317,7 @@ struct Tensor[dtype: DType = DType.float32](
         )
 
     fn matmul(
-        mut A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
+        A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         return Matmul[Self.dtype].forward(A, B)
 

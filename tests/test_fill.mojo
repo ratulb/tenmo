@@ -314,9 +314,11 @@ fn test_fill_scalar_on_view_reshape() raises:
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(12)
-    var view = x.reshape(3, 4)
+    var view = x.into_view()
+    var reshaped = view.reshape(3, 4)
+    print("View is contiguous: ", view.is_contiguous())
 
-    view.fill(77.0, i(1), i(2))  # [1, 2] in reshaped view
+    reshaped.fill(77.0, i(1), i(2))  # [1, 2] in reshaped view
 
     # Should modify x at flat index 1*4 + 2 = 6
     assert_true(x[6] == 77.0)
@@ -474,10 +476,11 @@ fn test_fill_tensor_reshaped_view() raises:
 
     comptime dtype = DType.float32
     var x = Tensor[dtype].arange(12)
-    var view = x.reshape(3, 4)
+    var v = x.into_view()
+    var reshaped = v.reshape(3, 4)
 
     var src = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0])
-    view.fill(src, i(1), s())  # Fill second row
+    reshaped.fill(src, i(1), s())  # Fill second row
 
     # x should be modified at [4:8]
     assert_true(x[3] == 3.0)

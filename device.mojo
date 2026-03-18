@@ -56,7 +56,7 @@ struct CPU(Equatable, ImplicitlyCopyable, Movable):
 struct GPU(Equatable, ImplicitlyCopyable, Movable):
     """Essentially a shared DeviceContext."""
 
-    #var device_context: ArcPointer[DeviceContext]
+    # var device_context: ArcPointer[DeviceContext]
     var device_context: DeviceContext
     var id: Int64
 
@@ -64,7 +64,7 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
         return Device(self)
 
     fn __init__(out self, device_id: Int = 0) raises:
-        #self.device_context = ArcPointer(DeviceContext(device_id))
+        # self.device_context = ArcPointer(DeviceContext(device_id))
         self.device_context = DeviceContext(device_id)
         self.id = device_id
 
@@ -78,9 +78,10 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
 
     fn __eq__(self, other: Self) -> Bool:
         return (
-            #self.device_context.__is__(other.device_context)
-            #or self.id == other.id
-            self.id == other.id
+            # self.device_context.__is__(other.device_context)
+            # or self.id == other.id
+            self.id
+            == other.id
         )
 
     fn __ne__(self, other: Self) -> Bool:
@@ -91,22 +92,22 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
 
     fn __exit__(mut self):
         try:
-            #self.device_context[].synchronize()
+            # self.device_context[].synchronize()
             self.device_context.synchronize()
         except e:
             print(e)
             print("Error synchronizing GPU device context: ", e.__str__())
 
-    #fn __getitem__(self) -> ArcPointer[DeviceContext]:
+    # fn __getitem__(self) -> ArcPointer[DeviceContext]:
     fn __getitem__(self) -> DeviceContext:
         return self.device_context.copy()
 
-    #fn handle(self) -> ArcPointer[DeviceContext]:
+    # fn handle(self) -> ArcPointer[DeviceContext]:
     fn handle(self) -> DeviceContext:
         return self.device_context.copy()
 
     fn __call__(self) -> DeviceContext:
-        #return self.device_context.copy()[]
+        # return self.device_context.copy()[]
         return self.device_context.copy()
 
 
@@ -144,20 +145,29 @@ struct DeviceState[dtype: DType](
     fn __len__(self) -> Int:
         return len(self.buffer)
 
+    @always_inline
+    fn sync(self) raises:
+        self.gpu().synchronize()
+
     fn new(
-        self, size: Int, value: Scalar[Self.dtype] = Scalar[Self.dtype](0)
-    ) raises -> Self:
+        self,
+        size: Int,
+        value: Scalar[Self.dtype] = Scalar[Self.dtype](0),
+        sync: Bool = True,
+    ) raises -> DeviceState[Self.dtype]:
         var device_state = Self(size, self.gpu)
         device_state.buffer.enqueue_fill(value)
-        self.gpu().synchronize()
+        if sync:
+            self.sync()
         return device_state
 
-    fn fill(self, value: Scalar[Self.dtype]) raises:
+    fn fill(self, value: Scalar[Self.dtype], sync: Bool = True) raises:
         with self.buffer.map_to_host() as host_buffer:
             host_buffer.enqueue_fill(value)
-        self.gpu().synchronize()
+        if sync:
+            self.sync()
 
-    fn fill(self, ref source: NDBuffer[Self.dtype]) raises:
+    fn fill(self, ref source: NDBuffer[Self.dtype], sync: Bool = True) raises:
         """Fill the DeviceBuffer from the source NDBuffer."""
         with self.buffer.map_to_host() as host_buffer:
             var device_ptr = host_buffer.unsafe_ptr()
@@ -174,18 +184,19 @@ struct DeviceState[dtype: DType](
                 for index in source.index_iterator():
                     (device_ptr + next_index)[] = (src_ptr + index)[]
                     next_index += 1
-        self.gpu().synchronize()
+        if sync:
+            self.sync()
 
     fn into(
-        self, shape: Shape, *, copy: Bool = True
+        self, shape: Shape, *, copy: Bool = True, sync: Bool = True
     ) raises -> NDBuffer[Self.dtype]:
         """Copy the DeviceState content to realize a filled NDBuffer.
         The NDBuffer is contiguous with 0 offset.
         """
         var ndb = NDBuffer[Self.dtype](self.buffer, shape, copy=copy)
-        self.gpu().synchronize()
+        if sync:
+            self.sync()
         return ndb^
-
 
     fn device_buffer(
         ref self,

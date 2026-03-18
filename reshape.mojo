@@ -35,31 +35,13 @@ struct Reshape[dtype: DType](Copyable):
     fn forward[
         track_grad: Bool = True
     ](
-        mut tensor: Tensor[Self.dtype],
+        tensor: Tensor[Self.dtype],
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[Self.dtype]:
-        shape = new_shape if validated else Validator.validate_and_construct_new_shape(
-            tensor.shape(), new_shape.intarray()
-        )
-        var out: Tensor[Self.dtype]
-        if tensor.is_contiguous():
-            # Calculate the correct offset and strides
-            var new_offset = tensor.offset()
-            var new_strides = Strides.default(shape)
-
-            out = Tensor[Self.dtype].build_view(
-                tensor,
-                shape^,
-                Optional(new_strides^),
-                new_offset,
-                requires_grad=False,
-            )
-
-        else:
-            nd_buffer = tensor.buffer.contiguous(shape^)
-            out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
+        var ndb = tensor.buffer.reshape(new_shape, validated, prefer_sharing=True)
+        var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         @parameter
         if track_grad:
@@ -72,3 +54,18 @@ struct Reshape[dtype: DType](Copyable):
                 out.add_ancestry(tensor)
 
         return out^
+
+
+fn main() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(12).reshape(3, 4, requires_grad=True)
+    a.print()
+
+    var a_gpu = a.to_gpu()
+    var a_gpu_reshaped = a_gpu.reshape(2, 2, 3)
+    var res = a_gpu_reshaped * 42
+    res.backward()
+    a.grad().print()
+    a_gpu.grad().print()
+    a_gpu_reshaped.grad().print()
+
