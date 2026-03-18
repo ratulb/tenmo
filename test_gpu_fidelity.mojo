@@ -43,7 +43,8 @@ fn test_forward_matmul_fidelity() raises:
 
 fn test_backward_grad_A_fidelity() raises:
     print("=== Test 4: Backward grad_A fidelity ===")
-    var A = Tensor[dtype].arange(9 * 30, requires_grad=True).reshape(9, 30)
+    var AA = Tensor[dtype].arange(9 * 30, requires_grad=True)
+    var A =AA.reshape(9, 30)
     var B = Tensor[dtype].arange(30 * 5).reshape(30, 5)
 
     var A_gpu = A.to_gpu()
@@ -130,17 +131,26 @@ fn test_ancestry_transposed_matmul_fidelity() raises:
 
 from common_utils import now
 fn main() raises:
+    var A_parent = Tensor[dtype].arange(9 * 30, requires_grad=True)
+    var A = A_parent.reshape(9, 30, requires_grad=True)
+    var B = Tensor[dtype].arange(30 * 5).reshape(30, 5)
+
+    var C_cpu = A.matmul(B)
+    C_cpu.backward()
+
+    A_parent.grad().print()
+
     @parameter
     if not has_accelerator():
         print("No GPU available — skipping tests")
         return
     else:
-        test_backward_grad_A_fidelity()
         test_gpu_transfer_fidelity()
         test_ancestry_storage_fidelity()
         test_forward_matmul_fidelity()
         test_ancestry_transposed_matmul_fidelity()
         test_transposed_matmul_fidelity()
+        test_backward_grad_A_fidelity()
 
         print("\n=== ALL TESTS PASSED ===")
 

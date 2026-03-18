@@ -756,7 +756,7 @@ struct Gradbox[dtype: DType](
     fn reshape(
         self, new_shape: Shape, validated: Bool = False, share: Bool = False
     ) -> Gradbox[Self.dtype]:
-        var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
+        _="""var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             self.shape(), new_shape.intarray()
         )
         var nd_buffer: NDBuffer[Self.dtype]
@@ -770,8 +770,8 @@ struct Gradbox[dtype: DType](
                 print(e)
                 panic("NDBuffer → rehape: failed.", e.__str__())
                 # Unreachable
-                nd_buffer = NDBuffer[Self.dtype](Shape())
-        #var nd_buffer = self.buffer.reshape(new_shape, validated, prefer_sharing=False)
+                nd_buffer = NDBuffer[Self.dtype](Shape())"""
+        var nd_buffer = self.buffer.reshape(new_shape, validated, prefer_sharing=False)
 
         return Gradbox[Self.dtype](nd_buffer^, share=share)
 

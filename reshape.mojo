@@ -58,14 +58,23 @@ struct Reshape[dtype: DType](Copyable):
 
 fn main() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(12).reshape(3, 4, requires_grad=True)
-    a.print()
+    var a = Tensor[dtype].arange(12, requires_grad=True).reshape(3, 4, requires_grad=True)
+    #var a =aa.reshape(3, 4, requires_grad=True)
+    #a.print()
 
-    var a_gpu = a.to_gpu()
+    var b = a * 42
+    c = b.reshape(4, 3)
+    d = c.reshape(2, 2, 3)
+    e = d * 5
+    e.backward()
+    a.grad().print()
+    a.grad().print()
+
+    _="""var a_gpu = a.to_gpu()
     var a_gpu_reshaped = a_gpu.reshape(2, 2, 3)
     var res = a_gpu_reshaped * 42
     res.backward()
     a.grad().print()
     a_gpu.grad().print()
-    a_gpu_reshaped.grad().print()
+    a_gpu_reshaped.grad().print()"""
 
