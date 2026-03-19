@@ -11,7 +11,8 @@ from mnemonics import AddTensor, mm, vm, mv, dot, invalid
 from gradbox import Gradbox
 from shapes import Shape
 from broadcasthelper import ShapeBroadcaster
-from common_utils import il, s, panic, log_debug
+#from common_utils import il, s, panic, log_debug
+from common_utils import panic
 from vectormatrix import VectorMatmulNd
 from matrixvector import MatrixVectorMulNd
 from algorithm import parallelize
@@ -128,7 +129,6 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
         if A.requires_grad:
             var B_transposed = B.transpose[track_grad=False](
                 axes=[-1, -2]
-            #).contiguous[track_grad=False]()
             )
 
             var A_batch_grad = MatmulNd[Self.dtype].forward(

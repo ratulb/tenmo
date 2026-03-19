@@ -786,10 +786,8 @@ struct NDBuffer[dtype: DType](
         self,
         new_shape: Shape,
         validated: Bool = False,
-        prefer_sharing: Bool = False,
     ) -> NDBuffer[Self.dtype]:
-        """If on GPU an NDBuffer with shared device state.
-        On CPU either allocated buffer or shared.
+        """Always a newly allocated buffer.
         """
         var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             self.shape, new_shape.intarray()
@@ -799,70 +797,30 @@ struct NDBuffer[dtype: DType](
         @parameter
         if has_accelerator():
             if self.is_on_gpu():
-                out = self.reshape_gpu(
-                    shape, validated=True, prefer_sharing=prefer_sharing
-                )
+                out = self.reshape_gpu(shape)
             else:
-                out = self.reshape_cpu(
-                    shape, validated=True, prefer_sharing=prefer_sharing
-                )
+                out = out = self.contiguous(shape)
         else:
-            out = self.reshape_cpu(
-                shape, validated=True, prefer_sharing=prefer_sharing
-            )
+            out = out = self.contiguous(shape)
 
         return out^
 
     fn reshape_gpu(
         self,
         shape: Shape,
-        validated: Bool = False,
-        prefer_sharing: Bool = False,
     ) -> NDBuffer[Self.dtype]:
-        """If on GPU an NDBuffer with shared device state.
-        On CPU either allocated buffer or shared.
-        """
         var out: NDBuffer[Self.dtype]
 
-        ref device_state = self.device_state.value()
-        if prefer_sharing:
-            out = NDBuffer[Self.dtype].with_device_state(device_state, shape)
-        else:
-            try:
-                var new_state = device_state.new(self.numels(), 0, sync=False)
-                new_state.fill(self, sync=True)
-                out = NDBuffer[Self.dtype].with_device_state(new_state, shape)
-            except e:
-                print(e)
-                panic("Error reshaping device buffer")
-                # Unreachable
-                out = NDBuffer[Self.dtype](Shape())
-        return out^
-
-    fn reshape_cpu(
-        self,
-        shape: Shape,
-        validated: Bool = False,
-        prefer_sharing: Bool = False,
-    ) -> NDBuffer[Self.dtype]:
-        """If on GPU an NDBuffer with shared device state.
-        On CPU either allocated buffer or shared.
-        """
-        var out: NDBuffer[Self.dtype]
-
-        if self.is_contiguous():
-            if prefer_sharing:
-                var new_offset = self.offset
-                var new_strides = Strides.default(shape)
-                # Would be shared if already shared
-                out = NDBuffer[Self.dtype](
-                    self.buffer.copy(), shape, new_strides^, new_offset
-                )
-            else:
-                out = self.contiguous(shape)
-        else:
-            out = self.contiguous(shape)
-
+        try:
+            ref device_state = self.device_state.value()
+            var new_state = device_state.new(self.numels(), 0, sync=False)
+            new_state.fill(self, sync=True)
+            out = NDBuffer[Self.dtype].with_device_state(new_state, shape)
+        except e:
+            print(e)
+            panic("Error reshaping device buffer")
+            # Unreachable
+            out = NDBuffer[Self.dtype](Shape())
         return out^
 
     fn contiguous(
@@ -2383,12 +2341,9 @@ fn main() raises:
     var ndb = NDBuffer[dtype](buffer, Shape(2, 3, 4))
     var result1 = ndb.sum_over_broadcasted_axes(Shape(4))
     result1.print()
+
     @parameter
     if has_accelerator():
         var ndb_gpu = ndb.to_gpu(GPU())
         var result2 = ndb_gpu.sum_over_broadcasted_axes(Shape(4))
         result2.print()
-
-
-
-

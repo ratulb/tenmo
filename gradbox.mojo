@@ -770,7 +770,7 @@ struct Gradbox[dtype: DType](
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
     @always_inline
-    fn reshape(self, share: Bool = True) -> Gradbox[Self.dtype]:
+    fn reshape(self, share: Bool = False) -> Gradbox[Self.dtype]:
         if self.numels() != 1:
             panic(
                 "Gradbox → reshape: only gradbox with single element can be"
@@ -782,24 +782,7 @@ struct Gradbox[dtype: DType](
     fn reshape(
         self, new_shape: Shape, validated: Bool = False, share: Bool = False
     ) -> Gradbox[Self.dtype]:
-        _ = """var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
-            self.shape(), new_shape.intarray()
-        )
-        var nd_buffer: NDBuffer[Self.dtype]
-        if self.is_on_cpu():
-            var buffer = self.buffer.contiguous_buffer()
-            nd_buffer = NDBuffer[Self.dtype](buffer^, shape^)
-        else:
-            try:
-                nd_buffer = self.buffer.device_state.value().into(shape^)
-            except e:
-                print(e)
-                panic("NDBuffer → rehape: failed.", e.__str__())
-                # Unreachable
-                nd_buffer = NDBuffer[Self.dtype](Shape())"""
-        var nd_buffer = self.buffer.reshape(
-            new_shape, validated, prefer_sharing=False
-        )
+        var nd_buffer = self.buffer.reshape(new_shape, validated)
 
         return Gradbox[Self.dtype](nd_buffer^, share=share)
 

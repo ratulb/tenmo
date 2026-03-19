@@ -44,8 +44,10 @@ fn test_gpu_grad_flow() raises:
     var B_reshaped = B.reshape(Shape(30, 5))
 
     var A_gpu = A_reshaped.to_gpu()
+    var A_r = A_gpu.reshape(3, 3, 1, 30)
+    var A_rr = A_r.reshape(3, 2, 3, 1, 15)
     var B_gpu = B_reshaped.to_gpu()
-    var A_gpu_reshaped = A_gpu.reshape(Shape(9, 1, 30))
+    var A_gpu_reshaped = A_rr.reshape(Shape(9, 1, 30))
     var C_gpu = A_gpu_reshaped.matmul(B_gpu)
 
     C_gpu.backward()

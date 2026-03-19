@@ -1330,7 +1330,6 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn reshape[
         track_grad: Bool = True
-        # ](mut self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
         if self.numels() != 1:
             panic(
@@ -1343,7 +1342,6 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn reshape[
         track_grad: Bool = True
-        # ](mut self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
     ](self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
@@ -1359,11 +1357,12 @@ struct Tensor[dtype: DType = DType.float32](
     fn reshape[
         track_grad: Bool = True
     ](
-        # mut self, shape: List[Int], requires_grad: Optional[Bool] = None
         self,
         shape: List[Int],
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
+    ) -> Tensor[
+        Self.dtype
+    ]:
         new_shape = Validator.validate_and_construct_new_shape(
             self.shape(), IntArray(shape)
         )
@@ -1374,7 +1373,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn reshape[
         track_grad: Bool = True
     ](
-        # mut self,
         self,
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,

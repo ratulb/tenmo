@@ -40,7 +40,7 @@ struct Reshape[dtype: DType](Copyable):
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[Self.dtype]:
-        var ndb = tensor.buffer.reshape(new_shape, validated, prefer_sharing=True)
+        var ndb = tensor.buffer.reshape(new_shape, validated)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         @parameter
