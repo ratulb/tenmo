@@ -40,12 +40,13 @@ fn test_gpu_grad_flow() raises:
     var A = Tensor[dtype].arange(9 * 30, requires_grad=True)
     var B = Tensor[dtype].arange(30 * 5)
 
-    var A_reshaped = A.reshape(Shape(9, 30))
+    var A_reshaped = A.reshape(Shape(1, 9, 30))
     var B_reshaped = B.reshape(Shape(30, 5))
 
     var A_gpu = A_reshaped.to_gpu()
     var B_gpu = B_reshaped.to_gpu()
-    var C_gpu = A_gpu.matmul(B_gpu)
+    var A_gpu_reshaped = A_gpu.reshape(Shape(9, 1, 30))
+    var C_gpu = A_gpu_reshaped.matmul(B_gpu)
 
     C_gpu.backward()
     var A_grad = A.grad().copy()

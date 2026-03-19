@@ -128,7 +128,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
         if A.requires_grad:
             var B_transposed = B.transpose[track_grad=False](
                 axes=[-1, -2]
-            ).contiguous[track_grad=False]()
+            #).contiguous[track_grad=False]()
+            )
 
             var A_batch_grad = MatmulNd[Self.dtype].forward(
                 grad_out, B_transposed
