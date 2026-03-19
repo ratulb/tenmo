@@ -2379,25 +2379,16 @@ from gradbox import Gradbox
 
 fn main() raises:
     comptime dtype = DType.float32
-    _ = """var ndb = NDBuffer[dtype].arange(36)
-    ndb.print()
-    var reshaped = ndb.share(Shape(3, 4, 3))
-    reshaped.print()
-    var transposed = reshaped.transpose(IntArray(-1, -2))
-    transposed.print()
-    var gb = Gradbox[dtype](transposed, share=False)
-    gb.print()"""
-    # var ndb = NDBuffer[dtype](Shape(3, 4))
-    # print(ndb.strides[0], ndb.strides[1])
     var buffer = Buffer[dtype].arange(24)
-    # var ndb1 = NDBuffer[dtype](buffer, Shape(3, 8))
-    var ndb1 = NDBuffer[dtype](buffer, Shape(8, 3))
-    ndb4 = ndb1.transpose(IntArray())
-    # var ndb2 = NDBuffer[dtype](buffer, Shape(8, 3))
-    var ndb2 = NDBuffer[dtype](buffer, Shape(3, 8))
-    var ndb3 = ndb2.transpose(IntArray())
+    var ndb = NDBuffer[dtype](buffer, Shape(2, 3, 4))
+    var result1 = ndb.sum_over_broadcasted_axes(Shape(4))
+    result1.print()
+    @parameter
+    if has_accelerator():
+        var ndb_gpu = ndb.to_gpu(GPU())
+        var result2 = ndb_gpu.sum_over_broadcasted_axes(Shape(4))
+        result2.print()
 
-    var result = ndb4.matmul_2d(ndb3)
-    result.print()
-    r = result.reshape(Shape(9))
-    r.print()
+
+
+
