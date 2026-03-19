@@ -490,29 +490,12 @@ struct Tensor[dtype: DType = DType.float32](
                     (ptr + offset)[] = data_buffer[index]
                     offset += 1
 
-    fn to_device(
-        mut self, device: Device, requires_grad: Optional[Bool] = None
-    ) raises -> Self:
-        if device.is_cpu():
-            if self.is_on_cpu():
-                return self
-            return DeviceTransfer[Self.dtype].forward[True](
-                self, device, requires_grad
-            )
-
-        # GPU case
-        if self.is_on_gpu():
-            return self
-        return DeviceTransfer[Self.dtype].forward[True](
-            self, device, requires_grad
-        )
-
-    fn to_cpu(
-        mut self,
-    ) raises -> Self:
+    fn to_cpu(self, requires_grad: Optional[Bool] = None) raises -> Self:
         @parameter
         if has_accelerator():
-            return self.to_device(CPU().into())
+            return DeviceTransfer[Self.dtype].forward[True](
+                self, CPU().into(), requires_grad
+            )
         raise Error("System does not have any accelerator")
 
     fn to_gpu(
@@ -523,22 +506,27 @@ struct Tensor[dtype: DType = DType.float32](
         @parameter
         if has_accelerator():
             if gpu:
-                return self.to_device(
-                    gpu.value().into(), requires_grad=requires_grad
+                return DeviceTransfer[Self.dtype].forward[True](
+                    self, gpu.value().into(), requires_grad
                 )
             else:
-                return self.to_device(GPU().into(), requires_grad=requires_grad)
+                return DeviceTransfer[Self.dtype].forward[True](
+                    self, GPU().into(), requires_grad
+                )
         else:
             raise Error(
                 "Can not move to GPU. System does not have any accelerator"
                 " device"
             )
 
-    #fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+    # fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
     fn device_context(self) -> Optional[DeviceContext]:
         @parameter
         if has_accelerator():
-            return self.buffer.device_context()
+            if self.is_on_gpu():
+                return self.buffer.device_context()
+            else:
+                return None
         return None
 
     # Check if it has a backward fn before calling this API
@@ -1342,7 +1330,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn reshape[
         track_grad: Bool = True
-    #](mut self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
+        # ](mut self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
         if self.numels() != 1:
             panic(
@@ -1355,7 +1343,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn reshape[
         track_grad: Bool = True
-    #](mut self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
+        # ](mut self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
     ](self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
@@ -1371,8 +1359,10 @@ struct Tensor[dtype: DType = DType.float32](
     fn reshape[
         track_grad: Bool = True
     ](
-        #mut self, shape: List[Int], requires_grad: Optional[Bool] = None
-        self, shape: List[Int], requires_grad: Optional[Bool] = None
+        # mut self, shape: List[Int], requires_grad: Optional[Bool] = None
+        self,
+        shape: List[Int],
+        requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         new_shape = Validator.validate_and_construct_new_shape(
             self.shape(), IntArray(shape)
@@ -1384,7 +1374,7 @@ struct Tensor[dtype: DType = DType.float32](
     fn reshape[
         track_grad: Bool = True
     ](
-        #mut self,
+        # mut self,
         self,
         new_shape: Shape,
         requires_grad: Optional[Bool] = None,
@@ -2309,9 +2299,7 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn matmul[
         track_grad: Bool = True, mode: Int = mnemonics.mm
-    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[
-        Self.dtype
-    ]:
+    ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         return Matmul[Self.dtype].forward[track_grad=track_grad, mode=mode](
             A, B
         )

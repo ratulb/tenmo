@@ -150,6 +150,18 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable):
 
         return out^
 
+    @always_inline
+    @staticmethod
+    fn forward(
+        self: Gradbox[Self.dtype],
+        device: Device,
+    ) raises -> Gradbox[Self.dtype]:
+        var (code, ndb) = self.buffer.to_device(device)
+        # Either CPU→CPU or GPU→GPU on same device — no transfer needed
+        if code == -1:
+            return self
+        return Gradbox[Self.dtype](ndb^, share=False)
+
 
 fn main() raises:
     pass

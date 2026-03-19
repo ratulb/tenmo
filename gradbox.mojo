@@ -7,7 +7,7 @@ from intarray import IntArray
 from ndbuffer import NDBuffer
 from broadcasthelper import ShapeBroadcaster
 from strides import Strides
-from sys import simd_width_of
+from sys import simd_width_of, has_accelerator
 from matmul import Matmul
 from random import seed, random_float64
 from buffers import Buffer
@@ -16,6 +16,8 @@ from utilities import Utils
 from indexhelper import IndexIterator
 from filler import Filler
 from common_utils import Idx, panic, print_buffer
+from device import CPU, GPU
+from device_transfer import DeviceTransfer
 
 
 struct Gradbox[dtype: DType](
@@ -536,6 +538,30 @@ struct Gradbox[dtype: DType](
     fn is_on_cpu(self) -> Bool:
         return self.is_on_gpu() == False
 
+    fn to_cpu(self) raises -> Self:
+        @parameter
+        if has_accelerator():
+            return DeviceTransfer[Self.dtype].forward(self, CPU().into())
+        raise Error("System does not have any accelerator")
+
+    fn to_gpu(
+        mut self,
+        gpu: Optional[GPU] = None,
+    ) raises -> Self:
+        @parameter
+        if has_accelerator():
+            if gpu:
+                return DeviceTransfer[Self.dtype].forward(
+                    self, gpu.value().into()
+                )
+            else:
+                return DeviceTransfer[Self.dtype].forward(self, GPU().into())
+        else:
+            raise Error(
+                "Can not move to GPU. System does not have any accelerator"
+                " device"
+            )
+
     fn __str__(self) -> String:
         rank = self.rank()
         s = String("[")
@@ -647,7 +673,7 @@ struct Gradbox[dtype: DType](
         )
 
     fn matmul(
-        A: Gradbox[Self.dtype], mut B: Tensor[Self.dtype]
+        A: Gradbox[Self.dtype], B: Tensor[Self.dtype]
     ) -> Gradbox[Self.dtype]:
         return Matmul[Self.dtype].forward(A, B)
 
@@ -756,7 +782,7 @@ struct Gradbox[dtype: DType](
     fn reshape(
         self, new_shape: Shape, validated: Bool = False, share: Bool = False
     ) -> Gradbox[Self.dtype]:
-        _="""var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
+        _ = """var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             self.shape(), new_shape.intarray()
         )
         var nd_buffer: NDBuffer[Self.dtype]
@@ -771,7 +797,9 @@ struct Gradbox[dtype: DType](
                 panic("NDBuffer → rehape: failed.", e.__str__())
                 # Unreachable
                 nd_buffer = NDBuffer[Self.dtype](Shape())"""
-        var nd_buffer = self.buffer.reshape(new_shape, validated, prefer_sharing=False)
+        var nd_buffer = self.buffer.reshape(
+            new_shape, validated, prefer_sharing=False
+        )
 
         return Gradbox[Self.dtype](nd_buffer^, share=share)
 
