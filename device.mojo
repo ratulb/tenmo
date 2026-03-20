@@ -169,6 +169,20 @@ struct DeviceState[dtype: DType](
 
     fn fill(self, ref source: NDBuffer[Self.dtype], sync: Bool = True) raises:
         """Fill the DeviceBuffer from the source NDBuffer."""
+
+        if source.is_on_gpu():
+            if source.is_contiguous():
+                source.device_state.value().buffer.enqueue_copy_to(self.buffer)
+            else:
+                # Materialise to CPU first, then CPU→GPU
+                var cpu_ndb = source.device_state.value().into(
+                    source.shape, sync=False
+                )
+                self.fill(cpu_ndb)
+            if sync:
+                self.sync()
+            return
+
         with self.buffer.map_to_host() as host_buffer:
             var device_ptr = host_buffer.unsafe_ptr()
             var src_ptr = source.data_ptr()
