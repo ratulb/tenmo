@@ -59,7 +59,7 @@ fn test_backward_grad_A_fidelity() raises:
     C_gpu.backward()
 
     A_gpu.grad().print()
-    assert_true(A.grad().reshape(Shape(9, 30)).all_close(A_gpu.grad() * 2))
+    assert_true(AA.grad().reshape(Shape(9, 30)).all_close(A_gpu.grad() * 2))
     print("PASSED: GPU backward grad_A == CPU backward grad_A")
 
 
