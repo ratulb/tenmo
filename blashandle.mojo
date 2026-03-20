@@ -7,7 +7,6 @@ from backpropagation import BackwardFn, Delegate, BLAS_BACKWARD_MATMUL_2D
 from sys.param_env import env_get_string
 from gradbox import Gradbox
 from memory import ArcPointer
-from walkback import Matmul2dBackward
 
 
 @fieldwise_init

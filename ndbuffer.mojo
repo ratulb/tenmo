@@ -782,7 +782,7 @@ struct NDBuffer[dtype: DType](
             for index in self.index_iterator():
                 (ptr + index)[] = value
 
-    fn reshape(
+    fn reshape1(
         self,
         new_shape: Shape,
         validated: Bool = False,
@@ -804,6 +804,16 @@ struct NDBuffer[dtype: DType](
             out = out = self.contiguous(shape)
 
         return out^
+
+    fn reshape(self, new_shape: Shape, validated: Bool = False) -> NDBuffer[Self.dtype]:
+        var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
+            self.shape, new_shape.intarray()
+    )
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                return self.reshape_gpu(shape)
+        return self.contiguous(shape)
 
     fn reshape_gpu(
         self,
