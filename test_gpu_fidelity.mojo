@@ -44,7 +44,7 @@ fn test_forward_matmul_fidelity() raises:
 fn test_backward_grad_A_fidelity() raises:
     print("=== Test 4: Backward grad_A fidelity ===")
     var AA = Tensor[dtype].arange(9 * 30, requires_grad=True)
-    var A =AA.reshape(9, 30)
+    var A = AA.reshape(9, 30)
     var B = Tensor[dtype].arange(30 * 5).reshape(30, 5)
 
     var A_gpu = A.to_gpu()
@@ -132,7 +132,7 @@ fn test_ancestry_transposed_matmul_fidelity() raises:
 from common_utils import now
 fn main() raises:
     var A_parent = Tensor[dtype].arange(9 * 30, requires_grad=True)
-    var A = A_parent.reshape(9, 30, requires_grad=True)
+    var A = A_parent.reshape(1, 9, 30, requires_grad=True)
     var B = Tensor[dtype].arange(30 * 5).reshape(30, 5)
 
     var C_cpu = A.matmul(B)

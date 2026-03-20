@@ -320,8 +320,8 @@ fn test_fill_scalar_on_view_reshape() raises:
 
     reshaped.fill(77.0, i(1), i(2))  # [1, 2] in reshaped view
 
-    # Should modify x at flat index 1*4 + 2 = 6
-    assert_true(x[6] == 77.0)
+    # Should not modify x at flat index 1*4 + 2 = 6, reshape is allocated
+    assert_true(x[6] == 6.0)
     assert_true(x[5] == 5.0)
     assert_true(x[7] == 7.0)
 
@@ -482,10 +482,10 @@ fn test_fill_tensor_reshaped_view() raises:
     var src = Tensor[dtype].d1([10.0, 20.0, 30.0, 40.0])
     reshaped.fill(src, i(1), s())  # Fill second row
 
-    # x should be modified at [4:8]
+    # x should not be modified at [4:8], reshape is now allocated
     assert_true(x[3] == 3.0)
-    assert_true(x[4] == 10.0)
-    assert_true(x[7] == 40.0)
+    assert_true(x[4] == 4.0)
+    assert_true(x[7] == 7.0)
     assert_true(x[8] == 8.0)
 
 
