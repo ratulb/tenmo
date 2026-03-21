@@ -6,7 +6,7 @@ from common_utils import panic
 from shapes import Shape
 from strides import Strides
 from gradbox import Gradbox
-
+from views import View
 
 @fieldwise_init
 @register_passable
@@ -106,17 +106,19 @@ struct Squeeze[dtype: DType]:
                 new_shape.append(shape[i])
                 new_strides.append(tensor.strides()[i])
 
-        squeezed_shape = Shape(new_shape)
-        strides = Strides(new_strides)
+        var squeezed_shape = Shape(new_shape)
+        var strides = Strides(new_strides)
         offset = tensor.offset()
 
-        out = Tensor[Self.dtype].build_view(
+        _="""out = Tensor[Self.dtype].build_view(
             tensor,
             squeezed_shape,
             strides,
             offset,
             requires_grad=False,
-        )
+        )"""
+
+        var out = View[Self.dtype].forward[track_grad=False](tensor, squeezed_shape, strides, offset, requires_grad=False, validated=True)
 
         @parameter
         if (

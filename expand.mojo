@@ -6,7 +6,7 @@ from intarray import IntArray
 from strides import Strides
 from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
-
+from views import View
 
 @fieldwise_init
 @register_passable
@@ -57,17 +57,18 @@ struct Expand[dtype: DType]:
             else:
                 strides_expanded.append(padded_strides[i])
 
-        strides = Strides(strides_expanded)
+        var strides = Strides(strides_expanded)
 
-        offset = tensor.offset()  # keep same as current tensor
+        var offset = tensor.offset()  # keep same as current tensor
 
-        out = Tensor[Self.dtype].build_view(
+        _="""out = Tensor[Self.dtype].build_view(
             tensor,
             shape_expanded,
             strides,
             offset,
             requires_grad=False,
-        )
+        )"""
+        var out = View[Self.dtype].forward[track_grad=False](tensor, shape_expanded, strides, offset,  requires_grad=False, validated=True,)
 
         @parameter
         if track_grad:

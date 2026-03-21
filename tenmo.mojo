@@ -142,16 +142,18 @@ struct Tensor[dtype: DType = DType.float32](
         return out
 
     @staticmethod
-    fn build_view(
-        mut tensor: Self,
+    fn build_view_1(
+        #mut tensor: Self,
+        mut self,
         shape: Shape,
         strides: Optional[Strides] = None,
         offset: Int = 0,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        ref tensor_buffer = tensor.buffer
+        #ref tensor_buffer = tensor.buffer
+        #ref own_buffer = self.buffer
 
-        var buffer = tensor_buffer.share(shape, strides, offset)
+        var buffer = self.buffer.share(shape, strides, offset)
         return Tensor[Self.dtype](buffer=buffer^, requires_grad=requires_grad)
 
     fn as_gradbox(

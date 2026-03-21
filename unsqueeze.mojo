@@ -7,6 +7,7 @@ from backpropagation import Delegate, BackwardFn, BACKWARD_UNSQUEEZE
 from squeeze import Squeeze
 from common_utils import panic
 from gradbox import Gradbox
+from views import View
 
 
 @fieldwise_init
@@ -106,14 +107,22 @@ struct Unsqueeze[dtype: DType]:
                 orig_axis_index += 1
 
         # Create the unsqueezed tensor
-        shape = Shape(new_shape)
-        strides = Strides(new_strides)
-        out = Tensor[Self.dtype].build_view(
+        var shape = Shape(new_shape)
+        var strides = Strides(new_strides)
+        _ = """out = Tensor[Self.dtype].build_view(
             tensor,
             shape,
             strides,
             tensor.offset(),
             requires_grad=False,
+        )"""
+        var out = View[Self.dtype].forward[track_grad=False](
+            tensor,
+            shape,
+            strides,
+            tensor.offset(),
+            requires_grad=False,
+            validated=True,
         )
 
         @parameter

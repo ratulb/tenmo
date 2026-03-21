@@ -4,6 +4,7 @@ from mnemonics import AddTensor
 from validators import Validator
 from gradbox import Gradbox
 from intarray import IntArray
+from views import View
 
 
 @fieldwise_init
@@ -56,12 +57,20 @@ struct Transpose[dtype: DType](Copyable):
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides().permute(normalized_axes)
 
-        var out = Tensor[Self.dtype].build_view(
+        _ = """var out = Tensor[Self.dtype].build_view(
             self,
             new_shape,
             new_strides,
             self.offset(),
             requires_grad=False,
+        )"""
+        var out = View[Self.dtype].forward[track_grad=False](
+            self,
+            new_shape,
+            new_strides,
+            self.offset(),
+            requires_grad=False,
+            validated=True,
         )
 
         @parameter

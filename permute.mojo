@@ -65,12 +65,20 @@ struct Permute[dtype: DType]:
             new_strides.append(self.strides()[axis])
 
         # Return new view with same base but reordered axes
-        out = Tensor[Self.dtype].build_view(
+        _ = """out = Tensor[Self.dtype].build_view(
             self,
             shape=Shape(new_shape),
             strides=Strides(new_strides),
             offset=self.offset(),  # Permute doesn't change offset
             requires_grad=False,
+        )"""
+        var out = View[Self.dtype].forward[track_grad=False](
+            self,
+            shape=Shape(new_shape),
+            strides=Strides(new_strides),
+            offset=self.offset(),
+            requires_grad=False,
+            validated=True,
         )
 
         @parameter
