@@ -755,24 +755,32 @@ struct Tensor[dtype: DType = DType.float32](
         like: Tensor[Self.dtype],
         value: Scalar[Self.dtype],
         requires_grad: Bool = False,
+        device: Device = CPU().into(),
     ) -> Tensor[Self.dtype]:
         shape = like.shape()
         return Tensor[Self.dtype].full(
-            shape, value, requires_grad=requires_grad
+            shape, value, requires_grad=requires_grad, device=device
         )
 
     @staticmethod
     fn full(
-        shape: List[Int], value: Scalar[Self.dtype], requires_grad: Bool = False
+        shape: List[Int],
+        value: Scalar[Self.dtype],
+        requires_grad: Bool = False,
+        device: Device = CPU().into(),
     ) -> Tensor[Self.dtype]:
-        return Self.full(Shape(shape), value, requires_grad)
+        return Self.full(Shape(shape), value, requires_grad, device=device)
 
     @staticmethod
     fn full(
-        shape: Shape, value: Scalar[Self.dtype], requires_grad: Bool = False
+        shape: Shape,
+        value: Scalar[Self.dtype],
+        requires_grad: Bool = False,
+        device: Device = CPU().into(),
     ) -> Tensor[Self.dtype]:
         return Tensor[Self.dtype](
-            NDBuffer[Self.dtype].full(shape, value), requires_grad=requires_grad
+            NDBuffer[Self.dtype].full(shape, value, device=device),
+            requires_grad=requires_grad,
         )
 
     @staticmethod

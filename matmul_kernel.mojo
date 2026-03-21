@@ -255,16 +255,6 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
             matmul_2d_tiled[Self.dtype, tile_size],
             matmul_2d_tiled[Self.dtype, tile_size],
         ]()
-        _="""print("MatmulNdGpu.launch:")
-        print("  m=", m, "n=", n, "k=", k)
-        print("  A_row_stride=", A_row_stride, "A_col_stride=", A_col_stride)
-        print("  B_row_stride=", B_row_stride, "B_col_stride=", B_col_stride)
-        print("  total_batch=", total_batch)
-        print("  A_offsets[0]=", A_offsets[0])
-        print("  B_offsets[0]=", B_offsets[0])
-        print("  A buf ptr=", A_buf.unsafe_ptr())
-        print("  B buf ptr=", B_buf.unsafe_ptr())
-        print("  result_buffer ptr=", result_buffer.unsafe_ptr())"""
 
         device_context.enqueue_function(
             compiled_func,

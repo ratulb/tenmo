@@ -5,6 +5,8 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_SUM
 from validators import Validator
 from gradbox import Gradbox
+from device import Device, CPU
+from common_utils import panic
 
 
 @fieldwise_init
@@ -19,20 +21,36 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
-        rank = ancestor.shape().rank()
+        _ = """rank = ancestor.shape().rank()
         if rank == 0:
-            return [(ancestor^, gradbox.copy(), AddTensor)]
+            debug_assert(gradbox.rank() == 0, "Gradbox does not match parent's 0 rank")
+            return [(ancestor^, gradbox.copy(), AddTensor)]"""
         shape = ancestor.shape()
 
         var grad_contrib: Gradbox[Self.dtype]
-
+        var is_on_gpu = gradbox.is_on_gpu()
         # Handle scalar gradient case (sum reduced to scalar)
         if gradbox.shape() == Shape():
-            grad_contrib = Gradbox[Self.dtype].full(
-                shape,
-                gradbox.item(),
-                share=False,
-            )
+            if is_on_gpu:
+                var device: Device = CPU().into()
+                try:
+                    device = gradbox.get_gpu().into()
+                except e:
+                    print(e)
+                    panic("SumBackward -> error retrieving gpu from gradbox")
+                grad_contrib = Gradbox[Self.dtype].full(
+                    shape,
+                    gradbox.item(),
+                    share=False,
+                    device=device,
+                )
+            else:
+                grad_contrib = Gradbox[Self.dtype].full(
+                    shape,
+                    gradbox.item(),
+                    share=False,
+                )
+
         else:
             # Handle keepdims=False case (need to reshape gradient)
             if not self.keepdims:
@@ -95,3 +113,21 @@ struct Summer[dtype: DType](Copyable):
                 out.add_ancestry(tensor)
 
         return out^
+
+
+fn main() raises:
+    comptime dtype = DType.float32
+
+    var a = Tensor[dtype].arange(12, requires_grad=True)
+    var a_gpu = a.to_gpu()
+    var s = a_gpu.sum()
+    s.backward()
+    a.grad().print()
+
+    var b = Tensor[dtype].arange(12, requires_grad=True).reshape(3, 4).contiguous()
+    var c = b * 42
+    var c_gpu = c.to_gpu()
+    var ss = c.sum()
+
+    ss.backward()
+    b.grad().print()

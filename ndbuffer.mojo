@@ -173,6 +173,18 @@ struct NDBuffer[dtype: DType](
         var buffer = Buffer[Self.dtype].zeros(shape.num_elements())
         return NDBuffer[Self.dtype](buffer^, shape)
 
+    fn get_gpu(
+        ref self,
+    ) raises -> ref [self.device_state.value().gpu] GPU:
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                return self.device_state.value().get_gpu()
+            else:
+                raise("NDBuffer get_gpu: buffer is not on gpu")
+        else:
+            raise("NDBuffer get_gpu: buffer not on gpu or system has no accelerator")
+
     fn to_cpu(self) raises -> Self:
         var _, nd_buffer = self.to_device(CPU().into())
         return nd_buffer^
@@ -326,9 +338,28 @@ struct NDBuffer[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn full(shape: Shape, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+    fn full(
+        shape: Shape, scalar: Scalar[Self.dtype], device: Device = CPU().into()
+    ) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype].full(scalar, shape.num_elements())
-        return NDBuffer[Self.dtype](buffer^, shape)
+        var ndb = NDBuffer[Self.dtype](buffer^, shape)
+
+        if device.is_cpu():
+            return ndb^
+        else:
+
+            @parameter
+            if has_accelerator():
+                try:
+                    var (_, result) = ndb^.to_device(device)
+                    return result^
+                except e:
+                    print(e)
+                    panic("NDBuffer full: device transfer failed")
+                    # Unreachable"""
+                    return NDBuffer[Self.dtype](Shape())
+            else:
+                return ndb^
 
     @always_inline
     fn index_iterator(
@@ -782,33 +813,13 @@ struct NDBuffer[dtype: DType](
             for index in self.index_iterator():
                 (ptr + index)[] = value
 
-    fn reshape1(
-        self,
-        new_shape: Shape,
-        validated: Bool = False,
+    fn reshape(
+        self, new_shape: Shape, validated: Bool = False
     ) -> NDBuffer[Self.dtype]:
-        """Always a newly allocated buffer.
-        """
         var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
             self.shape, new_shape.intarray()
         )
-        var out: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu():
-                out = self.reshape_gpu(shape)
-            else:
-                out = out = self.contiguous(shape)
-        else:
-            out = out = self.contiguous(shape)
-
-        return out^
-
-    fn reshape(self, new_shape: Shape, validated: Bool = False) -> NDBuffer[Self.dtype]:
-        var shape = new_shape if validated else Validator.validate_and_construct_new_shape(
-            self.shape, new_shape.intarray()
-    )
         @parameter
         if has_accelerator():
             if self.is_on_gpu():
@@ -1540,7 +1551,7 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn broadcast_to(self, target_shape: Shape) -> NDBuffer[Self.dtype]:
-        own_shape = self.shape
+        var own_shape = self.shape
         if not ShapeBroadcaster.broadcastable(own_shape, target_shape):
             panic(
                 "NDBuffer → broadcast_to(target_shape): "
@@ -1549,8 +1560,18 @@ struct NDBuffer[dtype: DType](
                 + target_shape.__str__()
             )
 
-        mask = ShapeBroadcaster.broadcast_mask(own_shape, target_shape)
-        out = NDBuffer[Self.dtype].zeros(target_shape)
+        var mask = ShapeBroadcaster.broadcast_mask(own_shape, target_shape)
+        var out = NDBuffer[Self.dtype].zeros(target_shape)
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    ref gpu = self.device_state.value().get_gpu()
+                    out = out.to_gpu(gpu)
+                except e:
+                    print(e)
+                    panic("NDBuffer broadcast_to: error transferring to gpu")
 
         for target_coord in target_shape:
             src_coord = ShapeBroadcaster.translate_index(
@@ -2351,6 +2372,12 @@ fn main() raises:
     var ndb = NDBuffer[dtype](buffer, Shape(2, 3, 4))
     var result1 = ndb.sum_over_broadcasted_axes(Shape(4))
     result1.print()
+
+    var ndb_full = NDBuffer[dtype].full(Shape(3), 42)
+    ndb_full.print()
+    var _cpu: Device = CPU().into()
+    var grad = Gradbox[dtype].full(Shape(4), 32)
+    grad.print()
 
     @parameter
     if has_accelerator():

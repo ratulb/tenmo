@@ -16,7 +16,7 @@ from utilities import Utils
 from indexhelper import IndexIterator
 from filler import Filler
 from common_utils import Idx, panic, print_buffer
-from device import CPU, GPU
+from device import Device, CPU, GPU
 from device_transfer import DeviceTransfer
 
 
@@ -261,9 +261,14 @@ struct Gradbox[dtype: DType](
     @staticmethod
     @always_inline
     fn full(
-        shape: Shape, scalar: Scalar[Self.dtype], share: Bool = False
+        shape: Shape,
+        scalar: Scalar[Self.dtype],
+        share: Bool = False,
+        device: Device = CPU().into(),
     ) -> Gradbox[Self.dtype]:
-        return Gradbox[Self.dtype](NDBuffer.full(shape, scalar), share=share)
+        return Gradbox[Self.dtype](
+            NDBuffer.full(shape, scalar, device), share=share
+        )
 
     @staticmethod
     @always_inline
@@ -352,8 +357,8 @@ struct Gradbox[dtype: DType](
                 + target_shape.__str__()
             )
 
-        broadcasted_buffer = self.buffer.broadcast_to(target_shape)
-        out = Gradbox[Self.dtype](broadcasted_buffer^, share=share)
+        var broadcasted_buffer = self.buffer.broadcast_to(target_shape)
+        var out = Gradbox[Self.dtype](broadcasted_buffer^, share=share)
         return out^
 
     fn __getitem__(self, *indices: Idx) -> Gradbox[Self.dtype]:
@@ -531,6 +536,11 @@ struct Gradbox[dtype: DType](
                 other.shape().__str__(),
             )
         return self.buffer.compare[NotEqual](other.buffer).buffer.all_true()
+
+    fn get_gpu(self) raises -> GPU:
+        if self.is_on_gpu():
+            return self.buffer.get_gpu()
+        raise "Gradbox get_gpu: gradbox is not on gpu"
 
     fn is_on_gpu(self) -> Bool:
         return self.buffer.is_on_gpu()
