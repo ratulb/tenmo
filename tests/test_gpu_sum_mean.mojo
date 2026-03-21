@@ -165,6 +165,8 @@ fn test_gpu_sum_grad_accumulation() raises:
     var loss1 = s1.to_cpu().sum()
     var loss2 = s2.to_cpu().sum()
     loss1.backward()
+    s1.zero_grad()
+    a_gpu.zero_grad() 
     loss2.backward()
     # Each backward contributes 1.0 per element → total 2.0 per element
     assert_true(a.grad().all_close(Tensor[dtype].d2([[2.0, 2.0], [2.0, 2.0]])))
@@ -423,6 +425,7 @@ fn test_gpu_mean_grad_accumulation() raises:
     var m2 = a_gpu.mean(axes=[1])
     ss = m1.to_cpu().sum()
     ss.backward()
+    a_gpu.zero_grad()
     sss = m2.to_cpu().sum()
     sss.backward()
     # m1 backward: 0.5 each; m2 backward: 0.5 each → accumulated 1.0 each
