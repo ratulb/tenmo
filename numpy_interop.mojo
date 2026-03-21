@@ -94,7 +94,8 @@ from testing import assert_true
 
 
 fn main() raises:
-    mnist = Python.import_module("mnist_datasets")
+    comptime dtype = DType.float32
+    _ = """mnist = Python.import_module("mnist_datasets")
     loader = mnist.MNISTLoader(folder="/tmp")
 
     # Load train dataset
@@ -107,8 +108,33 @@ fn main() raises:
     var test_data: PythonObject = loader.load(train=False)
     var test_images = test_data[0]
     var test_labels = test_data[1]
-    assert_true(len(test_images) == 10000 and len(test_labels) == 10000)
-    test_to_ndarray()
+    assert_true(len(test_images) == 10000 and len(test_labels) == 10000)"""
+    # test_to_ndarray()
+    _ = """var A = Tensor[dtype].arange(32)
+    var A_reshaped = A.reshape(2, 8, 2)
+    save(A_reshaped, "/tmp/mojo_data.npz")"""
+    # np = Python.import_module("numpy")
+    # data = np.load('/tmp/mojo_data.npz')
+    # print(data['array'])
+    var A = load[dtype]("/tmp/mojo_data.npz")
+    A.print()
+
+
+fn save[dtype: DType, //](t: Tensor[dtype], filename: StaticString) raises:
+    var python_obj = to_ndarray(t)
+    np = Python.import_module("numpy")
+    np.savez(filename, array=python_obj)
+
+
+fn load[
+    dtype: DType
+](filename: StaticString, requires_grad: Bool = False) raises -> Tensor[dtype]:
+    np = Python.import_module("numpy")
+    data = np.load(filename)
+    ndarray = data["array"]
+    tenmo_tensor = from_ndarray[dtype](ndarray, requires_grad=requires_grad)
+    # print(ndarray)
+    return tenmo_tensor^
 
 
 fn test_to_ndarray() raises:
