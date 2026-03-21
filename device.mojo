@@ -56,16 +56,14 @@ struct CPU(Equatable, ImplicitlyCopyable, Movable):
 struct GPU(Equatable, ImplicitlyCopyable, Movable):
     """Essentially a shared DeviceContext."""
 
-    # var device_context: ArcPointer[DeviceContext]
-    var device_context: DeviceContext
+    var device_context: ArcPointer[DeviceContext]
     var id: Int64
 
     fn into(self) -> Device:
         return Device(self)
 
     fn __init__(out self, device_id: Int = 0) raises:
-        # self.device_context = ArcPointer(DeviceContext(device_id))
-        self.device_context = DeviceContext(device_id)
+        self.device_context = ArcPointer(DeviceContext(device_id))
         self.id = device_id
 
     fn __copyinit__(out self, existing: Self):
@@ -78,10 +76,8 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
 
     fn __eq__(self, other: Self) -> Bool:
         return (
-            # self.device_context.__is__(other.device_context)
-            # or self.id == other.id
-            self.id
-            == other.id
+            self.device_context.__is__(other.device_context)
+            or self.id == other.id
         )
 
     fn __ne__(self, other: Self) -> Bool:
@@ -92,23 +88,19 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
 
     fn __exit__(mut self):
         try:
-            # self.device_context[].synchronize()
-            self.device_context.synchronize()
+            self.device_context[].synchronize()
         except e:
             print(e)
             print("Error synchronizing GPU device context: ", e.__str__())
 
-    # fn __getitem__(self) -> ArcPointer[DeviceContext]:
-    fn __getitem__(self) -> DeviceContext:
+    fn __getitem__(self) -> ArcPointer[DeviceContext]:
         return self.device_context.copy()
 
-    # fn handle(self) -> ArcPointer[DeviceContext]:
-    fn handle(self) -> DeviceContext:
+    fn handle(self) -> ArcPointer[DeviceContext]:
         return self.device_context.copy()
 
     fn __call__(self) -> DeviceContext:
-        # return self.device_context.copy()[]
-        return self.device_context.copy()
+        return self.device_context.copy()[]
 
 
 @fieldwise_init

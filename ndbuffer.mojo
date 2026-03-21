@@ -181,9 +181,12 @@ struct NDBuffer[dtype: DType](
             if self.is_on_gpu():
                 return self.device_state.value().get_gpu()
             else:
-                raise("NDBuffer get_gpu: buffer is not on gpu")
+                raise ("NDBuffer get_gpu: buffer is not on gpu")
         else:
-            raise("NDBuffer get_gpu: buffer not on gpu or system has no accelerator")
+            raise (
+                "NDBuffer get_gpu: buffer not on gpu or system has no"
+                " accelerator"
+            )
 
     fn to_cpu(self) raises -> Self:
         var _, nd_buffer = self.to_device(CPU().into())
@@ -194,11 +197,9 @@ struct NDBuffer[dtype: DType](
             raise "NDBuffer -> to_gpu(): Empty buffer"
         return self.to_device(gpu.into())[1]
 
-    # fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
-    fn device_context(self) -> Optional[DeviceContext]:
+    fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
         if self.is_on_gpu():
-            # return self.device_state.value().gpu[]
-            return self.device_state.value().gpu()
+            return self.device_state.value().gpu[]
         return None
 
     fn get(self, index: Int) -> Scalar[Self.dtype]:

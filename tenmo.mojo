@@ -519,8 +519,7 @@ struct Tensor[dtype: DType = DType.float32](
                 " device"
             )
 
-    # fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
-    fn device_context(self) -> Optional[DeviceContext]:
+    fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
         @parameter
         if has_accelerator():
             if self.is_on_gpu():
@@ -2428,18 +2427,4 @@ from testing import assert_true
 
 fn main() raises:
     comptime dtype = DType.float32
-
-    a = Tensor[dtype].d2(
-        [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]], requires_grad=True
-    )
-
-    v1 = a.view(shape=Shape(2, 4), strides=Strides(4, 1), offset=2)
-    v2 = v1.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=2)
-    v3 = v2.view(shape=Shape(2, 2), strides=Strides(2, 1), offset=0)
-    c = v3.contiguous()
-    s = c.mean()
-    print(s.has_backward_fn())
-    s.backward(42)
-    grad = a.grad().as_tensor()
-    result = grad[Slice(0, 1, None), Slice(2, None, None)]
-    assert_true(result == Tensor[dtype].d2([[10.5, 10.5]]))
+    pass
