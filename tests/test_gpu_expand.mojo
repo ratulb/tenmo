@@ -1,6 +1,7 @@
 from testing import assert_true
 from tenmo import Tensor
 from shapes import Shape
+from sys import has_accelerator
 # ============================================================
 # GPU EXPAND TESTS — forward shape, values, and backward grad flow
 # Grad always flows back to the original CPU tensor.
@@ -218,7 +219,7 @@ fn test_gpu_expand_grad_weighted_loss() raises:
     comptime dtype = DType.float32
     var bias = Tensor[dtype].d2([[1.0, 2.0, 3.0, 4.0]], requires_grad=True)
     var bias_gpu = bias.to_gpu()
-    var e = bias_gpu.expand(3, 4)
+    var e = bias_gpu.expand(3, 4, requires_grad=True)
     var weights = Tensor[dtype].d2(
         [[1.0, 2.0, 1.0, 2.0],
          [2.0, 1.0, 2.0, 1.0],
@@ -229,7 +230,7 @@ fn test_gpu_expand_grad_weighted_loss() raises:
     loss.backward()
     # col0: 1+2+1=4, col1: 2+1+1=4, col2: 1+2+1=4, col3: 2+1+1=4
     assert_true(bias.grad().all_close(Tensor[dtype].d2([[4.0, 4.0, 4.0, 4.0]])))
-
+    print("passed test_gpu_expand_grad_weighted_loss")
 
 # ------------------------------------------------------------
 # Expand then reduce — round-trip grad check
@@ -474,58 +475,62 @@ fn test_gpu_expand_is_zero_stride_view() raises:
 # ============================================================
 
 fn main() raises:
-    # 1D → nD
-    test_gpu_expand_1d_to_2d_new_batch_dim()
-    test_gpu_expand_1d_to_3d()
+    @parameter
+    if has_accelerator():
+        # 1D → nD
+        test_gpu_expand_1d_to_2d_new_batch_dim()
+        test_gpu_expand_1d_to_3d()
 
-    # 2D expansions
-    test_gpu_expand_2d_row_vector_to_matrix()
-    test_gpu_expand_2d_col_vector_to_matrix()
-    test_gpu_expand_2d_both_dims_size1()
-    test_gpu_expand_2d_no_op_same_shape()
+        # 2D expansions
+        test_gpu_expand_2d_row_vector_to_matrix()
+        test_gpu_expand_2d_col_vector_to_matrix()
+        test_gpu_expand_2d_both_dims_size1()
+        test_gpu_expand_2d_no_op_same_shape()
 
-    # 3D expansions
-    test_gpu_expand_3d_first_dim()
-    test_gpu_expand_3d_last_dim()
-    test_gpu_expand_3d_middle_dim()
-    test_gpu_expand_3d_two_dims_broadcast()
-    test_gpu_expand_3d_all_dims_size1()
+        # 3D expansions
+        test_gpu_expand_3d_first_dim()
+        test_gpu_expand_3d_last_dim()
+        test_gpu_expand_3d_middle_dim()
+        test_gpu_expand_3d_two_dims_broadcast()
+        test_gpu_expand_3d_all_dims_size1()
 
-    # Shape API overload
-    test_gpu_expand_shape_api_overload()
+        # Shape API overload
+        test_gpu_expand_shape_api_overload()
 
-    # Grad correctness
-    test_gpu_expand_grad_non_uniform_values()
-    test_gpu_expand_grad_weighted_loss()
+        # Grad correctness
+        test_gpu_expand_grad_non_uniform_values()
+        test_gpu_expand_grad_weighted_loss()
 
-    # Round-trip reduce
-    test_gpu_expand_then_sum_axis_round_trip()
-    test_gpu_expand_then_mean_grad()
+        # Round-trip reduce
+        test_gpu_expand_then_sum_axis_round_trip()
+        test_gpu_expand_then_mean_grad()
 
-    # Common patterns
-    test_gpu_expand_bias_broadcast_pattern()
-    test_gpu_expand_grad_accumulation_two_expands()
+        # Common patterns
+        test_gpu_expand_bias_broadcast_pattern()
+        test_gpu_expand_grad_accumulation_two_expands()
 
-    # track_grad=False
-    test_gpu_expand_no_grad_tracking()
+        # track_grad=False
+        test_gpu_expand_no_grad_tracking()
 
-    # 4D
-    test_gpu_expand_4d_first_two_dims()
-    test_gpu_expand_4d_last_dim_only()
+        # 4D
+        test_gpu_expand_4d_first_two_dims()
+        test_gpu_expand_4d_last_dim_only()
 
-    # CPU/GPU cross-validation
-    test_gpu_expand_matches_cpu_forward()
-    test_gpu_expand_matches_cpu_forward_3d()
+        # CPU/GPU cross-validation
+        test_gpu_expand_matches_cpu_forward()
+        test_gpu_expand_matches_cpu_forward_3d()
 
-    # Device transfer backward
-    test_gpu_expand_grad_lands_on_cpu()
-    test_gpu_expand_cpu_tensor_data_unchanged()
+        # Device transfer backward
+        test_gpu_expand_grad_lands_on_cpu()
+        test_gpu_expand_cpu_tensor_data_unchanged()
 
-    # Chained ops
-    test_gpu_expand_chained_two_expands()
-    test_gpu_expand_then_sum_then_expand()
+        # Chained ops
+        test_gpu_expand_chained_two_expands()
+        test_gpu_expand_then_sum_then_expand()
 
-    # Zero-stride view
-    test_gpu_expand_is_zero_stride_view()
+        # Zero-stride view
+        test_gpu_expand_is_zero_stride_view()
 
-    print("All GPU expand tests passed.")
+        print("All GPU expand tests passed.")
+    else:
+        print("System does not have any acclerator")
