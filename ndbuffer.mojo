@@ -279,15 +279,6 @@ struct NDBuffer[dtype: DType](
             #   - contiguous
             #   - offset = 0
             #   - no CPU buffer
-            _ = """var empty_cpu_buffer = Buffer[Self.dtype]()  # uninitialized
-            var result = NDBuffer[Self.dtype](
-                empty_cpu_buffer^,
-                shape=self.shape,
-                strides=Strides.default(self.shape),
-                offset=0,
-            )
-
-            result.device_state = new_device_state^"""
             var result = NDBuffer[Self.dtype].with_device_state(
                 new_device_state, self.shape
             )
