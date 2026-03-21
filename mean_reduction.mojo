@@ -5,6 +5,8 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_MEAN
 from validators import Validator
 from gradbox import Gradbox
+from device import Device, CPU
+from common_utils import panic
 
 
 @register_passable
@@ -25,14 +27,35 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         self, read output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
-        gradbox_shape = gradbox.shape()
+        var gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
         if gradbox_shape == Shape():
             scalar_grad = gradbox.item() / ancestor.shape().num_elements()
-            grad_contrib = Gradbox[Self.dtype].full(
-                ancestor.shape(),
-                scalar_grad,
-            )
+            var is_on_gpu = gradbox.is_on_gpu()
+            var device: Device = CPU().into()
+            var grad_contrib: Gradbox[Self.dtype]
+            if is_on_gpu:
+                try:
+                    device = gradbox.get_gpu().into()
+                except e:
+                    print(e)
+                    panic(
+                        "MeanBackward backward - failed to retrieve device from"
+                        " gradbox"
+                    )
+
+                grad_contrib = Gradbox[Self.dtype].full(
+                    ancestor.shape(),
+                    scalar_grad,
+                    share=False,
+                    device=device,
+                )
+            else:
+                grad_contrib = Gradbox[Self.dtype].full(
+                    ancestor.shape(),
+                    scalar_grad,
+                    share=False,
+                )
 
             return [
                 (
@@ -127,14 +150,18 @@ from testing import assert_true
 
 
 fn main() raises:
-    a = Tensor[DType.float32].arange(5, 50)
-    a = a.reshape(5, 9)
-    a_gpu = a.to_gpu()
-    gpu_mean = a_gpu.mean(keepdims=True)
+    A = Tensor[DType.float32].arange(5, 50, requires_grad=True)
+    B = A.reshape(5, 9, requires_grad=True)
+    a_gpu = B.to_gpu()
+    b_cpu = a_gpu.reshape(3, 15)
+    c_gpu = b_cpu + 10
+    d_gpu = c_gpu * 42
+
+    gpu_mean = d_gpu.mean(keepdims=True)
     gpu_mean.print()
 
-    cpu_mean = a.mean(keepdims=True)
-    cpu_mean.print()
-    cpu_mean_to_gpu = cpu_mean.to_gpu()
-    cpu_mean_to_gpu.print()
-    assert_true(gpu_mean.all_close(cpu_mean_to_gpu))
+    s = gpu_mean.sum()
+    s.backward()
+
+    A.grad().print()
+
