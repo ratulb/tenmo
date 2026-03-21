@@ -312,7 +312,18 @@ struct NDBuffer[dtype: DType](
         # ---------------------------------------
         # Materialize contiguous CPU buffer
         # New NDBuffer alltogether!
-        return 0, curr_state.into(self.shape)
+        if self.is_contiguous():
+            return 0, curr_state.into(self.shape)
+        else:
+            # Materialise respecting strides
+            # Step 1: bring raw flat device buffer to CPU
+            var flat_cpu = curr_state.into(Shape(curr_state.__len__()))
+            # Step 2: create view with correct shape/strides/offset over flat data
+            var viewed = flat_cpu.share(self.shape, self.strides, self.offset)
+            # Step 3: materialise into contiguous CPU buffer
+            var result = NDBuffer[Self.dtype](self.shape)
+            result.copy_from_alike[overwrite=True, validate=False](viewed^)
+            return 0, result^
 
     fn is_on_gpu(self) -> Bool:
         @parameter
