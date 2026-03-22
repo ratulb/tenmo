@@ -2428,4 +2428,13 @@ from testing import assert_true
 
 fn main() raises:
     comptime dtype = DType.float32
-    pass
+    var a = Tensor[dtype].scalar(42)
+    print(
+        a.shape(),
+        len(a),
+        a.numels(),
+        len(a.shape()),
+        a.shape().product(),
+        a.is_scalar(),
+    )
+    # prints () 0 1 0 1 True
