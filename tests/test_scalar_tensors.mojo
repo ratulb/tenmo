@@ -2,7 +2,7 @@ from tenmo import Tensor
 from testing import assert_true
 from sys import has_accelerator
 from shapes import Shape
-from mnemnics import AddTensor
+from mnemonics import AddTensor
 
 comptime dtype = DType.float32
 
