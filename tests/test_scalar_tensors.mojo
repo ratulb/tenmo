@@ -74,8 +74,33 @@ fn test_gpu_scalar_add_backward_seed_only() raises:
     gpu_result.grad().print()
     print("passed")
 
+fn test_gpu_scalar_add_backward_manual_handler() raises:
+    print("test_gpu_scalar_add_backward_manual_handler")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].scalar(3.0, requires_grad=True)
+    var b = Tensor[dtype].scalar(4.0, requires_grad=True)
+    var a_gpu = a.to_gpu()
+    var b_gpu = b.to_gpu()
+    var gpu_result = a_gpu + b_gpu
+
+    # Manually seed
+    var seed_tensor = Tensor[dtype].full(gpu_result.shape(), Scalar[dtype](1.0))
+    var seed_gpu = seed_tensor.to_gpu()
+    gpu_result.seed_grad(seed_gpu)
+    print("gradbox seeded")
+
+    # Manually fire backward handler
+    print("firing backward fn")
+    var results = gpu_result.backward_fn()(gpu_result)
+    print("backward fn returned, num results:", len(results))
+    for i in range(len(results)):
+        print("result", i, "grad:")
+        results[i][1].print()
+    print("passed")
+
 fn main() raises:
     #test_cpu_add_scalar_tensor_result()
     #test_gpu_scalar_add_forward_only()
     #test_gpu_scalar_add_backward_only()
-    test_gpu_scalar_add_backward_seed_only()
+    #test_gpu_scalar_add_backward_seed_only()
+    test_gpu_scalar_add_backward_manual_handler()
