@@ -13,8 +13,8 @@ fn test_cpu_add_scalar_tensor_result() raises:
     var b = Tensor[dtype].scalar(4.0, requires_grad=True)
     var result = a + b  # Shape()
     result.backward()
-    a.grad().print()
-    b.grad().print()
+    #a.grad().print()
+    #b.grad().print()
     print("passed")
 
 fn test_gpu_scalar_add_backward_only() raises:
@@ -169,9 +169,9 @@ fn main() raises:
     test_cpu_add_scalar_tensor_result()
     @parameter
     if has_accelerator():
-        _="""test_gpu_scalar_add_forward_only()
+        test_gpu_scalar_add_forward_only()
         test_gpu_scalar_add_backward_only()
         test_gpu_scalar_add_backward_seed_only()
         test_gpu_scalar_add_backward_manual_handler()
-        test_gpu_scalar_add_backward_update_grad()"""
+        test_gpu_scalar_add_backward_update_grad()
         test_gpu_scalar_add_full_backward()

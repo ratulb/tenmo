@@ -5,7 +5,6 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_MEAN
 from validators import Validator
 from gradbox import Gradbox
-from device import Device, CPU
 from common_utils import panic
 
 
@@ -31,32 +30,19 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         var ancestor = output.ancestry().get(0)
         if gradbox_shape == Shape():
             scalar_grad = gradbox.item() / ancestor.shape().num_elements()
-            var is_on_gpu = gradbox.is_on_gpu()
-            var device: Device = CPU().into()
             var grad_contrib: Gradbox[Self.dtype]
-            if is_on_gpu:
-                try:
-                    device = gradbox.get_gpu().into()
-                except e:
-                    print(e)
-                    panic(
-                        "MeanBackward backward - failed to retrieve device from"
+            try:
+                grad_contrib = Gradbox[Self.dtype].full(
+                    ancestor.shape(), scalar_grad, share=False, device=gradbox.device()
+                )
+            except e:
+                print(e)
+                panic("MeanBackward backward - failed to retrieve device from"
                         " gradbox"
-                    )
-
-                grad_contrib = Gradbox[Self.dtype].full(
-                    ancestor.shape(),
-                    scalar_grad,
-                    share=False,
-                    device=device,
-                )
-            else:
-                grad_contrib = Gradbox[Self.dtype].full(
-                    ancestor.shape(),
-                    scalar_grad,
-                    share=False,
                 )
 
+                # Unreachable
+                grad_contrib = Gradbox[Self.dtype].zeros(Shape())
             return [
                 (
                     ancestor^,

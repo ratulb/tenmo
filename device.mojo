@@ -10,7 +10,7 @@ comptime DeviceType = Variant[CPU, GPU]
 
 
 @fieldwise_init
-struct Device(Equatable, ImplicitlyCopyable, Movable):
+struct Device(Equatable, ImplicitlyCopyable, Movable, Writable):
     var kind: DeviceType
 
     fn __init__(out self):
@@ -39,9 +39,15 @@ struct Device(Equatable, ImplicitlyCopyable, Movable):
     fn is_gpu(self) -> Bool:
         return self.kind.isa[GPU]()
 
+    fn write_to[W: Writer](self, mut writer: W):
+        if self.is_cpu():
+            writer.write(self.kind[CPU])
+        else:
+            writer.write(self.kind[GPU])
+
 
 @fieldwise_init
-struct CPU(Equatable, ImplicitlyCopyable, Movable):
+struct CPU(Equatable, ImplicitlyCopyable, Movable, Writable):
     fn __eq__(self, other: Self) -> Bool:
         return True
 
@@ -51,9 +57,12 @@ struct CPU(Equatable, ImplicitlyCopyable, Movable):
     fn into(self) -> Device:
         return Device(self)
 
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write("CPU")
+
 
 @fieldwise_init
-struct GPU(Equatable, ImplicitlyCopyable, Movable):
+struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
     """Essentially a shared DeviceContext."""
 
     var device_context: ArcPointer[DeviceContext]
@@ -73,6 +82,9 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable):
     fn __moveinit__(out self, deinit existing: Self):
         self.device_context = existing.device_context^
         self.id = existing.id
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write("GPU[" + self.id.__str__() + "]")
 
     fn __eq__(self, other: Self) -> Bool:
         return (

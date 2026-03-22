@@ -197,6 +197,13 @@ struct NDBuffer[dtype: DType](
             raise "NDBuffer -> to_gpu(): Empty buffer"
         return self.to_device(gpu.into())[1]
 
+    fn device(self) raises -> Device:
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                return self.device_state.value().get_gpu().into()
+        return CPU().into()
+
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
         if self.is_on_gpu():
             return self.device_state.value().gpu[]
@@ -2376,6 +2383,9 @@ fn main() raises:
     var result1 = ndb.sum_over_broadcasted_axes(Shape(4))
     result1.print()
 
+    print(result1.device())
+
+    print("Got device")
     var ndb_full = NDBuffer[dtype].full(Shape(3), 42)
     ndb_full.print()
     var _cpu: Device = CPU().into()

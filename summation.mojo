@@ -5,7 +5,6 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_SUM
 from validators import Validator
 from gradbox import Gradbox
-from device import Device, CPU
 from common_utils import panic
 
 
@@ -21,34 +20,19 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
-        _ = """rank = ancestor.shape().rank()
-        if rank == 0:
-            debug_assert(gradbox.rank() == 0, "Gradbox does not match parent's 0 rank")
-            return [(ancestor^, gradbox.copy(), AddTensor)]"""
         shape = ancestor.shape()
-
         var grad_contrib: Gradbox[Self.dtype]
-        var is_on_gpu = gradbox.is_on_gpu()
-        # Handle scalar gradient case (sum reduced to scalar)
+        # SumBackward.backward — already raises-capable via panic pattern
         if gradbox.shape() == Shape():
-            if is_on_gpu:
-                var device: Device = CPU().into()
-                try:
-                    device = gradbox.get_gpu().into()
-                except e:
-                    print(e)
-                    panic("SumBackward -> error retrieving gpu from gradbox")
+            try:
                 grad_contrib = Gradbox[Self.dtype].full(
-                    shape,
-                    gradbox.item(),
-                    share=False,
-                    device=device,
+                    shape, gradbox.item(), share=False, device=gradbox.device()
                 )
-            else:
+            except e:
+                panic("SumBackward: device() failed: " + e.__str__())
+                # Unreachable
                 grad_contrib = Gradbox[Self.dtype].full(
-                    shape,
-                    gradbox.item(),
-                    share=False,
+                    shape, Scalar[Self.dtype](0)
                 )
 
         else:
@@ -124,7 +108,9 @@ fn main() raises:
     s.backward()
     a.grad().print()
 
-    var b = Tensor[dtype].arange(12, requires_grad=True).reshape(3, 4).contiguous()
+    var b = (
+        Tensor[dtype].arange(12, requires_grad=True).reshape(3, 4).contiguous()
+    )
     var c = b * 42
     var c_gpu = c.to_gpu()
     var ss = c.sum()

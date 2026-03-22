@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [scalar|broadcast|gpu_expand|expand|gpusummean|gpu|npiop|sgd|matmul|cnn|chunk|fill|pad|logarithm|stack|concat|std_variance|blas|dropout|indexhelper|utils|variance|tanh|losses|data|intarray|tensors|mmnd|mm2d|mv|vm|argminmax|minmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|shapes|strides|bench|validators|ce|synth_mnist|shapebroadcast|all]"
+    echo "Usage: $0 [item|scalar|broadcast|gpu_expand|expand|gpusummean|gpu|npiop|sgd|matmul|cnn|chunk|fill|pad|logarithm|stack|concat|std_variance|blas|dropout|indexhelper|utils|variance|tanh|losses|data|intarray|tensors|mmnd|mm2d|mv|vm|argminmax|minmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|shapes|strides|bench|validators|ce|synth_mnist|shapebroadcast|all]"
     exit 1
 fi
 
@@ -22,6 +22,11 @@ case $1 in
         echo "Running mojo -I . tests/test_gpu.mojo"
         mojo -I . $DEBUG_MODE tests/test_gpu.mojo
         ;;
+    item)
+        echo "Running mojo -I . tests/test_item.mojo"
+        mojo -I . $DEBUG_MODE tests/test_item.mojo
+        ;;
+
     gpusummean)
         echo "Running mojo -I . tests/test_gpu_sum_mean.mojo"
         mojo -I . $DEBUG_MODE tests/test_gpu_sum_mean.mojo
@@ -271,6 +276,9 @@ case $1 in
         ;;
 
     all)
+        echo "Running tests/test_item.mojo"
+        mojo -I . tests/test_item.mojo
+
         echo "Running tests/test_scalar_tensors.mojo"
         mojo -I . tests/test_scalar_tensors.mojo
 
@@ -426,7 +434,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: scalar, broadcast, gpu_expand, expand, gpusummean, gpu, npiop, sgd, matmul, cnn, chunk, fill, pad, logarithm, stack, concat, std_variance, dropout, blas, indexhelper, utils, variance, tanh, losses, data, intarray, mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax, permute, shuffle, argminmax, minmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, strides, shapebroadcast, bench, validators, ce, synth_mnist, all"
+        echo "Available tests: item, scalar, broadcast, gpu_expand, expand, gpusummean, gpu, npiop, sgd, matmul, cnn, chunk, fill, pad, logarithm, stack, concat, std_variance, dropout, blas, indexhelper, utils, variance, tanh, losses, data, intarray, mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax, permute, shuffle, argminmax, minmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, strides, shapebroadcast, bench, validators, ce, synth_mnist, all"
         exit 1
         ;;
 esac

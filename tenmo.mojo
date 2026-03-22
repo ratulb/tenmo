@@ -486,7 +486,7 @@ struct Tensor[dtype: DType = DType.float32](
         raise Error("System does not have any accelerator")
 
     fn to_gpu(
-        mut self,
+        self,
         gpu: Optional[GPU] = None,
         requires_grad: Optional[Bool] = None,
     ) raises -> Self:
@@ -505,6 +505,9 @@ struct Tensor[dtype: DType = DType.float32](
                 "Can not move to GPU. System does not have any accelerator"
                 " device"
             )
+
+    fn device(self) raises -> Device:
+        return self.buffer.device()
 
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
         @parameter
@@ -1385,23 +1388,21 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Gradbox[Self.dtype]:
         var grad_contrib: Gradbox[Self.dtype]
         if upstream_grad.shape() == Shape():
-            var is_on_gpu = upstream_grad.is_on_gpu()
-            var device: Device = CPU().into()
-            if is_on_gpu:
-                try:
-                    device = upstream_grad.get_gpu().into()
-                except e:
-                    print(e)
-                    panic(
-                        "Tensor upstream_grad_share  - failed to retrieve"
-                        " device from upstream grad"
-                    )
-            grad_contrib = Gradbox[Self.dtype].full(
-                self.shape(),
-                upstream_grad.item(),
-                share=False,
-                device=device,
-            )
+            try:
+                grad_contrib = Gradbox[Self.dtype].full(
+                    self.shape(),
+                    upstream_grad.item(),
+                    share=False,
+                    device=upstream_grad.device(),
+                )
+            except e:
+                panic(
+                    "Tensor upstream_grad_share: device() call failed: "
+                    + e.__str__()
+                )
+                # Unreachable
+                grad_contrib = Gradbox[Self.dtype].zeros(Shape())
+
         else:
 
             @parameter
@@ -2437,4 +2438,5 @@ fn main() raises:
         a.shape().product(),
         a.is_scalar(),
     )
+    print(a.device())
     # prints () 0 1 0 1 True

@@ -58,6 +58,9 @@ struct Gradbox[dtype: DType](
                 self^.buffer.contiguous(), requires_grad=requires_grad
             )
 
+    fn device(self) raises -> Device:
+        return self.buffer.device()
+
     @always_inline
     fn transpose(self, axes: IntArray) -> Gradbox[Self.dtype]:
         """Fused transpose and then contiguous."""
@@ -555,7 +558,7 @@ struct Gradbox[dtype: DType](
         raise Error("System does not have any accelerator")
 
     fn to_gpu(
-        mut self,
+        self,
         gpu: Optional[GPU] = None,
     ) raises -> Self:
         @parameter
@@ -834,10 +837,11 @@ struct Gradbox[dtype: DType](
         )
 
 
-fn main():
+fn main() raises:
     comptime dtype = DType.float32
     var gb = Gradbox[dtype].arange(10)
     x = gb.detach()
     x.print()
     x = x.reshape(Shape(2, 5))
     x.print()
+    print(x.device())
