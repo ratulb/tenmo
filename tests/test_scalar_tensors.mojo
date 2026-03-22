@@ -34,3 +34,4 @@ fn test_gpu_scalar_add_forward_only() raises:
 
 fn main() raises:
     test_cpu_add_scalar_tensor_result()
+    test_gpu_scalar_add_forward_only()
