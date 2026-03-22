@@ -98,9 +98,53 @@ fn test_gpu_scalar_add_backward_manual_handler() raises:
         results[i][1].print()
     print("passed")
 
+
+fn test_gpu_scalar_add_backward_update_grad() raises:
+    print("test_gpu_scalar_add_backward_update_grad")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].scalar(3.0, requires_grad=True)
+    var b = Tensor[dtype].scalar(4.0, requires_grad=True)
+    var a_gpu = a.to_gpu()
+    var b_gpu = b.to_gpu()
+    var gpu_result = a_gpu + b_gpu
+
+    var seed_tensor = Tensor[dtype].full(gpu_result.shape(), Scalar[dtype](1.0))
+    var seed_gpu = seed_tensor.to_gpu()
+    gpu_result.seed_grad(seed_gpu)
+
+    var results = gpu_result.backward_fn()(gpu_result)
+    print("backward fn returned")
+
+    # result[0] targets a_gpu, result[1] targets b_gpu
+    var target_0 = results[0][0]
+    var grad_0 = results[0][1]
+    var target_1 = results[1][0]
+    var grad_1 = results[1][1]
+
+    print("target_0 is_on_gpu:", target_0.is_on_gpu())
+    print("target_0 gradbox is_on_gpu:", target_0.gradbox[].is_on_gpu())
+    print("grad_0 is_on_gpu:", grad_0.is_on_gpu())
+    print("calling update_grad on target_0")
+    target_0.update_grad[AddTensor](grad_0)
+    print("update_grad target_0 done")
+    print("target_0 gradbox after update:")
+    target_0.grad().print()
+
+    print("target_1 is_on_gpu:", target_1.is_on_gpu())
+    print("target_1 gradbox is_on_gpu:", target_1.gradbox[].is_on_gpu())
+    print("grad_1 is_on_gpu:", grad_1.is_on_gpu())
+    print("calling update_grad on target_1")
+    target_1.update_grad[AddTensor](grad_1)
+    print("update_grad target_1 done")
+    print("target_1 gradbox after update:")
+    target_1.grad().print()
+
+    print("passed")
+
 fn main() raises:
     #test_cpu_add_scalar_tensor_result()
     #test_gpu_scalar_add_forward_only()
     #test_gpu_scalar_add_backward_only()
     #test_gpu_scalar_add_backward_seed_only()
-    test_gpu_scalar_add_backward_manual_handler()
+    #test_gpu_scalar_add_backward_manual_handler()
+    test_gpu_scalar_add_backward_update_grad()
