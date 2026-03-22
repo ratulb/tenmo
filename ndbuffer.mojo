@@ -317,7 +317,7 @@ struct NDBuffer[dtype: DType](
         else:
             # Materialise respecting strides
             # Step 1: bring raw flat device buffer to CPU
-            var flat_cpu = curr_state.into(Shape(curr_state.__len__()))
+            var flat_cpu = curr_state.into(Shape(len(curr_state)))
             # Step 2: create view with correct shape/strides/offset over flat data
             var viewed = flat_cpu.share(self.shape, self.strides, self.offset)
             # Step 3: materialise into contiguous CPU buffer

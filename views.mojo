@@ -144,7 +144,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
             # Re-attach the view's logical shape/strides/offset
             # so backward_cpu coordinate mapping works correctly
             var cpu_ndb = cpu_ndb_flat.share(
-                self.shape, self.strides, self.offset
+                self.shape, Strides.default(self.shape), self.offset
             )
             cpu_gradbox = Gradbox[Self.dtype](cpu_ndb^, share=False)
         except e:
