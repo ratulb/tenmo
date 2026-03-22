@@ -8,6 +8,7 @@ from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
 from views import View
 
+
 @fieldwise_init
 @register_passable
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable):
@@ -61,14 +62,14 @@ struct Expand[dtype: DType]:
 
         var offset = tensor.offset()  # keep same as current tensor
 
-        _="""out = Tensor[Self.dtype].build_view(
+        var out = View[Self.dtype].forward[track_grad=False](
             tensor,
             shape_expanded,
             strides,
             offset,
             requires_grad=False,
-        )"""
-        var out = View[Self.dtype].forward[track_grad=False](tensor, shape_expanded, strides, offset,  requires_grad=False, validated=True,)
+            validated=True,
+        )
 
         @parameter
         if track_grad:

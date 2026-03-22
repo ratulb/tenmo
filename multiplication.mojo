@@ -48,8 +48,7 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        # ref gradbox = output.gradients()[]
-        var gradbox = output.grad()
+        ref gradbox = output.gradients()[]
         count = len(output.ancestry())
         var ancestor_lhs = output.ancestry().get(0)
 

@@ -141,21 +141,6 @@ struct Tensor[dtype: DType = DType.float32](
             )
         return out
 
-    @staticmethod
-    fn build_view_1(
-        #mut tensor: Self,
-        mut self,
-        shape: Shape,
-        strides: Optional[Strides] = None,
-        offset: Int = 0,
-        requires_grad: Bool = False,
-    ) -> Tensor[Self.dtype]:
-        #ref tensor_buffer = tensor.buffer
-        #ref own_buffer = self.buffer
-
-        var buffer = self.buffer.share(shape, strides, offset)
-        return Tensor[Self.dtype](buffer=buffer^, requires_grad=requires_grad)
-
     fn as_gradbox(
         deinit self, share: Bool = False, *, contiguous: Bool = True
     ) -> Gradbox[Self.dtype]:
@@ -1400,8 +1385,22 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Gradbox[Self.dtype]:
         var grad_contrib: Gradbox[Self.dtype]
         if upstream_grad.shape() == Shape():
+            var is_on_gpu = upstream_grad.is_on_gpu()
+            var device: Device = CPU().into()
+            if is_on_gpu:
+                try:
+                    device = upstream_grad.get_gpu().into()
+                except e:
+                    print(e)
+                    panic(
+                        "Tensor upstream_grad_share  - failed to retrieve"
+                        " device from upstream grad"
+                    )
             grad_contrib = Gradbox[Self.dtype].full(
-                self.shape(), upstream_grad.item(), share=False
+                self.shape(),
+                upstream_grad.item(),
+                share=False,
+                device=device,
             )
         else:
 

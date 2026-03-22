@@ -290,7 +290,7 @@ fn test_gpu_expand_grad_accumulation_two_expands() raises:
     var e2 = a_gpu.expand(5, 2)
     es1 = e1.sum()
     es1.backward()
-
+    a_gpu.zero_grad()
     es2 = e2.sum()
     es2.backward()
     # e1 contributes 3.0, e2 contributes 5.0 → accumulated 8.0
