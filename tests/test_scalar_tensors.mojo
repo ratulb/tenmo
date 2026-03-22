@@ -143,9 +143,11 @@ fn test_gpu_scalar_add_backward_update_grad() raises:
     print("passed")
 
 fn main() raises:
-    #test_cpu_add_scalar_tensor_result()
-    #test_gpu_scalar_add_forward_only()
-    #test_gpu_scalar_add_backward_only()
-    #test_gpu_scalar_add_backward_seed_only()
-    #test_gpu_scalar_add_backward_manual_handler()
-    test_gpu_scalar_add_backward_update_grad()
+    test_cpu_add_scalar_tensor_result()
+    @parameter
+    if has_accelerator():
+        test_gpu_scalar_add_forward_only()
+        test_gpu_scalar_add_backward_only()
+        test_gpu_scalar_add_backward_seed_only()
+        test_gpu_scalar_add_backward_manual_handler()
+        test_gpu_scalar_add_backward_update_grad()
