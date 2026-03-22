@@ -142,12 +142,36 @@ fn test_gpu_scalar_add_backward_update_grad() raises:
 
     print("passed")
 
+fn test_gpu_scalar_add_full_backward() raises:
+    print("test_gpu_scalar_add_full_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].scalar(3.0, requires_grad=True)
+    var b = Tensor[dtype].scalar(4.0, requires_grad=True)
+    var a_gpu = a.to_gpu()
+    var b_gpu = b.to_gpu()
+    var cpu_result = a + b
+    cpu_result.backward()
+    var a_cpu_grad = a.grad().copy()
+    var b_cpu_grad = b.grad().copy()
+    a.zero_grad()
+    b.zero_grad()
+    var gpu_result = a_gpu + b_gpu
+    gpu_result.backward()
+    print("a.grad():")
+    a.grad().print()
+    print("b.grad():")
+    b.grad().print()
+    assert_true(a.grad().all_close(a_cpu_grad))
+    assert_true(b.grad().all_close(b_cpu_grad))
+    print("passed")
+
 fn main() raises:
     test_cpu_add_scalar_tensor_result()
     @parameter
     if has_accelerator():
-        test_gpu_scalar_add_forward_only()
+        _="""test_gpu_scalar_add_forward_only()
         test_gpu_scalar_add_backward_only()
         test_gpu_scalar_add_backward_seed_only()
         test_gpu_scalar_add_backward_manual_handler()
-        test_gpu_scalar_add_backward_update_grad()
+        test_gpu_scalar_add_backward_update_grad()"""
+        test_gpu_scalar_add_full_backward()
