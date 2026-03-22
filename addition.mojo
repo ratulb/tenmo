@@ -51,7 +51,7 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var gradbox = output.grad()
+        var gradbox = output.gradients()[]
         count = len(output.ancestry())
 
         var grad_shares = List[
