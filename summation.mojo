@@ -18,6 +18,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        print("In sum backward")
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         shape = ancestor.shape()
@@ -46,6 +47,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
             else:
                 # keepdims=True: shapes match except for broadcasting
                 grad_contrib = gradbox.broadcast_to(shape, share=False)
+        print("Out of sumbackward")
 
         return [
             (

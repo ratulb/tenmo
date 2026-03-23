@@ -19,11 +19,13 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        print("In transpose backward")
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var inverted_axes = IntArray.invert_permutation(self.axes)
         var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes)
 
+        print("In transpose backward - out")
         return [
             (
                 ancestor^,

@@ -16,6 +16,7 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, read output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        print("Contiguous backward")
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         ref parent_shape = parent.shape()
@@ -37,6 +38,7 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable):
             for coord in parent_shape:
                 parent_gradbox[coord] = gradbox[coord]
 
+        print("Contiguous backward done")
         return [
             (parent^, parent_gradbox^, AddTensor),
         ]
