@@ -129,90 +129,22 @@ struct Gradbox[dtype: DType](
         flattened_buffer = self.buffer.flatten(start_dim, end_dim)
         return Gradbox[Self.dtype](flattened_buffer^, share=False)
 
-    @always_inline
+    # shared=False → always owned, contiguous, GPU-aware
+    fn squeeze(self, axes: IntArray) -> Gradbox[Self.dtype]:
+        var buffer = self.buffer.copy()
+        var ndb = buffer.squeeze(axes, shared=False)
+        return Gradbox[Self.dtype](ndb^, share=False)
+
     fn squeeze(self, axes: List[Int] = []) -> Gradbox[Self.dtype]:
         return self.squeeze(IntArray(axes))
 
-    @always_inline
-    fn squeeze(self, axes: IntArray) -> Gradbox[Self.dtype]:
-        shape = self.shape()
-        rank = shape.rank()
+    fn unsqueeze(self, axes: IntArray) -> Gradbox[Self.dtype]:
+        var buffer = self.buffer.copy()
+        var ndb = buffer.unsqueeze(axes, shared=False)
+        return Gradbox[Self.dtype](ndb^, share=False)
 
-        # Validate axes
-        var validated_axes = IntArray()
-        if len(axes) == 0:
-            # Default: squeeze all dimensions with size 1
-            for i in range(rank):
-                if shape[i] == 1:
-                    validated_axes.append(i)
-        else:
-            validated_axes = Validator.validate_and_normalize_axes(
-                shape, axes, ordered=True
-            )
-
-            # ensure all are truly size-1 dimensions
-            for ax in validated_axes:
-                if shape[ax] != 1:
-                    panic(
-                        "Gradbox.squeeze(): cannot squeeze non-unit dimension "
-                        + ax.__str__()
-                        + " (size="
-                        + shape[ax].__str__()
-                        + ")"
-                    )
-
-        # construct new shape
-        var new_dims = IntArray()
-        for i in range(rank):
-            if i not in validated_axes:
-                new_dims.append(shape[i])
-
-        var new_shape = Shape(new_dims)
-        var buffer = self.buffer.contiguous_buffer()
-        var nd_buffer = NDBuffer[Self.dtype](buffer^, new_shape^)
-
-        return Gradbox[Self.dtype](nd_buffer^, share=False)
-
-    fn unsqueeze(self, axes: List[Int]) -> Self:
+    fn unsqueeze(self, axes: List[Int]) -> Gradbox[Self.dtype]:
         return self.unsqueeze(IntArray(axes))
-
-    fn unsqueeze(self, axes: IntArray) -> Self:
-        var rank = self.rank()
-        var sorted_axes = axes.sorted()
-        var new_rank = rank + sorted_axes.size()
-
-        # Normalize negative axes
-        for i in range(sorted_axes.size()):
-            var ax = sorted_axes[i]
-            if ax < 0:
-                ax += new_rank
-                # Validate
-                if ax < 0 or ax > new_rank:
-                    panic(
-                        "Gradbox → unsqueeze: invalid axis",
-                        sorted_axes[i].__str__(),
-                    )
-            sorted_axes[i] = ax
-
-        # Build new shape
-        shape = self.shape()
-        var new_shape_dims = IntArray.with_capacity(new_rank)
-        var src_i = 0
-        for dst_i in range(new_rank):
-            if dst_i in sorted_axes:
-                new_shape_dims.append(1)
-            else:
-                new_shape_dims.append(shape[src_i])
-                src_i += 1
-
-        # Allocate new gradbox
-        new_shape = Shape(new_shape_dims)
-
-        # Copy elements preserving order
-        # Unsqueeze doesn't change total number of elements.
-        # So we can safely copy flattened contents.
-        nd_buffer = self.buffer.contiguous(new_shape)
-        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @always_inline
     fn permute(self, axes: IntArray) -> Gradbox[Self.dtype]:

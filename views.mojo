@@ -12,6 +12,7 @@ from device import DeviceState
 from sys import has_accelerator
 from ndbuffer import NDBuffer
 
+
 @fieldwise_init
 @register_passable
 struct ViewBackward[dtype: DType](ImplicitlyCopyable):
@@ -394,13 +395,6 @@ struct View[dtype: DType](Copyable):
             abs_strides = strides
         # At this point, NDBuffer -> Buffer would be shared, ref counted if not already so
         var shared_ndb = tensor.buffer.share(shape, abs_strides, abs_offset)
-        _ = """var out = Tensor[Self.dtype].build_view(
-            tensor,
-            shape,
-            abs_strides,
-            abs_offset,
-            requires_grad=False,
-        )"""
         var out = Tensor[Self.dtype](shared_ndb^, requires_grad=False)
 
         @parameter
@@ -415,6 +409,7 @@ struct View[dtype: DType](Copyable):
                 out.add_ancestry(tensor)
 
         return out^
+
 
 fn main() raises:
     pass

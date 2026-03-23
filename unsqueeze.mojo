@@ -1,13 +1,9 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
-from shapes import Shape
-from strides import Strides
 from backpropagation import Delegate, BackwardFn, BACKWARD_UNSQUEEZE
 from squeeze import Squeeze
-from common_utils import panic
 from gradbox import Gradbox
-from views import View
 
 
 @fieldwise_init
@@ -43,96 +39,28 @@ struct Unsqueeze[dtype: DType]:
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        """Unsqueeze multiple axes by inserting dimensions of size 1."""
-        rank = tensor.rank()
-        original_shape = tensor.shape()
-        original_strides = tensor.strides()
-        new_axes_count = len(axes)
-
-        if new_axes_count == 0:
+        if len(axes) == 0:
             return tensor.copy()
 
-        new_rank = rank + new_axes_count
-
-        normalized_axes = IntArray.with_capacity(new_axes_count)
-        seen = IntArray.with_capacity(new_axes_count)
-
-        for axis in axes:
-            normalized = axis if axis >= 0 else new_rank + axis
-            if normalized < 0 or normalized >= new_rank:
-                panic(
-                    "Tensor → unsqueeze: axis", axis.__str__(), "out of range"
-                )
-
-            # Check for duplicates
-            if normalized in seen:
-                panic("Tensor → unsqueeze: duplicate axis", axis.__str__())
-            seen.append(normalized)
-            normalized_axes.append(normalized)
-
-        # Sort axes for efficient insertion
-        normalized_axes.sort()
-
-        # Pre-allocate with exact capacity
-        var new_shape = IntArray.with_capacity(new_rank)
-        var new_strides = IntArray.with_capacity(new_rank)
-
-        var orig_axis_index = 0
-        var new_axis_index = 0
-
-        # Build new shape and strides by inserting 1's at specified positions
-        for i in range(new_rank):
-            if (
-                new_axis_index < new_axes_count
-                and i == normalized_axes[new_axis_index]
-            ):
-                # Insert new dimension
-                new_shape.append(1)
-
-                # Calculate stride for inserted dimension
-                # If inserting before existing dimensions, use stride of next dimension
-                # If inserting at the end, use stride 1
-                insert_stride = (
-                    original_strides[orig_axis_index] if orig_axis_index
-                    < rank else 1
-                )
-
-                new_strides.append(insert_stride)
-
-                new_axis_index += 1
-            else:
-                # Copy existing dimension
-                new_shape.append(original_shape[orig_axis_index])
-                new_strides.append(original_strides[orig_axis_index])
-                orig_axis_index += 1
-
-        # Create the unsqueezed tensor
-        var shape = Shape(new_shape)
-        var strides = Strides(new_strides)
-        _ = """out = Tensor[Self.dtype].build_view(
-            tensor,
-            shape,
-            strides,
-            tensor.offset(),
-            requires_grad=False,
-        )"""
-        var out = View[Self.dtype].forward[track_grad=False](
-            tensor,
-            shape,
-            strides,
-            tensor.offset(),
-            requires_grad=False,
-            validated=True,
-        )
+        var unsqueezed_ndb = tensor.buffer.unsqueeze(
+            axes
+        )  # shared=True default
+        var out = Tensor[Self.dtype](unsqueezed_ndb^, requires_grad=False)
 
         @parameter
         if track_grad:
-            grad_required = requires_grad.or_else(tensor.requires_grad)
-
+            var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                bfn = UnsqueezeBackward[Self.dtype](
-                    axes=normalized_axes
+                var rank = tensor.rank()
+                var new_rank = rank + len(axes)
+                var normalized = IntArray.with_capacity(len(axes))
+                for axis in axes:
+                    var n = axis if axis >= 0 else new_rank + axis
+                    normalized.append(n)
+                normalized.sort()
+                var bfn = UnsqueezeBackward[Self.dtype](
+                    axes=normalized
                 ).into_backward_fn()
                 out.backwardFn = Optional(bfn^)
                 out.add_ancestry(tensor)

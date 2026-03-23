@@ -854,18 +854,6 @@ struct NDBuffer[dtype: DType](
             out = NDBuffer[Self.dtype](Shape())
         return out^
 
-    fn contiguous(
-        self, new_shape: Optional[Shape] = None
-    ) -> NDBuffer[Self.dtype]:
-        target_shape = new_shape.or_else(self.shape)
-        if (
-            self.is_contiguous()
-            and not self.shared()
-            and target_shape == self.shape
-        ):
-            return self
-        return NDBuffer[Self.dtype](self.contiguous_buffer(), target_shape)
-
     fn map[
         map_buffer: fn (Buffer[Self.dtype]) -> Buffer[Self.dtype],
         map_element: fn (Scalar[Self.dtype]) -> Scalar[Self.dtype],
@@ -1017,7 +1005,8 @@ struct NDBuffer[dtype: DType](
         return self.contiguous(new_shape)
 
     fn contiguous_buffer(self) -> Buffer[Self.dtype]:
-        """Returns a contiguous copy of the buffer with the same data."""
+        """Returns a contiguous copy of the buffer with the same data - CPU only.
+        """
         # - same shape
         # - contiguous strides
         # - offset = 0
@@ -1033,6 +1022,171 @@ struct NDBuffer[dtype: DType](
                 buffer[index] = self.buffer[idx]
                 index += 1
             return buffer^
+
+    fn contiguous_device_state(self) raises -> DeviceState[Self.dtype]:
+        """
+        Returns a fresh independent contiguous DeviceState.
+        Caller must ensure self is on GPU.
+        Fast path: enqueue_copy_to for contiguous source.
+        Slow path: DeviceState.fill for non-contiguous (handles strided iteration).
+        """
+        ref curr_state = self.device_state.value()
+        ref gpu = curr_state.get_gpu()
+        var new_state = DeviceState[Self.dtype](self.numels(), gpu)
+
+        if self.is_contiguous():
+            # Fast path: direct DeviceBuffer → DeviceBuffer copy, no host round-trip
+            curr_state.buffer.enqueue_copy_to(new_state.buffer)
+            new_state.sync()
+        else:
+            # Slow path: fill handles non-contiguous strided GPU source correctly
+            # It materialises through CPU: GPU→CPU (strided) then CPU→GPU (contiguous)
+            new_state.fill(
+                self
+            )  # fill(ref source: NDBuffer) — already handles this
+
+        return new_state^
+
+    fn contiguous(
+        self, new_shape: Optional[Shape] = None
+    ) -> NDBuffer[Self.dtype]:
+        var target_shape = new_shape.or_else(self.shape)
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                # Already contiguous on GPU with no shape change — but still need
+                # a fresh independent DeviceState (unshared), so always materialise
+                try:
+                    var new_state = self.contiguous_device_state()
+                    return NDBuffer[Self.dtype].with_device_state(
+                        new_state^, target_shape
+                    )
+                except e:
+                    panic(
+                        "NDBuffer.contiguous: GPU materialisation failed: "
+                        + e.__str__()
+                    )
+                    # unreachable — satisfies compiler
+                    return self
+
+        # CPU path — unchanged
+        if (
+            self.is_contiguous()
+            and not self.shared()
+            and target_shape == self.shape
+        ):
+            return self
+        return NDBuffer[Self.dtype](self.contiguous_buffer(), target_shape)
+
+    fn squeeze(
+        mut self, axes: IntArray, *, shared: Bool = True
+    ) -> NDBuffer[Self.dtype]:
+        var shape = self.shape
+        var rank = shape.rank()
+
+        var axes_to_squeeze: IntArray
+        if axes == IntArray():
+            axes_to_squeeze = shape.indices_of_axes_with_size(1)
+        else:
+            axes_to_squeeze = IntArray.with_capacity(len(axes))
+            var seen = IntArray.with_capacity(len(axes))
+            for axis in axes:
+                var normalized = axis if axis >= 0 else axis + rank
+                if normalized < 0 or normalized >= rank:
+                    panic(
+                        "NDBuffer.squeeze: axis ",
+                        axis.__str__(),
+                        " out of range",
+                    )
+                if shape[normalized] != 1:
+                    panic(
+                        "NDBuffer.squeeze: cannot squeeze axis ",
+                        normalized.__str__(),
+                        " with size ",
+                        shape[normalized].__str__(),
+                    )
+                if normalized in seen:
+                    panic("NDBuffer.squeeze: duplicate axis ", axis.__str__())
+                seen.append(normalized)
+                axes_to_squeeze.append(normalized)
+            axes_to_squeeze.sort()
+
+        if len(axes_to_squeeze) == 0:
+            return self
+
+        var new_size = rank - len(axes_to_squeeze)
+        var new_shape_dims = IntArray.with_capacity(new_size)
+        var new_strides_arr = IntArray.with_capacity(new_size)
+
+        for i in range(rank):
+            if i not in axes_to_squeeze:
+                new_shape_dims.append(shape[i])
+                new_strides_arr.append(self.strides[i])
+
+        var new_shape = Shape(new_shape_dims)
+        var new_strides = Strides(new_strides_arr)
+
+        if shared:
+            # View: shared buffer, ref-counted — for Tensor view ops
+            return self.share(new_shape, new_strides, self.offset)
+        else:
+            # Owned contiguous copy — for Gradbox
+            # First build the view to get correct shape/strides, then materialise
+            var view = self.share(new_shape, new_strides, self.offset)
+            return view.contiguous()
+
+    fn unsqueeze(
+        mut self, axes: IntArray, *, shared: Bool = True
+    ) -> NDBuffer[Self.dtype]:
+        var rank = self.shape.rank()
+        var new_axes_count = len(axes)
+
+        if new_axes_count == 0:
+            return self
+
+        var new_rank = rank + new_axes_count
+
+        var normalized_axes = IntArray.with_capacity(new_axes_count)
+        var seen = IntArray.with_capacity(new_axes_count)
+
+        for axis in axes:
+            var normalized = axis if axis >= 0 else new_rank + axis
+            if normalized < 0 or normalized >= new_rank:
+                panic(
+                    "NDBuffer.unsqueeze: axis ", axis.__str__(), " out of range"
+                )
+            if normalized in seen:
+                panic("NDBuffer.unsqueeze: duplicate axis ", axis.__str__())
+            seen.append(normalized)
+            normalized_axes.append(normalized)
+
+        normalized_axes.sort()
+
+        var new_shape_dims = IntArray.with_capacity(new_rank)
+        var new_strides_arr = IntArray.with_capacity(new_rank)
+        var orig_i = 0
+        var ins_i = 0
+
+        for i in range(new_rank):
+            if ins_i < new_axes_count and i == normalized_axes[ins_i]:
+                new_shape_dims.append(1)
+                var insert_stride = self.strides[orig_i] if orig_i < rank else 1
+                new_strides_arr.append(insert_stride)
+                ins_i += 1
+            else:
+                new_shape_dims.append(self.shape[orig_i])
+                new_strides_arr.append(self.strides[orig_i])
+                orig_i += 1
+
+        var new_shape = Shape(new_shape_dims)
+        var new_strides = Strides(new_strides_arr)
+
+        if shared:
+            return self.share(new_shape, new_strides, self.offset)
+        else:
+            var view = self.share(new_shape, new_strides, self.offset)
+            return view.contiguous()
 
     fn count(self, key: Scalar[Self.dtype]) -> Int:
         """Count occurence of the key in the buffer."""
