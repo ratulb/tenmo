@@ -3,6 +3,8 @@ from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
 from backpropagation import Delegate, BackwardFn, BACKWARD_SQUEEZE
 from gradbox import Gradbox
+from shapes import Shape
+from common_utils import panic
 
 
 @fieldwise_init
@@ -18,12 +20,28 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ancestor = output.ancestry().get(0)
         var gradbox = output.gradients()[]
-
+        var ancestor_gradbox: Gradbox[Self.dtype]
         var original_shape = ancestor.shape()
-
-        var gradbox_ancestor = gradbox.reshape(original_shape)
+        if gradbox.shape() == Shape():
+            try:
+                ancestor_gradbox = Gradbox[Self.dtype].full(
+                    original_shape,
+                    gradbox.item(),
+                    share=False,
+                    device=gradbox.device(),
+                )
+            except e:
+                print(e)
+                panic(
+                    "SqueezeBackward: failed to construct parent grad from"
+                    " scalar grad"
+                )
+                # Unreachable
+                ancestor_gradbox = Gradbox[Self.dtype].zeros(Shape())
+        else:
+            ancestor_gradbox = gradbox.reshape(original_shape)
         return [
-            (ancestor^, gradbox_ancestor^, AddTensor),
+            (ancestor^, ancestor_gradbox^, AddTensor),
             (
                 output,
                 gradbox^,
