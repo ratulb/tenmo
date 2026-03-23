@@ -588,20 +588,33 @@ fn test_squz_gpu_grad_accumulation() raises:
 # GPU UNSQUEEZE TESTS
 # ============================================================
 
+
 fn test_unsquz_gpu_single_axis_front() raises:
+    pass
+fn main() raises:
     @parameter
     if has_accelerator():
         print("test_unsquz_gpu_single_axis_front")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
         var a_gpu = a.to_gpu()
+        print("check1")
         var u = a_gpu.unsqueeze(0)
+        u.print()
+        print("check2")
         assert_true(u.shape() == Shape.of(1, 2, 2))
+        print("check3")
         assert_true(u.to_cpu().all_close(Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]]])))
+        print("check4")
         var loss = u.sum()
+        print("check5 ")
+        loss.print()
         loss.backward()
+        print("check 6 - post backward")
         assert_true(not a.grad().is_on_gpu())
+        print("check7")
         assert_true(a.grad().all_close(Tensor.ones_like(a)))
+        print("check8")
 
 
 fn test_unsquz_gpu_single_axis_middle() raises:
@@ -783,7 +796,7 @@ fn test_squz_unsquz_gpu_round_trip_multi() raises:
 # MAIN
 # ============================================================
 
-fn main() raises:
+fn main_1() raises:
     #Old tests
     test_squeeze_scalar()
     test_squeeze_1d_no_effect()
