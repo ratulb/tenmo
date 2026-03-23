@@ -578,6 +578,7 @@ fn test_squz_gpu_grad_accumulation() raises:
         var s2 = a_gpu.squeeze([0])
         var loss1 = s1.sum()
         loss1.backward()
+        a_gpu.zero_grad()
         var loss2 = s2.sum()
         loss2.backward()
         assert_true(a.grad().all_close(Tensor[dtype].d3([[[2.0, 2.0]]])))
