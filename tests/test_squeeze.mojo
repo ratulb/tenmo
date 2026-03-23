@@ -590,8 +590,6 @@ fn test_squz_gpu_grad_accumulation() raises:
 
 
 fn test_unsquz_gpu_single_axis_front() raises:
-    pass
-fn main() raises:
     @parameter
     if has_accelerator():
         print("test_unsquz_gpu_single_axis_front")
@@ -796,7 +794,7 @@ fn test_squz_unsquz_gpu_round_trip_multi() raises:
 # MAIN
 # ============================================================
 
-fn main_1() raises:
+fn main() raises:
     #Old tests
     test_squeeze_scalar()
     test_squeeze_1d_no_effect()
