@@ -746,6 +746,7 @@ fn test_unsquz_gpu_grad_accumulation() raises:
         var loss1 = u1.sum()
         loss1.backward()
         var loss2 = u2.sum()
+        a_gpu.zero_grad()
         loss2.backward()
         assert_true(a.grad().all_close(Tensor[dtype].d1([2.0, 2.0, 2.0])))
 
