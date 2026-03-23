@@ -2,6 +2,7 @@ from tenmo import Tensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_CONTIGUOUS
 from mnemonics import AddTensor
 from gradbox import Gradbox
+from shapes import Shape
 
 
 @fieldwise_init
@@ -18,10 +19,23 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable):
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         ref parent_shape = parent.shape()
-
-        var parent_gradbox = Gradbox[Self.dtype].zeros(parent_shape)
-        for coord in parent_shape:
-            parent_gradbox[coord] = gradbox[coord]
+        var parent_gradbox: Gradbox[Self.dtype]
+        if gradbox.shape() == Shape():
+            parent_gradbox = Gradbox[Self.dtype].full(
+                parent_shape,
+                gradbox.item(),
+                share=False,
+                device=gradbox.device(),
+            )
+        else:
+            parent_gradbox = Gradbox[Self.dtype].full(
+                parent_shape,
+                Scalar[Self.dtype](0),
+                share=False,
+                device=gradbox.device(),
+            )
+            for coord in parent_shape:
+                parent_gradbox[coord] = gradbox[coord]
 
         return [
             (parent^, parent_gradbox^, AddTensor),

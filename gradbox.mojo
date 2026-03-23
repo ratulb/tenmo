@@ -31,6 +31,7 @@ struct Gradbox[dtype: DType](
     & Absable
 ):
     var buffer: NDBuffer[Self.dtype]
+    comptime Empty = Gradbox[Self.dtype].zeros(Shape())
 
     fn __init__(out self, shape: Shape, share: Bool = True):
         buffer = NDBuffer[Self.dtype](shape)
@@ -58,8 +59,16 @@ struct Gradbox[dtype: DType](
                 self^.buffer.contiguous(), requires_grad=requires_grad
             )
 
-    fn device(self) raises -> Device:
-        return self.buffer.device()
+    fn device(self) -> Device:
+        try:
+            return self.buffer.device()
+        except e:
+            print(e)
+            panic(
+                "Gradbox device(): failed to retrive device from gradbox buffer"
+            )
+            # Unreachable
+            return CPU().into()
 
     @always_inline
     fn transpose(self, axes: IntArray) -> Gradbox[Self.dtype]:
