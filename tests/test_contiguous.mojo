@@ -794,5 +794,3 @@ fn main() raises:
     test_contig_gpu_cpu_tensor_unchanged()
 
     print("All contiguous tests passed.")
-    s = Shape.of()
-    print(s)
