@@ -6,6 +6,8 @@ from ndbuffer import NDBuffer
 from math import exp, log
 from unary_ops_kernel import UnaryOpsKernel
 from sys import has_accelerator
+from common_utils import panic
+
 
 @fieldwise_init
 @register_passable
@@ -37,24 +39,20 @@ struct Exponential[dtype: DType]:
         tensor: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-
         var out: Tensor[Self.dtype]
 
         @parameter
         if has_accelerator():
             if tensor.is_on_gpu():
                 try:
-                    out = UnaryOpsKernel[Self.dtype].launch[EXP](
-                        tensor
-                    )
+                    out = UnaryOpsKernel[Self.dtype].launch[EXP](tensor)
                 except e:
                     print(e)
-                    print(
+                    panic(
                         "Exponential - GPU operation failed for opcode: ",
-                        EXP,
-                        ". Failling back on CPU",
+                        EXP.__str__(),
                     )
-                    out = Self.generate_output(tensor)
+                    out = Tensor[Self.dtype].scalar(0)
 
             else:
                 out = Self.generate_output(tensor)
