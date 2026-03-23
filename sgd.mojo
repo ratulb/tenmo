@@ -4,11 +4,13 @@ from math import sqrt
 from sys import simd_width_of, has_accelerator
 from common_utils import panic
 
+
 @fieldwise_init
 struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
     """
     SGD with momentum, weight decay, and gradient clipping.
     """
+
     var parameters: List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]
     var lr: Scalar[Self.dtype]
     var momentum: Scalar[Self.dtype]
