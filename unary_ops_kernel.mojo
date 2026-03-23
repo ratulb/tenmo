@@ -25,7 +25,6 @@ fn unary_ops[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     size: UInt,
-    # ) where dtype.is_floating_point():
 ):
     var tid = thread_idx.x
     var gtid = tid + block_dim.x * block_idx.x

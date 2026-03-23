@@ -506,8 +506,16 @@ struct Tensor[dtype: DType = DType.float32](
                 " device"
             )
 
-    fn device(self) raises -> Device:
-        return self.buffer.device()
+    fn device(self) -> Device:
+        try:
+            return self.buffer.device()
+        except e:
+            print(e)
+            panic(
+                "Tensor device(): failed to retrive device from tensor buffer"
+            )
+            # Unreachable
+            return CPU().into()
 
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
         @parameter
@@ -1388,21 +1396,12 @@ struct Tensor[dtype: DType = DType.float32](
     ) -> Gradbox[Self.dtype]:
         var grad_contrib: Gradbox[Self.dtype]
         if upstream_grad.shape() == Shape():
-            try:
-                grad_contrib = Gradbox[Self.dtype].full(
-                    self.shape(),
-                    upstream_grad.item(),
-                    share=False,
-                    device=upstream_grad.device(),
-                )
-            except e:
-                panic(
-                    "Tensor upstream_grad_share: device() call failed: "
-                    + e.__str__()
-                )
-                # Unreachable
-                grad_contrib = Gradbox[Self.dtype].zeros(Shape())
-
+            grad_contrib = Gradbox[Self.dtype].full(
+                self.shape(),
+                upstream_grad.item(),
+                share=False,
+                device=upstream_grad.device(),
+            )
         else:
 
             @parameter

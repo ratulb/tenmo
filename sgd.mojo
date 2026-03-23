@@ -47,20 +47,14 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 @parameter
                 if has_accelerator():
                     if parameter.is_on_gpu():
-                        try:
-                            self.velocities.append(
-                                Gradbox[Self.dtype].full(
-                                    parameter.shape(),
-                                    Scalar[Self.dtype](0),
-                                    share=False,
-                                    device=parameter.device(),
-                                )
+                        self.velocities.append(
+                            Gradbox[Self.dtype].full(
+                                parameter.shape(),
+                                Scalar[Self.dtype](0),
+                                share=False,
+                                device=parameter.device(),
                             )
-                        except e:
-                            panic(
-                                "SGD.__init__: GPU velocity allocation failed: "
-                                + e.__str__()
-                            )
+                        )
                     else:
                         self.velocities.append(
                             Gradbox[Self.dtype].zeros(

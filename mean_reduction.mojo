@@ -31,18 +31,12 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         if gradbox_shape == Shape():
             scalar_grad = gradbox.item() / ancestor.shape().num_elements()
             var grad_contrib: Gradbox[Self.dtype]
-            try:
-                grad_contrib = Gradbox[Self.dtype].full(
-                    ancestor.shape(), scalar_grad, share=False, device=gradbox.device()
-                )
-            except e:
-                print(e)
-                panic("MeanBackward backward - failed to retrieve device from"
-                        " gradbox"
-                )
-
-                # Unreachable
-                grad_contrib = Gradbox[Self.dtype].zeros(Shape())
+            grad_contrib = Gradbox[Self.dtype].full(
+                ancestor.shape(),
+                scalar_grad,
+                share=False,
+                device=gradbox.device(),
+            )
             return [
                 (
                     ancestor^,
@@ -150,4 +144,3 @@ fn main() raises:
     s.backward()
 
     A.grad().print()
-

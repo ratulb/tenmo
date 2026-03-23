@@ -24,17 +24,9 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
         var grad_contrib: Gradbox[Self.dtype]
         # SumBackward.backward — already raises-capable via panic pattern
         if gradbox.shape() == Shape():
-            try:
-                grad_contrib = Gradbox[Self.dtype].full(
-                    shape, gradbox.item(), share=False, device=gradbox.device()
-                )
-            except e:
-                panic("SumBackward: device() failed: " + e.__str__())
-                # Unreachable
-                grad_contrib = Gradbox[Self.dtype].full(
-                    shape, Scalar[Self.dtype](0)
-                )
-
+            grad_contrib = Gradbox[Self.dtype].full(
+                shape, gradbox.item(), share=False, device=gradbox.device()
+            )
         else:
             # Handle keepdims=False case (need to reshape gradient)
             if not self.keepdims:

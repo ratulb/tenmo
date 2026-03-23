@@ -23,21 +23,12 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
         var ancestor_gradbox: Gradbox[Self.dtype]
         var original_shape = ancestor.shape()
         if gradbox.shape() == Shape():
-            try:
-                ancestor_gradbox = Gradbox[Self.dtype].full(
-                    original_shape,
-                    gradbox.item(),
-                    share=False,
-                    device=gradbox.device(),
-                )
-            except e:
-                print(e)
-                panic(
-                    "SqueezeBackward: failed to construct parent grad from"
-                    " scalar grad"
-                )
-                # Unreachable
-                ancestor_gradbox = Gradbox[Self.dtype].zeros(Shape())
+            ancestor_gradbox = Gradbox[Self.dtype].full(
+                original_shape,
+                gradbox.item(),
+                share=False,
+                device=gradbox.device(),
+            )
         else:
             ancestor_gradbox = gradbox.reshape(original_shape)
         return [

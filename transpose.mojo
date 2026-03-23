@@ -57,13 +57,6 @@ struct Transpose[dtype: DType](Copyable):
         var new_shape = shape.permute(normalized_axes)
         var new_strides = self.strides().permute(normalized_axes)
 
-        _ = """var out = Tensor[Self.dtype].build_view(
-            self,
-            new_shape,
-            new_strides,
-            self.offset(),
-            requires_grad=False,
-        )"""
         var out = View[Self.dtype].forward[track_grad=False](
             self,
             new_shape,
