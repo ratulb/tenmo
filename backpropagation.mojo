@@ -61,6 +61,7 @@ comptime BACKWARD_MAXPOOL2D = 48
 comptime BACKWARD_DROPOUT = 49
 comptime BACKWARD_EXPONENTIAL = 50
 comptime BACKWARD_DEVICE_TRANSFER = 51
+comptime BACKWARD_MINMAX_GPU = 52
 # ========== Delegate (Variant) ==========
 
 comptime Delegate[dtype: DType] = Variant[
@@ -116,6 +117,7 @@ comptime Delegate[dtype: DType] = Variant[
     DropoutBackward[dtype],
     ExponentialBackward[dtype],
     DeviceTransferBackward[dtype],
+    MinMaxBackwardGPU[dtype],
 ]
 
 # ========== BackwardFn with Tag-Based Dispatch ==========
@@ -297,6 +299,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.tag == BACKWARD_MINMAX:
             return self.grad_fn[MinMaxBackward[Self.dtype]].backward(output)
+
+        elif self.tag == BACKWARD_MINMAX_GPU:
+            return self.grad_fn[MinMaxBackwardGPU[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_TILE:
             return self.grad_fn[TileBackward[Self.dtype]].backward(output)

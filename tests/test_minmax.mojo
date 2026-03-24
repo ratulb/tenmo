@@ -2,6 +2,957 @@ from tenmo import Tensor
 from testing import assert_true
 from intarray import IntArray
 from shapes import Shape
+from sys import has_accelerator
+
+
+# Exhaustive tests for the revamped MinMax implementation.
+# Prefix: mmrev_ (minmax revamp)
+# Covers:
+#  - Forward correctness (0D, 1D, 2D, 3D, 4D)
+#  - keepdims=True and keepdims=False
+#  - Backward / grad flow (mask correctness, ties, unique max/min)
+#  - Multi-axis reductions
+#  - Global reduction (no axes = all axes)
+#  - CPU and GPU variants
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# CPU TESTS — MAX
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── 1D ────────────────────────────────────────────────────────────────────────
+
+
+fn test_mmrev_cpu_max_1d_forward() raises:
+    print("test_mmrev_cpu_max_1d_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0])
+    var m = a.max()
+    assert_true(m.shape() == Shape())
+    assert_true(m.item() == 9.0)
+
+
+fn test_mmrev_cpu_max_1d_backward_unique() raises:
+    print("test_mmrev_cpu_max_1d_backward_unique")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([3.0, 1.0, 9.0, 2.0], requires_grad=True)
+    var m = a.max()
+    var loss = m.sum()
+    loss.backward()
+    # Only index 2 (value 9) gets grad 1, rest 0
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0, 0.0])))
+
+
+fn test_mmrev_cpu_max_1d_backward_tied() raises:
+    print("test_mmrev_cpu_max_1d_backward_tied")
+    comptime dtype = DType.float32
+    # Two tied maxima — grad split evenly (0.5 each)
+    var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 5.0], requires_grad=True)
+    var m = a.max()
+    var loss = m.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.5, 0.0, 0.5])))
+
+
+# ── 2D ────────────────────────────────────────────────────────────────────────
+
+
+fn test_mmrev_cpu_max_2d_global_forward() raises:
+    print("test_mmrev_cpu_max_2d_global_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 7.0], [3.0, 2.0]])
+    var m = a.max()
+    assert_true(m.shape() == Shape())
+    assert_true(m.item() == 7.0)
+
+
+fn test_mmrev_cpu_max_2d_axis0_forward() raises:
+    print("test_mmrev_cpu_max_2d_axis0_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+    var m = a.max([0])
+    assert_true(m.shape() == Shape(3))
+    assert_true(m.all_close(Tensor[dtype].d1([4.0, 5.0, 6.0])))
+
+
+fn test_mmrev_cpu_max_2d_axis0_keepdims_forward() raises:
+    print("test_mmrev_cpu_max_2d_axis0_keepdims_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+    var m = a.max([0], keepdims=True)
+    assert_true(m.shape() == Shape(1, 3))
+    assert_true(m.all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0]])))
+
+
+fn test_mmrev_cpu_max_2d_axis1_forward() raises:
+    print("test_mmrev_cpu_max_2d_axis1_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+    var m = a.max([1])
+    assert_true(m.shape() == Shape(2))
+    assert_true(m.all_close(Tensor[dtype].d1([5.0, 6.0])))
+
+
+fn test_mmrev_cpu_max_2d_axis1_keepdims_forward() raises:
+    print("test_mmrev_cpu_max_2d_axis1_keepdims_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+    var m = a.max([1], keepdims=True)
+    assert_true(m.shape() == Shape(2, 1))
+    assert_true(m.all_close(Tensor[dtype].d2([[5.0], [6.0]])))
+
+
+fn test_mmrev_cpu_max_2d_axis0_backward() raises:
+    print("test_mmrev_cpu_max_2d_axis0_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+    )
+    var m = a.max([0])
+    var loss = m.sum()
+    loss.backward()
+    # col0: max=4 (row1) → [0,1], col1: max=5 (row0) → [1,0], col2: max=6 (row1) → [0,1]
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0, 0.0], [1.0, 0.0, 1.0]]))
+    )
+
+
+fn test_mmrev_cpu_max_2d_axis1_backward() raises:
+    print("test_mmrev_cpu_max_2d_axis1_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+    )
+    var m = a.max([1])
+    var loss = m.sum()
+    loss.backward()
+    # row0: max=5 (col1), row1: max=6 (col2)
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]))
+    )
+
+
+fn test_mmrev_cpu_max_2d_axis1_keepdims_backward() raises:
+    print("test_mmrev_cpu_max_2d_axis1_keepdims_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+    )
+    var m = a.max([1], keepdims=True)
+    var loss = m.sum()
+    loss.backward()
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]))
+    )
+
+
+fn test_mmrev_cpu_max_2d_global_backward() raises:
+    print("test_mmrev_cpu_max_2d_global_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 7.0], [3.0, 2.0]], requires_grad=True)
+    var m = a.max()
+    var loss = m.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [0.0, 0.0]])))
+
+
+fn test_mmrev_cpu_max_2d_tied_backward() raises:
+    print("test_mmrev_cpu_max_2d_tied_backward")
+    comptime dtype = DType.float32
+    # Two tied maxima in same row
+    var a = Tensor[dtype].d2(
+        [[3.0, 5.0, 5.0], [1.0, 2.0, 4.0]], requires_grad=True
+    )
+    var m = a.max([1])
+    var loss = m.sum()
+    loss.backward()
+    # row0: tied at 5 (cols 1,2) → 0.5 each; row1: max=4 (col2) → 1.0
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d2([[0.0, 0.5, 0.5], [0.0, 0.0, 1.0]]))
+    )
+
+
+# ── 3D ────────────────────────────────────────────────────────────────────────
+
+
+fn test_mmrev_cpu_max_3d_axis0_forward() raises:
+    print("test_mmrev_cpu_max_3d_axis0_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    var m = a.max([0])
+    assert_true(m.shape() == Shape(3, 4))
+    # For each (j,k): max over i in {0,1} → second batch wins (values 12..23)
+    assert_true(
+        m.all_close(Tensor[dtype].arange(12.0, 24.0).reshape(Shape(3, 4)))
+    )
+
+
+fn test_mmrev_cpu_max_3d_axis0_backward() raises:
+    print("test_mmrev_cpu_max_3d_axis0_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    a.requires_grad_(True)
+    var m = a.max([0])
+    var loss = m.sum()
+    loss.backward()
+    # Slice 0 (values 0..11) always < slice 1 (values 12..23) → grad 0 for slice 0, 1 for slice 1
+    var expected = Tensor[dtype].zeros(Shape(2, 3, 4))
+    for j in range(3):
+        for k in range(4):
+            expected[1, j, k] = 1.0
+    assert_true(a.grad().all_close(expected))
+
+
+fn test_mmrev_cpu_max_3d_multi_axis_forward() raises:
+    print("test_mmrev_cpu_max_3d_multi_axis_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    var m = a.max([0, 2])
+    assert_true(m.shape() == Shape(3))
+    # For each j: max over i,k → last element of second batch row
+    assert_true(m.all_close(Tensor[dtype].d1([15.0, 19.0, 23.0])))
+
+
+fn test_mmrev_cpu_max_3d_multi_axis_backward() raises:
+    print("test_mmrev_cpu_max_3d_multi_axis_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    a.requires_grad_(True)
+    var m = a.max([0, 2])
+    var loss = m.sum()
+    loss.backward()
+    # Each output max is unique → exactly one 1.0 per (j) group
+    # j=0: max=15 at [1,0,3]; j=1: max=19 at [1,1,3]; j=2: max=23 at [1,2,3]
+    var expected = Tensor[dtype].zeros(Shape(2, 3, 4))
+    expected[1, 0, 3] = 1.0
+    expected[1, 1, 3] = 1.0
+    expected[1, 2, 3] = 1.0
+    assert_true(a.grad().all_close(expected))
+
+
+# ── 4D ────────────────────────────────────────────────────────────────────────
+
+
+fn test_mmrev_cpu_max_4d_axis1_forward() raises:
+    print("test_mmrev_cpu_max_4d_axis1_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+    var m = a.max([1])
+    assert_true(m.shape() == Shape(2, 4, 5))
+
+
+fn test_mmrev_cpu_max_4d_axis1_backward() raises:
+    print("test_mmrev_cpu_max_4d_axis1_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+    a.requires_grad_(True)
+    var m = a.max([1])
+    var loss = m.sum()
+    loss.backward()
+    # grad sums to 1 per output element → total grad sum == num output elements
+    var total_grad = a.grad().sum().item()
+    assert_true(total_grad == 40.0)  # Shape(2,4,5).product() == 40
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CPU TESTS — MIN
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+fn test_mmrev_cpu_min_1d_forward() raises:
+    print("test_mmrev_cpu_min_1d_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([3.0, 1.0, 4.0, 1.0, 5.0])
+    var m = a.min()
+    assert_true(m.shape() == Shape())
+    assert_true(m.item() == 1.0)
+
+
+fn test_mmrev_cpu_min_1d_backward_unique() raises:
+    print("test_mmrev_cpu_min_1d_backward_unique")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([3.0, 1.0, 4.0, 2.0], requires_grad=True)
+    var m = a.min()
+    var loss = m.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0, 0.0])))
+
+
+fn test_mmrev_cpu_min_1d_backward_tied() raises:
+    print("test_mmrev_cpu_min_1d_backward_tied")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 5.0, 1.0, 3.0], requires_grad=True)
+    var m = a.min()
+    var loss = m.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d1([0.5, 0.0, 0.5, 0.0])))
+
+
+fn test_mmrev_cpu_min_2d_axis0_forward() raises:
+    print("test_mmrev_cpu_min_2d_axis0_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+    var m = a.min([0])
+    assert_true(m.shape() == Shape(3))
+    assert_true(m.all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
+
+
+fn test_mmrev_cpu_min_2d_axis1_forward() raises:
+    print("test_mmrev_cpu_min_2d_axis1_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+    var m = a.min([1])
+    assert_true(m.shape() == Shape(2))
+    assert_true(m.all_close(Tensor[dtype].d1([1.0, 2.0])))
+
+
+fn test_mmrev_cpu_min_2d_axis0_backward() raises:
+    print("test_mmrev_cpu_min_2d_axis0_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+    )
+    var m = a.min([0])
+    var loss = m.sum()
+    loss.backward()
+    # col0: min=1 (row0), col1: min=2 (row1), col2: min=3 (row0)
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d2([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]]))
+    )
+
+
+fn test_mmrev_cpu_min_2d_axis1_backward() raises:
+    print("test_mmrev_cpu_min_2d_axis1_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+    )
+    var m = a.min([1])
+    var loss = m.sum()
+    loss.backward()
+    # row0: min=1 (col0), row1: min=2 (col1)
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
+    )
+
+
+fn test_mmrev_cpu_min_2d_keepdims_backward() raises:
+    print("test_mmrev_cpu_min_2d_keepdims_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+    )
+    var m = a.min([1], keepdims=True)
+    var loss = m.sum()
+    loss.backward()
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
+    )
+
+
+fn test_mmrev_cpu_min_3d_axis2_forward() raises:
+    print("test_mmrev_cpu_min_3d_axis2_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    var m = a.min([2])
+    assert_true(m.shape() == Shape(2, 3))
+    # min along last axis: 0,4,8,12,16,20
+    assert_true(
+        m.all_close(Tensor[dtype].d2([[0.0, 4.0, 8.0], [12.0, 16.0, 20.0]]))
+    )
+
+
+fn test_mmrev_cpu_min_3d_axis2_backward() raises:
+    print("test_mmrev_cpu_min_3d_axis2_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+    a.requires_grad_(True)
+    var m = a.min([2])
+    var loss = m.sum()
+    loss.backward()
+    # Min along axis 2 is always the first element (arange is increasing)
+    var expected = Tensor[dtype].zeros(Shape(2, 3, 4))
+    for i in range(2):
+        for j in range(3):
+            expected[i, j, 0] = 1.0
+    assert_true(a.grad().all_close(expected))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CPU — grad flow
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+fn test_mmrev_cpu_max_grad_flow_chained() raises:
+    print("test_mmrev_cpu_max_grad_flow_chained")
+    comptime dtype = DType.float32
+    # loss = max(max(a, axis=1), axis=0)  → scalar
+    var a = Tensor[dtype].d2(
+        [[1.0, 8.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+    )
+    var m1 = a.max([1])  # shape (2,): [8, 6]
+    var m2 = m1.max([0])  # shape (): 8
+    var loss = m2.sum()
+    loss.backward()
+    # grad flows back: 8 is at a[0,1]
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0, 0.0], [0.0, 0.0, 0.0]]))
+    )
+
+
+fn test_mmrev_cpu_min_grad_flow_chained() raises:
+    print("test_mmrev_cpu_min_chained")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2(
+        [[4.0, 8.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+    )
+    var m1 = a.min([1])  # [3, 2]
+    var m2 = m1.min([0])  # 2
+    var loss = m2.sum()
+    loss.backward()
+    # grad flows to a[1,1]=2
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d2([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
+    )
+
+
+fn test_mmrev_cpu_max_then_matmul_grad() raises:
+    print("test_mmrev_cpu_max_then_matmul_grad")
+    comptime dtype = DType.float32
+    # loss = sum(max(a, axis=1, keepdims=True) * ones)
+    var a = Tensor[dtype].d2([[1.0, 3.0], [4.0, 2.0]], requires_grad=True)
+    var m = a.max([1], keepdims=True)  # [[3],[4]]
+    var ones = Tensor[dtype].ones(m.shape())
+    var prod = m * ones
+    var loss = prod.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [1.0, 0.0]])))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GPU TESTS — MAX
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+fn test_mmrev_gpu_max_1d_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_1d_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0])
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max()
+        assert_true(m.shape() == Shape())
+        assert_true(m.to_cpu().item() == 9.0)
+
+
+fn test_mmrev_gpu_max_1d_backward_unique() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_1d_backward_unique")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([3.0, 1.0, 9.0, 2.0], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max()
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 1.0, 0.0])))
+
+
+fn test_mmrev_gpu_max_1d_backward_tied() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_1d_backward_tied")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 5.0], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max()
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 0.5, 0.0, 0.5])))
+
+
+fn test_mmrev_gpu_max_2d_axis0_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_2d_axis0_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([0])
+        assert_true(m.shape() == Shape(3))
+        assert_true(m.to_cpu().all_close(Tensor[dtype].d1([4.0, 5.0, 6.0])))
+
+
+fn test_mmrev_gpu_max_2d_axis0_keepdims_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_2d_axis0_keepdims_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([0], keepdims=True)
+        assert_true(m.shape() == Shape(1, 3))
+        assert_true(m.to_cpu().all_close(Tensor[dtype].d2([[4.0, 5.0, 6.0]])))
+
+
+fn test_mmrev_gpu_max_2d_axis1_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_2d_axis1_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([1])
+        assert_true(m.shape() == Shape(2))
+        assert_true(m.to_cpu().all_close(Tensor[dtype].d1([5.0, 6.0])))
+
+
+fn test_mmrev_gpu_max_2d_axis1_keepdims_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_2d_axis1_keepdims_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([1], keepdims=True)
+        assert_true(m.shape() == Shape(2, 1))
+        assert_true(m.to_cpu().all_close(Tensor[dtype].d2([[5.0], [6.0]])))
+
+
+fn test_mmrev_gpu_max_2d_axis0_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_2d_axis0_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([0])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[0.0, 1.0, 0.0], [1.0, 0.0, 1.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_max_2d_axis1_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_2d_axis1_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([1])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_max_2d_axis1_keepdims_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_2d_axis1_keepdims_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([1], keepdims=True)
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_max_2d_global_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_2d_global_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 7.0], [3.0, 2.0]], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max()
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [0.0, 0.0]]))
+        )
+
+
+fn test_mmrev_gpu_max_2d_tied_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_2d_tied_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[3.0, 5.0, 5.0], [1.0, 2.0, 4.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([1])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[0.0, 0.5, 0.5], [0.0, 0.0, 1.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_max_3d_axis0_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_3d_axis0_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([0])
+        assert_true(m.shape() == Shape(3, 4))
+        assert_true(
+            m.to_cpu().all_close(
+                Tensor[dtype].arange(12.0, 24.0).reshape(Shape(3, 4))
+            )
+        )
+
+
+fn test_mmrev_gpu_max_3d_axis0_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_3d_axis0_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        a.requires_grad_(True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([0])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        var expected = Tensor[dtype].zeros(Shape(2, 3, 4))
+        for j in range(3):
+            for k in range(4):
+                expected[1, j, k] = 1.0
+        assert_true(a.grad().all_close(expected))
+
+
+fn test_mmrev_gpu_max_3d_multi_axis_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_3d_multi_axis_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([0, 2])
+        assert_true(m.shape() == Shape(3))
+        assert_true(m.to_cpu().all_close(Tensor[dtype].d1([15.0, 19.0, 23.0])))
+
+
+fn test_mmrev_gpu_max_3d_multi_axis_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_3d_multi_axis_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        a.requires_grad_(True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([0, 2])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        var expected = Tensor[dtype].zeros(Shape(2, 3, 4))
+        expected[1, 0, 3] = 1.0
+        expected[1, 1, 3] = 1.0
+        expected[1, 2, 3] = 1.0
+        assert_true(a.grad().all_close(expected))
+
+
+fn test_mmrev_gpu_max_4d_axis1_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_4d_axis1_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([1])
+        assert_true(m.shape() == Shape(2, 4, 5))
+
+
+fn test_mmrev_gpu_max_4d_axis1_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_4d_axis1_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].arange(0.0, 120.0).reshape(Shape(2, 3, 4, 5))
+        a.requires_grad_(True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([1])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        var total_grad = a.grad().sum().item()
+        assert_true(total_grad == 40.0)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GPU TESTS — MIN
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+fn test_mmrev_gpu_min_1d_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_1d_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([3.0, 1.0, 4.0, 1.0, 5.0])
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min()
+        assert_true(m.shape() == Shape())
+        assert_true(m.to_cpu().item() == 1.0)
+
+
+fn test_mmrev_gpu_min_1d_backward_unique() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_1d_backward_unique")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([3.0, 1.0, 4.0, 2.0], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min()
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(a.grad().all_close(Tensor[dtype].d1([0.0, 1.0, 0.0, 0.0])))
+
+
+fn test_mmrev_gpu_min_1d_backward_tied() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_1d_backward_tied")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([1.0, 5.0, 1.0, 3.0], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min()
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(a.grad().all_close(Tensor[dtype].d1([0.5, 0.0, 0.5, 0.0])))
+
+
+fn test_mmrev_gpu_min_2d_axis0_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_2d_axis0_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min([0])
+        assert_true(m.shape() == Shape(3))
+        assert_true(m.to_cpu().all_close(Tensor[dtype].d1([1.0, 2.0, 3.0])))
+
+
+fn test_mmrev_gpu_min_2d_axis1_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_2d_axis1_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]])
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min([1])
+        assert_true(m.shape() == Shape(2))
+        assert_true(m.to_cpu().all_close(Tensor[dtype].d1([1.0, 2.0])))
+
+
+fn test_mmrev_gpu_min_2d_axis0_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_2d_axis0_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min([0])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_min_2d_axis1_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_2d_axis1_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min([1])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_min_2d_keepdims_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_2d_keepdims_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[1.0, 5.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min([1], keepdims=True)
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_min_3d_axis2_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_3d_axis2_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min([2])
+        assert_true(m.shape() == Shape(2, 3))
+        assert_true(
+            m.to_cpu().all_close(
+                Tensor[dtype].d2([[0.0, 4.0, 8.0], [12.0, 16.0, 20.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_min_3d_axis2_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_3d_axis2_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].arange(0.0, 24.0).reshape(Shape(2, 3, 4))
+        a.requires_grad_(True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.min([2])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        var expected = Tensor[dtype].zeros(Shape(2, 3, 4))
+        for i in range(2):
+            for j in range(3):
+                expected[i, j, 0] = 1.0
+        assert_true(a.grad().all_close(expected))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GPU — grad flow
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+fn test_mmrev_gpu_max_grad_flow_chained() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_grad_flow_chained")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[1.0, 8.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var m1 = a_gpu.max([1])
+        var m2 = m1.max([0])
+        var loss = m2.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[0.0, 1.0, 0.0], [0.0, 0.0, 0.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_min_grad_flow_chained() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_min_grad_flow_chained")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2(
+            [[4.0, 8.0, 3.0], [4.0, 2.0, 6.0]], requires_grad=True
+        )
+        var a_gpu = a.to_gpu()
+        var m1 = a_gpu.min([1])
+        var m2 = m1.min([0])
+        var loss = m2.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+            )
+        )
+
+
+fn test_mmrev_gpu_max_then_op_grad_flow() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_max_then_op_grad_flow")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 3.0], [4.0, 2.0]], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([1], keepdims=True)  # [[3],[4]]
+        var ones = Tensor[dtype].ones(m.shape()).to_gpu()
+        var prod = m * ones
+        var loss = prod.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d2([[0.0, 1.0], [1.0, 0.0]]))
+        )
+
+
+fn test_mmrev_gpu_grad_lands_on_cpu() raises:
+    @parameter
+    if has_accelerator():
+        print("test_mmrev_gpu_grad_lands_on_cpu")
+        comptime dtype = DType.float32
+        # Verify grads always land on CPU regardless of op chain
+        var a = Tensor[dtype].arange(0.0, 12.0).reshape(Shape(3, 4))
+        a.requires_grad_(True)
+        var a_gpu = a.to_gpu()
+        var m = a_gpu.max([1])
+        var loss = m.sum()
+        loss.backward()
+        assert_true(not a.grad().is_on_gpu())
+
 
 # ============================================================================
 # EXHAUSTIVE MIN/MAX TEST SUITE
@@ -136,12 +1087,6 @@ fn test_full_reduction_with_negative() raises:
     assert_true(max_mixed.all_close(Tensor[dtype].scalar(15.0)))
     max_mixed.backward()
     assert_true(b.grad().all_close(Tensor[dtype].d1([0.0, 0.0, 0.0, 1.0, 0.0])))
-
-
-fn main() raises:
-    test_max_min_mixed()
-    test_max_min()
-    run_all_minmax_tests()
 
 
 fn test_max_min_mixed() raises:
@@ -1122,3 +2067,93 @@ fn run_all_minmax_tests() raises:
     print("Numerical stability")
     print("Backwards compatibility")
     print("=" * 70)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# MAIN
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+fn main() raises:
+    # Old tests
+    test_max_min_mixed()
+    test_max_min()
+    run_all_minmax_tests()
+
+    # CPU max
+    test_mmrev_cpu_max_1d_forward()
+    test_mmrev_cpu_max_1d_backward_unique()
+    test_mmrev_cpu_max_1d_backward_tied()
+    test_mmrev_cpu_max_2d_global_forward()
+    test_mmrev_cpu_max_2d_axis0_forward()
+    test_mmrev_cpu_max_2d_axis0_keepdims_forward()
+    test_mmrev_cpu_max_2d_axis1_forward()
+    test_mmrev_cpu_max_2d_axis1_keepdims_forward()
+    test_mmrev_cpu_max_2d_axis0_backward()
+    test_mmrev_cpu_max_2d_axis1_backward()
+    test_mmrev_cpu_max_2d_axis1_keepdims_backward()
+    test_mmrev_cpu_max_2d_global_backward()
+    test_mmrev_cpu_max_2d_tied_backward()
+    test_mmrev_cpu_max_3d_axis0_forward()
+    test_mmrev_cpu_max_3d_axis0_backward()
+    test_mmrev_cpu_max_3d_multi_axis_forward()
+    test_mmrev_cpu_max_3d_multi_axis_backward()
+    test_mmrev_cpu_max_4d_axis1_forward()
+    test_mmrev_cpu_max_4d_axis1_backward()
+
+    # CPU min
+    test_mmrev_cpu_min_1d_forward()
+    test_mmrev_cpu_min_1d_backward_unique()
+    test_mmrev_cpu_min_1d_backward_tied()
+    test_mmrev_cpu_min_2d_axis0_forward()
+    test_mmrev_cpu_min_2d_axis1_forward()
+    test_mmrev_cpu_min_2d_axis0_backward()
+    test_mmrev_cpu_min_2d_axis1_backward()
+    test_mmrev_cpu_min_2d_keepdims_backward()
+    test_mmrev_cpu_min_3d_axis2_forward()
+    test_mmrev_cpu_min_3d_axis2_backward()
+
+    # CPU grad flow
+    test_mmrev_cpu_max_grad_flow_chained()
+    test_mmrev_cpu_min_grad_flow_chained()
+    test_mmrev_cpu_max_then_matmul_grad()
+
+    # GPU max
+    test_mmrev_gpu_max_1d_forward()
+    test_mmrev_gpu_max_1d_backward_unique()
+    test_mmrev_gpu_max_1d_backward_tied()
+    test_mmrev_gpu_max_2d_axis0_forward()
+    test_mmrev_gpu_max_2d_axis0_keepdims_forward()
+    test_mmrev_gpu_max_2d_axis1_forward()
+    test_mmrev_gpu_max_2d_axis1_keepdims_forward()
+    test_mmrev_gpu_max_2d_axis0_backward()
+    test_mmrev_gpu_max_2d_axis1_backward()
+    test_mmrev_gpu_max_2d_axis1_keepdims_backward()
+    test_mmrev_gpu_max_2d_global_backward()
+    test_mmrev_gpu_max_2d_tied_backward()
+    test_mmrev_gpu_max_3d_axis0_forward()
+    test_mmrev_gpu_max_3d_axis0_backward()
+    test_mmrev_gpu_max_3d_multi_axis_forward()
+    test_mmrev_gpu_max_3d_multi_axis_backward()
+    test_mmrev_gpu_max_4d_axis1_forward()
+    test_mmrev_gpu_max_4d_axis1_backward()
+
+    # GPU min
+    test_mmrev_gpu_min_1d_forward()
+    test_mmrev_gpu_min_1d_backward_unique()
+    test_mmrev_gpu_min_1d_backward_tied()
+    test_mmrev_gpu_min_2d_axis0_forward()
+    test_mmrev_gpu_min_2d_axis1_forward()
+    test_mmrev_gpu_min_2d_axis0_backward()
+    test_mmrev_gpu_min_2d_axis1_backward()
+    test_mmrev_gpu_min_2d_keepdims_backward()
+    test_mmrev_gpu_min_3d_axis2_forward()
+    test_mmrev_gpu_min_3d_axis2_backward()
+
+    # GPU grad flow
+    test_mmrev_gpu_max_grad_flow_chained()
+    test_mmrev_gpu_min_grad_flow_chained()
+    test_mmrev_gpu_max_then_op_grad_flow()
+    test_mmrev_gpu_grad_lands_on_cpu()
+
+    print("All mmrev tests passed.")

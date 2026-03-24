@@ -30,7 +30,7 @@ from dotproduct import DotBackward
 from unsqueeze import UnsqueezeBackward
 from squeeze import SqueezeBackward
 from expand import ExpandBackward
-from minmax import MinMaxBackward
+from minmax import MinMaxBackward, MinMaxBackwardGPU
 from shuffle import ShuffleBackward
 from relu import ReLUBackward
 from softmax import SoftmaxBackward, LogSoftmaxBackward

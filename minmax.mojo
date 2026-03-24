@@ -1,77 +1,57 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
 from shapes import Shape
-from backpropagation import Delegate, BackwardFn, BACKWARD_MINMAX
-from common_utils import panic
+from backpropagation import (
+    Delegate,
+    BackwardFn,
+    BACKWARD_MINMAX,
+    BACKWARD_MINMAX_GPU,
+)
 from validators import Validator
-from utils.numerics import min_finite, max_finite
 from intarray import IntArray
 from gradbox import Gradbox
-from indexhelper import IndexCalculator
-from algorithm import parallelize
-
-
-comptime Gradbag[dtype: DType] = List[Tuple[IntArray, Scalar[dtype]]]
+from minmax_reducer import MinMaxReducer
+from ndbuffer import NDBuffer
+from sys import has_accelerator
+from common_utils import panic
+from minmax_kernel import ReductionMinMax
 
 
 @fieldwise_init
-struct MinMaxBackward[dtype: DType = DType.float32](
-    ImplicitlyCopyable & Movable
-):
+struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     comptime TAG = BACKWARD_MINMAX
     var axes: IntArray
     var keepdims: Bool
-    var gradbag: Gradbag[Self.dtype]
-
-    fn __copyinit__(out self, other: Self):
-        self.axes = other.axes.copy()
-        self.keepdims = other.keepdims
-        self.gradbag = other.gradbag.copy()
-
-    fn __moveinit__(out self, deinit other: Self):
-        self.axes = other.axes^
-        self.keepdims = other.keepdims
-        self.gradbag = other.gradbag^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
+    var mask: NDBuffer[Self.dtype]  # shape == ancestor.shape, contiguous
 
     fn backward(
         self, read output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var gradbox = output.grad()
+        var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
-        var mask = Gradbox[Self.dtype].zeros(ancestor.shape(), share=False)
-
-        # Build mask from saved gradient contributions
-        for grad in self.gradbag:
-            mask[grad[0]] = grad[1]
-
         var shape = ancestor.shape()
-        var rank = shape.rank()
+        var mask_grad = Gradbox[Self.dtype](self.mask)
 
-        if rank == 0:
-            return [(ancestor^, gradbox^, AddTensor)]
+        if shape.rank() == 0:
+            return [(ancestor^, mask_grad^, AddTensor)]
 
+        var grad_expanded: Gradbox[Self.dtype]
         if gradbox.shape() == Shape():
-            # Scalar upstream gradient
-            var filled = Gradbox[Self.dtype].full(
+            grad_expanded = Gradbox[Self.dtype].full(
                 shape, gradbox.item(), share=False
             )
-            var grad_contrib = filled * mask
-            return [(ancestor^, grad_contrib^, AddTensor)]
+        elif not self.keepdims:
+            grad_expanded = gradbox.unsqueeze(self.axes).broadcast_to(
+                shape, share=False
+            )
         else:
-            # Non-scalar upstream gradient
-            var gradbox_like_input: Gradbox[Self.dtype]
-            if not self.keepdims:
-                gradbox_like_input = gradbox.unsqueeze(self.axes).broadcast_to(
-                    shape, share=False
-                )
-            else:
-                gradbox_like_input = gradbox.broadcast_to(shape, share=False)
+            grad_expanded = gradbox.broadcast_to(shape, share=False)
 
-            var grad_contrib = gradbox_like_input * mask
-            return [(ancestor^, grad_contrib^, AddTensor)]
+        var grad_contrib = grad_expanded * mask_grad
+        return [(ancestor^, grad_contrib^, AddTensor)]
+
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -87,265 +67,132 @@ struct MinMax[dtype: DType = DType.float32]:
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         var shape = self.shape()
-        var rank = shape.rank()
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
-        var out_shape = shape.compute_output_shape(normalized_axes, keepdims)
-        var result = Tensor[Self.dtype].zeros(out_shape)
-        var gradbag: Gradbag[Self.dtype] = Gradbag[Self.dtype]()
 
-        # ===== FAST PATH: Scalar Input =====
-        if rank == 0:
-            var v = self[IntArray()]
-            result[IntArray()] = v
+        @parameter
+        if has_accelerator():
+            if self.buffer.is_on_gpu():
+                try:
+                    var (result_ndb, mask_ndb) = ReductionMinMax[
+                        Self.dtype
+                    ].launch[is_max=max](self.buffer, normalized_axes, keepdims)
+                    var result = Tensor[Self.dtype](
+                        result_ndb^, requires_grad=False
+                    )
 
-            @parameter
-            if track_grad:
-                grad_required = requires_grad.or_else(self.requires_grad)
-                if grad_required:
-                    result.requires_grad_(True)
-                    var backward_fn = MinMaxBackward[Self.dtype](
-                        normalized_axes, keepdims, gradbag^
-                    ).into_backward_fn()
-                    result.backwardFn = Optional(backward_fn^)
-                    result.add_ancestry(self)
-            return result^
+                    @parameter
+                    if track_grad:
+                        var grad_required = requires_grad.or_else(
+                            self.requires_grad
+                        )
+                        if grad_required:
+                            result.requires_grad_(True)
+                            # Wrap mask NDBuffer in a Gradbox (contiguous, on GPU)
+                            var mask_gradbox = Gradbox[Self.dtype](
+                                mask_ndb^, share=False
+                            )
+                            var backward_fn = MinMaxBackwardGPU[Self.dtype](
+                                mask_gradbox^, normalized_axes, keepdims
+                            ).into_backward_fn()
+                            result.backwardFn = Optional(backward_fn^)
+                            result.add_ancestry(self)
 
-        # ===== FAST PATH: Full Reduction to Scalar =====
-        if out_shape == Shape():
-            return Self._full_reduction_vectorized[max, track_grad](
-                self,
-                shape,
-                normalized_axes,
-                keepdims,
-                result^,
-                gradbag^,
-                requires_grad,
-            )
+                    return result^
+                except e:
+                    panic("MinMax.forward GPU path failed: " + e.__str__())
+                    # unreachable
+                    return Tensor[Self.dtype](Shape())
 
-        # ===== GENERAL CASE: Partial Reduction (Parallelized) =====
-        return Self._partial_reduction_parallel[max, track_grad](
-            self,
-            shape,
-            normalized_axes,
-            keepdims,
-            out_shape,
-            result^,
-            gradbag^,
-            requires_grad,
+        # CPU path — unchanged
+        var result_ndb = MinMaxReducer[Self.dtype].reduce_minmax[max](
+            self.buffer, normalized_axes, keepdims
         )
-
-    # ===== VECTORIZED FULL REDUCTION (All axes → scalar) =====
-
-    @always_inline
-    @staticmethod
-    fn _full_reduction_vectorized[
-        max: Bool, track_grad: Bool
-    ](
-        self: Tensor[Self.dtype],
-        shape: Shape,
-        normalized_axes: IntArray,
-        keepdims: Bool,
-        var result: Tensor[Self.dtype],
-        var gradbag: Gradbag[Self.dtype],
-        requires_grad: Optional[Bool],
-    ) -> Tensor[Self.dtype]:
-        var total_elements = shape.num_elements()
-
-        # Initialize with first element
-        var best_value = self[shape.first_index()]
-        var best_positions = List[IntArray]()
+        var result = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
         @parameter
         if track_grad:
-            best_positions.append(shape.first_index())
-
-        # ===== SEQUENTIAL SCAN (No vectorization for gradient tracking) =====
-        # Vectorization doesn't help much for min/max with gradient tracking
-        # because we need to track positions, which requires branching
-
-        for flat_idx in range(
-            1, total_elements
-        ):  # Start from 1, we already have element 0
-            var idx = IndexCalculator.index_to_coord(shape, flat_idx)
-            var cur = self[idx]
-
-            @parameter
-            if max:
-                if cur > best_value:
-                    best_value = cur
-
-                    @parameter
-                    if track_grad:
-                        best_positions.clear()
-                        best_positions.append(idx)
-                elif cur == best_value:
-
-                    @parameter
-                    if track_grad:
-                        best_positions.append(idx)
-            else:
-                if cur < best_value:
-                    best_value = cur
-
-                    @parameter
-                    if track_grad:
-                        best_positions.clear()
-                        best_positions.append(idx)
-                elif cur == best_value:
-
-                    @parameter
-                    if track_grad:
-                        best_positions.append(idx)
-
-        # Write result
-        result[IntArray()] = best_value
-
-        @parameter
-        if track_grad:
-            # Split gradient among all tied positions
-            var count = len(best_positions)
-            if count > 0:
-                var inv = Scalar[Self.dtype](1) / count
-                for p in best_positions:
-                    gradbag.append((p, inv))
-
-            grad_required = requires_grad.or_else(self.requires_grad)
+            var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
-                var backward_fn = MinMaxBackward[Self.dtype](
-                    normalized_axes, keepdims, gradbag^
-                ).into_backward_fn()
-                result.backwardFn = Optional(backward_fn^)
-                result.add_ancestry(self)
-
-        return result^
-
-    # ===== PARALLELIZED PARTIAL REDUCTION =====
-    @always_inline
-    @staticmethod
-    fn _partial_reduction_parallel[
-        max: Bool, track_grad: Bool
-    ](
-        self: Tensor[Self.dtype],
-        shape: Shape,
-        normalized_axes: IntArray,
-        keepdims: Bool,
-        out_shape: Shape,
-        var result: Tensor[Self.dtype],
-        var gradbag: Gradbag[Self.dtype],
-        requires_grad: Optional[Bool],
-    ) -> Tensor[Self.dtype]:
-        var reduced_shape = shape.reduced_shape(normalized_axes)
-        var num_output_elements = out_shape.num_elements()
-
-        # Thread-local storage for gradient bags (one per output element)
-        # Note: In real Mojo, we would need proper synchronization primitives
-        var local_gradbags = List[Gradbag[Self.dtype]]()
-        for _ in range(num_output_elements):
-            local_gradbags.append(Gradbag[Self.dtype]())
-
-        # ===== PARALLEL PROCESSING: Each output element computed independently =====
-        @parameter
-        fn compute_output_element(out_flat_idx: Int):
-            # Convert flat index to multidimensional index
-            var out_idx = IndexCalculator.index_to_coord(
-                out_shape, out_flat_idx
-            )
-            var best_value: Scalar[Self.dtype]
-
-            # Initialize best value for this output element
-            @parameter
-            if max:
-                best_value = min_finite[Self.dtype]()
-            else:
-                best_value = max_finite[Self.dtype]()
-
-            var best_positions = List[IntArray]()
-            var first_iteration = True
-
-            # ===== VECTORIZED INNER LOOP: Scan reduced dimensions =====
-            # For each output position, scan all elements in the reduced block
-            var num_reduced_elements = reduced_shape.num_elements()
-
-            for red_flat_idx in range(num_reduced_elements):
-                var red_idx = IndexCalculator.index_to_coord(
-                    reduced_shape, red_flat_idx
+                var mask_ndb = MinMaxReducer[Self.dtype].build_minmax_mask[max](
+                    self.buffer, result.buffer, normalized_axes, keepdims
                 )
-
-                # Compute full input index
-                var full_idx = out_idx.replace(
-                    normalized_axes, red_idx
-                ) if keepdims else out_idx.insert(normalized_axes, red_idx)
-
-                var cur = self[full_idx]
-
-                if first_iteration:
-                    best_value = cur
-                    first_iteration = False
-
-                    @parameter
-                    if track_grad:
-                        best_positions.append(full_idx)
-                else:
-
-                    @parameter
-                    if max:
-                        if cur > best_value:
-                            best_value = cur
-
-                            @parameter
-                            if track_grad:
-                                best_positions.clear()
-                                best_positions.append(full_idx)
-                        elif cur == best_value:
-
-                            @parameter
-                            if track_grad:
-                                best_positions.append(full_idx)
-                    else:
-                        if cur < best_value:
-                            best_value = cur
-
-                            @parameter
-                            if track_grad:
-                                best_positions.clear()
-                                best_positions.append(full_idx)
-                        elif cur == best_value:
-
-                            @parameter
-                            if track_grad:
-                                best_positions.append(full_idx)
-
-            # Write result to output
-            result[out_idx] = best_value
-
-            @parameter
-            if track_grad:
-                # Store gradient contributions in thread-local storage
-                var count = len(best_positions)
-                if count > 0:
-                    var inv = Scalar[Self.dtype](1) / count
-                    for p in best_positions:
-                        local_gradbags[out_flat_idx].append((p, inv))
-
-        # Execute in parallel across all output elements
-        # Each thread handles a subset of output positions independently
-        parallelize[compute_output_element](num_output_elements)
-
-        # ===== MERGE: Combine thread-local gradient bags =====
-        @parameter
-        if track_grad:
-            for i in range(num_output_elements):
-                for item in local_gradbags[i]:
-                    gradbag.append(item)
-
-            grad_required = requires_grad.or_else(self.requires_grad)
-            if grad_required:
-                result.requires_grad_(True)
                 var backward_fn = MinMaxBackward[Self.dtype](
-                    normalized_axes, keepdims, gradbag^
+                    normalized_axes, keepdims, mask_ndb^
                 ).into_backward_fn()
                 result.backwardFn = Optional(backward_fn^)
                 result.add_ancestry(self)
 
         return result^
+
+    @staticmethod
+    fn forward_old[
+        max: Bool, track_grad: Bool = True
+    ](
+        self: Tensor[Self.dtype],
+        axes: IntArray,
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        var shape = self.shape()
+        var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
+        var result_ndb = MinMaxReducer[Self.dtype].reduce_minmax[max](
+            self.buffer, normalized_axes, keepdims
+        )
+        var result = Tensor[Self.dtype](result_ndb^, requires_grad=False)
+
+        @parameter
+        if track_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
+                result.requires_grad_(True)
+                var mask_ndb = MinMaxReducer[Self.dtype].build_minmax_mask[max](
+                    self.buffer, result.buffer, normalized_axes, keepdims
+                )
+                var backward_fn = MinMaxBackward[Self.dtype](
+                    normalized_axes, keepdims, mask_ndb^
+                ).into_backward_fn()
+                result.backwardFn = Optional(backward_fn^)
+                result.add_ancestry(self)
+
+        return result^
+
+
+@fieldwise_init
+struct MinMaxBackwardGPU[dtype: DType](ImplicitlyCopyable & Movable):
+    comptime TAG = BACKWARD_MINMAX_GPU
+    var mask: Gradbox[Self.dtype]  # on GPU, shape == ancestor.shape
+    var axes: IntArray
+    var keepdims: Bool
+
+    fn backward(
+        self, read output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var gradbox = output.grad()
+        var ancestor = output.ancestry().get(0)
+        var shape = ancestor.shape()
+
+        var grad_expanded: Gradbox[Self.dtype]
+        if gradbox.shape() == Shape():
+            # scalar upstream grad — full tensor on same device as mask
+            grad_expanded = Gradbox[Self.dtype].full(
+                shape,
+                gradbox.item(),
+                share=False,
+                device=self.mask.device(),
+            )
+        elif not self.keepdims:
+            grad_expanded = gradbox.unsqueeze(self.axes).broadcast_to(
+                shape, share=False
+            )
+        else:
+            grad_expanded = gradbox.broadcast_to(shape, share=False)
+
+        return [(ancestor^, grad_expanded * self.mask, AddTensor)]
+
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
+
+
+fn main() raises:
+    pass

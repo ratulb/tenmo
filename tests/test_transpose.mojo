@@ -251,6 +251,8 @@ fn test_trrev_cpu_2d_explicit_axes_forward() raises:
     assert_true(
         t.all_close(Tensor[dtype].d2([[1.0, 3.0, 5.0], [2.0, 4.0, 6.0]]))
     )
+
+
 fn test_trrev_cpu_2d_explicit_axes_backward() raises:
     print("test_trrev_cpu_2d_explicit_axes_backward")
     comptime dtype = DType.float32
@@ -566,7 +568,7 @@ fn test_trrev_gpu_2d_explicit_axes_forward() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
         var a_gpu = a.to_gpu()
-        var t = a_gpu.transpose(0, 1)
+        var t = a_gpu.transpose(1, 0)
         assert_true(t.shape() == Shape(2, 3))
         assert_true(
             t.to_cpu().all_close(
@@ -584,7 +586,7 @@ fn test_trrev_gpu_2d_explicit_axes_backward() raises:
             [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
         )
         var a_gpu = a.to_gpu()
-        var t = a_gpu.transpose(0, 1)
+        var t = a_gpu.transpose(1, 0)
         var loss = t.sum()
         loss.backward()
         assert_true(not a.grad().is_on_gpu())
