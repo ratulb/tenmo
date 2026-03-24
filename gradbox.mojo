@@ -70,8 +70,14 @@ struct Gradbox[dtype: DType](
             # Unreachable
             return CPU().into()
 
-    @always_inline
     fn transpose(self, axes: IntArray) -> Gradbox[Self.dtype]:
+        """Fused transpose then contiguous - GPU aware via NDBuffer."""
+        var owned_buffer = self.buffer.copy()
+        var nd_buffer = owned_buffer.transpose(axes, shared=False)
+        return Gradbox[Self.dtype](nd_buffer^, share=False)
+
+    @always_inline
+    fn transpose_old(self, axes: IntArray) -> Gradbox[Self.dtype]:
         """Fused transpose and then contiguous."""
         shape = self.shape()
         normalized_axes = (

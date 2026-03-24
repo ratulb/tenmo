@@ -39,7 +39,7 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
 @register_passable
 struct Transpose[dtype: DType](Copyable):
     @staticmethod
-    fn forward[
+    fn forward_old[
         track_grad: Bool = True
     ](
         mut self: Tensor[Self.dtype],
@@ -73,6 +73,37 @@ struct Transpose[dtype: DType](Copyable):
             grad_required = requires_grad.or_else(self.requires_grad)
 
             if grad_required:
+                out.requires_grad_(True)
+                backward_fn = TransposeBackward[Self.dtype](
+                    normalized_axes
+                ).into_backward_fn()
+                out.backwardFn = Optional(backward_fn^)
+                out.add_ancestry(self)
+
+        return out^
+
+    @staticmethod
+    fn forward[
+        track_grad: Bool = True
+    ](
+        mut self: Tensor[Self.dtype],
+        axes: IntArray,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        var transposed_ndb = self.buffer.transpose(axes, shared=True)
+        var out = Tensor[Self.dtype](transposed_ndb^, requires_grad=False)
+
+        @parameter
+        if track_grad:
+            grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
+                ref shape = self.shape()
+                var normalized_axes = (
+                    Validator.validate_and_normalize_axes(
+                        shape, axes, ordered=False, fill_missing=True
+                    ) if len(axes)
+                    > 0 else IntArray.range(0, shape.rank()).reversed()
+                )
                 out.requires_grad_(True)
                 backward_fn = TransposeBackward[Self.dtype](
                     normalized_axes

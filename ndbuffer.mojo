@@ -752,6 +752,30 @@ struct NDBuffer[dtype: DType](
     fn transpose(
         mut self,
         axes: IntArray = IntArray(),
+        *,
+        shared: Bool = True,
+    ) -> NDBuffer[Self.dtype]:
+        ref shape = self.shape
+        var normalized_axes = (
+            Validator.validate_and_normalize_axes(
+                shape, axes, ordered=False, fill_missing=True
+            ) if len(axes)
+            > 0 else IntArray.range(0, shape.rank()).reversed()
+        )
+        var new_shape = shape.permute(normalized_axes)
+        var new_strides = self.strides.permute(normalized_axes)
+
+        if shared:
+            # View: shared buffer — for Tensor view ops
+            return self.share(new_shape, new_strides, self.offset)
+        else:
+            # Owned contiguous copy — for Gradbox
+            var view = self.share(new_shape, new_strides, self.offset)
+            return view.contiguous()
+
+    fn transpose_good(
+        mut self,
+        axes: IntArray = IntArray(),
     ) -> NDBuffer[Self.dtype]:
         ref shape = self.shape
         var normalized_axes = (
