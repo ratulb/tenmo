@@ -255,7 +255,8 @@ fn test_gradient_with_numerical_check() raises:
     var grad_output = Tensor[DType.float32].randn(1, 2, 4)
     result.backward(grad_output)
 
-    var grad_A = A.gradients()[]
+    #var grad_A = A.gradients()[]
+    var grad_A = A.grad()
 
     # Numerical gradient check for A[0,0]
 
