@@ -178,11 +178,6 @@ struct DeviceState[dtype: DType](
             if source.is_contiguous():
                 source.device_state.value().buffer.enqueue_copy_to(self.buffer)
             else:
-                _="""# Materialise to CPU first, then CPU→GPU
-                var cpu_ndb = source.device_state.value().into(
-                    source.shape, sync=False
-                )
-                self.fill(cpu_ndb)"""
                 with self.buffer.map_to_host() as host_buffer:
                     var next_index = 0
                     for index in source.index_iterator():
