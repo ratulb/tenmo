@@ -661,6 +661,7 @@ fn test_contig_gpu_grad_accumulation() raises:
         var loss1 = c1.sum()
         loss1.backward()
         var loss2 = c2.sum()
+        a_gpu.zero_grad()
         loss2.backward()
         assert_true(
             a.grad().all_close(Tensor[dtype].d2([[2.0, 2.0], [2.0, 2.0]]))

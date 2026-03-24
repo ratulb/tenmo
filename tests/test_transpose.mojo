@@ -22,7 +22,7 @@ fn test_2d_transpose_no_axes() raises:
     # Forward pass validation
     var expected = Tensor.d2([[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]])
     assert_true(b.all_close(expected))
-    assert_true(b.shape() == Shape.of(3, 2))
+    assert_true(b.shape() == Shape(3, 2))
 
     # Backward pass validation
     var loss = b.sum()
@@ -38,7 +38,7 @@ fn test_2d_transpose_explicit_axes() raises:
     # Forward pass validation
     var expected = Tensor.d2([[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]])
     assert_true(b.all_close(expected))
-    assert_true(b.shape() == Shape.of(3, 2))
+    assert_true(b.shape() == Shape(3, 2))
 
     # Backward pass validation
     var loss = b.sum()
@@ -55,7 +55,7 @@ fn test_3d_transpose_axes_0_1() raises:
     # Forward pass validation
     var expected = Tensor.d3([[[1.0, 2.0], [5.0, 6.0]], [[3.0, 4.0], [7.0, 8.0]]])
     assert_true(b.all_close(expected))
-    assert_true(b.shape() == Shape.of(2, 2, 2))
+    assert_true(b.shape() == Shape(2, 2, 2))
 
     # Backward pass validation
     var loss = b.sum()
@@ -72,7 +72,7 @@ fn test_3d_transpose_axes_1_2() raises:
     # Forward pass validation
     var expected = Tensor.d3([[[1.0, 3.0], [2.0, 4.0]], [[5.0, 7.0], [6.0, 8.0]]])
     assert_true(b.all_close(expected))
-    assert_true(b.shape() == Shape.of(2, 2, 2))
+    assert_true(b.shape() == Shape(2, 2, 2))
 
     # Backward pass validation
     var loss = b.sum()
@@ -90,7 +90,7 @@ fn test_4d_transpose_complex_axes() raises:
     var b = a.transpose(0, 2, 3, 1)
 
     # Forward pass validation - check shape
-    assert_true(b.shape() == Shape.of(2, 2, 2, 2))
+    assert_true(b.shape() == Shape(2, 2, 2, 2))
 
     # Backward pass validation
     var loss = b.sum()

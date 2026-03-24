@@ -4,7 +4,6 @@ from mnemonics import AddTensor
 from validators import Validator
 from gradbox import Gradbox
 from intarray import IntArray
-from views import View
 
 
 @fieldwise_init
@@ -19,13 +18,11 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        print("In transpose backward")
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var inverted_axes = IntArray.invert_permutation(self.axes)
         var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes)
 
-        print("In transpose backward - out")
         return [
             (
                 ancestor^,
@@ -38,50 +35,6 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct Transpose[dtype: DType](Copyable):
-    @staticmethod
-    fn forward_old[
-        track_grad: Bool = True
-    ](
-        mut self: Tensor[Self.dtype],
-        axes: IntArray,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
-        ref shape = self.shape()
-        var normalized_axes = (
-            Validator.validate_and_normalize_axes(
-                shape, axes, ordered=False, fill_missing=True
-            ) if len(axes)
-            > 0 else IntArray.range(0, shape.rank()).reversed()
-        )
-
-        # Permute shape and create default strides and permute
-
-        var new_shape = shape.permute(normalized_axes)
-        var new_strides = self.strides().permute(normalized_axes)
-
-        var out = View[Self.dtype].forward[track_grad=False](
-            self,
-            new_shape,
-            new_strides,
-            self.offset(),
-            requires_grad=False,
-            validated=True,
-        )
-
-        @parameter
-        if track_grad:
-            grad_required = requires_grad.or_else(self.requires_grad)
-
-            if grad_required:
-                out.requires_grad_(True)
-                backward_fn = TransposeBackward[Self.dtype](
-                    normalized_axes
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
-                out.add_ancestry(self)
-
-        return out^
-
     @staticmethod
     fn forward[
         track_grad: Bool = True

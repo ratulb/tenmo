@@ -5,7 +5,6 @@ from shapes import Shape
 from backpropagation import Delegate, BackwardFn, BACKWARD_SUM
 from validators import Validator
 from gradbox import Gradbox
-from common_utils import panic
 
 
 @fieldwise_init
@@ -18,12 +17,10 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        print("In sum backward")
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         shape = ancestor.shape()
         var grad_contrib: Gradbox[Self.dtype]
-        # SumBackward.backward — already raises-capable via panic pattern
         if gradbox.shape() == Shape():
             grad_contrib = Gradbox[Self.dtype].full(
                 shape, gradbox.item(), share=False, device=gradbox.device()
@@ -47,7 +44,6 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
             else:
                 # keepdims=True: shapes match except for broadcasting
                 grad_contrib = gradbox.broadcast_to(shape, share=False)
-        print("Out of sumbackward")
 
         return [
             (
@@ -91,23 +87,3 @@ struct Summer[dtype: DType](Copyable):
                 out.add_ancestry(tensor)
 
         return out^
-
-
-fn main() raises:
-    comptime dtype = DType.float32
-
-    var a = Tensor[dtype].arange(12, requires_grad=True)
-    var a_gpu = a.to_gpu()
-    var s = a_gpu.sum()
-    s.backward()
-    a.grad().print()
-
-    var b = (
-        Tensor[dtype].arange(12, requires_grad=True).reshape(3, 4).contiguous()
-    )
-    var c = b * 42
-    var c_gpu = c.to_gpu()
-    var ss = c.sum()
-
-    ss.backward()
-    b.grad().print()

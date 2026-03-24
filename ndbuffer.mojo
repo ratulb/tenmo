@@ -773,30 +773,6 @@ struct NDBuffer[dtype: DType](
             var view = self.share(new_shape, new_strides, self.offset)
             return view.contiguous()
 
-    fn transpose_good(
-        mut self,
-        axes: IntArray = IntArray(),
-    ) -> NDBuffer[Self.dtype]:
-        ref shape = self.shape
-        var normalized_axes = (
-            Validator.validate_and_normalize_axes(
-                shape, axes, ordered=False, fill_missing=True
-            ) if len(axes)
-            > 0 else IntArray.range(0, shape.rank()).reversed()
-        )
-
-        # Permute shape and create default strides and permute
-
-        var new_shape = shape.permute(normalized_axes)
-        var new_strides = self.strides.permute(normalized_axes)
-
-        var out = self.share(
-            new_shape,
-            new_strides,
-            self.offset,
-        )
-        return out^
-
     @always_inline
     fn __is__(self, other: NDBuffer[Self.dtype]) -> Bool:
         if self.is_on_cpu() and other.is_on_cpu():
@@ -2550,28 +2526,6 @@ struct NDBuffer[dtype: DType](
         return C^
 
 
-from tenmo import Tensor
-from gradbox import Gradbox
-
-
 fn main() raises:
     comptime dtype = DType.float32
-    var buffer = Buffer[dtype].arange(24)
-    var ndb = NDBuffer[dtype](buffer, Shape(2, 3, 4))
-    var result1 = ndb.sum_over_broadcasted_axes(Shape(4))
-    result1.print()
-
-    print(result1.device())
-
-    print("Got device")
-    var ndb_full = NDBuffer[dtype].full(Shape(3), 42)
-    ndb_full.print()
-    var _cpu: Device = CPU().into()
-    var grad = Gradbox[dtype].full(Shape(4), 32)
-    grad.print()
-
-    @parameter
-    if has_accelerator():
-        var ndb_gpu = ndb.to_gpu(GPU())
-        var result2 = ndb_gpu.sum_over_broadcasted_axes(Shape(4))
-        result2.print()
+    pass
