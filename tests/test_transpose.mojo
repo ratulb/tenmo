@@ -245,20 +245,19 @@ fn test_trrev_cpu_2d_explicit_axes_forward() raises:
     print("test_trrev_cpu_2d_explicit_axes_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
-    var t = a.transpose(0, 1)
+    # axes (1,0) swaps the two axes: (3,2) → (2,3)
+    var t = a.transpose(1, 0)
     assert_true(t.shape() == Shape(2, 3))
     assert_true(
         t.all_close(Tensor[dtype].d2([[1.0, 3.0, 5.0], [2.0, 4.0, 6.0]]))
     )
-
-
 fn test_trrev_cpu_2d_explicit_axes_backward() raises:
     print("test_trrev_cpu_2d_explicit_axes_backward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2(
         [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], requires_grad=True
     )
-    var t = a.transpose(0, 1)
+    var t = a.transpose(1, 0)
     var loss = t.sum()
     loss.backward()
     assert_true(a.grad().all_close(Tensor.ones_like(a)))
