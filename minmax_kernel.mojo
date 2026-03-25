@@ -16,6 +16,31 @@ fn output_to_input_base(
     var remaining = out_idx
     var input_base = 0
 
+    # Collect non-reduction axes in forward order — these form the output shape
+    var non_reduction_axes = Array()
+    for k in range(len(in_shape)):
+        if k not in reduction_axes:
+            non_reduction_axes.append(k)
+
+    # Decode out_idx using output dimensions in reverse
+    for i in reversed(range(len(non_reduction_axes))):
+        var k = non_reduction_axes[i]
+        var coord = remaining % in_shape[k]
+        remaining //= in_shape[k]
+        input_base += coord * in_strides[k]
+
+    return input_base
+
+
+fn output_to_input_base_orig(
+    out_idx: Int,
+    in_shape: Array,
+    in_strides: Array,
+    reduction_axes: Array,
+) -> Int:
+    var remaining = out_idx
+    var input_base = 0
+
     for k in reversed(range(len(in_shape))):
         if k not in reduction_axes:
             var coord = remaining % in_shape[k]

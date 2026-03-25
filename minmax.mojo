@@ -79,8 +79,6 @@ struct MinMax[dtype: DType = DType.float32]:
                     var result = Tensor[Self.dtype](
                         result_ndb^, requires_grad=False
                     )
-                    print("Result is on gpu: ", result.is_on_gpu())
-                    print("mask is on gpu: ", mask_ndb.is_on_gpu())
                     @parameter
                     if track_grad:
                         var grad_required = requires_grad.or_else(
@@ -135,12 +133,11 @@ struct MinMaxBackwardGPU[dtype: DType](ImplicitlyCopyable & Movable):
     var keepdims: Bool
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var shape = ancestor.shape()
-        print("MinMaxBackwardGPU backward: ", gradbox.is_on_gpu(), self.mask.is_on_gpu())
         var grad_expanded: Gradbox[Self.dtype]
         if gradbox.shape() == Shape():
             # scalar upstream grad — full tensor on same device as mask
@@ -156,7 +153,6 @@ struct MinMaxBackwardGPU[dtype: DType](ImplicitlyCopyable & Movable):
             )
         else:
             grad_expanded = gradbox.broadcast_to(shape, share=False)
-
         return [(ancestor^, grad_expanded * self.mask, AddTensor)]
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:

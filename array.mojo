@@ -124,6 +124,7 @@ struct Array(
             if value == self[i]:
                 return True
         return False
+
     # ========== Access ==========
 
     fn product(self) -> Int:
@@ -151,6 +152,18 @@ struct Array(
             "Array -> __setitem__: index out of bounds",
         )
         self.storage[index] = value
+
+    @always_inline("nodebug")
+    fn append(mut self, value: Int):
+        """Append a value. Panics if max_rank capacity is exceeded."""
+        if self.size >= max_rank:
+            panic(
+                "Array -> append: capacity exceeded.",
+                "max_rank is",
+                max_rank.__str__(),
+            )
+        self.storage[self.size] = value
+        self.size += 1
 
     fn clear(mut self):
         """Clear all elements."""
@@ -181,4 +194,3 @@ struct Array(
 fn main():
     a = Array(3, 4, 5)
     print(4 in a, 1 in a, a.product())
-

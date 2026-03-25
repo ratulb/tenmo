@@ -521,9 +521,6 @@ fn test_mmrev_gpu_max_2d_axis1_keepdims_forward() raises:
         assert_true(m.to_cpu().all_close(Tensor[dtype].d2([[5.0], [6.0]])))
 
 fn test_mmrev_gpu_max_2d_axis0_backward() raises:
-    pass
-
-fn main() raises:
     @parameter
     if has_accelerator():
         print("test_mmrev_gpu_max_2d_axis0_backward")
@@ -2076,7 +2073,7 @@ fn run_all_minmax_tests() raises:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-fn main_1() raises:
+fn main() raises:
     # Old tests
     test_max_min_mixed()
     test_max_min()
