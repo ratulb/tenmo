@@ -49,8 +49,28 @@ fn output_to_input_base_orig(
 
     return input_base
 
-
 fn rank_to_reduced_offset(
+    rank: Int, in_shape: Array, in_strides: Array, reduction_axes: Array
+) -> Int:
+    var tmp = rank
+    var offset = 0
+
+    # Collect reduction axes in forward order so we decode tmp correctly
+    var red_axes = Array()
+    for k in range(len(in_shape)):
+        if k in reduction_axes:
+            red_axes.append(k)
+
+    # Decode tmp in reverse over reduction axes only
+    for i in reversed(range(len(red_axes))):
+        var k = red_axes[i]
+        var coord = tmp % in_shape[k]
+        tmp //= in_shape[k]
+        offset += coord * in_strides[k]
+
+    return offset
+
+fn rank_to_reduced_offset_orig(
     rank: Int, in_shape: Array, in_strides: Array, reduction_axes: Array
 ) -> Int:
     var tmp = rank
