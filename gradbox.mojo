@@ -197,9 +197,12 @@ struct Gradbox[dtype: DType](
 
     @staticmethod
     @always_inline
-    fn zeros(shape: Shape, share: Bool = False) -> Gradbox[Self.dtype]:
+    fn zeros(
+        shape: Shape, share: Bool = False, device: Device = CPU().into()
+    ) -> Gradbox[Self.dtype]:
         return Gradbox[Self.dtype](
-            NDBuffer.full(shape, Scalar[Self.dtype](0)), share=share
+            NDBuffer.full(shape, Scalar[Self.dtype](0), device=device),
+            share=share,
         )
 
     @staticmethod

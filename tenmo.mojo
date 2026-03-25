@@ -210,9 +210,9 @@ struct Tensor[dtype: DType = DType.float32](
                             "init_gradbox: failed to allocate GPU gradbox: "
                             + e.__str__()
                         )
-                        gradbox = Gradbox[Self.dtype](
-                            self.shape()
-                        )  # unreachable, satisfies compiler
+                        gradbox = Gradbox[
+                            Self.dtype
+                        ].Empty  # unreachable, satisfies compiler
                 else:
                     gradbox = Gradbox[Self.dtype](self.shape())
                     gradbox.zero_grad()
