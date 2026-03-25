@@ -923,7 +923,7 @@ fn test_shuf_gpu_matches_cpu_3d() raises:
     if has_accelerator():
         print("test_shuf_gpu_matches_cpu_3d")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].randn(4, 5, 6)
+        var a = Tensor[dtype].randn(4, 4, 6)
         a.requires_grad_(True)
         var a_copy = a.copy()
         a_copy.requires_grad_(True)
