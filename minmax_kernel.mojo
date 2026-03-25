@@ -32,27 +32,13 @@ fn output_to_input_base(
     return input_base
 
 
-fn output_to_input_base_orig(
-    out_idx: Int,
+fn reduction_idx_to_reduced_offset(
+    reduction_idx: Int,
     in_shape: Array,
     in_strides: Array,
     reduction_axes: Array,
 ) -> Int:
-    var remaining = out_idx
-    var input_base = 0
-
-    for k in reversed(range(len(in_shape))):
-        if k not in reduction_axes:
-            var coord = remaining % in_shape[k]
-            remaining //= in_shape[k]
-            input_base += coord * in_strides[k]
-
-    return input_base
-
-fn rank_to_reduced_offset(
-    rank: Int, in_shape: Array, in_strides: Array, reduction_axes: Array
-) -> Int:
-    var tmp = rank
+    var tmp = reduction_idx
     var offset = 0
 
     # Collect reduction axes in forward order so we decode tmp correctly
@@ -67,19 +53,6 @@ fn rank_to_reduced_offset(
         var coord = tmp % in_shape[k]
         tmp //= in_shape[k]
         offset += coord * in_strides[k]
-
-    return offset
-
-fn rank_to_reduced_offset_orig(
-    rank: Int, in_shape: Array, in_strides: Array, reduction_axes: Array
-) -> Int:
-    var tmp = rank
-    var offset = 0
-
-    for k in reversed(range(len(in_shape))):
-        if k in reduction_axes:
-            var coord = tmp % in_shape[k]
-            offset += coord * in_strides[k]
 
     return offset
 
@@ -130,12 +103,14 @@ fn reduce_minmax[
     )
 
     # Grid-stride loop over reduced dimension
-    var rank = tid
-    while rank < reduced_volume:
+    var reduced_idx = tid
+    while reduced_idx < reduced_volume:
         var val = (
             in_buffer
             + input_base
-            + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes)
+            + reduction_idx_to_reduced_offset(
+                reduced_idx, in_shape, in_strides, reduction_axes
+            )
         )[]
 
         @parameter
@@ -146,7 +121,7 @@ fn reduce_minmax[
             if val < local:
                 local = val
 
-        rank += block_size
+        reduced_idx += block_size
 
     smem[tid] = local
     barrier()
@@ -208,15 +183,15 @@ fn build_minmax_mask[
 
     # Pass 1: count ties in this thread's slice
     var local_count: Scalar[dtype] = 0
-    var rank = tid
-    while rank < reduced_volume:
-        var offset = rank_to_reduced_offset(
-            rank, in_shape, in_strides, reduction_axes
+    var reduced_idx = tid
+    while reduced_idx < reduced_volume:
+        var offset = reduction_idx_to_reduced_offset(
+            reduced_idx, in_shape, in_strides, reduction_axes
         )
         var val = (in_buffer + input_base + offset)[]
         if val == best:
             local_count += 1
-        rank += block_size
+        reduced_idx += block_size
 
     smem[tid] = local_count
     barrier()
@@ -238,16 +213,16 @@ fn build_minmax_mask[
     barrier()
 
     # Pass 2: write normalised mask — each thread handles its slice
-    rank = tid
-    while rank < reduced_volume:
-        var offset = rank_to_reduced_offset(
-            rank, in_shape, in_strides, reduction_axes
+    reduced_idx = tid
+    while reduced_idx < reduced_volume:
+        var offset = reduction_idx_to_reduced_offset(
+            reduced_idx, in_shape, in_strides, reduction_axes
         )
         var val = (in_buffer + input_base + offset)[]
         (mask_buffer + input_base + offset)[] = inv if val == best else Scalar[
             dtype
         ](0)
-        rank += block_size
+        reduced_idx += block_size
 
 
 @fieldwise_init
