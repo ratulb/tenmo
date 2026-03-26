@@ -69,9 +69,9 @@ fn scalar_ops[
                 elif op_code == Divide:
                     vec_result = vec_a / scalar
                 elif op_code == MAX:
-                    vec_result = max(vec_a, scalar)
+                    vec_result = max(vec_a, SIMD[dtype, simd_width](scalar))
                 elif op_code == MIN:
-                    vec_result = min(vec_a, scalar)
+                    vec_result = min(vec_a, SIMD[dtype, simd_width](scalar))
 
                 else:
                     vec_result = scalar / vec_a
@@ -95,9 +95,9 @@ fn scalar_ops[
                     elif op_code == Divide:
                         res = val / scalar
                     elif op_code == MAX:
-                        res = max(val, scalar)
+                        res = max(val, Scalar[dtype](scalar))
                     elif op_code == MIN:
-                        res = min(val, scalar)
+                        res = min(val, Scalar[dtype](scalar))
 
                     else:
                         res = scalar / val
