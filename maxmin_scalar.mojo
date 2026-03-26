@@ -1,7 +1,11 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, MAX, MIN
-from backpropagation import BACKWARD_MAX_SCALAR, BACKWARD_MIN_SCALAR
-from backpropagation import Delegate, BackwardFn
+from backpropagation import (
+    Delegate,
+    BackwardFn,
+    BACKWARD_MAX_SCALAR,
+    BACKWARD_MIN_SCALAR,
+)
 from gradbox import Gradbox
 
 

@@ -347,6 +347,7 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             )
         elif self.tag == BACKWARD_MAX_SCALAR:
             return self.grad_fn[MaxBackwardScalar[Self.dtype]].backward(output)
+
         elif self.tag == BACKWARD_MIN_SCALAR:
             return self.grad_fn[MinBackwardScalar[Self.dtype]].backward(output)
 
