@@ -95,9 +95,9 @@ fn scalar_ops[
                     elif op_code == Divide:
                         res = val / scalar
                     elif op_code == MAX:
-                        res = max(val, Scalar[dtype](scalar))
+                        res = val if val > scalar else scalar
                     elif op_code == MIN:
-                        res = min(val, Scalar[dtype](scalar))
+                        res = val if val < scalar else scalar
 
                     else:
                         res = scalar / val
