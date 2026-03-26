@@ -52,6 +52,7 @@ struct Exponential[dtype: DType]:
                         "Exponential - GPU operation failed for opcode: ",
                         EXP.__str__(),
                     )
+                    # Not reachable
                     out = Tensor[Self.dtype].scalar(0)
 
             else:

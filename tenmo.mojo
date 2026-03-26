@@ -1661,6 +1661,24 @@ struct Tensor[dtype: DType = DType.float32](
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
         return AddScalar[Self.dtype].forward[track_grad](self, scalar)
 
+    fn max[
+        track_grad: Bool = True
+    ](
+        self, scalar: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
+    ) -> Tensor[Self.dtype]:
+        return MaxScalar[Self.dtype].forward[track_grad](
+            self, scalar, requires_grad
+        )
+
+    fn min[
+        track_grad: Bool = True
+    ](
+        self, scalar: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
+    ) -> Tensor[Self.dtype]:
+        return MinScalar[Self.dtype].forward[track_grad](
+            self, scalar, requires_grad
+        )
+
     fn __add__[
         track_grad: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
@@ -2439,3 +2457,7 @@ fn main() raises:
     )
     print(a.device())
     # prints () 0 1 0 1 True
+    var b = a.max(31)
+    var c = a.min(31)
+    b.print()
+    c.print()

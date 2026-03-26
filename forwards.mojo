@@ -41,3 +41,4 @@ from pooling import MaxPool2d
 from dropout import Dropout
 from exponential import Exponential
 from device_transfer import DeviceTransfer
+from maxmin_scalar import MaxScalar, MinScalar

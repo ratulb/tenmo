@@ -1,0 +1,162 @@
+from tenmo import Tensor
+from mnemonics import AddTensor, MAX, MIN
+from backpropagation import BACKWARD_MAX_SCALAR, BACKWARD_MIN_SCALAR
+from backpropagation import Delegate, BackwardFn
+from gradbox import Gradbox
+
+
+# ── MaxBackwardScalar ─────────────────────────────────────────────────────────
+
+
+@fieldwise_init
+@register_passable
+struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable):
+    comptime TAG = BACKWARD_MAX_SCALAR
+
+    var scalar: Scalar[Self.dtype]
+
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
+
+    fn backward(
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        """
+        Grad_input = grad_output * (parent > scalar).to_dtype()
+        Gradient passes through where x > scalar, zero elsewhere.
+        """
+        ref gradbox = output.gradients()[]
+        var parent = output.ancestry().get(0)
+
+        # Build float mask: 1.0 where parent > scalar, 0.0 elsewhere
+        var mask = (parent > self.scalar).to_dtype[Self.dtype]()
+
+        # grad_input = upstream_grad * mask
+        # Tensor.__mul__(Gradbox) — no grad tracking, broadcasts if needed
+        var grad_input = mask * gradbox
+
+        return [(parent^, grad_input^, AddTensor)]
+
+
+# ── MinBackwardScalar ─────────────────────────────────────────────────────────
+
+
+@fieldwise_init
+@register_passable
+struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable):
+    comptime TAG = BACKWARD_MIN_SCALAR
+
+    var scalar: Scalar[Self.dtype]
+
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
+
+    fn backward(
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        """
+        Grad_input = grad_output * (parent < scalar).to_dtype()
+        Gradient passes through where x < scalar, zero elsewhere.
+        """
+        ref gradbox = output.gradients()[]
+        var parent = output.ancestry().get(0)
+
+        # Build float mask: 1.0 where parent < scalar, 0.0 elsewhere
+        var mask = (parent < self.scalar).to_dtype[Self.dtype]()
+
+        # grad_input = upstream_grad * mask
+        # Tensor.__mul__(Gradbox) — no grad tracking, broadcasts if needed
+        var grad_input = mask * gradbox
+
+        return [(parent^, grad_input^, AddTensor)]
+
+
+# ── MaxScalar forward ─────────────────────────────────────────────────────────
+
+
+@fieldwise_init
+@register_passable
+struct MaxScalar[dtype: DType](Copyable):
+    @staticmethod
+    fn forward[
+        track_grad: Bool = True
+    ](
+        self: Tensor[Self.dtype],
+        scalar: Scalar[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        var out = Tensor[Self.dtype](
+            self.buffer.scalar_ops[MAX](scalar), requires_grad=False
+        )
+
+        @parameter
+        if track_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
+                out.requires_grad_(True)
+                var backward_fn = MaxBackwardScalar[Self.dtype](
+                    scalar
+                ).into_backward_fn()
+                out.backwardFn = Optional(backward_fn^)
+                out.add_ancestry(self)
+
+        return out^
+
+
+# ── MinScalar forward ─────────────────────────────────────────────────────────
+
+
+@fieldwise_init
+@register_passable
+struct MinScalar[dtype: DType](Copyable):
+    @staticmethod
+    fn forward[
+        track_grad: Bool = True
+    ](
+        self: Tensor[Self.dtype],
+        scalar: Scalar[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        var out = Tensor[Self.dtype](
+            self.buffer.scalar_ops[MIN](scalar), requires_grad=False
+        )
+
+        @parameter
+        if track_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
+                out.requires_grad_(True)
+                var backward_fn = MinBackwardScalar[Self.dtype](
+                    scalar
+                ).into_backward_fn()
+                out.backwardFn = Optional(backward_fn^)
+                out.add_ancestry(self)
+
+        return out^
+
+
+from testing import assert_true
+
+
+fn main() raises:
+    comptime dtype = DType.float32
+
+    # Test Max
+    var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
+    var b = a.max(4.0)
+    b.print()
+    assert_true(b == Tensor[dtype].d1([4.0, 5.0, 4.0, 7.0, 4.0]))
+
+    b.backward()
+    a.grad().print()
+    assert_true(a.grad() == Tensor[dtype].d1([0.0, 1.0, 0.0, 1.0, 0.0]))
+
+    # Test Min
+    var c = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
+    var d = c.min(4.0)
+    d.print()
+    assert_true(d == Tensor[dtype].d1([1.0, 4.0, 3.0, 4.0, 2.0]))
+
+    d.backward()
+    c.grad().print()
+    assert_true(c.grad() == Tensor[dtype].d1([1.0, 0.0, 1.0, 0.0, 1.0]))

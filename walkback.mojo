@@ -55,3 +55,4 @@ from pooling import MaxPool2dBackward
 from dropout import DropoutBackward
 from exponential import ExponentialBackward
 from device_transfer import DeviceTransferBackward
+from maxmin_scalar import MaxBackwardScalar, MinBackwardScalar

@@ -12,6 +12,8 @@ from mnemonics import (
     Subtract,
     ReverseSubtract,
     Divide,
+    MAX,
+    MIN,
     Overwrite,
     ReLUBackwardOp,
     ReLUForwardOp,
@@ -798,6 +800,11 @@ struct Buffer[dtype: DType = DType.float32](
                 op_result = scalar - block
             elif op_code == Divide:
                 op_result = block / scalar
+            elif op_code == MAX:
+                op_result = max(block, scalar)
+            elif op_code == MIN:
+                op_result = min(block, scalar)
+
             else:  # ReverseDivide
                 op_result = block.__rtruediv__(scalar)
 
@@ -820,6 +827,11 @@ struct Buffer[dtype: DType = DType.float32](
                 out[i] = scalar - self[start_index + i]
             elif op_code == Divide:
                 out[i] = self[start_index + i] / scalar
+            elif op_code == MAX:
+                out[i] = max(self[start_index + i], scalar)
+            elif op_code == MIN:
+                out[i] = min(self[start_index + i], scalar)
+
             else:  # ReverseDivide
                 out[i] = self[start_index + i].__rtruediv__(scalar)
 

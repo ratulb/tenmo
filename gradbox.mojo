@@ -562,6 +562,16 @@ struct Gradbox[dtype: DType](
     ):
         self.buffer.clamp_in_place(lower_bound, upper_bound)
 
+    fn max(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
+            self.buffer.max(scalar), share=False
+        )
+
+    fn min(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](
+            self.buffer.min(scalar), share=False
+        )
+
     fn __mul__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         return Gradbox[Self.dtype](
             self.buffer.scalar_ops[Multiply](scalar), share=False

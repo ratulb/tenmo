@@ -47,3 +47,5 @@ comptime EXP = 37
 comptime SQRT = 38
 comptime NEGATE = 39
 comptime ABS = 40
+comptime MAX = 41
+comptime MIN = 42

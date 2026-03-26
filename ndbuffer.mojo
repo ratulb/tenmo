@@ -27,6 +27,8 @@ from mnemonics import (
     Subtract,
     ReverseSubtract,
     Divide,
+    MAX,
+    MIN,
     Overwrite,
     ReverseDivide,
     Equal,
@@ -1571,6 +1573,14 @@ struct NDBuffer[dtype: DType](
         return self.scalar_ops[Multiply](scalar)
 
     @always_inline
+    fn max(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+        return self.scalar_ops[MAX](scalar)
+
+    @always_inline
+    fn min(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+        return self.scalar_ops[MIN](scalar)
+
+    @always_inline
     fn __rmul__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.__mul__(scalar)
 
@@ -1795,6 +1805,11 @@ struct NDBuffer[dtype: DType](
             return lhs * rhs
         elif op_code == Divide:
             return lhs / rhs
+        elif op_code == MAX:
+            return max(lhs, rhs)
+        elif op_code == MIN:
+            return min(lhs, rhs)
+
         else:  # op_code == ReverseDivide
             return rhs / lhs
 

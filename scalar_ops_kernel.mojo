@@ -4,7 +4,7 @@ from sys import simd_width_of
 from tenmo import Tensor
 from common_utils import panic
 from shapes import Shape
-from mnemonics import Multiply, Add, Subtract, Divide, ReverseSubtract
+from mnemonics import Multiply, Add, Subtract, Divide, ReverseSubtract, MAX, MIN
 from device import DeviceState
 from ndbuffer import NDBuffer
 
@@ -68,6 +68,11 @@ fn scalar_ops[
                     vec_result = vec_a * scalar
                 elif op_code == Divide:
                     vec_result = vec_a / scalar
+                elif op_code == MAX:
+                    vec_result = max(vec_a, scalar)
+                elif op_code == MIN:
+                    vec_result = min(vec_a, scalar)
+
                 else:
                     vec_result = scalar / vec_a
 
@@ -89,6 +94,11 @@ fn scalar_ops[
                         res = val * scalar
                     elif op_code == Divide:
                         res = val / scalar
+                    elif op_code == MAX:
+                        res = max(val, scalar)
+                    elif op_code == MIN:
+                        res = min(val, scalar)
+
                     else:
                         res = scalar / val
 

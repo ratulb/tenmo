@@ -62,6 +62,8 @@ comptime BACKWARD_DROPOUT = 49
 comptime BACKWARD_EXPONENTIAL = 50
 comptime BACKWARD_DEVICE_TRANSFER = 51
 comptime BACKWARD_MINMAX_GPU = 52
+comptime BACKWARD_MAX_SCALAR = 53
+comptime BACKWARD_MIN_SCALAR = 54
 # ========== Delegate (Variant) ==========
 
 comptime Delegate[dtype: DType] = Variant[
@@ -118,6 +120,8 @@ comptime Delegate[dtype: DType] = Variant[
     ExponentialBackward[dtype],
     DeviceTransferBackward[dtype],
     MinMaxBackwardGPU[dtype],
+    MaxBackwardScalar[dtype],
+    MinBackwardScalar[dtype],
 ]
 
 # ========== BackwardFn with Tag-Based Dispatch ==========
@@ -341,6 +345,10 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[DeviceTransferBackward[Self.dtype]].backward(
                 output
             )
+        elif self.tag == BACKWARD_MAX_SCALAR:
+            return self.grad_fn[MaxBackwardScalar[Self.dtype]].backward(output)
+        elif self.tag == BACKWARD_MIN_SCALAR:
+            return self.grad_fn[MinBackwardScalar[Self.dtype]].backward(output)
 
         else:
             panic("BackwardFn: Unknown backward tag: " + String(self.tag))
