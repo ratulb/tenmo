@@ -7,7 +7,7 @@ from backpropagation import (
     BACKWARD_MIN_SCALAR,
 )
 from gradbox import Gradbox
-
+from sys import has_accelerator
 
 # ── MaxBackwardScalar ─────────────────────────────────────────────────────────
 
@@ -164,3 +164,14 @@ fn main() raises:
     d.backward()
     c.grad().print()
     assert_true(c.grad() == Tensor[dtype].d1([1.0, 0.0, 1.0, 0.0, 1.0]))
+
+    @parameter
+    if has_accelerator():
+        print("test_maxmin_gpu_parity_min")
+        var a_cpu = Tensor[dtype].d2(
+            [[1.0, 3.0, 7.0], [8.0, 2.0, 5.0]], requires_grad=True
+        )
+        var a_gpu = a_cpu.to_gpu()
+
+        var b_cpu = a_cpu.min(4.0)
+        b_cpu.print()
