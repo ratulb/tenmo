@@ -564,12 +564,12 @@ struct Gradbox[dtype: DType](
 
     fn max(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         return Gradbox[Self.dtype](
-            self.buffer.max(scalar), share=False
+            self.buffer.scalar_ops[MAX](scalar), share=False
         )
 
     fn min(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:
         return Gradbox[Self.dtype](
-            self.buffer.min(scalar), share=False
+            self.buffer.scalar_ops[MIN](scalar), share=False
         )
 
     fn __mul__(self, scalar: Scalar[Self.dtype]) -> Gradbox[Self.dtype]:

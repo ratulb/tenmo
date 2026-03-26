@@ -149,6 +149,37 @@ struct DeviceState[dtype: DType](
     fn __len__(self) -> Int:
         return len(self.buffer)
 
+    fn sub_buffer[
+        NewType: DType
+    ](
+        self,
+        offset: Int = 0,
+        size: Optional[Int] = None,
+    ) raises -> DeviceState[
+        NewType
+    ]:
+        """
+        Creates a new DeviceState[NewType] by reinterpreting this
+        DeviceState's buffer as NewType.
+        Caller must ensure this is a fresh owned contiguous buffer
+        (e.g. from contiguous_device_state()) — not shared.
+        """
+        var actual = size.or_else(len(self))
+        if offset < 0:
+            raise "DeviceState sub_buffer: offset must be >= 0"
+        if actual <= 0:
+            raise "DeviceState sub_buffer: size must be > 0"
+        if offset + actual > len(self):
+            raise (
+                "DeviceState sub_buffer: offset + size ("
+                + String(offset + actual)
+                + ") out of bounds ("
+                + String(len(self))
+                + ")"
+            )
+        var new_buffer = self.buffer.create_sub_buffer[NewType](offset, actual)
+        return DeviceState[NewType](new_buffer^, self.gpu)
+
     @always_inline
     fn sync(self) raises:
         self.gpu().synchronize()

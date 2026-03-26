@@ -699,9 +699,36 @@ struct NDBuffer[dtype: DType](
             self.shape, indices, self.strides, self.offset
         )
 
-    @always_inline
     fn to_dtype[NewType: DType](self) -> NDBuffer[NewType]:
-        new_buffer = self.contiguous_buffer().to_dtype[NewType]()
+        """
+        Casts this NDBuffer to a new dtype.
+        GPU path: uses contiguous_device_state() + DeviceState.sub_buffer[NewType]()
+                  — fresh owned memory, no sharing.
+        CPU path: contiguous_buffer().to_dtype[NewType]() — existing implementation.
+        Result is always contiguous with zero offset.
+        """
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    # Step 1: get fresh, owned, contiguous DeviceState[Self.dtype]
+                    var contig_state = self.contiguous_device_state()
+                    # Step 2: reinterpret as NewType via sub_buffer
+                    # contig_state is owned — safe to reinterpret
+                    var new_state = contig_state.sub_buffer[NewType](
+                        0, self.numels()
+                    )
+                    # Step 3: wrap in NDBuffer[NewType] — contiguous, zero offset
+                    return NDBuffer[NewType].with_device_state(
+                        new_state^, self.shape
+                    )
+                except e:
+                    panic("NDBuffer to_dtype GPU failed: " + e.__str__())
+                    return NDBuffer[NewType].Empty()  # unreachable
+
+        # CPU path — unchanged
+        var new_buffer = self.contiguous_buffer().to_dtype[NewType]()
         return NDBuffer[NewType](new_buffer^, self.shape)
 
     @always_inline
