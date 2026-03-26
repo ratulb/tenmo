@@ -8,6 +8,8 @@ from backpropagation import (
 )
 from gradbox import Gradbox
 from sys import has_accelerator
+from ndbuffer import NDBuffer
+from mnemonics import GreaterThan
 
 # ── MaxBackwardScalar ─────────────────────────────────────────────────────────
 
@@ -23,6 +25,32 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref gradbox = output.gradients()[]
+        var parent = output.ancestry().get(0)
+
+        # Work at NDBuffer level — avoids pulling in GPU kernel launchers
+        var mask_bool: NDBuffer[DType.bool]
+
+        @parameter
+        if has_accelerator():
+            if parent.is_on_gpu():
+                mask_bool = parent.buffer.compare_scalar[GreaterThan](self.scalar)
+            else:
+                mask_bool = parent.buffer.compare_scalar_cpu[GreaterThan](self.scalar)
+        else:
+            mask_bool = parent.buffer.compare_scalar_cpu[GreaterThan](self.scalar)
+
+        var mask_float = mask_bool.to_dtype[Self.dtype]()
+        # wrap mask_float as Gradbox and multiply
+        var grad_input = Gradbox[Self.dtype](mask_float * gradbox.buffer, share=False)
+
+        return [(parent^, grad_input^, AddTensor)]
+
+
+
+    fn backward_old(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
@@ -56,6 +84,17 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref gradbox = output.gradients()[]
+        var parent = output.ancestry().get(0)
+        var grad_input = gradbox
+
+        return [(parent^, grad_input^, AddTensor)]
+
+
+
+    fn backward_old(
         self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
