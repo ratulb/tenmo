@@ -31,8 +31,8 @@ case $1 in
         mojo -I . $DEBUG_MODE tests/test_contiguous.mojo
         ;;
     maxmin_scalar)
-        echo "Running mojo -I . tests/test_max_min_scalar.mojo"
-        mojo -I . $DEBUG_MODE tests/test_max_min_scalar.mojo
+        echo "Running mojo -I . tests/test_maxmin_scalar.mojo"
+        mojo -I . $DEBUG_MODE tests/test_maxmin_scalar.mojo
         ;;
 
     gpusummean)
@@ -284,8 +284,8 @@ case $1 in
         ;;
 
     all)
-        echo "Running tests/test_max_min_scalar.mojo"
-        mojo -I . tests/test_max_min_scalar.mojo
+        echo "Running tests/test_maxmin_scalar.mojo"
+        mojo -I . tests/test_maxmin_scalar.mojo
 
         echo "Running tests/test_contiguous.mojo"
         mojo -I . tests/test_contiguous.mojo
