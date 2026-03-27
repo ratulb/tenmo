@@ -603,6 +603,9 @@ struct Tensor[dtype: DType = DType.float32](
             self.buffer.compare_scalar[GreaterThan](scalar)
         )
 
+    fn lt(self, scalar: Scalar[Self.dtype]) -> Tensor[DType.bool]:
+        return Tensor[DType.bool](self.buffer.compare_scalar[LessThan](scalar))
+
     fn __gt__(self, scalar: Scalar[Self.dtype]) -> Tensor[DType.bool]:
         return Tensor[DType.bool](
             self.buffer.compare_scalar[GreaterThan](scalar)
