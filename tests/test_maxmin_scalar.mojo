@@ -131,14 +131,9 @@ fn test_maxmin_cpu_max_chained() raises:
 # ── CPU Tests: Min ────────────────────────────────────────────────────────────
 fn test_maxmin_cpu_min_1d_forward() raises:
     print("test_maxmin_cpu_min_1d_forward")
-
-
-fn main() raises:
-    print("test_maxmin_cpu_min_1d_forward")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([1.0, 5.0, 3.0, 7.0, 2.0], requires_grad=True)
     var b = a.min(4.0)
-    b.print()
     assert_true(b.all_close(Tensor[dtype].d1([1.0, 4.0, 3.0, 4.0, 2.0])))
 
 
@@ -622,7 +617,7 @@ fn test_maxmin_gpu_parity_min() raises:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 
-fn main_1() raises:
+fn main() raises:
     # CPU Max
     test_maxmin_cpu_max_1d_forward()
     test_maxmin_cpu_max_1d_backward()
