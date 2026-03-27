@@ -700,6 +700,25 @@ struct NDBuffer[dtype: DType](
         )
 
     fn to_dtype[NewType: DType](self) -> NDBuffer[NewType]:
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    # GPU → CPU, cast, CPU → GPU
+                    var cpu_ndb = self.contiguous_device_state().into(self.shape)
+                    var cast_ndb = cpu_ndb.to_dtype[NewType]()  # CPU handles all cases correctly
+                    var new_state = DeviceState[NewType](self.numels(), self.device_state.value().gpu)
+                    new_state.fill(cast_ndb)
+                    return NDBuffer[NewType].with_device_state(new_state^, self.shape)
+                except e:
+                    panic("NDBuffer to_dtype GPU failed: " + e.__str__())
+                    return NDBuffer[NewType].Empty()  # unreachable
+
+        # CPU path — unchanged
+        var new_buffer = self.contiguous_buffer().to_dtype[NewType]()
+        return NDBuffer[NewType](new_buffer^, self.shape)
+
+    fn to_dtype_parked[NewType: DType](self) -> NDBuffer[NewType]:
         """
         Casts this NDBuffer to a new dtype.
         GPU path: uses contiguous_device_state() + DeviceState.sub_buffer[NewType]()
