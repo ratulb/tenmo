@@ -1,12 +1,3 @@
-from tenmo import Tensor
-from mnemonics import AddTensor
-from validators import Validator
-from backpropagation import (
-    Delegate,
-    BackwardFn,
-    BACKWARD_SOFTMAX,
-    BACKWARD_LOG_SOFTMAX,
-)
 from summation import Summer
 from subtraction import Subtractor
 from division import Divider
@@ -14,49 +5,65 @@ from minmax import MinMax
 from intarray import IntArray
 from gradbox import Gradbox
 from shapes import Shape
-from buffers import Buffer
 from ndbuffer import NDBuffer
+from backpropagation import (
+    BackwardFn,
+    Delegate,
+    BACKWARD_SOFTMAX,
+    BACKWARD_LOG_SOFTMAX,
+)
+from mnemonics import AddTensor
+from tenmo import Tensor
+from sys import has_accelerator
+from common_utils import panic
+from validators import Validator
 
-# Softmax Implementation
+# ── SoftmaxBackward ───────────────────────────────────────────────────────────
 
 
 @fieldwise_init
 struct SoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     comptime TAG = BACKWARD_SOFTMAX
     var axes: IntArray
-    var softmax_out_buffer: Buffer[Self.dtype]  # Store raw buffer
-    var softmax_out_shape: Shape
+    var softmax_out: NDBuffer[Self.dtype]  # carries device state — GPU safe
 
     fn __copyinit__(out self, other: Self):
         self.axes = other.axes.copy()
-        self.softmax_out_buffer = other.softmax_out_buffer.copy()
-        self.softmax_out_shape = other.softmax_out_shape.copy()
+        self.softmax_out = other.softmax_out
 
     fn __moveinit__(out self, deinit other: Self):
         self.axes = other.axes^
-        self.softmax_out_buffer = other.softmax_out_buffer^
-        self.softmax_out_shape = other.softmax_out_shape^
+        self.softmax_out = other.softmax_out^
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var gradbox = output.grad()
-
-        # Reconstruct softmax output from buffer
-        var ndb = NDBuffer[Self.dtype](
-            self.softmax_out_buffer.copy(), self.softmax_out_shape.copy()
-        )
-        var softmax_out = Gradbox[Self.dtype](ndb^)
-
-        # softmax_grad = y * (g - sum(g * y, axis, keepdims=True))
-        var gy_sum = (gradbox * softmax_out).sum(self.axes, keepdims=True)
-        var local_grad = softmax_out * (gradbox - gy_sum)
-
+        # softmax_grad = y * (g - sum(g * y, axes, keepdims=True))
+        # All ops at NDBuffer level — GPU safe, no LLVM lowering issues
+        ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
+
+        # Step 1: g * y — arithmetic_ops, GPU safe
+        var gy = gradbox.buffer * self.softmax_out
+
+        # Step 2: sum(g * y, axes, keepdims=True) — axis sum, GPU safe
+        var gy_sum = gy.sum(self.axes, keepdims=True)
+
+        # Step 3: g - sum(g * y) — broadcast subtract, GPU safe
+        var grad_diff = gradbox.buffer - gy_sum
+
+        # Step 4: y * (g - sum(g * y)) — arithmetic_ops, GPU safe
+        var local_grad_ndb = self.softmax_out * grad_diff
+
+        var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
+
         return [(ancestor^, local_grad^, AddTensor)]
+
+
+# ── Softmax forward ───────────────────────────────────────────────────────────
 
 
 @fieldwise_init
@@ -84,11 +91,15 @@ struct Softmax[dtype: DType]:
             this, max_vals
         )
 
-        # Compute exponentials
-        var stable_exp = stable.exp()
+        # Compute exponentials — track_grad=False, intermediate tensor
+        var stable_exp = stable.exp[track_grad=False]()
+
+        # Sum of exponentials along axes
         var exp_sum = Summer[Self.dtype].forward[track_grad=False](
             stable_exp, normalized_axes, True
         )
+
+        # Divide to get softmax
         var out = Divider[Self.dtype].forward[track_grad=False](
             stable_exp, exp_sum
         )
@@ -96,15 +107,14 @@ struct Softmax[dtype: DType]:
         @parameter
         if track_grad:
             var grad_required = requires_grad.or_else(this.requires_grad)
-
             if grad_required:
                 out.requires_grad_(True)
 
-                # Store buffer and shape (much more efficient than coordinate-value pairs)
+                # Store NDBuffer — carries device state, GPU safe
+                # contiguous() ensures zero offset and contiguous layout
                 var backward_fn = SoftmaxBackward[Self.dtype](
                     normalized_axes^,
-                    out.buffer.contiguous_buffer(),
-                    out.shape(),
+                    out.buffer.contiguous(),
                 ).into_backward_fn()
 
                 out.backwardFn = Optional(backward_fn^)
@@ -113,46 +123,50 @@ struct Softmax[dtype: DType]:
         return out^
 
 
-# LogSoftmax Implementation
+# ── LogSoftmaxBackward ────────────────────────────────────────────────────────
 
 
 @fieldwise_init
 struct LogSoftmaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     comptime TAG = BACKWARD_LOG_SOFTMAX
     var axes: IntArray
-    var softmax_out_buffer: Buffer[Self.dtype]
-    var softmax_out_shape: Shape
+    var softmax_out: NDBuffer[Self.dtype]  # carries device state — GPU safe
 
     fn __copyinit__(out self, other: Self):
         self.axes = other.axes.copy()
-        self.softmax_out_buffer = other.softmax_out_buffer.copy()
-        self.softmax_out_shape = other.softmax_out_shape.copy()
+        self.softmax_out = other.softmax_out
 
     fn __moveinit__(out self, deinit other: Self):
         self.axes = other.axes^
-        self.softmax_out_buffer = other.softmax_out_buffer^
-        self.softmax_out_shape = other.softmax_out_shape^
+        self.softmax_out = other.softmax_out^
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var gradbox = output.grad()
-
-        # Reconstruct softmax
-        var ndb = NDBuffer[Self.dtype](
-            self.softmax_out_buffer.copy(), self.softmax_out_shape.copy()
-        )
-        var softmax_out = Gradbox[Self.dtype](ndb^)
-
-        # Gradient for log_softmax: g - softmax(x) * sum(g, axis, keepdims=True)
-        var sum_grad = gradbox.sum(self.axes, keepdims=True)
-        var local_grad = gradbox - (softmax_out * sum_grad)
-
+        # Gradient for log_softmax:
+        # g - softmax(x) * sum(g, axes, keepdims=True)
+        # All ops at NDBuffer level — GPU safe, no LLVM lowering issues
+        ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
+
+        # Step 1: sum(g, axes, keepdims=True) — axis sum, GPU safe
+        var sum_grad = gradbox.buffer.sum(self.axes, keepdims=True)
+
+        # Step 2: softmax(x) * sum(g) — arithmetic_ops, GPU safe
+        var softmax_sum = self.softmax_out * sum_grad
+
+        # Step 3: g - softmax(x) * sum(g) — broadcast subtract, GPU safe
+        var local_grad_ndb = gradbox.buffer - softmax_sum
+
+        var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
+
         return [(ancestor^, local_grad^, AddTensor)]
+
+
+# ── LogSoftmax forward ────────────────────────────────────────────────────────
 
 
 @fieldwise_init
@@ -175,18 +189,24 @@ struct LogSoftmax[dtype: DType]:
         var max_vals = MinMax[Self.dtype].forward[max=True, track_grad=False](
             this, normalized_axes, keepdims=True, requires_grad=False
         )
+
         var stable = Subtractor[Self.dtype].forward[track_grad=False](
             this, max_vals
         )
 
-        # Compute exponentials and sum
-        var stable_exp = stable.exp()
+        # Compute exponentials — track_grad=False, intermediate tensor
+        var stable_exp = stable.exp[track_grad=False]()
+
+        # Sum of exponentials along axes
         var exp_sum = Summer[Self.dtype].forward[track_grad=False](
             stable_exp, normalized_axes, True
         )
 
+        # log(sum(exp(x - max(x)))) — no grad tracking needed
+        # Uses Logarithm.forward via Tensor.log — track_grad=False
+        var log_sum_exp = exp_sum.log[track_grad=False]()
+
         # Log softmax: (x - max(x)) - log(sum(exp(x - max(x))))
-        var log_sum_exp = exp_sum.log(requires_grad=False)
         var out = Subtractor[Self.dtype].forward[track_grad=False](
             stable, log_sum_exp
         )
@@ -194,22 +214,25 @@ struct LogSoftmax[dtype: DType]:
         @parameter
         if track_grad:
             var grad_required = requires_grad.or_else(this.requires_grad)
-
             if grad_required:
                 out.requires_grad_(True)
 
-                # Compute and store softmax for backward pass
+                # Compute softmax for backward — needed for grad computation
+                # Store as NDBuffer — carries device state, GPU safe
                 var softmax_vals = Divider[Self.dtype].forward[
                     track_grad=False
                 ](stable_exp, exp_sum)
 
                 var backward_fn = LogSoftmaxBackward[Self.dtype](
                     normalized_axes^,
-                    softmax_vals.buffer.contiguous_buffer(),
-                    softmax_vals.shape(),
+                    softmax_vals.buffer.contiguous(),
                 ).into_backward_fn()
 
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(this)
 
         return out^
+
+
+fn main() raises:
+    pass

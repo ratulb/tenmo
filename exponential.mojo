@@ -3,7 +3,7 @@ from mnemonics import AddTensor, EXP
 from backpropagation import Delegate, BackwardFn, BACKWARD_EXPONENTIAL
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
-from math import exp, log
+from math import exp
 from unary_ops_kernel import UnaryOpsKernel
 from sys import has_accelerator
 from common_utils import panic
@@ -94,7 +94,7 @@ struct Exponential[dtype: DType]:
             var tensor_ptr = tensor.data_ptr()
             for idx in tensor.index_iterator():
                 var input_value = (tensor_ptr + idx)[]
-                (out_ptr + index)[] = log(input_value)
+                (out_ptr + index)[] = exp(input_value)
                 index += 1
 
         return out^

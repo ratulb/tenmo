@@ -346,7 +346,7 @@ struct NDBuffer[dtype: DType](
                     print(e)
                     panic("NDBuffer full: device transfer failed")
                     # Unreachable
-                    return NDBuffer[Self.dtype](Shape())
+                    return NDBuffer[Self.dtype].Empty()
             else:
                 return ndb^
 
@@ -405,7 +405,6 @@ struct NDBuffer[dtype: DType](
         var shape = Shape(buffer.size)
         return NDBuffer[Self.dtype](buffer^, shape^)
 
-    @always_inline
     @always_inline
     fn is_contiguous(self) -> Bool:
         return self.strides.is_contiguous(self.shape)
@@ -956,6 +955,9 @@ struct NDBuffer[dtype: DType](
             for index in self.index_iterator():
                 accum_sum += self.buffer[index]
             return accum_sum
+
+    fn sum(self, normalized_axes: IntArray, keepdims: Bool = False) -> NDBuffer[Self.dtype]:
+        return self.reduce[mean=False](normalized_axes, keepdims)
 
     fn reduce[
         mean: Bool = False
