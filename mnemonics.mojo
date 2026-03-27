@@ -49,4 +49,4 @@ comptime NEGATE = 39
 comptime ABS = 40
 comptime MAX = 41
 comptime MIN = 42
-comptime POW = 42
+comptime POW = 43
