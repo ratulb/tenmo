@@ -1,7 +1,7 @@
 from contiguous import Contiguous
 from matmul import Matmul
 from permute import Permute
-from exponiention import Exponentiator
+from exponentiator import Exponentiator
 from argminmax import Argmin, Argmax
 from views import View
 from addition import AddScalar, Adder

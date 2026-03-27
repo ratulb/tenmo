@@ -1800,13 +1800,17 @@ struct Tensor[dtype: DType = DType.float32](
 
     fn __pow__[
         track_grad: Bool = True
-    ](self, exponent: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+    ](
+        self, exponent: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
+    ) -> Tensor[Self.dtype]:
         constrained[
             Self.dtype.is_numeric(),
             "Tensor → __pow__ is for numeric data types only",
         ]()
 
-        return Exponentiator[Self.dtype].forward[track_grad](self, exponent)
+        return Exponentiator[Self.dtype].forward[track_grad](
+            self, exponent, requires_grad
+        )
 
     fn dot[track_grad: Bool = True](self, other: Self) -> Tensor[Self.dtype]:
         return Dot[Self.dtype].forward[track_grad](self, other)
