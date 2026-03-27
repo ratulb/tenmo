@@ -2,6 +2,10 @@ from tenmo import Tensor
 from testing import assert_true, assert_false
 from common_utils import isnan, isinf
 from math import log
+from sys import has_accelerator
+from math import log
+from shapes import Shape
+
 
 # ============================================================================
 # TESTS - Forward Pass
@@ -406,3 +410,593 @@ fn main() raises:
     loss.backward()
 
     run_all_log_tests()
+
+    # New tests
+
+    # CPU forward
+    test_log_cpu_1d_basic_forward()
+    test_log_cpu_2d_forward()
+    test_log_cpu_3d_forward()
+    test_log_cpu_ones_forward()
+    test_log_cpu_epsilon_clamping()
+    test_log_cpu_custom_epsilon()
+    test_log_cpu_large_values()
+    test_log_cpu_no_grad()
+    test_log_cpu_requires_grad_propagates()
+    test_log_cpu_suppress_grad()
+
+    # CPU backward
+    test_log_cpu_1d_backward()
+    test_log_cpu_2d_backward()
+    test_log_cpu_3d_backward()
+    test_log_cpu_backward_chain()
+    test_log_cpu_backward_epsilon_clamping()
+    test_log_cpu_backward_custom_epsilon()
+    test_log_cpu_backward_chained_with_exp()
+
+    # GPU forward
+    test_log_gpu_1d_basic_forward()
+    test_log_gpu_2d_forward()
+    test_log_gpu_3d_forward()
+    test_log_gpu_ones_forward()
+    test_log_gpu_epsilon_clamping()
+    test_log_gpu_large_values()
+
+    # GPU backward
+    test_log_gpu_1d_backward()
+    test_log_gpu_2d_backward()
+    test_log_gpu_3d_backward()
+    test_log_gpu_backward_chain()
+    test_log_gpu_backward_epsilon_clamping()
+    test_log_gpu_backward_chained_with_exp()
+    test_log_gpu_backward_custom_epsilon()
+
+    # Parity
+    test_log_parity_1d_forward()
+    test_log_parity_2d_forward()
+    test_log_parity_1d_backward()
+    test_log_parity_2d_backward()
+    test_log_parity_epsilon_clamping()
+    test_log_parity_chain_exp()
+
+    print("All logarithm tests passed!")
+
+# ── CPU Forward Tests ─────────────────────────────────────────────────────────
+
+
+fn test_log_cpu_1d_basic_forward() raises:
+    print("test_log_cpu_1d_basic_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0])
+    var result = a.log()
+    var expect = Tensor[dtype].d1(
+        [log(Float32(1.0)), log(Float32(2.0)), log(Float32(3.0))]
+    )
+    assert_true(result.all_close(expect))
+
+
+fn test_log_cpu_2d_forward() raises:
+    print("test_log_cpu_2d_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
+    var result = a.log()
+    var expect = Tensor[dtype].d2(
+        [
+            [log(Float32(1.0)), log(Float32(2.0))],
+            [log(Float32(3.0)), log(Float32(4.0))],
+        ]
+    )
+    assert_true(result.all_close(expect))
+
+
+fn test_log_cpu_3d_forward() raises:
+    print("test_log_cpu_3d_forward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d3(
+        [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+    )
+    var result = a.log()
+    var expect = Tensor[dtype].d3(
+        [
+            [
+                [log(Float32(1.0)), log(Float32(2.0))],
+                [log(Float32(3.0)), log(Float32(4.0))],
+            ],
+            [
+                [log(Float32(5.0)), log(Float32(6.0))],
+                [log(Float32(7.0)), log(Float32(8.0))],
+            ],
+        ]
+    )
+    assert_true(result.all_close(expect))
+
+
+fn test_log_cpu_ones_forward() raises:
+    print("test_log_cpu_ones_forward")
+    comptime dtype = DType.float32
+    # log(1) = 0
+    var a = Tensor[dtype].ones(Shape(4))
+    var result = a.log()
+    assert_true(result.all_close(Tensor[dtype].zeros(Shape(4))))
+
+
+fn test_log_cpu_epsilon_clamping() raises:
+    print("test_log_cpu_epsilon_clamping")
+    comptime dtype = DType.float32
+    # Values <= 0 should be clamped to epsilon before log
+    # With default epsilon=1e-12, log(1e-12) ≈ -27.631
+    var a = Tensor[dtype].d1([0.0, -1.0, 1.0])
+    var result = a.log()
+    # log(1e-12) for first two, log(1.0)=0 for last
+    var expected_clamped = log(Float32(1e-12))
+    assert_true(result[[0]] == expected_clamped)
+    assert_true(result[[1]] == expected_clamped)
+    assert_true(result[[2]] == Float32(0.0))
+
+fn test_log_cpu_custom_epsilon() raises:
+    print("test_log_cpu_custom_epsilon")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([0.0, 1.0, 2.0])
+    var result = a.log(epsilon=Scalar[dtype](1e-6))
+    var expected_clamped = log(Float32(1e-6))
+    assert_true(result[[0]] == expected_clamped)
+    assert_true(result[[1]] == Float32(0.0))
+    assert_true(result[[2]] == log(Float32(2.0)))
+
+fn test_log_cpu_large_values() raises:
+    print("test_log_cpu_large_values")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([100.0, 1000.0, 10000.0])
+    var result = a.log()
+    var expect = Tensor[dtype].d1(
+        [log(Float32(100.0)), log(Float32(1000.0)), log(Float32(10000.0))]
+    )
+    assert_true(result.all_close(expect))
+
+
+fn test_log_cpu_no_grad() raises:
+    print("test_log_cpu_no_grad")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=False)
+    var result = a.log()
+    assert_true(not result.requires_grad)
+
+
+fn test_log_cpu_requires_grad_propagates() raises:
+    print("test_log_cpu_requires_grad_propagates")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var result = a.log()
+    assert_true(result.requires_grad)
+
+
+fn test_log_cpu_suppress_grad() raises:
+    print("test_log_cpu_suppress_grad")
+    comptime dtype = DType.float32
+    # requires_grad=True on input but suppressed via parameter
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var result = a.log(requires_grad=False)
+    assert_true(not result.requires_grad)
+
+
+# ── CPU Backward Tests ────────────────────────────────────────────────────────
+
+
+fn test_log_cpu_1d_backward() raises:
+    print("test_log_cpu_1d_backward")
+    comptime dtype = DType.float32
+    # d/dx log(x) = 1/x
+    var a = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
+    var result = a.log()
+    var loss = result.sum()
+    loss.backward()
+    # grad = 1/x = [1.0, 0.5, 0.25]
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d1([1.0, 0.5, 0.25]))
+    )
+
+
+fn test_log_cpu_2d_backward() raises:
+    print("test_log_cpu_2d_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
+    var result = a.log()
+    var loss = result.sum()
+    loss.backward()
+    # grad = 1/x
+    assert_true(
+        a.grad().all_close(
+            Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.125]])
+        )
+    )
+
+
+fn test_log_cpu_3d_backward() raises:
+    print("test_log_cpu_3d_backward")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d3(
+        [[[1.0, 2.0], [4.0, 8.0]], [[1.0, 4.0], [2.0, 8.0]]],
+        requires_grad=True,
+    )
+    var result = a.log()
+    var loss = result.sum()
+    loss.backward()
+    assert_true(
+        a.grad().all_close(
+            Tensor[dtype].d3(
+                [[[1.0, 0.5], [0.25, 0.125]], [[1.0, 0.25], [0.5, 0.125]]]
+            )
+        )
+    )
+
+
+fn test_log_cpu_backward_chain() raises:
+    print("test_log_cpu_backward_chain")
+    comptime dtype = DType.float32
+    # Chain: log(x) * 2 → sum → backward
+    # grad of x = 2/x
+    var a = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
+    var result = a.log() * 2.0
+    var loss = result.sum()
+    loss.backward()
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d1([2.0, 1.0, 0.5]))
+    )
+
+
+fn test_log_cpu_backward_epsilon_clamping() raises:
+    print("test_log_cpu_backward_epsilon_clamping")
+    comptime dtype = DType.float32
+    # For values <= epsilon, grad = 1/epsilon not 1/x
+    # Default epsilon = 1e-12
+    var a = Tensor[dtype].d1([0.0, 1.0, 2.0], requires_grad=True)
+    var result = a.log()
+    var loss = result.sum()
+    loss.backward()
+    # grad[0] = 1/epsilon = 1/1e-12
+    # grad[1] = 1/1.0 = 1.0
+    # grad[2] = 1/2.0 = 0.5
+    assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-12))
+    assert_true(a.grad()[[1]] == Float32(1.0))
+    assert_true(a.grad()[[2]] == Float32(0.5))
+
+
+fn test_log_cpu_backward_custom_epsilon() raises:
+    print("test_log_cpu_backward_custom_epsilon")
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
+    var result = a.log(epsilon=Scalar[dtype](1e-6))
+    var loss = result.sum()
+    loss.backward()
+    assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-6))
+    assert_true(a.grad()[[1]] == Float32(1.0))
+    assert_true(a.grad()[[2]] == Float32(0.25))
+
+
+fn test_log_cpu_backward_chained_with_exp() raises:
+    print("test_log_cpu_backward_chained_with_exp")
+    comptime dtype = DType.float32
+    # log(exp(x)) = x, so grad should be 1.0 everywhere
+    var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+    var result = a.exp().log()
+    var loss = result.sum()
+    loss.backward()
+    assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(3))))
+
+
+# ── GPU Forward Tests ─────────────────────────────────────────────────────────
+
+
+fn test_log_gpu_1d_basic_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_1d_basic_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
+        var result = a.log()
+        assert_true(result.is_on_gpu())
+        var expect = Tensor[dtype].d1(
+            [log(Float32(1.0)), log(Float32(2.0)), log(Float32(3.0))]
+        )
+        assert_true(result.to_cpu().all_close(expect))
+
+
+fn test_log_gpu_2d_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_2d_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
+        var result = a.log()
+        assert_true(result.is_on_gpu())
+        var expect = Tensor[dtype].d2(
+            [
+                [log(Float32(1.0)), log(Float32(2.0))],
+                [log(Float32(3.0)), log(Float32(4.0))],
+            ]
+        )
+        assert_true(result.to_cpu().all_close(expect))
+
+
+fn test_log_gpu_3d_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_3d_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d3(
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+        ).to_gpu()
+        var result = a.log()
+        assert_true(result.is_on_gpu())
+        var expect = Tensor[dtype].d3(
+            [
+                [
+                    [log(Float32(1.0)), log(Float32(2.0))],
+                    [log(Float32(3.0)), log(Float32(4.0))],
+                ],
+                [
+                    [log(Float32(5.0)), log(Float32(6.0))],
+                    [log(Float32(7.0)), log(Float32(8.0))],
+                ],
+            ]
+        )
+        assert_true(result.to_cpu().all_close(expect))
+
+
+fn test_log_gpu_ones_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_ones_forward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].ones(Shape(4)).to_gpu()
+        var result = a.log()
+        assert_true(result.is_on_gpu())
+        assert_true(result.to_cpu().all_close(Tensor[dtype].zeros(Shape(4))))
+
+
+fn test_log_gpu_epsilon_clamping() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_epsilon_clamping")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([0.0, -1.0, 1.0]).to_gpu()
+        var result = a.log()
+        var result_cpu = result.to_cpu()
+        var expected_clamped = log(Float32(1e-12))
+        assert_true(result_cpu[[0]] == expected_clamped)
+        assert_true(result_cpu[[1]] == expected_clamped)
+        assert_true(result_cpu[[2]] == Float32(0.0))
+
+
+fn test_log_gpu_large_values() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_large_values")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([100.0, 1000.0, 10000.0]).to_gpu()
+        var result = a.log()
+        var expect = Tensor[dtype].d1(
+            [log(Float32(100.0)), log(Float32(1000.0)), log(Float32(10000.0))]
+        )
+        assert_true(result.to_cpu().all_close(expect))
+
+
+# ── GPU Backward Tests ────────────────────────────────────────────────────────
+
+
+fn test_log_gpu_1d_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_1d_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var result = a_gpu.log()
+        var loss = result.sum()
+        loss.backward()
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d1([1.0, 0.5, 0.25]))
+        )
+
+
+fn test_log_gpu_2d_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_2d_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var result = a_gpu.log()
+        var loss = result.sum()
+        loss.backward()
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.125]])
+            )
+        )
+
+
+fn test_log_gpu_3d_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_3d_backward")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d3(
+            [[[1.0, 2.0], [4.0, 8.0]], [[1.0, 4.0], [2.0, 8.0]]],
+            requires_grad=True,
+        )
+        var a_gpu = a.to_gpu()
+        var result = a_gpu.log()
+        var loss = result.sum()
+        loss.backward()
+        assert_true(
+            a.grad().all_close(
+                Tensor[dtype].d3(
+                    [
+                        [[1.0, 0.5], [0.25, 0.125]],
+                        [[1.0, 0.25], [0.5, 0.125]],
+                    ]
+                )
+            )
+        )
+
+
+fn test_log_gpu_backward_chain() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_backward_chain")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var result = a_gpu.log() * 2.0
+        var loss = result.sum()
+        loss.backward()
+        assert_true(
+            a.grad().all_close(Tensor[dtype].d1([2.0, 1.0, 0.5]))
+        )
+
+
+fn test_log_gpu_backward_epsilon_clamping() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_backward_epsilon_clamping")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([0.0, 1.0, 2.0], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var result = a_gpu.log()
+        var loss = result.sum()
+        loss.backward()
+        assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-12))
+        assert_true(a.grad()[[1]] == Float32(1.0))
+        assert_true(a.grad()[[2]] == Float32(0.5))
+
+
+fn test_log_gpu_backward_chained_with_exp() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_backward_chained_with_exp")
+        comptime dtype = DType.float32
+        # log(exp(x)) = x, grad should be 1.0 everywhere
+        var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var result = a_gpu.exp().log()
+        var loss = result.sum()
+        loss.backward()
+        assert_true(a.grad().all_close(Tensor[dtype].ones(Shape(3))))
+
+
+fn test_log_gpu_backward_custom_epsilon() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_gpu_backward_custom_epsilon")
+        comptime dtype = DType.float32
+        var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
+        var a_gpu = a.to_gpu()
+        var result = a_gpu.log(epsilon=Scalar[dtype](1e-6))
+        var loss = result.sum()
+        loss.backward()
+        assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-6))
+        assert_true(a.grad()[[1]] == Float32(1.0))
+        assert_true(a.grad()[[2]] == Float32(0.25))
+
+
+# ── CPU/GPU Parity Tests ──────────────────────────────────────────────────────
+
+
+fn test_log_parity_1d_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_parity_1d_forward")
+        comptime dtype = DType.float32
+        var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
+        var a_gpu = a_cpu.to_gpu()
+        var result_cpu = a_cpu.log()
+        var result_gpu = a_gpu.log()
+        assert_true(result_cpu.all_close(result_gpu.to_cpu()))
+
+
+fn test_log_parity_2d_forward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_parity_2d_forward")
+        comptime dtype = DType.float32
+        var a_cpu = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        var a_gpu = a_cpu.to_gpu()
+        var result_cpu = a_cpu.log()
+        var result_gpu = a_gpu.log()
+        assert_true(result_cpu.all_close(result_gpu.to_cpu()))
+
+
+fn test_log_parity_1d_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_parity_1d_backward")
+        comptime dtype = DType.float32
+        var a_cpu = Tensor[dtype].d1([1.0, 2.0, 4.0, 8.0], requires_grad=True)
+        var a_gpu = a_cpu.to_gpu()
+
+        var loss_cpu = a_cpu.log().sum()
+        loss_cpu.backward()
+
+        var loss_gpu = a_gpu.log().sum()
+        loss_gpu.backward()
+
+        assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
+
+
+fn test_log_parity_2d_backward() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_parity_2d_backward")
+        comptime dtype = DType.float32
+        var a_cpu = Tensor[dtype].d2(
+            [[1.0, 2.0], [4.0, 8.0]], requires_grad=True
+        )
+        var a_gpu = a_cpu.to_gpu()
+
+        var loss_cpu = a_cpu.log().sum()
+        loss_cpu.backward()
+
+        var loss_gpu = a_gpu.log().sum()
+        loss_gpu.backward()
+
+        assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
+
+
+fn test_log_parity_epsilon_clamping() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_parity_epsilon_clamping")
+        comptime dtype = DType.float32
+        var a_cpu = Tensor[dtype].d1(
+            [0.0, -1.0, 1.0, 2.0], requires_grad=True
+        )
+        var a_gpu = a_cpu.to_gpu()
+
+        var loss_cpu = a_cpu.log().sum()
+        loss_cpu.backward()
+
+        var loss_gpu = a_gpu.log().sum()
+        loss_gpu.backward()
+
+        assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
+
+
+fn test_log_parity_chain_exp() raises:
+    @parameter
+    if has_accelerator():
+        print("test_log_parity_chain_exp")
+        comptime dtype = DType.float32
+        var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
+        var a_gpu = a_cpu.to_gpu()
+
+        var loss_cpu = a_cpu.exp().log().sum()
+        loss_cpu.backward()
+
+        var loss_gpu = a_gpu.exp().log().sum()
+        loss_gpu.backward()
+
+        assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
+
+
+
