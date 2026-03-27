@@ -2,6 +2,8 @@ from gpu import thread_idx, block_dim, grid_dim, block_idx
 from sys import simd_width_of
 
 from tenmo import Tensor
+from ndbuffer import NDBuffer
+from device import DeviceState
 from common_utils import panic
 from shapes import Shape
 from mnemonics import (
@@ -21,6 +23,7 @@ fn unary_ops[
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
     simd_vectors_per_thread: Int = 2 * simd_width,
+    epsilon: Scalar[dtype] = 1e-12 if dtype.is_floating_point() else Scalar[dtype](0),
 ](
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
@@ -45,7 +48,8 @@ fn unary_ops[
 
                 @parameter
                 if op_code == LOG:
-                    vec_result = log10(vec_a) * Scalar[dtype](log_factor)
+                    var clamped = max(vec_a, SIMD[dtype, simd_width](epsilon))
+                    vec_result = log10(clamped) * Scalar[dtype](log_factor)
                 elif op_code == EXP:
                     vec_result = exp(vec_a)
                 elif op_code == SQRT:
@@ -66,7 +70,8 @@ fn unary_ops[
 
                     @parameter
                     if op_code == LOG:
-                        res = log10(val) * Scalar[dtype](log_factor)
+                        var clamped = max(val, epsilon)
+                        res = log10(clamped) * Scalar[dtype](log_factor)
                     elif op_code == EXP:
                         res = exp(val)
                     elif op_code == SQRT:
@@ -84,10 +89,17 @@ fn unary_ops[
 
 
 struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
+
     @staticmethod
     fn launch[
         op_code: Int,
-    ](A: Tensor[Self.dtype]) raises -> Tensor[Self.dtype]:
+        epsilon: Scalar[Self.dtype] = 1e-12 if Self.dtype.is_floating_point() else Scalar[Self.dtype](0),
+    ](A: NDBuffer[Self.dtype]) raises -> NDBuffer[Self.dtype]:
+        """
+        Core launch â€” takes NDBuffer, returns NDBuffer.
+        Caller must ensure A is on GPU.
+        Result is contiguous with zero offset.
+        """
         debug_assert(A.is_on_gpu())
 
         var numels = A.numels()
@@ -97,7 +109,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             numels, simdwidth
         )
 
-        ref device_state = A.buffer.device_state.value()
+        ref device_state = A.device_state.value()
         var device_context = device_state.gpu()
 
         var compiled_func = device_context.compile_function[
@@ -106,16 +118,20 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 dtype = Self.dtype,
                 simd_width=simdwidth,
                 simd_vectors_per_thread = 2 * simdwidth,
+                epsilon=epsilon,
             ],
             unary_ops[
                 op_code=op_code,
                 dtype = Self.dtype,
                 simd_width=simdwidth,
                 simd_vectors_per_thread = 2 * simdwidth,
+                epsilon=epsilon,
             ],
         ]()
 
-        ref A_buffer = device_state.device_buffer()
+        # Ensure contiguous GPU buffer for input
+        var contig_state = A.contiguous_device_state()
+        ref A_buffer = contig_state.device_buffer()
 
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
             numels
@@ -132,7 +148,21 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        return Tensor[Self.dtype].from_device_buffer(result_buffer, A.shape())
+        var result_state = DeviceState[Self.dtype](result_buffer^, device_state.gpu)
+        return NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
+
+    @staticmethod
+    fn launch[
+        op_code: Int,
+        epsilon: Scalar[Self.dtype] = 1e-12 if Self.dtype.is_floating_point() else Scalar[Self.dtype](0),
+    ](A: Tensor[Self.dtype]) raises -> Tensor[Self.dtype]:
+        """
+        Convenience overload â€” takes Tensor, returns Tensor.
+        Delegates to NDBuffer overload.
+        """
+        debug_assert(A.is_on_gpu())
+        var result_ndb = Self.launch[op_code, epsilon](A.buffer)
+        return Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
     @staticmethod
     fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
@@ -167,18 +197,46 @@ fn main() raises:
     var tensor_a = tensor_A.to_gpu()
     var start = now()
     var expect = tensor_A.exp()
-    print("CPU mul took: ", (now() - start) * 1000, "ms")
-    # First test
+    print("CPU exp took: ", (now() - start) * 1000, "ms")
+
+    # Test EXP via Tensor overload
     start = now()
     var result = tensor_a.exp()
-    print("GPU mul took: ", (now() - start) * 1000, "ms")
+    print("GPU exp took: ", (now() - start) * 1000, "ms")
     assert_true(result.all_close(expect))
 
-    # Second test
+    # Test LOG via NDBuffer overload with default epsilon
     tensor_A = Tensor[dtype].ones(SIZE) * 2
-    expect = - tensor_A
-    tensor_a = tensor_A.to_gpu()
-    result = - tensor_a
+    var ndb_a = tensor_A.to_gpu().buffer
+    expect = tensor_A.log()
+    start = now()
+    var result_ndb = UnaryOpsKernel[dtype].launch[LOG](ndb_a)
+    print("GPU log NDBuffer (default epsilon) took: ", (now() - start) * 1000, "ms")
+    assert_true(Tensor[dtype](result_ndb^, requires_grad=False).all_close(expect))
+
+    # Test LOG via Tensor overload with default epsilon
+    tensor_A = Tensor[dtype].ones(SIZE) * 2
+    var tensor_a_log = tensor_A.to_gpu()
+    expect = tensor_A.log()
+    start = now()
+    result = UnaryOpsKernel[dtype].launch[LOG](tensor_a_log)
+    print("GPU log Tensor (default epsilon) took: ", (now() - start) * 1000, "ms")
+    assert_true(result.all_close(expect))
+
+    # Test LOG via Tensor overload with custom epsilon
+    tensor_A = Tensor[dtype].ones(SIZE) * 2
+    tensor_a_log = tensor_A.to_gpu()
+    start = now()
+    result = UnaryOpsKernel[dtype].launch[LOG, Scalar[dtype](1e-7)](tensor_a_log)
+    print("GPU log Tensor (custom epsilon) took: ", (now() - start) * 1000, "ms")
+    assert_true(result.all_close(expect))
+
+    # Test NEGATE
+    tensor_A = Tensor[dtype].ones(SIZE) * 2
+    expect = -tensor_A
+    var tensor_a_neg = tensor_A.to_gpu()
+    result = -tensor_a_neg
     assert_true(result.all_close(expect))
 
     print("Launch success")
+
