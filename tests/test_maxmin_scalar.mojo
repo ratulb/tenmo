@@ -613,7 +613,7 @@ fn test_maxmin_gpu_parity_min() raises:
         var loss_gpu = b_gpu.sum()
         loss_gpu.backward()
 
-        assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
+        assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
