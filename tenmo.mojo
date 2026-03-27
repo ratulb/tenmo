@@ -755,11 +755,11 @@ struct Tensor[dtype: DType = DType.float32](
         like: Tensor[Self.dtype],
         value: Scalar[Self.dtype],
         requires_grad: Bool = False,
-        device: Device = CPU().into(),
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        shape = like.shape()
+        var shape = like.shape()
         return Tensor[Self.dtype].full(
-            shape, value, requires_grad=requires_grad, device=device
+            shape^, value, requires_grad=requires_grad, device=device
         )
 
     @staticmethod
@@ -767,19 +767,20 @@ struct Tensor[dtype: DType = DType.float32](
         shape: List[Int],
         value: Scalar[Self.dtype],
         requires_grad: Bool = False,
-        device: Device = CPU().into(),
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
         return Self.full(Shape(shape), value, requires_grad, device=device)
 
     @staticmethod
     fn full(
         shape: Shape,
-        value: Scalar[Self.dtype],
+        scalar: Scalar[Self.dtype],
         requires_grad: Bool = False,
-        device: Device = CPU().into(),
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        var target_device = device.or_else(CPU().into())
         return Tensor[Self.dtype](
-            NDBuffer[Self.dtype].full(shape, value, device=device),
+            NDBuffer[Self.dtype].full(shape, scalar, target_device),
             requires_grad=requires_grad,
         )
 
@@ -953,13 +954,21 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn zeros(
-        axes_spans: List[Int], requires_grad: Bool = False
+        axes_spans: List[Int],
+        requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        return Self.zeros(Shape(axes_spans), requires_grad=requires_grad)
+        return Self.zeros(
+            Shape(axes_spans), requires_grad=requires_grad, device=device
+        )
 
     @staticmethod
-    fn eye(n: Int, requires_grad: Bool = False) -> Tensor[Self.dtype]:
-        var out = Self.zeros(Shape(n, n), requires_grad=requires_grad)
+    fn eye(
+        n: Int, requires_grad: Bool = False, device: Optional[Device] = None
+    ) -> Tensor[Self.dtype]:
+        var out = Self.zeros(
+            Shape(n, n), requires_grad=requires_grad, device=device
+        )
         for i, j in zip(range(n), range(n)):
             if i == j:
                 out[i, j] = Scalar[Self.dtype](1)
@@ -967,48 +976,98 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn zeros(
-        *axes_spans: Int, requires_grad: Bool = False
+        *axes_spans: Int,
+        requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
         shape = Shape(axes_spans)
-        return Self.zeros(shape, requires_grad=requires_grad)
+        return Self.zeros(shape, requires_grad=requires_grad, device=device)
 
     @staticmethod
     fn zeros_like(
-        tensor: Tensor[Self.dtype], requires_grad: Bool = False
+        self: Tensor[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        shape = tensor.shape()
-        buffer = Buffer[Self.dtype].zeros(shape.num_elements())
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
+        var target_device: Optional[Device]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                target_device = device.or_else(
+                    self.buffer.device_state.value().get_gpu().into()
+                )
+            else:
+                target_device = device.or_else(CPU().into())
+        else:
+            target_device = CPU().into()
+
+        return Tensor[Self.dtype].zeros(
+            self.shape(),
+            requires_grad=requires_grad.or_else(self.requires_grad),
+            device=target_device,
+        )
+
+    @staticmethod
+    fn zeros(
+        shape: Shape,
+        requires_grad: Bool = False,
+        device: Optional[Device] = None,
+    ) -> Tensor[Self.dtype]:
+        var target_device = device.or_else(CPU().into())
+        return Tensor[Self.dtype](
+            NDBuffer[Self.dtype].zeros(shape, target_device),
+            requires_grad=requires_grad,
+        )
 
     @staticmethod
     fn ones_like(
-        tensor: Tensor[Self.dtype], requires_grad: Bool = False
+        self: Tensor[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        out = Tensor[Self.dtype].full(
-            tensor.shape(), 1, requires_grad=requires_grad
+        """
+        Creates a ones tensor with same shape as self.
+        Defaults to same device and requires_grad as self.
+        """
+        var target_device: Optional[Device]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                target_device = device.or_else(
+                    self.buffer.device_state.value().get_gpu().into()
+                )
+            else:
+                target_device = device.or_else(CPU().into())
+        else:
+            target_device = CPU().into()
+
+        return Tensor[Self.dtype].ones(
+            self.shape(),
+            requires_grad=requires_grad.or_else(self.requires_grad),
+            device=target_device,
         )
-        return out^
 
     @staticmethod
-    fn zeros(shape: Shape, requires_grad: Bool = False) -> Tensor[Self.dtype]:
-        buffer = Buffer[Self.dtype].zeros(shape.num_elements())
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
-
-    fn onehot(self: Tensor[Self.dtype], num_classes: Int) -> Tensor[Self.dtype]:
+    fn onehot(
+        indices: Tensor[Self.dtype],
+        num_classes: Int,
+        device: Optional[Device] = None,
+    ) -> Tensor[Self.dtype]:
         """Convert tensor of class indices to one-hot encoding.
         Args:
-            self: Tensor of shape (...,) containing class indices.
+            indices: Tensor of shape (...,) containing class indices.
             num_classes: Number of classes.
+            device: Target device. Defaults to same device as indices.
         Returns: Tensor of shape (..., num_classes).
         """
-        shape = self.shape()
-        result = Tensor[Self.dtype].zeros(shape + [num_classes])
+        var shape = indices.shape()
+        var target_device = device.or_else(indices.device())
+        var result = Tensor[Self.dtype].zeros(shape + [num_classes])
 
-        # Set appropriate positions to 1.0
         for coord in shape:
-            var class_index = self[coord].__int__()
+            var class_index = indices[coord].__int__()
             if class_index < 0 or class_index >= num_classes:
                 panic(
                     "Tensor → onehot: invalid class",
@@ -1018,6 +1077,19 @@ struct Tensor[dtype: DType = DType.float32](
                 )
             var onehot_coord = coord + class_index
             result[onehot_coord] = Scalar[Self.dtype](1)
+
+        # Transfer to target device if needed
+        @parameter
+        if has_accelerator():
+            if target_device.is_gpu():
+                try:
+                    return result.to_gpu(target_device.kind[GPU])
+                except e:
+                    panic(
+                        "Tensor → onehot: device transfer failed: "
+                        + e.__str__()
+                    )
+                    return result^  # unreachable
 
         return result^
 
@@ -1219,25 +1291,30 @@ struct Tensor[dtype: DType = DType.float32](
 
     @staticmethod
     fn ones(
-        *axes_spans: Int, requires_grad: Bool = False
+        *axes_spans: Int,
+        requires_grad: Bool = False,
+        device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        return Self.ones(Shape(axes_spans), requires_grad)
+        return Self.ones(Shape(axes_spans), requires_grad, device)
 
     @staticmethod
-    fn ones(shape: Shape, requires_grad: Bool = False) -> Tensor[Self.dtype]:
-        numels = shape.num_elements()
-        buffer = Buffer[Self.dtype](numels)
-        var value: SIMD[Self.dtype, 1]
+    fn ones(
+        shape: Shape,
+        requires_grad: Bool = False,
+        device: Optional[Device] = None,
+    ) -> Tensor[Self.dtype]:
+        var target_device = device.or_else(CPU().into())
+        var value: Scalar[Self.dtype]
 
         @parameter
         if Self.dtype.is_floating_point():
-            value = SIMD[Self.dtype, 1](1.0)
+            value = Scalar[Self.dtype](1.0)
         else:
-            value = SIMD[Self.dtype, 1](1)
-        for i in range(numels):
-            buffer[i] = value
-        nd_buffer = NDBuffer[Self.dtype](buffer^, shape)
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
+            value = Scalar[Self.dtype](1)
+        return Tensor[Self.dtype](
+            NDBuffer[Self.dtype].full(shape, value, target_device),
+            requires_grad=requires_grad,
+        )
 
     fn broadcast_to(
         self, target_shape: Shape, requires_grad: Optional[Bool] = None
@@ -1633,7 +1710,7 @@ struct Tensor[dtype: DType = DType.float32](
             "Tensor → __neg__ is for numeric data types only",
         ]()
         # Create a zero tensor with same shape and properties
-        var zeros = Tensor[Self.dtype].zeros_like(self)
+        var zeros = Tensor[Self.dtype].zeros_like(self, requires_grad=False)
 
         # Use subtraction: 0 - self
         return Subtractor[Self.dtype].forward[track_grad=track_grad](
