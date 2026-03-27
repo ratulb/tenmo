@@ -90,7 +90,7 @@ comptime Delegate[dtype: DType] = Variant[
     VectorMatmulNdBackward[dtype],
     MatrixVectorMulNdBackward[dtype],
     SubLeftRightBackwardScalar[dtype],
-    ExponientionBackward[dtype],
+    ExponentiationBackward[dtype],
     TrueDivBackwardScalar[dtype],
     RightTrueDivBackwardScalar[dtype],
     DivideBackward[dtype],
@@ -277,7 +277,7 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         # ========== TIER 6: SPECIALIZED OPERATIONS ==========
         elif self.tag == BACKWARD_EXPONENTIATION:
-            return self.grad_fn[ExponientionBackward[Self.dtype]].backward(
+            return self.grad_fn[ExponentiationBackward[Self.dtype]].backward(
                 output
             )
 

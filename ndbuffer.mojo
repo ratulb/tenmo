@@ -29,6 +29,7 @@ from mnemonics import (
     Divide,
     MAX,
     MIN,
+    POW,
     Overwrite,
     ReverseDivide,
     Equal,
@@ -1603,6 +1604,10 @@ struct NDBuffer[dtype: DType](
         return self.scalar_ops[MIN](scalar)
 
     @always_inline
+    fn __pow__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+        return self.scalar_ops[POW](scalar)
+
+    @always_inline
     fn __rmul__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.__mul__(scalar)
 
@@ -1647,7 +1652,7 @@ struct NDBuffer[dtype: DType](
                         op_code.__str__(),
                     )
                     # Unreachable
-                    out = NDBuffer[Self.dtype](Shape())
+                    out = NDBuffer[Self.dtype].Empty()
             else:
                 out = self.arithmetic_ops_cpu[op_code](other)
         else:
@@ -1831,6 +1836,8 @@ struct NDBuffer[dtype: DType](
             return max(lhs, rhs)
         elif op_code == MIN:
             return min(lhs, rhs)
+        elif op_code == POW:
+            return lhs**rhs
 
         else:  # op_code == ReverseDivide
             return rhs / lhs
@@ -1852,9 +1859,16 @@ struct NDBuffer[dtype: DType](
         if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    out = ScalarOperations[Self.dtype].launch[op_code](
-                        self, scalar
-                    )
+
+                    @parameter
+                    if op_code == POW:
+                        out = ScalarOperations[Self.dtype].launch_pow(
+                            self, scalar
+                        )
+                    else:
+                        out = ScalarOperations[Self.dtype].launch[op_code](
+                            self, scalar
+                        )
                 except e:
                     print(e)
                     panic(
@@ -1882,9 +1896,15 @@ struct NDBuffer[dtype: DType](
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
-            var result_buffer = self.buffer.arithmetic_ops_scalar[op_code](
-                scalar, start, end
-            )
+            var result_buffer: Buffer[Self.dtype]
+
+            @parameter
+            if op_code == POW:
+                result_buffer = self.buffer[start:end] ** scalar
+            else:
+                result_buffer = self.buffer.arithmetic_ops_scalar[op_code](
+                    scalar, start, end
+                )
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
         else:

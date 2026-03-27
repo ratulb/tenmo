@@ -17,7 +17,7 @@ from multiplication import (
     MultiplyBroadcastBackward,
 )
 
-from exponiention import ExponientionBackward
+from exponiention import ExponentiationBackward
 from division import (
     TrueDivBackwardScalar,
     RightTrueDivBackwardScalar,

@@ -42,10 +42,11 @@ comptime FLATTEN = 35
 comptime MAXPOOL2D = 36
 
 #####################
-comptime max_rank = 8 # Change this to extend/reduce max supported dimension
+comptime max_rank = 8  # Change this to extend/reduce max supported dimension
 comptime EXP = 37
 comptime SQRT = 38
 comptime NEGATE = 39
 comptime ABS = 40
 comptime MAX = 41
 comptime MIN = 42
+comptime POW = 42

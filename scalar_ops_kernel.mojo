@@ -4,7 +4,16 @@ from sys import simd_width_of
 from tenmo import Tensor
 from common_utils import panic
 from shapes import Shape
-from mnemonics import Multiply, Add, Subtract, Divide, ReverseSubtract, MAX, MIN
+from mnemonics import (
+    Multiply,
+    Add,
+    Subtract,
+    Divide,
+    ReverseSubtract,
+    MAX,
+    MIN,
+    POW,
+)
 from device import DeviceState
 from ndbuffer import NDBuffer
 
@@ -107,6 +116,83 @@ fn scalar_ops[
         base_idx += stride * CHUNK_SIZE
 
 
+# ── Dedicated pow kernels ─────────────────────────────────────────────────────
+# POW is separated from scalar_ops because:
+# - pow() with float exponent needs Powable trait constraint
+# - GPU compiler doesn't yet support generic dtype constraints on kernels
+# - Hardcoding dtype sidesteps the constraint entirely
+
+
+fn pow_op_f32[
+    simd_width: Int = simd_width_of[DType.float32](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
+    exponent: Scalar[DType.float32],
+    size: UInt,
+):
+    """Dedicated float32 pow kernel — x ** exponent elementwise."""
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+
+        @parameter
+        for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                var vec_exp = SIMD[DType.float32, simd_width](exponent)
+                result.store[width=simd_width](i, pow(vec_a, vec_exp))
+
+            elif i < size:
+                for j in range(size - i):
+                    result[i + j] = pow(A[i + j], exponent)
+
+        base_idx += stride * CHUNK_SIZE
+
+
+fn pow_op_f64[
+    simd_width: Int = simd_width_of[DType.float64](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
+    A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
+    exponent: Scalar[DType.float64],
+    size: UInt,
+):
+    """Dedicated float64 pow kernel — x ** exponent elementwise."""
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+
+        @parameter
+        for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                var vec_exp = SIMD[DType.float64, simd_width](exponent)
+                result.store[width=simd_width](i, pow(vec_a, vec_exp))
+
+            elif i < size:
+                for j in range(size - i):
+                    result[i + j] = pow(A[i + j], exponent)
+
+        base_idx += stride * CHUNK_SIZE
+
+
 struct ScalarOperations[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
@@ -164,6 +250,79 @@ struct ScalarOperations[dtype: DType = DType.float32](
         return out^
 
     @staticmethod
+    fn launch_pow(
+        A: NDBuffer[Self.dtype], exponent: Scalar[Self.dtype]
+    ) raises -> NDBuffer[Self.dtype]:
+        """
+        Dedicated POW launcher — dispatches to typed f32/f64 kernels.
+        POW only supported for float32 and float64.
+        """
+        var numels = A.numels()
+        comptime simdwidth = simd_width_of[Self.dtype]()
+        var (threads_per_block, num_blocks) = Self.launch_config(
+            numels, simdwidth
+        )
+        ref A_device_state = A.device_state.value()
+        ref gpu = A_device_state.get_gpu()
+        var device_context = gpu()
+
+        # Ensure contiguous GPU input
+        var contig_state = A.contiguous_device_state()
+        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            numels
+        )
+
+        @parameter
+        if Self.dtype == DType.float32:
+            var compiled = device_context.compile_function[
+                pow_op_f32[
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread = 2 * simdwidth,
+                ],
+                pow_op_f32[
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread = 2 * simdwidth,
+                ],
+            ]()
+            device_context.enqueue_function(
+                compiled,
+                result_buffer,
+                contig_state.device_buffer(),
+                exponent.cast[DType.float32](),
+                UInt(numels),
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+        elif Self.dtype == DType.float64:
+            var compiled = device_context.compile_function[
+                pow_op_f64[
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread = 2 * simdwidth,
+                ],
+                pow_op_f64[
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread = 2 * simdwidth,
+                ],
+            ]()
+            device_context.enqueue_function(
+                compiled,
+                result_buffer,
+                contig_state.device_buffer(),
+                exponent.cast[DType.float64](),
+                UInt(numels),
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+        else:
+            panic(
+                "ScalarOperations: POW only supported for float32 and float64"
+            )
+
+        device_context.synchronize()
+        var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
+        return NDBuffer[Self.dtype].with_device_state(device_state^, A.shape)
+
+    @staticmethod
     fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
         threads_per_block: Int
         num_blocks: Int
@@ -187,11 +346,41 @@ struct ScalarOperations[dtype: DType = DType.float32](
 
 from testing import assert_true
 from common_utils import now
+from sys import has_accelerator
 
 
 fn main() raises:
     var SIZE = 65536 * 10
     comptime dtype = DType.float32
+    # Test CPU pow forward
+    var a_cpu = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
+    var b_cpu = a_cpu**2.0
+    assert_true(b_cpu.all_close(Tensor[dtype].d1([4.0, 9.0, 16.0])))
+
+    # Test CPU pow backward — ∂(x²)/∂x = 2x
+    var loss_cpu = b_cpu.sum()
+    loss_cpu.backward()
+    assert_true(a_cpu.grad().all_close(Tensor[dtype].d1([4.0, 6.0, 8.0])))
+
+    @parameter
+    if has_accelerator():
+        # Test GPU pow forward
+        var a_gpu = (
+            Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True).to_gpu()
+        )
+        var b_gpu = a_gpu**2.0
+        assert_true(
+            b_gpu.to_cpu().all_close(Tensor[dtype].d1([4.0, 9.0, 16.0]))
+        )
+
+        # Test GPU pow backward
+        var loss_gpu = b_gpu.sum()
+        loss_gpu.backward()
+        assert_true(
+            a_gpu.grad().to_cpu().all_close(Tensor[dtype].d1([4.0, 6.0, 8.0]))
+        )
+
+    print("Exponentiator tests passed!")
     var tensor_A = Tensor[dtype].ones(SIZE, requires_grad=True)
     var tensor_a = tensor_A.to_gpu()
     var start = now()

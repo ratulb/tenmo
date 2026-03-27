@@ -1,13 +1,15 @@
 from tenmo import Tensor
 from backpropagation import BackwardFn, Delegate, BACKWARD_EXPONENTIATION
-from mnemonics import AddTensor
+from mnemonics import AddTensor, Multiply
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
+
+# ── ExponentiationBackward ────────────────────────────────────────────────────
 
 
 @fieldwise_init
 @register_passable
-struct ExponientionBackward[dtype: DType](ImplicitlyCopyable):
+struct ExponentiationBackward[dtype: DType](ImplicitlyCopyable):
     comptime TAG = BACKWARD_EXPONENTIATION
     var exponent: Scalar[Self.dtype]
 
@@ -15,23 +17,32 @@ struct ExponientionBackward[dtype: DType](ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        """
+        ∂(x**n)/∂x = n * x**(n-1)
+        All ops at NDBuffer level — GPU safe, no LLVM lowering issues.
+        """
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
 
-        # ∂(x**n)/∂x = n * x**(n-1)
-        # var base_pow = self ** (scalar - 1.0)
-        base_pow = ancestor.__pow__[track_grad=False](self.exponent - 1.0)
-        var local_grad = base_pow.__mul__[track_grad=False](self.exponent)
-        gradbox_prod = local_grad * gradbox
-        return [
-            (
-                ancestor^,
-                gradbox_prod^,
-                AddTensor,
-            )
-        ]
+        # Step 1: x ** (n-1) — NDBuffer.pow, GPU safe
+        var base_pow = ancestor.buffer ** (
+            self.exponent - Scalar[Self.dtype](1)
+        )
+
+        # Step 2: n * x**(n-1) — scalar_ops[Multiply], GPU safe
+        var local_grad = base_pow.scalar_ops[Multiply](self.exponent)
+
+        # Step 3: local_grad * upstream_grad — arithmetic_ops[Multiply], GPU safe
+        var grad_result = local_grad * gradbox.buffer
+
+        var parent_gradbox = Gradbox[Self.dtype](grad_result^, share=False)
+
+        return [(ancestor^, parent_gradbox^, AddTensor)]
+
+
+# ── Exponentiator forward ─────────────────────────────────────────────────────
 
 
 @fieldwise_init
@@ -40,19 +51,24 @@ struct Exponentiator[dtype: DType](Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
-    ](self: Tensor[Self.dtype], exponent: Scalar[Self.dtype]) -> Tensor[
-        Self.dtype
-    ]:
-        nd_buffer = NDBuffer[Self.dtype](
-            (self.buffer.contiguous_buffer() ** exponent), self.shape()
-        )
-        var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
+    ](
+        self: Tensor[Self.dtype],
+        exponent: Scalar[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """
+        Element-wise x ** exponent.
+        Delegates to NDBuffer.pow — handles GPU and CPU paths.
+        """
+        var result_ndb = self.buffer**exponent
+        var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
         @parameter
         if track_grad:
-            if self.requires_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
                 out.requires_grad_(True)
-                backward_fn = ExponientionBackward[Self.dtype](
+                var backward_fn = ExponentiationBackward[Self.dtype](
                     exponent
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
@@ -63,12 +79,15 @@ struct Exponentiator[dtype: DType](Copyable):
 
 from shapes import Shape
 
+
 fn main() raises:
     test_exponentiation()
     test_negation()
-    print("Did pass")
+    print("pass")
+
 
 from testing import assert_true
+
 
 fn test_exponentiation() raises:
     print("test_exponentiation")
@@ -80,6 +99,7 @@ fn test_exponentiation() raises:
     assert_true(b.all_close(expected), "exponentiation assertion failed")
     b.backward()
     a.grad().print()
+
 
 fn test_negation() raises:
     print("test_negation")
