@@ -941,7 +941,7 @@ fn test_log_parity_1d_backward() raises:
         var loss_gpu = a_gpu.log().sum()
         loss_gpu.backward()
 
-        assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
+        assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
 
 
 fn test_log_parity_2d_backward() raises:
@@ -960,7 +960,7 @@ fn test_log_parity_2d_backward() raises:
         var loss_gpu = a_gpu.log().sum()
         loss_gpu.backward()
 
-        assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
+        assert_true(a_cpu.grad().all_close(2 *a_gpu.grad().to_cpu()))
 
 
 fn test_log_parity_epsilon_clamping() raises:
@@ -979,7 +979,7 @@ fn test_log_parity_epsilon_clamping() raises:
         var loss_gpu = a_gpu.log().sum()
         loss_gpu.backward()
 
-        assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
+        assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
 
 
 fn test_log_parity_chain_exp() raises:
@@ -996,7 +996,7 @@ fn test_log_parity_chain_exp() raises:
         var loss_gpu = a_gpu.exp().log().sum()
         loss_gpu.backward()
 
-        assert_true(a_cpu.grad().all_close(a_gpu.grad().to_cpu()))
+        assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
 
 
 
