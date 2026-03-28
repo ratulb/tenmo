@@ -293,6 +293,23 @@ struct DeviceState[dtype: DType](
             print(e)
             return False
 
+    fn any_true(self: DeviceState[DType.bool]) -> Bool:
+        """Check if any element in a boolean DeviceState is True.
+        Mirrors all_true — maps to host and iterates.
+        """
+        try:
+            var length = len(self)
+            if length == 0:
+                return False
+            with self.buffer.map_to_host() as host_buffer:
+                for i in range(length):
+                    if host_buffer[i]:
+                        return True
+            return False
+        except e:
+            print(e)
+            return False
+
 
 from tenmo import Tensor
 

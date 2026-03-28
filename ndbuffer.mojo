@@ -956,7 +956,9 @@ struct NDBuffer[dtype: DType](
                 accum_sum += self.buffer[index]
             return accum_sum
 
-    fn sum(self, normalized_axes: IntArray, keepdims: Bool = False) -> NDBuffer[Self.dtype]:
+    fn sum(
+        self, normalized_axes: IntArray, keepdims: Bool = False
+    ) -> NDBuffer[Self.dtype]:
         return self.reduce[mean=False](normalized_axes, keepdims)
 
     fn reduce[
@@ -2167,6 +2169,96 @@ struct NDBuffer[dtype: DType](
             )
 
         return result
+
+    fn map_to_bool(
+        self,
+        pred: fn (Scalar[Self.dtype]) -> Bool,
+    ) -> NDBuffer[DType.bool]:
+        """Apply predicate to each element, returning a boolean NDBuffer.
+        GPU path: transfers to CPU, applies pred, transfers back if needed.
+        CPU path: delegates to Buffer.map_to_bool via contiguous buffer.
+        Note: pred is a CPU function — GPU path materialises through CPU.
+        """
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    # Materialise to CPU — pred is a CPU fn
+                    var cpu_ndb = self.to_cpu()
+                    var bool_buffer = cpu_ndb.contiguous_buffer().map_to_bool(
+                        pred
+                    )
+                    return NDBuffer[DType.bool](bool_buffer^, self.shape)
+                except e:
+                    panic(
+                        "NDBuffer map_to_bool: GPU→CPU failed: " + e.__str__()
+                    )
+                    return NDBuffer[DType.bool].Empty()  # unreachable
+
+        # CPU path
+        var bool_buffer = self.contiguous_buffer().map_to_bool(pred)
+        return NDBuffer[DType.bool](bool_buffer^, self.shape)
+
+    fn all_true(self: NDBuffer[DType.bool]) -> Bool:
+        """Check if all elements are True.
+        GPU path: delegates to DeviceState.all_true (maps to host).
+        CPU contiguous: delegates to Buffer.all_true.
+        CPU non-contiguous: iterates via index_iterator.
+        """
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                return self.device_state.value().all_true()
+
+        # CPU contiguous fast path
+        if self.is_contiguous():
+            var start = self.offset
+            var end = start + self.numels()
+            if start == 0 and end == len(self.buffer):
+                return self.buffer.all_true()
+            # Contiguous slice
+            for i in range(start, end):
+                if not self.buffer[i]:
+                    return False
+            return True
+
+        # CPU non-contiguous fallback
+        for idx in self.index_iterator():
+            if not self.buffer[idx]:
+                return False
+        return True
+
+    fn any_true(self: NDBuffer[DType.bool]) -> Bool:
+        """Check if any element is True.
+        GPU path: delegates to DeviceState.any_true (maps to host).
+        CPU contiguous: delegates to Buffer.any_true.
+        CPU non-contiguous: iterates via index_iterator.
+        """
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                return self.device_state.value().any_true()
+
+        # CPU contiguous fast path
+        if self.is_contiguous():
+            var start = self.offset
+            var end = start + self.numels()
+            if start == 0 and end == len(self.buffer):
+                return self.buffer.any_true()
+            # Contiguous slice
+            for i in range(start, end):
+                if self.buffer[i]:
+                    return True
+            return False
+
+        # CPU non-contiguous fallback
+        for idx in self.index_iterator():
+            if self.buffer[idx]:
+                return True
+        return False
 
     @always_inline
     fn sum_over_broadcasted_axes(

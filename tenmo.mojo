@@ -682,18 +682,6 @@ struct Tensor[dtype: DType = DType.float32](
     fn broadcastable(self, to: Tensor[Self.dtype]) -> Bool:
         return ShapeBroadcaster.broadcastable(self.shape(), to.shape())
 
-    fn all(self, pred: fn (Scalar[Self.dtype]) -> Bool) -> Bool:
-        return self.buffer.buffer.map_to_bool(pred).all_true()
-
-    fn all_true(self: Tensor[DType.bool]) -> Bool:
-        fn all_holds(scalar: Scalar[DType.bool]) -> Bool:
-            return scalar == Scalar[DType.bool](True)
-
-        return self.all(all_holds)
-
-    fn any(self, pred: fn (Scalar[Self.dtype]) -> Bool) -> Bool:
-        return self.buffer.buffer.any(pred)
-
     fn log[
         track_grad: Bool = True
     ](
@@ -710,6 +698,36 @@ struct Tensor[dtype: DType = DType.float32](
         atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Self,) -> Bool:
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
+
+    fn all(self, pred: fn (Scalar[Self.dtype]) -> Bool) -> Bool:
+        """Returns True if pred holds for all elements.
+        Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.
+        """
+        return self.buffer.map_to_bool(pred).all_true()
+
+    fn any(self, pred: fn (Scalar[Self.dtype]) -> Bool) -> Bool:
+        """Returns True if pred holds for any element.
+        Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.
+        """
+        return self.buffer.map_to_bool(pred).any_true()
+
+    fn all_true(self: Tensor[DType.bool]) -> Bool:
+        """Returns True if all elements are True.
+        GPU path: NDBuffer.all_true → DeviceState.all_true (maps to host).
+        CPU path: NDBuffer.all_true → Buffer.all_true.
+        """
+
+        fn all_holds(scalar: Scalar[DType.bool]) -> Bool:
+            return scalar == Scalar[DType.bool](True)
+
+        return self.buffer.all_true()
+
+    fn any_true(self: Tensor[DType.bool]) -> Bool:
+        """Returns True if any element is True.
+        GPU path: NDBuffer.any_true → DeviceState.any_true (maps to host).
+        CPU path: NDBuffer.any_true → Buffer.any_true.
+        """
+        return self.buffer.any_true()
 
     fn unsafe_ptr[
         origin: Origin, address_space: AddressSpace, //
