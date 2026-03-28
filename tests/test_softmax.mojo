@@ -614,9 +614,7 @@ fn test_log_softmax_cpu_backward_finite_difference() raises:
     var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
     var loss = a.softmax[log=True]().sum()
     loss.backward()
-    assert_true(
-        (abs(a.grad()[[0]] - numerical_grad) < Scalar[dtype](1e-3)).all_true()
-    )
+    assert_true(abs(a.grad()[[0]] - numerical_grad.item()) < Float32(1e-3))
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1001,7 +999,7 @@ fn main() raises:
     print("Group A passed!")
 
     # ── Group B: CPU Softmax Backward ─────────────────────────────────────────
-    _="""test_softmax_cpu_1d_backward_sum_grad()
+    test_softmax_cpu_1d_backward_sum_grad()
     test_softmax_cpu_1d_backward_single_output()
     test_softmax_cpu_2d_backward_axis1()
     test_softmax_cpu_backward_chain()
@@ -1068,7 +1066,7 @@ fn main() raises:
     test_softmax_3d_axis_2()
     test_softmax_gradient_validation_2d()
     test_softmax_numerical_stability()
-    test_softmax_negative_values()"""
+    test_softmax_negative_values()
 
     # End of old tests
 
