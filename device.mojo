@@ -149,37 +149,6 @@ struct DeviceState[dtype: DType](
     fn __len__(self) -> Int:
         return len(self.buffer)
 
-    fn sub_buffer[
-        NewType: DType
-    ](
-        self,
-        offset: Int = 0,
-        size: Optional[Int] = None,
-    ) raises -> DeviceState[
-        NewType
-    ]:
-        """
-        Creates a new DeviceState[NewType] by reinterpreting this
-        DeviceState's buffer as NewType.
-        Caller must ensure this is a fresh owned contiguous buffer
-        (e.g. from contiguous_device_state()) — not shared.
-        """
-        var actual = size.or_else(len(self))
-        if offset < 0:
-            raise "DeviceState sub_buffer: offset must be >= 0"
-        if actual <= 0:
-            raise "DeviceState sub_buffer: size must be > 0"
-        if offset + actual > len(self):
-            raise (
-                "DeviceState sub_buffer: offset + size ("
-                + String(offset + actual)
-                + ") out of bounds ("
-                + String(len(self))
-                + ")"
-            )
-        var new_buffer = self.buffer.create_sub_buffer[NewType](offset, actual)
-        return DeviceState[NewType](new_buffer^, self.gpu)
-
     @always_inline
     fn sync(self) raises:
         self.gpu().synchronize()
@@ -278,37 +247,6 @@ struct DeviceState[dtype: DType](
         with self.buffer.map_to_host() as host_buffer:
             var device_ptr = host_buffer.unsafe_ptr()
             device_ptr.store[width=simdwidth](addr, value)
-
-    fn all_true(self: DeviceState[DType.bool]) -> Bool:
-        try:
-            var length = len(self)
-            if length == 0:
-                return True
-            with self.buffer.map_to_host() as host_buffer:
-                for i in range(length):
-                    if not host_buffer[i]:
-                        return False
-            return True
-        except e:
-            print(e)
-            return False
-
-    fn any_true(self: DeviceState[DType.bool]) -> Bool:
-        """Check if any element in a boolean DeviceState is True.
-        Mirrors all_true — maps to host and iterates.
-        """
-        try:
-            var length = len(self)
-            if length == 0:
-                return False
-            with self.buffer.map_to_host() as host_buffer:
-                for i in range(length):
-                    if host_buffer[i]:
-                        return True
-            return False
-        except e:
-            print(e)
-            return False
 
 
 from tenmo import Tensor

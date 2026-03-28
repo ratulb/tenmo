@@ -717,9 +717,6 @@ struct Tensor[dtype: DType = DType.float32](
         CPU path: NDBuffer.all_true → Buffer.all_true.
         """
 
-        fn all_holds(scalar: Scalar[DType.bool]) -> Bool:
-            return scalar == Scalar[DType.bool](True)
-
         return self.buffer.all_true()
 
     fn any_true(self: Tensor[DType.bool]) -> Bool:

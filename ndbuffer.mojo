@@ -2207,11 +2207,6 @@ struct NDBuffer[dtype: DType](
         CPU non-contiguous: iterates via index_iterator.
         """
 
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu():
-                return self.device_state.value().all_true()
-
         # CPU contiguous fast path
         if self.is_contiguous():
             var start = self.offset
@@ -2236,11 +2231,6 @@ struct NDBuffer[dtype: DType](
         CPU contiguous: delegates to Buffer.any_true.
         CPU non-contiguous: iterates via index_iterator.
         """
-
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu():
-                return self.device_state.value().any_true()
 
         # CPU contiguous fast path
         if self.is_contiguous():
