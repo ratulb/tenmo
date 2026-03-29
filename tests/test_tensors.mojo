@@ -1666,7 +1666,7 @@ fn test_sum() raises:
     result = r.sum(axes=[], keepdims=True)
     assert_true((result == Tensor[dtype].d3([[[276.0]]]).float()))
 
-    ones = Tensor.ones(3, 3)
+    ones = Tensor[dtype].ones(3, 3)
     summed = ones.sum(axes=[0], keepdims=True)
     assert_true(
         (summed == Tensor[dtype].d2([[3, 3, 3]])),
@@ -2091,7 +2091,7 @@ fn test_sum_specific_axis() raises:
     var s = a.sum(axes=[1], keepdims=True)  # shape (2,1,2)
     s.backward()
     assert_true((s == Tensor[dtype].d3([[[4, 6]], [[12, 14]]])))
-    assert_true(a.grad().all_close(Tensor.ones_like(a)))
+    assert_true(a.grad().all_close(Tensor[dtype].ones_like(a)))
 
 
 fn test_mean_with_keepdims() raises:
@@ -2998,7 +2998,7 @@ fn test_flat_view_chain_backprop() raises:
     var v2 = v1.view([2, 4])
     var v3 = v2.view([8])
     v3.backward()
-    # assert_eq(a.grad[], Tensor.ones_like(a).slice(2, 10).pad_left(2))
+    # assert_eq(a.grad[], Tensor[dtype].ones_like(a).slice(2, 10).pad_left(2))
     assert_true((a.grad() == Tensor[dtype].of(0, 0, 1, 1, 1, 1, 1, 1, 0, 0)))
 
 
@@ -3294,8 +3294,8 @@ fn test_scalar_indexing() raises:
 fn test_grads_on_tensor_init() raises:
     print("test_grads_on_tensor_init")
     comptime dtype = DType.float32
-    a = Tensor(6, 3, 4, requires_grad=True)
-    b = Tensor(6, 3, 4)
+    a = Tensor[dtype](6, 3, 4, requires_grad=True)
+    b = Tensor[dtype](6, 3, 4)
     assert_true(
         a.has_grad() and not b.has_grad(),
         "Initialization grad assertions failed",
@@ -3606,7 +3606,7 @@ fn test_batched_matrix_vector_matmul() raises:
     b = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2,3)
     b_transposed = b.transpose()
     c = a.matmul(b_transposed)  # (2,2,2)
-    c.backward(Tensor.ones_like(c))
+    c.backward(Tensor[dtype].ones_like(c))
 
     assert_true(
         c.all_close(
@@ -3754,7 +3754,7 @@ fn test_batched_matmul_vector_rhs_broadcast() raises:
     # A: (2,3,4)  v: (4,)  -> out (2,3)
     A = Tensor[dtype].arange(2 * 3 * 4, requires_grad=True)
     r = A.reshape(2, 3, 4)
-    v = Tensor.ones(4, requires_grad=True)
+    v = Tensor[dtype].ones(4, requires_grad=True)
     out = r.matmul(v)  # row sums over last axis
     # forward check: sums along last axis
     s00 = 0 + 1 + 2 + 3

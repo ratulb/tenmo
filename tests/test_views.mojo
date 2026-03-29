@@ -109,7 +109,7 @@ fn test_tensor_permute_flatten_backprop() raises:
 
     flat.backward()
 
-    var expected = Tensor.ones(12)
+    var expected = Tensor[dtype].ones(12)
     assert_true((a.grad() == expected))
 
 
@@ -147,7 +147,7 @@ fn test_strided_view_chain_2d_to_3d() raises:
     var v2 = v1.view([5, 2, 3])
     var v3 = v2.view([30])
     v3.backward()
-    expected = Tensor.ones_like(a)
+    expected = Tensor[dtype].ones_like(a)
     for i in range(30, 60):
         expected[i] = 0
     assert_true((a.grad() == expected))
@@ -161,7 +161,7 @@ fn test_nested_views_with_interleaved_strides() raises:
     var v2 = v1.view([3, 2, 6])  # (3 blocks of 2x6)
     var v3 = v2.view([36])
     v3.backward()
-    assert_true((a.grad() == Tensor.ones_like(a)))
+    assert_true((a.grad() == Tensor[dtype].ones_like(a)))
 
 
 fn test_view_chain_reversed_shape() raises:
@@ -172,7 +172,7 @@ fn test_view_chain_reversed_shape() raises:
     var v2 = v1.view([4, 6])
     var v3 = v2.view([24])
     v3.backward()
-    assert_true((a.grad() == Tensor.ones_like(a)))
+    assert_true((a.grad() == Tensor[dtype].ones_like(a)))
 
 
 fn test_grad_propagation_with_offset_chain() raises:
@@ -604,7 +604,7 @@ fn test_identity_permutation() raises:
     y3 = v3.permute([0, 1])
     loss3 = y3.sum()
     loss3.backward()
-    assert_true(x3.grad().all_close(Tensor.ones(3, 3)))
+    assert_true(x3.grad().all_close(Tensor[dtype].ones(3, 3)))
 
 
 fn test_reshape_slice_sum_backward() raises:
