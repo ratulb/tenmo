@@ -556,7 +556,9 @@ struct NDBuffer[dtype: DType](
         if self.is_on_gpu():
             ref device_state = self.device_state.value()
             try:
-                return device_state.load[simdwidth=simdwidth](addr)
+                return device_state.load[simdwidth=simdwidth](addr).cast[
+                    Self.dtype
+                ]()
             except e:
                 print(e)
                 panic("Error in NDBuffer → get: ", e.__str__())
@@ -618,7 +620,9 @@ struct NDBuffer[dtype: DType](
         if self.is_on_gpu():
             ref device_state = self.device_state.value()
             try:
-                device_state.store[simdwidth=simdwidth](addr, value)
+                device_state.store[simdwidth=simdwidth](
+                    addr, value.cast[DeviceState[Self.dtype].datatype]()
+                )
             except e:
                 print(e)
                 panic("Error in NDBuffer → store: ", e.__str__())
