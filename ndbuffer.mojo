@@ -1255,6 +1255,71 @@ struct NDBuffer[dtype: DType](
             var view = self.share(new_shape, new_strides, self.offset)
             return view.contiguous()
 
+    fn permute(
+        mut self, axes: IntArray, *, shared: Bool = True
+    ) -> NDBuffer[Self.dtype]:
+        """
+        Permute axes of this NDBuffer.
+
+        shared=True  → view with reordered shape/strides, same buffer
+                       used by Tensor.permute — no data movement
+        shared=False → owned contiguous copy with permuted layout
+                       used by Gradbox.permute — GPU safe via contiguous()
+
+        GPU safety: shared=True is always safe — just metadata.
+                    shared=False delegates to contiguous() which handles
+                    GPU via contiguous_device_state().
+        """
+        var shape = self.shape
+        var rank = shape.rank()
+
+        if len(axes) != rank:
+            panic(
+                "NDBuffer → permute: number of axes (",
+                len(axes).__str__(),
+                ") must match rank (",
+                rank.__str__(),
+                ")",
+            )
+
+        # Validate permutation
+        var seen = IntArray.with_capacity(rank)
+        for axis in axes:
+            var normalized = axis if axis >= 0 else axis + rank
+            if normalized < 0 or normalized >= rank:
+                panic(
+                    "NDBuffer → permute: invalid axis index ",
+                    axis.__str__(),
+                    " for rank ",
+                    rank.__str__(),
+                )
+            if normalized in seen:
+                panic(
+                    "NDBuffer → permute: duplicate axis ", axis.__str__()
+                )
+            seen.append(normalized)
+
+        # Build permuted shape and strides
+        var new_shape_dims = IntArray.with_capacity(rank)
+        var new_strides_arr = IntArray.with_capacity(rank)
+        for axis in axes:
+            new_shape_dims.append(shape[axis])
+            new_strides_arr.append(self.strides[axis])
+
+        var new_shape = Shape(new_shape_dims)
+        var new_strides = Strides(new_strides_arr)
+
+        if shared:
+            # View — shared buffer, ref-counted — for Tensor view ops
+            # No data movement, GPU safe
+            return self.share(new_shape, new_strides, self.offset)
+        else:
+            # Owned contiguous copy — for Gradbox
+            # Build view first, then materialise via contiguous()
+            # contiguous() handles GPU via contiguous_device_state()
+            var view = self.share(new_shape, new_strides, self.offset)
+            return view.contiguous()
+
     fn count(self, key: Scalar[Self.dtype]) -> Int:
         """Count occurence of the key in the buffer."""
         if self.is_contiguous():

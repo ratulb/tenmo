@@ -136,52 +136,17 @@ struct Gradbox[dtype: DType](
     fn unsqueeze(self, axes: List[Int]) -> Gradbox[Self.dtype]:
         return self.unsqueeze(IntArray(axes))
 
-    @always_inline
     fn permute(self, axes: IntArray) -> Gradbox[Self.dtype]:
-        # Validate rank / axis count
-        var rank = self.rank()
-        if len(axes) != rank:
-            panic(
-                "Gradbox → permute: number of axes (",
-                len(axes).__str__(),
-                ") must match rank (",
-                rank.__str__(),
-                ")",
-            )
+        """
+        Permute axes of this Gradbox.
+        Returns owned contiguous copy — never a view.
+        GPU safe: delegates to NDBuffer.permute(shared=False)
+        which uses contiguous() → contiguous_device_state() on GPU.
+        """
+        var self_buffer = self.buffer.copy()
+        var result_ndb = self_buffer.permute(axes, shared=False)
+        return Gradbox[Self.dtype](result_ndb^, share=False)
 
-        # Validate permutation (no duplicates, indices in range)
-        var seen = IntArray.with_capacity(rank)
-        for axis in axes:
-            if axis < 0 or axis >= rank:
-                panic(
-                    "Gradbox → permute: invalid axis index ",
-                    axis.__str__(),
-                    " for rank ",
-                    rank.__str__(),
-                )
-            if axis in seen:
-                panic(
-                    "Gradbox → permute: duplicate axis in permutation ",
-                    axis.__str__(),
-                )
-            seen.append(axis)
-
-        # Build permuted shape and strides
-        var new_shape = IntArray.with_capacity(rank)
-        var new_strides = IntArray.with_capacity(rank)
-        for axis in axes:
-            new_shape.append(self.shape()[axis])
-            new_strides.append(self.strides()[axis])
-
-        var buffer = self.buffer.contiguous_buffer()
-        var nd_buffer = NDBuffer[Self.dtype](
-            buffer=buffer^,
-            shape=Shape(new_shape^),
-            strides=Optional(Strides(new_strides^)),
-            offset=0,
-        )
-
-        return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     @staticmethod
     @always_inline

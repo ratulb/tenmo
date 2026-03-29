@@ -13,24 +13,32 @@ from gradbox import Gradbox
 @register_passable
 struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
     comptime TAG = BACKWARD_PERMUTE
-    var permutation: IntArray  # forward permutation used
+    var permutation: IntArray
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var gradbox = output.grad()
+        """
+        Backward pass for permute.
+        Apply inverse permutation to upstream gradients.
+        GPU safe: Gradbox.permute → NDBuffer.permute(shared=False)
+                  → contiguous() → contiguous_device_state() on GPU.
+        """
+        ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
+
+        # Invert the forward permutation
         var inverted = IntArray.invert_permutation(self.permutation)
 
-        # Apply inverse permutation to gradients
+        # Apply inverse permutation — GPU safe via NDBuffer.permute
         var parent_gradbox = gradbox.permute(inverted^)
 
         return [
             (parent^, parent_gradbox^, AddTensor),
-            (output, gradbox^, ZeroGrad),
+            (output, gradbox, ZeroGrad),
         ]
 
 
@@ -45,50 +53,18 @@ struct Permute[dtype: DType]:
         axes: IntArray,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        if len(axes) != self.rank():
-            panic("Tensor → permute: number of axes must match tensor rank")
-
-        # Check for valid permutation
-        seen = IntArray.with_capacity(len(axes))
-        for axis in axes:
-            if axis < 0 or axis >= self.rank():
-                panic("Tensor → permute: invalid axis index")
-            if axis in seen:
-                panic("Tensor → permute: duplicate axis in permutation")
-            seen.append(axis)
-
-        # Create new shape and strides
-        new_shape = IntArray.with_capacity(len(axes))
-        new_strides = IntArray.with_capacity(len(axes))
-        for axis in axes:
-            new_shape.append(self.shape()[axis])
-            new_strides.append(self.strides()[axis])
-
-        # Return new view with same base but reordered axes
-        _ = """out = Tensor[Self.dtype].build_view(
-            self,
-            shape=Shape(new_shape),
-            strides=Strides(new_strides),
-            offset=self.offset(),  # Permute doesn't change offset
-            requires_grad=False,
-        )"""
-        var out = View[Self.dtype].forward[track_grad=False](
-            self,
-            shape=Shape(new_shape),
-            strides=Strides(new_strides),
-            offset=self.offset(),
-            requires_grad=False,
-            validated=True,
-        )
+        # NDBuffer.permute(shared=True) handles validation + view creation
+        # GPU safe — just reorders shape/strides metadata, no data movement
+        var result_ndb = self.buffer.permute(axes, shared=True)
+        var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
         @parameter
         if track_grad:
-            grad_required = requires_grad.or_else(self.requires_grad)
+            var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                permutation = axes.copy()
-                backward_fn = PermuteBackward[Self.dtype](
-                    permutation
+                var backward_fn = PermuteBackward[Self.dtype](
+                    axes.copy()
                 ).into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
