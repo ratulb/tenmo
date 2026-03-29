@@ -1321,20 +1321,135 @@ struct NDBuffer[dtype: DType](
             return view.contiguous()
 
     fn count(self, key: Scalar[Self.dtype]) -> Int:
-        """Count occurence of the key in the buffer."""
+        """
+        Count occurrences of key in the buffer.
+
+        GPU path:
+            1. contiguous_device_state() — materialises logical view correctly,
+               handles offset (contiguous fast path) and non-contiguous strides
+               (slow path via fill/index_iterator). Result is flat, offset=0.
+            2. map_to_host once — SIMD vectorized count on flat buffer.
+        CPU path:
+            Contiguous: delegates to Buffer.count (SIMD vectorized).
+            Non-contiguous: index_iterator.
+        Result is always a CPU scalar Int.
+        """
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    # Materialise logical view — handles offset + strides
+                    var contig = self.contiguous_device_state()
+                    var numels = self.numels()
+                    var total = 0
+
+                    with contig.buffer.map_to_host() as host_buffer:
+                        var ptr = host_buffer.unsafe_ptr()
+                        @parameter
+                        if Self.dtype == DType.bool:
+                            var key_u8 = UInt8(1) if key.cast[DType.bool]() else UInt8(0)
+                            var key_storage = key_u8.cast[DeviceState[Self.dtype].datatype]()
+                            for i in range(numels):
+                                if ptr[i] == key_storage:
+                                    total += 1
+                        else:
+                            # SIMD vectorized on flat contiguous buffer
+                            comptime simd_width = simd_width_of[
+                                DeviceState[Self.dtype].datatype
+                            ]()
+                            var key_storage = key.cast[
+                                DeviceState[Self.dtype].datatype
+                            ]()
+                            var idx = 0
+                            # Full SIMD chunks
+                            while idx + simd_width <= numels:
+                                var block = ptr.load[width=simd_width](idx)
+                                var result = block.eq(key_storage)
+                                if result.reduce_and():
+                                    total += simd_width
+                                elif result.reduce_or():
+                                    for i in range(simd_width):
+                                        if result[i]:
+                                            total += 1
+                                idx += simd_width
+                            # Scalar tail
+                            for i in range(idx, numels):
+                                if ptr[i] == key_storage:
+                                    total += 1
+
+                    return total
+                except e:
+                    panic("NDBuffer count GPU failed: " + e.__str__())
+                    return 0  # unreachable
+        # CPU contiguous fast path
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
             return self.buffer.count(key, start, end)
-        else:
-            var _count = 0
-            for index in self.index_iterator():
-                if self.buffer[index] == key:
-                    _count += 1
-            return _count
+
+        # CPU non-contiguous fallback
+        var _count = 0
+        for index in self.index_iterator():
+            if self.buffer[index] == key:
+                _count += 1
+        return _count
+
 
     fn unique(self) -> NDBuffer[Self.dtype]:
-        """Get the unique values in the buffer."""
+        """
+        Get unique values in the buffer.
+
+        GPU path:
+            1. contiguous_device_state() — materialises logical view correctly,
+               handles offset (contiguous fast path) and non-contiguous strides
+               (slow path via fill/index_iterator). Result is flat, offset=0.
+            2. map_to_host once — collect uniques via Set on CPU.
+        CPU path:
+            Contiguous: iterates buffer directly respecting offset.
+            Non-contiguous: index_iterator.
+        Result is always a CPU NDBuffer — Set is CPU-side and unique
+        results are typically small, no benefit keeping on GPU.
+        """
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    # Materialise logical view — handles offset + strides
+                    var contig = self.contiguous_device_state()
+                    var numels = self.numels()
+                    var uniques = Set[Scalar[Self.dtype]]()
+
+                    with contig.buffer.map_to_host() as host_buffer:
+                        var ptr = host_buffer.unsafe_ptr()
+
+                        @parameter
+                        if Self.dtype == DType.bool:
+                            var key_storage = UInt8(1).cast[DeviceState[Self.dtype].datatype]()
+                            for i in range(numels):
+                                uniques.add(
+                                    Scalar[Self.dtype](
+                                        ptr[i] == key_storage
+                                    )
+                                )
+
+                        else:
+                            for i in range(numels):
+                                uniques.add(ptr[i].cast[Self.dtype]())
+
+                    var distincts = List[Scalar[Self.dtype]](
+                        capacity=len(uniques)
+                    )
+                    for elem in uniques:
+                        distincts.append(elem)
+                    var unique_shape = Shape(len(distincts))
+                    return NDBuffer[Self.dtype](
+                        Buffer[Self.dtype](distincts^), unique_shape
+                    )
+                except e:
+                    panic("NDBuffer unique GPU failed: " + e.__str__())
+                    return NDBuffer[Self.dtype].Empty()  # unreachable
+
+        # CPU contiguous fast path
         var uniques = Set[Scalar[Self.dtype]]()
         if self.is_contiguous():
             if not self.shared():
@@ -1346,8 +1461,10 @@ struct NDBuffer[dtype: DType](
                 for i in range(start, end):
                     uniques.add(self.buffer[i])
         else:
+            # CPU non-contiguous fallback
             for index in self.index_iterator():
                 uniques.add(self.buffer[index])
+
         var distincts = List[Scalar[Self.dtype]](capacity=Int(len(uniques)))
         for elem in uniques:
             distincts.append(elem)
@@ -1355,6 +1472,7 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[Self.dtype](
             Buffer[Self.dtype](distincts^), unique_shape
         )
+
 
     fn copy_from_alike[
         overwrite: Bool = True, validate: Bool = True
