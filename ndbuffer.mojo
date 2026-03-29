@@ -2201,19 +2201,22 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[DType.bool](bool_buffer^, self.shape)
 
     fn all_true(self: NDBuffer[DType.bool]) -> Bool:
-        """Check if all elements are True.
-        GPU path: delegates to DeviceState.all_true (maps to host).
-        CPU contiguous: delegates to Buffer.all_true.
-        CPU non-contiguous: iterates via index_iterator.
+        """
+        Returns True if all elements are True.
+        GPU path: delegates to DeviceState[DType.bool].all_true()
+                  which checks all uint8 values == 1 internally.
+        CPU path: delegates to Buffer[DType.bool].all_true()
         """
 
-        # CPU contiguous fast path
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                return self.device_state.value().all_true()
+
+        # CPU path — contiguous fast path
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
-            if start == 0 and end == len(self.buffer):
-                return self.buffer.all_true()
-            # Contiguous slice
             for i in range(start, end):
                 if not self.buffer[i]:
                     return False
@@ -2226,19 +2229,22 @@ struct NDBuffer[dtype: DType](
         return True
 
     fn any_true(self: NDBuffer[DType.bool]) -> Bool:
-        """Check if any element is True.
-        GPU path: delegates to DeviceState.any_true (maps to host).
-        CPU contiguous: delegates to Buffer.any_true.
-        CPU non-contiguous: iterates via index_iterator.
+        """
+        Returns True if any element is True.
+        GPU path: delegates to DeviceState[DType.bool].any_true()
+                  which checks any uint8 value == 1 internally.
+        CPU path: delegates to Buffer[DType.bool] iteration.
         """
 
-        # CPU contiguous fast path
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                return self.device_state.value().any_true()
+
+        # CPU path — contiguous fast path
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
-            if start == 0 and end == len(self.buffer):
-                return self.buffer.any_true()
-            # Contiguous slice
             for i in range(start, end):
                 if self.buffer[i]:
                     return True

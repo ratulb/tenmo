@@ -3,7 +3,6 @@ from gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
 from os.atomic import Atomic, Consistency
 from memory import AddressSpace, stack_allocation
 from utils.numerics import isnan, isinf
-from buffers import Buffer
 
 from mnemonics import (
     Equal,
@@ -35,10 +34,10 @@ fn atomic_and[
             success_ordering=ordering,
         ](ptr, expected, desired):
             return expected
-        # expected refreshed by compare_exchange — retry
 
 
 # ── all_close kernel — unchanged ──────────────────────────────────────────────
+
 
 fn all_close[
     dtype: DType,
@@ -225,9 +224,12 @@ struct AllClose[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         return num_blocks, threads_per_block
 
 
-# ── compare kernel — output is DType.uint8 (0/1) not DType.bool ──────────────
-# DType.bool DeviceBuffer is not supported in current stable Mojo GPU.
-# Kernel writes uint8 0/1 values. Launcher converts to CPU NDBuffer[DType.bool].
+# ── compare kernel ────────────────────────────────────────────────────────────
+# Kernel output pointer is DType.uint8 — enqueue_create_buffer[DType.bool]
+# is not supported by Mojo GPU runtime.
+# DeviceState[DType.bool] internally uses DeviceBuffer[DType.uint8] via the
+# bool→uint8 mapping in DeviceState, so we can safely wrap the uint8
+# DeviceBuffer in DeviceState[DType.bool] and return GPU NDBuffer[DType.bool].
 
 
 fn compare[
@@ -236,7 +238,7 @@ fn compare[
     simd_width: Int = simd_width_of[dtype](),
     simd_vectors_per_thread: Int = 2 * simd_width,
 ](
-    result: UnsafePointer[Scalar[DType.uint8], MutAnyOrigin],  # uint8, not bool
+    result: UnsafePointer[Scalar[DType.uint8], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     A_offset: Int,
@@ -277,9 +279,12 @@ fn compare[
                 else:  # LessThanEqual
                     vec_result = vec_a.le(vec_b)
 
-                # Write as uint8 0/1 — element by element
+                # Write uint8 0/1 — element by element
+                # bool bit-packing requires scalar writes
                 for idx in range(simd_width):
-                    (result + i + idx)[] = UInt8(1) if vec_result[idx] else UInt8(0)
+                    (result + i + idx)[] = UInt8(1) if vec_result[
+                        idx
+                    ] else UInt8(0)
 
             else:
                 for j in range(size - i):
@@ -325,7 +330,8 @@ struct Compare[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu()
 
-        # Use uint8 result buffer — DType.bool not supported on GPU
+        # enqueue_create_buffer[DType.bool] not supported on GPU —
+        # use uint8 instead. DeviceState[DType.bool] wraps uint8 internally.
         var result_buffer = device_context.enqueue_create_buffer[DType.uint8](
             output_size
         )
@@ -352,14 +358,15 @@ struct Compare[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        # Materialise uint8 result to CPU NDBuffer[DType.bool]
-        # Never create DeviceBuffer[DType.bool] — not supported on GPU
-        var bool_buffer = Buffer[DType.bool](output_size)
-        with result_buffer.map_to_host() as host_buffer:
-            for i in range(output_size):
-                bool_buffer[i] = True if host_buffer[i] == UInt8(1) else False
-
-        return NDBuffer[DType.bool](bool_buffer^, output_shape)
+        # Wrap uint8 DeviceBuffer in DeviceState[DType.bool].
+        # DeviceState[DType.bool].dtype == DType.uint8 internally —
+        # so DeviceBuffer[DType.uint8] is a valid internal buffer for it.
+        var device_state = DeviceState[DType.bool].__init__[True](
+            result_buffer^, gpu
+        )
+        return NDBuffer[DType.bool].with_device_state(
+            device_state^, output_shape
+        )
 
     @staticmethod
     fn launch_config(output_size: Int) -> Tuple[Int, Int]:
@@ -379,7 +386,8 @@ struct Compare[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         return num_blocks, threads_per_block
 
 
-# ── compare_scalar kernel — output is DType.uint8 (0/1) not DType.bool ────────
+# ── compare_scalar kernel ─────────────────────────────────────────────────────
+# Same pattern as compare — uint8 output, wrapped in DeviceState[DType.bool]
 
 
 fn compare_scalar[
@@ -388,7 +396,7 @@ fn compare_scalar[
     simd_width: Int = simd_width_of[dtype](),
     simd_vectors_per_thread: Int = 2 * simd_width,
 ](
-    result: UnsafePointer[Scalar[DType.uint8], MutAnyOrigin],  # uint8, not bool
+    result: UnsafePointer[Scalar[DType.uint8], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     scalar: Scalar[dtype],
     size: UInt,
@@ -424,9 +432,11 @@ fn compare_scalar[
                 else:  # LessThanEqual
                     vec_result = vec_a.le(scalar)
 
-                # Write as uint8 0/1 — element by element
+                # Write uint8 0/1 — element by element
                 for idx in range(simd_width):
-                    (result + i + idx)[] = UInt8(1) if vec_result[idx] else UInt8(0)
+                    (result + i + idx)[] = UInt8(1) if vec_result[
+                        idx
+                    ] else UInt8(0)
 
             elif i < size:
                 for j in range(size - i):
@@ -488,7 +498,8 @@ struct CompareScalar[dtype: DType = DType.float32](
 
         ref A_buffer = A_device_state.device_buffer()
 
-        # Use uint8 result buffer — DType.bool not supported on GPU
+        # enqueue_create_buffer[DType.bool] not supported on GPU —
+        # use uint8 instead. DeviceState[DType.bool] wraps uint8 internally.
         var result_buffer = device_context.enqueue_create_buffer[DType.uint8](
             numels
         )
@@ -505,14 +516,13 @@ struct CompareScalar[dtype: DType = DType.float32](
 
         device_context.synchronize()
 
-        # Materialise uint8 result to CPU NDBuffer[DType.bool]
-        # Never create DeviceBuffer[DType.bool] — not supported on GPU
-        var bool_buffer = Buffer[DType.bool](numels)
-        with result_buffer.map_to_host() as host_buffer:
-            for i in range(numels):
-                bool_buffer[i] = True if host_buffer[i] == UInt8(1) else False
-
-        return NDBuffer[DType.bool](bool_buffer^, A.shape)
+        # Wrap uint8 DeviceBuffer in DeviceState[DType.bool].
+        # DeviceState[DType.bool].dtype == DType.uint8 internally —
+        # so DeviceBuffer[DType.uint8] is a valid internal buffer for it.
+        var device_state = DeviceState[DType.bool].__init__[True](
+            result_buffer^, gpu
+        )
+        return NDBuffer[DType.bool].with_device_state(device_state^, A.shape)
 
     @staticmethod
     fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
@@ -535,5 +545,6 @@ struct CompareScalar[dtype: DType = DType.float32](
             )  # Cap at 512 blocks
         return threads_per_block, num_blocks
 
+
 fn main() raises:
-    print("passes")
+    pass

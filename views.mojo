@@ -141,7 +141,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
         try:
             # Materialise entire GPU DeviceBuffer to CPU — raw flat copy
             var ds = gradbox.buffer.device_state.value()
-            var cpu_ndb_flat = ds.into(Shape(len(ds)), copy=True)
+            var cpu_ndb_flat = ds.into(Shape(len(ds)))
             # Re-attach the view's logical shape/strides/offset
             # so backward_cpu coordinate mapping works correctly
             var cpu_ndb = cpu_ndb_flat.share(

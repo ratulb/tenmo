@@ -285,6 +285,18 @@ struct DeviceState[dtype: DType](
         self.buffer = device_buffer^
         self.gpu = device_ctx^
 
+    fn __init__[
+        special: Bool
+    ](
+        out self,
+        buffer: DeviceBuffer[
+            Self.datatype
+        ],  # accepts datatype (uint8 for bool)
+        gpu: GPU,
+    ) raises:
+        self.buffer = buffer
+        self.gpu = gpu
+
     fn __init__(
         out self,
         buffer: DeviceBuffer[Self.dtype],
