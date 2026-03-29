@@ -1971,10 +1971,14 @@ struct NDBuffer[dtype: DType](
 
     fn __eq__(self, other: Self) -> Bool:
         var ndb = self.compare[Equal](other)
+        if ndb.is_on_gpu():
+            return ndb.device_state.value().all_true()
         return ndb.buffer.all_true()
 
     fn __ne__(self, other: Self) -> Bool:
         var ndb = self.compare[NotEqual](other)
+        if ndb.is_on_gpu():
+            return ndb.device_state.value().all_true()
         return ndb.buffer.all_true()
 
     @always_inline
@@ -2002,6 +2006,14 @@ struct NDBuffer[dtype: DType](
                     panic("NDBuffer compare → GPU operation failed")
                     # Not reachable
                     result = NDBuffer[DType.bool].Empty()
+            elif (self.is_on_gpu() and other.is_on_cpu()) or (
+                self.is_on_cpu() and other.is_on_gpu()
+            ):
+                panic(
+                    "NDBuffer compare → not both buffers are no the same device"
+                )
+                # Not reachable
+                result = NDBuffer[DType.bool].Empty()
             else:
                 result = self.compare_cpu[op_code](other)
         else:
@@ -2203,9 +2215,9 @@ struct NDBuffer[dtype: DType](
     fn all_true(self: NDBuffer[DType.bool]) -> Bool:
         """
         Returns True if all elements are True.
-        GPU path: delegates to DeviceState[DType.bool].all_true()
+        GPU path: delegates to DeviceState[DType.bool].all_true().
                   which checks all uint8 values == 1 internally.
-        CPU path: delegates to Buffer[DType.bool].all_true()
+        CPU path: delegates to Buffer[DType.bool].all_true().
         """
 
         @parameter
