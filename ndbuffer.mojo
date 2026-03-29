@@ -1294,9 +1294,7 @@ struct NDBuffer[dtype: DType](
                     rank.__str__(),
                 )
             if normalized in seen:
-                panic(
-                    "NDBuffer → permute: duplicate axis ", axis.__str__()
-                )
+                panic("NDBuffer → permute: duplicate axis ", axis.__str__())
             seen.append(normalized)
 
         # Build permuted shape and strides
@@ -1334,6 +1332,7 @@ struct NDBuffer[dtype: DType](
             Non-contiguous: index_iterator.
         Result is always a CPU scalar Int.
         """
+
         @parameter
         if has_accelerator():
             if self.is_on_gpu():
@@ -1345,10 +1344,15 @@ struct NDBuffer[dtype: DType](
 
                     with contig.buffer.map_to_host() as host_buffer:
                         var ptr = host_buffer.unsafe_ptr()
+
                         @parameter
                         if Self.dtype == DType.bool:
-                            var key_u8 = UInt8(1) if key.cast[DType.bool]() else UInt8(0)
-                            var key_storage = key_u8.cast[DeviceState[Self.dtype].datatype]()
+                            var key_u8 = UInt8(1) if key.cast[
+                                DType.bool
+                            ]() else UInt8(0)
+                            var key_storage = key_u8.cast[
+                                DeviceState[Self.dtype].datatype
+                            ]()
                             for i in range(numels):
                                 if ptr[i] == key_storage:
                                     total += 1
@@ -1394,7 +1398,6 @@ struct NDBuffer[dtype: DType](
                 _count += 1
         return _count
 
-
     fn unique(self) -> NDBuffer[Self.dtype]:
         """
         Get unique values in the buffer.
@@ -1410,6 +1413,7 @@ struct NDBuffer[dtype: DType](
         Result is always a CPU NDBuffer — Set is CPU-side and unique
         results are typically small, no benefit keeping on GPU.
         """
+
         @parameter
         if has_accelerator():
             if self.is_on_gpu():
@@ -1424,12 +1428,12 @@ struct NDBuffer[dtype: DType](
 
                         @parameter
                         if Self.dtype == DType.bool:
-                            var key_storage = UInt8(1).cast[DeviceState[Self.dtype].datatype]()
+                            var key_storage = UInt8(1).cast[
+                                DeviceState[Self.dtype].datatype
+                            ]()
                             for i in range(numels):
                                 uniques.add(
-                                    Scalar[Self.dtype](
-                                        ptr[i] == key_storage
-                                    )
+                                    Scalar[Self.dtype](ptr[i] == key_storage)
                                 )
 
                         else:
@@ -1472,7 +1476,6 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[Self.dtype](
             Buffer[Self.dtype](distincts^), unique_shape
         )
-
 
     fn copy_from_alike[
         overwrite: Bool = True, validate: Bool = True
@@ -1975,8 +1978,16 @@ struct NDBuffer[dtype: DType](
             )
         return NDBuffer[Self.dtype](buffer^, result_shape)
 
-    @always_inline
     fn broadcast_to(self, target_shape: Shape) -> NDBuffer[Self.dtype]:
+        """
+        Broadcast this NDBuffer to target_shape.
+        Uses stride=0 trick for broadcast dims — pure metadata, no data copy.
+        Then contiguous() materialises the view correctly on CPU or GPU.
+
+        GPU safe: share() is metadata only, contiguous() uses
+                  contiguous_device_state() on GPU.
+        CPU safe: contiguous() uses contiguous_buffer().
+        """
         var own_shape = self.shape
         if not ShapeBroadcaster.broadcastable(own_shape, target_shape):
             panic(
@@ -1986,26 +1997,33 @@ struct NDBuffer[dtype: DType](
                 + target_shape.__str__()
             )
 
-        var mask = ShapeBroadcaster.broadcast_mask(own_shape, target_shape)
-        var out = NDBuffer[Self.dtype].zeros(target_shape)
+        var target_rank = target_shape.rank()
+        var own_rank = own_shape.rank()
+        var extra_dims = target_rank - own_rank
 
-        @parameter
-        if has_accelerator():
-            if self.is_on_gpu():
-                try:
-                    ref gpu = self.device_state.value().get_gpu()
-                    out = out.to_gpu(gpu)
-                except e:
-                    print(e)
-                    panic("NDBuffer → broadcast_to: error transferring to gpu")
+        # Build expanded strides — prepend zeros for extra leading dims
+        var new_strides = IntArray.with_capacity(target_rank)
 
-        for target_coord in target_shape:
-            src_coord = ShapeBroadcaster.translate_index(
-                own_shape, target_coord, mask, target_shape
-            )
-            out[target_coord] = self[src_coord]
+        # Extra leading dims — stride 0 (broadcast)
+        for _ in range(extra_dims):
+            new_strides.append(0)
 
-        return out^
+        # Align existing dims — stride 0 where dim==1 and target>1
+        for i in range(own_rank):
+            var target_i = i + extra_dims
+            if own_shape[i] == 1 and target_shape[target_i] > 1:
+                new_strides.append(0)  # broadcast dim
+            else:
+                new_strides.append(self.strides[i])  # keep original stride
+
+        # Create non-contiguous view with broadcast strides
+        var self_copy = self.copy()
+        var view = self_copy.share(
+            target_shape, Strides(new_strides), self.offset
+        )
+
+        # Materialise — handles GPU via contiguous_device_state()
+        return view.contiguous()
 
     @staticmethod
     @always_inline
