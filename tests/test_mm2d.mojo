@@ -166,8 +166,8 @@ fn test_matmul_2d_large_contiguous_simd_path() raises:
     var n: Int = 12  # Multiple of SIMD width (4)
     var p: Int = 16  # Multiple of SIMD width (4)
 
-    var A = Tensor.rand(Shape(m, n))
-    var B = Tensor.rand(Shape(n, p))  # Contiguous by default
+    var A = Tensor[dtype].rand(Shape(m, n))
+    var B = Tensor[dtype].rand(Shape(n, p))  # Contiguous by default
 
     # Verify B is contiguous and suitable for SIMD
     var b_strides = B.strides()
@@ -190,8 +190,8 @@ fn test_matmul_2d_very_large_matrices() raises:
     var n: Int = 64  # Large multiple of SIMD width
     var p: Int = 48  # Large multiple of SIMD width
 
-    var A = Tensor.rand(Shape(m, n), requires_grad=True)
-    var B = Tensor.rand(Shape(n, p), requires_grad=True)
+    var A = Tensor[dtype].rand(Shape(m, n), requires_grad=True)
+    var B = Tensor[dtype].rand(Shape(n, p), requires_grad=True)
 
     var C = A.matmul(B)
     assert_true(C.shape() == Shape(m, p))
@@ -211,8 +211,8 @@ fn test_matmul_2d_very_very_large_matrices() raises:
     var n: Int = 128  # Large multiple of SIMD width
     var p: Int = 1024  # Large multiple of SIMD width
 
-    var A = Tensor.rand(Shape(m, n), requires_grad=True)
-    var B = Tensor.rand(Shape(n, p), requires_grad=True)
+    var A = Tensor[dtype].rand(Shape(m, n), requires_grad=True)
+    var B = Tensor[dtype].rand(Shape(n, p), requires_grad=True)
 
     var C = A.matmul(B)
     assert_true(C.shape() == Shape(m, p))
@@ -235,8 +235,8 @@ fn test_matmul_2d_simd_width_boundary() raises:
     var n: Int = simd_width * 2  # 8 for float32
     var p: Int = simd_width * 3  # 12 for float32
 
-    var A = Tensor.rand(Shape(m, n))
-    var B = Tensor.rand(Shape(n, p))
+    var A = Tensor[dtype].rand(Shape(m, n))
+    var B = Tensor[dtype].rand(Shape(n, p))
 
     var C = A.matmul(B)
     assert_true(C.shape() == Shape(m, p))
@@ -255,8 +255,8 @@ fn test_matmul_2d_non_multiple_simd_width() raises:
     var n: Int = 11  # Not multiple of 4
     var p: Int = 13  # Not multiple of 4
 
-    var A = Tensor.rand(Shape(m, n), init_seed=42, requires_grad=True)
-    var B = Tensor.rand(Shape(n, p), init_seed=42, requires_grad=True)
+    var A = Tensor[dtype].rand(Shape(m, n), init_seed=42, requires_grad=True)
+    var B = Tensor[dtype].rand(Shape(n, p), init_seed=42, requires_grad=True)
     var C = A.matmul(B)
     assert_true(C.shape() == Shape(m, p))
     assert_true(
@@ -271,8 +271,8 @@ fn test_matmul_2d_large_views_simd_path() raises:
     print("test_matmul_2d_large_views_simd_path")
     comptime dtype = DType.float32
     # Create large base tensors and take contiguous views from them
-    var A_base = Tensor.rand(Shape(16, 24))
-    var B_base = Tensor.rand(Shape(24, 32))
+    var A_base = Tensor[dtype].rand(Shape(16, 24))
+    var B_base = Tensor[dtype].rand(Shape(24, 32))
 
     # Create contiguous views (should use SIMD path)
     var A = A_base.view(shape=Shape(8, 12), strides=Strides(24, 1), offset=0)
@@ -298,8 +298,8 @@ fn test_matmul_2d_large_transposed_slow_path() raises:
     var n: Int = 12
     var p: Int = 16
 
-    var A = Tensor.rand(Shape(m, n))
-    var B_orig = Tensor.rand(Shape(p, n))  # Note: dimensions swapped
+    var A = Tensor[dtype].rand(Shape(m, n))
+    var B_orig = Tensor[dtype].rand(Shape(p, n))  # Note: dimensions swapped
     var B = B_orig.transpose()  # Makes B non-contiguous
 
     # Verify B is NOT SIMD-friendly
