@@ -108,7 +108,7 @@ struct TileBackward_parked[dtype: DType](ImplicitlyCopyable):
                 1 if repeat_index < 0 else self.repeat[repeat_index]
             )
 
-            # CRITICAL FIX: Put repeat_factor FIRST, then orig_dim
+            # Put repeat_factor FIRST, then orig_dim
             reshaped_dims.append(repeat_factor)  # Repeat dimension first
             reshaped_dims.append(orig_dim)  # Original dimension second
 
@@ -270,6 +270,7 @@ struct Tile[dtype: DType]:
         GPU safe: reshape → GPU safe via reshape_gpu ✓
                   expand  → stride=0 view, GPU safe ✓
                   reshape → GPU safe via reshape_gpu ✓
+
         """
         var orig_shape = self.shape()
         var orig_rank = self.rank()
