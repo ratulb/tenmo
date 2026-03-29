@@ -34,7 +34,8 @@ from device import Device, CPU, GPU
 from sys.info import has_accelerator
 
 
-struct Tensor[dtype: DType = DType.float32](
+#struct Tensor[dtype: DType = DType.float32](
+struct Tensor[dtype: DType](
     Copyable
     & Movable
     & Sized

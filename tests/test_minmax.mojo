@@ -1584,7 +1584,7 @@ fn test_edge_cases_large_tensor() raises:
     assert_true(a.grad()[IntArray(99)] - expected_grad < 1e-6)
 
     # Test 2: Large 2D tensor (100x100) - partial reduction
-    var b = Tensor.zeros(Shape(100, 100), requires_grad=True)
+    var b = Tensor[dtype].zeros(Shape(100, 100), requires_grad=True)
     # Set specific values
     b[IntArray(50, 50)] = 1000.0
     b[IntArray(75, 25)] = 2000.0
@@ -1777,7 +1777,7 @@ fn test_high_dimensional_tensors() raises:
     comptime dtype = DType.float32
 
     # Test 1: 4D tensor (batch, channels, height, width)
-    var a = Tensor.zeros(Shape(2, 3, 4, 5), requires_grad=True)
+    var a = Tensor[dtype].zeros(Shape(2, 3, 4, 5), requires_grad=True)
     # Set specific max values
     a[IntArray(0, 1, 2, 3)] = 100.0
     a[IntArray(1, 2, 3, 4)] = 200.0
