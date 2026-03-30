@@ -1,11 +1,4 @@
 # Tenmo
-
-**A lean tensor library and neural network framework built entirely in Mojo 🔥**
-
-Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differentiation, modular neural networks, and end-to-end training pipelines—aiming for performance competitive with modern ML systems.
-
-> ⚠️ **Development Status**: Tenmo is actively evolving alongside Mojo itself. The API is subject to change as we incorporate improvements from the Mojo ecosystem. Not production-ready yet, but excellent for learning, experimentation, and systems-level exploration.
-
 ## Build Status
 
 ![Mojo Tests](https://github.com/ratulb/tenmo/actions/workflows/test.yml/badge.svg?branch=development)
@@ -13,6 +6,14 @@ Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differenti
 ![License](https://img.shields.io/github/license/ratulb/tenmo)
 ![Language](https://img.shields.io/badge/language-Mojo%20🔥-orange)
 ![Open Issues](https://img.shields.io/github/issues/ratulb/tenmo)
+
+**A lean tensor library and neural network framework built entirely in Mojo 🔥**
+
+Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differentiation, modular neural networks, and end-to-end training pipelines—aiming for performance competitive with modern ML systems.
+
+> ⚠️ **Development Status**: Tenmo is actively evolving alongside Mojo itself. The API is subject to change as we incorporate improvements from the Mojo ecosystem. Not production-ready yet, but excellent for learning, experimentation, and systems-level exploration.
+
+
 ---
 
 ## ⚡︎ Performance
@@ -172,6 +173,16 @@ fn main():
 
     Success: Network learned XOR perfectly
 ```
+## Running Tests
+```bash
+curl -fsSL https://pixi.sh/install.sh | sh
+source ~/.bashrc
+git clone https://github.com/ratulb/tenmo -b development
+cd tenmo
+pixi shell
+./execute.sh all
+```
+
 ---
 
 ## Why Tenmo?
