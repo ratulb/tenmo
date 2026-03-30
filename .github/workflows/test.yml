@@ -77,6 +77,12 @@ jobs:
           - npiop
 
     steps:
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenblas-dev
+
       - name: Install pixi
         run: |
           curl -fsSL https://pixi.sh/install.sh | sh
