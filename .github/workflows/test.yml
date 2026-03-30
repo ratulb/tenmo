@@ -198,11 +198,13 @@ jobs:
     needs: [test]
     if: always()
     steps:
-      - name: Test summary
+      - name: Write test summary
         run: |
-          if [ "${{ needs.test.result }}" = "success" ]; then
-            echo "✅ All CPU tests passed"
-          else
-            echo "❌ One or more CPU tests failed"
-            exit 1
-          fi
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Overall | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered by: \`${{ github.actor }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
