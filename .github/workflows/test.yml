@@ -14,7 +14,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false  # continue running other tests even if one fails
+      fail-fast: false
       matrix:
         test:
           - count_unique
@@ -46,6 +46,35 @@ jobs:
           - tensors
           - indexhelper
           - utils
+          - mmnd
+          - mv
+          - vm
+          - argminmax
+          - minmax
+          - repeat
+          - tiles
+          - linspace
+          - slice
+          - softmax
+          - flatten
+          - squeeze
+          - sgd
+          - matmul
+          - dropout
+          - stack
+          - concat
+          - std_variance
+          - variance
+          - pad
+          - fill
+          - chunk
+          - logarithm
+          - blas
+          - data
+          - scalar
+          - broadcast
+          - expand
+          - npiop
 
     steps:
       - name: Install pixi
@@ -62,6 +91,7 @@ jobs:
         run: pixi install
 
       - name: Run test — ${{ matrix.test }}
+        id: run_test
         run: |
           chmod +x execute.sh
           pixi run ./execute.sh ${{ matrix.test }}
@@ -69,3 +99,110 @@ jobs:
       - name: Report failure
         if: failure()
         run: echo "::error::Test '${{ matrix.test }}' FAILED"
+
+  test-gpu:
+    runs-on: self-hosted
+    if: false  # flip to true when a GPU self-hosted runner is registered
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - gpu
+          - gpusummean
+          - gpu_expand
+          - count_unique
+          - compare
+          - allany
+          - power
+          - onehot
+          - maxmin_scalar
+          - contiguous
+          - item
+          - intarray
+          - mm2d
+          - relu
+          - shuffle
+          - permute
+          - unsqueeze
+          - gradbox
+          - transpose
+          - ndb
+          - ce
+          - buffers
+          - views
+          - shapes
+          - shapebroadcast
+          - strides
+          - validators
+          - losses
+          - tanh
+          - tensors
+          - indexhelper
+          - utils
+          - mmnd
+          - mv
+          - vm
+          - argminmax
+          - minmax
+          - repeat
+          - tiles
+          - linspace
+          - slice
+          - softmax
+          - flatten
+          - squeeze
+          - sgd
+          - matmul
+          - dropout
+          - stack
+          - concat
+          - std_variance
+          - variance
+          - pad
+          - fill
+          - chunk
+          - logarithm
+          - blas
+          - data
+          - scalar
+          - broadcast
+          - expand
+          - npiop
+
+    steps:
+      - name: Install pixi
+        run: |
+          curl -fsSL https://pixi.sh/install.sh | sh
+          echo "$HOME/.pixi/bin" >> $GITHUB_PATH
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Install dependencies via pixi
+        run: pixi install
+
+      - name: Run GPU test — ${{ matrix.test }}
+        id: run_gpu_test
+        run: |
+          chmod +x execute.sh
+          pixi run ./execute.sh ${{ matrix.test }}
+
+      - name: Report failure
+        if: failure()
+        run: echo "::error::GPU Test '${{ matrix.test }}' FAILED"
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: always()
+    steps:
+      - name: Test summary
+        run: |
+          if [ "${{ needs.test.result }}" = "success" ]; then
+            echo "✅ All CPU tests passed"
+          else
+            echo "❌ One or more CPU tests failed"
+            exit 1
+          fi
