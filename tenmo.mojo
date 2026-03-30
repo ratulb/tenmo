@@ -34,7 +34,7 @@ from device import Device, CPU, GPU
 from sys.info import has_accelerator
 
 
-#struct Tensor[dtype: DType = DType.float32](
+# struct Tensor[dtype: DType = DType.float32](
 struct Tensor[dtype: DType](
     Copyable
     & Movable
@@ -1708,7 +1708,7 @@ struct Tensor[dtype: DType](
 
     fn exp[
         track_grad: Bool = True
-    ](self, requires_grad: Bool = False) -> Tensor[
+    ](self, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ] where Self.dtype.is_floating_point():
         constrained[
@@ -1717,7 +1717,7 @@ struct Tensor[dtype: DType](
         ]()
 
         return Exponential[Self.dtype].forward[track_grad=track_grad](
-            self, requires_grad=True
+            self, requires_grad=requires_grad
         )
 
     fn __neg__[track_grad: Bool = True](self) -> Tensor[Self.dtype]:

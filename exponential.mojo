@@ -56,10 +56,10 @@ struct Exponential[dtype: DType]:
                     out = Tensor[Self.dtype].scalar(0)
 
             else:
-                out = Self.generate_output(tensor)
+                out = Self.forward_cpu(tensor)
 
         else:
-            out = Self.generate_output(tensor)
+            out = Self.forward_cpu(tensor)
 
         @parameter
         if track_grad:
@@ -75,7 +75,7 @@ struct Exponential[dtype: DType]:
         return out^
 
     @staticmethod
-    fn generate_output(
+    fn forward_cpu(
         ref tensor: Tensor[Self.dtype],
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out: Tensor[Self.dtype]
