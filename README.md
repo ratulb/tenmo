@@ -6,6 +6,13 @@ Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differenti
 
 > ⚠️ **Development Status**: Tenmo is actively evolving alongside Mojo itself. The API is subject to change as we incorporate improvements from the Mojo ecosystem. Not production-ready yet, but excellent for learning, experimentation, and systems-level exploration.
 
+## Build Status
+
+![Mojo Tests](https://github.com/ratulb/tenmo/actions/workflows/test.yml/badge.svg?branch=development)
+![Last Commit](https://img.shields.io/github/last-commit/ratulb/tenmo/development)
+![License](https://img.shields.io/github/license/ratulb/tenmo)
+![Language](https://img.shields.io/badge/language-Mojo%20🔥-orange)
+![Open Issues](https://img.shields.io/github/issues/ratulb/tenmo)
 ---
 
 ## ⚡︎ Performance
@@ -31,7 +38,7 @@ Training the same 4-layer MLP (784→128→32→10) on identical hardware:
 **Why is Tenmo competitive?**
 - GPU overhead (kernel launch + data movement) dominates for small MNIST models
 - Tenmo benefits from:
-  - Zero Python overhead 
+  - Zero Python overhead
   - SIMD-vectorized operations on contiguous buffers
   - Zero-copy batch loading
   - Compile-time specialization (eliminates graph overhead in eval mode)
@@ -89,14 +96,14 @@ fn main() raises:
       [3.0, 3.0, 3.0, 3.0],
       [3.0, 3.0, 3.0, 3.0]
     ]
-  ] 
+  ]
 A's gradients
 
  [2D Gradbox(2, 3), Type: float32, Shared : False, Strides : (3, 1), Offset : 0]
   [
     [4.0, 4.0, 4.0],
     [4.0, 4.0, 4.0]
-  ]  
+  ]
 
 ```
 #### Solve XOR
@@ -252,16 +259,16 @@ Buffer[dtype: DType]
 
 ### Design Rationale
 
-**Gradbox is not a Tensor**  
+**Gradbox is not a Tensor**
 Gradients don't need the full Tensor API. A `Gradbox` encapsulates only an `NDBuffer`, keeping gradient storage minimal and explicit — **70% less code than full Tensors**.
 
-**NDBuffer as Single Source of Truth**  
+**NDBuffer as Single Source of Truth**
 Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both `Tensor` and `Gradbox`. This ensures views, slicing, and broadcasting behave consistently across the system.
 
-**Views are cheap**  
+**Views are cheap**
 `Buffer` is linear and becomes reference-counted when views are created. Views share storage without copying — which provides zero-cost slicing.
 
-**Backpropagation**  
+**Backpropagation**
 The innermost linear buffer is shared (ref-counted) between user tensors and the autograd engine, ensuring gradients flow correctly through the computation graph.
 
 This architecture keeps the system **explicit, predictable, and close to the metal**.
@@ -326,8 +333,8 @@ Full training pipeline with data loading, batching, and validation:
 ./example.sh mnist
 ```
 
-**Architecture**: 784 → 128 → 32 → 10  
-**Training**: 15 epochs, batch_size=64, lr=0.01, momentum=0.9  
+**Architecture**: 784 → 128 → 32 → 10
+**Training**: 15 epochs, batch_size=64, lr=0.01, momentum=0.9
 **Results**: 97.44% test accuracy in 171 seconds
 
 **Training Progression** (Tenmo on CPU):
@@ -388,7 +395,7 @@ for batch in train_loader:
 - [ ] Aggressive performance optimization of core components
 - [ ] Checkpointing: Model serialization and loading
 - [ ] Additional Layers: BatchNorm, LayerNorm
-      
+
 ### Medium Term
 - [ ] Transparent GPU Support: Unified CPU/GPU tensor operations
 - [ ] Investigate memory-efficient ancestry tracking for autodiff.
