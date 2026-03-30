@@ -17,6 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         test:
+          - transmute
           - count_unique
           - compare
           - allany
@@ -113,6 +114,7 @@ jobs:
       fail-fast: false
       matrix:
         test:
+          - transmute
           - gpu
           - gpusummean
           - gpu_expand
