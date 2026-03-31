@@ -50,6 +50,7 @@ struct NDBuffer[dtype: DType](
     & Stringable
     & Representable
     & Writable
+    & Sized
 ):
     var shape: Shape
     var strides: Strides
@@ -682,6 +683,10 @@ struct NDBuffer[dtype: DType](
         return self.shape.num_elements()
 
     @always_inline
+    fn __len__(self) -> Int:
+        return self.shape.num_elements()
+
+    @always_inline
     fn rank(self) -> Int:
         return self.shape.rank()
 
@@ -911,8 +916,38 @@ struct NDBuffer[dtype: DType](
             print(e)
             panic("Error reshaping device buffer")
             # Unreachable
-            out = NDBuffer[Self.dtype](Shape())
+            out = NDBuffer[Self.dtype].Empty()
         return out^
+
+    fn map_where(
+        self, pred: fn (Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    var mapped_ds = DeviceState[Self.dtype].map_where(
+                        self, pred, value
+                    )
+                    return NDBuffer[Self.dtype].with_device_state(
+                        mapped_ds^, self.shape
+                    )
+                except e:
+                    print(e)
+                    panic("NDBuffer mapp_where error")
+                    return NDBuffer[Self.dtype].Empty()
+            else:
+                return self.map_where_cpu(pred, value)
+        return self.map_where_cpu(pred, value)
+
+    @always_inline
+    fn map_where_cpu(
+        self, pred: fn (Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
+    ) -> NDBuffer[Self.dtype]:
+        var buffer = Buffer[Self.dtype](len(self))
+        for index in self.index_iterator():
+            buffer[index] = value if pred(self[index]) else self[index]
+        return NDBuffer[Self.dtype](buffer^, self.shape)
 
     fn map[
         map_buffer: fn (Buffer[Self.dtype]) -> Buffer[Self.dtype],

@@ -766,6 +766,15 @@ struct Tensor[dtype: DType](
     fn fill(self, value: Scalar[Self.dtype]):
         self.buffer.fill(value)
 
+    fn map_where(
+        self,
+        pred: fn (Scalar[Self.dtype]) -> Bool,
+        value: Scalar[Self.dtype],
+        requires_grad: Bool = False,
+    ) -> Tensor[Self.dtype]:
+        var ndb = self.buffer.map_where(pred, value)
+        return Tensor[Self.dtype](ndb^, requires_grad=requires_grad)
+
     @staticmethod
     fn full_like(
         like: Tensor[Self.dtype],
@@ -1070,20 +1079,31 @@ struct Tensor[dtype: DType](
         indices: Tensor[Self.dtype],
         num_classes: Int,
         device: Optional[Device] = None,
+        ignore_index: Optional[Int] = None,
     ) -> Tensor[Self.dtype]:
         """Convert tensor of class indices to one-hot encoding.
         Args:
             indices: Tensor of shape (...,) containing class indices.
             num_classes: Number of classes.
-            device: Target device. Defaults to same device as indices.
+            device: Target device.
+            ignore_index: If provided, rows where index == ignore_index become all zeros.
         Returns: Tensor of shape (..., num_classes).
         """
         var shape = indices.shape()
         var target_device = device.or_else(indices.device())
-        var result = Tensor[Self.dtype].zeros(shape + [num_classes])
+        var result = Tensor[Self.dtype].zeros(
+            shape + [num_classes], device=target_device
+        )
+
+        var ignore_val = ignore_index.or_else(-1000000)  # sentinel
 
         for coord in shape:
             var class_index = indices[coord].__int__()
+
+            # Skip ignored indices entirely — leave row as zeros
+            if ignore_index and class_index == ignore_val:
+                continue
+
             if class_index < 0 or class_index >= num_classes:
                 panic(
                     "Tensor → onehot: invalid class",
@@ -1093,19 +1113,6 @@ struct Tensor[dtype: DType](
                 )
             var onehot_coord = coord + class_index
             result[onehot_coord] = Scalar[Self.dtype](1)
-
-        # Transfer to target device if needed
-        @parameter
-        if has_accelerator():
-            if target_device.is_gpu():
-                try:
-                    return result.to_gpu(target_device.kind[GPU])
-                except e:
-                    panic(
-                        "Tensor → onehot: device transfer failed: "
-                        + e.__str__()
-                    )
-                    return result^  # unreachable
 
         return result^
 
@@ -2209,6 +2216,13 @@ struct Tensor[dtype: DType](
             self, IntArray(axes), requires_grad
         )
 
+    fn unsqueeze_unshared(
+        self, *axes: Int, requires_grad: Optional[Bool] = None
+    ) -> Tensor[Self.dtype]:
+        return Unsqueeze[Self.dtype].forward_unshared(
+            self, IntArray(axes), requires_grad
+        )
+
     fn unsqueeze[
         track_grad: Bool = True
     ](mut self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[
@@ -2253,6 +2267,11 @@ struct Tensor[dtype: DType](
         return Permute[Self.dtype].forward[track_grad](
             self, axes, requires_grad
         )
+
+    fn permute_unshared(
+        self, axes: IntArray, requires_grad: Optional[Bool] = None
+    ) -> Tensor[Self.dtype]:
+        return Permute[Self.dtype].forward_unshared(self, axes, requires_grad)
 
     fn argmax(
         self, axis: Int = 0, keepdims: Bool = False

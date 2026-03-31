@@ -35,7 +35,7 @@ from shuffle import ShuffleBackward
 from relu import ReLUBackward
 from softmax import SoftmaxBackward, LogSoftmaxBackward
 from logarithm import LogBackward
-from crossentropy import CrossEntropyBackward
+from crossentropy import CEClassIndicesBackward, CEProbabilitiesBackward
 from tiles import TileBackward
 from flatten import FlattenBackward
 from contiguous import ContiguousBackward

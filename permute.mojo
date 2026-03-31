@@ -70,3 +70,19 @@ struct Permute[dtype: DType]:
                 out.add_ancestry(self)
 
         return out^
+
+    @staticmethod
+    fn forward_unshared(
+        self: Tensor[Self.dtype],
+        axes: IntArray,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """
+        Takes unmutable self. Creates a copy of 'buffer'.
+        Original buffer is not muted.
+        """
+        var buffer = self.buffer.copy()
+        var result_ndb = buffer.permute(axes, shared=False)
+        return Tensor[Self.dtype](
+            result_ndb^, requires_grad=requires_grad.or_else(False)
+        )

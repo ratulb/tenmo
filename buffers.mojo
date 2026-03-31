@@ -2530,6 +2530,19 @@ struct Buffer[dtype: DType = DType.float32](
                 return True
         return False
 
+    @always_inline
+    fn map_where(
+        self: Buffer[Self.dtype],
+        pred: fn (Scalar[Self.dtype]) -> Bool,
+        value: Scalar[Self.dtype],
+    ) -> Buffer[Self.dtype]:
+        """Apply predicate to each element, setting value where predicate holds,
+        returning a new buffer."""
+        var out = Buffer[Self.dtype](self.size)
+        for i in range(self.size):
+            out[i] = value if pred(self[i]) else self[i]
+        return out^
+
     fn string(self) -> String:
         var result = "Buffer["
 

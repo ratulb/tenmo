@@ -147,7 +147,6 @@ struct Gradbox[dtype: DType](
         var result_ndb = self_buffer.permute(axes, shared=False)
         return Gradbox[Self.dtype](result_ndb^, share=False)
 
-
     @staticmethod
     @always_inline
     fn full(
@@ -195,22 +194,8 @@ struct Gradbox[dtype: DType](
         )
 
     @always_inline
-    fn detach(self) -> Gradbox[Self.dtype]:
-        if self.is_on_cpu():
-            return Gradbox[Self.dtype](self.buffer.contiguous(), share=False)
-        else:
-            try:
-                return Gradbox[Self.dtype](
-                    self.buffer.device_state.value().into(self.shape()),
-                    share=False,
-                )
-            except e:
-                print(e)
-                panic("Gradbox → detach: failed.", e.__str__())
-                # Unreachable
-                return Gradbox[Self.dtype](
-                    NDBuffer[Self.dtype](Shape()), share=False
-                )
+    fn detach(self, share: Bool = False) -> Gradbox[Self.dtype]:
+        return Gradbox[Self.dtype](self.buffer.contiguous(), share=share)
 
     fn shared(self) -> Bool:
         return self.buffer.shared()

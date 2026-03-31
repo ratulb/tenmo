@@ -66,3 +66,18 @@ struct Unsqueeze[dtype: DType]:
                 out.add_ancestry(tensor)
 
         return out^
+
+    @staticmethod
+    fn forward_unshared(
+        tensor: Tensor[Self.dtype],
+        axes: IntArray,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        if len(axes) == 0:
+            return tensor.copy()
+
+        var buffer = tensor.buffer.copy()
+        var unsqueezed_ndb = buffer.unsqueeze(axes, shared=False)
+        return Tensor[Self.dtype](
+            unsqueezed_ndb^, requires_grad=requires_grad.or_else(False)
+        )

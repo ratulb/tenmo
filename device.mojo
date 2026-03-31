@@ -348,6 +348,25 @@ struct DeviceState[dtype: DType](
             self.sync()
         return device_state
 
+    @staticmethod
+    fn map_where(
+        ref ndb: NDBuffer[Self.dtype],
+        pred: fn (Scalar[Self.dtype]) -> Bool,
+        value: Scalar[Self.dtype],
+        sync: Bool = True,
+    ) raises -> DeviceState[Self.dtype]:
+        ref src_device_state = ndb.device_state.value()
+        var dst_device_state = DeviceState[Self.dtype](len(ndb), ndb.get_gpu())
+        with src_device_state.buffer.map_to_host() as src, dst_device_state.buffer.map_to_host() as dst:
+            for index in ndb.index_iterator():
+                dst[index] = value.cast[Self.datatype]() if pred(
+                    src[index].cast[Self.dtype]()
+                ) else src[index].cast[Self.datatype]()
+        if sync:
+            dst_device_state.sync()
+
+        return dst_device_state
+
     fn fill(self, value: Scalar[Self.dtype], sync: Bool = True) raises:
         with self.buffer.map_to_host() as host_buffer:
 

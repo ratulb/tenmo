@@ -20,50 +20,51 @@ comptime BACKWARD_SIGMOID = 7
 comptime BACKWARD_ADD_BROADCAST = 8
 comptime BACKWARD_MULTIPLY_BROADCAST = 9
 comptime BACKWARD_SOFTMAX = 10
-comptime BACKWARD_CROSS_ENTROPY = 11
-comptime BACKWARD_TANH = 12
-comptime BACKWARD_SUB = 13
-comptime BACKWARD_RESHAPE = 14
-comptime BACKWARD_VIEW = 15
-comptime BACKWARD_MEAN = 16
-comptime BACKWARD_SUM = 17
-comptime BACKWARD_LOG_SOFTMAX = 18
-comptime BACKWARD_CONTIGUOUS = 19
-comptime BACKWARD_DIVIDE = 20
-comptime BACKWARD_MATRIX_VECTOR_MUL = 21
-comptime BACKWARD_VECTOR_MATMUL = 22
-comptime BACKWARD_ADD_SCALAR = 23
-comptime BACKWARD_MULTIPLY_SCALAR = 24
-comptime BACKWARD_SUB_SCALAR = 25
-comptime BACKWARD_DIV_SCALAR = 26
-comptime BACKWARD_RIGHT_DIV_SCALAR = 27
-comptime BACKWARD_EXPONENTIATION = 28
-comptime BACKWARD_DOT = 29
-comptime BACKWARD_EXPAND = 30
-comptime BACKWARD_FLATTEN = 31
-comptime BACKWARD_SQUEEZE = 32
-comptime BACKWARD_UNSQUEEZE = 33
-comptime BACKWARD_SHUFFLE = 34
-comptime BACKWARD_MINMAX = 35
-comptime BACKWARD_TILE = 36
-comptime BACKWARD_LOG = 37
-comptime BACKWARD_SQRT = 38
-comptime BACKWARD_CLIP = 39
-comptime BACKWARD_VARIANCE = 40
-comptime BACKWARD_STD = 41
-comptime BACKWARD_SUBTRACT_BROADCAST = 42
-comptime BLAS_BACKWARD_MATMUL_2D = 43
-comptime BACKWARD_CONCAT = 44
-comptime BACKWARD_STACK = 45
-comptime BACKWARD_PAD = 46
-comptime BACKWARD_FUSED_CONV = 47
-comptime BACKWARD_MAXPOOL2D = 48
-comptime BACKWARD_DROPOUT = 49
-comptime BACKWARD_EXPONENTIAL = 50
-comptime BACKWARD_DEVICE_TRANSFER = 51
-comptime BACKWARD_MINMAX_GPU = 52
-comptime BACKWARD_MAX_SCALAR = 53
-comptime BACKWARD_MIN_SCALAR = 54
+comptime BACKWARD_CE_CLASS_INDICES = 11
+comptime BACKWARD_CE_PROBABILITIES = 12
+comptime BACKWARD_TANH = 13
+comptime BACKWARD_SUB = 14
+comptime BACKWARD_RESHAPE = 15
+comptime BACKWARD_VIEW = 16
+comptime BACKWARD_MEAN = 17
+comptime BACKWARD_SUM = 18
+comptime BACKWARD_LOG_SOFTMAX = 19
+comptime BACKWARD_CONTIGUOUS = 20
+comptime BACKWARD_DIVIDE = 21
+comptime BACKWARD_MATRIX_VECTOR_MUL = 22
+comptime BACKWARD_VECTOR_MATMUL = 23
+comptime BACKWARD_ADD_SCALAR = 24
+comptime BACKWARD_MULTIPLY_SCALAR = 25
+comptime BACKWARD_SUB_SCALAR = 26
+comptime BACKWARD_DIV_SCALAR = 27
+comptime BACKWARD_RIGHT_DIV_SCALAR = 28
+comptime BACKWARD_EXPONENTIATION = 29
+comptime BACKWARD_DOT = 30
+comptime BACKWARD_EXPAND = 31
+comptime BACKWARD_FLATTEN = 32
+comptime BACKWARD_SQUEEZE = 33
+comptime BACKWARD_UNSQUEEZE = 34
+comptime BACKWARD_SHUFFLE = 35
+comptime BACKWARD_MINMAX = 36
+comptime BACKWARD_TILE = 37
+comptime BACKWARD_LOG = 38
+comptime BACKWARD_SQRT = 39
+comptime BACKWARD_CLIP = 40
+comptime BACKWARD_VARIANCE = 41
+comptime BACKWARD_STD = 42
+comptime BACKWARD_SUBTRACT_BROADCAST = 43
+comptime BLAS_BACKWARD_MATMUL_2D = 44
+comptime BACKWARD_CONCAT = 45
+comptime BACKWARD_STACK = 46
+comptime BACKWARD_PAD = 47
+comptime BACKWARD_FUSED_CONV = 48
+comptime BACKWARD_MAXPOOL2D = 49
+comptime BACKWARD_DROPOUT = 50
+comptime BACKWARD_EXPONENTIAL = 51
+comptime BACKWARD_DEVICE_TRANSFER = 52
+comptime BACKWARD_MINMAX_GPU = 53
+comptime BACKWARD_MAX_SCALAR = 54
+comptime BACKWARD_MIN_SCALAR = 55
 # ========== Delegate (Variant) ==========
 
 comptime Delegate[dtype: DType] = Variant[
@@ -81,7 +82,8 @@ comptime Delegate[dtype: DType] = Variant[
     ReshapeBackward[dtype],
     ViewBackward[dtype],
     TransposeBackward[dtype],
-    CrossEntropyBackward[dtype],
+    CEClassIndicesBackward[dtype],
+    CEProbabilitiesBackward[dtype],
     ContiguousBackward[dtype],
     MultiplyBackwardScalar[dtype],
     MultiplyBackward[dtype],
@@ -218,8 +220,12 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.tag == BACKWARD_VIEW:
             return self.grad_fn[ViewBackward[Self.dtype]].backward(output)
 
-        elif self.tag == BACKWARD_CROSS_ENTROPY:
-            return self.grad_fn[CrossEntropyBackward[Self.dtype]].backward(
+        elif self.tag == BACKWARD_CE_CLASS_INDICES:
+            return self.grad_fn[CEClassIndicesBackward[Self.dtype]].backward(
+                output
+            )
+        elif self.tag == BACKWARD_CE_PROBABILITIES:
+            return self.grad_fn[CEProbabilitiesBackward[Self.dtype]].backward(
                 output
             )
 

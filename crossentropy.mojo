@@ -3,27 +3,33 @@ from shapes import Shape
 from common_utils import panic
 from math import log, exp
 from subtraction import Subtractor
-from backpropagation import Delegate, BackwardFn, BACKWARD_CROSS_ENTROPY
-from mnemonics import AddTensor
+from backpropagation import (
+    Delegate,
+    BackwardFn,
+    BACKWARD_CE_CLASS_INDICES,
+    BACKWARD_CE_PROBABILITIES,
+)
+from mnemonics import AddTensor, NotEqual
 from buffers import Buffer
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from intarray import IntArray
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Reduction
+# ═══════════════════════════════════════════════════════════════════════════════
+
 
 @register_passable
-struct Reduction(Copyable, Equatable, ImplicitlyCopyable):
+struct Reduction(ImplicitlyCopyable):
     var reduction: Int
-    comptime Mean = Reduction(0)
-    comptime Sum = Reduction(1)
-    comptime `None` = Reduction(2)
 
     fn __init__(out self, reduction: Int = 0):
         self.reduction = reduction
         if reduction < 0 or reduction > 2:
             panic(
-                "Invalid reduction type. Must be '0 → mean', '1 → sum', or '2 →"
-                " none'"
+                "Reduction: must be 0=mean, 1=sum, 2=none, got "
+                + reduction.__str__()
             )
 
     fn __init__(out self, reduction: String):
@@ -35,23 +41,826 @@ struct Reduction(Copyable, Equatable, ImplicitlyCopyable):
             self.reduction = 2
         else:
             self.reduction = -1
-            panic("Invalid reduction type. Must be 'mean', 'sum', or 'none'")
+            panic(
+                "Reduction: must be 'mean', 'sum', or 'none', got '"
+                + reduction
+                + "'"
+            )
 
     fn __copyinit__(out self, existing: Self):
         self.reduction = existing.reduction
 
-    fn __eq__(self, other: Self) -> Bool:
-        return self.reduction == other.reduction
+    fn is_mean(self) -> Bool:
+        return self.reduction == 0
 
-    fn __ne__(self, other: Self) -> Bool:
-        return not (self == other)
+    fn is_sum(self) -> Bool:
+        return self.reduction == 1
 
-    fn value(self) -> Int:
-        return self.reduction
+    fn is_none(self) -> Bool:
+        return self.reduction == 2
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  Cetralized validation
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+struct CEValidation[dtype: DType]:
+    @staticmethod
+    fn validate_label_smoothing(ls: Scalar[Self.dtype]):
+        if ls < 0 or ls > 1:
+            panic(
+                "CrossEntropyLoss: label_smoothing must be in [0, 1], got "
+                + ls.__str__()
+            )
+
+    @staticmethod
+    fn validate_logits_rank(logits_shape: Shape):
+        if logits_shape.rank() < 2:
+            panic(
+                "CrossEntropyLoss: logits must have rank ≥ 2 (N, C, ...), got"
+                " rank "
+                + logits_shape.rank().__str__()
+            )
+
+    @staticmethod
+    fn validate_class_indices_shapes(
+        logits_shape: Shape,
+        target_shape: Shape,
+    ):
+        """
+        Logits: (N, C, d1, ..., dk).
+        target: (N, d1, ..., dk).
+        → target rank must be logits_rank - 1.
+        → batch size and all spatial dims must match.
+        """
+        var rank = logits_shape.rank()
+        CEValidation[Self.dtype].validate_logits_rank(logits_shape)
+
+        if logits_shape[0] != target_shape[0]:
+            panic(
+                "CrossEntropyLoss: batch size mismatch — logits N="
+                + logits_shape[0].__str__()
+                + ", target N="
+                + target_shape[0].__str__()
+            )
+
+        if rank > 2:
+            var expected_target_rank = rank - 1
+            if target_shape.rank() != expected_target_rank:
+                panic(
+                    "CrossEntropyLoss: for logits rank "
+                    + rank.__str__()
+                    + ", target must have rank "
+                    + expected_target_rank.__str__()
+                    + ", got "
+                    + target_shape.rank().__str__()
+                )
+            for i in range(2, rank):
+                if logits_shape[i] != target_shape[i - 1]:
+                    panic(
+                        "CrossEntropyLoss: spatial dim mismatch at logits axis "
+                        + i.__str__()
+                        + " — logits="
+                        + logits_shape[i].__str__()
+                        + ", target="
+                        + target_shape[i - 1].__str__()
+                    )
+        elif rank == 2:
+            if target_shape.rank() != 1:
+                panic(
+                    "CrossEntropyLoss: for 2D logits (N,C), target must be 1D"
+                    " (N,), got rank "
+                    + target_shape.rank().__str__()
+                )
+
+    @staticmethod
+    fn validate_probability_shapes(
+        logits_shape: Shape,
+        target_shape: Shape,
+    ):
+        """Logits and target must have identical shapes."""
+        CEValidation[Self.dtype].validate_logits_rank(logits_shape)
+        if logits_shape != target_shape:
+            panic(
+                "CrossEntropyLoss: for probability targets, logits and target"
+                " must have identical shapes. Got logits="
+                + logits_shape.__str__()
+                + ", target="
+                + target_shape.__str__()
+            )
+
+    @staticmethod
+    fn validate_target_indices(
+        target: Tensor[DType.int32],
+        num_classes: Int,
+        ignore_index: Int,
+    ):
+        """
+        All target indices must be in [0, num_classes) or == ignore_index.
+        ignore_index is always valid regardless of its value.
+        """
+        for coord in target.shape():
+            var idx = target[coord].__int__()
+            if idx == ignore_index:
+                continue  # always valid
+            if idx < 0 or idx >= num_classes:
+                panic(
+                    "CrossEntropyLoss: target index "
+                    + idx.__str__()
+                    + " at coordinate "
+                    + coord.__str__()
+                    + " is out of range [0, "
+                    + num_classes.__str__()
+                    + ")"
+                )
+
+    @staticmethod
+    fn validate_num_classes(C: Int):
+        if C < 1:
+            panic(
+                "CrossEntropyLoss: num_classes C must be ≥ 1, got "
+                + C.__str__()
+            )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CECommon — shared utilities for forward and backward
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+struct CECommon[dtype: DType]:
+    @staticmethod
+    fn flatten_spatial_class_indices(
+        logits: Tensor[Self.dtype],
+        target: Tensor[DType.int32],
+    ) -> Tuple[
+        NDBuffer[Self.dtype],  # logits_2d (M, C)
+        NDBuffer[DType.int32],  # target_1d (M,)
+        Int,  # M
+        Int,  # C
+        Shape,  # spatial_shape (for reshaping output)
+        Int,  # N
+    ]:
+        """
+        Flatten (N, C, d1..dk) → (M, C) and (N, d1..dk) → (M,).
+        Permutes logits so class dim is last before flattening.
+        Returns NDBuffers — safe to store in backward structs.
+        """
+        var logits_shape = logits.shape()
+        var N = logits_shape[0]
+        var C = logits_shape[1]
+        var rank = logits_shape.rank()
+
+        var M = N
+        var spatial_dims = IntArray.with_capacity(rank - 2)
+        if rank > 2:
+            for i in range(2, rank):
+                M *= logits_shape[i]
+                spatial_dims.append(logits_shape[i])
+
+        var logits_2d: Tensor[Self.dtype]
+        if rank == 2:
+            logits_2d = logits.reshape[track_grad=False](Shape(M, C))
+        else:
+            # Permute (N, C, d1..dk) → (N, d1..dk, C) then reshape to (M, C)
+            var perm = IntArray.with_capacity(rank)
+            perm.append(0)
+            for i in range(2, rank):
+                perm.append(i)
+            perm.append(1)
+            logits_2d = logits.permute_unshared(perm).reshape[track_grad=False](
+                Shape(M, C)
+            )
+
+        var target_1d = target.reshape[track_grad=False](Shape(M))
+        var spatial_shape = (
+            Shape(spatial_dims) if len(spatial_dims) > 0 else Shape()
+        )
+
+        return (
+            logits_2d.buffer,
+            target_1d.buffer,
+            M,
+            C,
+            spatial_shape,
+            N,
+        )
+
+    @staticmethod
+    fn flatten_spatial_probabilities(
+        logits: Tensor[Self.dtype],
+        target: Tensor[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype],  # logits_2d (M, C)
+        NDBuffer[Self.dtype],  # target_2d (M, C)
+        Int,  # M
+        Int,  # C
+        Shape,  # spatial_shape
+        Int,  # N
+    ]:
+        """Flatten probability targets — both logits and target (M, C)."""
+        var logits_shape = logits.shape()
+        var N = logits_shape[0]
+        var C = logits_shape[1]
+        var rank = logits_shape.rank()
+
+        var M = N
+        var spatial_dims = IntArray.with_capacity(rank - 2)
+        if rank > 2:
+            for i in range(2, rank):
+                M *= logits_shape[i]
+                spatial_dims.append(logits_shape[i])
+
+        var logits_2d = logits.reshape[track_grad=False](Shape(M, C)).buffer
+        var target_2d = target.reshape[track_grad=False](Shape(M, C)).buffer
+        var spatial_shape = (
+            Shape(spatial_dims) if len(spatial_dims) > 0 else Shape()
+        )
+
+        return logits_2d, target_2d, M, C, spatial_shape, N
+
+    @staticmethod
+    fn build_ignore_mask(
+        target_1d: NDBuffer[DType.int32],
+        ignore_index: Int,
+    ) -> NDBuffer[Self.dtype]:
+        """
+        Build float mask: 1.0 where target != ignore_index, 0.0 where ignored.
+        Used both in forward (zero losses) and backward (zero gradients).
+        GPU safe: compare_scalar returns NDBuffer[DType.bool] → to_dtype.
+        """
+        return target_1d.compare_scalar[NotEqual](
+            Scalar[DType.int32](ignore_index)
+        ).to_dtype[Self.dtype]()
+
+    @staticmethod
+    fn apply_reduction(
+        losses: NDBuffer[Self.dtype],
+        reduction: Reduction,
+        N: Int,
+        spatial_shape: Shape,
+        valid_count: Int,
+    ) -> Tensor[Self.dtype]:
+        """Apply reduction to per-sample losses (M,)."""
+        var losses_t = Tensor[Self.dtype](losses)
+
+        if reduction.is_none():
+            # Reshape (M,) → (N, d1..dk)
+            var spatial_rank = spatial_shape.rank()
+            if spatial_rank == 0:
+                return losses_t.reshape[track_grad=False](Shape(N))
+            var out_dims = IntArray.with_capacity(spatial_rank + 1)
+            out_dims.append(N)
+            for i in range(spatial_rank):
+                out_dims.append(spatial_shape[i])
+            return losses_t.reshape[track_grad=False](Shape(out_dims))
+        elif reduction.is_sum():
+            return losses_t.sum()
+        else:  # mean
+            var total = losses_t.sum()
+            if valid_count > 0:
+                return total / Scalar[Self.dtype](valid_count)
+            return total
+
+    @staticmethod
+    fn compute_log_softmax_and_softmax(
+        logits_2d: NDBuffer[Self.dtype],
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
+        """
+        Returns (log_softmax, softmax) along axis=1.
+        GPU safe — log_softmax and softmax are both GPU ready.
+        Returns NDBuffers — safe for backward storage.
+        """
+        var logits_t = Tensor[Self.dtype](logits_2d, requires_grad=False)
+        var log_probs = logits_t.softmax[log=True, track_grad=False](
+            axes=[1]
+        ).buffer
+        var probs = logits_t.softmax[track_grad=False](axes=[1]).buffer
+        return log_probs, probs
+
+    @staticmethod
+    fn scale_grad_by_upstream(
+        grad: NDBuffer[Self.dtype],
+        upstream: Gradbox[Self.dtype],
+        reduction: Reduction,
+        valid_count: Int,
+        M: Int,
+        C: Int,
+    ) -> NDBuffer[Self.dtype]:
+        """
+        Scale gradient by upstream grad and reduction factor.
+        For none reduction: broadcast upstream (M,) → (M, C).
+        For mean/sum: scalar multiply.
+        GPU safe: all arithmetic ops.
+        """
+        var grad_t = Tensor[Self.dtype](grad, requires_grad=False)
+
+        if reduction.is_none():
+            var ug = Tensor[Self.dtype](upstream.buffer, requires_grad=False)
+            var ug_expanded = ug.unsqueeze(-1).broadcast_to(Shape(M, C))
+            return (grad_t * ug_expanded).buffer
+        else:
+            var ug_scalar = (
+                Tensor[Self.dtype](upstream.buffer, requires_grad=False)
+                .sum()
+                .item()
+            )
+            var scale = Scalar[Self.dtype](
+                valid_count if reduction.is_mean() and valid_count > 0 else 1
+            )
+            return (grad_t * (ug_scalar / scale)).buffer
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CEClassIndicesBackward
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+@fieldwise_init
+struct CEClassIndicesBackward[dtype: DType](
+    Copyable & Movable & ImplicitlyCopyable
+):
+    """
+    Backward for class index targets.
+
+    grad[m,c] = (softmax[m,c] - (1-ls)*onehot[m,c] - ls/C)
+                * ignore_mask[m] * upstream / scale
+
+    Stores NDBuffers only — no Tensor (avoids self-recursive Tensor struct).
+    """
+
+    comptime TAG = BACKWARD_CE_CLASS_INDICES
+    var softmax_probs: NDBuffer[Self.dtype]  # shape (M, C)
+    var target_1d: NDBuffer[DType.int32]  # shape (M,) — ORIGINAL values
+    var logits_shape: Shape  # original logits shape
+    var rank: Int
+    var reduction: Reduction
+    var ignore_index: Int
+    var label_smoothing: Scalar[Self.dtype]
+    var valid_count: Int
+    var M: Int
+    var C: Int
+
+    fn __copyinit__(out self, other: Self):
+        self.softmax_probs = other.softmax_probs
+        self.target_1d = other.target_1d
+        self.logits_shape = other.logits_shape
+        self.rank = other.rank
+        self.reduction = other.reduction
+        self.ignore_index = other.ignore_index
+        self.label_smoothing = other.label_smoothing
+        self.valid_count = other.valid_count
+        self.M = other.M
+        self.C = other.C
+
+    fn __moveinit__(out self, deinit other: Self):
+        self.softmax_probs = other.softmax_probs^
+        self.target_1d = other.target_1d^
+        self.logits_shape = other.logits_shape
+        self.rank = other.rank
+        self.reduction = other.reduction
+        self.ignore_index = other.ignore_index
+        self.label_smoothing = other.label_smoothing
+        self.valid_count = other.valid_count
+        self.M = other.M
+        self.C = other.C
+
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
+
+    fn backward(
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref upstream = output.gradients()[]
+        var logits = output.ancestry().get(0)
+
+        _ = """var device = Tensor[Self.dtype](
+            self.softmax_probs, requires_grad=False
+        ).device()"""
+        var device = upstream.device()
+
+        # Step 1: grad = softmax — (M, C)
+        var grad_t = Tensor[Self.dtype](self.softmax_probs, requires_grad=False)
+
+        # Step 2: Build onehot from target — ignore_index rows → all zeros
+        # onehot with ignore_index: those rows stay zero (no subtraction needed)
+        # var target_t = Tensor[DType.int32](self.target_1d, requires_grad=False)
+        var target_t = Tensor[Self.dtype](
+            self.target_1d.to_dtype[Self.dtype](), requires_grad=False
+        )
+        var onehot = Tensor[Self.dtype].onehot(
+            # target_t.to_dtype[DType.float32](),
+            target_t,
+            self.C,
+            device,
+            ignore_index=self.ignore_index,
+        )
+
+        # Step 3: Apply smoothing
+        var ls = self.label_smoothing
+        if ls > Scalar[Self.dtype](0):
+            var ls_uniform = ls / Scalar[Self.dtype](self.C)
+            grad_t = grad_t - onehot * (Scalar[Self.dtype](1) - ls) - ls_uniform
+        else:
+            grad_t = grad_t - onehot
+
+        # Step 4: Zero out ignored positions via ignore mask
+        # ignore_mask: 1=valid, 0=ignored — built from ORIGINAL target
+        var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
+            self.target_1d, self.ignore_index
+        )
+        var ignore_mask_2d = (
+            Tensor[Self.dtype](ignore_mask, requires_grad=False)
+            .unsqueeze_unshared(-1)
+            .broadcast_to(Shape(self.M, self.C))
+        )
+        grad_t = grad_t * ignore_mask_2d
+
+        # Step 5: Scale by upstream grad and reduction
+        var scaled = CECommon[Self.dtype].scale_grad_by_upstream(
+            grad_t.buffer,
+            upstream,
+            self.reduction,
+            self.valid_count,
+            self.M,
+            self.C,
+        )
+
+        # Step 6: Reshape back to original logits shape
+        var grad_final = Gradbox[Self.dtype](scaled^, share=False).reshape(
+            self.logits_shape
+        )
+        # Step 6: Reshape and UNPERMUTE back to original logits shape
+        var rank = self.logits_shape.rank()
+        if rank > 2:
+            # Reshape (M, C) → (N, d1..dk, C)
+            var intermediate_dims = IntArray()
+            intermediate_dims.append(self.logits_shape[0])  # N
+            for i in range(2, rank):
+                intermediate_dims.append(self.logits_shape[i])  # d1..dk
+            intermediate_dims.append(self.logits_shape[1])  # C last
+            var reshaped = grad_final.reshape(Shape(intermediate_dims))
+            # Unpermute: (N, d1..dk, C) → (N, C, d1..dk)
+            # Forward perm was [0, 2, 3, ..., rank-1, 1]
+            # Inverse perm is  [0, rank-1, 1, 2, ..., rank-2]
+            var inv_perm = IntArray.with_capacity(rank)
+            inv_perm.append(0)  # N stays first
+            inv_perm.append(rank - 1)  # C was last → move to dim 1
+            for i in range(1, rank - 1):
+                inv_perm.append(i)  # d1..dk shift right
+            grad_final = reshaped.permute(inv_perm)
+        else:
+            grad_final = grad_final.reshape(self.logits_shape)
+
+        return [(logits^, grad_final, AddTensor)]
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CEClassIndicesForward
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+struct CEClassIndicesForward[dtype: DType]:
+    """
+    Forward pass for class index targets.
+
+    Steps:
+        1. Flatten spatial: logits (N,C,d..) → (M,C), target → (M,)
+        2. log_softmax + softmax along C dim
+        3. ignore_mask from original target
+        4. onehot from target (ignore_index rows → all zeros via onehot)
+        5. NLL with optional label smoothing
+        6. Zero losses at ignored positions
+        7. Apply reduction
+        8. Attach backward
+    """
+
+    @staticmethod
+    fn forward[
+        track_grad: Bool
+    ](
+        logits: Tensor[Self.dtype],
+        target: Tensor[DType.int32],
+        reduction: Reduction,
+        ignore_index: Int,
+        label_smoothing: Scalar[Self.dtype],
+        validate: Bool,
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        var logits_shape = logits.shape()
+        var C = logits_shape[1]
+
+        # Validation
+        if validate:
+            CEValidation[Self.dtype].validate_logits_rank(logits_shape)
+            CEValidation[Self.dtype].validate_num_classes(C)
+            CEValidation[Self.dtype].validate_class_indices_shapes(
+                logits_shape, target.shape()
+            )
+            CEValidation[Self.dtype].validate_target_indices(
+                target, C, ignore_index
+            )
+
+        # Flatten spatial dims
+        var logits_2d_ndb: NDBuffer[Self.dtype]
+        var target_1d_ndb: NDBuffer[DType.int32]
+        var M: Int
+        var C2: Int
+        var spatial_shape: Shape
+        var N: Int
+        logits_2d_ndb, target_1d_ndb, M, C2, spatial_shape, N = CECommon[
+            Self.dtype
+        ].flatten_spatial_class_indices(logits, target)
+
+        # log_softmax + softmax
+        var log_probs_ndb: NDBuffer[Self.dtype]
+        var softmax_probs_ndb: NDBuffer[Self.dtype]
+        log_probs_ndb, softmax_probs_ndb = CECommon[
+            Self.dtype
+        ].compute_log_softmax_and_softmax(logits_2d_ndb)
+
+        # ignore_mask: 1=valid, 0=ignored — from ORIGINAL target
+        var ignore_mask_ndb = CECommon[Self.dtype].build_ignore_mask(
+            target_1d_ndb, ignore_index
+        )
+
+        var valid_count = (
+            ignore_mask_ndb.sum(normalized_axes=IntArray()).item().__int__()
+        )
+
+        # onehot — ignore_index rows become all zeros
+        var target_t = Tensor[Self.dtype](
+            target_1d_ndb.to_dtype[Self.dtype](), requires_grad=False
+        )
+        var device = logits.device()
+        var onehot_mask = Tensor[Self.dtype].onehot(
+            target_t,
+            C2,
+            device,
+            ignore_index=ignore_index,
+        )
+
+        # NLL with optional label smoothing
+        var log_probs_t = Tensor[Self.dtype](log_probs_ndb, requires_grad=False)
+        var ls = label_smoothing
+        var losses_t: Tensor[Self.dtype]
+
+        if ls > Scalar[Self.dtype](0):
+            # loss = -(1-ls)*log_p[target] - ls * mean(log_p)
+            var nll = -(onehot_mask * log_probs_t).sum[track_grad=False](
+                axes=[1]
+            )
+            var mean_log_p = log_probs_t.sum[track_grad=False](
+                axes=[1]
+            ) / Scalar[Self.dtype](C2)
+            losses_t = (Scalar[Self.dtype](1) - ls) * nll - ls * mean_log_p
+        else:
+            losses_t = -(onehot_mask * log_probs_t).sum[track_grad=False](
+                axes=[1]
+            )
+
+        # Zero ignored positions
+        losses_t = losses_t * Tensor[Self.dtype](
+            ignore_mask_ndb, requires_grad=False
+        )
+
+        # Apply reduction
+        var out = CECommon[Self.dtype].apply_reduction(
+            losses_t.buffer, reduction, N, spatial_shape, valid_count
+        )
+
+        # Autograd
+        @parameter
+        if track_grad:
+            if logits.requires_grad:
+                out.requires_grad_(True)
+                var bwd = CEClassIndicesBackward[Self.dtype](
+                    softmax_probs=softmax_probs_ndb,
+                    target_1d=target_1d_ndb,
+                    logits_shape=logits_shape,
+                    rank=logits_shape.rank(),
+                    reduction=reduction,
+                    ignore_index=ignore_index,
+                    label_smoothing=ls,
+                    valid_count=valid_count,
+                    M=M,
+                    C=C2,
+                )
+                out.backwardFn = Optional(bwd.into_backward_fn())
+                out.add_ancestry(logits)
+
+        return out^
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CEProbabilitiesBackward
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+@fieldwise_init
+struct CEProbabilitiesBackward[dtype: DType](
+    Copyable & Movable & ImplicitlyCopyable
+):
+    """
+    Backward for probability targets.
+
+    grad = (softmax - smoothed_target) * upstream / scale
+
+    Stores NDBuffers only.
+    """
+
+    comptime TAG = BACKWARD_CE_PROBABILITIES
+    var softmax_probs: NDBuffer[Self.dtype]  # shape (M, C)
+    var smoothed_target: NDBuffer[Self.dtype]  # shape (M, C)
+    var logits_shape: Shape
+    var reduction: Reduction
+    var valid_count: Int
+    var M: Int
+    var C: Int
+
+    fn __copyinit__(out self, other: Self):
+        self.softmax_probs = other.softmax_probs
+        self.smoothed_target = other.smoothed_target
+        self.logits_shape = other.logits_shape
+        self.reduction = other.reduction
+        self.valid_count = other.valid_count
+        self.M = other.M
+        self.C = other.C
+
+    fn __moveinit__(out self, deinit other: Self):
+        self.softmax_probs = other.softmax_probs^
+        self.smoothed_target = other.smoothed_target^
+        self.logits_shape = other.logits_shape
+        self.reduction = other.reduction
+        self.valid_count = other.valid_count
+        self.M = other.M
+        self.C = other.C
+
+    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
+        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
+
+    fn backward(
+        self, output: Tensor[Self.dtype]
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref upstream = output.gradients()[]
+        var logits = output.ancestry().get(0)
+
+        # grad = softmax - smoothed_target
+        var grad_t = Tensor[Self.dtype](
+            self.softmax_probs, requires_grad=False
+        ) - Tensor[Self.dtype](self.smoothed_target, requires_grad=False)
+
+        # Scale by upstream and reduction
+        var scaled = CECommon[Self.dtype].scale_grad_by_upstream(
+            grad_t.buffer,
+            upstream,
+            self.reduction,
+            self.valid_count,
+            self.M,
+            self.C,
+        )
+
+        # Reshape to original logits shape
+        var grad_final = Tensor[Self.dtype](
+            scaled, requires_grad=False
+        ).reshape[track_grad=False](self.logits_shape)
+
+        return [
+            (
+                logits^,
+                Gradbox[Self.dtype](grad_final.buffer, share=False),
+                AddTensor,
+            )
+        ]
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CEProbabilitiesForward
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+struct CEProbabilitiesForward[dtype: DType]:
+    """
+    Forward pass for soft probability targets.
+
+    Steps:
+        1. Flatten spatial: (M,C) for both logits and target
+        2. log_softmax + softmax along C dim
+        3. Apply label smoothing to target
+        4. loss = -sum(smoothed * log_probs, axis=1)
+        5. Apply reduction
+        6. Attach backward
+    """
+
+    @staticmethod
+    fn forward[
+        track_grad: Bool
+    ](
+        logits: Tensor[Self.dtype],
+        target: Tensor[Self.dtype],
+        reduction: Reduction,
+        ignore_index: Int,
+        label_smoothing: Scalar[Self.dtype],
+        validate: Bool,
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        var logits_shape = logits.shape()
+
+        if validate:
+            CEValidation[Self.dtype].validate_logits_rank(logits_shape)
+            CEValidation[Self.dtype].validate_num_classes(logits_shape[1])
+            CEValidation[Self.dtype].validate_probability_shapes(
+                logits_shape, target.shape()
+            )
+
+        var logits_2d_ndb: NDBuffer[Self.dtype]
+        var target_2d_ndb: NDBuffer[Self.dtype]
+        var M: Int
+        var C: Int
+        var spatial_shape: Shape
+        var N: Int
+        logits_2d_ndb, target_2d_ndb, M, C, spatial_shape, N = CECommon[
+            Self.dtype
+        ].flatten_spatial_probabilities(logits, target)
+
+        var log_probs_ndb: NDBuffer[Self.dtype]
+        var softmax_probs_ndb: NDBuffer[Self.dtype]
+        log_probs_ndb, softmax_probs_ndb = CECommon[
+            Self.dtype
+        ].compute_log_softmax_and_softmax(logits_2d_ndb)
+
+        # Apply label smoothing to target
+        var ls = label_smoothing
+        var smoothed_target_ndb: NDBuffer[Self.dtype]
+        if ls > Scalar[Self.dtype](0):
+            var target_t = Tensor[Self.dtype](
+                target_2d_ndb, requires_grad=False
+            )
+            var uniform = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
+            smoothed_target_ndb = (
+                (Scalar[Self.dtype](1) - ls) * target_t + ls * uniform
+            ).buffer
+        else:
+            smoothed_target_ndb = target_2d_ndb
+
+        # loss = -sum(smoothed_target * log_probs, axis=1)
+        var losses_t = -(
+            Tensor[Self.dtype](smoothed_target_ndb, requires_grad=False)
+            * Tensor[Self.dtype](log_probs_ndb, requires_grad=False)
+        ).sum[track_grad=False](axes=[1])
+
+        # M = valid_count (no ignore_index for probabilities)
+        var out = CECommon[Self.dtype].apply_reduction(
+            losses_t.buffer, reduction, N, spatial_shape, M
+        )
+
+        @parameter
+        if track_grad:
+            if logits.requires_grad:
+                out.requires_grad_(True)
+                var bwd = CEProbabilitiesBackward[Self.dtype](
+                    softmax_probs=softmax_probs_ndb,
+                    smoothed_target=smoothed_target_ndb,
+                    logits_shape=logits_shape,
+                    reduction=reduction,
+                    valid_count=M,
+                    M=M,
+                    C=C,
+                )
+                out.backwardFn = Optional(bwd.into_backward_fn())
+                out.add_ancestry(logits)
+
+        return out^
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CrossEntropyLoss
+# ═════════════════════════════════════════════════════════════════════════════
 
 
 @register_passable
 struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
+    """
+    CrossEntropyLoss — flexible, modular, GPU-ready.
+
+    Features:
+        ✓ Class index targets  (Tensor[DType.int32])
+        ✓ Probability targets  (Tensor[dtype])
+        ✓ Reduction: mean, sum, none
+        ✓ Label smoothing ∈ [0, 1]
+        ✓ Ignore index (any value)
+        ✓ Multi-dimensional input (any rank ≥ 2)
+        ✓ Full autograd — GPU-safe forward and backward
+        ✓ train/eval modes
+
+    Input:         (N, C, d1, ..., dk)  k ≥ 0
+    Target class:  (N, d1, ..., dk)
+    Target probs:  (N, C, d1, ..., dk)
+    Output mean/sum: scalar
+    Output none:   (N, d1, ..., dk)
+    """
+
     var reduction: Reduction
     var ignore_index: Int
     var label_smoothing: Scalar[Self.dtype]
@@ -64,6 +873,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         label_smoothing: Scalar[Self.dtype] = Scalar[Self.dtype](0),
         training: Bool = True,
     ):
+        CEValidation[Self.dtype].validate_label_smoothing(label_smoothing)
         self.reduction = Reduction(reduction)
         self.ignore_index = ignore_index
         self.label_smoothing = label_smoothing
@@ -76,6 +886,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         label_smoothing: Scalar[Self.dtype] = Scalar[Self.dtype](0),
         training: Bool = True,
     ):
+        CEValidation[Self.dtype].validate_label_smoothing(label_smoothing)
         self.reduction = Reduction(reduction)
         self.ignore_index = ignore_index
         self.label_smoothing = label_smoothing
@@ -88,11 +899,11 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         self.training = existing.training
 
     fn train(mut self):
-        """Set to training mode - enables gradient tracking."""
+        """Enable gradient tracking (training mode)."""
         self.training = True
 
     fn eval(mut self):
-        """Set to evaluation mode - disables gradient tracking."""
+        """Disable gradient tracking (evaluation mode)."""
         self.training = False
 
     fn __call__(
@@ -101,13 +912,24 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         target: Tensor[DType.int32],
         validate: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        """Class index targets."""
         if self.training:
-            return self._forward_class_indices[track_grad=True](
-                logits, target, validate
+            return CEClassIndicesForward[Self.dtype].forward[track_grad=True](
+                logits,
+                target,
+                self.reduction,
+                self.ignore_index,
+                self.label_smoothing,
+                validate,
             )
         else:
-            return self._forward_class_indices[track_grad=False](
-                logits, target, validate
+            return CEClassIndicesForward[Self.dtype].forward[track_grad=False](
+                logits,
+                target,
+                self.reduction,
+                self.ignore_index,
+                self.label_smoothing,
+                validate,
             )
 
     fn __call__(
@@ -116,740 +938,26 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
         target: Tensor[Self.dtype],
         validate: Bool = True,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        """Probability targets."""
         if self.training:
-            return self._forward_probabilities[track_grad=True](
-                logits, target, validate
+            return CEProbabilitiesForward[Self.dtype].forward[track_grad=True](
+                logits,
+                target,
+                self.reduction,
+                self.ignore_index,
+                self.label_smoothing,
+                validate,
             )
         else:
-            return self._forward_probabilities[track_grad=False](
-                logits, target, validate
+            return CEProbabilitiesForward[Self.dtype].forward[track_grad=False](
+                logits,
+                target,
+                self.reduction,
+                self.ignore_index,
+                self.label_smoothing,
+                validate,
             )
 
-    @always_inline
-    fn _forward_class_indices[
-        track_grad: Bool
-    ](
-        self,
-        var logits: Tensor[Self.dtype],
-        var target: Tensor[DType.int32],
-        validate: Bool,
-    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        """Optimized forward pass for class indices targets."""
-        if validate:
-            Self._validate_class_indices_inputs(
-                logits, target, self.ignore_index
-            )
 
-        var logits_shape = logits.shape()
-        var N = logits_shape[0]
-        var C = logits_shape[1]
-        var rank = logits_shape.rank()
-        if rank > 5:
-            panic(
-                "Unsupported rank: " + rank.__str__(),
-                ". Only rank upto 5 is supported",
-            )
-
-        # Calculate total spatial elements
-        var total_spatial = 1
-        if rank > 2:
-            for i in range(2, rank):
-                total_spatial *= logits_shape[i]
-
-        var M = N * total_spatial
-
-        # Transpose logits to move class dimension to end
-        # From: [N, C, spatial...] → To: [N, spatial..., C]
-        var logits_reordered: Tensor[Self.dtype]
-        if rank == 2:
-            # No spatial dimensions - already correct
-            logits_reordered = logits
-        elif rank == 3:
-            # [N, C, S] → [N, S, C]
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 1)
-            )
-        elif rank == 4:
-            # [N, C, H, W] → [N, H, W, C]
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 3, 1)
-            )
-        else:
-            # [N, C, D, H, W] → [N, D, H, W, C]
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 3, 4, 1)
-            )
-
-        # Now reshape: [N, spatial..., C] → [M, C]
-        var logits_2d = logits_reordered.reshape[track_grad=False](
-            Shape([M, C])
-        )
-        var target_1d = target.reshape[track_grad=False](Shape([M]))
-
-        # Precompute smoothing values
-        var smoothing_active = self.label_smoothing > Scalar[Self.dtype](0)
-        var true_smoothed = Scalar[Self.dtype](1)
-        var non_true_smoothed = Scalar[Self.dtype](0)
-
-        if smoothing_active:
-            var uniform_val = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
-            non_true_smoothed = self.label_smoothing * uniform_val
-            true_smoothed = (
-                Scalar[Self.dtype](1) - self.label_smoothing + non_true_smoothed
-            )
-
-        # Fused log_softmax + loss computation
-        var losses = Tensor[Self.dtype].zeros(Shape([M]), requires_grad=False)
-        var valid_count = 0
-
-        for m in range(M):
-            var class_idx = target_1d[m].__int__()
-
-            if class_idx == self.ignore_index:
-                continue
-
-            valid_count += 1
-
-            # Compute log_softmax for this row (numerically stable)
-            var max_val = logits_2d[m, 0]
-            for c in range(1, C):
-                if logits_2d[m, c] > max_val:
-                    max_val = logits_2d[m, c]
-
-            var sum_exp = Scalar[Self.dtype](0)
-            for c in range(C):
-                sum_exp += exp(logits_2d[m, c] - max_val)
-
-            var log_sum_exp = log(sum_exp) + max_val
-
-            # Compute loss directly
-            if smoothing_active:
-                var loss_val = Scalar[Self.dtype](0)
-                for c in range(C):
-                    var log_prob = logits_2d[m, c] - log_sum_exp
-                    var true_prob = (
-                        true_smoothed if c == class_idx else non_true_smoothed
-                    )
-                    loss_val += true_prob * -log_prob
-                losses[m] = loss_val
-            else:
-                losses[m] = -(logits_2d[m, class_idx] - log_sum_exp)
-
-        # Apply reduction
-        var target_shape = target.shape()
-        var out = self._apply_reduction(losses, target_shape, valid_count)
-
-        # Setup autograd
-        @parameter
-        if track_grad:
-            if logits.requires_grad:
-                out.requires_grad_(True)
-                var backward_fn = CrossEntropyBackward[Self.dtype](
-                    self.reduction.value(),
-                    self.ignore_index,
-                    self.label_smoothing,
-                    Optional((target_shape, target.buffer.contiguous_buffer())),
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
-                out.add_ancestry(logits)
-
-        return out^
-
-    fn _forward_probabilities[
-        track_grad: Bool
-    ](
-        self,
-        var logits: Tensor[Self.dtype],
-        var target: Tensor[Self.dtype],
-        validate: Bool,
-    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        """Optimized forward pass for probability/one-hot targets."""
-        # Validate inputs
-
-        if validate:
-            Self._validate_probability_inputs(logits, target)
-
-        # Reshape to unified 2D format
-        var logits_shape = logits.shape()
-        var N = logits_shape[0]
-        var C = logits_shape[1]
-        _ = """var spatial_dims = logits_shape[2:]
-        var total_spatial = (
-            spatial_dims.product() if spatial_dims.rank() > 0 else 1
-        )
-        var M = N * total_spatial
-
-        var logits_2d = logits.reshape[track_grad=False](Shape([M, C]))
-        var target_2d = target.reshape[track_grad=False](Shape([M, C]))"""
-        var rank = logits_shape.rank()
-        if rank > 5:
-            panic(
-                "Unsupported rank: " + rank.__str__(),
-                ". Only rank upto 5 is supported",
-            )
-
-        var total_spatial = 1
-        if rank > 2:
-            for i in range(2, rank):
-                total_spatial *= logits_shape[i]
-
-        var M = N * total_spatial
-
-        # Transpose to move class to end
-        var logits_reordered: Tensor[Self.dtype]
-        var target_reordered: Tensor[Self.dtype]
-
-        if rank == 2:
-            logits_reordered = logits
-            target_reordered = target
-        elif rank == 3:
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 1)
-            )
-            target_reordered = target.permute[track_grad=False](
-                IntArray(0, 2, 1)
-            )
-        elif rank == 4:
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 3, 1)
-            )
-            target_reordered = target.permute[track_grad=False](
-                IntArray(0, 2, 3, 1)
-            )
-        else:
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 3, 4, 1)
-            )
-            target_reordered = target.permute[track_grad=False](
-                IntArray(0, 2, 3, 4, 1)
-            )
-
-        var logits_2d = logits_reordered.reshape[track_grad=False](
-            Shape([M, C])
-        )
-        var target_2d = target_reordered.reshape[track_grad=False](
-            Shape([M, C])
-        )
-
-        # Precompute smoothing
-        var smoothing_active = self.label_smoothing > Scalar[Self.dtype](0)
-        var uniform_val = Scalar[Self.dtype](0)
-        if smoothing_active:
-            uniform_val = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
-
-        # Fused log_softmax + loss computation
-        var losses = Tensor[Self.dtype].zeros(Shape([M]), requires_grad=False)
-
-        for m in range(M):
-            # Compute log_softmax for this row
-            var max_val = logits_2d[m, 0]
-            for c in range(1, C):
-                if logits_2d[m, c] > max_val:
-                    max_val = logits_2d[m, c]
-
-            var sum_exp = Scalar[Self.dtype](0)
-            for c in range(C):
-                sum_exp += exp(logits_2d[m, c] - max_val)
-
-            var log_sum_exp = log(sum_exp) + max_val
-
-            # Compute loss with optional smoothing
-            var loss_val = Scalar[Self.dtype](0)
-            for c in range(C):
-                var log_prob = logits_2d[m, c] - log_sum_exp
-                var target_prob = target_2d[m, c]
-
-                if smoothing_active:
-                    target_prob = (
-                        Scalar[Self.dtype](1) - self.label_smoothing
-                    ) * target_prob + self.label_smoothing * uniform_val
-
-                loss_val += target_prob * -log_prob
-
-            losses[m] = loss_val
-
-        # Apply reduction
-        var valid_count = M
-        var out = self._apply_reduction(
-            losses, target.shape()[0:-1], valid_count
-        )
-
-        # Setup autograd
-        @parameter
-        if track_grad:
-            if logits.requires_grad:
-                out.requires_grad_(True)
-                var backward_fn = CrossEntropyBackward[Self.dtype](
-                    self.reduction.value(),
-                    self.ignore_index,
-                    self.label_smoothing,
-                    None,
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
-                out.add_ancestry(logits, target)
-
-        return out^
-
-    fn _apply_reduction(
-        self,
-        var losses: Tensor[Self.dtype],
-        original_target_shape: Shape,
-        valid_count: Int,
-    ) -> Tensor[Self.dtype]:
-        """Apply reduction to per-sample losses."""
-        if self.reduction == Reduction.`None`:
-            return losses.reshape[track_grad=False](original_target_shape)
-        elif self.reduction == Reduction.Sum:
-            return losses.sum()
-        else:  # Mean reduction
-            if valid_count > 0:
-                var mean_loss = losses.sum().item() / Scalar[Self.dtype](
-                    valid_count
-                )
-                return Tensor.scalar(mean_loss)
-            else:
-                return Tensor.scalar(Scalar[Self.dtype](0))
-
-    @staticmethod
-    fn _validate_class_indices_inputs(
-        logits: Tensor[Self.dtype],
-        target: Tensor[DType.int32],
-        ignore_index: Int,
-    ):
-        """Validate inputs for class indices targets."""
-        var input_shape = logits.shape()
-        var target_shape = target.shape()
-
-        if input_shape.rank() < 2:
-            panic("Input must have at least 2 dimensions")
-
-        if target_shape.rank() != input_shape.rank() - 1:
-            panic("Target must have one fewer dimension than input")
-
-        var N = input_shape[0]
-        if target_shape[0] != N:
-            panic("Batch size mismatch between logits and target")
-
-        var C = input_shape[1]
-
-        if target_shape.rank() > 1:
-            for i in range(1, target_shape.rank()):
-                if i < input_shape.rank() - 1:
-                    if target_shape[i] != input_shape[i + 1]:
-                        panic(
-                            "Spatial dimension mismatch at dimension "
-                            + i.__str__()
-                        )
-
-        Self._validate_target_indices(target, C, ignore_index)
-
-    @staticmethod
-    fn _validate_probability_inputs(
-        logits: Tensor[Self.dtype], target: Tensor[Self.dtype]
-    ):
-        """Validate inputs for probability targets."""
-        var input_shape = logits.shape()
-        var target_shape = target.shape()
-
-        if input_shape.rank() < 2:
-            panic("Input must have at least 2 dimensions")
-
-        if target_shape.rank() != input_shape.rank():
-            panic("Target must have same rank as input for probability targets")
-
-        var N = input_shape[0]
-        var C = input_shape[1]
-
-        if target_shape[0] != N or target_shape[1] != C:
-            panic("Batch size or class count mismatch")
-
-        if input_shape.rank() > 2:
-            for i in range(2, input_shape.rank()):
-                if target_shape[i] != input_shape[i]:
-                    panic(
-                        "Spatial dimension mismatch at dimension " + i.__str__()
-                    )
-
-    @staticmethod
-    fn _validate_target_indices(
-        target: Tensor[DType.int32], num_classes: Int, ignore_index: Int
-    ):
-        """Validate that all target indices are within valid range."""
-        for coord, value in target:
-            var class_idx = value.__int__()
-            if class_idx != ignore_index and (
-                class_idx < 0 or class_idx >= num_classes
-            ):
-                var pos_str = "["
-                for i in range(coord.size()):
-                    if i > 0:
-                        pos_str += ", "
-                    pos_str += coord[i].__str__()
-                pos_str += "]"
-
-                panic(
-                    "Target index "
-                    + class_idx.__str__()
-                    + " at position "
-                    + pos_str
-                    + " is out of bounds for "
-                    + num_classes.__str__()
-                    + " classes. Valid range: [0, "
-                    + (num_classes - 1).__str__()
-                    + "] or ignore_index="
-                    + ignore_index.__str__()
-                )
-
-
-struct CrossEntropyBackward[dtype: DType](
-    Copyable & Movable & ImplicitlyCopyable
-):
-    comptime TAG = BACKWARD_CROSS_ENTROPY
-    var reduction: Reduction
-    var ignore_index: Int
-    var label_smoothing: Scalar[Self.dtype]
-    var original_target: Optional[Tuple[Shape, Buffer[DType.int32]]]
-
-    fn __init__(
-        out self,
-        reduction: Int = 0,
-        ignore_index: Int = -100,
-        label_smoothing: Scalar[Self.dtype] = Scalar[Self.dtype](0),
-        original_target: Optional[Tuple[Shape, Buffer[DType.int32]]] = None,
-    ):
-        self.reduction = Reduction(reduction)
-        self.ignore_index = ignore_index
-        self.label_smoothing = label_smoothing
-        self.original_target = original_target
-
-    fn __copyinit__(out self, existing: Self):
-        self.reduction = existing.reduction.copy()
-        self.ignore_index = existing.ignore_index
-        self.label_smoothing = existing.label_smoothing
-        self.original_target = existing.original_target.copy()
-
-    fn __moveinit__(out self, deinit existing: Self):
-        self.reduction = existing.reduction
-        self.ignore_index = existing.ignore_index
-        self.label_smoothing = existing.label_smoothing
-        self.original_target = existing.original_target^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-    fn backward(
-        self, output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var gradients = output.grad()
-        var logits = output.ancestry().get(0)
-
-        if self.original_target:
-            var shape_buffer_pair = self.original_target.value().copy()
-            var shape = shape_buffer_pair[0].copy()
-            var buffer = shape_buffer_pair[1].copy()
-            var ndb = NDBuffer[DType.int32](buffer^, shape^)
-            target = Tensor[DType.int32](ndb^, requires_grad=False)
-            return self._backward_class_indices(logits^, target^, gradients^)
-        else:
-            var target = output.ancestry().get(1)
-            return self._backward_probabilities(logits^, target^, gradients^)
-
-    @always_inline
-    fn _backward_class_indices(
-        self,
-        var logits: Tensor[Self.dtype],
-        var target: Tensor[DType.int32],
-        upstream_grad: Gradbox[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        """Optimized backward pass for class indices targets."""
-        var logits_shape = logits.shape()
-        var N = logits_shape[0]
-        var C = logits_shape[1]
-        var rank = logits_shape.rank()
-        if rank > 5:
-            panic(
-                "Unsupported rank: " + rank.__str__(),
-                ". Only rank upto 5 is supported",
-            )
-
-        # Calculate total spatial elements
-        var total_spatial = 1
-        if rank > 2:
-            for i in range(2, rank):
-                total_spatial *= logits_shape[i]
-
-        var M = N * total_spatial
-
-        # Transpose logits to move class dimension to end
-        # From: [N, C, spatial...] → To: [N, spatial..., C]
-        var logits_reordered: Tensor[Self.dtype]
-        if rank == 2:
-            logits_reordered = logits
-        elif rank == 3:
-            # [N, C, S] → [N, S, C]
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 1)
-            )
-        elif rank == 4:
-            # [N, C, H, W] → [N, H, W, C]
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 3, 1)
-            )
-        else:
-            # [N, C, D, H, W] → [N, D, H, W, C]
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 3, 4, 1)
-            )
-
-        # Reshape: [N, spatial..., C] → [M, C]
-        var logits_2d = logits_reordered.reshape[track_grad=False](
-            Shape([M, C])
-        )
-        var target_1d = target.reshape[track_grad=False](Shape([M]))
-
-        var grad_input_2d = Gradbox[Self.dtype].zeros(
-            Shape([M, C]), share=False
-        )
-        var valid_count = 0
-
-        # Precompute smoothing values
-        var smoothing_active = self.label_smoothing > Scalar[Self.dtype](0)
-        var true_smoothed = Scalar[Self.dtype](1)
-        var non_true_smoothed = Scalar[Self.dtype](0)
-
-        if smoothing_active:
-            var uniform_val = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
-            non_true_smoothed = self.label_smoothing * uniform_val
-            true_smoothed = (
-                Scalar[Self.dtype](1) - self.label_smoothing + non_true_smoothed
-            )
-
-        # Fused softmax + gradient computation
-        for m in range(M):
-            var class_idx = target_1d[m].__int__()
-
-            if class_idx == self.ignore_index:
-                # Gradients remain zero for ignored positions
-                continue
-
-            valid_count += 1
-
-            # Compute softmax for this row (numerically stable)
-            var max_val = logits_2d[m, 0]
-            for c in range(1, C):
-                if logits_2d[m, c] > max_val:
-                    max_val = logits_2d[m, c]
-
-            var sum_exp = Scalar[Self.dtype](0)
-            for c in range(C):
-                sum_exp += exp(logits_2d[m, c] - max_val)
-
-            # Compute gradient: softmax - target
-            for c in range(C):
-                var softmax_prob = exp(logits_2d[m, c] - max_val) / sum_exp
-
-                if smoothing_active:
-                    var target_prob = (
-                        true_smoothed if c == class_idx else non_true_smoothed
-                    )
-                    grad_input_2d[m, c] = softmax_prob - target_prob
-                else:
-                    var target_val = Scalar[Self.dtype](
-                        1
-                    ) if c == class_idx else Scalar[Self.dtype](0)
-                    grad_input_2d[m, c] = softmax_prob - target_val
-
-        # Apply reduction scaling
-        var target_shape = target.shape()
-        grad_input_2d = self._apply_reduction_scaling(
-            grad_input_2d, upstream_grad, valid_count, M, target_shape
-        )
-
-        # Reshape back to [N, spatial..., C] then transpose to [N, C, spatial...]
-        var grad_reordered: Gradbox[Self.dtype]
-        if rank == 2:
-            # [M, C] → [N, C]
-            grad_reordered = grad_input_2d.reshape(logits_shape)
-        elif rank == 3:
-            # [M, C] → [N, S, C]
-            var intermediate_shape = Shape([N, total_spatial, C])
-            var grad_temp = grad_input_2d.reshape(intermediate_shape)
-            # [N, S, C] → [N, C, S]
-            grad_reordered = grad_temp.transpose(IntArray(0, 2, 1))
-        elif rank == 4:
-            # [M, C] → [N, H, W, C]
-            var H = logits_shape[2]
-            var W = logits_shape[3]
-            var intermediate_shape = Shape([N, H, W, C])
-            var grad_temp = grad_input_2d.reshape(intermediate_shape)
-            # [N, H, W, C] → [N, C, H, W]
-            grad_reordered = grad_temp.transpose(IntArray(0, 3, 1, 2))
-        else:
-            # [M, C] → [N, D, H, W, C]
-            var D = logits_shape[2]
-            var H = logits_shape[3]
-            var W = logits_shape[4]
-            var intermediate_shape = Shape([N, D, H, W, C])
-            var grad_temp = grad_input_2d.reshape(intermediate_shape)
-            # [N, D, H, W, C] → [N, C, D, H, W]
-            grad_reordered = grad_temp.transpose(IntArray(0, 4, 1, 2, 3))
-
-        return [(logits, grad_reordered^, AddTensor)]
-
-    @always_inline
-    fn _backward_probabilities(
-        self,
-        var logits: Tensor[Self.dtype],
-        var target: Tensor[Self.dtype],
-        upstream_grad: Gradbox[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        """Optimized backward pass for probability/one-hot targets."""
-        var logits_shape = logits.shape()
-        var N = logits_shape[0]
-        var C = logits_shape[1]
-        var rank = logits_shape.rank()
-        if rank > 5:
-            panic(
-                "Unsupported rank: " + rank.__str__(),
-                ". Only rank upto 5 is supported",
-            )
-
-        var total_spatial = 1
-        if rank > 2:
-            for i in range(2, rank):
-                total_spatial *= logits_shape[i]
-
-        var M = N * total_spatial
-
-        # Transpose to move class to end
-        var logits_reordered: Tensor[Self.dtype]
-        var target_reordered: Tensor[Self.dtype]
-
-        if rank == 2:
-            logits_reordered = logits
-            target_reordered = target
-        elif rank == 3:
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 1)
-            )
-            target_reordered = target.permute[track_grad=False](
-                IntArray(0, 2, 1)
-            )
-        elif rank == 4:
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 3, 1)
-            )
-            target_reordered = target.permute[track_grad=False](
-                IntArray(0, 2, 3, 1)
-            )
-        else:
-            logits_reordered = logits.permute[track_grad=False](
-                IntArray(0, 2, 3, 4, 1)
-            )
-            target_reordered = target.permute[track_grad=False](
-                IntArray(0, 2, 3, 4, 1)
-            )
-
-        var logits_2d = logits_reordered.reshape[track_grad=False](
-            Shape([M, C])
-        )
-        var target_2d = target_reordered.reshape[track_grad=False](
-            Shape([M, C])
-        )
-
-        var grad_input_2d = Gradbox[Self.dtype].zeros(
-            Shape([M, C]), share=False
-        )
-
-        var smoothing_active = self.label_smoothing > Scalar[Self.dtype](0)
-        var uniform_val = Scalar[Self.dtype](0)
-        if smoothing_active:
-            uniform_val = Scalar[Self.dtype](1) / Scalar[Self.dtype](C)
-
-        for m in range(M):
-            var max_val = logits_2d[m, 0]
-            for c in range(1, C):
-                if logits_2d[m, c] > max_val:
-                    max_val = logits_2d[m, c]
-
-            var sum_exp = Scalar[Self.dtype](0)
-            for c in range(C):
-                sum_exp += exp(logits_2d[m, c] - max_val)
-
-            for c in range(C):
-                var softmax_prob = exp(logits_2d[m, c] - max_val) / sum_exp
-                var target_prob = target_2d[m, c]
-
-                if smoothing_active:
-                    target_prob = (
-                        Scalar[Self.dtype](1) - self.label_smoothing
-                    ) * target_prob + self.label_smoothing * uniform_val
-
-                grad_input_2d[m, c] = softmax_prob - target_prob
-
-        var valid_count = M
-        var target_shape = target.shape()
-        grad_input_2d = self._apply_reduction_scaling(
-            grad_input_2d, upstream_grad, valid_count, M, target_shape[0:-1]
-        )
-
-        # Reshape and transpose back
-        var grad_reordered: Gradbox[Self.dtype]
-        if rank == 2:
-            grad_reordered = grad_input_2d.reshape(logits_shape)
-        elif rank == 3:
-            var intermediate_shape = Shape([N, total_spatial, C])
-            var grad_temp = grad_input_2d.reshape(intermediate_shape)
-            grad_reordered = grad_temp.transpose(IntArray(0, 2, 1))
-        elif rank == 4:
-            var H = logits_shape[2]
-            var W = logits_shape[3]
-            var intermediate_shape = Shape([N, H, W, C])
-            var grad_temp = grad_input_2d.reshape(intermediate_shape)
-            grad_reordered = grad_temp.transpose(IntArray(0, 3, 1, 2))
-        else:
-            var D = logits_shape[2]
-            var H = logits_shape[3]
-            var W = logits_shape[4]
-            var intermediate_shape = Shape([N, D, H, W, C])
-            var grad_temp = grad_input_2d.reshape(intermediate_shape)
-            grad_reordered = grad_temp.transpose(IntArray(0, 4, 1, 2, 3))
-
-        return [(logits, grad_reordered^, AddTensor)]
-
-    fn _apply_reduction_scaling(
-        self,
-        grad_input_2d: Gradbox[Self.dtype],
-        upstream_grad: Gradbox[Self.dtype],
-        valid_count: Int,
-        total_elements: Int,
-        target_shape: Shape,
-    ) -> Gradbox[Self.dtype]:
-        """Apply reduction-specific scaling to gradients."""
-        var grad_input_2d_shape = grad_input_2d.shape()
-        var scaled_grad = grad_input_2d.copy()
-
-        # Apply reduction scaling first
-        if self.reduction == Reduction.Mean and valid_count > 0:
-            var scale_factor = Scalar[Self.dtype](1) / Scalar[Self.dtype](
-                valid_count
-            )
-            scaled_grad = grad_input_2d * scale_factor
-
-        # Then multiply by upstream gradient (chain rule)
-        if self.reduction == Reduction.`None`:
-            var upstream_1d = upstream_grad.reshape(Shape([total_elements]))
-            var expanded_upstream = Gradbox[Self.dtype](
-                Shape([total_elements, grad_input_2d_shape[1]]),
-            )
-
-            for m in range(total_elements):
-                for c in range(grad_input_2d_shape[1]):
-                    expanded_upstream[m, c] = upstream_1d[m]
-
-            scaled_grad = scaled_grad * expanded_upstream
-        else:
-            var upstream_scalar = upstream_grad.item()
-            scaled_grad = scaled_grad * upstream_scalar
-
-        return scaled_grad^
+fn main():
+    pass
