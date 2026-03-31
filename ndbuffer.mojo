@@ -220,7 +220,7 @@ struct NDBuffer[dtype: DType](
             raise "NDBuffer -> to_gpu(): Empty buffer"
         return self.to_device(gpu.into())[1]
 
-    fn device(self) raises -> Device:
+    fn device(self) -> Device:
         @parameter
         if has_accelerator():
             if self.is_on_gpu():
@@ -350,6 +350,48 @@ struct NDBuffer[dtype: DType](
                     return NDBuffer[Self.dtype].Empty()
             else:
                 return ndb^
+
+    @staticmethod
+    fn onehot(
+        indices: NDBuffer[Self.dtype],
+        num_classes: Int,
+        device: Optional[Device] = None,
+        ignore_index: Optional[Int] = None,
+    ) -> NDBuffer[Self.dtype]:
+        """Convert NDBuffer of class indices to one-hot encoding.
+        Args:
+            indices: Tensor of shape (...,) containing class indices.
+            num_classes: Number of classes.
+            device: Target device.
+            ignore_index: If provided, rows where index == ignore_index become all zeros.
+        Returns: Tensor of shape (..., num_classes).
+        """
+        ref shape = indices.shape
+        ref target_device = device.or_else(indices.device())
+        var result = NDBuffer[Self.dtype].zeros(
+            shape + [num_classes], device=target_device
+        )
+
+        var ignore_val = ignore_index.or_else(-1000000)  # sentinel
+
+        for coord in shape:
+            var class_index = indices[coord].__int__()
+
+            # Skip ignored indices entirely — leave row as zeros
+            if ignore_index and class_index == ignore_val:
+                continue
+
+            if class_index < 0 or class_index >= num_classes:
+                panic(
+                    "Tensor → onehot: invalid class",
+                    class_index.__str__(),
+                    "at coordinate",
+                    coord.__str__(),
+                )
+            var onehot_coord = coord + class_index
+            result[onehot_coord] = Scalar[Self.dtype](1)
+
+        return result^
 
     fn shuffle(
         self,

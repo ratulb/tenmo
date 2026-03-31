@@ -60,15 +60,7 @@ struct Gradbox[dtype: DType](
             )
 
     fn device(self) -> Device:
-        try:
-            return self.buffer.device()
-        except e:
-            print(e)
-            panic(
-                "Gradbox device(): failed to retrive device from gradbox buffer"
-            )
-            # Unreachable
-            return CPU().into()
+        return self.buffer.device()
 
     fn transpose(self, axes: IntArray) -> Gradbox[Self.dtype]:
         """Fused transpose then contiguous - GPU aware via NDBuffer."""

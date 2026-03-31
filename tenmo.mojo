@@ -508,15 +508,7 @@ struct Tensor[dtype: DType](
             )
 
     fn device(self) -> Device:
-        try:
-            return self.buffer.device()
-        except e:
-            print(e)
-            panic(
-                "Tensor device(): failed to retrive device from tensor buffer"
-            )
-            # Unreachable
-            return CPU().into()
+        return self.buffer.device()
 
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
         @parameter
@@ -1089,32 +1081,8 @@ struct Tensor[dtype: DType](
             ignore_index: If provided, rows where index == ignore_index become all zeros.
         Returns: Tensor of shape (..., num_classes).
         """
-        var shape = indices.shape()
-        var target_device = device.or_else(indices.device())
-        var result = Tensor[Self.dtype].zeros(
-            shape + [num_classes], device=target_device
-        )
-
-        var ignore_val = ignore_index.or_else(-1000000)  # sentinel
-
-        for coord in shape:
-            var class_index = indices[coord].__int__()
-
-            # Skip ignored indices entirely — leave row as zeros
-            if ignore_index and class_index == ignore_val:
-                continue
-
-            if class_index < 0 or class_index >= num_classes:
-                panic(
-                    "Tensor → onehot: invalid class",
-                    class_index.__str__(),
-                    "at coordinate",
-                    coord.__str__(),
-                )
-            var onehot_coord = coord + class_index
-            result[onehot_coord] = Scalar[Self.dtype](1)
-
-        return result^
+        var onehot_ndb = NDBuffer[Self.dtype].onehot(indices.buffer, num_classes, device, ignore_index)
+        return Tensor[Self.dtype](onehot_ndb^, requires_grad=False)
 
     @staticmethod
     fn d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[Self.dtype]:

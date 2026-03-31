@@ -396,7 +396,6 @@ struct CEClassIndicesBackward[dtype: DType](
     var softmax_probs: NDBuffer[Self.dtype]  # shape (M, C)
     var target_1d: NDBuffer[DType.int32]  # shape (M,) — ORIGINAL values
     var logits_shape: Shape  # original logits shape
-    var rank: Int
     var reduction: Reduction
     var ignore_index: Int
     var label_smoothing: Scalar[Self.dtype]
@@ -408,7 +407,6 @@ struct CEClassIndicesBackward[dtype: DType](
         self.softmax_probs = other.softmax_probs
         self.target_1d = other.target_1d
         self.logits_shape = other.logits_shape
-        self.rank = other.rank
         self.reduction = other.reduction
         self.ignore_index = other.ignore_index
         self.label_smoothing = other.label_smoothing
@@ -420,7 +418,6 @@ struct CEClassIndicesBackward[dtype: DType](
         self.softmax_probs = other.softmax_probs^
         self.target_1d = other.target_1d^
         self.logits_shape = other.logits_shape
-        self.rank = other.rank
         self.reduction = other.reduction
         self.ignore_index = other.ignore_index
         self.label_smoothing = other.label_smoothing
@@ -437,9 +434,6 @@ struct CEClassIndicesBackward[dtype: DType](
         ref upstream = output.gradients()[]
         var logits = output.ancestry().get(0)
 
-        _ = """var device = Tensor[Self.dtype](
-            self.softmax_probs, requires_grad=False
-        ).device()"""
         var device = upstream.device()
 
         # Step 1: grad = softmax — (M, C)
@@ -631,7 +625,6 @@ struct CEClassIndicesForward[dtype: DType]:
             losses_t.buffer, reduction, N, spatial_shape, valid_count
         )
 
-        # Autograd
         @parameter
         if track_grad:
             if logits.requires_grad:
@@ -640,7 +633,6 @@ struct CEClassIndicesForward[dtype: DType]:
                     softmax_probs=softmax_probs_ndb,
                     target_1d=target_1d_ndb,
                     logits_shape=logits_shape,
-                    rank=logits_shape.rank(),
                     reduction=reduction,
                     ignore_index=ignore_index,
                     label_smoothing=ls,
