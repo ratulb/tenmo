@@ -207,8 +207,8 @@ struct CECommon[dtype: DType]:
         Permutes logits so class dim is last before flattening.
         Returns NDBuffers — safe to store in backward structs.
         """
-        logits.print()
-        target.print()
+        #logits.print()
+        #target.print()
         var logits_shape = logits.shape()
         var N = logits_shape[0]
         var C = logits_shape[1]
@@ -307,7 +307,7 @@ struct CECommon[dtype: DType]:
     ) -> Tensor[Self.dtype]:
         """Apply reduction to per-sample losses (M,)."""
         var losses_t = Tensor[Self.dtype](losses)
-
+        print("losses_t on device: ", losses_t.is_on_gpu(), losses.is_on_gpu())
         if reduction.is_none():
             # Reshape (M,) → (N, d1..dk)
             var spatial_rank = spatial_shape.rank()
