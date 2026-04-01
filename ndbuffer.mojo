@@ -1876,6 +1876,11 @@ struct NDBuffer[dtype: DType](
         return self.scalar_ops[Multiply](scalar)
 
     @always_inline
+    fn __sub__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+        return self.scalar_ops[Subtract](scalar)
+
+
+    @always_inline
     fn max(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.scalar_ops[MAX](scalar)
 
