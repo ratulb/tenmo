@@ -17,6 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         test:
+          - summean
           - exp
           - transmute
           - count_unique
@@ -115,6 +116,7 @@ jobs:
       fail-fast: false
       matrix:
         test:
+          - summean
           - exp
           - transmute
           - gpu
