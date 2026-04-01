@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from mnemonics import AddTensor, SqrtForwardOp, SqrtBackwardOp
+from mnemonics import AddTensor, SQRT, SqrtBackwardOp
 from backpropagation import Delegate, BackwardFn, BACKWARD_SQRT
 from gradbox import Gradbox
 from math import sqrt
@@ -71,9 +71,7 @@ struct Sqrt[dtype: DType]:
         if self.is_contiguous():
             var start = self.offset()
             var end = start + self.numels()
-            var buffer = self.buffer.data_buffer().unary_ops[SqrtForwardOp](
-                start, end
-            )
+            var buffer = self.buffer.data_buffer().unary_ops[SQRT](start, end)
             out = Tensor[Self.dtype](
                 NDBuffer[Self.dtype](buffer^, shape), requires_grad=False
             )
@@ -106,7 +104,7 @@ struct Sqrt[dtype: DType]:
         var out: Gradbox[Self.dtype]
         ref shape = self.shape()
 
-        var buffer = self.buffer.data_buffer().unary_ops[SqrtForwardOp]()
+        var buffer = self.buffer.data_buffer().unary_ops[SQRT]()
         out = Gradbox[Self.dtype](
             NDBuffer[Self.dtype](buffer^, shape), share=False
         )

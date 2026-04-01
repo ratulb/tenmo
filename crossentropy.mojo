@@ -561,7 +561,7 @@ struct CEClassIndicesForward[dtype: DType]:
     """
 
     @staticmethod
-    fn forward[
+    fn forward_good[
         track_grad: Bool
     ](
         logits: Tensor[Self.dtype],
@@ -649,6 +649,111 @@ struct CEClassIndicesForward[dtype: DType]:
         # Apply reduction
         var out = CECommon[Self.dtype].apply_reduction(
             losses_t.buffer, reduction, N, spatial_shape, valid_count
+        )
+
+        @parameter
+        if track_grad:
+            if logits.requires_grad:
+                out.requires_grad_(True)
+                var bwd = CEClassIndicesBackward[Self.dtype](
+                    softmax_probs=softmax_probs_ndb,
+                    target_1d=target_1d_ndb,
+                    logits_shape=logits_shape,
+                    reduction=reduction,
+                    ignore_index=ignore_index,
+                    label_smoothing=ls,
+                    valid_count=valid_count,
+                    M=M,
+                    C=C2,
+                )
+                out.backwardFn = Optional(bwd.into_backward_fn())
+                out.add_ancestry(logits)
+
+        return out^
+
+    @staticmethod
+    fn forward[
+        track_grad: Bool
+    ](
+        logits: Tensor[Self.dtype],
+        target: Tensor[DType.int32],
+        reduction: Reduction,
+        ignore_index: Int,
+        label_smoothing: Scalar[Self.dtype],
+        validate: Bool,
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        var logits_shape = logits.shape()
+        var C = logits_shape[1]
+
+        # Validation
+        if validate:
+            CEValidation[Self.dtype].validate_logits_rank(logits_shape)
+            CEValidation[Self.dtype].validate_num_classes(C)
+            CEValidation[Self.dtype].validate_class_indices_shapes(
+                logits_shape, target.shape()
+            )
+            CEValidation[Self.dtype].validate_target_indices(
+                target, C, ignore_index
+            )
+
+        # Flatten spatial dims
+        var logits_2d_ndb: NDBuffer[Self.dtype]
+        var target_1d_ndb: NDBuffer[DType.int32]
+        var M: Int
+        var C2: Int
+        var spatial_shape: Shape
+        var N: Int
+        logits_2d_ndb, target_1d_ndb, M, C2, spatial_shape, N = CECommon[
+            Self.dtype
+        ].flatten_spatial_class_indices(logits, target)
+
+        # log_softmax + softmax
+        var log_probs_ndb: NDBuffer[Self.dtype]
+        var softmax_probs_ndb: NDBuffer[Self.dtype]
+        log_probs_ndb, softmax_probs_ndb = CECommon[
+            Self.dtype
+        ].compute_log_softmax_and_softmax(logits_2d_ndb)
+
+        # ignore_mask: 1=valid, 0=ignored — from ORIGINAL target
+        var ignore_mask_ndb = CECommon[Self.dtype].build_ignore_mask(
+            target_1d_ndb, ignore_index
+        )
+        var valid_count = (
+            ignore_mask_ndb.sum(normalized_axes=IntArray()).item().__int__()
+        )
+        # onehot — ignore_index rows become all zeros
+        var device = logits.device()
+        var onehot_mask = NDBuffer[Self.dtype].onehot(
+            target_1d_ndb.to_dtype[Self.dtype](),
+            C2,
+            device,
+            ignore_index=ignore_index,
+        )
+
+        # NLL with optional label smoothing
+        var ls = label_smoothing
+        var losses: NDBuffer[Self.dtype]
+
+        if ls > Scalar[Self.dtype](0):
+            # loss = -(1-ls)*log_p[target] - ls * mean(log_p)
+            var nll = -(onehot_mask * log_probs_ndb).sum(
+                normalized_axes=IntArray(1)
+            )
+            var mean_log_p = log_probs_ndb.sum(
+                normalized_axes=IntArray(1)
+            ) / Scalar[Self.dtype](C2)
+            losses = (Scalar[Self.dtype](1) - ls) * nll - ls * mean_log_p
+        else:
+            losses = -(onehot_mask * log_probs_ndb).sum(
+                normalized_axes=IntArray(1)
+            )
+
+        # Zero ignored positions
+        losses = losses * ignore_mask_ndb
+
+        # Apply reduction
+        var out = CECommon[Self.dtype].apply_reduction(
+            losses, reduction, N, spatial_shape, valid_count
         )
 
         @parameter

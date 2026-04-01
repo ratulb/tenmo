@@ -18,7 +18,7 @@ from mnemonics import (
     ReLUBackwardOp,
     ReLUForwardOp,
     ReverseDivide,
-    SqrtForwardOp,
+    SQRT,
     SqrtBackwardOp,
     Equal,
     NotEqual,
@@ -1037,7 +1037,7 @@ struct Buffer[dtype: DType = DType.float32](
         @parameter
         if op_code == ReLUForwardOp:
             return max(block, 0.0)
-        elif op_code == SqrtForwardOp:
+        elif op_code == SQRT:
             return sqrt(block)
         elif op_code == SqrtBackwardOp:
             return 1 / (epsilon + 2 * sqrt(block))

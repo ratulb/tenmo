@@ -54,8 +54,8 @@ fn unary_ops[
                     vec_result = exp(vec_a)
                 elif op_code == SQRT:
                     vec_result = sqrt(vec_a)
-                elif op_code == TANH:
-                    vec_result = tanh(vec_a)
+                    _ = """elif op_code == TANH:
+                    vec_result = tanh(vec_a)"""
                 elif op_code == NEGATE:
                     vec_result = -vec_a
                 else:  # ABS
@@ -73,8 +73,8 @@ fn unary_ops[
                         res = exp(val)
                     elif op_code == SQRT:
                         res = sqrt(val)
-                    elif op_code == TANH:
-                        res = tanh(val)
+                        _ = """elif op_code == TANH:
+                        res = tanh(val)"""
                     elif op_code == NEGATE:
                         res = -val
                     else:  # ABS
@@ -174,11 +174,12 @@ fn log_op_f64[
 
 
 struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
-
     @staticmethod
     fn launch[
         op_code: Int,
-        epsilon: Scalar[Self.dtype] = 1e-12 if Self.dtype.is_floating_point() else Scalar[Self.dtype](0),
+        epsilon: Scalar[
+            Self.dtype
+        ] = 1e-12 if Self.dtype.is_floating_point() else Scalar[Self.dtype](0),
     ](A: NDBuffer[Self.dtype]) raises -> NDBuffer[Self.dtype]:
         """
         Core launch — takes NDBuffer, returns NDBuffer.
@@ -215,12 +216,12 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     log_op_f32[
                         simd_width=simdwidth,
                         simd_vectors_per_thread = 2 * simdwidth,
-                        epsilon=epsilon.cast[DType.float32](),
+                        epsilon = epsilon.cast[DType.float32](),
                     ],
                     log_op_f32[
                         simd_width=simdwidth,
                         simd_vectors_per_thread = 2 * simdwidth,
-                        epsilon=epsilon.cast[DType.float32](),
+                        epsilon = epsilon.cast[DType.float32](),
                     ],
                 ]()
                 device_context.enqueue_function(
@@ -236,12 +237,12 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     log_op_f64[
                         simd_width=simdwidth,
                         simd_vectors_per_thread = 2 * simdwidth,
-                        epsilon=epsilon.cast[DType.float64](),
+                        epsilon = epsilon.cast[DType.float64](),
                     ],
                     log_op_f64[
                         simd_width=simdwidth,
                         simd_vectors_per_thread = 2 * simdwidth,
-                        epsilon=epsilon.cast[DType.float64](),
+                        epsilon = epsilon.cast[DType.float64](),
                     ],
                 ]()
                 device_context.enqueue_function(
@@ -253,7 +254,9 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     block_dim=threads_per_block,
                 )
             else:
-                panic("UnaryOpsKernel: LOG only supported for float32 and float64")
+                panic(
+                    "UnaryOpsKernel: LOG only supported for float32 and float64"
+                )
         else:
             # Generic unary_ops kernel for EXP, SQRT, TANH, NEGATE, ABS
             var compiled = device_context.compile_function[
@@ -281,13 +284,17 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, device_state.gpu)
+        var result_state = DeviceState[Self.dtype](
+            result_buffer^, device_state.gpu
+        )
         return NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
 
     @staticmethod
     fn launch[
         op_code: Int,
-        epsilon: Scalar[Self.dtype] = 1e-12 if Self.dtype.is_floating_point() else Scalar[Self.dtype](0),
+        epsilon: Scalar[
+            Self.dtype
+        ] = 1e-12 if Self.dtype.is_floating_point() else Scalar[Self.dtype](0),
     ](A: Tensor[Self.dtype]) raises -> Tensor[Self.dtype]:
         """
         Convenience overload — takes Tensor, returns Tensor.
@@ -344,8 +351,14 @@ fn main() raises:
     expect = tensor_A.log()
     start = now()
     var result_ndb = UnaryOpsKernel[dtype].launch[LOG](ndb_a)
-    print("GPU log NDBuffer (default epsilon) took: ", (now() - start) * 1000, "ms")
-    assert_true(Tensor[dtype](result_ndb^, requires_grad=False).all_close(expect))
+    print(
+        "GPU log NDBuffer (default epsilon) took: ",
+        (now() - start) * 1000,
+        "ms",
+    )
+    assert_true(
+        Tensor[dtype](result_ndb^, requires_grad=False).all_close(expect)
+    )
 
     # Test LOG via Tensor overload with default epsilon
     tensor_A = Tensor[dtype].ones(SIZE) * 2
@@ -353,15 +366,21 @@ fn main() raises:
     expect = tensor_A.log()
     start = now()
     result = UnaryOpsKernel[dtype].launch[LOG](tensor_a_log)
-    print("GPU log Tensor (default epsilon) took: ", (now() - start) * 1000, "ms")
+    print(
+        "GPU log Tensor (default epsilon) took: ", (now() - start) * 1000, "ms"
+    )
     assert_true(result.all_close(expect))
 
     # Test LOG via Tensor overload with custom epsilon
     tensor_A = Tensor[dtype].ones(SIZE) * 2
     tensor_a_log = tensor_A.to_gpu()
     start = now()
-    result = UnaryOpsKernel[dtype].launch[LOG, Scalar[dtype](1e-7)](tensor_a_log)
-    print("GPU log Tensor (custom epsilon) took: ", (now() - start) * 1000, "ms")
+    result = UnaryOpsKernel[dtype].launch[LOG, Scalar[dtype](1e-7)](
+        tensor_a_log
+    )
+    print(
+        "GPU log Tensor (custom epsilon) took: ", (now() - start) * 1000, "ms"
+    )
     assert_true(result.all_close(expect))
 
     # Test NEGATE

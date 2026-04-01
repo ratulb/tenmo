@@ -18,9 +18,11 @@ from scalar_ops_kernel import ScalarOperations
 from scalar_inplace_ops_kernel import InplaceScalarOperations
 from binary_ops_kernel import BinaryOperations
 from binary_inplace_ops_kernel import BinaryInplaceOperations
+from unary_ops_kernel import UnaryOpsKernel
 from matmul_kernel import MatmulNdGpu
 from compare_kernel import AllClose, Compare, CompareScalar
 from reduction_kernel import Reduction
+from math import sqrt
 from mnemonics import (
     Multiply,
     Add,
@@ -30,6 +32,9 @@ from mnemonics import (
     MAX,
     MIN,
     POW,
+    NEGATE,
+    SQRT,
+    ABS,
     Overwrite,
     ReverseDivide,
     Equal,
@@ -1859,6 +1864,10 @@ struct NDBuffer[dtype: DType](
         return self.arithmetic_ops[Add](other)
 
     @always_inline
+    fn __neg__(self) -> NDBuffer[Self.dtype]:
+        return self.unary_ops[NEGATE]()
+
+    @always_inline
     fn __mul__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.arithmetic_ops[Multiply](other)
 
@@ -1886,8 +1895,13 @@ struct NDBuffer[dtype: DType](
     fn __sub__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.arithmetic_ops[Subtract](other)
 
+    @always_inline
     fn __truediv__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.arithmetic_ops[Divide](other)
+
+    @always_inline
+    fn __truediv__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+        return self.scalar_ops[Divide](scalar)
 
     @always_inline
     fn arithmetic_ops[
@@ -2128,6 +2142,19 @@ struct NDBuffer[dtype: DType](
         else:  # op_code == ReverseDivide
             return rhs / lhs
 
+    @staticmethod
+    @always_inline
+    fn unary_fn_helper[
+        op_code: Int
+    ](scalar: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
+        @parameter
+        if op_code == NEGATE:
+            return -scalar
+        elif op_code == SQRT:
+            return sqrt(scalar)
+        else:  # op_code == ABS:
+            return scalar.__abs__()
+
     @always_inline
     fn scalar_ops[
         op_code: Int,
@@ -2200,6 +2227,66 @@ struct NDBuffer[dtype: DType](
             for idx in self.index_iterator():
                 result_buffer[index] = Self.scalar_fn[op_code](
                     self.buffer[idx], scalar
+                )
+                index += 1
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    @always_inline
+    fn unary_ops[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+        var out: NDBuffer[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = UnaryOpsKernel[Self.dtype].launch[op_code](self)
+                except e:
+                    print(e)
+                    panic(
+                        (
+                            "NDBuffer unary_ops → GPU operation failed for"
+                            " opcode: "
+                        ),
+                        op_code.__str__(),
+                    )
+                    # Unreacahble
+                    out = Self.Empty()
+            else:
+                out = self.unary_ops_cpu[op_code]()
+        else:
+            out = self.unary_ops_cpu[op_code]()
+
+        return out^
+
+    @always_inline
+    fn unary_ops_cpu[
+        op_code: Int
+    ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+        if self.is_contiguous():
+            var start = self.offset
+            var end = start + self.numels()
+            var result_buffer: Buffer[Self.dtype]
+
+            @parameter
+            if op_code == NEGATE:
+                result_buffer = self.buffer[start:end].__neg__()
+            elif op_code == SQRT:
+                result_buffer = self.buffer.unary_ops[SQRT](start, end)
+            else:  # op_code == ABS:
+                result_buffer = self.buffer[start:end].__abs__()
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+        else:
+            var index = 0
+            var result_buffer = Buffer[Self.dtype](self.numels())
+
+            for idx in self.index_iterator():
+                result_buffer[index] = Self.unary_fn_helper[op_code](
+                    self.buffer[idx]
                 )
                 index += 1
 

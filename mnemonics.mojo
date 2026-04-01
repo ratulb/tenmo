@@ -18,7 +18,7 @@ comptime GreaterThanEqual = 16
 comptime Overwrite = 17
 comptime ReLUForwardOp = 18
 comptime ReLUBackwardOp = 19
-comptime SqrtForwardOp = 20
+comptime SQRT = 20
 comptime SqrtBackwardOp = 21
 comptime LOG = 22
 ###################
@@ -44,9 +44,8 @@ comptime MAXPOOL2D = 36
 #####################
 comptime max_rank = 8  # Change this to extend/reduce max supported dimension
 comptime EXP = 37
-comptime SQRT = 38
-comptime NEGATE = 39
-comptime ABS = 40
-comptime MAX = 41
-comptime MIN = 42
-comptime POW = 43
+comptime NEGATE = 38
+comptime ABS = 39
+comptime MAX = 40
+comptime MIN = 41
+comptime POW = 42
