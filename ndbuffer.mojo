@@ -5,7 +5,7 @@ from intarray import IntArray
 from indexhelper import IndexCalculator, IndexIterator
 from matrixshapevalidator import MatrixShapeValidator
 from broadcasthelper import ShapeBroadcaster
-from common_utils import panic, log_warning, print_buffer
+from common_utils import panic, log_debug, print_buffer
 from validators import Validator
 from memory import memcpy, AddressSpace, ArcPointer
 from gpu.host import DeviceBuffer, DeviceContext
@@ -75,7 +75,7 @@ struct NDBuffer[dtype: DType](
         self.device_state = None
 
         if buffer.size == 0:
-            log_warning(
+            log_debug(
                 "NDBuffer →__init__(Buffer, ...): zero sized buffer - potential"
                 " danger"
             )

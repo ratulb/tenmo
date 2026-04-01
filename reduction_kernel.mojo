@@ -7,7 +7,6 @@ from device import DeviceState
 from ndbuffer import NDBuffer
 from intarray import IntArray
 
-
 fn output_to_input_base(
     out_idx: Int,
     in_shape: Array,
@@ -16,6 +15,10 @@ fn output_to_input_base(
 ) -> Int:
     var remaining = out_idx
     var input_base = 0
+
+    # When reducing all axes, there's only one output element
+    if len(reduction_axes) == 0:
+        return 0
 
     for k in reversed(range(len(in_shape))):
         if k not in reduction_axes:
@@ -32,11 +35,15 @@ fn rank_to_reduced_offset(
     var tmp = rank
     var offset = 0
 
+    # Determine which axes are being reduced
+    var reduce_all = len(reduction_axes) == 0
+
     for k in reversed(range(len(in_shape))):
-        if k in reduction_axes:
+        if reduce_all or k in reduction_axes:
             var coord = tmp % in_shape[k]
+            tmp //= in_shape[k]  # Consume this dimension
             offset += coord * in_strides[k]
-    print("Returning offset: ", offset, rank, in_shape, in_strides)
+
     return offset
 
 
@@ -122,10 +129,20 @@ struct Reduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         var output_shape = shape_A.compute_output_shape(
             normalized_axes, keepdims, validated=True
         )
+
+        var normalized_axes_copy = normalized_axes
+        if len(normalized_axes_copy) == 0:
+            # Reduce all axes
+            normalized_axes_copy = IntArray(len(shape_A))
+            for i in range(len(shape_A)):
+                normalized_axes_copy[i] = i
+
+        var reduction_axes: Array = Array(normalized_axes_copy)
+
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
         var in_shape: Array = shape_A.array()
         var in_strides: Array = strides_A.array()
-        var reduction_axes: Array = Array(normalized_axes)
+        #var reduction_axes: Array = Array(normalized_axes)
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
 

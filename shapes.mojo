@@ -287,6 +287,8 @@ struct Shape(
     fn reduced_shape(self, axes: IntArray) -> Shape:
         if len(axes) > self.rank():
             panic("Shape -> reduced_shape: axes greater that shape rank")
+        if len(axes) == 0:
+            return self
         var reduced_axes = IntArray.with_capacity(len(axes))
         for i in range(len(axes)):
             reduced_axes.append(self[axes[i]])
