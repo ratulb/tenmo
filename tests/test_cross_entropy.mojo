@@ -1402,63 +1402,6 @@ fn test_ce_no_validation_speedup() raises:
     print("No validation speedup test passed")
 
 
-fn main_1() raises:
-    run_all_tests()
-    test_ce_gradients_computation_heavy()  # Need to be re-enabled
-    test_ce_reduction_none_1()
-    # Basic functionality tests
-    test_ce_basic_no_reduction()
-    test_ce_reduction_mean_orig()
-    test_ce_reduction_sum_orig()
-    test_ce_reduction_none_orig()
-
-    # Label smoothing tests
-    test_ce_label_smoothing_basic_orig()
-    test_ce_label_smoothing_mean()
-    test_ce_label_smoothing_extreme()
-
-    # Ignore index tests
-    test_ce_ignore_index_basic_orig()
-    test_ce_ignore_index_all_ignored_orig()
-    test_ce_ignore_index_partial()
-
-    # Spatial dimensions tests
-    test_ce_2d_spatial()
-    test_ce_3d_spatial()
-    test_ce_spatial_with_ignore()
-    test_ce_5d_spatial()
-    # Gradient validation tests
-    test_ce_gradients_basic()
-    test_ce_gradients_label_smoothing()
-    test_ce_gradients_ignore_index_orig()
-    test_ce_gradients_spatial_orig()
-
-    # Edge case tests
-    test_ce_single_class()
-    test_ce_perfect_prediction_orig()
-    test_ce_worst_prediction()
-    test_ce_zero_logits()
-    test_ce_large_logits()
-
-    # Validation tests (negative)
-    # test_ce_validation_wrong_target_dims()
-    # test_ce_validation_class_out_of_bounds()
-    # test_ce_validation_spatial_mismatch()
-    # test_ce_validation_batch_size_mismatch()
-
-    test_ce_extreme_perfect_prediction()
-    test_ce_reduction_sum_1()
-    test_ce_2d_basic()
-    test_ce_2d_ignore_index()
-    test_ce_2d_label_smoothing()
-    test_ce_2d_logits_1d_target()
-    test_ce_3d_spatial()
-    test_ce_4d_spatial()
-    test_ce_4d_spatial_1x2()
-    test_ce_reduction_mean_1()
-    test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig()
-    run_all_ce_tests_v2()
-
 fn test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig() raises:
     print("test_ce_reduction_types_with_ignore_index_and_label_smoothing_orig")
     logits = Tensor.d2(

@@ -950,6 +950,27 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
                 validate,
             )
 
+from testing import assert_true
+from testing import assert_false
+from sys import has_accelerator
 
-fn main():
-    pass
+
+fn allclose(a: Float32, b: Float32, atol: Float32 = 1e-4) -> Bool:
+    return abs(a - b) < atol
+
+fn main() raises:
+    @parameter
+    if has_accelerator():
+        print("test_ce_gpu_ci_basic_mean")
+        comptime dtype = DType.float32
+        var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
+        var target = Tensor[DType.int32].d1([0, 1])
+        var target_gpu = Tensor[DType.int32].d1([0, 1]).to_gpu()
+        var ce = CrossEntropyLoss[dtype](reduction="mean")
+        var loss = ce(logits, target_gpu)
+        loss.print()
+        var logits_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
+        var ce2 = CrossEntropyLoss[dtype](reduction="mean")
+        var loss_cpu = ce2(logits_cpu, target)
+        loss_cpu.print()
+        assert_true(allclose(loss.item(), loss_cpu.item()))
