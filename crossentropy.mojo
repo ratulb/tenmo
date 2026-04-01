@@ -307,8 +307,8 @@ struct CECommon[dtype: DType]:
     ) -> Tensor[Self.dtype]:
         """Apply reduction to per-sample losses (M,)."""
         var losses_t = Tensor[Self.dtype](losses)
-        print("losses_t on device: ", losses_t.is_on_gpu(), losses.is_on_gpu())
-        losses.print()
+        #print("losses_t on device: ", losses_t.is_on_gpu(), losses.is_on_gpu())
+        #losses.print()
         if reduction.is_none():
             # Reshape (M,) → (N, d1..dk)
             var spatial_rank = spatial_shape.rank()
@@ -325,8 +325,8 @@ struct CECommon[dtype: DType]:
             var total = losses_t.sum()
             if valid_count > 0:
                 total = total / Scalar[Self.dtype](valid_count)
-            print("The total")
-            total.print()
+            #print("The total")
+            #total.print()
             return total
 
     @staticmethod
@@ -345,7 +345,7 @@ struct CECommon[dtype: DType]:
             axes=[1]
         ).buffer
 
-        print("On accelerator: ", logits_t.is_on_gpu(), log_probs.is_on_gpu())
+        #print("On accelerator: ", logits_t.is_on_gpu(), log_probs.is_on_gpu())
         var probs = logits_t.softmax[track_grad=False](axes=[1]).buffer
         #log_probs.print()
         #probs.print()
@@ -589,7 +589,10 @@ struct CEClassIndicesForward[dtype: DType]:
         var ignore_mask_ndb = CECommon[Self.dtype].build_ignore_mask(
             target_1d_ndb, ignore_index
         )
-
+        ignore_mask_ndb.print()
+        var summ = ignore_mask_ndb.sum(normalized_axes=IntArray())
+        summ.print()
+        print(summ.item())
         var valid_count = (
             ignore_mask_ndb.sum(normalized_axes=IntArray()).item().__int__()
         )
@@ -978,9 +981,9 @@ fn main() raises:
         var target_gpu = Tensor[DType.int32].d1([0, 1]).to_gpu()
         var ce = CrossEntropyLoss[dtype](reduction="mean")
         var loss = ce(logits, target_gpu)
-        loss.print()
+        #loss.print()
         var logits_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
         var ce2 = CrossEntropyLoss[dtype](reduction="mean")
         var loss_cpu = ce2(logits_cpu, target)
-        loss_cpu.print()
+        #loss_cpu.print()
         assert_true(allclose(loss.item(), loss_cpu.item()))
