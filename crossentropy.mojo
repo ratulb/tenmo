@@ -294,7 +294,7 @@ struct CECommon[dtype: DType]:
         ).to_dtype[Self.dtype]()
 
     @staticmethod
-    fn apply_reduction(
+    fn apply_reduction_good(
         losses: NDBuffer[Self.dtype],
         reduction: Reduction,
         N: Int,
@@ -320,6 +320,35 @@ struct CECommon[dtype: DType]:
             if valid_count > 0:
                 total = total / Scalar[Self.dtype](valid_count)
             return total
+
+    @staticmethod
+    fn apply_reduction(
+        losses: NDBuffer[Self.dtype],
+        reduction: Reduction,
+        N: Int,
+        spatial_shape: Shape,
+        valid_count: Int,
+    ) -> Tensor[Self.dtype]:
+        """Apply reduction to per-sample losses (M,)."""
+        var transformed: NDBuffer[Self.dtype]
+        if reduction.is_none():
+            # Reshape (M,) → (N, d1..dk)
+            var spatial_rank = spatial_shape.rank()
+            if spatial_rank == 0:
+                transformed = losses.reshape(Shape(N))
+            else:
+                var out_dims = IntArray.with_capacity(spatial_rank + 1)
+                out_dims.append(N)
+                for i in range(spatial_rank):
+                    out_dims.append(spatial_shape[i])
+                transformed = losses.reshape(Shape(out_dims))
+        elif reduction.is_sum():
+            transformed = losses.sum(IntArray())
+        else:  # mean
+            transformed = losses.sum(IntArray())
+            if valid_count > 0:
+                transformed /= Scalar[Self.dtype](valid_count)
+        return Tensor[Self.dtype](transformed^, requires_grad=False)
 
     @staticmethod
     fn compute_log_softmax_and_softmax(
@@ -947,6 +976,7 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](Copyable):
                 validate,
             )
 
+
 from testing import assert_true
 from testing import assert_false
 from sys import has_accelerator
@@ -955,12 +985,15 @@ from sys import has_accelerator
 fn allclose(a: Float32, b: Float32, atol: Float32 = 1e-4) -> Bool:
     return abs(a - b) < atol
 
+
 fn main() raises:
     @parameter
     if has_accelerator():
         print("test_ce_gpu_ci_basic_mean")
         comptime dtype = DType.float32
-        var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
+        var logits = (
+            Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
+        )
         var target = Tensor[DType.int32].d1([0, 1])
         var target_gpu = Tensor[DType.int32].d1([0, 1]).to_gpu()
         var ce = CrossEntropyLoss[dtype](reduction="mean")
