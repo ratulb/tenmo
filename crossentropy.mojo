@@ -308,6 +308,7 @@ struct CECommon[dtype: DType]:
         """Apply reduction to per-sample losses (M,)."""
         var losses_t = Tensor[Self.dtype](losses)
         print("losses_t on device: ", losses_t.is_on_gpu(), losses.is_on_gpu())
+        losses.print()
         if reduction.is_none():
             # Reshape (M,) → (N, d1..dk)
             var spatial_rank = spatial_shape.rank()
@@ -324,6 +325,8 @@ struct CECommon[dtype: DType]:
             var total = losses_t.sum()
             if valid_count > 0:
                 return total / Scalar[Self.dtype](valid_count)
+            print("The total")
+            total.print()
             return total
 
     @staticmethod
