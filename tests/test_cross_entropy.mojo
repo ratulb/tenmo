@@ -3536,8 +3536,58 @@ fn test_ce_gpu_ci_label_smoothing() raises:
         )(logits_cpu, target)
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
-
 fn test_ce_gpu_ci_3d() raises:
+    @parameter
+    if has_accelerator():
+        print("test_ce_gpu_ci_3d")
+        comptime dtype = DType.float32
+
+        # Define data with correct shape (N, C, H)
+        var logits = Tensor[dtype].d3(
+            [
+                # Batch 0
+                [
+                    [2.0, 1.0],   # Class 0: spatial positions 0, 1
+                    [1.0, 2.0],   # Class 1: spatial positions 0, 1
+                    [0.5, 1.5]    # Class 2: spatial positions 0, 1
+                ],
+                # Batch 1
+                [
+                    [1.5, 2.0],   # Class 0: spatial positions 0, 1
+                    [2.0, 1.0],   # Class 1: spatial positions 0, 1
+                    [1.0, 2.0]    # Class 2: spatial positions 0, 1
+                ]
+            ],
+            requires_grad=True
+        )
+
+        var target = Tensor[DType.int32].d2(
+            [[0, 2],   # Batch 0: spatial0→class0, spatial1→class2
+             [1, 0]]   # Batch 1: spatial0→class1, spatial1→class0
+        )
+
+        # GPU forward
+        var logits_gpu = logits.to_gpu()
+        var target_gpu = target.to_gpu()
+        var ce = CrossEntropyLoss[dtype](reduction="mean")
+        var loss_gpu = ce(logits_gpu, target_gpu)
+
+        # CPU forward for comparison
+        var loss_cpu = ce(logits, target)  # Use same criterion instance or create new
+
+        # Compare results
+        assert_true(allclose(loss_gpu.to_cpu().item(), loss_cpu.item(), 1e-5))
+
+        # Optional: Test backward
+        loss_gpu.backward()
+        loss_cpu.backward()
+
+        # Compare gradients
+        assert_true(logits.grad().all_close(logits_gpu.grad().to_cpu(), 1e-5))
+
+        print("✓ 3D cross-entropy GPU test passed")
+
+fn test_ce_gpu_ci_3d_1() raises:
     @parameter
     if has_accelerator():
         print("test_ce_gpu_ci_3d")
