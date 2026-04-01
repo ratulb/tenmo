@@ -3583,7 +3583,7 @@ fn test_ce_gpu_ci_3d() raises:
         loss_cpu.backward()
 
         # Compare gradients
-        assert_true(logits.grad().all_close(logits_gpu.grad().to_cpu(), 1e-5))
+        assert_true(logits.grad().all_close(logits_gpu.grad().to_cpu()))
 
         print("✓ 3D cross-entropy GPU test passed")
 
