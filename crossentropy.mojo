@@ -593,7 +593,7 @@ struct CEClassIndicesForward[dtype: DType]:
         var valid_count = (
             ignore_mask_ndb.sum(normalized_axes=IntArray()).item().__int__()
         )
-
+        print("valid_count: ", valid_count, "ignore_mask_ndb on: ", ignore_mask_ndb.is_on_gpu())
         # onehot — ignore_index rows become all zeros
         var target_t = Tensor[Self.dtype](
             target_1d_ndb.to_dtype[Self.dtype](), requires_grad=False
