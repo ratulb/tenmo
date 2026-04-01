@@ -239,8 +239,8 @@ struct CECommon[dtype: DType]:
         var spatial_shape = (
             Shape(spatial_dims) if len(spatial_dims) > 0 else Shape()
         )
-        logits_2d.print()
-        target_1d.print()
+        #logits_2d.print()
+        #target_1d.print()
         return (
             logits_2d.buffer,
             target_1d.buffer,
@@ -324,7 +324,7 @@ struct CECommon[dtype: DType]:
         else:  # mean
             var total = losses_t.sum()
             if valid_count > 0:
-                return total / Scalar[Self.dtype](valid_count)
+                total = total / Scalar[Self.dtype](valid_count)
             print("The total")
             total.print()
             return total
@@ -347,8 +347,8 @@ struct CECommon[dtype: DType]:
 
         print("On accelerator: ", logits_t.is_on_gpu(), log_probs.is_on_gpu())
         var probs = logits_t.softmax[track_grad=False](axes=[1]).buffer
-        log_probs.print()
-        probs.print()
+        #log_probs.print()
+        #probs.print()
         return log_probs, probs
 
     @staticmethod
