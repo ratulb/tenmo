@@ -64,7 +64,6 @@ fn reduce[
         max_block_size.is_power_of_two() and max_block_size < 1024,
         "Invalid max_block_size",
     ]()
-    print("in_shape: ", in_shape, "in_strides: ", in_strides, reduction_axes, total_output, reduced_volume)
     var smem = stack_allocation[
         max_block_size, Scalar[dtype], address_space = AddressSpace.SHARED
     ]()
@@ -151,7 +150,6 @@ struct Reduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
             max_block_width
         ](total_output, reduced_volume)
 
-        print("reduced_shape: ", reduced_shape, total_output, reduced_volume, threads_per_block, num_blocks, normalized_axes)
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu()
