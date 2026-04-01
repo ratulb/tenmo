@@ -207,8 +207,6 @@ struct CECommon[dtype: DType]:
         Permutes logits so class dim is last before flattening.
         Returns NDBuffers — safe to store in backward structs.
         """
-        #logits.print()
-        #target.print()
         var logits_shape = logits.shape()
         var N = logits_shape[0]
         var C = logits_shape[1]
@@ -239,8 +237,6 @@ struct CECommon[dtype: DType]:
         var spatial_shape = (
             Shape(spatial_dims) if len(spatial_dims) > 0 else Shape()
         )
-        #logits_2d.print()
-        #target_1d.print()
         return (
             logits_2d.buffer,
             target_1d.buffer,
@@ -307,8 +303,6 @@ struct CECommon[dtype: DType]:
     ) -> Tensor[Self.dtype]:
         """Apply reduction to per-sample losses (M,)."""
         var losses_t = Tensor[Self.dtype](losses)
-        #print("losses_t on device: ", losses_t.is_on_gpu(), losses.is_on_gpu())
-        #losses.print()
         if reduction.is_none():
             # Reshape (M,) → (N, d1..dk)
             var spatial_rank = spatial_shape.rank()
@@ -325,8 +319,6 @@ struct CECommon[dtype: DType]:
             var total = losses_t.sum()
             if valid_count > 0:
                 total = total / Scalar[Self.dtype](valid_count)
-            #print("The total")
-            #total.print()
             return total
 
     @staticmethod
@@ -345,10 +337,7 @@ struct CECommon[dtype: DType]:
             axes=[1]
         ).buffer
 
-        #print("On accelerator: ", logits_t.is_on_gpu(), log_probs.is_on_gpu())
         var probs = logits_t.softmax[track_grad=False](axes=[1]).buffer
-        #log_probs.print()
-        #probs.print()
         return log_probs, probs
 
     @staticmethod
@@ -589,14 +578,9 @@ struct CEClassIndicesForward[dtype: DType]:
         var ignore_mask_ndb = CECommon[Self.dtype].build_ignore_mask(
             target_1d_ndb, ignore_index
         )
-        ignore_mask_ndb.print()
-        var summ = ignore_mask_ndb.sum(normalized_axes=IntArray())
-        summ.print()
-        print(summ.item())
         var valid_count = (
             ignore_mask_ndb.sum(normalized_axes=IntArray()).item().__int__()
         )
-        print("valid_count: ", valid_count, "ignore_mask_ndb on: ", ignore_mask_ndb.is_on_gpu())
         # onehot — ignore_index rows become all zeros
         var target_t = Tensor[Self.dtype](
             target_1d_ndb.to_dtype[Self.dtype](), requires_grad=False
@@ -981,9 +965,7 @@ fn main() raises:
         var target_gpu = Tensor[DType.int32].d1([0, 1]).to_gpu()
         var ce = CrossEntropyLoss[dtype](reduction="mean")
         var loss = ce(logits, target_gpu)
-        #loss.print()
         var logits_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
         var ce2 = CrossEntropyLoss[dtype](reduction="mean")
         var loss_cpu = ce2(logits_cpu, target)
-        #loss_cpu.print()
         assert_true(allclose(loss.item(), loss_cpu.item()))
