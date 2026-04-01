@@ -207,6 +207,8 @@ struct CECommon[dtype: DType]:
         Permutes logits so class dim is last before flattening.
         Returns NDBuffers — safe to store in backward structs.
         """
+        logits.print()
+        target.print()
         var logits_shape = logits.shape()
         var N = logits_shape[0]
         var C = logits_shape[1]
@@ -237,7 +239,8 @@ struct CECommon[dtype: DType]:
         var spatial_shape = (
             Shape(spatial_dims) if len(spatial_dims) > 0 else Shape()
         )
-
+        logits_2d.print()
+        target_1d.print()
         return (
             logits_2d.buffer,
             target_1d.buffer,
@@ -338,7 +341,11 @@ struct CECommon[dtype: DType]:
         var log_probs = logits_t.softmax[log=True, track_grad=False](
             axes=[1]
         ).buffer
+
+        print("On accelerator: ", logits_t.is_on_gpu(), log_probs.is_on_gpu())
         var probs = logits_t.softmax[track_grad=False](axes=[1]).buffer
+        log_probs.print()
+        probs.print()
         return log_probs, probs
 
     @staticmethod
