@@ -36,7 +36,7 @@ fn rank_to_reduced_offset(
         if k in reduction_axes:
             var coord = tmp % in_shape[k]
             offset += coord * in_strides[k]
-
+    print("Returning offset: ", offset, rank, in_shape, in_strides)
     return offset
 
 
@@ -57,6 +57,7 @@ fn reduce[
         max_block_size.is_power_of_two() and max_block_size < 1024,
         "Invalid max_block_size",
     ]()
+    print("in_shape: ", in_shape, "in_strides: ", in_strides, reduction_axes, total_output, reduced_volume)
     var smem = stack_allocation[
         max_block_size, Scalar[dtype], address_space = AddressSpace.SHARED
     ]()
@@ -133,6 +134,7 @@ struct Reduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
             max_block_width
         ](total_output, reduced_volume)
 
+        print("reduced_shape: ", reduced_shape, total_output, reduced_volume, threads_per_block, num_blocks, normalized_axes)
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu()
@@ -182,60 +184,21 @@ struct Reduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
 
 
 fn main() raises:
-    test_sum_all()
-    test_sum_partial()
-
+    test_mean()
 
 from tenmo import Tensor
 from testing import assert_true
 
-
-fn test_sum_all() raises:
-    print("test_sum_all")
-    comptime dtype = DType.float32
-    var a = Tensor[dtype].ones(2, 3, 4)
-    var cpu_result = a.sum()
-    cpu_result.print()
-    assert_true(cpu_result == Tensor[dtype].scalar(24))
-    var a_gpu = a.to_gpu()
-    var gpu_result = a_gpu.sum()
-    var cpu_result_gpu = cpu_result.to_gpu()
-    gpu_result.print()
-    assert_true(cpu_result_gpu.all_close(gpu_result))
-
-    cpu_result = a.sum(keepdims=True)
-    gpu_result = a_gpu.sum(keepdims=True)
-    cpu_result.print()
-    gpu_result.print()
-    cpu_result_gpu = cpu_result.to_gpu()
-    assert_true(cpu_result_gpu == gpu_result)
-    assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    assert_true(cpu_result.all_close(gpu_result.to_cpu()))
-
-
-fn test_sum_partial() raises:
-    print("test_sum_partial")
-    comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(2 * 3 * 4)
-    a = a.reshape(2, 3, 4)
-    var cpu_result = a.sum(axes=[1])
-    cpu_result.print()
-    var a_gpu = a.to_gpu()
-    var gpu_result = a_gpu.sum(axes=[1])
-    var cpu_result_gpu = cpu_result.to_gpu()
-    gpu_result.print()
-    assert_true(cpu_result_gpu.all_close(gpu_result))
-
-    cpu_result = a.sum(axes=[0], keepdims=True)
-    gpu_result = a_gpu.sum(axes=[0], keepdims=True)
-    cpu_result.print()
-    gpu_result.print()
-    cpu_result_gpu = cpu_result.to_gpu()
-    assert_true(cpu_result_gpu == gpu_result)
-    assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    assert_true(cpu_result.all_close(gpu_result.to_cpu()))
-
-
+from device import GPU
+from shapes import Shape
 fn test_mean() raises:
     print("test_mean")
     comptime dtype = DType.float32
+    var ndb = NDBuffer[dtype](10, 20, 30)
+    #ndb.print()
+    s1 = ndb.sum(IntArray())
+    s1.print()
+    var ndb_gpu = ndb.to_gpu(GPU())
+    #ndb_gpu.print()
+    s2 = ndb_gpu.sum(IntArray())
+    s2.print()
