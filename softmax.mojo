@@ -83,7 +83,7 @@ struct Softmax[dtype: DType]:
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
 
         # Numerical stability: subtract max along axes
-        var max_vals = MinMax[Self.dtype].forward[max=True, track_grad=False](
+        _="""var max_vals = MinMax[Self.dtype].forward[max=True, track_grad=False](
             this, normalized_axes, keepdims=True, requires_grad=False
         )
 
@@ -102,7 +102,9 @@ struct Softmax[dtype: DType]:
         # Divide to get softmax
         var out = Divider[Self.dtype].forward[track_grad=False](
             stable_exp, exp_sum
-        )
+        )"""
+        var ndb = this.buffer.softmax(normalized_axes, validated=True)
+        var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         @parameter
         if track_grad:
@@ -186,7 +188,7 @@ struct LogSoftmax[dtype: DType]:
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
 
         # Numerical stability: subtract max along axes
-        var max_vals = MinMax[Self.dtype].forward[max=True, track_grad=False](
+        _="""var max_vals = MinMax[Self.dtype].forward[max=True, track_grad=False](
             this, normalized_axes, keepdims=True, requires_grad=False
         )
 
@@ -209,7 +211,10 @@ struct LogSoftmax[dtype: DType]:
         # Log softmax: (x - max(x)) - log(sum(exp(x - max(x))))
         var out = Subtractor[Self.dtype].forward[track_grad=False](
             stable, log_sum_exp
-        )
+        )"""
+
+        var (ndb, softmax_vals) = this.buffer.log_softmax(normalized_axes, validated=True)
+        var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         @parameter
         if track_grad:
@@ -219,13 +224,18 @@ struct LogSoftmax[dtype: DType]:
 
                 # Compute softmax for backward — needed for grad computation
                 # Store as NDBuffer — carries device state, GPU safe
-                var softmax_vals = Divider[Self.dtype].forward[
+                _="""var softmax_vals = Divider[Self.dtype].forward[
                     track_grad=False
                 ](stable_exp, exp_sum)
 
                 var backward_fn = LogSoftmaxBackward[Self.dtype](
                     normalized_axes^,
                     softmax_vals.buffer.contiguous(),
+                ).into_backward_fn()"""
+
+                var backward_fn = LogSoftmaxBackward[Self.dtype](
+                    normalized_axes^,
+                    softmax_vals,
                 ).into_backward_fn()
 
                 out.backwardFn = Optional(backward_fn^)

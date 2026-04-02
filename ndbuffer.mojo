@@ -933,6 +933,29 @@ struct NDBuffer[dtype: DType](
     fn zero(self):
         self.fill(Scalar[Self.dtype](0))
 
+    fn softmax(self, axes: IntArray, validated: Bool = False) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        var normalized_axes = axes if validated else Validator.validate_and_normalize_axes(self.shape, axes)
+        # Numerical stability: subtract max along axes
+        var (max_values, _) = self.minmax[is_max=True](normalized_axes, keepdims=True)
+        var stable = self - max_values
+        # Compute exponentials
+        var stable_exp = stable.exp()
+        # Sum of exponentials along axes
+        var exp_sum = stable_exp.sum(normalized_axes, keepdims=True)
+        return stable_exp / exp_sum
+
+    fn log_softmax(self, axes: IntArray, validated: Bool = False) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]] where Self.dtype.is_floating_point():
+        var normalized_axes = axes if validated else Validator.validate_and_normalize_axes(self.shape, axes)
+        # Numerical stability: subtract max along axes
+        var (max_values, _) = self.minmax[is_max=True](normalized_axes, keepdims=True)
+        var stable = self - max_values
+        # Compute exponentials
+        var stable_exp = stable.exp()
+        # Sum of exponentials along axes
+        var exp_sum = stable_exp.sum(normalized_axes, keepdims=True)
+        var log_sum_exp = exp_sum.log()
+        return stable - log_sum_exp, stable_exp / exp_sum
+
     @always_inline
     fn fill(self, value: Scalar[Self.dtype]):
         @parameter
