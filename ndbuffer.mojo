@@ -22,6 +22,8 @@ from unary_ops_kernel import UnaryOpsKernel
 from matmul_kernel import MatmulNdGpu
 from compare_kernel import AllClose, Compare, CompareScalar
 from reduction_kernel import Reduction
+from minmax_kernel import ReductionMinMax
+from minmax_reducer import MinMaxReducer
 from math import sqrt
 from mnemonics import (
     Multiply,
@@ -1883,7 +1885,6 @@ struct NDBuffer[dtype: DType](
     fn __sub__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.scalar_ops[Subtract](scalar)
 
-
     @always_inline
     fn max(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.scalar_ops[MAX](scalar)
@@ -2300,6 +2301,56 @@ struct NDBuffer[dtype: DType](
                 index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    fn minmax[
+        is_max: Bool
+    ](
+        self, axes: IntArray, keepdims: Bool = False, paired: Bool = False
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        ref shape = self.shape
+        var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    var (result_ndb, mask_ndb) = ReductionMinMax[
+                        Self.dtype
+                    ].launch[is_max=is_max](self, normalized_axes, keepdims)
+                    return result_ndb, mask_ndb
+                except e:
+                    print(e)
+                    panic("NDBuffer minmax: gpu path failed")
+                    # Unreachable
+                    return (
+                        NDBuffer[Self.dtype].Empty(),
+                        NDBuffer[Self.dtype].Empty(),
+                    )
+            else:
+                return self.minmax_cpu[is_max](
+                    normalized_axes, keepdims, paired
+                )
+        else:
+            return self.minmax_cpu[is_max](normalized_axes, keepdims, paired)
+
+    fn minmax_cpu[
+        is_max: Bool
+    ](
+        self,
+        normalized_axes: IntArray,
+        keepdims: Bool = False,
+        paired: Bool = False,
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        var result_ndb = MinMaxReducer[Self.dtype].reduce_minmax[is_max](
+            self, normalized_axes, keepdims
+        )
+        if paired:
+            var mask_ndb = MinMaxReducer[Self.dtype].build_minmax_mask[is_max](
+                self, result_ndb, normalized_axes, keepdims
+            )
+            return result_ndb, mask_ndb
+        else:
+            return result_ndb, NDBuffer[Self.dtype].Empty()
 
     fn clamp(
         self: NDBuffer[Self.dtype],

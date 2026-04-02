@@ -58,7 +58,7 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
 @register_passable
 struct MinMax[dtype: DType = DType.float32]:
     @staticmethod
-    fn forward[
+    fn forward_good[
         max: Bool, track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],
@@ -79,6 +79,7 @@ struct MinMax[dtype: DType = DType.float32]:
                     var result = Tensor[Self.dtype](
                         result_ndb^, requires_grad=False
                     )
+
                     @parameter
                     if track_grad:
                         var grad_required = requires_grad.or_else(
@@ -123,6 +124,47 @@ struct MinMax[dtype: DType = DType.float32]:
                 result.add_ancestry(self)
 
         return result^
+
+    @staticmethod
+    fn forward[
+        max: Bool, track_grad: Bool = True
+    ](
+        self: Tensor[Self.dtype],
+        axes: IntArray,
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        var shape = self.shape()
+        var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
+        var tracking_grad = track_grad and requires_grad.or_else(
+            self.requires_grad
+        )
+        var (result_ndb, mask_ndb) = self.buffer.minmax[is_max=max](
+            normalized_axes, keepdims, tracking_grad
+        )
+        var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
+
+        @parameter
+        if track_grad:
+            var grad_required = requires_grad.or_else(self.requires_grad)
+            if grad_required:
+                out.requires_grad_(True)
+                var var backward_fn: BackwardFn[Self.dtype]
+                if self.is_on_gpu():
+                    var mask_gradbox = Gradbox[Self.dtype](
+                        mask_ndb^, share=False
+                    )
+                    backward_fn = MinMaxBackwardGPU[Self.dtype](
+                        mask_gradbox^, normalized_axes, keepdims
+                    ).into_backward_fn()
+                else:
+                    backward_fn = MinMaxBackward[Self.dtype](
+                        normalized_axes, keepdims, mask_ndb^
+                    ).into_backward_fn()
+                out.backwardFn = Optional(backward_fn^)
+                out.add_ancestry(self)
+
+        return out^
 
 
 @fieldwise_init
