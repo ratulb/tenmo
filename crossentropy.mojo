@@ -389,7 +389,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
         GPU safe: all arithmetic ops.
         """
         if reduction.is_none():
-            var ug = upstream.buffer
+            var ug = upstream.buffer.copy()
             var ug_expanded = ug.unsqueeze(IntArray(-1)).broadcast_to(
                 Shape(M, C)
             )
