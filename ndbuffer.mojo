@@ -1894,7 +1894,7 @@ struct NDBuffer[dtype: DType](
     fn log[
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        return self.float_unary_ops[LOG]()
+        return self.float_unary_ops[LOG, epsilon]()
 
     @always_inline
     fn exp(self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():

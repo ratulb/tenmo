@@ -164,7 +164,8 @@ struct Logarithm[dtype: DType]:
         Thin wrapper — delegates compute to forward(NDBuffer).
         Attaches autograd machinery if needed.
         """
-        var result_ndb = Self.forward[epsilon](self.buffer)
+        #var result_ndb = Self.forward[epsilon](self.buffer)
+        var result_ndb = self.buffer.log[epsilon]()
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
         @parameter
