@@ -1402,7 +1402,7 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
         *,
-        threshold: Int = 10000,
+        threshold: Int = 100000,
     ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
         var actual_end = end_index.or_else(self.size)
         var extent = actual_end - start_index
@@ -1459,33 +1459,6 @@ struct Buffer[dtype: DType = DType.float32](
                 var out_idx = out_start + i
                 dst_data[out_idx] = exp(src_data[src_idx])
                 i += 1
-
-        _ = """@parameter
-        fn process_chunk(chunk_idx: Int):
-
-            comptime simd = simd_width_of[Self.dtype]()
-
-            var out_start = chunk_idx * chunk_size
-            if out_start >= extent:
-                return
-
-            var out_end = min(out_start + chunk_size, extent)
-
-            var src_start = start_index + out_start
-            var n = out_end - out_start
-
-            var vec_end = (n // simd) * simd
-
-            var i = 0
-
-            while i < vec_end:
-                var v = self.load[simdwidth=simd](src_start + i)
-                out.store[simdwidth=simd](out_start + i, exp(v))
-                i += simd
-
-            while i < n:
-                out[out_start + i] = exp(self[src_start + i])
-                i += 1"""
 
         parallelize[process_chunk](num_cores)
 
