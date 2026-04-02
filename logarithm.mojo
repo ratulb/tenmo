@@ -97,60 +97,6 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
 @fieldwise_init
 @register_passable
 struct Logarithm[dtype: DType]:
-    @staticmethod
-    fn forward[
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-    ](
-        buffer: NDBuffer[Self.dtype],
-    ) -> NDBuffer[
-        Self.dtype
-    ] where Self.dtype.is_floating_point():
-        """
-        Core log computation on NDBuffer.
-        epsilon is runtime — GPU path uses max(x, epsilon) then log
-        via NDBuffer scalar_ops and UnaryOpsKernel[LOG] with default epsilon=0
-        (clamping already done, so no double-clamping needed).
-
-        GPU path   : clamp via scalar_ops[MAX], then log via UnaryOpsKernel[LOG, 0]
-        CPU fast   : contiguous buffer log with epsilon clamping
-        CPU slow   : strided index iterator fallback
-        """
-        var shape = buffer.shape
-
-        @parameter
-        if has_accelerator():
-            if buffer.is_on_gpu():
-                try:
-                    # Step 1: clamp to epsilon — scalar_ops[MAX], runtime epsilon OK
-                    # var clamped = buffer.max(epsilon)
-                    # Step 2: log on already-clamped buffer
-                    # epsilon=0 here since clamping already done
-                    # comptime zero_epsilon = Scalar[Self.dtype](0)
-                    return UnaryOpsKernel[Self.dtype].launch[LOG, epsilon](
-                        buffer
-                    )
-                except e:
-                    panic("Logarithm GPU forward failed: " + e.__str__())
-                    return NDBuffer[Self.dtype].Empty()  # unreachable
-
-        # CPU contiguous fast path
-        if buffer.is_contiguous():
-            var start = buffer.offset
-            var end = start + buffer.numels()
-            var input_data = buffer.data_buffer()
-            var out_buffer = input_data.log[epsilon](start, end)
-            return NDBuffer[Self.dtype](out_buffer^, shape)
-
-        # CPU non-contiguous fallback
-        var result = NDBuffer[Self.dtype](shape)
-        var index = 0
-        var result_ptr = result.data_ptr()
-        for idx in buffer.index_iterator():
-            var val = (buffer.data_ptr() + idx)[]
-            var val_safe = max(val, epsilon)
-            (result_ptr + index)[] = log(val_safe)
-            index += 1
-        return result^
 
     @staticmethod
     fn forward[
@@ -180,7 +126,6 @@ struct Logarithm[dtype: DType]:
                 out.add_ancestry(self)
 
         return out^
-
 
 fn main() raises:
     pass
