@@ -342,7 +342,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
         return log_probs, probs
 
     @staticmethod
-    fn scale_grad_by_upstream(
+    fn scale_grad_by_upstream_good(
         grad: NDBuffer[Self.dtype],
         upstream: Gradbox[Self.dtype],
         reduction: Reduction,
@@ -372,6 +372,34 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
                 valid_count if reduction.is_mean() and valid_count > 0 else 1
             )
             return (grad_t * (ug_scalar / scale)).buffer
+
+    @staticmethod
+    fn scale_grad_by_upstream(
+        grad: NDBuffer[Self.dtype],
+        upstream: Gradbox[Self.dtype],
+        reduction: Reduction,
+        valid_count: Int,
+        M: Int,
+        C: Int,
+    ) -> NDBuffer[Self.dtype]:
+        """
+        Scale gradient by upstream grad and reduction factor.
+        For none reduction: broadcast upstream (M,) → (M, C).
+        For mean/sum: scalar multiply.
+        GPU safe: all arithmetic ops.
+        """
+        if reduction.is_none():
+            var ug = upstream.buffer
+            var ug_expanded = ug.unsqueeze(IntArray(-1)).broadcast_to(
+                Shape(M, C)
+            )
+            return grad * ug_expanded
+        else:
+            var ug_scalar = upstream.buffer.sum(IntArray()).item()
+            var scale = Scalar[Self.dtype](
+                valid_count if reduction.is_mean() and valid_count > 0 else 1
+            )
+            return grad * (ug_scalar / scale)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
