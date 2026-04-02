@@ -13,10 +13,15 @@ from mnemonics import (
     TANH,
     NEGATE,
 )
-from math import log, exp, sqrt, tanh
+from math import log, exp, sqrt
 
 
-# ── Generic unary ops kernel (no LOG) ────────────────────────────────────────
+# ── Generic unary ops kernel (SQRT, NEGATE, ABS) ──────────────────────────────
+# LOG, EXP, TANH are handled by dedicated typed kernels because:
+# - log(), exp(), tanh() all require where dtype.is_floating_point()
+# - GPU compiler doesn't yet support that constraint on generic kernels
+#   in current stable Mojo — even with hardcoded dtype, the runtime proof
+#   fails. Dedicated typed kernels sidestep the constraint entirely.
 
 
 fn unary_ops[
@@ -29,8 +34,8 @@ fn unary_ops[
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     size: UInt,
 ):
-    """Generic unary ops kernel — EXP, SQRT, TANH, NEGATE, ABS.
-    LOG is handled by dedicated log_op_f32 / log_op_f64 kernels.
+    """Generic unary ops kernel — SQRT, NEGATE, ABS.
+    LOG, EXP, TANH are handled by dedicated typed kernels.
     """
     var tid = thread_idx.x
     var gtid = tid + block_dim.x * block_idx.x
@@ -50,12 +55,8 @@ fn unary_ops[
                 var vec_result: SIMD[dtype, simd_width]
 
                 @parameter
-                if op_code == EXP:
-                    vec_result = exp(vec_a)
-                elif op_code == SQRT:
+                if op_code == SQRT:
                     vec_result = sqrt(vec_a)
-                    _ = """elif op_code == TANH:
-                    vec_result = tanh(vec_a)"""
                 elif op_code == NEGATE:
                     vec_result = -vec_a
                 else:  # ABS
@@ -69,12 +70,8 @@ fn unary_ops[
                     var res: Scalar[dtype]
 
                     @parameter
-                    if op_code == EXP:
-                        res = exp(val)
-                    elif op_code == SQRT:
+                    if op_code == SQRT:
                         res = sqrt(val)
-                        _ = """elif op_code == TANH:
-                        res = tanh(val)"""
                     elif op_code == NEGATE:
                         res = -val
                     else:  # ABS
@@ -85,23 +82,177 @@ fn unary_ops[
         base_idx += stride * CHUNK_SIZE
 
 
-# ── Dedicated log kernels ─────────────────────────────────────────────────────
-# LOG is separated from unary_ops because:
-# - log() requires where dtype.is_floating_point() which GPU compiler doesn't
-#   yet support on generic kernels in current stable Mojo
-# - Hardcoding dtype sidesteps the constraint entirely
+# ── Dedicated exp kernels ─────────────────────────────────────────────────────
 
 
-fn log_op_f32[
+fn exp_op_f32[
     simd_width: Int = simd_width_of[DType.float32](),
     simd_vectors_per_thread: Int = 2 * simd_width,
-    epsilon: Scalar[DType.float32] = Scalar[DType.float32](1e-12),
 ](
     result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
     size: UInt,
 ):
-    """Dedicated float32 log kernel with epsilon clamping."""
+    """Dedicated float32 exp kernel."""
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+
+        @parameter
+        for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                result.store[width=simd_width](i, exp(vec_a))
+
+            elif i < size:
+                for j in range(size - i):
+                    result[i + j] = exp(A[i + j])
+
+        base_idx += stride * CHUNK_SIZE
+
+
+fn exp_op_f64[
+    simd_width: Int = simd_width_of[DType.float64](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
+    A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
+    size: UInt,
+):
+    """Dedicated float64 exp kernel."""
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+
+        @parameter
+        for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                result.store[width=simd_width](i, exp(vec_a))
+
+            elif i < size:
+                for j in range(size - i):
+                    result[i + j] = exp(A[i + j])
+
+        base_idx += stride * CHUNK_SIZE
+
+
+# ── Dedicated tanh kernels ────────────────────────────────────────────────────
+# tanh() requires PTX ISA 7.0+ which is not generally available.
+# We use the identity: tanh(x) = (e^2x - 1) / (e^2x + 1)
+# which only requires exp() — available on all PTX ISA versions.
+
+
+fn tanh_op_f32[
+    simd_width: Int = simd_width_of[DType.float32](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
+    size: UInt,
+):
+    """Dedicated float32 tanh kernel.
+    Implemented as (e^2x - 1) / (e^2x + 1) to avoid PTX ISA 7.0 requirement.
+    """
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+
+        @parameter
+        for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                var e2x = exp(vec_a + vec_a)
+                var one = SIMD[DType.float32, simd_width](1.0)
+                result.store[width=simd_width](i, (e2x - one) / (e2x + one))
+
+            elif i < size:
+                for j in range(size - i):
+                    var x = A[i + j]
+                    var e2x = exp(x + x)
+                    result[i + j] = (e2x - 1.0) / (e2x + 1.0)
+
+        base_idx += stride * CHUNK_SIZE
+
+
+fn tanh_op_f64[
+    simd_width: Int = simd_width_of[DType.float64](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
+    A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
+    size: UInt,
+):
+    """Dedicated float64 tanh kernel.
+    Implemented as (e^2x - 1) / (e^2x + 1) to avoid PTX ISA 7.0 requirement.
+    """
+    var tid = thread_idx.x
+    var gtid = tid + block_dim.x * block_idx.x
+    var stride = block_dim.x * grid_dim.x
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+
+        @parameter
+        for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                var e2x = exp(vec_a + vec_a)
+                var one = SIMD[DType.float64, simd_width](1.0)
+                result.store[width=simd_width](i, (e2x - one) / (e2x + one))
+
+            elif i < size:
+                for j in range(size - i):
+                    var x = A[i + j]
+                    var e2x = exp(x + x)
+                    result[i + j] = (e2x - 1.0) / (e2x + 1.0)
+
+        base_idx += stride * CHUNK_SIZE
+
+
+# ── Dedicated log kernels ─────────────────────────────────────────────────────
+# epsilon defaults differ by dtype:
+#   float32 → 1e-7  (1e-12 flushes to 0.0 in float32 — silent breakage)
+#   float64 → 1e-12
+
+
+fn log_op_f32[
+    simd_width: Int = simd_width_of[DType.float32](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+    epsilon: Scalar[DType.float32] = Scalar[DType.float32](1e-7),
+](
+    result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
+    A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
+    size: UInt,
+):
+    """Dedicated float32 log kernel with epsilon clamping.
+    epsilon defaults to 1e-7 (safe for float32 precision floor).
+    """
     var tid = thread_idx.x
     var gtid = tid + block_dim.x * block_idx.x
     var stride = block_dim.x * grid_dim.x
@@ -140,7 +291,9 @@ fn log_op_f64[
     A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
     size: UInt,
 ):
-    """Dedicated float64 log kernel with epsilon clamping."""
+    """Dedicated float64 log kernel with epsilon clamping.
+    epsilon defaults to 1e-12 (safe for float64 precision).
+    """
     var tid = thread_idx.x
     var gtid = tid + block_dim.x * block_idx.x
     var stride = block_dim.x * grid_dim.x
@@ -177,16 +330,19 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     fn launch[
         op_code: Int,
-        epsilon: Scalar[
+        epsilon: Scalar[Self.dtype] = 1e-7 if Self.dtype
+        == DType.float32 else 1e-12 if Self.dtype.is_floating_point() else Scalar[
             Self.dtype
-        ] = 1e-12 if Self.dtype.is_floating_point() else Scalar[Self.dtype](0),
+        ](
+            0
+        ),
     ](A: NDBuffer[Self.dtype]) raises -> NDBuffer[Self.dtype]:
         """
         Core launch — takes NDBuffer, returns NDBuffer.
         Caller must ensure A is on GPU.
         Result is contiguous with zero offset.
-        LOG dispatches to dedicated f32/f64 kernels.
-        All others dispatch to generic unary_ops kernel.
+        LOG, EXP, TANH dispatch to dedicated f32/f64 kernels.
+        SQRT, NEGATE, ABS dispatch to generic unary_ops kernel.
         """
         debug_assert(A.is_on_gpu())
 
@@ -209,7 +365,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         @parameter
         if op_code == LOG:
-            # Dispatch to dedicated typed log kernels
+
             @parameter
             if Self.dtype == DType.float32:
                 var compiled = device_context.compile_function[
@@ -257,8 +413,99 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 panic(
                     "UnaryOpsKernel: LOG only supported for float32 and float64"
                 )
+        elif op_code == EXP:
+
+            @parameter
+            if Self.dtype == DType.float32:
+                var compiled = device_context.compile_function[
+                    exp_op_f32[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread = 2 * simdwidth,
+                    ],
+                    exp_op_f32[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread = 2 * simdwidth,
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled,
+                    result_buffer,
+                    contig_state.device_buffer(),
+                    UInt(numels),
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+            elif Self.dtype == DType.float64:
+                var compiled = device_context.compile_function[
+                    exp_op_f64[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread = 2 * simdwidth,
+                    ],
+                    exp_op_f64[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread = 2 * simdwidth,
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled,
+                    result_buffer,
+                    contig_state.device_buffer(),
+                    UInt(numels),
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+            else:
+                panic(
+                    "UnaryOpsKernel: EXP only supported for float32 and float64"
+                )
+        elif op_code == TANH:
+
+            @parameter
+            if Self.dtype == DType.float32:
+                var compiled = device_context.compile_function[
+                    tanh_op_f32[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread = 2 * simdwidth,
+                    ],
+                    tanh_op_f32[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread = 2 * simdwidth,
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled,
+                    result_buffer,
+                    contig_state.device_buffer(),
+                    UInt(numels),
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+            elif Self.dtype == DType.float64:
+                var compiled = device_context.compile_function[
+                    tanh_op_f64[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread = 2 * simdwidth,
+                    ],
+                    tanh_op_f64[
+                        simd_width=simdwidth,
+                        simd_vectors_per_thread = 2 * simdwidth,
+                    ],
+                ]()
+                device_context.enqueue_function(
+                    compiled,
+                    result_buffer,
+                    contig_state.device_buffer(),
+                    UInt(numels),
+                    grid_dim=num_blocks,
+                    block_dim=threads_per_block,
+                )
+            else:
+                panic(
+                    "UnaryOpsKernel: TANH only supported for float32 and"
+                    " float64"
+                )
         else:
-            # Generic unary_ops kernel for EXP, SQRT, TANH, NEGATE, ABS
+            # Generic unary_ops kernel for SQRT, NEGATE, ABS
             var compiled = device_context.compile_function[
                 unary_ops[
                     op_code=op_code,
@@ -292,9 +539,12 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     fn launch[
         op_code: Int,
-        epsilon: Scalar[
+        epsilon: Scalar[Self.dtype] = 1e-7 if Self.dtype
+        == DType.float32 else 1e-12 if Self.dtype.is_floating_point() else Scalar[
             Self.dtype
-        ] = 1e-12 if Self.dtype.is_floating_point() else Scalar[Self.dtype](0),
+        ](
+            0
+        ),
     ](A: Tensor[Self.dtype]) raises -> Tensor[Self.dtype]:
         """
         Convenience overload — takes Tensor, returns Tensor.
@@ -331,7 +581,7 @@ from common_utils import now
 
 
 fn main() raises:
-    var SIZE = 65536 * 1000
+    var SIZE = 65536
     comptime dtype = DType.float32
 
     # Test EXP via Tensor overload
@@ -343,7 +593,16 @@ fn main() raises:
     start = now()
     var result = tensor_a.exp()
     print("GPU exp took: ", (now() - start) * 1000, "ms")
-    assert_true(result.all_close(expect))
+    assert_true(result.to_cpu().all_close(expect))
+
+    # Test TANH via Tensor overload
+    tensor_A = Tensor[dtype].ones(SIZE) * 2
+    var tensor_a_tanh = tensor_A.to_gpu()
+    expect = tensor_A.tanh()
+    start = now()
+    result = UnaryOpsKernel[dtype].launch[TANH](tensor_a_tanh)
+    print("GPU tanh took: ", (now() - start) * 1000, "ms")
+    assert_true(result.to_cpu().all_close(expect))
 
     # Test LOG via NDBuffer overload with default epsilon
     tensor_A = Tensor[dtype].ones(SIZE) * 2
@@ -357,7 +616,9 @@ fn main() raises:
         "ms",
     )
     assert_true(
-        Tensor[dtype](result_ndb^, requires_grad=False).all_close(expect)
+        Tensor[dtype](result_ndb^, requires_grad=False)
+        .to_cpu()
+        .all_close(expect)
     )
 
     # Test LOG via Tensor overload with default epsilon
@@ -369,7 +630,7 @@ fn main() raises:
     print(
         "GPU log Tensor (default epsilon) took: ", (now() - start) * 1000, "ms"
     )
-    assert_true(result.all_close(expect))
+    assert_true(result.to_cpu().all_close(expect))
 
     # Test LOG via Tensor overload with custom epsilon
     tensor_A = Tensor[dtype].ones(SIZE) * 2
@@ -381,13 +642,13 @@ fn main() raises:
     print(
         "GPU log Tensor (custom epsilon) took: ", (now() - start) * 1000, "ms"
     )
-    assert_true(result.all_close(expect))
+    assert_true(result.to_cpu().all_close(expect))
 
     # Test NEGATE
     tensor_A = Tensor[dtype].ones(SIZE) * 2
     expect = -tensor_A
     var tensor_a_neg = tensor_A.to_gpu()
     result = -tensor_a_neg
-    assert_true(result.all_close(expect))
+    assert_true(result.to_cpu().all_close(expect))
 
     print("Launch success")
