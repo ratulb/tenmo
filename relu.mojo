@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from mnemonics import AddTensor, ReLUForwardOp, ReLUBackwardOp
+from mnemonics import AddTensor, RELU_FORWARD, RELU_BACKWARD
 from backpropagation import Delegate, BackwardFn, BACKWARD_RELU
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
@@ -62,7 +62,7 @@ struct ReLU[dtype: DType]:
 
             # Compute both output and mask in one pass! Returns Tuple
             var result = self.buffer.data_buffer().unary_ops_with_mask[
-                ReLUForwardOp
+                RELU_FORWARD
             ](start, end)
             var buffer = result[0]
             mask = result[1]

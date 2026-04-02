@@ -15,11 +15,11 @@ from mnemonics import (
     MAX,
     MIN,
     Overwrite,
-    ReLUBackwardOp,
-    ReLUForwardOp,
+    RELU_BACKWARD,
+    RELU_FORWARD,
     ReverseDivide,
     SQRT,
-    SqrtBackwardOp,
+    SQRT_BACKWARD,
     Equal,
     NotEqual,
     LessThan,
@@ -1035,11 +1035,11 @@ struct Buffer[dtype: DType = DType.float32](
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
     ](block: SIMD[Self.dtype, smdwidth]) -> SIMD[Self.dtype, smdwidth]:
         @parameter
-        if op_code == ReLUForwardOp:
+        if op_code == RELU_FORWARD:
             return max(block, 0.0)
         elif op_code == SQRT:
             return sqrt(block)
-        elif op_code == SqrtBackwardOp:
+        elif op_code == SQRT_BACKWARD:
             return 1 / (epsilon + 2 * sqrt(block))
         else:
             return block
@@ -1245,7 +1245,7 @@ struct Buffer[dtype: DType = DType.float32](
             var selected: SIMD[Self.dtype, smdwidth]
 
             @parameter
-            if op_code == ReLUBackwardOp:
+            if op_code == RELU_BACKWARD:
                 var cond_block = self.load[simdwidth=smdwidth](self_start + idx)
                 var true_block = other.load[simdwidth=smdwidth](
                     other_start + idx
@@ -1265,7 +1265,7 @@ struct Buffer[dtype: DType = DType.float32](
                 var selected: Scalar[Self.dtype]
 
                 @parameter
-                if op_code == ReLUBackwardOp:
+                if op_code == RELU_BACKWARD:
                     var cond_val = self[self_start + idx]
                     var true_val = other[other_start + idx]
                     var false_val = out[idx]
@@ -1358,7 +1358,7 @@ struct Buffer[dtype: DType = DType.float32](
             var mask_block: SIMD[Self.dtype, simd_width]
 
             @parameter
-            if op_code == ReLUForwardOp:
+            if op_code == RELU_FORWARD:
                 # Mask is 1.0 where input > 0, else 0.0
                 mask_block = block.gt(SIMD[Self.dtype, simd_width](0)).select(
                     one, zero
@@ -1384,7 +1384,7 @@ struct Buffer[dtype: DType = DType.float32](
                 var mask_val: Scalar[Self.dtype]
 
                 @parameter
-                if op_code == ReLUForwardOp:
+                if op_code == RELU_FORWARD:
                     mask_val = (
                         one_scalar if val[0] > zero_scalar else zero_scalar
                     )

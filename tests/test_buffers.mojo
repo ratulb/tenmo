@@ -5115,7 +5115,7 @@ fn test_unary_ops_manual_relu() raises:
     for i in range(MEDIUM_SIZE):
         buffer[i] = Float32(i - 30)  # Values from -30 to 37
 
-    var result = buffer.unary_ops[ReLUForwardOp]()
+    var result = buffer.unary_ops[RELU_FORWARD]()
 
     # Check that negative values are zeroed
     var all_correct = True
@@ -5138,7 +5138,7 @@ fn test_select_manual_relu_backward() raises:
         input_buf[i] = Float32(i - 30)  # Values from -30 to 37
         grad_buf[i] = 1.0  # All gradients are 1.0
 
-    var result = input_buf.select[ReLUBackwardOp](grad_buf)
+    var result = input_buf.select[RELU_BACKWARD](grad_buf)
 
     # Check that gradients are zeroed where input <= 0
     var all_correct = True
@@ -5214,7 +5214,7 @@ fn test_relu_forward_with_mask() raises:
     for i in range(10):
         buffer[i] = Float32(i - 5)  # Values from -5 to 4
 
-    var result = buffer.unary_ops_with_mask[ReLUForwardOp]()
+    var result = buffer.unary_ops_with_mask[RELU_FORWARD]()
     var output = result[0]
     var mask = result[1]
 

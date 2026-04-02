@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from mnemonics import AddTensor, SQRT, SqrtBackwardOp
+from mnemonics import AddTensor, SQRT, SQRT_BACKWARD
 from backpropagation import Delegate, BackwardFn, BACKWARD_SQRT
 from gradbox import Gradbox
 from math import sqrt
@@ -30,7 +30,7 @@ struct SqrtBackward[dtype: DType](ImplicitlyCopyable):
             # Compute 1 / (2 * sqrt(x)) - we can not use output - it may have changed
             # output is sqrt(x), so gradient is 1 / (2 * sqrt(input))
             var buffer = input_tensor.buffer.data_buffer().unary_ops[
-                SqrtBackwardOp  # This should compute: 1 / (2 * sqrt(input))
+                SQRT_BACKWARD  # This should compute: 1 / (2 * sqrt(input))
             ](start, end)
             var ancestor_grad_buffer = gradbox.buffer.data_buffer() * buffer
             var ndb = NDBuffer[Self.dtype](ancestor_grad_buffer^, shape)

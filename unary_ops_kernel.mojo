@@ -10,10 +10,10 @@ from mnemonics import (
     LOG,
     EXP,
     SQRT,
-    TANH,
+    TANH_FORWARD,
     NEGATE,
-    SIGMOID,
-    RELU,
+    SIGMOID_FORWARD,
+    RELU_FORWARD,
 )
 from math import log, exp, sqrt
 
@@ -66,7 +66,7 @@ fn unary_ops[
                     vec_result = sqrt(vec_a)
                 elif op_code == NEGATE:
                     vec_result = -vec_a
-                elif op_code == RELU:
+                elif op_code == RELU_FORWARD:
                     vec_result = max(vec_a, SIMD[dtype, simd_width](0))
                 else:  # ABS
                     vec_result = abs(vec_a)
@@ -83,7 +83,7 @@ fn unary_ops[
                         res = sqrt(val)
                     elif op_code == NEGATE:
                         res = -val
-                    elif op_code == RELU:
+                    elif op_code == RELU_FORWARD:
                         res = max(val, Scalar[dtype](0))
                     else:  # ABS
                         res = abs(val)
@@ -554,7 +554,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 panic(
                     "UnaryOpsKernel: EXP only supported for float32 and float64"
                 )
-        elif op_code == TANH:
+        elif op_code == TANH_FORWARD:
 
             @parameter
             if Self.dtype == DType.float32:
@@ -600,7 +600,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     "UnaryOpsKernel: TANH only supported for float32 and"
                     " float64"
                 )
-        elif op_code == SIGMOID:
+        elif op_code == SIGMOID_FORWARD:
 
             @parameter
             if Self.dtype == DType.float32:
@@ -742,7 +742,7 @@ fn main() raises:
     var tensor_a_tanh = tensor_A.to_gpu()
     expect = tensor_A.tanh()
     start = now()
-    result = UnaryOpsKernel[dtype].launch[TANH](tensor_a_tanh)
+    result = UnaryOpsKernel[dtype].launch[TANH_FORWARD](tensor_a_tanh)
     print("GPU tanh took: ", (now() - start) * 1000, "ms")
     assert_true(result.to_cpu().all_close(expect))
 
@@ -751,7 +751,7 @@ fn main() raises:
     var tensor_a_sigmoid = tensor_A.to_gpu()
     expect = tensor_A.sigmoid()
     start = now()
-    result = UnaryOpsKernel[dtype].launch[SIGMOID](tensor_a_sigmoid)
+    result = UnaryOpsKernel[dtype].launch[SIGMOID_FORWARD](tensor_a_sigmoid)
     print("GPU sigmoid took: ", (now() - start) * 1000, "ms")
     assert_true(result.to_cpu().all_close(expect))
 
@@ -760,7 +760,7 @@ fn main() raises:
     var tensor_a_relu = tensor_A.to_gpu()
     expect = tensor_A.relu()
     start = now()
-    result = UnaryOpsKernel[dtype].launch[RELU](tensor_a_relu)
+    result = UnaryOpsKernel[dtype].launch[RELU_FORWARD](tensor_a_relu)
     print("GPU relu took: ", (now() - start) * 1000, "ms")
     assert_true(result.to_cpu().all_close(expect))
 

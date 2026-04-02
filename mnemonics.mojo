@@ -16,10 +16,10 @@ comptime LessThanEqual = 14
 comptime GreaterThan = 15
 comptime GreaterThanEqual = 16
 comptime Overwrite = 17
-comptime ReLUForwardOp = 18
-comptime ReLUBackwardOp = 19
+comptime RELU_FORWARD = 18
+comptime RELU_BACKWARD = 19
 comptime SQRT = 20
-comptime SqrtBackwardOp = 21
+comptime SQRT_BACKWARD = 21
 comptime LOG = 22
 ###################
 ### matul ###########
@@ -49,3 +49,5 @@ comptime ABS = 39
 comptime MAX = 40
 comptime MIN = 41
 comptime POW = 42
+comptime TANH_FORWARD = 43
+comptime SIGMOID_FORWARD = 44
