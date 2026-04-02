@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from testing import assert_true, assert_false
-from common_utils import isnan, isinf
+from common_utils import isnan, isinf, Epsilon
 from math import log
 from sys import has_accelerator
 from math import log
@@ -32,8 +32,8 @@ fn test_log_forward_with_epsilon() raises:
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([1e-15, 1e-13, 1.0, 10.0])
-    var epsilon = Scalar[dtype](1e-12)
-    var y = x.log(epsilon=epsilon)
+    comptime epsilon = Scalar[dtype](1e-12)
+    var y = x.log[epsilon=epsilon]()
 
     # First two values should be clamped to epsilon
     # log(1e-12)  -27.63
@@ -51,9 +51,8 @@ fn test_log_forward_zero_handling() raises:
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([0.0, 1.0, 2.0])
-    var epsilon = Scalar[dtype](1e-10)
-    var y = x.log(epsilon=epsilon)
-
+    comptime epsilon = Scalar[dtype](1e-10)
+    var y = x.log[epsilon=epsilon]()
     # log(0) should become log(epsilon)
     var expected_zero = log(epsilon)
     assert_true(abs(y[0] - expected_zero) < 1e-6)
@@ -68,8 +67,8 @@ fn test_log_forward_negative_values() raises:
 
     comptime dtype = DType.float64
     var x = Tensor[dtype]([-1.0, -0.5, 1.0])
-    var epsilon = Scalar[dtype](1e-10)
-    var y = x.log(epsilon=epsilon)
+    comptime epsilon = Scalar[dtype](1e-10)
+    var y = x.log[epsilon=epsilon]()
 
     # Negative values should be clamped to epsilon
     var expected_neg = log(epsilon)
@@ -167,9 +166,9 @@ fn test_log_backward_with_epsilon() raises:
     print("test_log_backward_with_epsilon")
 
     comptime dtype = DType.float64
-    var epsilon = Scalar[dtype](1e-10)
+    comptime epsilon = Scalar[dtype](1e-10)
     var x = Tensor[dtype]([1e-15, 1.0, 2.0], requires_grad=True)
-    var y = x.log(epsilon=epsilon)
+    var y = x.log[epsilon=epsilon]()
     var loss = y.sum()
     loss.backward()
 
@@ -187,9 +186,9 @@ fn test_log_backward_zero_input() raises:
     print("test_log_backward_zero_input")
 
     comptime dtype = DType.float64
-    var epsilon = Scalar[dtype](1e-8)
+    comptime epsilon = Scalar[dtype](1e-8)
     var x = Tensor[dtype]([0.0, 1.0, 2.0], requires_grad=True)
-    var y = x.log(epsilon=epsilon)
+    var y = x.log[epsilon=epsilon]()
     var loss = y.sum()
     loss.backward()
 
@@ -262,9 +261,9 @@ fn test_log_numerical_stability_small() raises:
     print("test_log_numerical_stability_small")
 
     comptime dtype = DType.float64
-    var epsilon = Scalar[dtype](1e-12)
+    comptime epsilon = Scalar[dtype](1e-12)
     var x = Tensor[dtype]([1e-20, 1e-15, 1e-10])
-    var y = x.log(epsilon=epsilon)
+    var y = x.log[epsilon=epsilon]()
 
     # Should produce finite negative values
     for i in range(3):
@@ -277,9 +276,9 @@ fn test_log_gradient_stability() raises:
     print("test_log_gradient_stability")
 
     comptime dtype = DType.float64
-    var epsilon = Scalar[dtype](1e-10)
+    comptime epsilon = Scalar[dtype](1e-10)
     var x = Tensor[dtype].d1([1e-12, 1e-8, 1.0], requires_grad=True)
-    var y = x.log(epsilon=epsilon)
+    var y = x.log[epsilon=epsilon]()
     var loss = y.sum()
     loss.backward()
     # All gradients should be finite
@@ -329,9 +328,9 @@ fn test_log_custom_epsilon_values() raises:
     var x = Tensor[dtype]([0.0, 1.0])
 
     # Test with different epsilon values
-    var y1 = x.log(epsilon=1e-6)
-    var y2 = x.log(epsilon=1e-10)
-    var y3 = x.log(epsilon=1e-15)
+    var y1 = x.log[epsilon=1e-6]()
+    var y2 = x.log[epsilon=1e-10]()
+    var y3 = x.log[epsilon=1e-15]()
 
     # Different epsilons should give different results for zero
     assert_true(abs(y1[0] - log(Scalar[dtype](1e-6))) < 1e-8)
@@ -459,7 +458,9 @@ fn main() raises:
     test_log_parity_epsilon_clamping()
     test_log_parity_chain_exp()
 
+
     print("All logarithm tests passed!")
+
 
 # ── CPU Forward Tests ─────────────────────────────────────────────────────────
 
@@ -528,20 +529,22 @@ fn test_log_cpu_epsilon_clamping() raises:
     var a = Tensor[dtype].d1([0.0, -1.0, 1.0])
     var result = a.log()
     # log(1e-12) for first two, log(1.0)=0 for last
-    var expected_clamped = log(Float32(1e-12))
+    var expected_clamped = log(Float32(1e-7))
     assert_true(result[[0]] == expected_clamped)
     assert_true(result[[1]] == expected_clamped)
     assert_true(result[[2]] == Float32(0.0))
+
 
 fn test_log_cpu_custom_epsilon() raises:
     print("test_log_cpu_custom_epsilon")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 1.0, 2.0])
-    var result = a.log(epsilon=Scalar[dtype](1e-6))
+    var result = a.log[epsilon = Scalar[dtype](1e-6)]()
     var expected_clamped = log(Float32(1e-6))
     assert_true(result[[0]] == expected_clamped)
     assert_true(result[[1]] == Float32(0.0))
     assert_true(result[[2]] == log(Float32(2.0)))
+
 
 fn test_log_cpu_large_values() raises:
     print("test_log_cpu_large_values")
@@ -591,9 +594,7 @@ fn test_log_cpu_1d_backward() raises:
     var loss = result.sum()
     loss.backward()
     # grad = 1/x = [1.0, 0.5, 0.25]
-    assert_true(
-        a.grad().all_close(Tensor[dtype].d1([1.0, 0.5, 0.25]))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 0.5, 0.25])))
 
 
 fn test_log_cpu_2d_backward() raises:
@@ -605,9 +606,7 @@ fn test_log_cpu_2d_backward() raises:
     loss.backward()
     # grad = 1/x
     assert_true(
-        a.grad().all_close(
-            Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.125]])
-        )
+        a.grad().all_close(Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.125]]))
     )
 
 
@@ -639,9 +638,7 @@ fn test_log_cpu_backward_chain() raises:
     var result = a.log() * 2.0
     var loss = result.sum()
     loss.backward()
-    assert_true(
-        a.grad().all_close(Tensor[dtype].d1([2.0, 1.0, 0.5]))
-    )
+    assert_true(a.grad().all_close(Tensor[dtype].d1([2.0, 1.0, 0.5])))
 
 
 fn test_log_cpu_backward_epsilon_clamping() raises:
@@ -656,7 +653,7 @@ fn test_log_cpu_backward_epsilon_clamping() raises:
     # grad[0] = 1/epsilon = 1/1e-12
     # grad[1] = 1/1.0 = 1.0
     # grad[2] = 1/2.0 = 0.5
-    assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-12))
+    assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-7))
     assert_true(a.grad()[[1]] == Float32(1.0))
     assert_true(a.grad()[[2]] == Float32(0.5))
 
@@ -665,7 +662,7 @@ fn test_log_cpu_backward_custom_epsilon() raises:
     print("test_log_cpu_backward_custom_epsilon")
     comptime dtype = DType.float32
     var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
-    var result = a.log(epsilon=Scalar[dtype](1e-6))
+    var result = a.log[epsilon = Scalar[dtype](1e-6)]()
     var loss = result.sum()
     loss.backward()
     assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-6))
@@ -723,9 +720,11 @@ fn test_log_gpu_3d_forward() raises:
     if has_accelerator():
         print("test_log_gpu_3d_forward")
         comptime dtype = DType.float32
-        var a = Tensor[dtype].d3(
-            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
-        ).to_gpu()
+        var a = (
+            Tensor[dtype]
+            .d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
+            .to_gpu()
+        )
         var result = a.log()
         assert_true(result.is_on_gpu())
         var expect = Tensor[dtype].d3(
@@ -762,7 +761,7 @@ fn test_log_gpu_epsilon_clamping() raises:
         var a = Tensor[dtype].d1([0.0, -1.0, 1.0]).to_gpu()
         var result = a.log()
         var result_cpu = result.to_cpu()
-        var expected_clamped = log(Float32(1e-12))
+        var expected_clamped = log(Float32(1e-7))
         assert_true(result_cpu[[0]] == expected_clamped)
         assert_true(result_cpu[[1]] == expected_clamped)
         assert_true(result_cpu[[2]] == Float32(0.0))
@@ -794,9 +793,7 @@ fn test_log_gpu_1d_backward() raises:
         var result = a_gpu.log()
         var loss = result.sum()
         loss.backward()
-        assert_true(
-            a.grad().all_close(Tensor[dtype].d1([1.0, 0.5, 0.25]))
-        )
+        assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 0.5, 0.25])))
 
 
 fn test_log_gpu_2d_backward() raises:
@@ -810,9 +807,7 @@ fn test_log_gpu_2d_backward() raises:
         var loss = result.sum()
         loss.backward()
         assert_true(
-            a.grad().all_close(
-                Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.125]])
-            )
+            a.grad().all_close(Tensor[dtype].d2([[1.0, 0.5], [0.25, 0.125]]))
         )
 
 
@@ -851,9 +846,7 @@ fn test_log_gpu_backward_chain() raises:
         var result = a_gpu.log() * 2.0
         var loss = result.sum()
         loss.backward()
-        assert_true(
-            a.grad().all_close(Tensor[dtype].d1([2.0, 1.0, 0.5]))
-        )
+        assert_true(a.grad().all_close(Tensor[dtype].d1([2.0, 1.0, 0.5])))
 
 
 fn test_log_gpu_backward_epsilon_clamping() raises:
@@ -866,7 +859,7 @@ fn test_log_gpu_backward_epsilon_clamping() raises:
         var result = a_gpu.log()
         var loss = result.sum()
         loss.backward()
-        assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-12))
+        assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-7))
         assert_true(a.grad()[[1]] == Float32(1.0))
         assert_true(a.grad()[[2]] == Float32(0.5))
 
@@ -892,7 +885,7 @@ fn test_log_gpu_backward_custom_epsilon() raises:
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
         var a_gpu = a.to_gpu()
-        var result = a_gpu.log(epsilon=Scalar[dtype](1e-6))
+        var result = a_gpu.log[epsilon = Scalar[dtype](1e-6)]()
         var loss = result.sum()
         loss.backward()
         assert_true(a.grad()[[0]] == Float32(1.0) / Float32(1e-6))
@@ -960,7 +953,7 @@ fn test_log_parity_2d_backward() raises:
         var loss_gpu = a_gpu.log().sum()
         loss_gpu.backward()
 
-        assert_true(a_cpu.grad().all_close(2 *a_gpu.grad().to_cpu()))
+        assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
 
 
 fn test_log_parity_epsilon_clamping() raises:
@@ -968,9 +961,7 @@ fn test_log_parity_epsilon_clamping() raises:
     if has_accelerator():
         print("test_log_parity_epsilon_clamping")
         comptime dtype = DType.float32
-        var a_cpu = Tensor[dtype].d1(
-            [0.0, -1.0, 1.0, 2.0], requires_grad=True
-        )
+        var a_cpu = Tensor[dtype].d1([0.0, -1.0, 1.0, 2.0], requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
 
         var loss_cpu = a_cpu.log().sum()
@@ -997,6 +988,3 @@ fn test_log_parity_chain_exp() raises:
         loss_gpu.backward()
 
         assert_true(a_cpu.grad().all_close(2 * a_gpu.grad().to_cpu()))
-
-
-

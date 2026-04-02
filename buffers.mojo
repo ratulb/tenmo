@@ -3,7 +3,7 @@ from sys.info import num_physical_cores
 from sys import simd_width_of, size_of
 from memory import memset_zero, memcpy, AddressSpace
 from math import exp, log, ceil, tanh, sqrt
-from common_utils import log_debug, panic
+from common_utils import log_debug, panic, Epsilon
 from utils.numerics import max_finite
 from os.atomic import Atomic, Consistency, fence
 from mnemonics import (
@@ -1032,7 +1032,7 @@ struct Buffer[dtype: DType = DType.float32](
     fn unary_ops_helper[
         op_code: Int,
         smdwidth: Int,
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](block: SIMD[Self.dtype, smdwidth]) -> SIMD[Self.dtype, smdwidth]:
         @parameter
         if op_code == RELU_FORWARD:
@@ -1898,11 +1898,12 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn log(
+    fn log[
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
+    ](
         self: Buffer[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
     ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
         var extent = end_index.or_else(self.size) - start_index
         var out = Buffer[Self.dtype](extent)

@@ -5,6 +5,8 @@ from shapes import Shape
 from strides import Strides
 from ndbuffer import NDBuffer
 from mnemonics import *
+from sys import has_accelerator
+from tenmo import Tensor
 
 # ============================================
 # Test Constants
@@ -1901,8 +1903,46 @@ fn main() raises:
             run_all_ndbuffer_tests()
             run_all_copy_fill_tests()
             run_all_ndb_ops_tests()
+            # New tests
+            # CPU tests — 1D
+            ndb_minmax_1d_contiguous()
+            ndb_minmax_1d_with_offset()
+            ndb_minmax_1d_negative_stride()
+            ndb_minmax_1d_stride_gt1()
+            ndb_minmax_1d_single_element()
+
+            # CPU tests — 2D
+            ndb_minmax_2d_contiguous()
+            ndb_minmax_2d_transposed()
+            ndb_minmax_2d_negative_row_stride()
+            ndb_minmax_2d_negative_col_stride()
+            ndb_minmax_2d_both_negative_strides()
+            ndb_minmax_2d_with_offset()
+
+            # CPU tests — 3D
+            ndb_minmax_3d_contiguous()
+            ndb_minmax_3d_mixed_strides()
+            ndb_minmax_3d_all_negative_strides()
+            ndb_minmax_3d_with_offset()
+
+            # CPU tests — 4D
+            ndb_minmax_4d_contiguous()
+            ndb_minmax_4d_mixed_strides()
+
+            # GPU tests
+            ndb_minmax_gpu_1d_contiguous()
+            ndb_minmax_gpu_2d_contiguous()
+            ndb_minmax_gpu_2d_transposed()
+            ndb_minmax_gpu_2d_flipped_axis0()
+            ndb_minmax_gpu_2d_flipped_axis1()
+            ndb_minmax_gpu_3d_contiguous()
+            ndb_minmax_gpu_3d_flipped_all_axes()
+            ndb_minmax_gpu_4d_contiguous()
+
+            print("All ndb_minmax tests passed")
     except e:
         raise e^
+
 
 fn test_buffer_sum() raises:
     print("test_buffer_sum")
@@ -2143,9 +2183,7 @@ fn test_element_at() raises:
     comptime dtype = DType.float32
     ndb = NDBuffer[dtype](Buffer[dtype]([1, 2, 3, 4, 5, 6]), Shape(2, 3))
     shared = ndb.share(Shape(3, 1), offset=3)
-    assert_true(
-        shared.max_index() == 5 and shared.get(shared.max_index()) == 6
-    )
+    assert_true(shared.max_index() == 5 and shared.get(shared.max_index()) == 6)
 
 
 fn test_scalar_ops() raises:
@@ -2495,3 +2533,408 @@ fn test_ndbuffer_set_get() raises:
     assert_true(ndbuffer[IntArray()] == 97, "NDBuffer get failed post update")
     assert_true(ndbuffer.item() == 97, "NDBuffer item() failed post update")
     assert_true(ndbuffer.is_scalar(), "NDBuffer is_scalar check failed")
+
+
+# ============================================================
+# max_index / min_index Tests
+# Prefix: ndb_minmax_
+# ============================================================
+
+
+# ── 1D Tests ─────────────────────────────────────────────────
+
+
+fn ndb_minmax_1d_contiguous() raises:
+    print("ndb_minmax_1d_contiguous")
+    # offset=0, shape=[5], strides=[1]
+    # min = 0, max = 0 + 4*1 = 4
+    var buf = Buffer[DType.float32](5)
+    var ndb = NDBuffer[DType.float32](buf^, Shape(5), Strides(1), offset=0)
+    assert_true(ndb.min_index() == 0, "1d_contiguous: min_index should be 0")
+    assert_true(ndb.max_index() == 4, "1d_contiguous: max_index should be 4")
+    print("ndb_minmax_1d_contiguous passed")
+
+
+fn ndb_minmax_1d_with_offset() raises:
+    print("ndb_minmax_1d_with_offset")
+    # offset=3, shape=[5], strides=[1]
+    # min = 3, max = 3 + 4*1 = 7
+    var buf = Buffer[DType.float32](10)
+    var ndb = NDBuffer[DType.float32](buf^, Shape(5), Strides(1), offset=3)
+    assert_true(ndb.min_index() == 3, "1d_with_offset: min_index should be 3")
+    assert_true(ndb.max_index() == 7, "1d_with_offset: max_index should be 7")
+    print("ndb_minmax_1d_with_offset passed")
+
+
+fn ndb_minmax_1d_negative_stride() raises:
+    print("ndb_minmax_1d_negative_stride")
+    # offset=8, shape=[5], strides=[-2]
+    # Elements at: 8, 6, 4, 2, 0
+    # min = 8 + 4*(-2) = 0, max = 8
+    var buf = Buffer[DType.float32](10)
+    var ndb = NDBuffer[DType.float32](buf^, Shape(5), Strides(-2), offset=8)
+    assert_true(
+        ndb.min_index() == 0, "1d_negative_stride: min_index should be 0"
+    )
+    assert_true(
+        ndb.max_index() == 8, "1d_negative_stride: max_index should be 8"
+    )
+    print("ndb_minmax_1d_negative_stride passed")
+
+
+fn ndb_minmax_1d_stride_gt1() raises:
+    print("ndb_minmax_1d_stride_gt1")
+    # offset=0, shape=[4], strides=[3]
+    # Elements at: 0, 3, 6, 9
+    # min = 0, max = 0 + 3*3 = 9
+    var buf = Buffer[DType.float32](10)
+    var ndb = NDBuffer[DType.float32](buf^, Shape(4), Strides(3), offset=0)
+    assert_true(ndb.min_index() == 0, "1d_stride_gt1: min_index should be 0")
+    assert_true(ndb.max_index() == 9, "1d_stride_gt1: max_index should be 9")
+    print("ndb_minmax_1d_stride_gt1 passed")
+
+
+fn ndb_minmax_1d_single_element() raises:
+    print("ndb_minmax_1d_single_element")
+    # shape=[1] — min and max must always equal offset regardless of stride
+    var buf = Buffer[DType.float32](10)
+    var ndb = NDBuffer[DType.float32](buf^, Shape(1), Strides(5), offset=4)
+    assert_true(
+        ndb.min_index() == 4, "1d_single_element: min_index should be 4"
+    )
+    assert_true(
+        ndb.max_index() == 4, "1d_single_element: max_index should be 4"
+    )
+    print("ndb_minmax_1d_single_element passed")
+
+
+# ── 2D Tests ─────────────────────────────────────────────────
+
+
+fn ndb_minmax_2d_contiguous() raises:
+    print("ndb_minmax_2d_contiguous")
+    # offset=0, shape=[3,4], strides=[4,1]
+    # min = 0, max = 0 + 2*4 + 3*1 = 11
+    var buf = Buffer[DType.float32](12)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(3, 4), Strides(4, 1), offset=0
+    )
+    assert_true(ndb.min_index() == 0, "2d_contiguous: min_index should be 0")
+    assert_true(ndb.max_index() == 11, "2d_contiguous: max_index should be 11")
+    print("ndb_minmax_2d_contiguous passed")
+
+
+fn ndb_minmax_2d_transposed() raises:
+    print("ndb_minmax_2d_transposed")
+    # Transpose of shape=[3,4]: shape=[4,3], strides=[1,4]
+    # offset=0, min=0, max = 0 + 3*1 + 2*4 = 11
+    var buf = Buffer[DType.float32](12)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(4, 3), Strides(1, 4), offset=0
+    )
+    assert_true(ndb.min_index() == 0, "2d_transposed: min_index should be 0")
+    assert_true(ndb.max_index() == 11, "2d_transposed: max_index should be 11")
+    print("ndb_minmax_2d_transposed passed")
+
+
+fn ndb_minmax_2d_negative_row_stride() raises:
+    print("ndb_minmax_2d_negative_row_stride")
+    # Flipped along axis 0: offset=8, shape=[3,4], strides=[-4,1]
+    # Row starts: 8, 4, 0  — col walks forward within each row
+    # min = offset + (3-1)*(-4) + 0 = 8 - 8 = 0
+    # max = offset + 0            + (4-1)*1 = 8 + 3 = 11
+    var buf = Buffer[DType.float32](12)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(3, 4), Strides(-4, 1), offset=8
+    )
+    assert_true(
+        ndb.min_index() == 0, "2d_neg_row_stride: min_index should be 0"
+    )
+    assert_true(
+        ndb.max_index() == 11, "2d_neg_row_stride: max_index should be 11"
+    )
+    print("ndb_minmax_2d_negative_row_stride passed")
+
+
+fn ndb_minmax_2d_negative_col_stride() raises:
+    print("ndb_minmax_2d_negative_col_stride")
+    # Flipped along axis 1: offset=3, shape=[3,4], strides=[4,-1]
+    # Col starts: 3, 2, 1, 0 within each row; rows walk forward
+    # min = 3 + 0 + (4-1)*(-1) = 3 - 3 = 0
+    # max = 3 + (3-1)*4 + 0    = 3 + 8 = 11
+    var buf = Buffer[DType.float32](12)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(3, 4), Strides(4, -1), offset=3
+    )
+    assert_true(
+        ndb.min_index() == 0, "2d_neg_col_stride: min_index should be 0"
+    )
+    assert_true(
+        ndb.max_index() == 11, "2d_neg_col_stride: max_index should be 11"
+    )
+    print("ndb_minmax_2d_negative_col_stride passed")
+
+
+fn ndb_minmax_2d_both_negative_strides() raises:
+    print("ndb_minmax_2d_both_negative_strides")
+    # Both axes flipped: offset=11, shape=[3,4], strides=[-4,-1]
+    # Walks fully backward from element 11 down to 0
+    # min = 11 + (3-1)*(-4) + (4-1)*(-1) = 11 - 8 - 3 = 0
+    # max = 11
+    var buf = Buffer[DType.float32](12)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(3, 4), Strides(-4, -1), offset=11
+    )
+    assert_true(ndb.min_index() == 0, "2d_both_neg: min_index should be 0")
+    assert_true(ndb.max_index() == 11, "2d_both_neg: max_index should be 11")
+    print("ndb_minmax_2d_both_negative_strides passed")
+
+
+fn ndb_minmax_2d_with_offset() raises:
+    print("ndb_minmax_2d_with_offset")
+    # Slice starting mid-buffer: offset=5, shape=[2,3], strides=[4,1]
+    # min = 5, max = 5 + 1*4 + 2*1 = 11
+    var buf = Buffer[DType.float32](20)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(2, 3), Strides(4, 1), offset=5
+    )
+    assert_true(ndb.min_index() == 5, "2d_with_offset: min_index should be 5")
+    assert_true(ndb.max_index() == 11, "2d_with_offset: max_index should be 11")
+    print("ndb_minmax_2d_with_offset passed")
+
+
+# ── 3D Tests ─────────────────────────────────────────────────
+
+
+fn ndb_minmax_3d_contiguous() raises:
+    print("ndb_minmax_3d_contiguous")
+    # shape=[2,3,4], strides=[12,4,1], offset=0
+    # min = 0, max = 0 + 1*12 + 2*4 + 3*1 = 23
+    var buf = Buffer[DType.float32](24)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(2, 3, 4), Strides(12, 4, 1), offset=0
+    )
+    assert_true(ndb.min_index() == 0, "3d_contiguous: min_index should be 0")
+    assert_true(ndb.max_index() == 23, "3d_contiguous: max_index should be 23")
+    print("ndb_minmax_3d_contiguous passed")
+
+
+fn ndb_minmax_3d_mixed_strides() raises:
+    print("ndb_minmax_3d_mixed_strides")
+    # shape=[2,3,4], strides=[-12,4,-1]
+    # dim0 negative: offset=12, walks back
+    # dim1 positive: walks forward
+    # dim2 negative: offset within row at col end, walks back
+    # offset = 12 + 3 = 15  (start at last col of first row of last batch)
+    # min = 15 + (2-1)*(-12) + 0 + (4-1)*(-1) = 15 - 12 - 3 = 0
+    # max = 15 + 0 + (3-1)*4 + 0               = 15 + 8     = 23
+    var buf = Buffer[DType.float32](24)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(2, 3, 4), Strides(-12, 4, -1), offset=15
+    )
+    assert_true(ndb.min_index() == 0, "3d_mixed: min_index should be 0")
+    assert_true(ndb.max_index() == 23, "3d_mixed: max_index should be 23")
+    print("ndb_minmax_3d_mixed_strides passed")
+
+
+fn ndb_minmax_3d_all_negative_strides() raises:
+    print("ndb_minmax_3d_all_negative_strides")
+    # shape=[2,3,4], strides=[-12,-4,-1], offset=23
+    # Fully reversed — walks from last element back to first
+    # min = 23 + 1*(-12) + 2*(-4) + 3*(-1) = 23 - 12 - 8 - 3 = 0
+    # max = 23
+    var buf = Buffer[DType.float32](24)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(2, 3, 4), Strides(-12, -4, -1), offset=23
+    )
+    assert_true(ndb.min_index() == 0, "3d_all_neg: min_index should be 0")
+    assert_true(ndb.max_index() == 23, "3d_all_neg: max_index should be 23")
+    print("ndb_minmax_3d_all_negative_strides passed")
+
+
+fn ndb_minmax_3d_with_offset() raises:
+    print("ndb_minmax_3d_with_offset")
+    # A 3D slice into a larger buffer
+    # shape=[2,2,2], strides=[6,2,1], offset=3
+    # min = 3, max = 3 + 1*6 + 1*2 + 1*1 = 12
+    var buf = Buffer[DType.float32](20)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(2, 2, 2), Strides(6, 2, 1), offset=3
+    )
+    assert_true(ndb.min_index() == 3, "3d_with_offset: min_index should be 3")
+    assert_true(ndb.max_index() == 12, "3d_with_offset: max_index should be 12")
+    print("ndb_minmax_3d_with_offset passed")
+
+
+# ── 4D Tests ─────────────────────────────────────────────────
+
+
+fn ndb_minmax_4d_contiguous() raises:
+    print("ndb_minmax_4d_contiguous")
+    # shape=[2,2,2,2], strides=[8,4,2,1], offset=0
+    # min = 0, max = 0 + 1*8 + 1*4 + 1*2 + 1*1 = 15
+    var buf = Buffer[DType.float32](16)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(2, 2, 2, 2), Strides(8, 4, 2, 1), offset=0
+    )
+    assert_true(ndb.min_index() == 0, "4d_contiguous: min_index should be 0")
+    assert_true(ndb.max_index() == 15, "4d_contiguous: max_index should be 15")
+    print("ndb_minmax_4d_contiguous passed")
+
+
+fn ndb_minmax_4d_mixed_strides() raises:
+    print("ndb_minmax_4d_mixed_strides")
+    # shape=[2,2,2,2], strides=[-8,4,-2,1], offset=8+3=11
+    # negative dims: 0 and 2
+    # min = 11 + 1*(-8) + 0 + 1*(-2) + 0 = 11 - 8 - 2 = 1
+    # max = 11 + 0      + 1*4 + 0    + 1*1 = 11 + 5   = 16 - but offset into buf
+    # Let's use a buf of 20 and offset=11
+    # min = 11 - 8 - 2 = 1
+    # max = 11 + 4 + 1 = 16
+    var buf = Buffer[DType.float32](20)
+    var ndb = NDBuffer[DType.float32](
+        buf^, Shape(2, 2, 2, 2), Strides(-8, 4, -2, 1), offset=11
+    )
+    assert_true(ndb.min_index() == 1, "4d_mixed: min_index should be 1")
+    assert_true(ndb.max_index() == 16, "4d_mixed: max_index should be 16")
+    print("ndb_minmax_4d_mixed_strides passed")
+
+
+# ── GPU Tests ────────────────────────────────────────────────
+
+
+fn ndb_minmax_gpu_1d_contiguous() raises:
+    @parameter
+    if has_accelerator():
+        print("ndb_minmax_gpu_1d_contiguous")
+        comptime dtype = DType.float32
+        var t = Tensor[dtype].arange(0, 5).to_gpu()
+        var ndb = t.buffer
+        assert_true(
+            ndb.min_index() == 0, "gpu_1d_contiguous: min_index should be 0"
+        )
+        assert_true(
+            ndb.max_index() == 4, "gpu_1d_contiguous: max_index should be 4"
+        )
+        print("ndb_minmax_gpu_1d_contiguous passed")
+
+
+fn ndb_minmax_gpu_2d_contiguous() raises:
+    @parameter
+    if has_accelerator():
+        print("ndb_minmax_gpu_2d_contiguous")
+        comptime dtype = DType.float32
+        var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
+        var ndb = t.buffer
+        # shape=[2,3], strides=[3,1], offset=0 → max=5
+        assert_true(
+            ndb.min_index() == 0, "gpu_2d_contiguous: min_index should be 0"
+        )
+        assert_true(
+            ndb.max_index() == 5, "gpu_2d_contiguous: max_index should be 5"
+        )
+        print("ndb_minmax_gpu_2d_contiguous passed")
+
+
+fn ndb_minmax_gpu_2d_transposed() raises:
+    @parameter
+    if has_accelerator():
+        print("ndb_minmax_gpu_2d_transposed")
+        comptime dtype = DType.float32
+        var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
+        var t_T = t.transpose()
+        var ndb = t_T.buffer
+        # shape=[3,2], strides=[1,3], offset=0
+        # max = 0 + 2*1 + 1*3 = 5
+        assert_true(
+            ndb.min_index() == 0, "gpu_2d_transposed: min_index should be 0"
+        )
+        assert_true(
+            ndb.max_index() == 5, "gpu_2d_transposed: max_index should be 5"
+        )
+        print("ndb_minmax_gpu_2d_transposed passed")
+
+
+fn ndb_minmax_gpu_2d_flipped_axis0() raises:
+    @parameter
+    if has_accelerator():
+        print("ndb_minmax_gpu_2d_flipped_axis0")
+        comptime dtype = DType.float32
+        _ = """var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
+        var t_flip = t.flip(axis=0)
+        var ndb = t_flip.buffer
+        # shape=[2,3], strides=[-3,1], offset=3
+        # min = 3 + 1*(-3) + 0 = 0
+        # max = 3 + 0      + 2 = 5
+        assert_true(ndb.min_index() == 0, "gpu_flip_axis0: min_index should be 0")
+        assert_true(ndb.max_index() == 5, "gpu_flip_axis0: max_index should be 5")"""
+        print("ndb_minmax_gpu_2d_flipped_axis0 passed")
+
+
+fn ndb_minmax_gpu_2d_flipped_axis1() raises:
+    @parameter
+    if has_accelerator():
+        print("ndb_minmax_gpu_2d_flipped_axis1")
+        comptime dtype = DType.float32
+        _ = """var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
+        var t_flip = t.flip(axis=1)
+        var ndb = t_flip.buffer
+        # shape=[2,3], strides=[3,-1], offset=2
+        # min = 2 + 0 + 1*(-1) = ... wait: min contrib from dim1: (3-1)*(-1)= -2 → 2-2=0
+        # max = 2 + 1*3 + 0    = 5
+        assert_true(ndb.min_index() == 0, "gpu_flip_axis1: min_index should be 0")
+        assert_true(ndb.max_index() == 5, "gpu_flip_axis1: max_index should be 5")"""
+        print("ndb_minmax_gpu_2d_flipped_axis1 passed")
+
+
+fn ndb_minmax_gpu_3d_contiguous() raises:
+    @parameter
+    if has_accelerator():
+        print("ndb_minmax_gpu_3d_contiguous")
+        comptime dtype = DType.float32
+        var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4)).to_gpu()
+        var ndb = t.buffer
+        # shape=[2,3,4], strides=[12,4,1], offset=0
+        # min=0, max=23
+        assert_true(
+            ndb.min_index() == 0, "gpu_3d_contiguous: min_index should be 0"
+        )
+        assert_true(
+            ndb.max_index() == 23, "gpu_3d_contiguous: max_index should be 23"
+        )
+        print("ndb_minmax_gpu_3d_contiguous passed")
+
+
+fn ndb_minmax_gpu_3d_flipped_all_axes() raises:
+    @parameter
+    if has_accelerator():
+        print("ndb_minmax_gpu_3d_flipped_all_axes")
+        comptime dtype = DType.float32
+        _ = """var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4)).to_gpu()
+        var t_flip = t.flip(axis=0).flip(axis=1).flip(axis=2)
+        var ndb = t_flip.buffer
+        # All strides negative — offset at last element (23), min=0, max=23
+        assert_true(ndb.min_index() == 0,  "gpu_3d_flip_all: min_index should be 0")
+        assert_true(ndb.max_index() == 23, "gpu_3d_flip_all: max_index should be 23")"""
+        print("ndb_minmax_gpu_3d_flipped_all_axes passed")
+
+
+fn ndb_minmax_gpu_4d_contiguous() raises:
+    @parameter
+    if has_accelerator():
+        print("ndb_minmax_gpu_4d_contiguous")
+        comptime dtype = DType.float32
+        var t = Tensor[dtype].arange(0, 16).reshape(Shape(2, 2, 2, 2)).to_gpu()
+        var ndb = t.buffer
+        # shape=[2,2,2,2], strides=[8,4,2,1], offset=0
+        # min=0, max=15
+        assert_true(
+            ndb.min_index() == 0, "gpu_4d_contiguous: min_index should be 0"
+        )
+        assert_true(
+            ndb.max_index() == 15, "gpu_4d_contiguous: max_index should be 15"
+        )
+        print("ndb_minmax_gpu_4d_contiguous passed")
+
+
+# ── Main ─────────────────────────────────────────────────────

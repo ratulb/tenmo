@@ -5,7 +5,7 @@ from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from math import log
 from sys import has_accelerator
-from common_utils import panic
+from common_utils import panic, Epsilon
 from unary_ops_kernel import UnaryOpsKernel
 
 
@@ -98,10 +98,13 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
 @register_passable
 struct Logarithm[dtype: DType]:
     @staticmethod
-    fn forward(
+    fn forward[
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+    ](
         buffer: NDBuffer[Self.dtype],
-        epsilon: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+    ) -> NDBuffer[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
         """
         Core log computation on NDBuffer.
         epsilon is runtime — GPU path uses max(x, epsilon) then log
@@ -119,12 +122,12 @@ struct Logarithm[dtype: DType]:
             if buffer.is_on_gpu():
                 try:
                     # Step 1: clamp to epsilon — scalar_ops[MAX], runtime epsilon OK
-                    var clamped = buffer.max(epsilon)
+                    # var clamped = buffer.max(epsilon)
                     # Step 2: log on already-clamped buffer
                     # epsilon=0 here since clamping already done
-                    comptime zero_epsilon = Scalar[Self.dtype](0)
-                    return UnaryOpsKernel[Self.dtype].launch[LOG, zero_epsilon](
-                        clamped
+                    # comptime zero_epsilon = Scalar[Self.dtype](0)
+                    return UnaryOpsKernel[Self.dtype].launch[LOG, epsilon](
+                        buffer
                     )
                 except e:
                     panic("Logarithm GPU forward failed: " + e.__str__())
@@ -135,7 +138,7 @@ struct Logarithm[dtype: DType]:
             var start = buffer.offset
             var end = start + buffer.numels()
             var input_data = buffer.data_buffer()
-            var out_buffer = input_data.log(start, end, epsilon)
+            var out_buffer = input_data.log[epsilon](start, end)
             return NDBuffer[Self.dtype](out_buffer^, shape)
 
         # CPU non-contiguous fallback
@@ -151,19 +154,17 @@ struct Logarithm[dtype: DType]:
 
     @staticmethod
     fn forward[
-        track_grad: Bool = True
+        track_grad: Bool = True,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
-        epsilon: Scalar[
-            Self.dtype
-        ] = 1e-12 if Self.dtype.is_floating_point() else Scalar[Self.dtype](0),
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         """
         Thin wrapper — delegates compute to forward(NDBuffer).
         Attaches autograd machinery if needed.
         """
-        var result_ndb = Self.forward(self.buffer, epsilon)
+        var result_ndb = Self.forward[epsilon](self.buffer)
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
         @parameter

@@ -2,7 +2,7 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_STD
 from gradbox import Gradbox
-from common_utils import panic
+from common_utils import panic, Epsilon
 
 
 @fieldwise_init
@@ -90,7 +90,7 @@ struct StdDev[dtype: DType]:
         axis: Int = -100,
         keepdims: Bool = False,
         unbiased: Bool = True,
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         if axis != -100 and (axis < 0 or axis >= self.rank()):

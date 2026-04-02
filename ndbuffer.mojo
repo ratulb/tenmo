@@ -5,7 +5,7 @@ from intarray import IntArray
 from indexhelper import IndexCalculator, IndexIterator
 from matrixshapevalidator import MatrixShapeValidator
 from broadcasthelper import ShapeBroadcaster
-from common_utils import panic, log_debug, print_buffer
+from common_utils import panic, log_debug, print_buffer, Epsilon
 from validators import Validator
 from memory import memcpy, AddressSpace, ArcPointer
 from gpu.host import DeviceBuffer, DeviceContext
@@ -24,7 +24,7 @@ from compare_kernel import AllClose, Compare, CompareScalar
 from reduction_kernel import Reduction
 from minmax_kernel import ReductionMinMax
 from minmax_reducer import MinMaxReducer
-from math import sqrt
+from math import sqrt, log, exp
 from mnemonics import (
     Multiply,
     Add,
@@ -37,6 +37,8 @@ from mnemonics import (
     NEGATE,
     SQRT,
     ABS,
+    LOG,
+    EXP,
     Overwrite,
     ReverseDivide,
     Equal,
@@ -741,6 +743,25 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn max_index(self) -> Int:
+        var max_idx = self.offset
+        for i in range(self.shape.rank()):
+            if self.strides[i] > 0:
+                max_idx += (self.shape[i] - 1) * self.strides[i]
+            # negative stride: highest address is already at offset,
+            # no addition needed for this dimension
+        return max_idx
+
+    @always_inline
+    fn min_index(self) -> Int:
+        var min_idx = self.offset
+        for i in range(self.shape.rank()):
+            if self.strides[i] < 0:
+                min_idx += (self.shape[i] - 1) * self.strides[i]
+            # positive stride: lowest address is already at offset
+        return min_idx
+
+    @always_inline
+    fn max_index_parked(self) -> Int:
         var max_index = self.offset
         for i in range(self.shape.rank()):
             max_index += (self.shape[i] - 1) * abs(self.strides[i])
@@ -1870,6 +1891,16 @@ struct NDBuffer[dtype: DType](
         return self.unary_ops[NEGATE]()
 
     @always_inline
+    fn log[
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
+    ](self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        return self.float_unary_ops[LOG]()
+
+    @always_inline
+    fn exp(self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        return self.float_unary_ops[EXP]()
+
+    @always_inline
     fn __mul__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.arithmetic_ops[Multiply](other)
 
@@ -2165,6 +2196,19 @@ struct NDBuffer[dtype: DType](
         else:  # op_code == ABS:
             return scalar.__abs__()
 
+    @staticmethod
+    @always_inline
+    fn float_unary_fn_helper[
+        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
+    ](scalar: Scalar[Self.dtype]) -> Scalar[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
+        @parameter
+        if op_code == LOG:
+            return log(max(scalar, epsilon))
+        else:  # op_code == EXP:
+            return exp(scalar)
+
     @always_inline
     fn scalar_ops[
         op_code: Int,
@@ -2298,6 +2342,71 @@ struct NDBuffer[dtype: DType](
                 result_buffer[index] = Self.unary_fn_helper[op_code](
                     self.buffer[idx]
                 )
+                index += 1
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    @always_inline
+    fn float_unary_ops[
+        op_code: Int,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+    ](self: NDBuffer[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
+        var out: NDBuffer[Self.dtype]
+
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = UnaryOpsKernel[Self.dtype].launch[op_code, epsilon](
+                        self
+                    )
+                except e:
+                    print(e)
+                    panic(
+                        (
+                            "NDBuffer float_unary_ops → GPU operation failed"
+                            " for opcode: "
+                        ),
+                        op_code.__str__(),
+                    )
+                    # Unreacahble
+                    out = Self.Empty()
+            else:
+                out = self.float_unary_ops_cpu[op_code, epsilon]()
+        else:
+            out = self.float_unary_ops_cpu[op_code, epsilon]()
+
+        return out^
+
+    @always_inline
+    fn float_unary_ops_cpu[
+        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
+    ](self: NDBuffer[Self.dtype]) -> NDBuffer[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
+        if self.is_contiguous():
+            var start = self.offset
+            var end = start + self.numels()
+            var result_buffer: Buffer[Self.dtype]
+
+            @parameter
+            if op_code == LOG:
+                result_buffer = self.buffer.log[epsilon](start, end)
+            else:  # op_code == EXP:
+                result_buffer = self.buffer.exp(start, end)
+
+            return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+        else:
+            var index = 0
+            var result_buffer = Buffer[Self.dtype](self.numels())
+
+            for idx in self.index_iterator():
+                result_buffer[index] = Self.float_unary_fn_helper[
+                    op_code, epsilon
+                ](self.buffer[idx])
                 index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)

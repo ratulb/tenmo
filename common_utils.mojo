@@ -13,7 +13,6 @@ from testing import assert_true
 from intarray import IntArray
 from random import randn_float64
 from ndbuffer import NDBuffer
-
 from sys import prefetch, PrefetchOptions
 
 comptime LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
@@ -208,6 +207,20 @@ struct IDGen:
         # Combine them in a way that preserves uniqueness
         # Use XOR to mix the values
         return perf_time ^ (mono_time << 32)
+
+
+@register_passable
+struct Epsilon[dtype: DType]:
+    @staticmethod
+    fn value() -> Scalar[Self.dtype]:
+        @parameter
+        if Self.dtype == DType.float32:
+            return Scalar[Self.dtype](1e-7)
+        elif Self.dtype == DType.float64:
+            return Scalar[Self.dtype](1e-12)
+        else:
+            panic("Epsilon value not supported for: ", Self.dtype.__str__())
+            return Scalar[Self.dtype](0)
 
 
 @always_inline("nodebug")
@@ -518,7 +531,7 @@ fn print_buffer[
     num_last: Int = 10,
 ):
     if buffer.buffer.size == 0 and buffer.device_state == None:
-    #if buffer.numels() == 0:
+        # if buffer.numels() == 0:
         print("  Empty")
         return
     if buffer.rank() == 0:  # Tensor with Shape ()
@@ -599,6 +612,8 @@ from gpu.host import DeviceBuffer
 from buffers import Buffer
 
 
-
 fn main():
-    pass
+    print(Epsilon[DType.int32].value())
+    print(Epsilon[DType.float32].value())
+    print(Epsilon[DType.float64].value())
+    print(Epsilon[DType.bool].value())

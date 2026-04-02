@@ -4,6 +4,7 @@ from backpropagation import Delegate, BackwardFn, BACKWARD_SQRT
 from gradbox import Gradbox
 from math import sqrt
 from ndbuffer import NDBuffer
+from common_utils import Epsilon
 
 
 @fieldwise_init
@@ -62,7 +63,7 @@ struct Sqrt[dtype: DType]:
         track_grad: Bool = True
     ](
         self: Tensor[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         var out: Tensor[Self.dtype]
@@ -99,7 +100,7 @@ struct Sqrt[dtype: DType]:
     @staticmethod
     fn forward(
         self: Gradbox[Self.dtype],
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ) -> Gradbox[Self.dtype]:
         var out: Gradbox[Self.dtype]
         ref shape = self.shape()
@@ -110,3 +111,12 @@ struct Sqrt[dtype: DType]:
         )
 
         return out^
+
+
+fn main() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].ones(10)
+    a = a * 2
+    var b = a.sqrt()
+    b.print()
+    a.std().print()

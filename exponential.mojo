@@ -39,13 +39,39 @@ struct Exponential[dtype: DType]:
         tensor: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        var ndb = tensor.buffer.exp()
+        var out = Tensor[Self.dtype](ndb^, requires_grad=False)
+
+        @parameter
+        if track_grad:
+            var grad_required = requires_grad.or_else(tensor.requires_grad)
+            if grad_required:
+                out.requires_grad_(True)
+                var backward_fn = ExponentialBackward[
+                    Self.dtype
+                ]().into_backward_fn()
+                out.backwardFn = Optional(backward_fn^)
+                out.add_ancestry(tensor)
+
+        return out^
+
+    @staticmethod
+    fn forward_parked[
+        track_grad: Bool = True
+    ](
+        tensor: Tensor[Self.dtype],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
         var out: Tensor[Self.dtype]
 
         @parameter
         if has_accelerator():
             if tensor.is_on_gpu():
                 try:
-                    out = UnaryOpsKernel[Self.dtype].launch[EXP](tensor)
+                    var ndb = UnaryOpsKernel[Self.dtype].launch[EXP](
+                        tensor.buffer
+                    )
+                    out = Tensor[Self.dtype](ndb^, requires_grad=False)
                 except e:
                     print(e)
                     panic(

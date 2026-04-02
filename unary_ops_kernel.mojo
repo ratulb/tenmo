@@ -4,7 +4,7 @@ from sys import simd_width_of
 from tenmo import Tensor
 from ndbuffer import NDBuffer
 from device import DeviceState
-from common_utils import panic
+from common_utils import panic, Epsilon
 from shapes import Shape
 from mnemonics import (
     LOG,
@@ -334,7 +334,7 @@ fn sigmoid_op_f64[
 fn log_op_f32[
     simd_width: Int = simd_width_of[DType.float32](),
     simd_vectors_per_thread: Int = 2 * simd_width,
-    epsilon: Scalar[DType.float32] = Scalar[DType.float32](1e-7),
+    epsilon: Scalar[DType.float32] = Epsilon[DType.float32].value(),
 ](
     result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
@@ -375,7 +375,7 @@ fn log_op_f32[
 fn log_op_f64[
     simd_width: Int = simd_width_of[DType.float64](),
     simd_vectors_per_thread: Int = 2 * simd_width,
-    epsilon: Scalar[DType.float64] = Scalar[DType.float64](1e-12),
+    epsilon: Scalar[DType.float64] = Epsilon[DType.float64].value(),
 ](
     result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
@@ -419,13 +419,7 @@ fn log_op_f64[
 struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     fn launch[
-        op_code: Int,
-        epsilon: Scalar[Self.dtype] = 1e-7 if Self.dtype
-        == DType.float32 else 1e-12 if Self.dtype.is_floating_point() else Scalar[
-            Self.dtype
-        ](
-            0
-        ),
+        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](A: NDBuffer[Self.dtype]) raises -> NDBuffer[Self.dtype]:
         """
         Core launch — takes NDBuffer, returns NDBuffer.
@@ -679,14 +673,8 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         return NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
 
     @staticmethod
-    fn launch[
-        op_code: Int,
-        epsilon: Scalar[Self.dtype] = 1e-7 if Self.dtype
-        == DType.float32 else 1e-12 if Self.dtype.is_floating_point() else Scalar[
-            Self.dtype
-        ](
-            0
-        ),
+    fn launch_parked[
+        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](A: Tensor[Self.dtype]) raises -> Tensor[Self.dtype]:
         """
         Convenience overload — takes Tensor, returns Tensor.
@@ -733,7 +721,7 @@ fn main() raises:
     var expect = tensor_A.exp()
     print("CPU exp took: ", (now() - start) * 1000, "ms")
     start = now()
-    var result = tensor_a.exp()
+    var result = Tensor[dtype](tensor_a.buffer.exp())
     print("GPU exp took: ", (now() - start) * 1000, "ms")
     assert_true(result.to_cpu().all_close(expect))
 
@@ -742,7 +730,9 @@ fn main() raises:
     var tensor_a_tanh = tensor_A.to_gpu()
     expect = tensor_A.tanh()
     start = now()
-    result = UnaryOpsKernel[dtype].launch[TANH_FORWARD](tensor_a_tanh)
+    result = Tensor[dtype](
+        UnaryOpsKernel[dtype].launch[TANH_FORWARD](tensor_a_tanh.buffer)
+    )
     print("GPU tanh took: ", (now() - start) * 1000, "ms")
     assert_true(result.to_cpu().all_close(expect))
 
@@ -751,7 +741,9 @@ fn main() raises:
     var tensor_a_sigmoid = tensor_A.to_gpu()
     expect = tensor_A.sigmoid()
     start = now()
-    result = UnaryOpsKernel[dtype].launch[SIGMOID_FORWARD](tensor_a_sigmoid)
+    result = Tensor[dtype](
+        UnaryOpsKernel[dtype].launch[SIGMOID_FORWARD](tensor_a_sigmoid.buffer)
+    )
     print("GPU sigmoid took: ", (now() - start) * 1000, "ms")
     assert_true(result.to_cpu().all_close(expect))
 
@@ -760,7 +752,9 @@ fn main() raises:
     var tensor_a_relu = tensor_A.to_gpu()
     expect = tensor_A.relu()
     start = now()
-    result = UnaryOpsKernel[dtype].launch[RELU_FORWARD](tensor_a_relu)
+    result = Tensor[dtype](
+        UnaryOpsKernel[dtype].launch[RELU_FORWARD](tensor_a_relu.buffer)
+    )
     print("GPU relu took: ", (now() - start) * 1000, "ms")
     assert_true(result.to_cpu().all_close(expect))
 
@@ -786,7 +780,9 @@ fn main() raises:
     var tensor_a_log = tensor_A.to_gpu()
     expect = tensor_A.log()
     start = now()
-    result = UnaryOpsKernel[dtype].launch[LOG](tensor_a_log)
+    result = Tensor[dtype](
+        UnaryOpsKernel[dtype].launch[LOG](tensor_a_log.buffer)
+    )
     print(
         "GPU log Tensor (default epsilon) took: ", (now() - start) * 1000, "ms"
     )
@@ -796,8 +792,10 @@ fn main() raises:
     tensor_A = Tensor[dtype].ones(SIZE) * 2
     tensor_a_log = tensor_A.to_gpu()
     start = now()
-    result = UnaryOpsKernel[dtype].launch[LOG, Scalar[dtype](1e-7)](
-        tensor_a_log
+    result = Tensor[dtype](
+        UnaryOpsKernel[dtype].launch[LOG, Scalar[dtype](1e-7)](
+            tensor_a_log.buffer
+        )
     )
     print(
         "GPU log Tensor (custom epsilon) took: ", (now() - start) * 1000, "ms"
@@ -808,7 +806,7 @@ fn main() raises:
     tensor_A = Tensor[dtype].ones(SIZE) * 2
     expect = -tensor_A
     var tensor_a_neg = tensor_A.to_gpu()
-    result = -tensor_a_neg
+    result = Tensor[dtype](-tensor_a_neg.buffer)
     assert_true(result.to_cpu().all_close(expect))
 
     print("Launch success")

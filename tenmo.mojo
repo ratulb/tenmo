@@ -16,6 +16,7 @@ from common_utils import (
     print_buffer,
     panic,
     variadic1or2,
+    Epsilon,
 )
 from mnemonics import *
 from indexhelper import IndexIterator
@@ -676,14 +677,16 @@ struct Tensor[dtype: DType](
         return ShapeBroadcaster.broadcastable(self.shape(), to.shape())
 
     fn log[
-        track_grad: Bool = True
+        track_grad: Bool = True,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](
         self,
         requires_grad: Optional[Bool] = None,
-        epsilon: Scalar[Self.dtype] = 1e-12,
-    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        return Logarithm[Self.dtype].forward[track_grad](
-            self, requires_grad, epsilon
+    ) -> Tensor[
+        Self.dtype
+    ] where Self.dtype.is_floating_point():
+        return Logarithm[Self.dtype].forward[track_grad, epsilon](
+            self, requires_grad
         )
 
     fn all_close[
@@ -1081,7 +1084,9 @@ struct Tensor[dtype: DType](
             ignore_index: If provided, rows where index == ignore_index become all zeros.
         Returns: Tensor of shape (..., num_classes).
         """
-        var onehot_ndb = NDBuffer[Self.dtype].onehot(indices.buffer, num_classes, device, ignore_index)
+        var onehot_ndb = NDBuffer[Self.dtype].onehot(
+            indices.buffer, num_classes, device, ignore_index
+        )
         return Tensor[Self.dtype](onehot_ndb^, requires_grad=False)
 
     @staticmethod
@@ -1517,7 +1522,7 @@ struct Tensor[dtype: DType](
         track_grad: Bool = True
     ](
         self,
-        epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
         return Sqrt[Self.dtype].forward[track_grad](
