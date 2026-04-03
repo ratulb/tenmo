@@ -933,28 +933,35 @@ struct NDBuffer[dtype: DType](
     fn zero(self):
         self.fill(Scalar[Self.dtype](0))
 
-    fn softmax(self, axes: IntArray, validated: Bool = False) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+    fn softmax(
+        self, axes: IntArray, validated: Bool = False
+    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         var normalized_axes = axes if validated else Validator.validate_and_normalize_axes(self.shape, axes)
-        # Numerical stability: subtract max along axes
-        var (max_values, _) = self.minmax[is_max=True](normalized_axes, keepdims=True)
-        var stable = self - max_values
-        # Compute exponentials
-        var stable_exp = stable.exp()
-        # Sum of exponentials along axes
+        var (_, stable_exp) = self._softmax_components(normalized_axes)
         var exp_sum = stable_exp.sum(normalized_axes, keepdims=True)
         return stable_exp / exp_sum
 
-    fn log_softmax(self, axes: IntArray, validated: Bool = False) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]] where Self.dtype.is_floating_point():
+    fn log_softmax(
+        self, axes: IntArray, validated: Bool = False
+    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]
+            where Self.dtype.is_floating_point():
         var normalized_axes = axes if validated else Validator.validate_and_normalize_axes(self.shape, axes)
-        # Numerical stability: subtract max along axes
-        var (max_values, _) = self.minmax[is_max=True](normalized_axes, keepdims=True)
-        var stable = self - max_values
-        # Compute exponentials
-        var stable_exp = stable.exp()
-        # Sum of exponentials along axes
+        var (stable, stable_exp) = self._softmax_components(normalized_axes)
+        var log_sum_exp = stable.log_sum(normalized_axes, keepdims=True)
         var exp_sum = stable_exp.sum(normalized_axes, keepdims=True)
-        var log_sum_exp = exp_sum.log()
         return stable - log_sum_exp, stable_exp / exp_sum
+
+    fn _softmax_components(
+        self, normalized_axes: IntArray
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
+        var (max_values, _) = self.minmax[is_max=True](
+            normalized_axes, keepdims=True
+        )
+        var stable = self - max_values
+        var stable_exp = stable.exp()
+        return stable, stable_exp
 
     @always_inline
     fn fill(self, value: Scalar[Self.dtype]):
@@ -1111,13 +1118,13 @@ struct NDBuffer[dtype: DType](
                     )
                 except e:
                     print(e)
-                    print(
-                        (
-                            "NDBuffer sum - GPU operation failed for"
-                            ". Failling back on CPU"
-                        ),
+                    panic(
+                        "NDBuffer sum - GPU operation failed for: ",
+                        "mean: ",
+                        mean.__str__(),
                     )
-                    out = self.reduce_cpu[mean=mean](normalized_axes, keepdims)
+                    # Unreachable
+                    out = NDBuffer[Self.dtype].Empty()
             else:
                 out = self.reduce_cpu[mean=mean](normalized_axes, keepdims)
         else:
@@ -1171,6 +1178,54 @@ struct NDBuffer[dtype: DType](
                     out[out_coord] = accum_sum / reduced_volume
                 else:
                     out[out_coord] = accum_sum
+
+        return out^
+
+    fn log_sum(
+        self, normalized_axes: IntArray, keepdims: Bool = False
+    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        @parameter
+        if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    return Reduction[Self.dtype].launch_log_sum(
+                        self, normalized_axes, keepdims
+                    )
+                except e:
+                    print(e)
+                    panic("NDBuffer log_sum - GPU failed, falling back to CPU")
+                    # Not reachable
+                    return NDBuffer[Self.dtype].Empty()
+            else:
+                return self.reduce_log_sum_cpu(normalized_axes, keepdims)
+        else:
+            return self.reduce_log_sum_cpu(normalized_axes, keepdims)
+
+    fn reduce_log_sum_cpu(
+        self, normalized_axes: IntArray, keepdims: Bool
+    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        var out_shape = self.shape.compute_output_shape(
+            normalized_axes, keepdims, validated=True
+        )
+        var out = NDBuffer[Self.dtype].zeros(out_shape)
+
+        if out_shape == Shape():
+            var accum = Scalar[Self.dtype](0)
+            for index in self.index_iterator():
+                accum += exp(self.buffer[index])
+            out[IntArray()] = log(max(accum, Epsilon[Self.dtype].value()))
+        else:
+            var reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
+            for out_coord in out_shape:
+                var accum = Scalar[Self.dtype](0)
+                for red_coord in reduction_axes_shape:
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        normalized_axes, red_coord
+                    )
+                    accum += exp(self[self_coord])
+                out[out_coord] = log(max(accum, Epsilon[Self.dtype].value()))
 
         return out^
 
