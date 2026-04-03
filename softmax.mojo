@@ -25,14 +25,6 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
     var axes: IntArray
     var softmax_out: NDBuffer[Self.dtype]
 
-#    fn __copyinit__(out self, other: Self):
-#        self.axes = other.axes.copy()
-#        self.softmax_out = other.softmax_out
-#
-#    fn __moveinit__(out self, deinit other: Self):
-#        self.axes = other.axes^
-#        self.softmax_out = other.softmax_out^
-
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
@@ -57,52 +49,6 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
             local_grad_ndb = self.softmax_out * grad_diff
 
         var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
-        return [(ancestor^, local_grad^, AddTensor)]
-
-
-
-# ── SoftmaxBackward ───────────────────────────────────────────────────────────
-
-
-@fieldwise_init
-struct SoftmaxBackward_parked[dtype: DType](ImplicitlyCopyable & Movable):
-    comptime TAG = BACKWARD_SOFTMAX
-    var axes: IntArray
-    var softmax_out: NDBuffer[Self.dtype]  # carries device state — GPU safe
-
-#    fn __copyinit__(out self, other: Self):
-#        self.axes = other.axes.copy()
-#        self.softmax_out = other.softmax_out
-#
-#    fn __moveinit__(out self, deinit other: Self):
-#        self.axes = other.axes^
-#        self.softmax_out = other.softmax_out^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-    fn backward(
-        self, output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        # softmax_grad = y * (g - sum(g * y, axes, keepdims=True))
-        # All ops at NDBuffer level — GPU safe, no LLVM lowering issues
-        ref gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-
-        # Step 1: g * y — arithmetic_ops, GPU safe
-        var gy = gradbox.buffer * self.softmax_out
-
-        # Step 2: sum(g * y, axes, keepdims=True) — axis sum, GPU safe
-        var gy_sum = gy.sum(self.axes, keepdims=True)
-
-        # Step 3: g - sum(g * y) — broadcast subtract, GPU safe
-        var grad_diff = gradbox.buffer - gy_sum
-
-        # Step 4: y * (g - sum(g * y)) — arithmetic_ops, GPU safe
-        var local_grad_ndb = self.softmax_out * grad_diff
-
-        var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
-
         return [(ancestor^, local_grad^, AddTensor)]
 
 
@@ -135,7 +81,6 @@ struct Softmax[dtype: DType]:
                 out.requires_grad_(True)
 
                 # Store NDBuffer — carries device state, GPU safe
-                # contiguous() ensures zero offset and contiguous layout
                 var backward_fn = SoftmaxBackward[Self.dtype](
                     normalized_axes^,
                     ndb,
@@ -145,49 +90,6 @@ struct Softmax[dtype: DType]:
                 out.add_ancestry(this)
 
         return out^
-
-
-# ── LogSoftmaxBackward ────────────────────────────────────────────────────────
-
-
-@fieldwise_init
-struct LogSoftmaxBackward_parked[dtype: DType](ImplicitlyCopyable & Movable):
-    comptime TAG = BACKWARD_LOG_SOFTMAX
-    var axes: IntArray
-    var softmax_out: NDBuffer[Self.dtype]  # carries device state — GPU safe
-
-    fn __copyinit__(out self, other: Self):
-        self.axes = other.axes.copy()
-        self.softmax_out = other.softmax_out
-
-    fn __moveinit__(out self, deinit other: Self):
-        self.axes = other.axes^
-        self.softmax_out = other.softmax_out^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-    fn backward(
-        self, output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        # Gradient for log_softmax:
-        # g - softmax(x) * sum(g, axes, keepdims=True)
-        # All ops at NDBuffer level — GPU safe, no LLVM lowering issues
-        ref gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-
-        # Step 1: sum(g, axes, keepdims=True) — axis sum, GPU safe
-        var sum_grad = gradbox.buffer.sum(self.axes, keepdims=True)
-
-        # Step 2: softmax(x) * sum(g) — arithmetic_ops, GPU safe
-        var softmax_sum = self.softmax_out * sum_grad
-
-        # Step 3: g - softmax(x) * sum(g) — broadcast subtract, GPU safe
-        var local_grad_ndb = gradbox.buffer - softmax_sum
-
-        var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
-
-        return [(ancestor^, local_grad^, AddTensor)]
 
 
 # ── LogSoftmax forward ────────────────────────────────────────────────────────

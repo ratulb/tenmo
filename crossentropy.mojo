@@ -219,10 +219,10 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
                 M *= logits_shape[i]
                 spatial_dims.append(logits_shape[i])
 
-        #var logits_2d: Tensor[Self.dtype]
+        # var logits_2d: Tensor[Self.dtype]
         var logits_2d: NDBuffer[Self.dtype]
         if rank == 2:
-            #logits_2d = logits.reshape[track_grad=False](Shape(M, C))
+            # logits_2d = logits.reshape[track_grad=False](Shape(M, C))
             logits_2d = logits.buffer.reshape(Shape(M, C))
         else:
             # Permute (N, C, d1..dk) → (N, d1..dk, C) then reshape to (M, C)
@@ -231,7 +231,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
             for i in range(2, rank):
                 perm.append(i)
             perm.append(1)
-            _="""logits_2d = logits.permute_unshared(perm).reshape[track_grad=False](
+            _ = """logits_2d = logits.permute_unshared(perm).reshape[track_grad=False](
                 Shape(M, C)
             ).buffer"""
             var logits_buffer = logits.buffer
@@ -239,16 +239,15 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
                 Shape(M, C)
             )
 
-
-        #var target_1d = target.reshape[track_grad=False](Shape(M))
+        # var target_1d = target.reshape[track_grad=False](Shape(M))
         var target_1d = target.buffer.reshape(Shape(M))
         var spatial_shape = (
             Shape(spatial_dims) if len(spatial_dims) > 0 else Shape()
         )
         return (
-            #logits_2d.buffer,
+            # logits_2d.buffer,
             logits_2d,
-            #target_1d.buffer,
+            # target_1d.buffer,
             target_1d,
             M,
             C,
@@ -281,11 +280,10 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
                 M *= logits_shape[i]
                 spatial_dims.append(logits_shape[i])
 
-
-        #var logits_2d = logits.reshape[track_grad=False](Shape(M, C)).buffer
-        #var target_2d = target.reshape[track_grad=False](Shape(M, C)).buffer
-        #var logits_2d = logits.buffer.reshape(Shape(M, C), True)
-        #var target_2d = target.buffer.reshape(Shape(M, C), True)
+        # var logits_2d = logits.reshape[track_grad=False](Shape(M, C)).buffer
+        # var target_2d = target.reshape[track_grad=False](Shape(M, C)).buffer
+        # var logits_2d = logits.buffer.reshape(Shape(M, C), True)
+        # var target_2d = target.buffer.reshape(Shape(M, C), True)
         var logits_2d = logits.buffer.reshape(Shape(M, C))
         var target_2d = target.buffer.reshape(Shape(M, C))
 
@@ -340,25 +338,6 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
             if valid_count > 0:
                 transformed /= Scalar[Self.dtype](valid_count)
         return Tensor[Self.dtype](transformed^, requires_grad=False)
-
-    @staticmethod
-    fn compute_log_softmax_and_softmax_parked(
-        logits_2d: NDBuffer[Self.dtype],
-    ) -> Tuple[
-        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
-    ] where Self.dtype.is_floating_point():
-        """
-        Returns (log_softmax, softmax) along axis=1.
-        GPU safe — log_softmax and softmax are both GPU ready.
-        Returns NDBuffers — safe for backward storage.
-        """
-        var logits_t = Tensor[Self.dtype](logits_2d, requires_grad=False)
-        var log_probs = logits_t.softmax[log=True, track_grad=False](
-            axes=[1]
-        ).buffer
-
-        var probs = logits_t.softmax[track_grad=False](axes=[1]).buffer
-        return log_probs, probs
 
     @always_inline
     @staticmethod
@@ -958,7 +937,7 @@ fn allclose(a: Float32, b: Float32, atol: Float32 = 1e-4) -> Bool:
 
 
 fn main() raises:
-    _="""@parameter
+    _ = """@parameter
     if has_accelerator():
         print("test_ce_gpu_ci_basic_mean")
         comptime dtype = DType.float32
@@ -974,6 +953,7 @@ fn main() raises:
         var loss_cpu = ce2(logits_cpu, target)
         assert_true(allclose(loss.item(), loss_cpu.item()))"""
     test_ce_rank3_reduction_none_v2()
+
 
 fn test_ce_rank3_reduction_none_v2() raises:
     """Test rank-3 with reduction='none'."""
@@ -995,7 +975,9 @@ fn test_ce_rank3_reduction_none_v2() raises:
 
     # Loss shape should match target shape [1, 2]
     assert_true(
-        loss.shape().rank() == 2 and loss.shape()[0] == 1 and loss.shape()[1] == 2,
+        loss.shape().rank() == 2
+        and loss.shape()[0] == 1
+        and loss.shape()[1] == 2,
         "Rank-3: reduction=none should preserve target shape",
     )
 
@@ -1006,7 +988,9 @@ fn test_ce_rank3_reduction_none_v2() raises:
     for c in range(3):
         assert_true(
             abs(logits.grad()[0, c, 1]) < 1e-10,
-            "Rank-3: reduction=none - ignored class " + c.__str__() + " should be 0",
+            "Rank-3: reduction=none - ignored class "
+            + c.__str__()
+            + " should be 0",
         )
 
     print("✓ Rank-3 reduction=none test passed")
