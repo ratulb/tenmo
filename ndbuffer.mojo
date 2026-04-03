@@ -936,16 +936,25 @@ struct NDBuffer[dtype: DType](
     fn softmax(
         self, axes: IntArray, validated: Bool = False
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        var normalized_axes = axes if validated else Validator.validate_and_normalize_axes(self.shape, axes)
+        var normalized_axes = (
+            axes if validated else Validator.validate_and_normalize_axes(
+                self.shape, axes
+            )
+        )
         var (_, stable_exp) = self._softmax_components(normalized_axes)
         var exp_sum = stable_exp.sum(normalized_axes, keepdims=True)
         return stable_exp / exp_sum
 
     fn log_softmax(
         self, axes: IntArray, validated: Bool = False
-    ) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]
-            where Self.dtype.is_floating_point():
-        var normalized_axes = axes if validated else Validator.validate_and_normalize_axes(self.shape, axes)
+    ) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ] where Self.dtype.is_floating_point():
+        var normalized_axes = (
+            axes if validated else Validator.validate_and_normalize_axes(
+                self.shape, axes
+            )
+        )
         var (stable, stable_exp) = self._softmax_components(normalized_axes)
         var log_sum_exp = stable.log_sum(normalized_axes, keepdims=True)
         var exp_sum = stable_exp.sum(normalized_axes, keepdims=True)
@@ -1439,53 +1448,54 @@ struct NDBuffer[dtype: DType](
             return view.contiguous()
 
     fn permute(
-        mut self, axes: IntArray, *, shared: Bool = True
+        mut self, perm: IntArray, *, shared: Bool = True
     ) -> NDBuffer[Self.dtype]:
         """
         Permute axes of this NDBuffer.
+        perm[i] = j means: new axis i takes old axis j.
+        Example: perm=[2,0,1] on shape [A,B,C] → shape [C,A,B].
 
-        shared=True  → view with reordered shape/strides, same buffer
-                       used by Tensor.permute — no data movement
-        shared=False → owned contiguous copy with permuted layout
-                       used by Gradbox.permute — GPU safe via contiguous()
-
+        shared=True  → view with reordered shape/strides, same buffer.
+                       used by Tensor.permute — no data movement.
+        shared=False → owned contiguous copy with permuted layout.
+                       used by Gradbox.permute — GPU safe via contiguous().
         GPU safety: shared=True is always safe — just metadata.
-                    shared=False delegates to contiguous() which handles
+                    shared=False delegates to contiguous() which handles.
                     GPU via contiguous_device_state().
         """
         var shape = self.shape
         var rank = shape.rank()
 
-        if len(axes) != rank:
+        if len(perm) != rank:
             panic(
                 "NDBuffer → permute: number of axes (",
-                len(axes).__str__(),
+                len(perm).__str__(),
                 ") must match rank (",
                 rank.__str__(),
                 ")",
             )
 
-        # Validate permutation
-        var seen = IntArray.with_capacity(rank)
-        for axis in axes:
-            var normalized = axis if axis >= 0 else axis + rank
+        # Validate permutation — one pass, no O(n) `in` scan per element
+        var visited = IntArray.filled(rank, 0)
+        for i in range(len(perm)):
+            var normalized = perm[i] if perm[i] >= 0 else perm[i] + rank
             if normalized < 0 or normalized >= rank:
                 panic(
-                    "NDBuffer → permute: invalid axis index ",
-                    axis.__str__(),
+                    "NDBuffer → permute: invalid axis ",
+                    perm[i].__str__(),
                     " for rank ",
                     rank.__str__(),
                 )
-            if normalized in seen:
-                panic("NDBuffer → permute: duplicate axis ", axis.__str__())
-            seen.append(normalized)
+            if visited[normalized] == 1:
+                panic("NDBuffer → permute: duplicate axis ", perm[i].__str__())
+            visited[normalized] = 1
 
         # Build permuted shape and strides
         var new_shape_dims = IntArray.with_capacity(rank)
         var new_strides_arr = IntArray.with_capacity(rank)
-        for axis in axes:
-            new_shape_dims.append(shape[axis])
-            new_strides_arr.append(self.strides[axis])
+        for i in range(len(perm)):
+            new_shape_dims.append(shape[perm[i]])
+            new_strides_arr.append(self.strides[perm[i]])
 
         var new_shape = Shape(new_shape_dims)
         var new_strides = Strides(new_strides_arr)
@@ -3331,4 +3341,26 @@ struct NDBuffer[dtype: DType](
 
 fn main() raises:
     comptime dtype = DType.float32
-    pass
+    var ndb = NDBuffer[dtype].arange(8)
+    ndb.print()
+    var shape = Shape(4, 2)
+    var reshaped1 = ndb.reshape(shape)
+    var reshaped2 = ndb.reshape(shape, validated=False)
+    var reshaped3 = ndb.reshape(shape, validated=True)
+    print()
+    reshaped1.print()
+    print()
+    reshaped2.print()
+    print()
+    reshaped3.print()
+
+    var permuted = ndb.permute(IntArray(0), shared=False)
+    var reshaped_1 = permuted.reshape(shape)
+    var reshaped_2 = permuted.reshape(shape, validated=False)
+    var reshaped_3 = permuted.reshape(shape, validated=True)
+    print()
+    reshaped_1.print()
+    print()
+    reshaped_2.print()
+    print()
+    reshaped_3.print()
