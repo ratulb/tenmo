@@ -219,10 +219,8 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
                 M *= logits_shape[i]
                 spatial_dims.append(logits_shape[i])
 
-        # var logits_2d: Tensor[Self.dtype]
         var logits_2d: NDBuffer[Self.dtype]
         if rank == 2:
-            # logits_2d = logits.reshape[track_grad=False](Shape(M, C))
             logits_2d = logits.buffer.reshape(Shape(M, C))
         else:
             # Permute (N, C, d1..dk) → (N, d1..dk, C) then reshape to (M, C)
@@ -231,25 +229,16 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
             for i in range(2, rank):
                 perm.append(i)
             perm.append(1)
-            _ = """logits_2d = logits.permute_unshared(perm).reshape[track_grad=False](
-                Shape(M, C)
-            ).buffer"""
             var logits_buffer = logits.buffer.copy()
             var permuted = logits_buffer.permute(perm, shared=False)
-            logits_2d = permuted.reshape(Shape(M, C))  # True not needed?
-            _="""logits_2d = logits_buffer.permute(perm, shared=False).reshape(
-                Shape(M, C)
-            )"""
+            logits_2d = permuted.reshape(Shape(M, C))
 
-        # var target_1d = target.reshape[track_grad=False](Shape(M))
         var target_1d = target.buffer.reshape(Shape(M))
         var spatial_shape = (
             Shape(spatial_dims) if len(spatial_dims) > 0 else Shape()
         )
         return (
-            # logits_2d.buffer,
             logits_2d,
-            # target_1d.buffer,
             target_1d,
             M,
             C,
@@ -282,10 +271,6 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
                 M *= logits_shape[i]
                 spatial_dims.append(logits_shape[i])
 
-        # var logits_2d = logits.reshape[track_grad=False](Shape(M, C)).buffer
-        # var target_2d = target.reshape[track_grad=False](Shape(M, C)).buffer
-        # var logits_2d = logits.buffer.reshape(Shape(M, C), True)
-        # var target_2d = target.buffer.reshape(Shape(M, C), True)
         var logits_2d = logits.buffer.reshape(Shape(M, C))
         var target_2d = target.buffer.reshape(Shape(M, C))
 
@@ -354,38 +339,6 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
         Returns NDBuffers — safe for backward storage.
         """
         return logits_2d.log_softmax(IntArray([1]), validated=True)
-
-    @staticmethod
-    fn scale_grad_by_upstream_good(
-        grad: NDBuffer[Self.dtype],
-        upstream: Gradbox[Self.dtype],
-        reduction: Reduction,
-        valid_count: Int,
-        M: Int,
-        C: Int,
-    ) -> NDBuffer[Self.dtype]:
-        """
-        Scale gradient by upstream grad and reduction factor.
-        For none reduction: broadcast upstream (M,) → (M, C).
-        For mean/sum: scalar multiply.
-        GPU safe: all arithmetic ops.
-        """
-        var grad_t = Tensor[Self.dtype](grad, requires_grad=False)
-
-        if reduction.is_none():
-            var ug = Tensor[Self.dtype](upstream.buffer, requires_grad=False)
-            var ug_expanded = ug.unsqueeze(-1).broadcast_to(Shape(M, C))
-            return (grad_t * ug_expanded).buffer
-        else:
-            var ug_scalar = (
-                Tensor[Self.dtype](upstream.buffer, requires_grad=False)
-                .sum()
-                .item()
-            )
-            var scale = Scalar[Self.dtype](
-                valid_count if reduction.is_mean() and valid_count > 0 else 1
-            )
-            return (grad_t * (ug_scalar / scale)).buffer
 
     @staticmethod
     fn scale_grad_by_upstream(
