@@ -234,10 +234,12 @@ struct CECommon[dtype: DType](ImplicitlyCopyable):
             _ = """logits_2d = logits.permute_unshared(perm).reshape[track_grad=False](
                 Shape(M, C)
             ).buffer"""
-            var logits_buffer = logits.buffer
-            logits_2d = logits_buffer.permute(perm, shared=False).reshape(
+            var logits_buffer = logits.buffer.copy()
+            var permuted = logits_buffer.permute(perm, shared=False)
+            logits_2d = permuted.reshape(Shape(M, C))  # True not needed?
+            _="""logits_2d = logits_buffer.permute(perm, shared=False).reshape(
                 Shape(M, C)
-            )
+            )"""
 
         # var target_1d = target.reshape[track_grad=False](Shape(M))
         var target_1d = target.buffer.reshape(Shape(M))
@@ -633,9 +635,9 @@ struct CEClassIndicesForward[dtype: DType](ImplicitlyCopyable):
             if logits.requires_grad:
                 out.requires_grad_(True)
                 var bwd = CEClassIndicesBackward[Self.dtype](
-                    softmax_probs=softmax_probs_ndb,
-                    target_1d=target_1d_ndb,
-                    logits_shape=logits_shape,
+                    softmax_probs=softmax_probs_ndb^,
+                    target_1d=target_1d_ndb^,
+                    logits_shape=logits_shape^,
                     reduction=reduction,
                     ignore_index=ignore_index,
                     label_smoothing=ls,
@@ -787,9 +789,9 @@ struct CEProbabilitiesForward[dtype: DType](ImplicitlyCopyable):
             if logits.requires_grad:
                 out.requires_grad_(True)
                 var bwd = CEProbabilitiesBackward[Self.dtype](
-                    softmax_probs=softmax_probs_ndb,
-                    smoothed_target=smoothed_target_ndb,
-                    logits_shape=logits_shape,
+                    softmax_probs=softmax_probs_ndb^,
+                    smoothed_target=smoothed_target_ndb^,
+                    logits_shape=logits_shape^,
                     reduction=reduction,
                     valid_count=M,
                     M=M,
