@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from net import MSELoss, BCELoss, BCEWithLogitsLoss, Linear, Sigmoid
 from common_utils import isnan, isinf
-from testing import assert_true
+from std.testing import assert_true
 from intarray import IntArray
 
 # ============================================================================

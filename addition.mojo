@@ -13,8 +13,7 @@ from broadcastbackward import BroadcastBackward
 
 
 @fieldwise_init
-@register_passable
-struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable):
+struct AddBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_ADD_SCALAR
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -41,8 +40,7 @@ comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
 
 
 @fieldwise_init
-@register_passable
-struct AddBackward[dtype: DType](ImplicitlyCopyable):
+struct AddBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_ADD
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -84,8 +82,7 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct AddScalar[dtype: DType](Copyable):
+struct AddScalar[dtype: DType](RegisterPassable, Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -109,8 +106,7 @@ struct AddScalar[dtype: DType](Copyable):
 
 # Element wise addition of two tensors - would broadcast if required
 @fieldwise_init
-@register_passable
-struct Adder[dtype: DType](Copyable):
+struct Adder[dtype: DType](RegisterPassable, Copyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -154,7 +150,7 @@ struct Adder[dtype: DType](Copyable):
 
 
 from common_utils import now
-from testing import assert_true
+from std.testing import assert_true
 from shapes import Shape
 
 

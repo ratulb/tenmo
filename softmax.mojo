@@ -9,7 +9,7 @@ from backpropagation import (
 )
 from mnemonics import AddTensor
 from tenmo import Tensor
-from sys import has_accelerator
+from std.sys import has_accelerator
 from common_utils import panic
 from validators import Validator
 
@@ -35,8 +35,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
         var ancestor = output.ancestry().get(0)
         var local_grad_ndb: NDBuffer[Self.dtype]
 
-        @parameter
-        if Self.is_log:
+        comptime if Self.is_log:
             # g - softmax(x) * sum(g, axes, keepdims=True)
             var sum_grad = gradbox.buffer.sum(self.axes, keepdims=True)
             var softmax_sum = self.softmax_out * sum_grad
@@ -56,8 +55,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
 
 
 @fieldwise_init
-@register_passable
-struct Softmax[dtype: DType]:
+struct Softmax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -74,8 +72,7 @@ struct Softmax[dtype: DType]:
         var ndb = this.buffer.softmax(normalized_axes, validated=True)
         var out = Tensor[Self.dtype](ndb, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(this.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
@@ -96,8 +93,7 @@ struct Softmax[dtype: DType]:
 
 
 @fieldwise_init
-@register_passable
-struct LogSoftmax[dtype: DType]:
+struct LogSoftmax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -116,8 +112,7 @@ struct LogSoftmax[dtype: DType]:
         )
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(this.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

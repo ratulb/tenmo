@@ -1,13 +1,13 @@
 from gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
-from memory import AddressSpace, stack_allocation
+from std.memory import AddressSpace, stack_allocation
 
 from array import Array
 from common_utils import Epsilon, panic
 from device import DeviceState
 from ndbuffer import NDBuffer
 from intarray import IntArray
-from math import exp, log
-from sys import simd_width_of
+from std.math import exp, log
+from std.sys import simd_width_of
 
 fn output_to_input_base(
     out_idx: Int,
@@ -107,8 +107,7 @@ fn reduce[
 
     if tid == 0:
 
-        @parameter
-        if mean:
+        comptime if mean:
             (out_buffer + out_idx)[] = smem[0] / Scalar[dtype](
                 max(reduced_volume, 1)
             )
@@ -232,8 +231,7 @@ fn log_sum_exp_f64[
 
 
 @fieldwise_init
-@register_passable
-struct Reduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
+struct Reduction[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn launch[
         max_block_width: Int = 512, mean: Bool = False
@@ -339,8 +337,7 @@ struct Reduction[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
         )
         ref A_buffer = A_device_state.device_buffer()
 
-        @parameter
-        if Self.dtype == DType.float32:
+        comptime if Self.dtype == DType.float32:
             var compiled_func = device_context.compile_function[
                 log_sum_exp_f32[
                     max_block_size=max_block_width,
@@ -411,7 +408,7 @@ fn main() raises:
     test_mean()
 
 from tenmo import Tensor
-from testing import assert_true
+from std.testing import assert_true
 
 from device import GPU
 from shapes import Shape

@@ -6,8 +6,7 @@ from common_utils import panic
 
 
 @fieldwise_init
-@register_passable
-struct VarianceBackward[dtype: DType](ImplicitlyCopyable):
+struct VarianceBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_VARIANCE
     var axis: Int
     var unbiased: Bool
@@ -73,8 +72,7 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Variance[dtype: DType]:
+struct Variance[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
@@ -133,8 +131,7 @@ struct Variance[dtype: DType]:
             else:
                 result = result.squeeze[track_grad=False]()
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)

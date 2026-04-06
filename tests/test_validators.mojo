@@ -1,6 +1,6 @@
 from shapes import Shape
 from validators import Validator
-from testing import assert_true
+from std.testing import assert_true
 from intarray import IntArray
 
 

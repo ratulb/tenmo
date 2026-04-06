@@ -3,7 +3,7 @@ from common_utils import panic
 from random import shuffle as reshuffle
 from python import PythonObject
 from numpy_interop import from_ndarray, numpy_dtype
-from memory import memcpy, Pointer
+from std.memory import memcpy, Pointer
 from shapes import Shape
 
 # MNIST

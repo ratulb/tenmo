@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from common_utils import panic, now
-from testing import assert_true, assert_equal, assert_false
+from std.testing import assert_true, assert_equal, assert_false
 from dataloader import *
 from python import Python, PythonObject
 

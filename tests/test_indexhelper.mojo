@@ -2,7 +2,7 @@ from shapes import Shape
 from strides import Strides
 from common_utils import now
 from buffers import Buffer
-from testing import assert_equal, assert_true, assert_false
+from std.testing import assert_equal, assert_true, assert_false
 from indexhelper import IndexIterator
 from indexhelper import IndexCalculator
 

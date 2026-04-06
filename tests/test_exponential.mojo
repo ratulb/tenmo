@@ -1,11 +1,11 @@
 from tenmo import Tensor
-from testing import assert_true
+from std.testing import assert_true
 from numpy_interop import to_ndarray
 from python import Python
 
 from shapes import Shape
-from sys import has_accelerator
-from math import exp as scalar_exp
+from std.sys import has_accelerator
+from std.math import exp as scalar_exp
 
 comptime dtype = DType.float32
 comptime tol = Float32(1e-4)

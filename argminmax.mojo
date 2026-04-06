@@ -4,11 +4,11 @@ from common_utils import panic
 from shapes import Shape
 from utils.numerics import max_finite, min_finite
 from gpu import thread_idx, block_idx, block_dim, barrier
-from memory import AddressSpace, stack_allocation
+from std.memory import AddressSpace, stack_allocation
 from array import Array
 from device import DeviceState
 from ndbuffer import NDBuffer
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 
 fn reduce_argminmax[
@@ -73,8 +73,7 @@ fn reduce_argminmax[
     var local_val: Scalar[dtype]
     var local_idx: Scalar[DType.int32] = 0
 
-    @parameter
-    if is_max:
+    comptime if is_max:
         local_val = min_finite[dtype]()
     else:
         local_val = max_finite[dtype]()
@@ -84,8 +83,7 @@ fn reduce_argminmax[
     while r < reduced_volume:
         var val = (in_buffer + input_base + r * axis_stride)[]
 
-        @parameter
-        if is_max:
+        comptime if is_max:
             if val > local_val:
                 local_val = val
                 local_idx = r
@@ -105,8 +103,7 @@ fn reduce_argminmax[
     while stride > 0:
         if tid < stride:
 
-            @parameter
-            if is_max:
+            comptime if is_max:
                 if smem_val[tid + stride] > smem_val[tid]:
                     smem_val[tid] = smem_val[tid + stride]
                     smem_idx[tid] = smem_idx[tid + stride]
@@ -123,8 +120,7 @@ fn reduce_argminmax[
 
 
 @fieldwise_init
-@register_passable
-struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable & Movable):
+struct ArgMinMaxReducer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     """
     Unified CPU + GPU argmin/argmax on NDBuffer.
     Returns an NDBuffer[DType.int32] with the output shape.
@@ -162,8 +158,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable & Movable):
         var reduced_volume = shape[ax]
         var total_output = out_shape.num_elements()
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if A.is_on_gpu():
                 return Self._gpu_reduce[is_max, max_block_size](
                     A, ax, keepdims, out_shape, total_output, reduced_volume
@@ -240,8 +235,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable & Movable):
             var best_val: Scalar[Self.dtype]
             var best_pos = 0
 
-            @parameter
-            if is_max:
+            comptime if is_max:
                 best_val = min_finite[Self.dtype]()
             else:
                 best_val = max_finite[Self.dtype]()
@@ -252,8 +246,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable & Movable):
                 ) if not keepdims else out_idx.replace(ax, idx)
                 var val = A[full_idx]
 
-                @parameter
-                if is_max:
+                comptime if is_max:
                     if val > best_val:
                         best_val = val
                         best_pos = idx

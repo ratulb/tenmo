@@ -1,10 +1,9 @@
-from math import log, exp
+from std.math import log, exp
 from buffers import Buffer
 
 
 @fieldwise_init
-@register_passable
-struct Utils[dtype: DType](ImplicitlyCopyable):
+struct Utils[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     @always_inline
     fn log_scalar(

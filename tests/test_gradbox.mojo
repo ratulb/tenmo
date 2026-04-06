@@ -1,5 +1,5 @@
 from buffers import Buffer
-from testing import assert_true
+from std.testing import assert_true
 from ndbuffer import NDBuffer
 from shapes import Shape
 from gradbox import Gradbox

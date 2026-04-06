@@ -1,10 +1,10 @@
 ### Mojo Tensor
 ### Implement tensor library in mojo
-from math import exp, floor, log, cos, sin, sqrt, pi
+from std.math import exp, floor, log, cos, sin, sqrt, pi
 from random import seed, random_float64
-from sys import simd_width_of
-from utils.numerics import min_finite
-from memory import memcpy, memset, memset_zero, AddressSpace, ArcPointer
+from std.sys import simd_width_of
+from std.utils.numerics import min_finite
+from std.memory import memcpy, memset, memset_zero, AddressSpace, ArcPointer
 from shapes import Shape, ShapeIndexIterator
 from ancestry import Ancestors
 from strides import Strides
@@ -15,7 +15,7 @@ from common_utils import (
     Idx,
     print_buffer,
     panic,
-    variadic1or2,
+    #variadic1or2,
     Epsilon,
 )
 from mnemonics import *
@@ -24,24 +24,21 @@ from backpropagation import BackwardFn
 from forwards import *
 from buffers import Buffer
 from validators import Validator
-from collections import Set, Deque
+from std.collections import Set, Deque
 from gradbox import Gradbox
 from intarray import IntArray
 from broadcasthelper import ShapeBroadcaster
 from ndbuffer import NDBuffer
 from utilities import Utils
-from gpu.host import DeviceBuffer, DeviceContext
+from std.gpu.host import DeviceBuffer, DeviceContext
 from device import Device, CPU, GPU
-from sys.info import has_accelerator
+from std.sys.info import has_accelerator
 
 
-# struct Tensor[dtype: DType = DType.float32](
 struct Tensor[dtype: DType](
     Copyable
     & Movable
     & Sized
-    & Stringable
-    & Representable
     & Writable
     & Absable
     & Equatable
@@ -157,25 +154,25 @@ struct Tensor[dtype: DType](
         memcpy(dest=tensor_data.unsafe_ptr(), src=self.data_ptr(), count=count)
         return tensor_data^
 
-    fn __moveinit__(out self, deinit other: Self):
-        self._id = other._id
-        self.buffer = other.buffer^
-        self.requires_grad = other.requires_grad
-        self.gradbox = other.gradbox
-        self.ancestors = other.ancestors^
-        self.backwardFn = other.backwardFn^
+    fn __moveinit__(out self, deinit take: Self):
+        self._id = take._id
+        self.buffer = take.buffer^
+        self.requires_grad = take.requires_grad
+        self.gradbox = take.gradbox
+        self.ancestors = take.ancestors^
+        self.backwardFn = take.backwardFn^
 
-    fn __copyinit__(out self, other: Self):
-        self._id = other._id
-        self.buffer = other.buffer.copy()
-        self.requires_grad = other.requires_grad
-        if other.gradbox != UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]():
+    fn __copyinit__(out self, copy: Self):
+        self._id = copy._id
+        self.buffer = copy.buffer.copy()
+        self.requires_grad = copy.requires_grad
+        if copy.gradbox != UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]():
             self.gradbox = alloc[Gradbox[Self.dtype]](1)
-            self.gradbox.init_pointee_copy(other.gradbox[])
+            self.gradbox.init_pointee_copy(copy.gradbox[])
         else:
             self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
-        self.ancestors = other.ancestors.copy()
-        self.backwardFn = other.backwardFn.copy()
+        self.ancestors = copy.ancestors.copy()
+        self.backwardFn = copy.backwardFn.copy()
 
     fn shallow_copy(self) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype]()
@@ -195,8 +192,7 @@ struct Tensor[dtype: DType](
         ):
             var gradbox: Gradbox[Self.dtype]
 
-            @parameter
-            if has_accelerator():
+            comptime if has_accelerator():
                 if self.is_on_gpu():
                     try:
                         var device_state = self.buffer.device_state.value().new(
@@ -364,7 +360,7 @@ struct Tensor[dtype: DType](
         track_grad: Bool = True
     ](mut self, *indices: Idx) -> Tensor[Self.dtype]:
         # Compute view metadata
-        view_shape, view_strides, offset = (
+        var(view_shape, view_strides, offset) = (
             Validator.validate_and_compute_advanced_indexing_metadata(
                 self.shape(), self.strides(), indices
             )
@@ -480,8 +476,7 @@ struct Tensor[dtype: DType](
                     offset += 1
 
     fn to_cpu(self, requires_grad: Optional[Bool] = None) raises -> Self:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             return DeviceTransfer[Self.dtype].forward[True](
                 self, CPU().into(), requires_grad
             )
@@ -492,8 +487,7 @@ struct Tensor[dtype: DType](
         gpu: Optional[GPU] = None,
         requires_grad: Optional[Bool] = None,
     ) raises -> Self:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if gpu:
                 return DeviceTransfer[Self.dtype].forward[True](
                     self, gpu.value().into(), requires_grad
@@ -512,8 +506,7 @@ struct Tensor[dtype: DType](
         return self.buffer.device()
 
     fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.buffer.device_context()
             else:
@@ -1011,8 +1004,7 @@ struct Tensor[dtype: DType](
     ) -> Tensor[Self.dtype]:
         var target_device: Optional[Device]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 target_device = device.or_else(
                     self.buffer.device_state.value().get_gpu().into()
@@ -1052,8 +1044,7 @@ struct Tensor[dtype: DType](
         """
         var target_device: Optional[Device]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 target_device = device.or_else(
                     self.buffer.device_state.value().get_gpu().into()
@@ -1249,9 +1240,8 @@ struct Tensor[dtype: DType](
         tensor = Tensor[Self.dtype](shape, requires_grad)
         for i in range(len(elems)):
             tensor[i] = elems[i]
-        return tensor^
 
-    @staticmethod
+        _="""@staticmethod
     fn of[
         row_size: Int
     ](*elems: Scalar[Self.dtype], requires_grad: Bool = False) -> Tensor[
@@ -1275,6 +1265,7 @@ struct Tensor[dtype: DType](
         for i in range(num_rows):
             for j in range(row_size):
                 tensor[i, j] = elems[i * row_size + j]
+        return tensor^"""
         return tensor^
 
     @staticmethod
@@ -1302,8 +1293,7 @@ struct Tensor[dtype: DType](
         var target_device = device.or_else(CPU().into())
         var value: Scalar[Self.dtype]
 
-        @parameter
-        if Self.dtype.is_floating_point():
+        comptime if Self.dtype.is_floating_point():
             value = Scalar[Self.dtype](1.0)
         else:
             value = Scalar[Self.dtype](1)
@@ -1480,8 +1470,7 @@ struct Tensor[dtype: DType](
             )
         else:
 
-            @parameter
-            if augment:
+            comptime if augment:
                 grad_contrib = upstream_grad * other
             else:
                 grad_contrib = upstream_grad.copy()
@@ -2356,8 +2345,7 @@ struct Tensor[dtype: DType](
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        @parameter
-        if log:
+        comptime if log:
             return LogSoftmax[Self.dtype].forward[track_grad](
                 self, IntArray(axes), requires_grad
             )
@@ -2375,8 +2363,7 @@ struct Tensor[dtype: DType](
     ) -> Tensor[
         Self.dtype
     ] where Self.dtype.is_floating_point():
-        @parameter
-        if log:
+        comptime if log:
             return LogSoftmax[Self.dtype].forward[track_grad](
                 self, axes, requires_grad
             )
@@ -2498,9 +2485,8 @@ struct Tensor[dtype: DType](
 
 
 @fieldwise_init
-@register_passable
 struct ElemIterator[dtype: DType, origin: ImmutOrigin](
-    ImplicitlyCopyable & Iterable & Iterator & Sized
+    RegisterPassable & ImplicitlyCopyable & Iterable & Iterator & Sized
 ):
     comptime Element = Tuple[IntArray, Scalar[Self.dtype]]
     comptime IteratorType[
@@ -2533,7 +2519,7 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
         return self.index_itr.bounds()
 
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

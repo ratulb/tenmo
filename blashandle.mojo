@@ -1,4 +1,4 @@
-from sys.ffi import OwnedDLHandle, _DLHandle
+from std.ffi import OwnedDLHandle, _DLHandle
 from tenmo import Tensor
 from shapes import Shape
 from common_utils import panic
@@ -6,12 +6,11 @@ from mnemonics import AddTensor
 from backpropagation import BackwardFn, Delegate, BLAS_BACKWARD_MATMUL_2D
 from sys.param_env import env_get_string
 from gradbox import Gradbox
-from memory import ArcPointer
+from std.memory import ArcPointer
 
 
 @fieldwise_init
-@register_passable
-struct BLASMatmul2dBackward[dtype: DType](ImplicitlyCopyable):
+struct BLASMatmul2dBackward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     comptime TAG = BLAS_BACKWARD_MATMUL_2D
     var transpose_A: Bool
     var transpose_B: Bool
@@ -155,9 +154,9 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
     var _handle_ptr: Optional[ArcPointer[OwnedDLHandle]]
     var _error_msg: String
 
-    fn __copyinit__(out self, other: Self):
-        self._handle_ptr = other._handle_ptr.copy()
-        self._error_msg = other._error_msg
+    fn __copyinit__(out self, copy: Self):
+        self._handle_ptr = copy._handle_ptr.copy()
+        self._error_msg = copy._error_msg
 
     fn __init__(out self):
         self._error_msg = ""
@@ -608,12 +607,11 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
 
 
 @fieldwise_init
-@register_passable
-struct BLASHandleLite[dtype: DType](ImplicitlyCopyable):
+struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var _handle: _DLHandle
 
-    fn __copyinit__(out self, other: Self):
-        self._handle = other._handle.copy()
+    fn __copyinit__(out self, copy: Self):
+        self._handle = copy._handle.copy()
 
     # ========== REQUIRED PARAMS BEFORE OPTIONAL ==========
     fn matmul_f32(
@@ -1042,7 +1040,7 @@ fn main() raises:
 # ============================================================================
 # COMPREHENSIVE BLAS MATMUL TESTS
 # ============================================================================
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn test_blas_case_4_Atranspose_Btranspose() raises:

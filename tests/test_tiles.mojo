@@ -1,7 +1,7 @@
 from tenmo import Tensor
-from testing import assert_true
+from std.testing import assert_true
 from shapes import Shape
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 
 # Start of old tests

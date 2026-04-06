@@ -9,12 +9,11 @@ from backpropagation import (
 from mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
 from gradbox import Gradbox
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 
 @fieldwise_init
-@register_passable
-struct TrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
+struct TrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_DIV_SCALAR
     var factor: Scalar[Self.dtype]
 
@@ -38,8 +37,7 @@ struct TrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct RightTrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
+struct RightTrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_RIGHT_DIV_SCALAR
     var scalar: Scalar[Self.dtype]
 
@@ -65,8 +63,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct DivideBackward[dtype: DType](ImplicitlyCopyable):
+struct DivideBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_DIVIDE
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -122,8 +119,7 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct DivideScalar[dtype: DType](ImplicitlyCopyable):
+struct DivideScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -153,8 +149,7 @@ struct DivideScalar[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct DivideByScalar[dtype: DType](ImplicitlyCopyable):
+struct DivideByScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -189,8 +184,7 @@ struct DivideByScalar[dtype: DType](ImplicitlyCopyable):
 
 # Element wise division of two tensors
 @fieldwise_init
-@register_passable
-struct Divider[dtype: DType](ImplicitlyCopyable):
+struct Divider[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -224,7 +218,7 @@ struct Divider[dtype: DType](ImplicitlyCopyable):
 
 
 from common_utils import now
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

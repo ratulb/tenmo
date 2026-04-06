@@ -1,8 +1,8 @@
-from testing import assert_true
+from std.testing import assert_true
 from tenmo import Tensor
-from sys import has_accelerator
+from std.sys import has_accelerator
 from shapes import Shape
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 comptime dtype = DType.float32
 

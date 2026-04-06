@@ -1,14 +1,12 @@
 from common_utils import panic
-from memory import memcpy
+from std.memory import memcpy
 
 
-@register_passable
 struct IntArray(
+    RegisterPassable,
     ImplicitlyCopyable,
     Iterable,
-    Representable,
     Sized,
-    Stringable,
     Writable,
 ):
     """A lightweight, register-passable growable array of integers.
@@ -45,7 +43,7 @@ struct IntArray(
             self._data[i] = values[i]
 
     @always_inline("nodebug")
-    fn __init__(out self, values: VariadicList[Int]):
+    fn __init__(out self, values: VariadicList[Int, _]):
         """Create from VariadicList : IntArray(1, 2, 3)."""
         var n = len(values)
         self._data = alloc[Int](n)
@@ -64,13 +62,13 @@ struct IntArray(
         memcpy(dest=self._data, src=values._data, count=n)
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
+    fn __copyinit__(out self, copy: Self):
         """Deep copy."""
-        self._size = existing._size
-        self._capacity = existing._capacity
-        if existing._capacity > 0:
-            self._data = alloc[Int](existing._capacity)
-            memcpy(dest=self._data, src=existing._data, count=existing._size)
+        self._size = copy._size
+        self._capacity = copy._capacity
+        if copy._capacity > 0:
+            self._data = alloc[Int](copy._capacity)
+            memcpy(dest=self._data, src=copy._data, count=copy._size)
         else:
             self._data = UnsafePointer[Int, MutExternalOrigin]()
 
@@ -587,13 +585,12 @@ struct IntArray(
 
 
 @fieldwise_init
-@register_passable
 struct IntArrayIterator[
     mut: Bool,
     //,
     origin: Origin[mut=mut],
     forward: Bool = True,
-](ImplicitlyCopyable, Iterable, Iterator, Sized):
+](RegisterPassable, ImplicitlyCopyable, Iterable, Iterator, Sized):
     comptime Element = Int
 
     comptime IteratorType[
@@ -609,8 +606,7 @@ struct IntArrayIterator[
     fn __next__(
         mut self,
     ) raises StopIteration -> ref [Self.origin] Self.Element:
-        @parameter
-        if Self.forward:
+        comptime if Self.forward:
             if self.index >= len(self.src[]):
                 raise StopIteration()
             self.index += 1
@@ -624,8 +620,7 @@ struct IntArrayIterator[
     fn bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len: Int
 
-        @parameter
-        if Self.forward:
+        comptime if Self.forward:
             iter_len = len(self.src[]) - self.index
         else:
             iter_len = self.index
@@ -637,8 +632,7 @@ struct IntArrayIterator[
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
-        @parameter
-        if Self.forward:
+        comptime if Self.forward:
             return len(self.src[]) - self.index
         else:
             return self.index
@@ -666,18 +660,17 @@ struct ZipIterator[
         self.offset = abs(len(src_this[]) - len(src_that[]))
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
-        self.index = existing.index
-        self.offset = existing.offset
-        self.src_this = existing.src_this
-        self.src_that = existing.src_that
+    fn __copyinit__(out self, copy: Self):
+        self.index = copy.index
+        self.offset = copy.offset
+        self.src_this = copy.src_this
+        self.src_that = copy.src_that
 
     fn __iter__(self) -> Self:
         return self.copy()
 
     fn __next__(mut self) -> Tuple[Int, Int]:
-        @parameter
-        if Self.forward:
+        comptime if Self.forward:
             self.index += 1
             return (
                 self.src_this[][self.index - 1],
@@ -701,8 +694,7 @@ struct ZipIterator[
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
-        @parameter
-        if Self.forward:
+        comptime if Self.forward:
             return min(len(self.src_this[]), len(self.src_that[])) - self.index
         else:
             return self.index

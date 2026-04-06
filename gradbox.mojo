@@ -7,7 +7,7 @@ from intarray import IntArray
 from ndbuffer import NDBuffer
 from broadcasthelper import ShapeBroadcaster
 from strides import Strides
-from sys import simd_width_of, has_accelerator
+from std.sys import simd_width_of, has_accelerator
 from matmul import Matmul
 from random import seed, random_float64
 from buffers import Buffer
@@ -24,8 +24,6 @@ struct Gradbox[dtype: DType](
     ImplicitlyCopyable
     & Movable
     & Sized
-    & Stringable
-    & Representable
     & Writable
     & Equatable
     & Absable
@@ -40,11 +38,11 @@ struct Gradbox[dtype: DType](
     fn __init__(out self, var buffer: NDBuffer[Self.dtype], share: Bool = True):
         self.buffer = buffer.share() if share else buffer^
 
-    fn __moveinit__(out self, deinit other: Self):
-        self.buffer = other.buffer^
+    fn __moveinit__(out self, deinit take: Self):
+        self.buffer = take.buffer^
 
-    fn __copyinit__(out self, other: Self):
-        self.buffer = other.buffer.copy()
+    fn __copyinit__(out self, copy: Self):
+        self.buffer = copy.buffer.copy()
 
     @always_inline
     fn as_tensor(

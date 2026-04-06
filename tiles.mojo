@@ -9,8 +9,7 @@ from indexhelper import IndexCalculator
 
 
 @fieldwise_init
-@register_passable
-struct TileBackward[dtype: DType](ImplicitlyCopyable):
+struct TileBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_TILE
     var repeat: IntArray
     var orig_shape: Shape
@@ -66,8 +65,7 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct TileBackward_parked[dtype: DType](ImplicitlyCopyable):
+struct TileBackward_parked[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_TILE
     var repeat: IntArray
     var orig_shape: Shape
@@ -130,8 +128,7 @@ struct TileBackward_parked[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Tile_parked[dtype: DType]:
+struct Tile_parked[dtype: DType](RegisterPassable, ImplcitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -231,9 +228,7 @@ struct Tile_parked[dtype: DType]:
             # Now src_coord has same rank as source tensor
             out[out_coord] = self[src_coord]
 
-        # --- Gradient setup ---
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
@@ -247,8 +242,7 @@ struct Tile_parked[dtype: DType]:
 
 
 @fieldwise_init
-@register_passable
-struct Tile[dtype: DType]:
+struct Tile[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -308,9 +302,7 @@ struct Tile[dtype: DType]:
         var out = expanded.reshape[track_grad=False](out_shape)
         out.requires_grad_(False)
 
-        # Autograd hookup
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

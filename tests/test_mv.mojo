@@ -19,7 +19,7 @@ fn main() raises:
 
 # ===== BASIC MATRIX-VECTOR TESTS =====
 
-from testing import assert_true
+from std.testing import assert_true
 from strides import Strides
 
 

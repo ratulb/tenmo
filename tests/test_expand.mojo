@@ -1,4 +1,4 @@
-from testing import assert_true
+from std.testing import assert_true
 from tenmo import Tensor
 from shapes import Shape
 # ============================================================

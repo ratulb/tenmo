@@ -3,8 +3,8 @@ from mnemonics import AddTensor, LOG
 from backpropagation import Delegate, BackwardFn, BACKWARD_LOG
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
-from math import log
-from sys import has_accelerator
+from std.math import log
+from std.sys import has_accelerator
 from common_utils import panic, Epsilon
 from unary_ops_kernel import UnaryOpsKernel
 
@@ -13,8 +13,7 @@ from unary_ops_kernel import UnaryOpsKernel
 
 
 @fieldwise_init
-@register_passable
-struct LogBackward[dtype: DType](ImplicitlyCopyable):
+struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_LOG
 
     var epsilon: Scalar[Self.dtype]
@@ -42,8 +41,7 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
         """
         var shape = parent_buffer.shape
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if parent_buffer.is_on_gpu():
                 # Step 1: clamp parent values to epsilon — scalar_ops[MAX], GPU safe
                 var clamped = parent_buffer.max(epsilon)
@@ -95,8 +93,7 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Logarithm[dtype: DType]:
+struct Logarithm[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
     @staticmethod
     fn forward[
@@ -114,8 +111,7 @@ struct Logarithm[dtype: DType]:
         var result_ndb = self.buffer.log[epsilon]()
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

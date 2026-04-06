@@ -3,7 +3,7 @@ from shapes import Shape
 from time import perf_counter_ns
 from blashandle import BLASHandle
 from common_utils import now
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn benchmark_cifar_sizes() raises:

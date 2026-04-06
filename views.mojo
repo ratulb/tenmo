@@ -7,15 +7,14 @@ from validators import Validator
 from gradbox import Gradbox
 from intarray import IntArray
 from common_utils import panic, log_warning
-from sys import simd_width_of
+from std.sys import simd_width_of
 from device import DeviceState
-from sys import has_accelerator
+from std.sys import has_accelerator
 from ndbuffer import NDBuffer
 
 
 @fieldwise_init
-@register_passable
-struct ViewBackward[dtype: DType](ImplicitlyCopyable):
+struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_VIEW
     var shape: Shape
     var strides: Strides
@@ -29,8 +28,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
     ](self, read output: Tensor[Self.dtype]) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if output.is_on_gpu():
                 return self.backward_gpu(output)
         return self.backward_cpu(output)
@@ -256,8 +254,7 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct ViewBackward_old_is_gold[dtype: DType](ImplicitlyCopyable):
+struct ViewBackward_old_is_gold[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_VIEW
     var shape: Shape
     var strides: Strides
@@ -369,8 +366,8 @@ struct ViewBackward_old_is_gold[dtype: DType](ImplicitlyCopyable):
         ]
 
 
-@register_passable
-struct View[dtype: DType](Copyable):
+@fieldwise_init
+struct View[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
@@ -397,8 +394,7 @@ struct View[dtype: DType](Copyable):
         var shared_ndb = tensor.buffer.share(shape, abs_strides, abs_offset)
         var out = Tensor[Self.dtype](shared_ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from gradbox import Gradbox
-from math import sqrt
-from sys import simd_width_of, has_accelerator
+from std.math import sqrt
+from std.sys import simd_width_of, has_accelerator
 from common_utils import panic
 
 

@@ -4,8 +4,8 @@ from intarray import IntArray
 from strides import Strides
 
 
-@register_passable
-struct ShapeBroadcaster:
+@fieldwise_init
+struct ShapeBroadcaster(RegisterPassable, ImplicitlyCopyable):
     """Utility for broadcasting and manipulating shapes for tensor operations.
     """
 
@@ -35,8 +35,7 @@ struct ShapeBroadcaster:
     ](this: Shape, that: Shape) -> Shape:
         """Compute the broadcasted shape from two input shapes."""
 
-        @parameter
-        if not validated:
+        comptime if not validated:
             if not ShapeBroadcaster.broadcastable(this, that):
                 panic(
                     "ShapeBroadcaster → broadcast_shape - not broadcastable: "
@@ -242,7 +241,7 @@ struct ShapeBroadcaster:
         return result
 
 
-from memory import stack_allocation
+from std.memory import stack_allocation
 
 fn main() raises:
     test_broadcast_strides()
@@ -251,7 +250,7 @@ fn main() raises:
     stack[6143] = shape[0]
     print(stack[6143])
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn test_broadcast_strides() raises:

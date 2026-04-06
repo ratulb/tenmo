@@ -1,11 +1,11 @@
-from testing import assert_true, assert_false
+from std.testing import assert_true, assert_false
 from buffers import Buffer
 from intarray import IntArray
 from shapes import Shape
 from strides import Strides
 from ndbuffer import NDBuffer
 from mnemonics import *
-from sys import has_accelerator
+from std.sys import has_accelerator
 from tenmo import Tensor
 
 # ============================================

@@ -14,8 +14,7 @@ from forwards import Concate
 
 
 @fieldwise_init
-@register_passable
-struct StackBackward[dtype: DType](ImplicitlyCopyable):
+struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     """Backward pass for stack operation."""
 
     comptime TAG = BACKWARD_STACK
@@ -97,8 +96,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Stack[dtype: DType](ImplicitlyCopyable):
+struct Stack[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
@@ -163,8 +161,7 @@ struct Stack[dtype: DType](ImplicitlyCopyable):
         )
 
         # ===== 4. SETUP AUTOGRAD =====
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if grad_required:
                 result.requires_grad_(True)
                 var backward_fn = StackBackward[Self.dtype](

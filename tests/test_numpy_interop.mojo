@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from numpy_interop import to_ndarray, from_ndarray
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

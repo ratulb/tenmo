@@ -8,8 +8,7 @@ from common_utils import panic
 
 
 @fieldwise_init
-@register_passable
-struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
+struct SqueezeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_SQUEEZE
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -40,9 +39,8 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable):
             ),  # Send out a signal to this output of squeeze op to zero out its grad(No accumulation of grad for view)
         ]
 
-
-@register_passable
-struct Squeeze[dtype: DType]:
+@fieldwise_init
+struct Squeeze[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     # Squeeze specified axes or all dims of size 1 if no axes provided
     @staticmethod
     fn forward[

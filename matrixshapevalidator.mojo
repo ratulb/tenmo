@@ -8,8 +8,7 @@ fn main():
 
 
 @fieldwise_init
-@register_passable
-struct MatrixShapeValidator:
+struct MatrixShapeValidator(RegisterPassable, ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn validate_matrix_shapes_nd(A_shape: Shape, B_shape: Shape):

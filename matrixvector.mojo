@@ -5,13 +5,12 @@ from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic
 from matmul import Matmul2d, MatmulNd
-from sys import simd_width_of, has_accelerator
+from std.sys import simd_width_of, has_accelerator
 from ndbuffer import NDBuffer
 from matrixvector_kernel import MatrixVectorNdGpu
 
 @fieldwise_init
-@register_passable
-struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
+struct MatrixVectorMulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
     @staticmethod
     fn forward[
@@ -177,8 +176,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
 
         var out: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if M.is_on_gpu() and v.is_on_gpu():
                 try:
                     out = MatrixVectorNdGpu[Self.dtype].launch[block_size=256](
@@ -200,9 +198,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
         #var ndb = Self.forward[simdwidth=simdwidth](M.buffer, v.buffer)
         #var result = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        # Setup backward
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var requires_grad = M.requires_grad or v.requires_grad
             if requires_grad:
                 result.requires_grad_(True)
@@ -217,8 +213,7 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct MatrixVectorMulNdBackward[dtype: DType](ImplicitlyCopyable):
+struct MatrixVectorMulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_MATRIX_VECTOR_MUL
 
     fn backward(

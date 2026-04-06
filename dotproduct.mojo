@@ -4,20 +4,19 @@ from backpropagation import Delegate, BackwardFn, BACKWARD_DOT
 from mnemonics import AddTensor
 from gradbox import Gradbox
 from shapes import Shape
-from memory import stack_allocation, AddressSpace
+from std.memory import stack_allocation, AddressSpace
 from gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
-from os.atomic import Atomic, Consistency
-from sys import has_accelerator
+from std.os.atomic import Atomic, Consistency
+from std.sys import has_accelerator
 from gpu.primitives.id import lane_id, warp_id
 from gpu.primitives.warp import shuffle_down
 from gpu.globals import WARP_SIZE
 
-from sys import simd_width_of
+from std.sys import simd_width_of
 
 
 @fieldwise_init
-@register_passable
-struct DotBackward[dtype: DType](ImplicitlyCopyable):
+struct DotBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_DOT
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -57,8 +56,7 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Dot[dtype: DType](ImplicitlyCopyable & Movable):
+struct Dot[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -78,8 +76,7 @@ struct Dot[dtype: DType](ImplicitlyCopyable & Movable):
 
         var out: Tensor[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if lhs.is_on_gpu() and rhs.is_on_gpu():
                 try:
                     start = now()
@@ -113,8 +110,7 @@ struct Dot[dtype: DType](ImplicitlyCopyable & Movable):
                 requires_grad=False,
             )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = lhs.requires_grad or rhs.requires_grad
 
             if grad_required:
@@ -263,8 +259,7 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var rank = A.rank()
         var numels = A.numels()
 
-        @parameter
-        if not suppress_validation:
+        comptime if not suppress_validation:
             if rank != 1 or B.rank() != 1:
                 panic(
                     "Dot product expects 1D tensors. Found",
@@ -298,8 +293,7 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
             Self.dtype
         ]() > 8 else False
 
-        @parameter
-        if use_32_kernel:
+        comptime if use_32_kernel:
             var compiled_func = device_context.compile_function[
                 dot_product_32[Self.dtype, BLOCK_SIZE=threads_per_block],
                 dot_product_32[Self.dtype, BLOCK_SIZE=threads_per_block],
@@ -336,7 +330,7 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 from mnemonics import dot
-from testing import assert_true
+from std.testing import assert_true
 from common_utils import now
 
 

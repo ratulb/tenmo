@@ -2,8 +2,8 @@ from ndbuffer import NDBuffer
 from intarray import IntArray
 from shapes import Shape
 from indexhelper import IndexCalculator
-from algorithm import parallelize
-from sys.info import num_physical_cores
+from std.algorithm import parallelize
+from std.sys.info import num_physical_cores
 from utils.numerics import min_or_neg_inf, max_or_inf
 
 

@@ -5,9 +5,8 @@ from common_utils import panic
 
 
 @fieldwise_init
-@register_passable
 struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
-    ImplicitlyCopyable, Iterable, Iterator, Sized
+    RegisterPassable, ImplicitlyCopyable, Iterable, Iterator, Sized
 ):
     comptime Element = Int
     comptime IteratorType[
@@ -49,6 +48,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         return self
 
     fn __next__(mut self) raises StopIteration -> Self.Element:
+    #fn __next__(mut self) raises StopIteration -> Int:
         """
         Return next memory offset and advance iterator.
 
@@ -177,8 +177,8 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         return self.current_offset
 
 
-@register_passable
-struct IndexCalculator:
+@fieldwise_init
+struct IndexCalculator(RegisterPassable, ImplicitlyCopyable):
     """Utility for calculating flat indices and coordinates in multi-dimensional arrays.
     """
 
@@ -296,7 +296,7 @@ struct IndexCalculator:
     @staticmethod
     fn flatten_index(
         shape: Shape,
-        indices: VariadicList[Int],
+        indices: VariadicList[Int, _],
         strides: Strides,
         offset: Int = 0,
     ) -> Int:

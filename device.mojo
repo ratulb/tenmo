@@ -1,8 +1,8 @@
 from common_utils import panic, now
-from gpu.host import DeviceContext, DeviceBuffer
-from memory import ArcPointer, memcpy
-from sys import has_accelerator, simd_width_of
-from utils import Variant
+from std.gpu.host import DeviceContext, DeviceBuffer
+from std.memory import ArcPointer, memcpy
+from std.sys import has_accelerator, simd_width_of
+from std.utils import Variant
 from ndbuffer import NDBuffer
 from shapes import Shape
 from buffers import Buffer
@@ -76,13 +76,13 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
         self.device_context = ArcPointer(DeviceContext(device_id))
         self.id = device_id
 
-    fn __copyinit__(out self, existing: Self):
-        self.device_context = existing.device_context.copy()
-        self.id = existing.id
+    fn __copyinit__(out self, copy: Self):
+        self.device_context = copy.device_context.copy()
+        self.id = copy.id
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self.device_context = existing.device_context^
-        self.id = existing.id
+    fn __moveinit__(out self, deinit take: Self):
+        self.device_context = take.device_context^
+        self.id = take.id
 
     fn write_to[W: Writer](self, mut writer: W):
         writer.write("GPU[" + self.id.__str__() + "]")
@@ -305,13 +305,13 @@ struct DeviceState[dtype: DType](
         self.buffer = buffer.create_sub_buffer[Self.datatype](0, len(buffer))
         self.gpu = gpu
 
-    fn __copyinit__(out self, existing: Self):
-        self.gpu = existing.gpu.copy()
-        self.buffer = existing.buffer.copy()
+    fn __copyinit__(out self, copy: Self):
+        self.gpu = copy.gpu.copy()
+        self.buffer = copy.buffer.copy()
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self.buffer = existing.buffer^
-        self.gpu = existing.gpu^
+    fn __moveinit__(out self, deinit take: Self):
+        self.buffer = take.buffer^
+        self.gpu = take.gpu^
 
     fn __eq__(self, other: Self) -> Bool:
         return self.gpu == other.gpu

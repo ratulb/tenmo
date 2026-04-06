@@ -11,19 +11,19 @@ from backpropagation import (
 from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 
-@register_passable
-struct SubBackward[dtype: DType](ImplicitlyCopyable):
+@fieldwise_init
+struct SubBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_SUB
     var signs: IntArray
 
     fn __init__(out self):
         self.signs = IntArray()
 
-    fn __copyinit__(out self, existing: Self):
-        self.signs = existing.signs.copy()
+    fn __copyinit__(out self, copy: Self):
+        self.signs = copy.signs.copy()
 
     fn negate(mut self, neg: Bool):
         if neg:
@@ -55,8 +55,7 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct SubLeftRightBackwardScalar[dtype: DType](ImplicitlyCopyable):
+struct SubLeftRightBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_SUB_SCALAR
     var negate: Bool
 
@@ -87,8 +86,7 @@ comptime SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[
 
 
 @fieldwise_init
-@register_passable
-struct SubtractScalar[dtype: DType](ImplicitlyCopyable):
+struct SubtractScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -113,8 +111,7 @@ struct SubtractScalar[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct SubtractFromScalar[dtype: DType](ImplicitlyCopyable):
+struct SubtractFromScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -139,8 +136,7 @@ struct SubtractFromScalar[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Subtractor[dtype: DType](ImplicitlyCopyable):
+struct Subtractor[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -191,7 +187,7 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable):
 
 
 from common_utils import now
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

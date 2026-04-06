@@ -1,6 +1,6 @@
 from shapes import Shape
 from strides import Strides
-from testing import assert_true
+from std.testing import assert_true
 from intarray import IntArray
 
 # ============================================

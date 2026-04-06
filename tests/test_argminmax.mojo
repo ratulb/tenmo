@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
 from argminmax import Argmin, Argmax
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 
 fn main() raises:
@@ -73,7 +73,7 @@ fn main() raises:
     print("passes")
 
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn test_tensor_argmax_keepdims() raises:

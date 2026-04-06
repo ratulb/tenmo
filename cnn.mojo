@@ -11,8 +11,8 @@ from forwards import Pad
 from shapes import Shape
 from gradbox import Gradbox
 from forwards import Padding
-from algorithm import parallelize
-from sys import simd_width_of
+from std.algorithm import parallelize
+from std.sys import simd_width_of
 from ndbuffer import NDBuffer
 from intarray import IntArray
 
@@ -35,9 +35,9 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
     var initialized: Bool
     var pad_spec: List[Tuple[Int, Int]]
 
-    fn __copyinit__(out self, other: Self):
-        self.initialized = other.initialized
-        self.pad_spec = other.pad_spec.copy()
+    fn __copyinit__(out self, copy: Self):
+        self.initialized = copy.initialized
+        self.pad_spec = copy.pad_spec.copy()
 
     fn __init__(out self):
         self.initialized = False
@@ -274,8 +274,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
+struct FusedIm2Col[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     """
     Fused Im2Col + Conv + Bias operation.
 
@@ -533,8 +532,7 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable & Movable):
+struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     """
     Convolution backward pass.
 

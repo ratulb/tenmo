@@ -8,8 +8,8 @@ Broadcasting rules for matmul:
 3. Last 2 dimensions must be compatible for matrix multiplication
 """
 
-from testing import assert_almost_equal, assert_equal, assert_true, assert_false
-from math import sqrt
+from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false
+from std.math import sqrt
 from random import random_float64
 from tenmo import Tensor
 from shapes import Shape

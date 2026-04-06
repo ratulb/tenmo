@@ -1,5 +1,5 @@
 from gpu import thread_idx, block_idx, block_dim, barrier
-from memory import AddressSpace, stack_allocation
+from std.memory import AddressSpace, stack_allocation
 
 from array import Array
 from device import DeviceState
@@ -83,9 +83,8 @@ fn vector_matmul_nd[
 
 
 @fieldwise_init
-@register_passable
 struct VectorMatmulNdGpu[dtype: DType = DType.float32](
-    ImplicitlyCopyable & Movable
+    RegisterPassable & ImplicitlyCopyable & Movable
 ):
     @staticmethod
     fn launch[

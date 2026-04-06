@@ -7,8 +7,7 @@ from intarray import IntArray
 
 
 @fieldwise_init
-@register_passable
-struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
+struct TransposeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_TRANSPOSE
     var axes: IntArray
 
@@ -33,8 +32,7 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Transpose[dtype: DType](Copyable):
+struct Transpose[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -46,8 +44,7 @@ struct Transpose[dtype: DType](Copyable):
         var transposed_ndb = self.buffer.transpose(axes, shared=True)
         var out = Tensor[Self.dtype](transposed_ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 ref shape = self.shape()

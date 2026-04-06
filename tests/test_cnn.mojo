@@ -5,10 +5,10 @@ Tests forward pass, backward pass, edge cases, and numerical gradients.
 from tenmo import Tensor
 from cnn import Conv2dFused
 
-from testing import assert_almost_equal, assert_equal, assert_true, assert_false
-from math import sqrt
+from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false
+from std.math import sqrt
 from common_utils import isnan, isinf
-from math import sqrt
+from std.math import sqrt
 from random import seed
 from gradbox import Gradbox
 from shapes import Shape

@@ -1,4 +1,4 @@
-from memory import Pointer
+from std.memory import Pointer
 from tenmo import Tensor
 
 
@@ -9,11 +9,11 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         self.ancestors = {}
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
-        self.ancestors = existing.ancestors.copy()
+    fn __copyinit__(out self, copy: Self):
+        self.ancestors = copy.ancestors.copy()
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self.ancestors = existing.ancestors^
+    fn __moveinit__(out self, deinit take: Self):
+        self.ancestors = take.ancestors^
 
     @staticmethod
     fn untracked() -> Ancestors[Self.dtype]:

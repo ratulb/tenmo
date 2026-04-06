@@ -3,7 +3,7 @@ from strides import Strides
 from buffers import Buffer
 from ndbuffer import NDBuffer
 from intarray import IntArray
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

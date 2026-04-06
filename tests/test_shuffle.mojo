@@ -1,8 +1,8 @@
 from tenmo import Tensor
-from testing import assert_true
+from std.testing import assert_true
 from shapes import Shape
 from shuffle import Shuffle
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 
 fn test_tensor_shuffle_forward_basic() raises:

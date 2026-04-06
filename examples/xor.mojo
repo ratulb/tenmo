@@ -7,7 +7,7 @@ Classic non-linearly separable problem requiring hidden layers.
 from tenmo import Tensor
 from net import Sequential, Linear, Sigmoid, MSELoss
 from time import perf_counter_ns
-from math import sqrt
+from std.math import sqrt
 from sgd import SGD
 
 

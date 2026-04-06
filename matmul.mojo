@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from sys import simd_width_of
+from std.sys import simd_width_of
 from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import (
     Delegate,
@@ -13,14 +13,13 @@ from shapes import Shape
 from common_utils import panic
 from vectormatrix import VectorMatmulNd
 from matrixvector import MatrixVectorMulNd
-from algorithm import parallelize
-from sys.info import num_physical_cores
+from std.algorithm import parallelize
+from std.sys.info import num_physical_cores
 from intarray import IntArray
 
 
 @fieldwise_init
-@register_passable
-struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
+struct Matmul2dBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_MATMUL_2D
 
     @always_inline
@@ -57,8 +56,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Matmul2d[dtype: DType](ImplicitlyCopyable):
+struct Matmul2d[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     @always_inline
     fn forward[
@@ -101,8 +99,7 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
+struct MatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_MATMUL_ND
 
     fn backward(
@@ -147,8 +144,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct MatmulNd[dtype: DType](ImplicitlyCopyable):
+struct MatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
@@ -211,8 +207,7 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Matmul[dtype: DType](ImplicitlyCopyable):
+struct Matmul[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
@@ -287,7 +282,7 @@ fn classify_matmul(a: Shape, b: Shape) -> Int:
 
 
 from time import perf_counter_ns as now
-from sys import argv
+from std.sys import argv
 from blashandle import BLASHandle
 
 
@@ -441,7 +436,7 @@ fn test_gflops() raises:
     print("  Operations:        " + (2 * M * K * N).__str__() + " FLOP")
 
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

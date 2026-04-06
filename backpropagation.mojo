@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, SubtractTensor
-from utils import Variant
+from std.utils import Variant
 from walkback import *
 from common_utils import panic
 from gradbox import Gradbox
@@ -137,13 +137,13 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         self.grad_fn = grad_fn
         self.tag = tag
 
-    fn __moveinit__(out self, deinit other: Self):
-        self.grad_fn = other.grad_fn^
-        self.tag = other.tag
+    fn __moveinit__(out self, deinit take: Self):
+        self.grad_fn = take.grad_fn^
+        self.tag = take.tag
 
-    fn __copyinit__(out self, other: Self):
-        self.grad_fn = other.grad_fn.copy()
-        self.tag = other.tag
+    fn __copyinit__(out self, copy: Self):
+        self.grad_fn = copy.grad_fn.copy()
+        self.tag = copy.tag
 
     fn __call__(
         self, output: Tensor[Self.dtype]

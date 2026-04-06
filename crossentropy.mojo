@@ -18,8 +18,7 @@ from intarray import IntArray
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@register_passable
-struct Reduction(ImplicitlyCopyable):
+struct Reduction(RegisterPassable, ImplicitlyCopyable):
     var reduction: Int
 
     fn __init__(out self, reduction: Int = 0):
@@ -45,8 +44,8 @@ struct Reduction(ImplicitlyCopyable):
                 + "'"
             )
 
-    fn __copyinit__(out self, existing: Self):
-        self.reduction = existing.reduction
+    fn __copyinit__(out self, copy: Self):
+        self.reduction = copy.reduction
 
     fn is_mean(self) -> Bool:
         return self.reduction == 0
@@ -62,8 +61,7 @@ struct Reduction(ImplicitlyCopyable):
 #  Cetralized validation
 # ═════════════════════════════════════════════════════════════════════════════
 @fieldwise_init
-@register_passable
-struct CEValidation[dtype: DType](ImplicitlyCopyable):
+struct CEValidation[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn validate_label_smoothing(ls: Scalar[Self.dtype]):
         if ls < 0 or ls > 1:
@@ -188,8 +186,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct CECommon[dtype: DType](ImplicitlyCopyable):
+struct CECommon[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn flatten_spatial_class_indices(
         logits: Tensor[Self.dtype],
@@ -482,8 +479,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 @fieldwise_init
-@register_passable
-struct CEClassIndicesForward[dtype: DType](ImplicitlyCopyable):
+struct CEClassIndicesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     """
     Forward pass for class index targets.
 
@@ -583,8 +579,7 @@ struct CEClassIndicesForward[dtype: DType](ImplicitlyCopyable):
             losses, reduction, N, spatial_shape, valid_count
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
                 var bwd = CEClassIndicesBackward[Self.dtype](
@@ -668,8 +663,7 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 @fieldwise_init
-@register_passable
-struct CEProbabilitiesForward[dtype: DType](ImplicitlyCopyable):
+struct CEProbabilitiesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     """
     Forward pass for soft probability targets.
 
@@ -737,8 +731,7 @@ struct CEProbabilitiesForward[dtype: DType](ImplicitlyCopyable):
             losses, reduction, N, spatial_shape, M
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
                 var bwd = CEProbabilitiesBackward[Self.dtype](
@@ -762,8 +755,7 @@ struct CEProbabilitiesForward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct CrossEntropyLoss[dtype: DType = DType.float32](ImplicitlyCopyable):
+struct CrossEntropyLoss[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     """
     CrossEntropyLoss — flexible, modular, GPU-ready.
 
@@ -882,9 +874,9 @@ struct CrossEntropyLoss[dtype: DType = DType.float32](ImplicitlyCopyable):
             )
 
 
-from testing import assert_true
-from testing import assert_false
-from sys import has_accelerator
+from std.testing import assert_true
+from std.testing import assert_false
+from std.sys import has_accelerator
 
 
 fn allclose(a: Float32, b: Float32, atol: Float32 = 1e-4) -> Bool:

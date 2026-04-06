@@ -1,27 +1,25 @@
 from common_utils import panic
-from builtin.device_passable import DevicePassable
-from utils import StaticTuple
+from std.builtin.device_passable import DevicePassable
+from std.utils import StaticTuple
 from intarray import IntArray
 from shapes import Shape
 from strides import Strides
 from mnemonics import max_rank
 
 
-@register_passable
 struct Array(
+    RegisterPassable,
     Defaultable,
     DevicePassable,
     ImplicitlyCopyable,
-    Representable,
     Sized,
-    Stringable,
     Writable,
 ):
     comptime device_type: AnyType = Self
 
     @staticmethod
     fn get_type_name() -> String:
-        return String("Array[max_rank:" + max_rank.__str__() + "]")
+        return String("Array[max_rank:" + String(max_rank) + "]")
 
     @staticmethod
     fn get_device_type_name() -> String:
@@ -54,7 +52,7 @@ struct Array(
         if length > max_rank:
             panic(
                 "Only dims upto",
-                max_rank.__str__(),
+                String(max_rank),
                 "is supported.",
                 "IntArray size exceeds that",
             )
@@ -71,7 +69,7 @@ struct Array(
         if length > max_rank:
             panic(
                 "Only dims upto",
-                max_rank.__str__(),
+                String(max_rank),
                 "is supported.",
                 "Shape dim exceeds that",
             )
@@ -88,7 +86,7 @@ struct Array(
         if length > max_rank:
             panic(
                 "Only dims upto",
-                max_rank.__str__(),
+                String(max_rank),
                 "is supported.",
                 "Strides length exceeds that",
             )
@@ -99,10 +97,10 @@ struct Array(
             self.storage[i] = strides[i]
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
+    fn __copyinit__(out self, copy: Self):
         """Deep copy."""
-        self.storage = existing.storage
-        self.size = existing.size
+        self.storage = copy.storage
+        self.size = copy.size
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -160,7 +158,7 @@ struct Array(
             panic(
                 "Array -> append: capacity exceeded.",
                 "max_rank is",
-                max_rank.__str__(),
+                String(max_rank),
             )
         self.storage[self.size] = value
         self.size += 1
@@ -170,26 +168,23 @@ struct Array(
         self.size = 0
 
     @no_inline
-    fn __str__(self) -> String:
-        """String representation."""
-        if self.size == 0:
-            return "[]"
-        var result = String("[")
-        for i in range(self.size):
-            if i > 0:
-                result += ", "
-            result += String(self.storage[i])
-        result += "]"
-        return result
-
-    @no_inline
     fn __repr__(self) -> String:
         return self.__str__()
 
     @no_inline
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(self.__str__())
+        if self.size == 0:
+            writer.write("[]")
+            return
+        writer.write("[")
+        for i in range(self.size):
+            if i > 0:
+                writer.write(", ")
+            writer.write(self.storage[i])
+        writer.write("]")
 
+    fn __str__(self) -> String:
+        return String(self)
 
 fn main():
     a = Array(3, 4, 5)

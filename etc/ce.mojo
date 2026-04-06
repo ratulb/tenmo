@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
 from common_utils import panic
-from math import log, exp
+from std.math import log, exp
 from subtraction import Subtractor
 from backpropagation import Delegate, BackwardFn, BACKWARD_CROSS_ENTROPY
 from mnemonics import AddTensor

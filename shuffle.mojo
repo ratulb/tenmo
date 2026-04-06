@@ -6,9 +6,9 @@ from random import shuffle, seed
 from gradbox import Gradbox
 
 from gpu import thread_idx, block_idx, block_dim, grid_dim
-from gpu.host import DeviceBuffer
-from memory import AddressSpace
-from sys import has_accelerator
+from std.gpu.host import DeviceBuffer
+from std.memory import AddressSpace
+from std.sys import has_accelerator
 from device import DeviceState, GPU
 from ndbuffer import NDBuffer
 from intarray import IntArray
@@ -83,8 +83,7 @@ fn shuffle_scatter[
 
 
 @fieldwise_init
-@register_passable
-struct ShuffleGPU[dtype: DType](ImplicitlyCopyable & Movable):
+struct ShuffleGPU[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn _upload_permutation(
         permutation: List[Int],
@@ -206,52 +205,12 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable & Movable):
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
 
 
-@fieldwise_init
-struct ShuffleBackward_old[dtype: DType](ImplicitlyCopyable & Movable):
-    comptime TAG = BACKWARD_SHUFFLE
-    var axis: Int
-    var permutation: List[Int]
-
-    fn __copyinit__(out self, other: Self):
-        self.axis = other.axis
-        self.permutation = other.permutation.copy()
-
-    fn __moveinit__(out self, deinit other: Self):
-        self.axis = other.axis
-        self.permutation = other.permutation^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-    fn backward(
-        self, output: Tensor[Self.dtype]
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        var parent = output.ancestry().get(0)
-
-        var shape = gradbox.shape()
-
-        # Allocate gradient w.r.t. ancestor
-        var gradbox_parent = Gradbox[Self.dtype].zeros(
-            shape, share=False
-        )  # parent.shape == gradients.shape, only difference is coord postions along the permuted axis
-
-        # Scatter gradients back using the original permutation
-        # For each position in the output gradient, find where it came from in the input
-        for grad_coord in shape:
-            parent_coord = grad_coord
-            parent_coord[self.axis] = self.permutation[grad_coord[self.axis]]
-            gradbox_parent[parent_coord] = gradbox[grad_coord]
-
-        return [(parent^, gradbox_parent^, AddTensor)]
-
 
 # ── Shuffle forward ──────────────────────────────────────────────────────────
 
 
 @fieldwise_init
-@register_passable
-struct Shuffle[dtype: DType](Copyable & Movable):
+struct Shuffle[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -277,8 +236,7 @@ struct Shuffle[dtype: DType](Copyable & Movable):
 
         var result_ndb: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     result_ndb = ShuffleGPU[Self.dtype].launch_gather(
@@ -294,8 +252,7 @@ struct Shuffle[dtype: DType](Copyable & Movable):
 
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
@@ -317,13 +274,13 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
     var axis: Int
     var permutation: List[Int]
 
-    fn __copyinit__(out self, other: Self):
-        self.axis = other.axis
-        self.permutation = other.permutation.copy()
+    fn __copyinit__(out self, copy: Self):
+        self.axis = copy.axis
+        self.permutation = copy.permutation.copy()
 
-    fn __moveinit__(out self, deinit other: Self):
-        self.axis = other.axis
-        self.permutation = other.permutation^
+    fn __moveinit__(out self, deinit take: Self):
+        self.axis = take.axis
+        self.permutation = take.permutation^
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
@@ -336,8 +293,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var shape = gradbox.shape()
         var gradbox_parent: Gradbox[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if gradbox.is_on_gpu():
                 try:
                     var result_ndb = ShuffleGPU[Self.dtype].launch_scatter(

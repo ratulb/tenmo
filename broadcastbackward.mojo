@@ -4,10 +4,9 @@ from gradbox import Gradbox
 
 
 @fieldwise_init
-@register_passable
 struct BroadcastBackward[
     dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int, TAG: Int
-](ImplicitlyCopyable):
+](RegisterPassable, ImplicitlyCopyable):
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 

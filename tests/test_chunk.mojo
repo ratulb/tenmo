@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from testing import assert_true
+from std.testing import assert_true
 from common_utils import s, i
 
 # ============================================================================

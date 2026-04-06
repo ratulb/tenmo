@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
-from sys import has_accelerator
-from testing import assert_true
+from std.sys import has_accelerator
+from std.testing import assert_true
 
 
 fn test_squeeze_scalar() raises:

@@ -5,8 +5,7 @@ from tiles import TileBackward, Tile
 
 
 @fieldwise_init
-@register_passable
-struct Repeat[dtype: DType]:
+struct Repeat[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True

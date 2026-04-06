@@ -1,8 +1,8 @@
 from buffers import Buffer
 from mnemonics import *
-from sys import simd_width_of
+from std.sys import simd_width_of
 from time import perf_counter_ns
-from testing import assert_almost_equal
+from std.testing import assert_almost_equal
 
 # ============================================
 # Test Constants
@@ -2328,7 +2328,7 @@ fn main() raises:
     print("Done running buffer tests")
 
 
-from testing import assert_true, assert_false
+from std.testing import assert_true, assert_false
 
 
 fn test_count_orig() raises:

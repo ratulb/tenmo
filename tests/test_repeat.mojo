@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from shapes import Shape
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn test_repeat_1d_simple() raises:

@@ -28,9 +28,9 @@ from backpropagation import BackwardFn, Delegate, BACKWARD_PAD
 from mnemonics import AddTensor
 from common_utils import panic
 from intarray import IntArray
-from utils import Variant
-from sys import simd_width_of
-from algorithm import parallelize
+from std.utils import Variant
+from std.sys import simd_width_of
+from std.algorithm import parallelize
 
 comptime Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
 
@@ -44,9 +44,13 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
     var pad: List[Tuple[Int, Int]]
     var mode: String
 
-    fn __copyinit__(out self, other: Self):
-        self.pad = other.pad.copy()
-        self.mode = other.mode
+    fn __copyinit__(out self, copy: Self):
+        self.pad = copy.pad.copy()
+        self.mode = copy.mode
+
+    fn __moveinit__(out self, deinit take: Self):
+        self.pad = take.pad.copy()
+        self.mode = take.mode
 
     fn backward(
         self, output: Tensor[Self.dtype]
@@ -314,8 +318,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 @fieldwise_init
-@register_passable
-struct Pad[dtype: DType](ImplicitlyCopyable):
+struct Pad[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     """
     Generalized padding operation supporting:
     - Arbitrary dimensions.
@@ -368,9 +371,7 @@ struct Pad[dtype: DType](ImplicitlyCopyable):
         else:
             panic("Pad: unsupported mode")
 
-        # Setup backward
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var req_grad = requires_grad.or_else(x.requires_grad)
             if req_grad:
                 result.requires_grad_(True)

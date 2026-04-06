@@ -3,15 +3,13 @@ from intarray import IntArray
 from array import Array
 
 
-@register_passable
 struct Shape(
+    RegisterPassable,
     Equatable,
     ImplicitlyCopyable,
     Iterable,
     Movable,
-    Representable,
     Sized,
-    Stringable,
     Writable,
 ):
     var dims: IntArray
@@ -39,7 +37,7 @@ struct Shape(
         self._numels = self._compute_numels()
 
     @always_inline("nodebug")
-    fn __init__(out self, values: VariadicList[Int]):
+    fn __init__(out self, values: VariadicList[Int, _]):
         self.dims = IntArray(values)
         self._numels = 0
         self._numels = self._compute_numels()
@@ -57,9 +55,9 @@ struct Shape(
         self._numels = self._compute_numels()
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
-        self.dims = existing.dims
-        self._numels = existing._numels
+    fn __copyinit__(out self, copy: Self):
+        self.dims = copy.dims
+        self._numels = copy._numels
 
     @always_inline("nodebug")
     fn _compute_numels(self) -> Int:
@@ -118,7 +116,8 @@ struct Shape(
 
     @no_inline
     fn __str__(self) -> String:
-        return "(" + self.dims.__str__()[1:-1] + ")"
+        var s = self.dims.__str__()
+        return "(" + s[byte=1:len(s)-1] + ")"
 
     @no_inline
     fn __repr__(self) -> String:
@@ -303,9 +302,8 @@ struct Shape(
         return self._numels
 
 
-@register_passable
 struct ShapeIndexIterator[origin: ImmutOrigin](
-    ImplicitlyCopyable & Iterable & Iterator & Sized
+    RegisterPassable & ImplicitlyCopyable & Iterable & Iterator & Sized
 ):
     """Iterator over IntArray coordinates of a shape."""
 
@@ -323,10 +321,10 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
         self.current = IntArray.filled(shape[].rank(), 0)
         self.index = 0
 
-    fn __copyinit__(out self, other: Self):
-        self.shape = other.shape
-        self.current = other.current
-        self.index = other.index
+    fn __copyinit__(out self, copy: Self):
+        self.shape = copy.shape
+        self.current = copy.current
+        self.index = copy.index
 
     fn __iter__(ref self) -> Self.IteratorType[origin_of(self)]:
         return self

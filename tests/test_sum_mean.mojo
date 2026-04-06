@@ -1,7 +1,7 @@
 from tenmo import Tensor
-from testing import assert_true
+from std.testing import assert_true
 from device import GPU, has_accelerator
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. BASIC TESTS - 1D

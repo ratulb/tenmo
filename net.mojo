@@ -1,9 +1,9 @@
 from tenmo import Tensor
 from shapes import Shape
 from gradbox import Gradbox
-from math import sqrt
+from std.math import sqrt
 from common_utils import panic, now
-from utils import Variant
+from std.utils import Variant
 from forwards import (
     Matmul,
     Adder,
@@ -32,10 +32,10 @@ from mnemonics import (
 )
 from blashandle import BLASHandle, BLASHandleLite
 from utils.numerics import neg_inf
-from algorithm import parallelize
+from std.algorithm import parallelize
 from ndbuffer import NDBuffer
 from random import seed, random_float64
-from sys import simd_width_of
+from std.sys import simd_width_of
 
 @fieldwise_init
 struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
@@ -218,8 +218,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
 
 @fieldwise_init
-@register_passable
-struct Profile(ImplicitlyCopyable):
+struct Profile(RegisterPassable & ImplicitlyCopyable):
     """Profile for a specific batch size."""
 
     var use_blas: Bool
@@ -558,16 +557,15 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 
-@register_passable
-struct ReLU[dtype: DType](ImplicitlyCopyable):
+struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     comptime TAG = RELU
 
     fn __init__(out self):
         self.training = True
 
-    fn __copyinit__(out self, other: Self):
-        self.training = other.training
+    fn __copyinit__(out self, copy: Self):
+        self.training = copy.training
 
     fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         if self.training:
@@ -593,16 +591,15 @@ struct ReLU[dtype: DType](ImplicitlyCopyable):
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 
-@register_passable
-struct Sigmoid[dtype: DType](ImplicitlyCopyable):
+struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     comptime TAG = SIGMOID
 
     fn __init__(out self):
         self.training = True
 
-    fn __copyinit__(out self, other: Self):
-        self.training = other.training
+    fn __copyinit__(out self, copy: Self):
+        self.training = copy.training
 
     fn __call__(
         self, x: Tensor[Self.dtype]
@@ -630,16 +627,15 @@ struct Sigmoid[dtype: DType](ImplicitlyCopyable):
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 
-@register_passable
-struct Tanh[dtype: DType](ImplicitlyCopyable):
+struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     comptime TAG = TANH
 
     fn __init__(out self):
         self.training = True
 
-    fn __copyinit__(out self, other: Self):
-        self.training = other.training
+    fn __copyinit__(out self, copy: Self):
+        self.training = copy.training
 
     fn __call__(
         self, x: Tensor[Self.dtype]
@@ -917,8 +913,7 @@ struct SequentialBLAS[dtype: DType](Copyable & Movable):
 # Mean Squared Error Loss
 # -----------------------------------------
 @fieldwise_init
-@register_passable
-struct MSELoss[dtype: DType = DType.float32]:
+struct MSELoss[dtype: DType = DType.float32](RegisterPassable):
     var training: Bool
 
     fn __init__(out self):
@@ -940,8 +935,7 @@ struct MSELoss[dtype: DType = DType.float32]:
 
 
 @fieldwise_init
-@register_passable
-struct BCELoss[dtype: DType = DType.float32]:
+struct BCELoss[dtype: DType = DType.float32](RegisterPassable):
     var training: Bool
     var epsilon: Scalar[Self.dtype]
 
@@ -1008,8 +1002,7 @@ struct BCELoss[dtype: DType = DType.float32]:
 
 
 @fieldwise_init
-@register_passable
-struct BCEWithLogitsLoss[dtype: DType = DType.float32]:
+struct BCEWithLogitsLoss[dtype: DType = DType.float32](RegisterPassable):
     var training: Bool
     var epsilon: Scalar[Self.dtype]
 
@@ -1313,8 +1306,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
 
-@register_passable
-struct Flatten[dtype: DType](ImplicitlyCopyable):
+struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     """
     Flatten spatial dimensions: (N, C, H, W) → (N, C*H*W).
     """
@@ -1325,8 +1317,8 @@ struct Flatten[dtype: DType](ImplicitlyCopyable):
     fn __init__(out self):
         self.training = True
 
-    fn __copyinit__(out self, other: Self):
-        self.training = other.training
+    fn __copyinit__(out self, copy: Self):
+        self.training = copy.training
 
     fn __call__(self, mut x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         ref shape = x.shape()

@@ -2,8 +2,8 @@ from tenmo import Tensor
 from ndbuffer import NDBuffer
 from intarray import IntArray
 from shapes import Shape
-from testing import assert_true
-from sys import has_accelerator
+from std.testing import assert_true
+from std.sys import has_accelerator
 from mnemonics import vm, mv
 from gradbox import Gradbox
 from matmul_kernel import MatmulNdGpu

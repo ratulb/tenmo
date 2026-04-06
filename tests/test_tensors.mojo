@@ -1,9 +1,9 @@
-from testing import assert_true, assert_false, assert_raises
+from std.testing import assert_true, assert_false, assert_raises
 from tenmo import Tensor
 from intarray import IntArray
 from shapes import Shape
 from common_utils import *
-from utils.numerics import min_finite
+from std.utils.numerics import min_finite
 from mnemonics import AddTensor
 from strides import Strides
 

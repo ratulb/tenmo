@@ -6,8 +6,7 @@ from shapes import Shape
 
 
 @fieldwise_init
-@register_passable
-struct ContiguousBackward[dtype: DType](ImplicitlyCopyable):
+struct ContiguousBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_CONTIGUOUS
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -42,8 +41,7 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable):
         ]
 
 
-@register_passable
-struct Contiguous[dtype: DType](Copyable):
+struct Contiguous[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -54,8 +52,7 @@ struct Contiguous[dtype: DType](Copyable):
         var ndb = self.buffer.contiguous()
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
 
             if grad_required:

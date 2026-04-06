@@ -1,5 +1,5 @@
-from gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
-from memory import AddressSpace, stack_allocation
+from std.gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
+from std.memory import AddressSpace, stack_allocation
 from array import Array
 from device import DeviceState
 from ndbuffer import NDBuffer
@@ -90,8 +90,7 @@ fn reduce_minmax[
     # Identity for local accumulator
     var local: Scalar[dtype]
 
-    @parameter
-    if is_max:
+    comptime if is_max:
         smem[tid] = min_or_neg_inf[dtype]()
         local = min_or_neg_inf[dtype]()
     else:
@@ -113,8 +112,7 @@ fn reduce_minmax[
             )
         )[]
 
-        @parameter
-        if is_max:
+        comptime if is_max:
             if val > local:
                 local = val
         else:
@@ -131,8 +129,7 @@ fn reduce_minmax[
     while stride > 0:
         if tid < stride:
 
-            @parameter
-            if is_max:
+            comptime if is_max:
                 if smem[tid + stride] > smem[tid]:
                     smem[tid] = smem[tid + stride]
             else:
@@ -226,9 +223,8 @@ fn build_minmax_mask[
 
 
 @fieldwise_init
-@register_passable
 struct ReductionMinMax[dtype: DType = DType.float32](
-    ImplicitlyCopyable & Movable
+    RegisterPassable, ImplicitlyCopyable & Movable
 ):
     @staticmethod
     fn launch[

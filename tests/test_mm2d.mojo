@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
 from common_utils import panic
-from sys import simd_width_of
+from std.sys import simd_width_of
 
 
 fn matmul_naive[
@@ -459,7 +459,7 @@ fn test_matmul_2d_mixed_stride_views() raises:
 
 # ===== BASIC MATRIX MULTIPLICATION =====
 
-from testing import assert_true
+from std.testing import assert_true
 from shapes import Shape
 from strides import Strides
 

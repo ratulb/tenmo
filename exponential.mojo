@@ -5,8 +5,7 @@ from gradbox import Gradbox
 
 
 @fieldwise_init
-@register_passable
-struct ExponentialBackward[dtype: DType](ImplicitlyCopyable):
+struct ExponentialBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_EXPONENTIAL
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -25,8 +24,7 @@ struct ExponentialBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Exponential[dtype: DType]:
+struct Exponential[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -37,8 +35,7 @@ struct Exponential[dtype: DType]:
         var ndb = tensor.buffer.exp()
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

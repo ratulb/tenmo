@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from sys import simd_width_of, has_accelerator
+from std.sys import simd_width_of, has_accelerator
 from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import (
     Delegate,
@@ -14,8 +14,8 @@ from broadcasthelper import ShapeBroadcaster
 from common_utils import il, s, panic, log_debug
 from vectormatrix import VectorMatmulNd
 from matrixvector import MatrixVectorMulNd
-from algorithm import parallelize
-from sys.info import num_logical_cores as num_physical_cores
+from std.algorithm import parallelize
+from std.sys.info import num_logical_cores as num_physical_cores
 from ndbuffer import NDBuffer
 from matmul_kernel import MatmulNdGpu
 from intarray import IntArray
@@ -1229,7 +1229,7 @@ fn classify_matmul(a: Shape, b: Shape) -> Int:
 
 
 from time import perf_counter_ns as now
-from sys import argv
+from std.sys import argv
 from blashandle import BLASHandle
 
 
@@ -1383,7 +1383,7 @@ fn test_gflops() raises:
     print("  Operations:        " + (2 * M * K * N).__str__() + " FLOP")
 
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

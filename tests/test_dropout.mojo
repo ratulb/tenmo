@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from random import seed
-from testing import assert_true
+from std.testing import assert_true
 from net import Dropout
 
 # ============================================================================

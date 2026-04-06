@@ -1,9 +1,9 @@
 from tenmo import Tensor
 from intarray import IntArray
 from shapes import Shape
-from testing import assert_true
+from std.testing import assert_true
 from permute import Permute
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 #Old tests
 

@@ -1,6 +1,6 @@
 from python import Python, PythonObject
 from tenmo import Tensor
-from memory import memcpy
+from std.memory import memcpy
 from shapes import Shape
 from buffers import Buffer
 from ndbuffer import NDBuffer
@@ -90,7 +90,7 @@ fn from_ndarray[
         )
 
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

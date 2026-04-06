@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from shapes import Shape
-from testing import assert_true, assert_raises
+from std.testing import assert_true, assert_raises
 from broadcasthelper import ShapeBroadcaster
 from intarray import IntArray
 

@@ -7,13 +7,13 @@ from matrixshapevalidator import MatrixShapeValidator
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic, log_debug, print_buffer, Epsilon
 from validators import Validator
-from memory import memcpy, AddressSpace, ArcPointer
-from gpu.host import DeviceBuffer, DeviceContext
-from algorithm import parallelize
-from sys.info import num_physical_cores
+from std.memory import memcpy, AddressSpace, ArcPointer
+from std.gpu.host import DeviceBuffer, DeviceContext
+from std.algorithm import parallelize
+from std.sys.info import num_physical_cores
 from device import Device, CPU, GPU, DeviceState
-from collections import Set
-from sys import simd_width_of, has_accelerator
+from std.collections import Set
+from std.sys import simd_width_of, has_accelerator
 from scalar_ops_kernel import ScalarOperations
 from scalar_inplace_ops_kernel import InplaceScalarOperations
 from binary_ops_kernel import BinaryOperations
@@ -24,7 +24,7 @@ from compare_kernel import AllClose, Compare, CompareScalar
 from reduction_kernel import Reduction
 from minmax_kernel import ReductionMinMax
 from minmax_reducer import MinMaxReducer
-from math import sqrt, log, exp
+from std.math import sqrt, log, exp
 from mnemonics import (
     Multiply,
     Add,
@@ -56,8 +56,6 @@ struct NDBuffer[dtype: DType](
     ImplicitlyCopyable
     & Movable
     & Equatable
-    & Stringable
-    & Representable
     & Writable
     & Sized
 ):
@@ -137,24 +135,24 @@ struct NDBuffer[dtype: DType](
         self.device_state = None
         self._contiguous = self.is_contiguous()
 
-    fn __moveinit__(out self, deinit other: Self):
-        self.buffer = other.buffer^
-        self.shape = other.shape^
-        self.strides = other.strides^
-        self.offset = other.offset
-        self._contiguous = other._contiguous
-        self.device_state = other.device_state^
+    fn __moveinit__(out self, deinit take: Self):
+        self.buffer = take.buffer^
+        self.shape = take.shape^
+        self.strides = take.strides^
+        self.offset = take.offset
+        self._contiguous = take._contiguous
+        self.device_state = take.device_state^
 
-    fn __copyinit__(out self, other: Self):
+    fn __copyinit__(out self, copy: Self):
         """Copy NDBuffer - Buffer handles ref counting automatically."""
         self.buffer = (
-            other.buffer.copy()
+            copy.buffer.copy()
         )  # Buffer copy handles shared/unshared!
-        self.shape = other.shape.copy()
-        self.strides = other.strides.copy()
-        self.offset = other.offset
-        self._contiguous = other._contiguous
-        self.device_state = other.device_state.copy()
+        self.shape = copy.shape.copy()
+        self.strides = copy.strides.copy()
+        self.offset = copy.offset
+        self._contiguous = copy._contiguous
+        self.device_state = copy.device_state.copy()
 
     @staticmethod
     fn with_device_state(
@@ -171,8 +169,7 @@ struct NDBuffer[dtype: DType](
         return ndb^
 
     fn sync(self):
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     self.device_state.value().sync()
@@ -192,8 +189,7 @@ struct NDBuffer[dtype: DType](
             return ndb^
         else:
 
-            @parameter
-            if has_accelerator():
+            comptime if has_accelerator():
                 try:
                     var (_, result) = ndb^.to_device(device)
                     return result^
@@ -208,8 +204,7 @@ struct NDBuffer[dtype: DType](
     fn get_gpu(
         ref self,
     ) raises -> ref [self.device_state.value().gpu] GPU:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.device_state.value().get_gpu()
             else:
@@ -230,8 +225,7 @@ struct NDBuffer[dtype: DType](
         return self.to_device(gpu.into())[1]
 
     fn device(self) -> Device:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.device_state.value().get_gpu().into()
         return CPU().into()
@@ -322,8 +316,7 @@ struct NDBuffer[dtype: DType](
             return 0, result^
 
     fn is_on_gpu(self) -> Bool:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             return not self.device_state == None
         return False
 
@@ -347,8 +340,7 @@ struct NDBuffer[dtype: DType](
             return ndb^
         else:
 
-            @parameter
-            if has_accelerator():
+            comptime if has_accelerator():
                 try:
                     var (_, result) = ndb^.to_device(device)
                     return result^
@@ -433,7 +425,7 @@ struct NDBuffer[dtype: DType](
     @staticmethod
     @always_inline
     fn arange(
-        args: VariadicList[Scalar[Self.dtype]],
+        args: VariadicList[Scalar[Self.dtype], _],
     ) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype].arange(args)
         var shape = Shape(buffer.size)
@@ -489,13 +481,13 @@ struct NDBuffer[dtype: DType](
         )
         self.set(index, value)
 
-    fn __getitem__(self, indices: VariadicList[Int]) -> Scalar[Self.dtype]:
+    fn __getitem__(self, indices: VariadicList[Int, _]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
         return self.get(index)
 
-    fn __setitem__(self, indices: VariadicList[Int], value: Scalar[Self.dtype]):
+    fn __setitem__(self, indices: VariadicList[Int, _], value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
@@ -567,8 +559,7 @@ struct NDBuffer[dtype: DType](
         if simdwidth > self.numels():
             panic("NDBuffer → load: buffer size is less than simd width")
 
-        @parameter
-        if not validated:
+        comptime if not validated:
             var rank = self.rank()
             ref shape = self.shape
 
@@ -631,8 +622,7 @@ struct NDBuffer[dtype: DType](
         if simdwidth > self.numels():
             panic("NDBuffer → store: buffer size is less than simd width")
 
-        @parameter
-        if not validated:
+        comptime if not validated:
             var rank = self.rank()
             ref shape = self.shape
 
@@ -779,8 +769,7 @@ struct NDBuffer[dtype: DType](
         )
 
     fn to_dtype[NewType: DType](self) -> NDBuffer[NewType]:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     # GPU → CPU, cast, CPU → GPU
@@ -974,8 +963,7 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn fill(self, value: Scalar[Self.dtype]):
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     self.device_state.value().fill(value)
@@ -1004,8 +992,7 @@ struct NDBuffer[dtype: DType](
             self.shape, new_shape.intarray()
         )
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.reshape_gpu(shape)
         return self.contiguous(shape)
@@ -1031,8 +1018,7 @@ struct NDBuffer[dtype: DType](
     fn map_where(
         self, pred: fn (Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     var mapped_ds = DeviceState[Self.dtype].map_where(
@@ -1054,8 +1040,10 @@ struct NDBuffer[dtype: DType](
         self, pred: fn (Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype](len(self))
-        for index in self.index_iterator():
-            buffer[index] = value if pred(self[index]) else self[index]
+        var index = 0
+        for next in self.index_iterator():
+            buffer[index] = value if pred(self.get(next)) else self.get(next)
+            index += 1
         return NDBuffer[Self.dtype](buffer^, self.shape)
 
     fn map[
@@ -1118,8 +1106,7 @@ struct NDBuffer[dtype: DType](
 
         var out: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     out = Reduction[Self.dtype].launch[mean=mean](
@@ -1146,8 +1133,7 @@ struct NDBuffer[dtype: DType](
     ](self, normalized_axes: IntArray, keepdims: Bool,) -> NDBuffer[Self.dtype]:
         var reduced_volume = Scalar[Self.dtype](1)
 
-        @parameter
-        if mean:
+        comptime if mean:
             var volume = self.shape.reduced_shape(normalized_axes).product()
             reduced_volume = reduced_volume if volume == 0 else Scalar[
                 Self.dtype
@@ -1162,8 +1148,7 @@ struct NDBuffer[dtype: DType](
         # Handle scalar output cases
         if out_shape == Shape():
             # This covers both scalar input AND full reduction cases
-            @parameter
-            if mean:
+            comptime if mean:
                 out[IntArray()] = self.sum_all() / reduced_volume
             else:
                 out[IntArray()] = self.sum_all()
@@ -1182,8 +1167,7 @@ struct NDBuffer[dtype: DType](
                     )
                     accum_sum += self[self_coord]
 
-                @parameter
-                if mean:
+                comptime if mean:
                     out[out_coord] = accum_sum / reduced_volume
                 else:
                     out[out_coord] = accum_sum
@@ -1193,8 +1177,7 @@ struct NDBuffer[dtype: DType](
     fn log_sum(
         self, normalized_axes: IntArray, keepdims: Bool = False
     ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     return Reduction[Self.dtype].launch_log_sum(
@@ -1309,8 +1292,7 @@ struct NDBuffer[dtype: DType](
     ) -> NDBuffer[Self.dtype]:
         var target_shape = new_shape.or_else(self.shape)
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 # Already contiguous on GPU with no shape change — but still need
                 # a fresh independent DeviceState (unshared), so always materialise
@@ -1526,8 +1508,7 @@ struct NDBuffer[dtype: DType](
         Result is always a CPU scalar Int.
         """
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     # Materialise logical view — handles offset + strides
@@ -1538,8 +1519,7 @@ struct NDBuffer[dtype: DType](
                     with contig.buffer.map_to_host() as host_buffer:
                         var ptr = host_buffer.unsafe_ptr()
 
-                        @parameter
-                        if Self.dtype == DType.bool:
+                        comptime if Self.dtype == DType.bool:
                             var key_u8 = UInt8(1) if key.cast[
                                 DType.bool
                             ]() else UInt8(0)
@@ -1607,8 +1587,7 @@ struct NDBuffer[dtype: DType](
         results are typically small, no benefit keeping on GPU.
         """
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     # Materialise logical view — handles offset + strides
@@ -1619,8 +1598,7 @@ struct NDBuffer[dtype: DType](
                     with contig.buffer.map_to_host() as host_buffer:
                         var ptr = host_buffer.unsafe_ptr()
 
-                        @parameter
-                        if Self.dtype == DType.bool:
+                        comptime if Self.dtype == DType.bool:
                             var key_storage = UInt8(1).cast[
                                 DeviceState[Self.dtype].datatype
                             ]()
@@ -1673,8 +1651,7 @@ struct NDBuffer[dtype: DType](
     fn copy_from_alike[
         overwrite: Bool = True, validate: Bool = True
     ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]):
-        @parameter
-        if validate:
+        comptime if validate:
             if not self.shape == other.shape:
                 panic(
                     (
@@ -1693,8 +1670,7 @@ struct NDBuffer[dtype: DType](
             self_end = self_start + self.numels()
             other_end = other_start + other.numels()
 
-            @parameter
-            if overwrite:
+            comptime if overwrite:
                 self.buffer.inplace_ops[Overwrite, validate=validate](
                     other.buffer, self_start, self_end, other_start, other_end
                 )
@@ -1707,8 +1683,7 @@ struct NDBuffer[dtype: DType](
             var index = self.offset
             for idx in other.index_iterator():
 
-                @parameter
-                if overwrite:
+                comptime if overwrite:
                     self.buffer[index] = other.buffer[idx]
                 else:
                     self.buffer[index] += other.buffer[idx]
@@ -1718,8 +1693,7 @@ struct NDBuffer[dtype: DType](
             var index = other.offset
             for idx in self.index_iterator():
 
-                @parameter
-                if overwrite:
+                comptime if overwrite:
                     self.buffer[idx] = other.buffer[index]
                 else:
                     self.buffer[idx] += other.buffer[index]
@@ -1729,8 +1703,7 @@ struct NDBuffer[dtype: DType](
             var iterator = other.index_iterator()
             for index in self.index_iterator():
 
-                @parameter
-                if overwrite:
+                comptime if overwrite:
                     try:
                         self.buffer[index] = other.buffer[iterator.__next__()]
                     except e:
@@ -1757,8 +1730,7 @@ struct NDBuffer[dtype: DType](
             )  # Scalar/Singleton NDBuffer - shared or otherwise
             return
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     self.device_state.value().fill(cpu_buffer)
@@ -1824,8 +1796,7 @@ struct NDBuffer[dtype: DType](
                 + other.shape.__str__()
             )
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
                     BinaryInplaceOperations[Self.dtype].launch[op_code](
@@ -1923,13 +1894,11 @@ struct NDBuffer[dtype: DType](
     fn inplace_scalar_ops[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]):
-        @parameter
-        if op_code == Divide:
+        comptime if op_code == Divide:
             if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     InplaceScalarOperations[Self.dtype].launch[op_code](
@@ -1954,8 +1923,7 @@ struct NDBuffer[dtype: DType](
     fn inplace_scalar_ops_cpu[
         op_code: Int,
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]):
-        @parameter
-        if op_code == Divide:
+        comptime if op_code == Divide:
             if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → inplace_scalar_ops: cannot divide by zero")
 
@@ -2049,8 +2017,7 @@ struct NDBuffer[dtype: DType](
 
         var out: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
                     out = BinaryOperations[Self.dtype].launch[op_code](
@@ -2250,8 +2217,7 @@ struct NDBuffer[dtype: DType](
     fn scalar_fn[
         op_code: Int
     ](lhs: Scalar[Self.dtype], rhs: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
-        @parameter
-        if op_code == Add:
+        comptime if op_code == Add:
             return lhs + rhs
         elif op_code == Subtract:
             return lhs - rhs
@@ -2276,8 +2242,7 @@ struct NDBuffer[dtype: DType](
     fn unary_fn_helper[
         op_code: Int
     ](scalar: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
-        @parameter
-        if op_code == NEGATE:
+        comptime if op_code == NEGATE:
             return -scalar
         elif op_code == SQRT:
             return sqrt(scalar)
@@ -2291,8 +2256,7 @@ struct NDBuffer[dtype: DType](
     ](scalar: Scalar[Self.dtype]) -> Scalar[
         Self.dtype
     ] where Self.dtype.is_floating_point():
-        @parameter
-        if op_code == LOG:
+        comptime if op_code == LOG:
             return log(max(scalar, epsilon))
         else:  # op_code == EXP:
             return exp(scalar)
@@ -2303,20 +2267,17 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
-        @parameter
-        if op_code == Divide:
+        comptime if op_code == Divide:
             if scalar == Scalar[Self.dtype](0):
                 panic("NDBuffer → scalar_ops: cannot divide by zero")
 
         var out: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
 
-                    @parameter
-                    if op_code == POW:
+                    comptime if op_code == POW:
                         out = ScalarOperations[Self.dtype].launch_pow(
                             self, scalar
                         )
@@ -2353,8 +2314,7 @@ struct NDBuffer[dtype: DType](
             var end = start + self.numels()
             var result_buffer: Buffer[Self.dtype]
 
-            @parameter
-            if op_code == POW:
+            comptime if op_code == POW:
                 result_buffer = self.buffer[start:end] ** scalar
             else:
                 result_buffer = self.buffer.arithmetic_ops_scalar[op_code](
@@ -2380,8 +2340,7 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     out = UnaryOpsKernel[Self.dtype].launch[op_code](self)
@@ -2412,8 +2371,7 @@ struct NDBuffer[dtype: DType](
             var end = start + self.numels()
             var result_buffer: Buffer[Self.dtype]
 
-            @parameter
-            if op_code == NEGATE:
+            comptime if op_code == NEGATE:
                 result_buffer = self.buffer[start:end].__neg__()
             elif op_code == SQRT:
                 result_buffer = self.buffer.unary_ops[SQRT](start, end)
@@ -2443,8 +2401,7 @@ struct NDBuffer[dtype: DType](
     ] where Self.dtype.is_floating_point():
         var out: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     out = UnaryOpsKernel[Self.dtype].launch[op_code, epsilon](
@@ -2479,8 +2436,7 @@ struct NDBuffer[dtype: DType](
             var end = start + self.numels()
             var result_buffer: Buffer[Self.dtype]
 
-            @parameter
-            if op_code == LOG:
+            comptime if op_code == LOG:
                 result_buffer = self.buffer.log[epsilon](start, end)
             else:  # op_code == EXP:
                 result_buffer = self.buffer.exp(start, end)
@@ -2507,8 +2463,7 @@ struct NDBuffer[dtype: DType](
         ref shape = self.shape
         var normalized_axes = Validator.validate_and_normalize_axes(shape, axes)
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     var (result_ndb, mask_ndb) = ReductionMinMax[
@@ -2618,8 +2573,7 @@ struct NDBuffer[dtype: DType](
             )
         var result: NDBuffer[DType.bool]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
                     result = Compare[Self.dtype].launch[op_code](self, other)
@@ -2672,8 +2626,7 @@ struct NDBuffer[dtype: DType](
 
                 var other_val = other.buffer[next_index]
 
-                @parameter
-                if op_code == Equal:
+                comptime if op_code == Equal:
                     buffer[index] = self_val == other_val
                 elif op_code == NotEqual:
                     buffer[index] = self_val != other_val
@@ -2698,8 +2651,7 @@ struct NDBuffer[dtype: DType](
     ]:
         var result: NDBuffer[DType.bool]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     result = CompareScalar[Self.dtype].launch[op_code](
@@ -2737,8 +2689,7 @@ struct NDBuffer[dtype: DType](
             for idx in self.index_iterator():
                 var value = self.buffer[idx]
 
-                @parameter
-                if op_code == Equal:
+                comptime if op_code == Equal:
                     buffer[index] = value == scalar
                 elif op_code == NotEqual:
                     buffer[index] = value != scalar
@@ -2774,8 +2725,7 @@ struct NDBuffer[dtype: DType](
             )
         var result: Bool
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
                     result = AllClose[Self.dtype].launch[rtol=rtol, atol=atol](
@@ -2814,8 +2764,7 @@ struct NDBuffer[dtype: DType](
         Note: pred is a CPU function — GPU path materialises through CPU.
         """
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
                     # Materialise to CPU — pred is a CPU fn
@@ -2842,8 +2791,7 @@ struct NDBuffer[dtype: DType](
         CPU path: delegates to Buffer[DType.bool].all_true().
         """
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.device_state.value().all_true()
 
@@ -2870,8 +2818,7 @@ struct NDBuffer[dtype: DType](
         CPU path: delegates to Buffer[DType.bool] iteration.
         """
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.device_state.value().any_true()
 
@@ -2924,8 +2871,7 @@ struct NDBuffer[dtype: DType](
 
         var C: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if A.is_on_gpu() and B.is_on_gpu():
                 try:
                     C = MatmulNdGpu[Self.dtype].launch[tile_size=TILE_SIZE](
@@ -3105,8 +3051,7 @@ struct NDBuffer[dtype: DType](
 
         var C: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if A.is_on_gpu() and B.is_on_gpu():
                 try:
                     C = MatmulNdGpu[Self.dtype].launch[tile_size=TILE_SIZE](

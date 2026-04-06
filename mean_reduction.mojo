@@ -8,8 +8,7 @@ from gradbox import Gradbox
 from common_utils import panic
 
 
-@register_passable
-struct MeanBackward[dtype: DType](ImplicitlyCopyable):
+struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_MEAN
     var axes: IntArray
     var keepdims: Bool
@@ -18,9 +17,9 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
         self.axes = axes
         self.keepdims = keepdims
 
-    fn __copyinit__(out self, other: Self):
-        self.axes = other.axes.copy()
-        self.keepdims = other.keepdims
+    fn __copyinit__(out self, copy: Self):
+        self.axes = copy.axes.copy()
+        self.keepdims = copy.keepdims
 
     fn backward(
         self, read output: Tensor[Self.dtype]
@@ -77,8 +76,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Mean[dtype: DType](Copyable):
+struct Mean[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn forward[
@@ -95,8 +93,7 @@ struct Mean[dtype: DType](Copyable):
         var ndb = tensor.buffer.reduce[mean=True](normalized_axes, keepdims)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:
@@ -126,7 +123,7 @@ struct Mean[dtype: DType](Copyable):
         return out^
 
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

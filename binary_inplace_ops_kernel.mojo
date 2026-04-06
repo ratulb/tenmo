@@ -1,6 +1,6 @@
-from sys import simd_width_of
+from std.sys import simd_width_of
 from gpu import thread_idx, block_idx, block_dim, grid_dim
-from memory import stack_allocation, AddressSpace
+from std.memory import stack_allocation, AddressSpace
 from mnemonics import Add, Multiply, Subtract, Divide
 from tenmo import Tensor
 from strides import Strides
@@ -30,8 +30,7 @@ fn arithmetic_ops_both_contiguous[
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i >= size:
@@ -42,8 +41,7 @@ fn arithmetic_ops_both_contiguous[
                 var vec_b = B.load[width=simd_width](B_offset + i)
                 var vec_result: SIMD[dtype, simd_width]
 
-                @parameter
-                if op_code == Add:
+                comptime if op_code == Add:
                     vec_result = vec_a + vec_b
                 elif op_code == Subtract:
                     vec_result = vec_a - vec_b
@@ -59,8 +57,7 @@ fn arithmetic_ops_both_contiguous[
                     var idx = i + j
                     var res: Scalar[dtype] = 0
 
-                    @parameter
-                    if op_code == Add:
+                    comptime if op_code == Add:
                         res = A[A_offset + idx] + B[B_offset + idx]
                     elif op_code == Subtract:
                         res = A[A_offset + idx] - B[B_offset + idx]
@@ -98,8 +95,7 @@ fn arithmetic_ops_A_contiguous[
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i >= size:
@@ -109,8 +105,7 @@ fn arithmetic_ops_A_contiguous[
                 var vec_a = A.load[width=simd_width](A_offset + i)
                 var vec_result: SIMD[dtype, simd_width] = 0
 
-                @parameter
-                for lane in range(simd_width):
+                comptime for lane in range(simd_width):
                     var linear_idx = i + lane
                     var remaining = linear_idx
                     var b_idx = B_offset
@@ -120,8 +115,7 @@ fn arithmetic_ops_A_contiguous[
                         b_idx += coord * B_strides[dim]
                         remaining //= result_shape[dim]
 
-                    @parameter
-                    if op_code == Add:
+                    comptime if op_code == Add:
                         vec_result[lane] = vec_a[lane] + B[b_idx]
                     elif op_code == Subtract:
                         vec_result[lane] = vec_a[lane] - B[b_idx]
@@ -145,8 +139,7 @@ fn arithmetic_ops_A_contiguous[
 
                     var res: Scalar[dtype] = 0
 
-                    @parameter
-                    if op_code == Add:
+                    comptime if op_code == Add:
                         res = A[A_offset + linear_idx] + B[b_idx]
                     elif op_code == Subtract:
                         res = A[A_offset + linear_idx] - B[b_idx]
@@ -184,8 +177,7 @@ fn arithmetic_ops_B_contiguous[
     var base_idx = gtid * CHUNK_SIZE
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i >= size:
@@ -196,8 +188,7 @@ fn arithmetic_ops_B_contiguous[
                 var vec_b = B.load[width=simd_width](B_offset + i)
                 var vec_result: SIMD[dtype, simd_width] = 0
 
-                @parameter
-                for lane in range(simd_width):
+                comptime for lane in range(simd_width):
                     var linear_idx = i + lane
                     var remaining = linear_idx
 
@@ -208,8 +199,7 @@ fn arithmetic_ops_B_contiguous[
                         a_idx += coord * A_strides[dim]
                         remaining //= result_shape[dim]
 
-                    @parameter
-                    if op_code == Add:
+                    comptime if op_code == Add:
                         vec_result[lane] = A[a_idx] + vec_b[lane]
                     elif op_code == Subtract:
                         vec_result[lane] = A[a_idx] - vec_b[lane]
@@ -234,8 +224,7 @@ fn arithmetic_ops_B_contiguous[
 
                     var res: Scalar[dtype] = 0
 
-                    @parameter
-                    if op_code == Add:
+                    comptime if op_code == Add:
                         res = A[a_idx] + B[B_offset + linear_idx]
                     elif op_code == Subtract:
                         res = A[a_idx] - B[B_offset + linear_idx]
@@ -274,8 +263,7 @@ fn arithmetic_ops_both_strided[
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i >= size:
@@ -284,8 +272,7 @@ fn arithmetic_ops_both_strided[
             if i + simd_width <= size:
                 var vec_result: SIMD[dtype, simd_width] = 0
 
-                @parameter
-                for lane in range(simd_width):
+                comptime for lane in range(simd_width):
                     var linear_idx = i + lane
                     var remaining = linear_idx
                     var a_idx = A_offset
@@ -297,8 +284,7 @@ fn arithmetic_ops_both_strided[
                         b_idx += coord * B_strides[dim]
                         remaining //= result_shape[dim]
 
-                    @parameter
-                    if op_code == Add:
+                    comptime if op_code == Add:
                         vec_result[lane] = A[a_idx] + B[b_idx]
                     elif op_code == Subtract:
                         vec_result[lane] = A[a_idx] - B[b_idx]
@@ -324,8 +310,7 @@ fn arithmetic_ops_both_strided[
 
                     var res: Scalar[dtype] = 0
 
-                    @parameter
-                    if op_code == Add:
+                    comptime if op_code == Add:
                         res = A[a_idx] + B[b_idx]
                     elif op_code == Subtract:
                         res = A[a_idx] - B[b_idx]
@@ -340,9 +325,8 @@ fn arithmetic_ops_both_strided[
 
 
 @fieldwise_init
-@register_passable
-struct BinaryInplaceOperations[dtype: DType = DType.float32](
-    ImplicitlyCopyable & Movable
+struct BinaryInplaceOperations[dtype: DType](
+    RegisterPassable, ImplicitlyCopyable
 ):
     @staticmethod
     fn launch[

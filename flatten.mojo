@@ -6,8 +6,7 @@ from gradbox import Gradbox
 
 
 @fieldwise_init
-@register_passable
-struct FlattenBackward[dtype: DType](ImplicitlyCopyable):
+struct FlattenBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_FLATTEN
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -26,8 +25,7 @@ struct FlattenBackward[dtype: DType](ImplicitlyCopyable):
         ]
 
 
-@register_passable
-struct FlattenForward[dtype: DType]:
+struct FlattenForward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -40,9 +38,7 @@ struct FlattenForward[dtype: DType]:
         flattened_buffer = self.buffer.flatten(start_dim, end_dim)
         out = Tensor[Self.dtype](flattened_buffer^, requires_grad=False)
 
-        # autograd hookup
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
 
             if grad_required:

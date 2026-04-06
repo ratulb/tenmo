@@ -6,8 +6,7 @@ from common_utils import panic, Epsilon
 
 
 @fieldwise_init
-@register_passable
-struct StdBackward[dtype: DType](ImplicitlyCopyable):
+struct StdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_STD
     var axis: Int
     var unbiased: Bool
@@ -80,8 +79,7 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct StdDev[dtype: DType]:
+struct StdDev[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True

@@ -11,4 +11,4 @@ pure-cifar-10=">=0.1.1"
 
 [dependencies]
 python = ">=3.10,<3.15"
-mojo = "==0.26.1"
+mojo = "==0.26.2"

@@ -13,8 +13,7 @@ from shapes import Shape
 
 
 @fieldwise_init
-@register_passable
-struct ConcatBackward[dtype: DType](ImplicitlyCopyable):
+struct ConcatBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_CONCAT
     var axis: Int
 
@@ -80,8 +79,7 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Concate[dtype: DType](ImplicitlyCopyable):
+struct Concate[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -173,8 +171,7 @@ struct Concate[dtype: DType](ImplicitlyCopyable):
 
         # ===== 5. SETUP AUTOGRAD =====
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(grad_required)
             if grad_required:
                 result.requires_grad_(True)

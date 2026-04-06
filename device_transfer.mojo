@@ -8,11 +8,10 @@ from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
 from device import Device, GPU
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 
-@register_passable
-struct Flow(Equatable, ImplicitlyCopyable):
+struct Flow(RegisterPassable & Equatable, ImplicitlyCopyable):
     var direction: Int
     comptime Cpu2Gpu = Flow(0)
     comptime Gpu2Cpu = Flow(1)
@@ -26,8 +25,8 @@ struct Flow(Equatable, ImplicitlyCopyable):
                 " or '-1 → UnMoved'"
             )
 
-    fn __copyinit__(out self, existing: Self):
-        self.direction = existing.direction
+    fn __copyinit__(out self, copy: Self):
+        self.direction = copy.direction
 
     fn __eq__(self, other: Self) -> Bool:
         return self.direction == other.direction
@@ -112,8 +111,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct DeviceTransfer[dtype: DType](ImplicitlyCopyable):
+struct DeviceTransfer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True

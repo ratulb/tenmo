@@ -8,8 +8,7 @@ from ndbuffer import NDBuffer
 
 
 @fieldwise_init
-@register_passable
-struct ExponentiationBackward[dtype: DType](ImplicitlyCopyable):
+struct ExponentiationBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_EXPONENTIATION
     var exponent: Scalar[Self.dtype]
 
@@ -46,8 +45,7 @@ struct ExponentiationBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Exponentiator[dtype: DType](Copyable):
+struct Exponentiator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -86,7 +84,7 @@ fn main() raises:
     print("pass")
 
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn test_exponentiation() raises:

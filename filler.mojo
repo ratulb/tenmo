@@ -3,22 +3,22 @@ from common_utils import Idx, panic
 from validators import Validator
 from broadcasthelper import ShapeBroadcaster
 from indexhelper import IndexIterator
-from memory import memcpy
+from std.memory import memcpy
 from ndbuffer import NDBuffer
 
 
 @fieldwise_init
-@register_passable
-struct Filler[dtype: DType](ImplicitlyCopyable & Movable):
+struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @always_inline
     @staticmethod
     fn fill(
         target: NDBuffer[Self.dtype],
         value: Scalar[Self.dtype],
-        indices: VariadicListMem[Idx],
+        #indices: VariadicListMem[Idx],
+        indices: VariadicList[Idx, _],
     ):
         # Compute view metadata
-        shape, strides, offset = (
+        var(shape, strides, offset) = (
             Validator.validate_and_compute_advanced_indexing_metadata(
                 target.shape, target.strides, indices
             )
@@ -54,7 +54,8 @@ struct Filler[dtype: DType](ImplicitlyCopyable & Movable):
     fn fill(
         target: NDBuffer[Self.dtype],
         source: NDBuffer[Self.dtype],
-        indices: VariadicListMem[Idx],
+        #indices: VariadicListMem[Idx],
+        indices: VariadicList[Idx, _],
     ):
         shape, strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(

@@ -2,14 +2,13 @@ from tenmo import Tensor
 from mnemonics import AddTensor, SQRT, SQRT_BACKWARD
 from backpropagation import Delegate, BackwardFn, BACKWARD_SQRT
 from gradbox import Gradbox
-from math import sqrt
+from std.math import sqrt
 from ndbuffer import NDBuffer
 from common_utils import Epsilon
 
 
 @fieldwise_init
-@register_passable
-struct SqrtBackward[dtype: DType](ImplicitlyCopyable):
+struct SqrtBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_SQRT
     var epsilon: Scalar[Self.dtype]
 
@@ -56,8 +55,7 @@ struct SqrtBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Sqrt[dtype: DType]:
+struct Sqrt[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True

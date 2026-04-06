@@ -4,14 +4,13 @@ from mnemonics import AddTensor
 from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
 from common_utils import panic
-from sys import simd_width_of, has_accelerator
+from std.sys import simd_width_of, has_accelerator
 from ndbuffer import NDBuffer
 from vectormatrix_kernel import VectorMatmulNdGpu
 
 
 @fieldwise_init
-@register_passable
-struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
+struct VectorMatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         simdwidth: Int = simd_width_of[Self.dtype]()
@@ -147,8 +146,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
     ](v: Tensor[Self.dtype], M: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if v.is_on_gpu() and M.is_on_gpu():
                 try:
                     out = VectorMatmulNdGpu[Self.dtype].launch[block_size=256](
@@ -167,9 +165,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
 
         var result = Tensor[Self.dtype](out^, requires_grad=False)
 
-        # Setup backward
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var requires_grad = v.requires_grad or M.requires_grad
             if requires_grad:
                 result.requires_grad_(True)
@@ -184,8 +180,7 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct VectorMatmulNdBackward[dtype: DType](ImplicitlyCopyable):
+struct VectorMatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_VECTOR_MATMUL
 
     fn backward[

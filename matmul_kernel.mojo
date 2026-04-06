@@ -1,6 +1,6 @@
 from gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
-from gpu.host import Dim
-from memory import AddressSpace, stack_allocation
+from std.gpu.host import Dim
+from std.memory import AddressSpace, stack_allocation
 from shapes import Shape
 from device import DeviceState
 from ndbuffer import NDBuffer
@@ -122,8 +122,7 @@ fn matmul_2d_tiled[
 
 
 @fieldwise_init
-@register_passable
-struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
+struct MatmulNdGpu[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn launch[
         tile_size: Int = 32,
@@ -296,7 +295,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
 
 
 from tenmo import Tensor
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

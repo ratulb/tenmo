@@ -1,5 +1,5 @@
 from gpu import thread_idx, block_idx, block_dim, barrier
-from memory import AddressSpace, stack_allocation
+from std.memory import AddressSpace, stack_allocation
 
 from array import Array
 from device import DeviceState
@@ -84,9 +84,8 @@ fn matrix_vector_nd[
 
 
 @fieldwise_init
-@register_passable
 struct MatrixVectorNdGpu[dtype: DType = DType.float32](
-    ImplicitlyCopyable & Movable
+    RegisterPassable, ImplicitlyCopyable
 ):
     @staticmethod
     fn launch[

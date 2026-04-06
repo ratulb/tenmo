@@ -1,5 +1,5 @@
 from intarray import IntArray
-from testing import assert_equal, assert_true, assert_false
+from std.testing import assert_equal, assert_true, assert_false
 
 # ========== Construction Tests ==========
 

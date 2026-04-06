@@ -1,8 +1,8 @@
 from time import perf_counter_ns
 from tenmo import Tensor
-from testing import assert_true
-from algorithm import vectorize
-from sys import simd_width_of
+from std.testing import assert_true
+from std.algorithm import vectorize
+from std.sys import simd_width_of
 from shapes import Shape
 
 

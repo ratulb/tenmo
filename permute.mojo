@@ -10,8 +10,7 @@ from gradbox import Gradbox
 
 
 @fieldwise_init
-@register_passable
-struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
+struct PermuteBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_PERMUTE
     var permutation: IntArray
 
@@ -43,8 +42,7 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Permute[dtype: DType]:
+struct Permute[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True

@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
-from testing import assert_true
-from sys import has_accelerator
+from std.testing import assert_true
+from std.sys import has_accelerator
 
 
 fn test_2d_transpose_no_axes() raises:

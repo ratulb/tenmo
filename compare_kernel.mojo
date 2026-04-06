@@ -1,7 +1,7 @@
-from sys import simd_width_of
+from std.sys import simd_width_of
 from gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
-from os.atomic import Atomic, Consistency
-from memory import AddressSpace, stack_allocation
+from std.os.atomic import Atomic, Consistency
+from std.memory import AddressSpace, stack_allocation
 from utils.numerics import isnan, isinf
 
 from mnemonics import (
@@ -72,8 +72,7 @@ fn all_close[
         if block_result[] == 0:
             break
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i >= size:
@@ -147,8 +146,7 @@ fn all_close[
 
 
 @fieldwise_init
-@register_passable
-struct AllClose[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
+struct AllClose[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn launch[
         rtol: Scalar[Self.dtype] = 1e-5,
@@ -253,8 +251,7 @@ fn compare[
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i >= size:
@@ -265,8 +262,7 @@ fn compare[
                 var vec_b = B.load[width=simd_width](B_offset + i)
                 var vec_result: SIMD[DType.bool, simd_width]
 
-                @parameter
-                if op_code == Equal:
+                comptime if op_code == Equal:
                     vec_result = vec_a.eq(vec_b)
                 elif op_code == NotEqual:
                     vec_result = vec_a.ne(vec_b)
@@ -291,8 +287,7 @@ fn compare[
                     var idx = i + j
                     var res: Scalar[DType.bool]
 
-                    @parameter
-                    if op_code == Equal:
+                    comptime if op_code == Equal:
                         res = A[A_offset + idx] == B[B_offset + idx]
                     elif op_code == NotEqual:
                         res = A[A_offset + idx] != B[B_offset + idx]
@@ -311,8 +306,7 @@ fn compare[
 
 
 @fieldwise_init
-@register_passable
-struct Compare[dtype: DType = DType.float32](ImplicitlyCopyable & Movable):
+struct Compare[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn launch[
         op_code: Int,
@@ -410,16 +404,14 @@ fn compare_scalar[
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
                 var vec_a = A.load[width=simd_width](i)
                 var vec_result: SIMD[DType.bool, simd_width]
 
-                @parameter
-                if op_code == Equal:
+                comptime if op_code == Equal:
                     vec_result = vec_a.eq(scalar)
                 elif op_code == NotEqual:
                     vec_result = vec_a.ne(scalar)
@@ -443,8 +435,7 @@ fn compare_scalar[
                     var val = A[i + j]
                     var res: Scalar[DType.bool]
 
-                    @parameter
-                    if op_code == Equal:
+                    comptime if op_code == Equal:
                         res = val == scalar
                     elif op_code == NotEqual:
                         res = val != scalar

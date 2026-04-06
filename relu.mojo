@@ -31,8 +31,7 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 @fieldwise_init
-@register_passable
-struct ReLU[dtype: DType]:
+struct ReLU[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -91,9 +90,7 @@ struct ReLU[dtype: DType]:
                     mask[index] = zero
                 index += 1
 
-        # Setup autograd if needed
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

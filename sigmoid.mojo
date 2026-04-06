@@ -2,13 +2,12 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_SIGMOID
 from gradbox import Gradbox
-from math import exp
+from std.math import exp
 from ndbuffer import NDBuffer
 
 
 @fieldwise_init
-@register_passable
-struct SigmoidBackward[dtype: DType](ImplicitlyCopyable):
+struct SigmoidBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_SIGMOID
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -49,8 +48,7 @@ struct SigmoidBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Sigmoid[dtype: DType]:
+struct Sigmoid[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -73,12 +71,12 @@ struct Sigmoid[dtype: DType]:
             var index = 0
             ref out_buffer = out.buffer.data_buffer()
             for idx in self.index_iterator():
-                sigmoid_value = 1 / (1 + exp(-self.buffer[idx]))
+                #sigmoid_value = 1 / (1 + exp(-self.buffer[idx]))
+                sigmoid_value = 1 / (1 + exp(-self.buffer.get(idx)))
                 out_buffer[index] = sigmoid_value
                 index += 1
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
 
             if grad_required:

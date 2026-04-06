@@ -8,8 +8,7 @@ from gradbox import Gradbox
 
 
 @fieldwise_init
-@register_passable
-struct SumBackward[dtype: DType](ImplicitlyCopyable):
+struct SumBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_SUM
     var axes: IntArray
     var keepdims: Bool
@@ -58,8 +57,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Summer[dtype: DType](Copyable):
+struct Summer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True

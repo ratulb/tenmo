@@ -1,19 +1,19 @@
 from shapes import Shape
 from tenmo import Tensor
 from gradbox import Gradbox
-from sys import simd_width_of
-from sys.param_env import env_get_string
-from logger import Level, Logger
+from std.sys import simd_width_of
+from std.sys.param_env import env_get_string
+from std.logger import Level, Logger
 from net import Sequential, Linear, ReLU
-from time import perf_counter_ns, monotonic
-from math import cos, sin, pi
-from os import abort
-from utils import Variant
-from testing import assert_true
+from std.time import perf_counter_ns, monotonic
+from std.math import cos, sin, pi
+from std.os import abort
+from std.utils import Variant
+from std.testing import assert_true
 from intarray import IntArray
 from random import randn_float64
 from ndbuffer import NDBuffer
-from sys import prefetch, PrefetchOptions
+from std.sys import prefetch, PrefetchOptions
 
 comptime LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
 comptime log = Logger[Level._from_str(LOG_LEVEL)]()
@@ -73,32 +73,29 @@ fn multiclass_accuracy[
 
 @always_inline("nodebug")
 fn log_debug(msg: String, color: String = RED):
-    log.debug(color + msg + RESET.__str__())
+    log.debug(color + msg + String(RESET))
 
 
 @always_inline("nodebug")
 fn log_info(msg: String, color: String = BLUE):
-    log.info(color + msg + RESET.__str__())
+    log.info(color + msg + String(RESET))
 
 
 @always_inline("nodebug")
 fn log_warning(msg: String, color: String = YELLOW):
-    log.warning(color + msg + RESET.__str__())
+    log.warning(color + msg + String(RESET))
 
 
 @always_inline("nodebug")
-fn panic[
-    S: Stringable,
-    //,
-](*s: S):
+fn panic(*s: String):
     var message = String(capacity=len(s))
     if len(s) > 0:
-        var start = s[0].__str__()
+        var start = String(s[0])
         message += start.strip()
         for i in range(1, len(s)):
-            var next_part = s[i].__str__()
+            var next_part = String(s[i])
             message += " " + next_part.strip()
-    abort(RED + message + RESET.__str__())
+    abort(RED + message + String(RESET))
 
 
 @always_inline
@@ -170,8 +167,7 @@ fn copy[
         if i + prefetch_ahead < count:
             prefetch[prefetch_opts](src + i + prefetch_ahead)
 
-        @parameter
-        for j in range(unrolled):
+        comptime for j in range(unrolled):
             var offset = i + j * simd_width
             dest.store[width=simd_width](
                 offset, src.load[width=simd_width](offset)
@@ -191,12 +187,11 @@ fn copy[
         i += 1
 
 
-fn is_null[type: AnyType, //](ptr: UnsafePointer[type]) -> Bool:
+fn is_null[type: AnyType, //](ptr: UnsafePointer[type, ImmutAnyOrigin]) -> Bool:
     return ptr.__bool__() == False
 
 
-@register_passable
-struct IDGen:
+struct IDGen(RegisterPassable):
     @always_inline
     @staticmethod
     fn generate_id() -> UInt:
@@ -209,17 +204,15 @@ struct IDGen:
         return perf_time ^ (mono_time << 32)
 
 
-@register_passable
-struct Epsilon[dtype: DType]:
+struct Epsilon[dtype: DType](RegisterPassable):
     @staticmethod
     fn value() -> Scalar[Self.dtype]:
-        @parameter
-        if Self.dtype == DType.float32:
+        comptime if Self.dtype == DType.float32:
             return Scalar[Self.dtype](1e-7)
         elif Self.dtype == DType.float64:
             return Scalar[Self.dtype](1e-12)
         else:
-            panic("Epsilon value not supported for: ", Self.dtype.__str__())
+            panic("Epsilon value not supported for: ", String(Self.dtype))
             return Scalar[Self.dtype](0)
 
 
@@ -241,8 +234,7 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
         "Only floating point dtypes support +inf.",
     ]()
 
-    @parameter
-    if dtype == DType.bfloat16:
+    comptime if dtype == DType.bfloat16:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
         )
@@ -286,13 +278,9 @@ fn nan[dtype: DType]() -> Scalar[dtype]:
     Returns:
         The NaN value of the given dtype.
     """
-    constrained[
-        dtype.is_floating_point(),
-        "Only floating point dtypes support NaN.",
-    ]()
+    comptime assert dtype.is_floating_point(), "Only floating point dtypes support NaN."
 
-    @parameter
-    if dtype == DType.float32:
+    comptime if dtype == DType.float32:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
         )
@@ -301,14 +289,13 @@ fn nan[dtype: DType]() -> Scalar[dtype]:
             __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
         )
     else:
-        constrained[False, "unsupported float type"]()
-        return {}
+        comptime assert False, "unsupported float type"
 
 
 # Helper
 def do_assert[
     dtype: DType, //
-](a: Tensor[dtype], b: Tensor[dtype], msg: String):
+](a: Tensor[dtype], b: Tensor[dtype], msg: String) raises:
     shape_mismatch = String("{0}: shape mismatch {1} vs {2}")
     tensors_not_equal = String("{}: values mismatch")
     assert_true(
@@ -320,21 +307,21 @@ def do_assert[
 # Helper
 def assert_grad[
     dtype: DType, //
-](t: Tensor[dtype], expected: Tensor[dtype], label: String):
+](t: Tensor[dtype], expected: Tensor[dtype], label: String) raises:
     assert_true(
         (t.grad() == expected),
-        String("grad assertion failed for {0}").format(label),
+        String("grad assertion failed for " + label),
     )
 
 
 # Create a single or two element(s) VariadicList
-fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int]:
-    fn create_variadic_list(*elems: Int) -> VariadicList[Int]:
-        return elems
+    _="""fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int, True]:
+    fn create_variadic_list(*elems: Int) -> VariadicList[Int, True]:
+        return {elems, True}
 
     if n == -1:
         return create_variadic_list(m)
-    return create_variadic_list(m, n)
+    return create_variadic_list(m, n)"""
 
 
 @fieldwise_init
@@ -435,7 +422,7 @@ fn print_summary[
 
     for i in range(len(mod.modules)):
         m = mod.modules[i].copy()
-        var name = "Layer" + i.__str__()
+        var name = "Layer" + String(i)
 
         if m.layer.isa[Linear[dtype]]():
             var l = m.layer[Linear[dtype]].copy()
@@ -444,13 +431,13 @@ fn print_summary[
             var in_features = l.weight.shape()[0]
             var out_features = l.weight.shape()[1]
 
-            var input_shape = "(?, " + in_features.__str__() + ")"
-            var output_shape = "(?, " + out_features.__str__() + ")"
+            var input_shape = "(?, " + String(in_features) + ")"
+            var output_shape = "(?, " + String(out_features) + ")"
 
             if x:
-                input_shape = x.value().shape().__str__()
+                input_shape = String(x.value().shape())
                 x = Optional(m(x.value()))
-                output_shape = x.value().shape().__str__()
+                output_shape = String(x.value().shape())
 
             current_shape = output_shape
 
@@ -468,8 +455,8 @@ fn print_summary[
                     "Linear",
                     input_shape,
                     output_shape,
-                    params.__str__(),
-                    (l.weight.requires_grad or l.bias.requires_grad).__str__(),
+                    String(arams),
+                    String(l.weight.requires_grad or l.bias.requires_grad),
                 ]
             )
 
@@ -478,9 +465,9 @@ fn print_summary[
             var output_shape = current_shape
 
             if x:
-                input_shape = x.value().shape().__str__()
+                input_shape = String(x.value().shape())
                 x = Optional(m(x.value()))
-                output_shape = x.value().shape().__str__()
+                output_shape = String(x.value().shape())
                 current_shape = output_shape
 
             rows.append([name, "ReLU", input_shape, output_shape, "0", "False"])
@@ -558,7 +545,7 @@ fn print_buffer[
             size,
             "at dim ",
             current_dim,
-            buffer.shape.__str__(),
+            String(buffer.shape),
         )
         return
 
@@ -608,12 +595,12 @@ fn print_buffer[
         print(indent + "]", end="")
 
 
-from gpu.host import DeviceBuffer
+from std.gpu.host import DeviceBuffer
 from buffers import Buffer
 
 
 fn main():
-    print(Epsilon[DType.int32].value())
+    #print(Epsilon[DType.int32].value())
     print(Epsilon[DType.float32].value())
     print(Epsilon[DType.float64].value())
-    print(Epsilon[DType.bool].value())
+    #print(Epsilon[DType.bool].value())

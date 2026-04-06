@@ -7,7 +7,7 @@ from backpropagation import (
     BACKWARD_MIN_SCALAR,
 )
 from gradbox import Gradbox
-from sys import has_accelerator
+from std.sys import has_accelerator
 from ndbuffer import NDBuffer
 from mnemonics import GreaterThan, LessThan
 
@@ -15,8 +15,7 @@ from mnemonics import GreaterThan, LessThan
 
 
 @fieldwise_init
-@register_passable
-struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable):
+struct MaxBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_MAX_SCALAR
 
     var scalar: Scalar[Self.dtype]
@@ -33,8 +32,7 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable):
         # Work at NDBuffer level — avoids pulling in GPU kernel launchers
         var mask_bool: NDBuffer[DType.bool]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if parent.is_on_gpu():
                 mask_bool = parent.buffer.compare_scalar[GreaterThan](
                     self.scalar
@@ -61,8 +59,7 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable):
+struct MinBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_MIN_SCALAR
     var scalar: Scalar[Self.dtype]
 
@@ -77,8 +74,7 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
         var mask_bool: NDBuffer[DType.bool]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if parent.is_on_gpu():
                 mask_bool = parent.buffer.compare_scalar[LessThan](self.scalar)
             else:
@@ -99,8 +95,7 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct MaxScalar[dtype: DType](Copyable):
+struct MaxScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -113,8 +108,7 @@ struct MaxScalar[dtype: DType](Copyable):
             self.buffer.scalar_ops[MAX](scalar), requires_grad=False
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
@@ -131,8 +125,7 @@ struct MaxScalar[dtype: DType](Copyable):
 
 
 @fieldwise_init
-@register_passable
-struct MinScalar[dtype: DType](Copyable):
+struct MinScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -145,8 +138,7 @@ struct MinScalar[dtype: DType](Copyable):
             self.buffer.scalar_ops[MIN](scalar), requires_grad=False
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
@@ -159,7 +151,7 @@ struct MinScalar[dtype: DType](Copyable):
         return out^
 
 
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:
@@ -185,8 +177,7 @@ fn main() raises:
     c.grad().print()
     assert_true(c.grad() == Tensor[dtype].d1([1.0, 0.0, 1.0, 0.0, 1.0]))
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_maxmin_gpu_parity_min")
         var a_cpu = Tensor[dtype].d2(
             [[1.0, 3.0, 7.0], [8.0, 2.0, 5.0]], requires_grad=True

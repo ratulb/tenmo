@@ -2,12 +2,11 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_CLIP
 from gradbox import Gradbox
-from sys import simd_width_of
+from std.sys import simd_width_of
 
 
 @fieldwise_init
-@register_passable
-struct ClipBackward[dtype: DType](ImplicitlyCopyable):
+struct ClipBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_CLIP
     var min_val: Scalar[Self.dtype]
     var max_val: Scalar[Self.dtype]
@@ -67,8 +66,7 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Clip[dtype: DType]:
+struct Clip[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -105,8 +103,7 @@ struct Clip[dtype: DType]:
                 var x = self[coord]
                 out[coord] = x.clamp(min_val, max_val)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

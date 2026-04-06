@@ -5,7 +5,7 @@ from gradbox import Gradbox
 from common_utils import panic
 from ndbuffer import NDBuffer
 from buffers import Buffer
-from sys import simd_width_of
+from std.sys import simd_width_of
 from net import Module, Layer
 from random import random_float64, seed
 
@@ -36,8 +36,7 @@ struct DropoutBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Dropout[dtype: DType](ImplicitlyCopyable):
+struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     """
     Optimized Dropout layer.
 
@@ -65,11 +64,11 @@ struct Dropout[dtype: DType](ImplicitlyCopyable):
         self.scale = Scalar[Self.dtype](1.0) / (Scalar[Self.dtype](1.0) - p)
         self.seed = 42  # Default seed
 
-    fn __copyinit__(out self, other: Self):
-        self.training = other.training
-        self.p = other.p
-        self.scale = other.scale
-        self.seed = other.seed
+    fn __copyinit__(out self, copy: Self):
+        self.training = copy.training
+        self.p = copy.p
+        self.scale = copy.scale
+        self.seed = copy.seed
 
     fn __call__(self, x: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         if not self.training or self.p == 0.0:

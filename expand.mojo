@@ -10,8 +10,7 @@ from views import View
 
 
 @fieldwise_init
-@register_passable
-struct ExpandBackward[dtype: DType](ImplicitlyCopyable):
+struct ExpandBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_EXPAND
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -28,8 +27,8 @@ struct ExpandBackward[dtype: DType](ImplicitlyCopyable):
         return [(ancestor^, gradbox_contracted^, AddTensor)]
 
 
-@register_passable
-struct Expand[dtype: DType]:
+@fieldwise_init
+struct Expand[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -71,8 +70,7 @@ struct Expand[dtype: DType]:
             validated=True,
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:

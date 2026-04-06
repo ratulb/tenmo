@@ -1,7 +1,7 @@
-from testing import assert_true
+from std.testing import assert_true
 from tenmo import Tensor
 from shapes import Shape
-from sys import has_accelerator
+from std.sys import has_accelerator
 # ============================================================
 # GPU EXPAND TESTS — forward shape, values, and backward grad flow
 # Grad always flows back to the original CPU tensor.

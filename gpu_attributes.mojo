@@ -1,4 +1,4 @@
-from gpu.host import DeviceContext, DeviceAttribute
+from std.gpu.host import DeviceContext, DeviceAttribute
 
 
 fn main() raises:

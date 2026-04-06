@@ -1,9 +1,9 @@
 from tenmo import Tensor
-from testing import assert_true, assert_false
+from std.testing import assert_true, assert_false
 from common_utils import isnan, isinf, Epsilon
-from math import log
-from sys import has_accelerator
-from math import log
+from std.math import log
+from std.sys import has_accelerator
+from std.math import log
 from shapes import Shape
 
 

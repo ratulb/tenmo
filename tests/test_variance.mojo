@@ -1,6 +1,6 @@
 from tenmo import Tensor
-from math import sqrt
-from testing import assert_true
+from std.math import sqrt
+from std.testing import assert_true
 from common_utils import isnan, isinf
 
 

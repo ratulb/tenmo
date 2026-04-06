@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from testing import assert_true, assert_equal, assert_almost_equal
+from std.testing import assert_true, assert_equal, assert_almost_equal
 from shapes import Shape
 
 # ============================================================================

@@ -4,13 +4,11 @@ from common_utils import panic
 from array import Array
 
 
-@register_passable
 struct Strides(
+    RegisterPassable,
     Defaultable,
     ImplicitlyCopyable,
-    Representable,
     Sized,
-    Stringable,
     Writable,
 ):
     """Strides for tensor indexing."""
@@ -41,8 +39,8 @@ struct Strides(
         self.data = IntArray(values)
 
     @always_inline("nodebug")
-    fn __copyinit__(out self, existing: Self):
-        self.data = existing.data
+    fn __copyinit__(out self, copy: Self):
+        self.data = copy.data
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -67,7 +65,8 @@ struct Strides(
         return self.data == other.data
 
     fn __str__(self) -> String:
-        return "(" + self.data.__str__()[1:-1] + ")"
+        var s = self.data.__str__()
+        return "(" + s[byte=1:len(s)-1] + ")"
 
     fn __repr__(self) -> String:
         return self.__str__()

@@ -1,14 +1,14 @@
 from tenmo import Tensor
-from testing import assert_true
-from testing import assert_false
+from std.testing import assert_true
+from std.testing import assert_false
 from time import perf_counter_ns
 from shapes import Shape
 from common_utils import log_warning
 from gradbox import Gradbox
 from intarray import IntArray
-from sys import has_accelerator
+from std.sys import has_accelerator
 from crossentropy import CrossEntropyLoss, Reduction
-from math import log, exp
+from std.math import log, exp
 
 
 

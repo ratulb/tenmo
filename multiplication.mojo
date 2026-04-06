@@ -10,12 +10,11 @@ from mnemonics import AddTensor, Multiply
 from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
-from sys import has_accelerator
+from std.sys import has_accelerator
 
 
 @fieldwise_init
-@register_passable
-struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
+struct MultiplyBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_MULTIPLY_SCALAR
     var factor: Scalar[Self.dtype]
 
@@ -38,8 +37,7 @@ struct MultiplyBackwardScalar[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct MultiplyBackward[dtype: DType](ImplicitlyCopyable):
+struct MultiplyBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_MULTIPLY
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -97,8 +95,7 @@ comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
 
 
 @fieldwise_init
-@register_passable
-struct MultiplyScalar[dtype: DType](ImplicitlyCopyable):
+struct MultiplyScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -109,8 +106,7 @@ struct MultiplyScalar[dtype: DType](ImplicitlyCopyable):
             self.buffer.scalar_ops[Multiply](factor), requires_grad=False
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
                 backward_fn = MultiplyBackwardScalar[Self.dtype](
@@ -124,8 +120,7 @@ struct MultiplyScalar[dtype: DType](ImplicitlyCopyable):
 
 # Element wise multiplication of two tensors
 @fieldwise_init
-@register_passable
-struct Multiplicator[dtype: DType]:
+struct Multiplicator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -147,8 +142,7 @@ struct Multiplicator[dtype: DType]:
             requires_grad=False,
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             requires_grad = self.requires_grad or other.requires_grad
             if requires_grad:
                 out.requires_grad_(True)
@@ -180,7 +174,7 @@ struct Multiplicator[dtype: DType]:
 
 
 from common_utils import now
-from testing import assert_true
+from std.testing import assert_true
 
 
 fn main() raises:

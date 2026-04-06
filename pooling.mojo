@@ -6,7 +6,7 @@ from mnemonics import AddTensor
 from ndbuffer import NDBuffer
 from utils.numerics import neg_inf
 from common_utils import panic
-from algorithm import parallelize
+from std.algorithm import parallelize
 from net import Module, Layer, MAXPOOL2D
 
 
@@ -109,8 +109,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 @fieldwise_init
-@register_passable
-struct MaxPool2d[dtype: DType](ImplicitlyCopyable):
+struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     """
     Batched, multi-channel 2D Max Pooling.
 

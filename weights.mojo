@@ -1,7 +1,7 @@
-from memory import UnsafePointer, memcpy
+from std.memory import UnsafePointer, memcpy
 from python import Python, PythonObject
 from tenmo import Tensor
-from utils import StaticTuple, Variant
+from std.utils import StaticTuple, Variant
 
 comptime TensorVariant = Variant[
     Tensor[1, DType.float32],

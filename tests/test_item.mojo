@@ -1,6 +1,6 @@
 from tenmo import Tensor
-from testing import assert_true
-from sys import has_accelerator
+from std.testing import assert_true
+from std.sys import has_accelerator
 
 fn test_item_cpu_scalar_tensor() raises:
     print("test_item_cpu_scalar_tensor")

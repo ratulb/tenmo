@@ -2,13 +2,12 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from backpropagation import Delegate, BackwardFn, BACKWARD_TANH
 from gradbox import Gradbox
-from math import tanh, exp
+from std.math import tanh, exp
 from ndbuffer import NDBuffer
 
 
 @fieldwise_init
-@register_passable
-struct TanhBackward[dtype: DType](ImplicitlyCopyable):
+struct TanhBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_TANH
 
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
@@ -42,7 +41,7 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable):
             for idx in input_tensor.index_iterator():
                 var tanh_value = (
                     1
-                    - Tanh[Self.dtype].tanh_stable(input_tensor.buffer[idx])
+                    - Tanh[Self.dtype].tanh_stable(input_tensor.buffer.get(idx))
                     ** 2
                 )
                 ancestor_gradbox_buffer[index] = (
@@ -54,8 +53,7 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable):
 
 
 @fieldwise_init
-@register_passable
-struct Tanh[dtype: DType]:
+struct Tanh[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -96,7 +94,7 @@ struct Tanh[dtype: DType]:
         return out^
 
     @staticmethod
-    fn tanh_stable(x: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
+    fn tanh_stable(x: Scalar[Self.dtype]) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
         """
         More numerically stable tanh implementation.
         """

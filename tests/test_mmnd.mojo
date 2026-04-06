@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from shapes import Shape
-from testing import assert_true
+from std.testing import assert_true
 from strides import Strides
 from common_utils import s, il
 
