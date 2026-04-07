@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from shapes import Shape
-from time import perf_counter_ns
+from std.time import perf_counter_ns
 from blashandle import BLASHandle
 from common_utils import now
 from std.testing import assert_true

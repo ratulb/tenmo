@@ -4,7 +4,7 @@ from array import Array
 from device import DeviceState
 from ndbuffer import NDBuffer
 from intarray import IntArray
-from utils.numerics import min_or_neg_inf, max_or_inf
+from std.utils.numerics import min_or_neg_inf, max_or_inf
 
 
 fn output_to_input_base(
@@ -70,10 +70,7 @@ fn reduce_minmax[
     total_output: Int,
     reduced_volume: Int,
 ):
-    constrained[
-        max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size",
-    ]()
+    comptime assert max_block_size.is_power_of_two() and max_block_size < 1024, "Invalid max_block_size"
 
     var smem = stack_allocation[
         max_block_size, Scalar[dtype], address_space = AddressSpace.SHARED
@@ -156,10 +153,7 @@ fn build_minmax_mask[
     total_output: Int,
     reduced_volume: Int,
 ):
-    constrained[
-        max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size",
-    ]()
+    comptime assert max_block_size.is_power_of_two() and max_block_size < 1024, "Invalid max_block_size"
 
     # smem[0..block_size)  : tie counts (Int32 cast to dtype)
     var smem = stack_allocation[

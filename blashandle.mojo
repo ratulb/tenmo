@@ -4,7 +4,7 @@ from shapes import Shape
 from common_utils import panic
 from mnemonics import AddTensor
 from backpropagation import BackwardFn, Delegate, BLAS_BACKWARD_MATMUL_2D
-from sys.param_env import env_get_string
+from std.sys.defines import get_defined_string
 from gradbox import Gradbox
 from std.memory import ArcPointer
 
@@ -85,8 +85,7 @@ struct BLASMatmul2dBackward[dtype: DType](RegisterPassable & ImplicitlyCopyable)
     fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
-
-comptime BLAS_PATH = env_get_string[
+comptime BLAS_PATH = get_defined_string[
     "BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"
 ]()
 
@@ -168,12 +167,12 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
 
         except e:
             print("Error loading BLAS: ", e)
-            self._error_msg = "Failed to load BLAS library: " + e.__str__()
+            self._error_msg = "Failed to load BLAS library: " + String(e)
             self._handle_ptr = None
 
-    fn __moveinit__(out self, deinit other: Self):
-        self._handle_ptr = other._handle_ptr^
-        self._error_msg = other._error_msg
+    fn __moveinit__(out self, deinit take: Self):
+        self._handle_ptr = take._handle_ptr^
+        self._error_msg = take._error_msg
 
     fn lite_handle(self) -> BLASHandleLite[Self.dtype]:
         return BLASHandleLite[Self.dtype](self._handle_ptr.value()[].borrow())
@@ -288,9 +287,9 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
         """
         # Validate inputs
         if A.rank() != 2:
-            panic("A must be a 2D tensor, got rank " + A.rank().__str__())
+            panic("A must be a 2D tensor, got rank " + String(A.rank()))
         if B.rank() != 2:
-            panic("B must be a 2D tensor, got rank " + B.rank().__str__())
+            panic("B must be a 2D tensor, got rank " + String(B.rank()))
 
         # Get stored dimensions
         var A_rows = A.shape()[0]
@@ -322,9 +321,9 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
             panic(
                 "Matrix dimensions incompatible for matmul: "
                 + "K mismatch: "
-                + K.__str__()
+                + String(K)
                 + " vs "
-                + K_from_B.__str__()
+                + String(K_from_B)
             )
 
         # Allocate result
@@ -352,8 +351,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
         var ldb = B.shape()[1]
 
         # Call BLAS with CORRECTED parameter order
-        @parameter
-        if Self.dtype == DType.float32:
+        comptime if Self.dtype == DType.float32:
             self.matmul_f32(
                 A_ptr.bitcast[Float32](),
                 B_ptr.bitcast[Float32](),
@@ -384,8 +382,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
                 transpose_B=transpose_B,
             )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(
                 A.requires_grad or B.requires_grad
             )
@@ -442,13 +439,13 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
             panic(
                 "Gradbox @ Tensor dimension mismatch: "
                 + "inner dim K="
-                + K.__str__()
+                + String(K)
                 + " vs K_from_B="
-                + K_from_B.__str__()
+                + String(K_from_B)
                 + " with transpose_A="
-                + transpose_A.__str__()
+                + String(transpose_A)
                 + " transpose_B="
-                + transpose_B.__str__()
+                + String(transpose_B)
             )
 
         # Allocate result
@@ -476,8 +473,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
         var ldb = B.shape()[1]
 
         # Call BLAS
-        @parameter
-        if Self.dtype == DType.float32:
+        comptime if Self.dtype == DType.float32:
             self.matmul_f32(
                 A_ptr.bitcast[Float32](),
                 B_ptr.bitcast[Float32](),
@@ -571,8 +567,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
         var ldb = B.shape()[1]
 
         # Call BLAS with CORRECTED parameter order
-        @parameter
-        if Self.dtype == DType.float32:
+        comptime if Self.dtype == DType.float32:
             self.matmul_f32(
                 A_ptr.bitcast[Float32](),
                 B_ptr.bitcast[Float32](),
@@ -709,9 +704,9 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         """
         # Validate inputs
         if A.rank() != 2:
-            panic("A must be a 2D tensor, got rank " + A.rank().__str__())
+            panic("A must be a 2D tensor, got rank " + String(A.rank()))
         if B.rank() != 2:
-            panic("B must be a 2D tensor, got rank " + B.rank().__str__())
+            panic("B must be a 2D tensor, got rank " + String(B.rank()))
 
         # Get stored dimensions
         var A_rows = A.shape()[0]
@@ -743,9 +738,9 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             panic(
                 "Matrix dimensions incompatible for matmul: "
                 + "K mismatch: "
-                + K.__str__()
+                + String(K)
                 + " vs "
-                + K_from_B.__str__()
+                + String(K_from_B)
             )
 
         # Ensure contiguous
@@ -777,8 +772,7 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         var ldb = B.shape()[1]
 
         # Call BLAS with CORRECTED parameter order
-        @parameter
-        if Self.dtype == DType.float32:
+        comptime if Self.dtype == DType.float32:
             self.matmul_f32(
                 A_ptr.bitcast[Float32](),
                 B_ptr.bitcast[Float32](),
@@ -809,10 +803,9 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                 transpose_B=transpose_B,
             )
         else:
-            panic("Unsupported dtype for BLAS: " + Self.dtype.__str__())
+            panic("Unsupported dtype for BLAS: " + String(Self.dtype))
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(
                 A.requires_grad or B.requires_grad
             )
@@ -869,13 +862,13 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             panic(
                 "Gradbox @ Tensor dimension mismatch: "
                 + "inner dim K="
-                + K.__str__()
+                + String(K)
                 + " vs K_from_B="
-                + K_from_B.__str__()
+                + String(K_from_B)
                 + " with transpose_A="
-                + transpose_A.__str__()
+                + String(transpose_A)
                 + " transpose_B="
-                + transpose_B.__str__()
+                + String(transpose_B)
             )
 
         # Allocate result
@@ -903,8 +896,7 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         var ldb = B.shape()[1]
 
         # Call BLAS
-        @parameter
-        if Self.dtype == DType.float32:
+        comptime if Self.dtype == DType.float32:
             self.matmul_f32(
                 A_ptr.bitcast[Float32](),
                 B_ptr.bitcast[Float32](),
@@ -998,8 +990,7 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         var ldb = B.shape()[1]
 
         # Call BLAS with CORRECTED parameter order
-        @parameter
-        if Self.dtype == DType.float32:
+        comptime if Self.dtype == DType.float32:
             self.matmul_f32(
                 A_ptr.bitcast[Float32](),
                 B_ptr.bitcast[Float32](),

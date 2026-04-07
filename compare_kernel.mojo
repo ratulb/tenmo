@@ -1,8 +1,8 @@
 from std.sys import simd_width_of
-from gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
+from std.gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
 from std.os.atomic import Atomic, Consistency
 from std.memory import AddressSpace, stack_allocation
-from utils.numerics import isnan, isinf
+from std.utils.numerics import isnan, isinf
 
 from mnemonics import (
     Equal,
@@ -52,7 +52,7 @@ fn all_close[
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     size: Int,
 ):
-    constrained[dtype.is_floating_point(), "all_close requires a float dtype"]()
+    comptime assert dtype.is_floating_point(), "all_close requires a float dtype"
 
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
     var grid_stride = Int(block_dim.x * grid_dim.x)
@@ -146,7 +146,7 @@ fn all_close[
 
 
 @fieldwise_init
-struct AllClose[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyable):
+struct AllClose[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @staticmethod
     fn launch[
         rtol: Scalar[Self.dtype] = 1e-5,
@@ -393,11 +393,11 @@ fn compare_scalar[
     result: UnsafePointer[Scalar[DType.uint8], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     scalar: Scalar[dtype],
-    size: UInt,
+    size: Int,
 ):
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
@@ -500,7 +500,7 @@ struct CompareScalar[dtype: DType = DType.float32](
             result_buffer,
             A_buffer,
             scalar,
-            UInt(numels),
+            numels,
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -538,4 +538,4 @@ struct CompareScalar[dtype: DType = DType.float32](
 
 
 fn main() raises:
-    pass
+    print("passes")

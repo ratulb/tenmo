@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from net import Linear, ReLU, Sequential, BCELoss, Sigmoid
 from sgd import SGD
-from python import Python, PythonObject
+from std.python import Python, PythonObject
 from numpy_interop import from_ndarray
 from common_utils import now
 from dataloader import *

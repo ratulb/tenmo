@@ -61,8 +61,7 @@ struct Exponentiator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         var result_ndb = self.buffer**exponent
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

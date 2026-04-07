@@ -2,8 +2,8 @@ from tenmo import Tensor
 from intarray import IntArray
 from common_utils import panic
 from shapes import Shape
-from utils.numerics import max_finite, min_finite
-from gpu import thread_idx, block_idx, block_dim, barrier
+from std.utils.numerics import max_finite, min_finite
+from std.gpu import thread_idx, block_idx, block_dim, barrier
 from std.memory import AddressSpace, stack_allocation
 from array import Array
 from device import DeviceState
@@ -30,10 +30,9 @@ fn reduce_argminmax[
     and its index. Then a two-array shared-memory tree reduction picks the
     global best index for this output slot.
     """
-    constrained[
+    comptime assert
         max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size",
-    ]()
+        "Invalid max_block_size"
 
     # Shared memory: interleaved [val, idx] pairs per thread
     # We store values in smem_val and indices in smem_idx
@@ -86,11 +85,11 @@ fn reduce_argminmax[
         comptime if is_max:
             if val > local_val:
                 local_val = val
-                local_idx = r
+                local_idx = Int32(r)
         else:
             if val < local_val:
                 local_val = val
-                local_idx = r
+                local_idx =Int32(r)
 
         r += block_size
 
@@ -141,9 +140,9 @@ struct ArgMinMaxReducer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if ax < 0 or ax >= rank:
             panic(
                 "ArgMinMaxReducer: axis",
-                axis.__str__(),
+                String(axis),
                 "out of range for rank",
-                rank.__str__(),
+                String(rank),
             )
 
         # Build output shape
@@ -257,9 +256,9 @@ struct ArgMinMaxReducer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if keepdims:
                 var write_idx = out_idx.replace(ax, 0)
-                out[write_idx] = best_pos
+                out[write_idx] = Int32(best_pos)
             else:
-                out[out_idx] = best_pos
+                out[out_idx] = Int32(best_pos)
 
         return out^
 

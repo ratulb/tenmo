@@ -190,48 +190,48 @@ struct IndexCalculator(RegisterPassable, ImplicitlyCopyable):
         """Calculate flat index from IntArray indices."""
         # 1. Rank check
         var rank = shape.rank()
-        if indices.size() != rank or len(strides) != rank:
-            if indices.size() != rank and len(strides) != rank:
+        if len(indices) != rank or len(strides) != rank:
+            if len(indices) != rank and len(strides) != rank:
                 panic(
                     "flatten_index: indices(",
-                    indices.size().__str__(),
+                    String(len(indices)),
                     ") and strides(",
-                    len(strides).__str__(),
+                    String(len(strides)),
                     ") both ≠ required rank(",
-                    rank.__str__(),
+                    String(rank),
                     ")",
                 )
-            elif indices.size() != rank:
+            elif len(indices) != rank:
                 panic(
                     "flatten_index: indices(",
-                    indices.size().__str__(),
+                    String(len(indices)),
                     ") ≠ required rank(",
-                    rank.__str__(),
+                    String(rank),
                     ")",
                 )
             else:
                 panic(
                     "flatten_index: strides(",
-                    len(strides).__str__(),
+                    String(len(strides)),
                     ") ≠ required rank(",
-                    rank.__str__(),
+                    String(rank),
                     ")",
                 )
 
         var flat = offset  # absolute base offset
         # 2. Normalize negative indices, bounds-check, and accumulate
-        for dim_idx in range(indices.size()):
+        for dim_idx in range(len(indices)):
             var idx = indices[dim_idx]
             dim_size = shape[dim_idx]
             idx = idx + dim_size if idx < 0 else idx
             if idx < 0 or idx >= dim_size:
                 panic(
                     "flatten_index: index out of bounds: axis",
-                    dim_idx.__str__(),
+                    String(dim_idx),
                     ", got",
-                    indices[dim_idx].__str__(),
+                    String(indices[dim_idx]),
                     ", size",
-                    dim_size.__str__(),
+                    String(dim_size),
                 )
             flat = flat + idx * strides[dim_idx]
         return flat
@@ -248,27 +248,27 @@ struct IndexCalculator(RegisterPassable, ImplicitlyCopyable):
             if len(indices) != rank and len(strides) != rank:
                 panic(
                     "flatten_index: indices(",
-                    len(indices).__str__(),
+                    String(len(indices)),
                     ") and strides(",
-                    len(strides).__str__(),
+                    String(len(strides)),
                     ") both ≠ required rank(",
-                    rank.__str__(),
+                    String(rank),
                     ")",
                 )
             elif len(indices) != rank:
                 panic(
                     "flatten_index: indices(",
-                    len(indices).__str__(),
+                    String(len(indices)),
                     ") ≠ required rank(",
-                    rank.__str__(),
+                    String(rank),
                     ")",
                 )
             else:
                 panic(
                     "flatten_index: strides(",
-                    len(strides).__str__(),
+                    String(len(strides)),
                     ") ≠ required rank(",
-                    rank.__str__(),
+                    String(rank),
                     ")",
                 )
 
@@ -282,11 +282,11 @@ struct IndexCalculator(RegisterPassable, ImplicitlyCopyable):
             if idx < 0 or idx >= dim_size:
                 panic(
                     "flatten_index: index out of bounds: axis",
-                    dim_idx.__str__(),
+                    String(dim_idx),
                     ", got",
-                    indices[dim_idx].__str__(),
+                    String(indices[dim_idx]),
                     ", size",
-                    dim_size.__str__(),
+                    String(dim_size),
                 )
 
             flat = flat + idx * strides[dim_idx]
@@ -307,27 +307,27 @@ struct IndexCalculator(RegisterPassable, ImplicitlyCopyable):
             if len(indices) != rank and len(strides) != rank:
                 panic(
                     "flatten_index: indices(",
-                    len(indices).__str__(),
+                    String(len(indices)),
                     ") and strides(",
-                    len(strides).__str__(),
+                    String(len(strides)),
                     ") both ≠ required rank(",
-                    rank.__str__(),
+                    String(rank),
                     ")",
                 )
             elif len(indices) != rank:
                 panic(
                     "flatten_index: indices(",
-                    len(indices).__str__(),
+                    String(len(indices)),
                     ") ≠ required rank(",
-                    rank.__str__(),
+                    String(rank),
                     ")",
                 )
             else:
                 panic(
                     "flatten_index: strides(",
-                    len(strides).__str__(),
+                    String(len(strides)),
                     ") ≠ required rank(",
-                    rank.__str__(),
+                    String(rank),
                     ")",
                 )
 
@@ -341,11 +341,11 @@ struct IndexCalculator(RegisterPassable, ImplicitlyCopyable):
             if idx < 0 or idx >= dim_size:
                 panic(
                     "flatten_index: index out of bounds: axis",
-                    dim_idx.__str__(),
+                    String(dim_idx),
                     ", got",
-                    indices[dim_idx].__str__(),
+                    String(indices[dim_idx]),
                     ", size",
-                    dim_size.__str__(),
+                    String(dim_size),
                 )
 
             flat = flat + idx * strides[dim_idx]
@@ -358,10 +358,10 @@ struct IndexCalculator(RegisterPassable, ImplicitlyCopyable):
         if flat_index < 0 or flat_index >= shape.num_elements():
             panic(
                 "IndexCalculator → index_to_coord: flat_index",
-                flat_index.__str__(),
+                String(flat_index),
                 "out of bounds.",
                 "Should be between 0 <= and <",
-                shape.num_elements().__str__(),
+                String(shape.num_elements()),
             )
         var rank = shape.rank()
         var indices = IntArray.filled(rank, 0)

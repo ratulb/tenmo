@@ -72,8 +72,7 @@ struct Summer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         var nd_buffer = tensor.buffer.reduce(reduction_axes, keepdims)
         var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(tensor.requires_grad)
 
             if grad_required:

@@ -69,8 +69,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
         if self.flow == Flow.UnMoved:
             return [(ancestor^, gradbox, AddTensor)]
 
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if self.flow == Flow.Cpu2Gpu:
                 # Forward was CPU→GPU, backward transfers grad GPU→CPU
                 try:
@@ -84,7 +83,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                 except e:
                     panic(
                         "DeviceTransferBackward: GPU→CPU transfer failed: "
-                        + e.__str__()
+                        + String(e)
                     )
                     return [(ancestor^, gradbox, AddTensor)]  # unreachable
             else:
@@ -103,7 +102,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                 except e:
                     panic(
                         "DeviceTransferBackward: CPU→GPU transfer failed: "
-                        + e.__str__()
+                        + String(e)
                     )
                     return [(ancestor^, gradbox, AddTensor)]  # unreachable
 
@@ -126,8 +125,7 @@ struct DeviceTransfer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             return self
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

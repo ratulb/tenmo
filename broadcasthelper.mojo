@@ -98,12 +98,12 @@ struct ShapeBroadcaster(RegisterPassable, ImplicitlyCopyable):
                 "ShapeBroadcaster → translate_index: original dims greater than"
                 " broadcast dims"
             )
-        if mask.size() != broadcast_shape.ndim():
+        if len(mask) != broadcast_shape.ndim():
             panic(
                 "ShapeBroadcaster → translate_index: mask size does not match"
                 " broadcast ndim"
             )
-        if indices.size() != broadcast_shape.ndim():
+        if len(indices) != broadcast_shape.ndim():
             panic(
                 "ShapeBroadcaster → translate_index: indices size does not"
                 " match broadcast ndim"

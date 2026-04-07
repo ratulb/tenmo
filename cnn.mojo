@@ -134,7 +134,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         if not bias_tensor.shape() == expected_bias_shape:
             panic(
                 "Invalid bias tensor shape: ",
-                bias_tensor.shape().__str__(),
+                String(bias_tensor.shape()),
                 ". Should be (C_out,)",
             )
 
@@ -256,7 +256,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
         if not bias_tensor.shape() == expected_bias_shape:
             panic(
                 "Invalid bias tensor shape: ",
-                bias_tensor.shape().__str__(),
+                String(bias_tensor.shape()),
                 ". Should be (C_out,)",
             )
 
@@ -447,8 +447,7 @@ struct FusedIm2Col[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                             )
                             var kernel_vec = SIMD[Self.dtype, simd_w](0)
 
-                            @parameter
-                            for v in range(simd_w):
+                            comptime for v in range(simd_w):
                                 var k_idx = (
                                     co + v
                                 ) * kernel_stride_Co + kernel_base
@@ -458,8 +457,7 @@ struct FusedIm2Col[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                             accum += img_val * kernel_vec
 
                 # Store results for simd_w output channels
-                @parameter
-                for v in range(simd_w):
+                comptime for v in range(simd_w):
                     var out_idx = out_n_base + (co + v) * out_stride_Co
                     out_ptr[out_idx] = accum[v]
 
@@ -498,8 +496,7 @@ struct FusedIm2Col[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         # ═══════════════════════════════════════════════════════════
         # STEP 7: Setup gradient tracking
         # ═══════════════════════════════════════════════════════════
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(
                 padded_image.requires_grad
                 or kernel.requires_grad
@@ -873,8 +870,7 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                                         var contrib_vec = grad_val * kernel_vec
 
                                         # Scatter (can't vectorize scatter, but at least vectorize multiply)
-                                        @parameter
-                                        for v in range(kw_simd_w):
+                                        comptime for v in range(kw_simd_w):
                                             var img_x = (
                                                 ox * stride
                                                 + (kx + v) * dilation

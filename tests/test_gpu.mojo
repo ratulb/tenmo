@@ -262,7 +262,7 @@ fn test_v2_ndbuffer_sum_1d() raises:
     print("test_v2_ndbuffer_sum_1d")
     var ndb = NDBuffer[DType.float32](Shape(5))
     for i in range(5):
-        ndb[IntArray(i)] = i + 1  # 1,2,3,4,5
+        ndb[IntArray(i)] = Float32(i + 1)  # 1,2,3,4,5
     var result = ndb.reduce(normalized_axes=IntArray(0))
     assert_true(result[IntArray()] == 15)
     print("test_v2_ndbuffer_sum_1d passed")
@@ -274,7 +274,7 @@ fn test_v2_ndbuffer_sum_2d_axis0() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = val
+            ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> axis0 -> [5,7,9]
     var result = ndb.reduce(normalized_axes=IntArray(0))
@@ -290,7 +290,7 @@ fn test_v2_ndbuffer_sum_2d_axis1() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = val
+            ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> axis1 -> [6,15]
     var result = ndb.reduce(normalized_axes=IntArray(1))
@@ -305,7 +305,7 @@ fn test_v2_ndbuffer_mean_2d_axis0() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = val
+            ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> mean axis0 -> [2.5, 3.5, 4.5]
     var result = ndb.reduce[mean=True](normalized_axes=IntArray(0))
@@ -321,7 +321,7 @@ fn test_v2_ndbuffer_mean_2d_axis1() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = val
+            ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> mean axis1 -> [2.0, 5.0]
     var result = ndb.reduce[mean=True](normalized_axes=IntArray(1))
@@ -336,7 +336,7 @@ fn test_v2_ndbuffer_sum_keepdims() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = val
+            ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # keepdims -> shape (1, 3)
     var result = ndb.reduce(normalized_axes=IntArray(0), keepdims=True)
@@ -352,7 +352,7 @@ fn test_v2_ndbuffer_mean_keepdims() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = val
+            ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # keepdims -> shape (2, 1)
     var result = ndb.reduce[mean=True](

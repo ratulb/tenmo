@@ -9,7 +9,7 @@ from std.testing import assert_almost_equal, assert_equal, assert_true, assert_f
 from std.math import sqrt
 from common_utils import isnan, isinf
 from std.math import sqrt
-from random import seed
+from std.random import seed
 from gradbox import Gradbox
 from shapes import Shape
 from common_utils import i, s
@@ -529,9 +529,9 @@ fn assert_shape_equal[
         raise Error(
             test_name
             + " FAILED: Shape rank mismatch. Expected "
-            + len(expected).__str__()
+            + String(len(expected))
             + " got "
-            + actual.rank().__str__()
+            + String(actual.rank())
         )
 
     for i in range(len(expected)):
@@ -539,14 +539,14 @@ fn assert_shape_equal[
             raise Error(
                 test_name
                 + " FAILED: Shape mismatch at dim "
-                + i.__str__()
+                + String(i)
                 + ". Expected "
-                + expected[i].__str__()
+                + String(expected[i])
                 + " got "
-                + actual[i].__str__()
+                + String(actual[i])
             )
 
-    print(test_name + " - Shape correct:", actual.__str__())
+    print(test_name + " - Shape correct:", String(actual))
 
 
 fn assert_tensor_close(
@@ -573,17 +573,17 @@ fn assert_tensor_close(
                 raise Error(
                     test_name
                     + " FAILED: Value mismatch at index "
-                    + i.__str__()
+                    + String(i)
                     + ". Expected "
-                    + b.buffer.data_buffer()[i].__str__()
+                    + String(b.buffer.data_buffer()[i])
                     + " got "
-                    + a.buffer.data_buffer()[i].__str__()
+                    + String(a.buffer.data_buffer()[i])
                     + " (diff: "
-                    + diff.__str__()
+                    + String(diff)
                     + ")"
                 )
 
-    print(test_name + " - Values close (max_diff: " + max_diff.__str__() + ")")
+    print(test_name + " - Values close (max_diff: " + String(max_diff) + ")")
 
 
 fn compute_numerical_gradient(
@@ -1229,7 +1229,7 @@ fn test_gradient_accumulation() raises:
         var actual = grad_after_second.buffer.data_buffer()[i]
         if abs(actual - expected) > 1e-3:
             raise Error(
-                "Gradient accumulation test failed at index " + i.__str__()
+                "Gradient accumulation test failed at index " + String(i)
             )
 
     print(" Gradients correctly accumulated across multiple backward passes")
@@ -1279,9 +1279,9 @@ fn test_batch_processing() raises:
             if abs(batch_val - individual_val) > 1e-3:
                 raise Error(
                     "Batch processing mismatch at batch "
-                    + i.__str__()
+                    +String(i)
                     + ", element "
-                    + j.__str__()
+                    + String(j)
                 )
 
     print(" Batch processing matches individual processing")

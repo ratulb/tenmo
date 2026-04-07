@@ -2,7 +2,7 @@ from tenmo import Tensor
 from common_utils import panic, now
 from std.testing import assert_true, assert_equal, assert_false
 from dataloader import *
-from python import Python, PythonObject
+from std.python import Python, PythonObject
 
 # Comprehensive tests for TensorDataset, Batch, and DataLoader
 # With FIXED shuffle implementation
@@ -109,14 +109,14 @@ fn test_tensor_dataset_getitem_all_indices() raises:
 
         assert_true(
             feat[0] == expected_feat_0,
-            "Feature mismatch at index " + i.__str__(),
+            "Feature mismatch at index " + String(i),
         )
         assert_true(
             feat[1] == expected_feat_1,
-            "Feature mismatch at index " + i.__str__(),
+            "Feature mismatch at index " + String(i),
         )
         assert_true(
-            lab[[]] == expected_label, "Label mismatch at index " + i.__str__()
+            lab[[]] == expected_label, "Label mismatch at index " + String(i)
         )
     print("Passed")
 
@@ -517,7 +517,7 @@ fn test_dataloader_shuffle_quality() raises:
 
     # Check all indices were found
     for i in range(10):
-        assert_true(found[i], "Missing index " + i.__str__() + " after shuffle")
+        assert_true(found[i], "Missing index " + String(i) + " after shuffle")
 
     print("Passed (all indices present after shuffle)")
 
@@ -2127,7 +2127,7 @@ fn test_stress_large_dataset() raises:
     var labels = Tensor[DType.int32].zeros(1000)
 
     for i in range(1000):
-        labels[i] = i % 10  # 10 classes
+        labels[i] = Int32(i % 10)  # 10 classes
 
     var dataset = TensorDataset(features, labels)
     var loader = dataset.into_loader(

@@ -74,7 +74,7 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
 
     fn __init__(out self, device_id: Int = 0) raises:
         self.device_context = ArcPointer(DeviceContext(device_id))
-        self.id = device_id
+        self.id = Int64(device_id)
 
     fn __copyinit__(out self, copy: Self):
         self.device_context = copy.device_context.copy()
@@ -85,7 +85,7 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
         self.id = take.id
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write("GPU[" + self.id.__str__() + "]")
+        writer.write("GPU[" + String(self.id) + "]")
 
     fn __eq__(self, other: Self) -> Bool:
         return (
@@ -104,7 +104,7 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
             self.device_context[].synchronize()
         except e:
             print(e)
-            print("Error synchronizing GPU device context: ", e.__str__())
+            print("Error synchronizing GPU device context: ", String(e))
 
     fn __getitem__(self) -> ArcPointer[DeviceContext]:
         return self.device_context.copy()
@@ -334,8 +334,7 @@ struct DeviceState[dtype: DType](
     ) raises -> DeviceState[Self.dtype]:
         var device_state = DeviceState[Self.dtype](size, self.gpu)
 
-        @parameter
-        if Self.dtype == DType.bool:
+        comptime if Self.dtype == DType.bool:
             var storage_val = UInt8(1) if value.cast[DType.bool]() else UInt8(0)
             device_state.buffer.enqueue_fill(
                 rebind[Scalar[Self.datatype]](storage_val)
@@ -370,8 +369,7 @@ struct DeviceState[dtype: DType](
     fn fill(self, value: Scalar[Self.dtype], sync: Bool = True) raises:
         with self.buffer.map_to_host() as host_buffer:
 
-            @parameter
-            if Self.dtype == DType.bool:
+            comptime if Self.dtype == DType.bool:
                 var storage_val = UInt8(1) if value.cast[
                     DType.bool
                 ]() else UInt8(0)
@@ -394,8 +392,7 @@ struct DeviceState[dtype: DType](
                     var next_index = 0
                     for index in source.index_iterator():
 
-                        @parameter
-                        if Self.dtype == DType.bool:
+                        comptime if Self.dtype == DType.bool:
                             var v = source.get(index).cast[DType.bool]()
                             host_buffer[next_index] = rebind[
                                 Scalar[Self.datatype]
@@ -418,8 +415,7 @@ struct DeviceState[dtype: DType](
                 src_ptr = src_ptr + src_offset
                 var numels = source.numels()
 
-                @parameter
-                if Self.dtype == DType.bool:
+                comptime if Self.dtype == DType.bool:
                     for i in range(numels):
                         device_ptr[i] = rebind[Scalar[Self.datatype]](
                             UInt8(1) if (src_ptr + i)[].cast[
@@ -436,8 +432,7 @@ struct DeviceState[dtype: DType](
                 var next_index = 0
                 for index in source.index_iterator():
 
-                    @parameter
-                    if Self.dtype == DType.bool:
+                    comptime if Self.dtype == DType.bool:
                         device_ptr[next_index] = rebind[Scalar[Self.datatype]](
                             UInt8(1) if (src_ptr + index)[].cast[
                                 DType.bool
@@ -459,8 +454,7 @@ struct DeviceState[dtype: DType](
         bool: converts uint8 0/1 back to bool.
         """
 
-        @parameter
-        if Self.dtype == DType.bool:
+        comptime if Self.dtype == DType.bool:
             var numels = len(self)
             var cpu_buf = Buffer[DType.bool](numels)
             with self.buffer.map_to_host() as host_buffer:
@@ -498,8 +492,7 @@ struct DeviceState[dtype: DType](
     fn __getitem__(self, index: Int) raises -> Scalar[Self.dtype]:
         with self.buffer.map_to_host() as host_buffer:
 
-            @parameter
-            if Self.dtype == DType.bool:
+            comptime if Self.dtype == DType.bool:
                 return Scalar[Self.dtype](
                     (host_buffer[index].cast[DType.uint8]() == UInt8(1))
                 )
@@ -509,8 +502,7 @@ struct DeviceState[dtype: DType](
     fn __setitem__(self, index: Int, value: Scalar[Self.dtype]) raises:
         with self.buffer.map_to_host() as host_buffer:
 
-            @parameter
-            if Self.dtype == DType.bool:
+            comptime if Self.dtype == DType.bool:
                 host_buffer[index] = Scalar[Self.datatype](
                     UInt8(1) if value.cast[DType.bool]() else UInt8(0)
                 )

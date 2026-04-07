@@ -18,8 +18,7 @@ fn test_sum_1d_forward_cpu() raises:
 
 fn test_sum_1d_forward_gpu() raises:
     """Test 1D sum forward on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_1d_forward_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -41,8 +40,7 @@ fn test_sum_1d_backward_cpu() raises:
 
 fn test_sum_1d_backward_gpu() raises:
     """Test 1D sum backward on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_1d_backward_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -64,8 +62,7 @@ fn test_mean_1d_forward_cpu() raises:
 
 fn test_mean_1d_forward_gpu() raises:
     """Test 1D mean forward on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_mean_1d_forward_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -87,8 +84,7 @@ fn test_mean_1d_backward_cpu() raises:
 
 fn test_mean_1d_backward_gpu() raises:
     """Test 1D mean backward on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_mean_1d_backward_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -116,8 +112,7 @@ fn test_sum_2d_axis0_cpu() raises:
 
 fn test_sum_2d_axis0_gpu() raises:
     """Test sum along axis 0 (rows) on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_2d_axis0_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -139,8 +134,7 @@ fn test_sum_2d_axis1_cpu() raises:
 
 fn test_sum_2d_axis1_gpu() raises:
     """Test sum along axis 1 (columns) on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_2d_axis1_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -162,8 +156,7 @@ fn test_sum_2d_keepdims_cpu() raises:
 
 fn test_sum_2d_keepdims_gpu() raises:
     """Test sum with keepdims=True on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_2d_keepdims_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -186,8 +179,7 @@ fn test_sum_2d_backward_axis0_cpu() raises:
 
 fn test_sum_2d_backward_axis0_gpu() raises:
     """Test backward of sum along axis 0 on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_2d_backward_axis0_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
@@ -209,8 +201,7 @@ fn test_mean_2d_axis0_cpu() raises:
 
 fn test_mean_2d_axis0_gpu() raises:
     """Test mean along axis 0 on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_mean_2d_axis0_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -236,8 +227,7 @@ fn test_sum_3d_all_cpu() raises:
 
 fn test_sum_3d_all_gpu() raises:
     """Test sum of all elements in 3D tensor on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_3d_all_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
@@ -258,8 +248,7 @@ fn test_sum_3d_axis12_cpu() raises:
 
 fn test_sum_3d_axis12_gpu() raises:
     """Test sum over last two axes on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_3d_axis12_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
@@ -281,8 +270,7 @@ fn test_mean_3d_axis0_cpu() raises:
 
 fn test_mean_3d_axis0_gpu() raises:
     """Test mean along first axis on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_mean_3d_axis0_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])
@@ -311,8 +299,7 @@ fn test_sum_grad_flow_chain_cpu() raises:
 
 fn test_sum_grad_flow_chain_gpu() raises:
     """Test gradient flow through chain of operations on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_grad_flow_chain_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -337,8 +324,7 @@ fn test_mean_grad_flow_scaling_cpu() raises:
 
 fn test_mean_grad_flow_scaling_gpu() raises:
     """Test mean gradient scaling on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_mean_grad_flow_scaling_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -373,8 +359,7 @@ fn test_sum_multiple_backward_cpu() raises:
 
 fn test_sum_multiple_backward_gpu() raises:
     """Test multiple backward passes on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_multiple_backward_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -407,8 +392,7 @@ fn test_sum_single_element_cpu() raises:
 
 fn test_sum_single_element_gpu() raises:
     """Test sum of single element tensor on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_single_element_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].scalar(42.0)
@@ -429,8 +413,7 @@ fn test_sum_negative_axis_cpu() raises:
 
 fn test_sum_negative_axis_gpu() raises:
     """Test sum with negative axes on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_negative_axis_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -452,8 +435,7 @@ fn test_sum_empty_axes_cpu() raises:
 
 fn test_sum_empty_axes_gpu() raises:
     """Test sum with empty axes on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_empty_axes_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -475,8 +457,7 @@ fn test_mean_empty_axes_cpu() raises:
 
 fn test_mean_empty_axes_gpu() raises:
     """Test mean with empty axes on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_mean_empty_axes_gpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -507,8 +488,7 @@ fn test_sum_large_1d_cpu() raises:
 
 fn test_sum_large_1d_gpu() raises:
     """Test sum of large 1D tensor on GPU."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_large_1d_gpu")
         comptime dtype = DType.float32
         var size = 10000
@@ -519,7 +499,7 @@ fn test_sum_large_1d_gpu() raises:
         var a_gpu = a.to_gpu()
         var result = a_gpu.sum()
         var expected = (size * (size + 1)) // 2
-        assert_true(result.to_cpu().item() == expected)
+        assert_true(result.to_cpu().item() == Float32(expected))
         print("✓ GPU large 1D sum passed")
 
 
@@ -529,8 +509,7 @@ fn test_sum_large_1d_gpu() raises:
 
 fn test_sum_cpu_gpu_consistency_2d() raises:
     """Test CPU and GPU results match for 2D sum."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_sum_cpu_gpu_consistency_2d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
@@ -543,8 +522,7 @@ fn test_sum_cpu_gpu_consistency_2d() raises:
 
 fn test_mean_cpu_gpu_consistency_3d() raises:
     """Test CPU and GPU results match for 3D mean."""
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_mean_cpu_gpu_consistency_3d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3([[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]])

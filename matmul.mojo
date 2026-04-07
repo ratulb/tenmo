@@ -65,8 +65,7 @@ struct Matmul2d[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         var ndb = A.buffer.matmul_2d(B.buffer)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
@@ -160,8 +159,7 @@ struct MatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         var ndb = A.buffer.matmul_nd(B.buffer)
         var C = Tensor[Self.dtype](ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
@@ -213,8 +211,7 @@ struct Matmul[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn forward[
         track_grad: Bool = True, mode: Int = mm
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        @parameter
-        if mode == mm:
+        comptime if mode == mm:
             # Step 1: Pure analysis - get the opcode
             var opcode = classify_matmul(A.shape(), B.shape())
 
@@ -281,7 +278,7 @@ fn classify_matmul(a: Shape, b: Shape) -> Int:
             return invalid
 
 
-from time import perf_counter_ns as now
+from std.time import perf_counter_ns as now
 from std.sys import argv
 from blashandle import BLASHandle
 
@@ -323,7 +320,7 @@ fn test_gflops_blas() raises:
 
     if A_shape[1] != B_shape[0]:
         panic(
-            "Matrix dimension mismatch: ", A_shape.__str__(), B_shape.__str__()
+            "Matrix dimension mismatch: ", String(A_shape), String(B_shape)
         )
     # Setup
     var A = Tensor[dtype].randn(A_shape)
@@ -344,21 +341,21 @@ fn test_gflops_blas() raises:
     # Calculations
     var avg_time_ms = Float64(end - start) / (100.0 * 1_000_000.0)
 
-    var gflops = (2.0 * M * K * N) / (avg_time_ms * 1_000_000.0)
+    var gflops = (2.0 * Float64(M * K * N)) / (avg_time_ms * 1_000_000.0)
 
     M = A_shape[0]
     K = A_shape[1]
     N = B_shape[1]
 
     # Formatted output
-    var shape_str = String("(") + M.__str__() + "×" + K.__str__() + ") @ ("
-    shape_str += K.__str__() + "×" + N.__str__() + ")"
+    var shape_str = String("(") + String(M) + "×" + String(K) + ") @ ("
+    shape_str += String(K) + "×" + String(N) + ")"
 
     print("Blas matmul Results:")
     print("  Matrix dimensions: " + shape_str)
-    print("  Average time:      " + avg_time_ms.__str__() + " ms")
-    print("  Performance:       " + gflops.__str__() + " GFLOPS")
-    print("  Operations:        " + (2 * M * K * N).__str__() + " FLOP")
+    print("  Average time:      " + String(avg_time_ms) + " ms")
+    print("  Performance:       " + String(gflops) + " GFLOPS")
+    print("  Operations:        " + String(2 * M * K * N) + " FLOP")
 
 
 fn test_gflops() raises:
@@ -398,7 +395,7 @@ fn test_gflops() raises:
 
     if A_shape[1] != B_shape[0]:
         panic(
-            "Matrix dimension mismatch: ", A_shape.__str__(), B_shape.__str__()
+            "Matrix dimension mismatch: ", String(A_shape), String(B_shape)
         )
     # Setup
     var A = Tensor[dtype].randn(A_shape)
@@ -419,21 +416,21 @@ fn test_gflops() raises:
     # Calculations
     var avg_time_ms = Float64(end - start) / (100.0 * 1_000_000.0)
 
-    var gflops = (2.0 * M * K * N) / (avg_time_ms * 1_000_000.0)
+    var gflops = (2.0 * Float64(M * K * N)) / (avg_time_ms * 1_000_000.0)
 
     M = A_shape[0]
     K = A_shape[1]
     N = B_shape[1]
 
     # Formatted output
-    var shape_str = String("(") + M.__str__() + "×" + K.__str__() + ") @ ("
-    shape_str += K.__str__() + "×" + N.__str__() + ")"
+    var shape_str = String("(") + String(M) + "×" + String(K) + ") @ ("
+    shape_str += String(K) + "×" + String(N) + ")"
 
     print("Results:")
     print("  Matrix dimensions: " + shape_str)
-    print("  Average time:      " + avg_time_ms.__str__() + " ms")
-    print("  Performance:       " + gflops.__str__() + " GFLOPS")
-    print("  Operations:        " + (2 * M * K * N).__str__() + " FLOP")
+    print("  Average time:      " + String(avg_time_ms) + " ms")
+    print("  Performance:       " + String(gflops) + " GFLOPS")
+    print("  Operations:        " + String(2 * M * K * N) + " FLOP")
 
 
 from std.testing import assert_true

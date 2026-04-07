@@ -1,5 +1,5 @@
 from std.sys import simd_width_of
-from gpu import thread_idx, block_idx, block_dim, grid_dim
+from std.gpu import thread_idx, block_idx, block_dim, grid_dim
 from std.memory import stack_allocation, AddressSpace
 from mnemonics import Add, Multiply, Subtract, Divide
 from tenmo import Tensor

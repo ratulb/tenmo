@@ -4,7 +4,7 @@ from gradbox import Gradbox
 from backpropagation import BackwardFn, Delegate, BACKWARD_MAXPOOL2D
 from mnemonics import AddTensor
 from ndbuffer import NDBuffer
-from utils.numerics import neg_inf
+from std.utils.numerics import neg_inf
 from common_utils import panic
 from std.algorithm import parallelize
 from net import Module, Layer, MAXPOOL2D

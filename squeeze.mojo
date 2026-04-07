@@ -60,8 +60,7 @@ struct Squeeze[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         var out = Tensor[Self.dtype](squeezed_ndb^, requires_grad=False)
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)

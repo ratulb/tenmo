@@ -628,7 +628,7 @@ fn test_concat_large_number_of_tensors() raises:
 
     # Create 10 tensors, each (1, 5)
     for i in range(10):
-        var t = Tensor[dtype].ones(1, 5) * (i + 1)
+        var t = Tensor[dtype].ones(1, 5) * Float32((i + 1))
         tensors.append(t)
 
     var result = Tensor[dtype].concat(tensors, axis=0)

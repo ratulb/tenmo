@@ -149,7 +149,7 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         except e:
             panic(
                 "ViewBackward backward_gpu: failed to materialise GPU gradbox:"
-                + e.__str__()
+                + String(e)
             )
             # Unreachable — satisfies compiler
             cpu_gradbox = Gradbox[Self.dtype].zeros(self.shape)
@@ -242,7 +242,7 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 panic(
                     "ViewBackward backward_gpu: failed to move parent_gradbox"
                     " to GPU: "
-                    + e.__str__()
+                    + String(e)
                 )
                 final_gradbox = parent_gradbox  # unreachable
         else:

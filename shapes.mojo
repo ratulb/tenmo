@@ -143,8 +143,13 @@ struct Shape(
     fn intarray(self) -> IntArray:
         return self.dims
 
+    @always_inline("nodebug")
     fn array(self) -> Array:
-        return Array(self)
+        var result = Array()
+        result.size = len(self)
+        for i in range(len(self)):
+            result[i] = self[i]
+        return result^
 
     # ========== Operations ==========
 

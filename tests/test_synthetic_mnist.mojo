@@ -4,7 +4,7 @@ from net import Linear, ReLU, Sequential
 from sgd import SGD
 from crossentropy import CrossEntropyLoss
 from std.testing import assert_true
-from utils.numerics import max_finite
+from std.utils.numerics import max_finite
 from common_utils import log_debug, s, i as Row
 
 

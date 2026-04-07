@@ -2,10 +2,10 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from validators import Validator
 from backpropagation import Delegate, BackwardFn, BACKWARD_SHUFFLE
-from random import shuffle, seed
+from std.random import shuffle, seed
 from gradbox import Gradbox
 
-from gpu import thread_idx, block_idx, block_dim, grid_dim
+from std.gpu import thread_idx, block_idx, block_dim, grid_dim
 from std.gpu.host import DeviceBuffer
 from std.memory import AddressSpace
 from std.sys import has_accelerator
@@ -243,7 +243,7 @@ struct Shuffle[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                         self.buffer, permutation, axis
                     )
                 except e:
-                    panic("Shuffle → forward GPU failed: " + e.__str__())
+                    panic("Shuffle → forward GPU failed: " + String(e))
                     result_ndb = NDBuffer[Self.dtype].Empty()  # unreachable
             else:
                 result_ndb = self.buffer.shuffle(permutation, axis)
@@ -303,7 +303,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
                         result_ndb^, share=False
                     )
                 except e:
-                    panic("ShuffleBackward GPU scatter failed: " + e.__str__())
+                    panic("ShuffleBackward GPU scatter failed: " + String(e))
                     gradbox_parent = Gradbox[Self.dtype].zeros(
                         shape, share=False
                     )

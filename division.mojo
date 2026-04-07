@@ -126,17 +126,15 @@ struct DivideScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Tensor → __rtruediv__ is for numeric data types only",
-        ]()
+            "Tensor → __rtruediv__ is for numeric data types only"
 
         var out = Tensor[Self.dtype](
             self.buffer.scalar_ops[ReverseDivide](scalar), requires_grad=False
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
                 backward_fn = RightTrueDivBackwardScalar[Self.dtype](
@@ -156,20 +154,18 @@ struct DivideByScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Tensor → __truediv__ is for numeric data types only",
-        ]()
+            "Tensor → __truediv__ is for numeric data types only"
 
         if scalar == Scalar[Self.dtype](0):
-            panic("Tensor → __truediv__ : canot divide by " + scalar.__str__())
+            panic("Tensor → __truediv__ : canot divide by " + String(scalar))
 
         var out = Tensor[Self.dtype](
             self.buffer.scalar_ops[Divide](scalar), requires_grad=False
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
 
@@ -194,9 +190,9 @@ struct Divider[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if not self.broadcastable(other):
             panic(
                 "Tensor division dimension mismatch: cannot broadcast shape "
-                + self.shape().__str__()
+                + String(self.shape())
                 + " with "
-                + other.shape().__str__(),
+                + String(other.shape()),
                 "at Divider → forward",
             )
 
@@ -205,8 +201,7 @@ struct Divider[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             requires_grad=False,
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             requires_grad = self.requires_grad or other.requires_grad
             if requires_grad:
                 out.requires_grad_(True)

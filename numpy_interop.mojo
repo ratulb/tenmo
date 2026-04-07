@@ -1,4 +1,4 @@
-from python import Python, PythonObject
+from std.python import Python, PythonObject
 from tenmo import Tensor
 from std.memory import memcpy
 from shapes import Shape

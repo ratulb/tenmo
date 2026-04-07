@@ -7,7 +7,7 @@ from ndbuffer import NDBuffer
 from buffers import Buffer
 from std.sys import simd_width_of
 from net import Module, Layer
-from random import random_float64, seed
+from std.random import random_float64, seed
 
 
 @fieldwise_init
@@ -103,8 +103,7 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             # Generate random values [0, 1)
             var rand_vec = SIMD[Self.dtype, simd_w](0)
 
-            @parameter
-            for v in range(simd_w):
+            comptime for v in range(simd_w):
                 rand_vec[v] = random_float64(0.0, 1.0).cast[Self.dtype]()
 
             # Create mask: scale if rand > p, else 0

@@ -1,4 +1,4 @@
-from gpu import thread_idx, block_dim, grid_dim, block_idx
+from std.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.sys import simd_width_of
 
 from tenmo import Tensor
@@ -31,7 +31,7 @@ fn scalar_ops[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     scalar: Scalar[dtype],
-    size: UInt,
+    size: Int,
 ):
     """
     Element-wise scalar operations.
@@ -44,8 +44,8 @@ fn scalar_ops[
     """
 
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
 
@@ -56,8 +56,7 @@ fn scalar_ops[
 
     while base_idx < size:
         # Process simd_vectors_per_thread vectors per thread
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             # Bounds check for this vector
@@ -66,8 +65,7 @@ fn scalar_ops[
                 var vec_a = A.load[width=simd_width](i)
                 var vec_result: SIMD[dtype, simd_width]
 
-                @parameter
-                if op_code == Add:
+                comptime if op_code == Add:
                     vec_result = vec_a + scalar
                 elif op_code == Subtract:
                     vec_result = vec_a - scalar
@@ -92,8 +90,7 @@ fn scalar_ops[
                     var val = A[i + j]
                     var res: Scalar[dtype]
 
-                    @parameter
-                    if op_code == Add:
+                    comptime if op_code == Add:
                         res = val + scalar
                     elif op_code == Subtract:
                         res = val - scalar
@@ -130,20 +127,19 @@ fn pow_op_f32[
     result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
     exponent: Scalar[DType.float32],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float32 pow kernel — x ** exponent elementwise."""
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -165,20 +161,19 @@ fn pow_op_f64[
     result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
     exponent: Scalar[DType.float64],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float64 pow kernel — x ** exponent elementwise."""
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -238,7 +233,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
             result_buffer,
             A_buffer,
             scalar,
-            UInt(numels),
+            numels,
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
@@ -272,8 +267,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
             numels
         )
 
-        @parameter
-        if Self.dtype == DType.float32:
+        comptime if Self.dtype == DType.float32:
             var compiled = device_context.compile_function[
                 pow_op_f32[
                     simd_width=simdwidth,
@@ -289,7 +283,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
                 result_buffer,
                 contig_state.device_buffer(),
                 exponent.cast[DType.float32](),
-                UInt(numels),
+                numels,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -309,7 +303,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
                 result_buffer,
                 contig_state.device_buffer(),
                 exponent.cast[DType.float64](),
-                UInt(numels),
+                numels,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -362,8 +356,7 @@ fn main() raises:
     loss_cpu.backward()
     assert_true(a_cpu.grad().all_close(Tensor[dtype].d1([4.0, 6.0, 8.0])))
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         # Test GPU pow forward
         var a_gpu = (
             Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True).to_gpu()

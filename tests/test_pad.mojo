@@ -1218,7 +1218,7 @@ fn test_pad_asymmetric_padding_backward() raises:
                 grad_image[0, 0, i, j],
                 4.0,
                 atol=1e-5,
-                msg="Gradient at " + i.__str__() + "," + j.__str__(),
+                msg="Gradient at " + String(i) + "," + String(j.__str__(),
             )
 
     print("✓ Asymmetric padding backward pass correct")
@@ -1535,7 +1535,7 @@ fn test_pad_kernel_gradient() raises:
         for j in range(2):
             assert_true(
                 grad_kernel[0, 0, i, j] > 0,
-                "Kernel grad :" + i.__str__() + "," + j.__str__() + "positive",
+                "Kernel grad :" + String(i) + "," + String(j.__str__() + "positive",
             )
 
     print("✓ Kernel gradient test correct")
@@ -1568,7 +1568,7 @@ fn test_pad_bias_gradient() raises:
 
     for i in range(16):
         assert_almost_equal(
-            grad_bias[i], expected, atol=1e-4, msg="Bias grad " + i.__str__()
+            grad_bias[i], expected, atol=1e-4, msg="Bias grad " + String(i)
         )
 
     print("✓ Bias gradient test correct")
@@ -1619,11 +1619,11 @@ fn test_pad_large_asymmetric() raises:
                     72.0,
                     atol=1e-4,
                     msg="Large asym grad at "
-                    + c.__str__()
+                    + String(c)
                     + ","
-                    + i.__str__()
+                    + String(i)
                     + ","
-                    + j.__str__(),
+                    + String(j),
                 )
 
     print("✓ Large asymmetric padding test correct")

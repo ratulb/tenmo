@@ -43,9 +43,9 @@ struct Validator:
                     " axis length."
                 ),
                 "perm length",
-                len(permutation).__str__(),
+                String(len(permutation)),
                 "and axis length",
-                axis_length.__str__(),
+                String(axis_length),
             )
 
         # Must contain all indices 0..axis_len-1 exactly once
@@ -95,9 +95,9 @@ struct Validator:
             if norm_axis < 0 or norm_axis >= rank:
                 panic(
                     "Reduction axis out of bounds: "
-                    + axis.__str__()
+                    + String(axis)
                     + " for rank "
-                    + rank.__str__()
+                    + String(rank)
                 )
             normalized.append(norm_axis)
 
@@ -154,9 +154,9 @@ struct Validator:
             panic(
                 "Validator → validate_and_normalize_axes: cannot reduce over"
                 " axes "
-                + axes.__str__()
+                + String(axes)
                 + " for scalar tensor with shape: "
-                + shape.__str__()
+                + String(shape)
             )
 
         # Default case: reduce all axes
@@ -174,7 +174,7 @@ struct Validator:
                     "Validator → validate_and_normalize_axes: invalid axis "
                     + String(axis)
                     + " for tensor shape "
-                    + shape.__str__()
+                    + String(shape)
                 )
 
             normalized.append(normalized_axis)
@@ -569,7 +569,7 @@ struct Validator:
             elif idx.isa[Int]():
                 required_rank += 1
             elif idx.isa[IntArray]():
-                required_rank += idx[IntArray].size()
+                required_rank += len(idx[IntArray])
             elif idx.isa[Slice]():
                 required_rank += 1
 
@@ -611,7 +611,7 @@ struct Validator:
                 # No shape/strides append (reduces rank)
             elif idx.isa[IntArray]():
                 list = idx[IntArray]
-                for t in range(list.size()):
+                for t in range(len(list)):
                     shape_dim = original_shape[dim_counter]
                     stride_dim = original_strides[dim_counter]
                     dim_counter += 1
@@ -726,8 +726,8 @@ struct Validator:
         # --- 5. Check for self-overlapping layout ---
         if not Self.is_non_overlapping(shape, strides):
             log_warning("Tensor → view: self-overlapping layout detected")
-            log_warning("  Shape:", shape.__str__())
-            log_warning("  Strides:", strides.__str__())
+            log_warning("  Shape:", String(shape))
+            log_warning("  Strides:", String(strides))
 
         return (offset, strides)
 

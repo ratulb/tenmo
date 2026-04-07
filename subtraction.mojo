@@ -97,8 +97,7 @@ struct SubtractScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             self.buffer.scalar_ops[Subtract](scalar), requires_grad=False
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
                 backward_fn = SubLeftRightBackwardScalar[Self.dtype](
@@ -122,8 +121,7 @@ struct SubtractFromScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             self.buffer.scalar_ops[ReverseSubtract](scalar), requires_grad=False
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
                 backward_fn = SubLeftRightBackwardScalar[Self.dtype](
@@ -146,9 +144,9 @@ struct Subtractor[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if not self.broadcastable(other):
             panic(
                 "Tensor subtraction dimension mismatch: cannot broadcast shape "
-                + self.shape().__str__()
+                + String(self.shape())
                 + " with "
-                + other.shape().__str__(),
+                + String(other.shape()),
                 "at Subtractor → forward",
             )
 
@@ -157,8 +155,7 @@ struct Subtractor[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             requires_grad=False,
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             requires_grad = self.requires_grad or other.requires_grad
 
             if requires_grad:

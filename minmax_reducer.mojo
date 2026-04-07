@@ -4,7 +4,7 @@ from shapes import Shape
 from indexhelper import IndexCalculator
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
-from utils.numerics import min_or_neg_inf, max_or_inf
+from std.utils.numerics import min_or_neg_inf, max_or_inf
 
 
 @fieldwise_init
@@ -55,8 +55,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
             var idx = IndexCalculator.index_to_coord(shape, flat_idx)
             var cur = ndb[idx]
 
-            @parameter
-            if is_max:
+            comptime if is_max:
                 if cur > best_value:
                     best_value = cur
             else:
@@ -88,8 +87,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
 
             var best_value: Scalar[Self.dtype]
 
-            @parameter
-            if is_max:
+            comptime if is_max:
                 best_value = min_or_neg_inf[Self.dtype]()
             else:
                 best_value = max_or_inf[Self.dtype]()
@@ -112,8 +110,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
                     first_iteration = False
                 else:
 
-                    @parameter
-                    if is_max:
+                    comptime if is_max:
                         if cur > best_value:
                             best_value = cur
                     else:
@@ -158,7 +155,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
                 if ndb[idx] == best:
                     tie_count += 1
             if tie_count > 0:
-                var inv = Scalar[Self.dtype](1) / tie_count
+                var inv = Scalar[Self.dtype](1) / Scalar[Self.dtype](tie_count)
                 for flat_idx in range(shape.num_elements()):
                     var idx = IndexCalculator.index_to_coord(shape, flat_idx)
                     if ndb[idx] == best:
@@ -191,7 +188,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
 
             # Write normalised mask
             if tie_count > 0:
-                var inv = Scalar[Self.dtype](1) / tie_count
+                var inv = Scalar[Self.dtype](1) / Scalar[Self.dtype](tie_count)
                 for red_flat_idx in range(num_reduced):
                     var red_idx = IndexCalculator.index_to_coord(
                         reduced_shape, red_flat_idx

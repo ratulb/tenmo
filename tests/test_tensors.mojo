@@ -1685,11 +1685,11 @@ fn test_sum() raises:
             [25.0, 30.0, ],
             [75.0, 80.0, ],
     ]"""
-    expect = Tensor[dtype].of[2](25, 30, 75, 80)
+    expect = Tensor[dtype].d2([[25, 30], [75, 80]])
     assert_true((summed == expect), "Sum across axis 1 assertion failed")
 
     summed = r.sum(axes=[0])
-    expect = Tensor[dtype].of[2](12, 14, 16, 18, 20, 22, 24, 26, 28, 30)
+    expect = Tensor[dtype].d2([[12, 14], [16, 18], [20, 22], [24, 26], [28, 30]])
     assert_true((summed == expect), "Sum across axis 0 assertion failed")
 
     expect = Tensor[dtype].scalar(210)
@@ -1701,12 +1701,12 @@ fn test_broadcast_add_2_tensors() raises:
     print("test_broadcast_add_2_tensors")
 
     comptime dtype = DType.float32
-    tensor1 = Tensor[dtype].of(1, 2, 3, 4, requires_grad=True)
-    tensor2 = Tensor[dtype].of(6, requires_grad=True)
+    tensor1 = Tensor[dtype].d1([1, 2, 3, 4], requires_grad=True)
+    tensor2 = Tensor[dtype].d1([6], requires_grad=True)
 
     result = tensor1 + tensor2
     assert_true(
-        (result == Tensor[dtype].of(7, 8, 9, 10)),
+        (result == Tensor[dtype].d1([7, 8, 9, 10])),
         "broadcast add assertion 1 failed",
     )
     result.backward()
@@ -1727,19 +1727,19 @@ fn test_broadcast_add_2_tensors() raises:
     )
 
     assert_true(
-        (tensor2.grad() == Tensor[dtype].of([4])),
+        (tensor2.grad() == Tensor[dtype].d1([4])),
         "grad check 2 - assertion failed",
     )
 
-    tensor1 = Tensor[dtype].of[3](1, 2, 3, 4, 5, 6, requires_grad=True)
-    tensor2 = Tensor[dtype].of(6, requires_grad=True)
+    tensor1 = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    tensor2 = Tensor[dtype].d1([6], requires_grad=True)
 
     result = tensor1 + tensor2
 
     result.backward()
 
     assert_true(
-        (result == Tensor[dtype].of[3](7, 8, 9, 10, 11, 12)),
+        (result == Tensor[dtype].d2([[7, 8, 9], [10, 11, 12]])),
         "broadcast add assertion 2 failed",
     )
 
@@ -1765,7 +1765,7 @@ fn test_broadcast_add_2_tensors() raises:
     )
 
     assert_true(
-        (tensor2.grad() == Tensor[dtype].of([6])),
+        (tensor2.grad() == Tensor[dtype].d1([6])),
         "grad check 4 - assertion failed",
     )
 
@@ -1874,14 +1874,14 @@ fn test_arange() raises:
     print("test_arange")
     comptime dtype = DType.float32
     tensor = Tensor[dtype].arange(0, 10)
-    expected = Tensor[dtype].of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    expected = Tensor[dtype].d1([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     is_true = tensor == expected
     assert_true(is_true, "arange gen check assertion failed")
 
     tensor1 = Tensor[dtype].arange(0, -5, -0.5)
-    expected1 = Tensor[dtype].of(
+    expected1 = Tensor[dtype].d1([
         0.0, -0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -3.5, -4.0, -4.5
-    )
+        ])
     is_true = tensor1 == expected1
     assert_true(is_true, "arange negative step assertion failed")
 
@@ -1909,7 +1909,7 @@ fn test_random() raises:
 fn test_item() raises:
     print("test_item")
     comptime dtype = DType.float32
-    tensor = Tensor[dtype].of(42)
+    tensor = Tensor[dtype].d1([42])
     assert_true(tensor.item() == 42)
 
 

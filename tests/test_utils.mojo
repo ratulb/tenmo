@@ -84,7 +84,7 @@ fn test_accuracy_custom_threshold() raises:
     var target = Tensor[dtype].d2([[1.0], [0.0], [1.0], [0.0]])
 
     # With threshold 0.6
-    var correct, total = accuracy[threshold=0.6](pred, target)
+    var correct, total = accuracy[threshold=Scalar[dtype](0.6)](pred, target)
     # 0.7 > 0.6 → 1 (correct)
     # 0.3 > 0.6 → 0 (correct)
     # 0.6 > 0.6 → 0 (wrong, should be 1)

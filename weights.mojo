@@ -1,5 +1,5 @@
 from std.memory import UnsafePointer, memcpy
-from python import Python, PythonObject
+from std.python import Python, PythonObject
 from tenmo import Tensor
 from std.utils import StaticTuple, Variant
 

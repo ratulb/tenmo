@@ -215,8 +215,7 @@ fn test_countuniq_cpu_unique_result_is_cpu() raises:
 
 
 fn test_countuniq_gpu_count_1d_basic() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_count_1d_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 1.0, 3.0, 1.0]).to_gpu()
@@ -226,8 +225,7 @@ fn test_countuniq_gpu_count_1d_basic() raises:
 
 
 fn test_countuniq_gpu_count_1d_all_same() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_count_1d_all_same")
         comptime dtype = DType.float32
         var a = Tensor[dtype].full(Shape(10), 5.0).to_gpu()
@@ -236,8 +234,7 @@ fn test_countuniq_gpu_count_1d_all_same() raises:
 
 
 fn test_countuniq_gpu_count_2d_basic() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_count_2d_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -249,8 +246,7 @@ fn test_countuniq_gpu_count_2d_basic() raises:
 
 
 fn test_countuniq_gpu_count_3d_basic() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_count_3d_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -262,8 +258,7 @@ fn test_countuniq_gpu_count_3d_basic() raises:
 
 
 fn test_countuniq_gpu_count_zeros() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_count_zeros")
         comptime dtype = DType.float32
         var a = Tensor[dtype].zeros(Shape(5)).to_gpu()
@@ -271,8 +266,7 @@ fn test_countuniq_gpu_count_zeros() raises:
 
 
 fn test_countuniq_gpu_count_large() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_count_large")
         comptime dtype = DType.float32
         var a = Tensor[dtype].full(Shape(10000), 3.0).to_gpu()
@@ -281,8 +275,7 @@ fn test_countuniq_gpu_count_large() raises:
 
 
 fn test_countuniq_gpu_count_int() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_count_int")
         comptime dtype = DType.int32
         var a = Tensor[dtype].d1([1, 2, 3, 2, 1, 2]).to_gpu()
@@ -291,8 +284,7 @@ fn test_countuniq_gpu_count_int() raises:
 
 
 fn test_countuniq_gpu_count_noncontiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_count_noncontiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -310,8 +302,7 @@ fn test_countuniq_gpu_count_noncontiguous() raises:
 
 
 fn test_countuniq_gpu_unique_1d_basic() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_unique_1d_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 1.0, 3.0, 2.0]).to_gpu()
@@ -325,8 +316,7 @@ fn test_countuniq_gpu_unique_1d_basic() raises:
 
 
 fn test_countuniq_gpu_unique_1d_all_same() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_unique_1d_all_same")
         comptime dtype = DType.float32
         var a = Tensor[dtype].full(Shape(10), 5.0).to_gpu()
@@ -337,8 +327,7 @@ fn test_countuniq_gpu_unique_1d_all_same() raises:
 
 
 fn test_countuniq_gpu_unique_2d_basic() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_unique_2d_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -353,8 +342,7 @@ fn test_countuniq_gpu_unique_2d_basic() raises:
 
 
 fn test_countuniq_gpu_unique_3d_basic() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_unique_3d_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -368,8 +356,7 @@ fn test_countuniq_gpu_unique_3d_basic() raises:
 
 
 fn test_countuniq_gpu_unique_all_different() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_unique_all_different")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0]).to_gpu()
@@ -379,8 +366,7 @@ fn test_countuniq_gpu_unique_all_different() raises:
 
 
 fn test_countuniq_gpu_unique_int() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_unique_int")
         comptime dtype = DType.int32
         var a = Tensor[dtype].d1([1, 2, 3, 2, 1, 4]).to_gpu()
@@ -390,8 +376,7 @@ fn test_countuniq_gpu_unique_int() raises:
 
 
 fn test_countuniq_gpu_unique_noncontiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_unique_noncontiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -404,8 +389,7 @@ fn test_countuniq_gpu_unique_noncontiguous() raises:
 
 
 fn test_countuniq_gpu_unique_result_always_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_gpu_unique_result_always_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 1.0]).to_gpu()
@@ -420,8 +404,7 @@ fn test_countuniq_gpu_unique_result_always_cpu() raises:
 
 
 fn test_countuniq_parity_count_1d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_parity_count_1d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 1.0, 3.0, 1.0, 2.0])
@@ -441,8 +424,7 @@ fn test_countuniq_parity_count_1d() raises:
 
 
 fn test_countuniq_parity_count_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_parity_count_2d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 2.0, 3.0], [2.0, 1.0, 3.0]])
@@ -456,8 +438,7 @@ fn test_countuniq_parity_count_2d() raises:
 
 
 fn test_countuniq_parity_count_large() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_parity_count_large")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].full(Shape(10000), 7.0)
@@ -469,8 +450,7 @@ fn test_countuniq_parity_count_large() raises:
 
 
 fn test_countuniq_parity_unique_count_1d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_parity_unique_count_1d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 1.0, 3.0, 2.0, 4.0])
@@ -486,8 +466,7 @@ fn test_countuniq_parity_unique_count_1d() raises:
 
 
 fn test_countuniq_parity_unique_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_parity_unique_2d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -500,8 +479,7 @@ fn test_countuniq_parity_unique_2d() raises:
 
 
 fn test_countuniq_parity_noncontiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_countuniq_parity_noncontiguous")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(

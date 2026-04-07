@@ -385,9 +385,9 @@ struct NDBuffer[dtype: DType](
             if class_index < 0 or class_index >= num_classes:
                 panic(
                     "Tensor → onehot: invalid class",
-                    class_index.__str__(),
+                    String(class_index),
                     "at coordinate",
-                    coord.__str__(),
+                    String(coord),
                 )
             var onehot_coord = coord + class_index
             result[onehot_coord] = Scalar[Self.dtype](1)
@@ -499,7 +499,7 @@ struct NDBuffer[dtype: DType](
             panic(
                 "NDBuffer → item(self): only valid for zero dim"
                 " buffer/singleton, got shape: "
-                + self.shape.__str__()
+                + String(self.shape)
             )
         return self.get(0)
 
@@ -509,9 +509,9 @@ struct NDBuffer[dtype: DType](
             panic(
                 "NDBuffer → element_at: index out of bounds.",
                 "NDBuffer max index",
-                self.max_index().__str__(),
+                String(self.max_index()),
                 ", provided index",
-                index.__str__(),
+                String(index),
             )
         if self.is_on_gpu():
             ref device_state = self.device_state.value()
@@ -519,7 +519,7 @@ struct NDBuffer[dtype: DType](
                 return device_state[idx]
             except e:
                 print(e)
-                panic("Error in NDBuffer → get: ", e.__str__())
+                panic("Error in NDBuffer → get: ", String(e))
                 # Unreachable
                 return Scalar[Self.dtype](0)
         return self.data_ptr()[idx]
@@ -530,9 +530,9 @@ struct NDBuffer[dtype: DType](
             panic(
                 "NDBuffer → set_element_at: index out of bounds.",
                 "NDBuffer max index",
-                self.max_index().__str__(),
+                String(self.max_index()),
                 ", provided index",
-                index.__str__(),
+                String(index),
             )
 
         if self.is_on_gpu():
@@ -541,7 +541,7 @@ struct NDBuffer[dtype: DType](
                 device_state[idx] = value
             except e:
                 print(e)
-                panic("Error in NDBuffer → set: ", e.__str__())
+                panic("Error in NDBuffer → set: ", String(e))
         else:
             var ptr = self.data_ptr().unsafe_mut_cast[True]()
             ptr[idx] = value
@@ -551,11 +551,9 @@ struct NDBuffer[dtype: DType](
         simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
     ](self, row: Int, col: Int) -> SIMD[Self.dtype, simdwidth]:
         """SIMD load of a row segment from a 2D NDBuffer."""
-
-        constrained[
+        comptime assert
             simdwidth.is_power_of_two(),
-            "NDBuffer → load: SIMD width must be a power of 2",
-        ]()
+            "NDBuffer → load: SIMD width must be a power of 2"
         if simdwidth > self.numels():
             panic("NDBuffer → load: buffer size is less than simd width")
 
@@ -575,14 +573,14 @@ struct NDBuffer[dtype: DType](
                 panic(
                     "NDBuffer → load: Out-of-bounds access. "
                     + "Attempted row "
-                    + row.__str__()
+                    + String(row)
                     + ", col range ["
-                    + col.__str__()
+                    + String(col)
                     + ", "
-                    + (col + simdwidth).__str__()
+                    + String((col + simdwidth))
                     + ") "
                     + "for shape "
-                    + shape.__str__()
+                    + String(shape)
                     + "."
                 )
 
@@ -590,7 +588,7 @@ struct NDBuffer[dtype: DType](
                 panic(
                     "NDBuffer → SIMD load requires contiguous column access. "
                     + "Expected stride[1] == 1 but got "
-                    + self.strides[1].__str__()
+                    + String(self.strides[1])
                     + ". "
                     + "Use .contiguous() or scalar loads."
                 )
@@ -604,7 +602,7 @@ struct NDBuffer[dtype: DType](
                 ]()
             except e:
                 print(e)
-                panic("Error in NDBuffer → get: ", e.__str__())
+                panic("Error in NDBuffer → get: ", String(e))
                 # Unreachable
                 return SIMD[Self.dtype, simdwidth](0)
         return self.data_ptr().load[width=simdwidth](addr)
@@ -614,11 +612,9 @@ struct NDBuffer[dtype: DType](
         simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
     ](self, row: Int, col: Int, value: SIMD[Self.dtype, simdwidth]):
         """SIMD store of a row segment into a 2D NDBuffer."""
-
-        constrained[
+        comptime assert
             simdwidth.is_power_of_two(),
-            "NDBuffer → store: SIMD width must be a power of 2",
-        ]()
+            "NDBuffer → store: SIMD width must be a power of 2"
         if simdwidth > self.numels():
             panic("NDBuffer → store: buffer size is less than simd width")
 
@@ -638,14 +634,14 @@ struct NDBuffer[dtype: DType](
                 panic(
                     "NDBuffer → store: Out-of-bounds access. "
                     + "Attempted row "
-                    + row.__str__()
+                    + String(row)
                     + ", col range ["
-                    + col.__str__()
+                    + String(col)
                     + ", "
-                    + (col + simdwidth).__str__()
+                    + String((col + simdwidth))
                     + ") "
                     + "for shape "
-                    + shape.__str__()
+                    + String(shape)
                     + "."
                 )
 
@@ -653,7 +649,7 @@ struct NDBuffer[dtype: DType](
                 panic(
                     "NDBuffer → SIMD store requires contiguous column access. "
                     + "Expected stride[1] == 1 but got "
-                    + self.strides[1].__str__()
+                    + String(self.strides[1])
                     + ". "
                     + "Use .contiguous() or scalar stores."
                 )
@@ -667,24 +663,24 @@ struct NDBuffer[dtype: DType](
                 )
             except e:
                 print(e)
-                panic("Error in NDBuffer → store: ", e.__str__())
+                panic("Error in NDBuffer → store: ", String(e))
         else:
             var ptr = self.data_ptr().unsafe_mut_cast[True]()
             ptr.store[width=simdwidth](addr, value)
 
     fn __str__(self) -> String:
         s = String("NDBuffer [")
-        s += "Shape: " + self.shape.__str__()
-        s += ", Type: " + Self.dtype.__str__()
-        s += ", Shared : " + self.shared().__str__()
-        s += ", Strides : " + self.strides.__str__()
-        s += ", Offset : " + self.offset.__str__()
-        s += ", Contiguous : " + self.is_contiguous().__str__()
-        s += ", Buffer size : " + self.size().__str__()
+        s += "Shape: " + String(self.shape)
+        s += ", Type: " + String(Self.dtype)
+        s += ", Shared : " + String(self.shared())
+        s += ", Strides : " + String(self.strides)
+        s += ", Offset : " + String(self.offset)
+        s += ", Contiguous : " + String(self.is_contiguous())
+        s += ", Buffer size : " + String(self.size())
         s += (
             ", Device : "
             + "gpu: "
-            + self.gpu_id().__str__() if self.is_on_gpu() else ", Device : "
+            + String(self.gpu_id()) if self.is_on_gpu() else ", Device : "
             + "cpu"
         )
         s += "]"
@@ -693,7 +689,7 @@ struct NDBuffer[dtype: DType](
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(
             "\n",
-            self.__str__(),
+            String(self),
             end="\n",
         )
         empty = List[Int]()
@@ -787,7 +783,7 @@ struct NDBuffer[dtype: DType](
                         new_state^, self.shape
                     )
                 except e:
-                    panic("NDBuffer to_dtype GPU failed: " + e.__str__())
+                    panic("NDBuffer to_dtype GPU failed: " + String(e))
                     return NDBuffer[NewType].Empty()  # unreachable
 
         # CPU path — unchanged
@@ -853,15 +849,15 @@ struct NDBuffer[dtype: DType](
         if max_index > size:
             panic(
                 "NDBuffer → share: invalid view [max_index="
-                + max_index.__str__()
+                + String(max_index)
                 + " > buffer_size="
-                + size.__str__()
+                + String(size)
                 + "] shape="
-                + new_shape.__str__()
+                + String(new_shape)
                 + " strides="
-                + new_strides.__str__()
+                + String(new_strides)
                 + " offset="
-                + offset.__str__()
+                + String(offset)
             )
 
         var ndb = NDBuffer[Self.dtype](
@@ -969,7 +965,7 @@ struct NDBuffer[dtype: DType](
                     self.device_state.value().fill(value)
                 except e:
                     print(e)
-                    panic("Error filling NDBuffer value: ", value.__str__())
+                    panic("Error filling NDBuffer value: ", String(value))
             else:
                 self.fill_cpu(value)
         else:
@@ -1117,7 +1113,7 @@ struct NDBuffer[dtype: DType](
                     panic(
                         "NDBuffer sum - GPU operation failed for: ",
                         "mean: ",
-                        mean.__str__(),
+                        String(mean),
                     )
                     # Unreachable
                     out = NDBuffer[Self.dtype].Empty()
@@ -1304,7 +1300,7 @@ struct NDBuffer[dtype: DType](
                 except e:
                     panic(
                         "NDBuffer → contiguous: GPU materialisation failed: "
-                        + e.__str__()
+                        + String(e)
                     )
                     # unreachable — satisfies compiler
                     return self
@@ -1335,18 +1331,18 @@ struct NDBuffer[dtype: DType](
                 if normalized < 0 or normalized >= rank:
                     panic(
                         "NDBuffer → squeeze: axis ",
-                        axis.__str__(),
+                        String(axis),
                         " out of range",
                     )
                 if shape[normalized] != 1:
                     panic(
                         "NDBuffer → squeeze: cannot squeeze axis ",
-                        normalized.__str__(),
+                        String(normalized),
                         " with size ",
-                        shape[normalized].__str__(),
+                        String(shape[normalized]),
                     )
                 if normalized in seen:
-                    panic("NDBuffer → squeeze: duplicate axis ", axis.__str__())
+                    panic("NDBuffer → squeeze: duplicate axis ", String(axis))
                 seen.append(normalized)
                 axes_to_squeeze.append(normalized)
             axes_to_squeeze.sort()
@@ -1394,11 +1390,11 @@ struct NDBuffer[dtype: DType](
             if normalized < 0 or normalized >= new_rank:
                 panic(
                     "NDBuffer → unsqueeze: axis ",
-                    axis.__str__(),
+                    String(axis),
                     " out of range",
                 )
             if normalized in seen:
-                panic("NDBuffer → unsqueeze: duplicate axis ", axis.__str__())
+                panic("NDBuffer → unsqueeze: duplicate axis ", String(axis))
             seen.append(normalized)
             normalized_axes.append(normalized)
 
@@ -1451,9 +1447,9 @@ struct NDBuffer[dtype: DType](
         if len(perm) != rank:
             panic(
                 "NDBuffer → permute: number of axes (",
-                len(perm).__str__(),
+                String(len(perm)),
                 ") must match rank (",
-                rank.__str__(),
+                String(rank),
                 ")",
             )
 
@@ -1464,12 +1460,12 @@ struct NDBuffer[dtype: DType](
             if normalized < 0 or normalized >= rank:
                 panic(
                     "NDBuffer → permute: invalid axis ",
-                    perm[i].__str__(),
+                    String(perm[i]),
                     " for rank ",
-                    rank.__str__(),
+                    String(rank),
                 )
             if visited[normalized] == 1:
-                panic("NDBuffer → permute: duplicate axis ", perm[i].__str__())
+                panic("NDBuffer → permute: duplicate axis ", String(perm[i]))
             visited[normalized] = 1
 
         # Build permuted shape and strides
@@ -1556,7 +1552,7 @@ struct NDBuffer[dtype: DType](
 
                     return total
                 except e:
-                    panic("NDBuffer count GPU failed: " + e.__str__())
+                    panic("NDBuffer count GPU failed: " + String(e))
                     return 0  # unreachable
         # CPU contiguous fast path
         if self.is_contiguous():
@@ -1621,7 +1617,7 @@ struct NDBuffer[dtype: DType](
                         Buffer[Self.dtype](distincts^), unique_shape
                     )
                 except e:
-                    panic("NDBuffer unique GPU failed: " + e.__str__())
+                    panic("NDBuffer unique GPU failed: " + String(e))
                     return NDBuffer[Self.dtype].Empty()  # unreachable
 
         # CPU contiguous fast path
@@ -1658,10 +1654,10 @@ struct NDBuffer[dtype: DType](
                         "NDBuffer → copy_from_alike(other):"
                         " dimension mismatch: self shape"
                     ),
-                    self.shape.__str__(),
+                    String(self.shape),
                     "≠",
                     "other shape",
-                    other.shape.__str__(),
+                    String(other.shape),
                 )
 
         if self.is_contiguous() and other.is_contiguous():
@@ -1759,10 +1755,10 @@ struct NDBuffer[dtype: DType](
                         "NDBuffer → fill_cpu(other): dimension mismatch: self"
                         " shape"
                     ),
-                    self.shape.__str__(),
+                    String(self.shape),
                     "≠",
                     "other shape",
-                    other.shape.__str__(),
+                    String(other.shape),
                 )
             var broadcast_shape = ShapeBroadcaster.broadcast_shape(
                 self.shape, other.shape
@@ -1791,9 +1787,9 @@ struct NDBuffer[dtype: DType](
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
             panic(
                 "NDBuffer → inplace_ops: dimension mismatch: "
-                + self.shape.__str__()
+                + String(self.shape)
                 + ", "
-                + other.shape.__str__()
+                + String(other.shape)
             )
 
         comptime if has_accelerator():
@@ -1809,7 +1805,7 @@ struct NDBuffer[dtype: DType](
                             "NDBuffer inplace_ops → GPU operation failed for"
                             " opcode: "
                         ),
-                        op_code.__str__(),
+                        String(op_code),
                     )
             else:
                 self.inplace_ops_cpu[op_code](other)
@@ -1824,9 +1820,9 @@ struct NDBuffer[dtype: DType](
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
             panic(
                 "NDBuffer → inplace_ops: dimension mismatch: "
-                + self.shape.__str__()
+                + String(self.shape)
                 + ", "
-                + other.shape.__str__()
+                + String(other.shape)
             )
 
         # Handle broadcasting case
@@ -1839,9 +1835,9 @@ struct NDBuffer[dtype: DType](
             if broadcast_shape != self.shape:
                 panic(
                     "NDBuffer → inplace_ops: broadcasted shape "
-                    + broadcast_shape.__str__()
+                    + String(broadcast_shape)
                     + " must match receiver shape "
-                    + self.shape.__str__()
+                    + String(self.shape)
                 )
 
             # Get the broadcasted result which is now of self's shape
@@ -1911,7 +1907,7 @@ struct NDBuffer[dtype: DType](
                             "NDBuffer inplace_scalar_ops → GPU operation failed"
                             " for opcode: "
                         ),
-                        op_code.__str__(),
+                        String(op_code),
                     )
                     # Unreacahble
             else:
@@ -2010,9 +2006,9 @@ struct NDBuffer[dtype: DType](
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
             panic(
                 "NDBuffer → arithmetic_ops: dimension mismatch: "
-                + self.shape.__str__()
+                + String(self.shape)
                 + ", "
-                + other.shape.__str__()
+                + String(other.shape)
             )
 
         var out: NDBuffer[Self.dtype]
@@ -2030,7 +2026,7 @@ struct NDBuffer[dtype: DType](
                             "NDBuffer arithmetic_ops → GPU operation failed for"
                             " opcode: "
                         ),
-                        op_code.__str__(),
+                        String(op_code),
                     )
                     # Unreachable
                     out = NDBuffer[Self.dtype].Empty()
@@ -2179,9 +2175,9 @@ struct NDBuffer[dtype: DType](
         if not ShapeBroadcaster.broadcastable(own_shape, target_shape):
             panic(
                 "NDBuffer → broadcast_to(target_shape): "
-                + own_shape.__str__()
+                + String(own_shape)
                 + " not broadcastable to "
-                + target_shape.__str__()
+                + String(target_shape)
             )
 
         var target_rank = target_shape.rank()
@@ -2292,7 +2288,7 @@ struct NDBuffer[dtype: DType](
                             "NDBuffer scalar_ops → GPU operation failed for"
                             " opcode: "
                         ),
-                        op_code.__str__(),
+                        String(op_code),
                     )
                     # Unreacahble
                     out = Self.Empty()
@@ -2351,7 +2347,7 @@ struct NDBuffer[dtype: DType](
                             "NDBuffer unary_ops → GPU operation failed for"
                             " opcode: "
                         ),
-                        op_code.__str__(),
+                        String(op_code),
                     )
                     # Unreacahble
                     out = Self.Empty()
@@ -2414,7 +2410,7 @@ struct NDBuffer[dtype: DType](
                             "NDBuffer float_unary_ops → GPU operation failed"
                             " for opcode: "
                         ),
-                        op_code.__str__(),
+                        String(op_code),
                     )
                     # Unreacahble
                     out = Self.Empty()
@@ -2567,9 +2563,9 @@ struct NDBuffer[dtype: DType](
         if not self.shape == other.shape:
             panic(
                 "NDBuffer → compare(self, other): dimension mismatch: "
-                + self.shape.__str__()
+                + String(self.shape)
                 + "≠"
-                + other.shape.__str__()
+                + String(other.shape)
             )
         var result: NDBuffer[DType.bool]
 
@@ -2711,17 +2707,16 @@ struct NDBuffer[dtype: DType](
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Self) -> Bool:
-        constrained[
+        comptime assert
             Self.dtype.is_floating_point(),
-            "NDBuffer → all_close is for floating point data types only",
-        ]()
+            "NDBuffer → all_close is for floating point data types only"
 
         if self.shape != other.shape:
             panic(
                 "NDBuffer → all_close(other) expects same shaped buffers: "
-                + self.shape.__str__()
+                + String(self.shape)
                 + "≠"
-                + other.shape.__str__()
+                + String(other.shape)
             )
         var result: Bool
 
@@ -2775,7 +2770,7 @@ struct NDBuffer[dtype: DType](
                     return NDBuffer[DType.bool](bool_buffer^, self.shape)
                 except e:
                     panic(
-                        "NDBuffer map_to_bool: GPU→CPU failed: " + e.__str__()
+                        "NDBuffer map_to_bool: GPU→CPU failed: " + String(e)
                     )
                     return NDBuffer[DType.bool].Empty()  # unreachable
 
@@ -2890,9 +2885,9 @@ struct NDBuffer[dtype: DType](
                         " NDBuffer matmaul_2d → both buffers must be on gpu. A"
                         " is on gpu?"
                     ),
-                    A.is_on_gpu().__str__(),
+                    String(A.is_on_gpu()),
                     ", B is on gpu?",
-                    B.is_on_gpu().__str__(),
+                    String(B.is_on_gpu()),
                 )
                 C = NDBuffer[Self.dtype](Shape())
 
@@ -3044,9 +3039,9 @@ struct NDBuffer[dtype: DType](
         if k_A != k_B:
             panic(
                 "NDBuffer → matmul_nd: inner dims must match, got "
-                + k_A.__str__()
+                + String(k_A)
                 + " and "
-                + k_B.__str__()
+                + String(k_B)
             )
 
         var C: NDBuffer[Self.dtype]
@@ -3070,9 +3065,9 @@ struct NDBuffer[dtype: DType](
                         " NDBuffer matmaul_nd → both buffers must be on gpu. A"
                         " is on gpu?"
                     ),
-                    A.is_on_gpu().__str__(),
+                    String(A.is_on_gpu()),
                     ", B is on gpu?",
-                    B.is_on_gpu().__str__(),
+                    String(B.is_on_gpu()),
                 )
                 C = NDBuffer[Self.dtype](Shape())
 
@@ -3101,9 +3096,9 @@ struct NDBuffer[dtype: DType](
         if k_A != k_B:
             panic(
                 "NDBuffer → matmul_nd: inner dims must match, got "
-                + k_A.__str__()
+                + String(k_A)
                 + " and "
-                + k_B.__str__()
+                + String(k_B)
             )
 
         comptime tile_size = TILE_SIZE
@@ -3118,9 +3113,9 @@ struct NDBuffer[dtype: DType](
         if not ShapeBroadcaster.broadcastable(A_batch_shape, B_batch_shape):
             panic(
                 "NDBuffer → matmul_nd: batch shapes not broadcastable: "
-                + A_batch_shape.__str__()
+                + String(A_batch_shape)
                 + " vs "
-                + B_batch_shape.__str__()
+                + String(B_batch_shape)
             )
 
         var batch_shape = ShapeBroadcaster.broadcast_shape(

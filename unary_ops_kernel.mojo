@@ -1,4 +1,4 @@
-from gpu import thread_idx, block_dim, grid_dim, block_idx
+from std.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.sys import simd_width_of
 
 from tenmo import Tensor
@@ -38,31 +38,29 @@ fn unary_ops[
 ](
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """Generic unary ops kernel — SQRT, NEGATE, ABS, RELU.
     LOG, EXP, TANH, SIGMOID are handled by dedicated typed kernels.
     RELU = max(x, 0) — pure arithmetic, safe for any dtype.
     """
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
                 var vec_a = A.load[width=simd_width](i)
                 var vec_result: SIMD[dtype, simd_width]
 
-                @parameter
-                if op_code == SQRT:
+                comptime if op_code == SQRT:
                     vec_result = sqrt(vec_a)
                 elif op_code == NEGATE:
                     vec_result = -vec_a
@@ -78,8 +76,7 @@ fn unary_ops[
                     var val = A[i + j]
                     var res: Scalar[dtype]
 
-                    @parameter
-                    if op_code == SQRT:
+                    comptime if op_code == SQRT:
                         res = sqrt(val)
                     elif op_code == NEGATE:
                         res = -val
@@ -102,20 +99,19 @@ fn exp_op_f32[
 ](
     result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float32 exp kernel."""
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -135,20 +131,19 @@ fn exp_op_f64[
 ](
     result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float64 exp kernel."""
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -174,22 +169,21 @@ fn tanh_op_f32[
 ](
     result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float32 tanh kernel.
     Implemented as (e^2x - 1) / (e^2x + 1) to avoid PTX ISA 7.0 requirement.
     """
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -213,22 +207,21 @@ fn tanh_op_f64[
 ](
     result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float64 tanh kernel.
     Implemented as (e^2x - 1) / (e^2x + 1) to avoid PTX ISA 7.0 requirement.
     """
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -257,22 +250,21 @@ fn sigmoid_op_f32[
 ](
     result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float32 sigmoid kernel.
     Implemented as 1 / (1 + e^-x).
     """
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -294,22 +286,21 @@ fn sigmoid_op_f64[
 ](
     result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float64 sigmoid kernel.
     Implemented as 1 / (1 + e^-x).
     """
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -338,22 +329,21 @@ fn log_op_f32[
 ](
     result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float32 log kernel with epsilon clamping.
     epsilon defaults to 1e-7 (safe for float32 precision floor).
     """
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -379,22 +369,21 @@ fn log_op_f64[
 ](
     result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
     A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
-    size: UInt,
+    size: Int,
 ):
     """Dedicated float64 log kernel with epsilon clamping.
     epsilon defaults to 1e-12 (safe for float64 precision).
     """
     var tid = thread_idx.x
-    var gtid = tid + block_dim.x * block_idx.x
-    var stride = block_dim.x * grid_dim.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
 
-        @parameter
-        for item in range(simd_vectors_per_thread):
+        comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
             if i + simd_width <= size:
@@ -453,11 +442,9 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             numels
         )
 
-        @parameter
-        if op_code == LOG:
+        comptime if op_code == LOG:
 
-            @parameter
-            if Self.dtype == DType.float32:
+            comptime if Self.dtype == DType.float32:
                 var compiled = device_context.compile_function[
                     log_op_f32[
                         simd_width=simdwidth,
@@ -474,7 +461,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     compiled,
                     result_buffer,
                     contig_state.device_buffer(),
-                    UInt(numels),
+                    numels,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -495,7 +482,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     compiled,
                     result_buffer,
                     contig_state.device_buffer(),
-                    UInt(numels),
+                    numels,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -505,8 +492,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 )
         elif op_code == EXP:
 
-            @parameter
-            if Self.dtype == DType.float32:
+            comptime if Self.dtype == DType.float32:
                 var compiled = device_context.compile_function[
                     exp_op_f32[
                         simd_width=simdwidth,
@@ -521,7 +507,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     compiled,
                     result_buffer,
                     contig_state.device_buffer(),
-                    UInt(numels),
+                    numels,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -540,7 +526,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     compiled,
                     result_buffer,
                     contig_state.device_buffer(),
-                    UInt(numels),
+                    numels,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -550,8 +536,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 )
         elif op_code == TANH_FORWARD:
 
-            @parameter
-            if Self.dtype == DType.float32:
+            comptime if Self.dtype == DType.float32:
                 var compiled = device_context.compile_function[
                     tanh_op_f32[
                         simd_width=simdwidth,
@@ -566,7 +551,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     compiled,
                     result_buffer,
                     contig_state.device_buffer(),
-                    UInt(numels),
+                    numels,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -585,7 +570,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     compiled,
                     result_buffer,
                     contig_state.device_buffer(),
-                    UInt(numels),
+                    numels,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -596,8 +581,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 )
         elif op_code == SIGMOID_FORWARD:
 
-            @parameter
-            if Self.dtype == DType.float32:
+            comptime if Self.dtype == DType.float32:
                 var compiled = device_context.compile_function[
                     sigmoid_op_f32[
                         simd_width=simdwidth,
@@ -612,7 +596,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     compiled,
                     result_buffer,
                     contig_state.device_buffer(),
-                    UInt(numels),
+                    numels,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -631,7 +615,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     compiled,
                     result_buffer,
                     contig_state.device_buffer(),
-                    UInt(numels),
+                    numels,
                     grid_dim=num_blocks,
                     block_dim=threads_per_block,
                 )
@@ -660,7 +644,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 compiled,
                 result_buffer,
                 contig_state.device_buffer(),
-                UInt(numels),
+                numels,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )

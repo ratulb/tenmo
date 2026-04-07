@@ -67,15 +67,15 @@ struct MatrixVectorMulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             # Calculate base offsets
             var M_base = M_offset
-            for i in range(M_indices.size()):
+            for i in range(len(M_indices)):
                 M_base += M_indices[i] * M.strides[i]
 
             var v_base = v_offset
-            for i in range(v_indices.size()):
+            for i in range(len(v_indices)):
                 v_base += v_indices[i] * v.strides[i]
 
             var result_base = result_offset
-            for i in range(indices.size()):
+            for i in range(len(indices)):
                 result_base += indices[i] * result.strides[i]
 
             # Optimized matrix-vector multiply: result[m] = M[m, k] @ v[k]
@@ -268,15 +268,15 @@ struct MatrixVectorMulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopya
                 )
 
                 var grad_out_base = 0
-                for i in range(indices.size()):
+                for i in range(len(indices)):
                     grad_out_base += indices[i] * grad_out.strides()[i]
 
                 var v_base = v_offset
-                for i in range(v_indices.size()):
+                for i in range(len(v_indices)):
                     v_base += v_indices[i] * v.buffer.strides[i]
 
                 var grad_M_base = grad_M_offset
-                for i in range(M_indices.size()):
+                for i in range(len(M_indices)):
                     grad_M_base += M_indices[i] * grad_M.strides()[i]
 
                 # Outer product: grad_M[m, k] = grad_out[m] * v[k]
@@ -363,15 +363,15 @@ struct MatrixVectorMulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopya
                 )
 
                 var M_base = M_offset
-                for i in range(M_indices.size()):
+                for i in range(len(M_indices)):
                     M_base += M_indices[i] * M.buffer.strides[i]
 
                 var grad_out_base = 0
-                for i in range(indices.size()):
+                for i in range(len(indices)):
                     grad_out_base += indices[i] * grad_out.strides()[i]
 
                 var grad_v_base = grad_v_offset
-                for i in range(v_indices.size()):
+                for i in range(len(v_indices)):
                     grad_v_base += v_indices[i] * grad_v.strides()[i]
 
                 # Compute: grad_v[k] = sum_i(M[i, k] * grad_out[i])

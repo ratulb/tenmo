@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from std.testing import assert_true
 from numpy_interop import to_ndarray
-from python import Python
+from std.python import Python
 
 from shapes import Shape
 from std.sys import has_accelerator
@@ -587,8 +587,7 @@ fn main() raises:
     test_exp_backward_cpu_double_exp()
     print("=== All CPU tests passed ===\n")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("=== exp forward GPU ===")
         test_exp_gpu_scalar()
         test_exp_gpu_1d_zeros()

@@ -224,40 +224,35 @@ fn test_anytrue_cpu_large_one_true() raises:
 
 
 fn test_alltrue_gpu_1d_all_true() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_alltrue_gpu_1d_all_true")
         var a = Tensor[DType.bool].d1([True, True, True, True]).to_gpu()
         assert_true(a.all_true())
 
 
 fn test_alltrue_gpu_1d_all_false() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_alltrue_gpu_1d_all_false")
         var a = Tensor[DType.bool].d1([False, False, False]).to_gpu()
         assert_true(not a.all_true())
 
 
 fn test_alltrue_gpu_1d_mixed() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_alltrue_gpu_1d_mixed")
         var a = Tensor[DType.bool].d1([True, False, True]).to_gpu()
         assert_true(not a.all_true())
 
 
 fn test_alltrue_gpu_1d_single_true() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_alltrue_gpu_1d_single_true")
         var a = Tensor[DType.bool].d1([True]).to_gpu()
         assert_true(a.all_true())
 
 
 fn test_alltrue_gpu_1d_single_false() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_alltrue_gpu_1d_single_false")
         var a = Tensor[DType.bool].d1([False]).to_gpu()
         assert_true(not a.all_true())

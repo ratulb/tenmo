@@ -81,8 +81,7 @@ struct Tanh[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out_buffer[index] = Self.tanh_stable(self[coord])
                 index += 1
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
 
             if grad_required:

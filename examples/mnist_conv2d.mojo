@@ -8,7 +8,7 @@ from sgd import SGD
 from net import Linear, ReLU, Sequential, Conv2D, Flatten, Dropout
 from forwards import MaxPool2d
 from crossentropy import CrossEntropyLoss
-from python import Python
+from std.python import Python
 from numpy_interop import from_ndarray, numpy_dtype
 from dataloader import NumpyDataset
 from forwards import Padding

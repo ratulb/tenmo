@@ -82,8 +82,7 @@ struct Sqrt[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out_buffer[index] = sqrt(self[coord])
                 index += 1
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
@@ -113,8 +112,12 @@ struct Sqrt[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 fn main() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].ones(10)
+    var a = Tensor[dtype].ones(10, requires_grad=True)
+    a.buffer.print()
+    a.grad().print()
     a = a * 2
+    print("Check 1")
     var b = a.sqrt()
+    print("Check 2")
     b.print()
     a.std().print()

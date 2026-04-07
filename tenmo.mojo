@@ -1,7 +1,7 @@
 ### Mojo Tensor
 ### Implement tensor library in mojo
 from std.math import exp, floor, log, cos, sin, sqrt, pi
-from random import seed, random_float64
+from std.random import seed, random_float64
 from std.sys import simd_width_of
 from std.utils.numerics import min_finite
 from std.memory import memcpy, memset, memset_zero, AddressSpace, ArcPointer
@@ -206,7 +206,7 @@ struct Tensor[dtype: DType](
                         print(e)
                         panic(
                             "init_gradbox: failed to allocate GPU gradbox: "
-                            + e.__str__()
+                            + String(e)
                         )
                         gradbox = Gradbox[
                             Self.dtype
@@ -282,7 +282,7 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn __getitem__(ref self, indices: IntArray) -> Scalar[Self.dtype]:
-        if self.rank() == 0 and indices.size() != 0:  # Tensor with Shape ()
+        if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
             panic(
                 "Tensor → __getitem__(IntArray): Scalar tensor expects no"
                 " indices"
@@ -400,7 +400,7 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn __setitem__(self, coord: IntArray, value: Scalar[Self.dtype]):
-        if self.rank() == 0 and coord.size() != 0:  # Tensor with Shape ()
+        if self.rank() == 0 and len(coord) != 0:  # Tensor with Shape ()
             panic(
                 "Tensor → __setitem__(IntArray): Scalar tensor expects no"
                 " indices"
@@ -436,16 +436,16 @@ struct Tensor[dtype: DType](
             s += "5D Tensor"
         else:
             s += "Tensor"
-        s += self.shape().__str__()
+        s += String(self.shape())
         if self.buffer.shared():
-            s += ", strides: " + self.strides().__str__()
-            s += ", offset: " + self.offset().__str__()
-        s += ", Type: " + Self.dtype.__str__()
+            s += ", strides: " + String(self.strides())
+            s += ", offset: " + String(self.offset())
+        s += ", Type: " + String(Self.dtype)
         s += ", requires_grad: " + String(self.requires_grad)
         s += (
             ", Device : "
             + "gpu: "
-            + self.buffer.gpu_id().__str__() if self.is_on_gpu() else ", Device : "
+            + String(self.buffer.gpu_id()) if self.is_on_gpu() else ", Device : "
             + "cpu"
         )
         s += "]"
@@ -805,10 +805,9 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Tensor → randint: is supported only for numeric type",
-        ]()
+            "Tensor → randint: is supported only for numeric type"
 
         return Self.rand(Shape(dims), low, high, init_seed, requires_grad)
 
@@ -830,10 +829,9 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Tensor → rand: is supported only for numeric type",
-        ]()
+            "Tensor → rand: is supported only for numeric type"
 
         if init_seed:
             seed(init_seed.value())
@@ -870,10 +868,9 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Tensor → randn: is supported only for numeric type",
-        ]()
+            "Tensor → randn: is supported only for numeric type"
 
         if init_seed:
             seed(init_seed.value())
@@ -1308,9 +1305,9 @@ struct Tensor[dtype: DType](
         if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
             panic(
                 "Tensor → broadcast_to: shape "
-                + self.shape().__str__()
+                + String(self.shape())
                 + " not broadcastable to "
-                + target_shape.__str__()
+                + String(target_shape)
             )
 
         broadcasted_buffer = self.buffer.broadcast_to(target_shape)
@@ -1656,18 +1653,16 @@ struct Tensor[dtype: DType](
         return self.buffer.count(key)
 
     fn sum_all(self) -> Scalar[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Tensor → sum_all is for numeric data types only",
-        ]()
+            "Tensor → sum_all is for numeric data types only"
 
         return self.buffer.sum_all()
 
     fn product_all(self) -> Scalar[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Tensor → product_all is for numeric data types only",
-        ]()
+            "Tensor → product_all is for numeric data types only"
 
         return self.buffer.reduce[
             Utils[Self.dtype].product_buffer,
@@ -1680,20 +1675,18 @@ struct Tensor[dtype: DType](
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ] where Self.dtype.is_floating_point():
-        constrained[
+        comptime assert
             Self.dtype.is_floating_point(),
-            "Tensor → exp is for floating point data types only",
-        ]()
+            "Tensor → exp is for floating point data types only"
 
         return Exponential[Self.dtype].forward[track_grad=track_grad](
             self, requires_grad=requires_grad
         )
 
     fn __neg__[track_grad: Bool = True](self) -> Tensor[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Tensor → __neg__ is for numeric data types only",
-        ]()
+            "Tensor → __neg__ is for numeric data types only"
         # Create a zero tensor with same shape and properties
         var zeros = Tensor[Self.dtype].zeros_like(self, requires_grad=False)
 
@@ -1788,10 +1781,9 @@ struct Tensor[dtype: DType](
     ](
         self, exponent: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Tensor → __pow__ is for numeric data types only",
-        ]()
+            "Tensor → __pow__ is for numeric data types only"
 
         return Exponentiator[Self.dtype].forward[track_grad](
             self, exponent, requires_grad
@@ -1835,7 +1827,7 @@ struct Tensor[dtype: DType](
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(
             "\n",
-            self.__str__(),
+            String(self),
             end="\n",
         )
         empty = List[Int]()
@@ -1927,7 +1919,7 @@ struct Tensor[dtype: DType](
                 try:
                     node_id = ready_queue.popleft()
                 except key_err:
-                    panic(key_err.__str__())
+                    panic(String(key_err))
                 var node_idx = id_to_index[node_id]
                 ref node = node_list[node_idx]
                 if node.has_backward_fn():

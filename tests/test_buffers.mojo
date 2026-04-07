@@ -1,7 +1,7 @@
 from buffers import Buffer
 from mnemonics import *
 from std.sys import simd_width_of
-from time import perf_counter_ns
+from std.time import perf_counter_ns
 from std.testing import assert_almost_equal
 
 # ============================================
@@ -42,8 +42,8 @@ fn test_constructor_from_list() raises:
     assert_true(buffer.size == 5, "Buffer size from list mismatch")
     for i in range(5):
         assert_true(
-            buffer[i] == i * 10,
-            "Buffer value from list mismatch at " + i.__str__(),
+            buffer[i] == Int32(i * 10),
+            "Buffer value from list mismatch at " + String(i),
         )
     print("test_constructor_from_list passed")
 
@@ -56,7 +56,7 @@ fn test_full() raises:
     var buffer = Buffer[DType.int32].full(42, MEDIUM_SIZE)
     assert_true(buffer.size == MEDIUM_SIZE, "full: size mismatch")
     for i in range(MEDIUM_SIZE):
-        assert_true(buffer[i] == 42, "full: value mismatch at " + i.__str__())
+        assert_true(buffer[i] == 42, "full: value mismatch at " + String(i))
     print("test_full passed")
 
 
@@ -65,7 +65,7 @@ fn test_zeros() raises:
     var buffer = Buffer[DType.float32].zeros(MEDIUM_SIZE)
     assert_true(buffer.size == MEDIUM_SIZE, "zeros: size mismatch")
     for i in range(MEDIUM_SIZE):
-        assert_true(buffer[i] == 0.0, "zeros: value mismatch at " + i.__str__())
+        assert_true(buffer[i] == 0.0, "zeros: value mismatch at " + String(i))
     print("test_zeros passed")
 
 
@@ -74,7 +74,7 @@ fn test_arange_single_arg() raises:
     var buffer = Buffer[DType.int32].arange(10)
     assert_true(buffer.size == 10, "arange: size mismatch")
     for i in range(10):
-        assert_true(buffer[i] == i, "arange: value mismatch at " + i.__str__())
+        assert_true(buffer[i] == i, "arange: value mismatch at " + String(i))
     print("test_arange_single_arg passed")
 
 
@@ -103,7 +103,7 @@ fn test_linspace() raises:
     for i in range(11):
         assert_true(
             abs(buffer[i] - Scalar[DType.float32](i)) < 0.001,
-            "linspace: value mismatch at " + i.__str__(),
+            "linspace: value mismatch at " + String(i),
         )
     print("test_linspace passed")
 
@@ -457,7 +457,7 @@ fn test_invert_bool() raises:
     for i in range(MEDIUM_SIZE):
         expected = i % 2 != 0
         assert_true(
-            result[i] == expected, "invert: value mismatch at " + i.__str__()
+            result[i] == expected, "invert: value mismatch at " + String(i)
         )
     print("test_invert_bool passed")
 
@@ -472,7 +472,7 @@ fn test_sum() raises:
         buffer[i] = i + 1  # 1 to 10
 
     var result = buffer.sum()
-    assert_true(result == 55, "sum: expected 55, got " + result.__str__())
+    assert_true(result == 55, "sum: expected 55, got " + String(result))
     print("test_sum passed")
 
 
@@ -480,10 +480,10 @@ fn test_sum_with_range() raises:
     print("test_sum_with_range")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
-        buffer[i] = i + 1  # 1 to 10
+        buffer[i] = Int32(i + 1)  # 1 to 10
 
     var result = buffer.sum(2, 5)  # Sum indices 2,3,4 -> 3+4+5 = 12
-    assert_true(result == 12, "sum range: expected 12, got " + result.__str__())
+    assert_true(result == 12, "sum range: expected 12, got " + String(result))
     print("test_sum_with_range passed")
 
 
@@ -491,11 +491,11 @@ fn test_product() raises:
     print("test_product")
     var buffer = Buffer[DType.int32](5)
     for i in range(5):
-        buffer[i] = i + 1  # 1 to 5
+        buffer[i] = Int32(i + 1)  # 1 to 5
 
     var result = buffer.product()
     assert_true(
-        result == 120, "product: expected 120 (5!), got " + result.__str__()
+        result == 120, "product: expected 120 (5!), got " + String(result)
     )
     print("test_product passed")
 
@@ -508,7 +508,7 @@ fn test_product_with_range() raises:
 
     var result = buffer.product(0, 3)  # 1*2*3 = 6
     assert_true(
-        result == 6, "product range: expected 6, got " + result.__str__()
+        result == 6, "product range: expected 6, got " + String(result)
     )
     print("test_product_with_range passed")
 
@@ -520,14 +520,14 @@ fn test_dot() raises:
 
     var result = a.dot(b)
     assert_true(
-        result == 30, "dot: expected 30 (2*3*5), got " + result.__str__()
+        result == 30, "dot: expected 30 (2*3*5), got " + String(result)
     )
     comptime dtype = DType.float32
     var A = Buffer[dtype].full(2, 42)
     var B = Buffer[dtype].full(2, 42)
     var scalar = A.dot(B)
     assert_true(
-        scalar == 168, "dot: expected 168 (2*2*42), got " + scalar.__str__()
+        scalar == 168, "dot: expected 168 (2*2*42), got " + String(scalar)
     )
 
     print("test_dot passed")
@@ -603,7 +603,7 @@ fn test_eq_full_scalar() raises:
     for i in range(MEDIUM_SIZE):
         expected = (i % 10) == 5
         assert_true(
-            result[i] == expected, "eq full: mismatch at " + i.__str__()
+            result[i] == expected, "eq full: mismatch at " + String(i)
         )
     print("test_eq_full_scalar passed")
 
@@ -618,7 +618,7 @@ fn test_ne_full_scalar() raises:
     for i in range(MEDIUM_SIZE):
         expected = (i % 10) != 5
         assert_true(
-            result[i] == expected, "ne full: mismatch at " + i.__str__()
+            result[i] == expected, "ne full: mismatch at " + String(i)
         )
     print("test_ne_full_scalar passed")
 
@@ -633,7 +633,7 @@ fn test_lt_full_scalar() raises:
     for i in range(20):
         expected = i < 10
         assert_true(
-            result[i] == expected, "lt full: mismatch at " + i.__str__()
+            result[i] == expected, "lt full: mismatch at " + String(i)
         )
     print("test_lt_full_scalar passed")
 
@@ -648,7 +648,7 @@ fn test_gt_full_scalar() raises:
     for i in range(20):
         expected = i > 10
         assert_true(
-            result[i] == expected, "gt full: mismatch at " + i.__str__()
+            result[i] == expected, "gt full: mismatch at " + String(i)
         )
     print("test_gt_full_scalar passed")
 
@@ -673,8 +673,8 @@ fn test_ne_buffers() raises:
     var a = Buffer[DType.int32](MEDIUM_SIZE)
     var b = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
-        a[i] = i
-        b[i] = i + 1  # All different
+        a[i] = Int32(i)
+        b[i] = Int32(i + 1)  # All different
 
     assert_true(a != b, "ne buffers: all different should be True")
 
@@ -710,7 +710,7 @@ fn test_eq_full_buffers() raises:
     for i in range(MEDIUM_SIZE):
         expected = a[i] == b[i]
         assert_true(
-            result[i] == expected, "eq full buffers: mismatch at " + i.__str__()
+            result[i] == expected, "eq full buffers: mismatch at " + String(i)
         )
     print("test_eq_full_buffers passed")
 
@@ -720,14 +720,14 @@ fn test_lt_full_buffers() raises:
     var a = Buffer[DType.int32](MEDIUM_SIZE)
     var b = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
-        a[i] = i
+        a[i] = Int32(i)
         b[i] = 30
 
     var result = a.lt(b)
     for i in range(MEDIUM_SIZE):
         expected = a[i] < b[i]
         assert_true(
-            result[i] == expected, "lt full buffers: mismatch at " + i.__str__()
+            result[i] == expected, "lt full buffers: mismatch at " + String(i)
         )
     print("test_lt_full_buffers passed")
 
@@ -776,18 +776,18 @@ fn test_count() raises:
     print("test_count")
     var buffer = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
-        buffer[i] = i % 10
+        buffer[i] = Int32(i % 10)
 
     var count_5 = buffer.count(5)
     # Values 0-67, with i % 10 == 5 at indices: 5, 15, 25, 35, 45, 55, 65 = 7 occurrences
     assert_true(
-        count_5 == 7, "count: expected 7 fives, got " + count_5.__str__()
+        count_5 == 7, "count: expected 7 fives, got " + String(count_5)
     )
 
     var count_0 = buffer.count(0)
     # i % 10 == 0 at indices: 0, 10, 20, 30, 40, 50, 60 = 7 occurrences
     assert_true(
-        count_0 == 7, "count: expected 7 zeros, got " + count_0.__str__()
+        count_0 == 7, "count: expected 7 zeros, got " + String(count_0)
     )
     print("test_count passed")
 
@@ -814,13 +814,13 @@ fn test_to_dtype_int_to_float() raises:
     print("test_to_dtype_int_to_float")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
-        buffer[i] = i * 10
+        buffer[i] = (i * 10)
 
     var result = buffer.to_dtype[DType.float32]()
     for i in range(10):
         assert_true(
             abs(result[i] - Scalar[DType.float32](i * 10)) < 0.001,
-            "to_dtype int->float: mismatch at " + i.__str__(),
+            "to_dtype int->float: mismatch at " + String(i),
         )
     print("test_to_dtype_int_to_float passed")
 
@@ -835,7 +835,7 @@ fn test_to_dtype_float_to_int() raises:
     for i in range(10):
         # Float to int truncates
         assert_true(
-            result[i] == i, "to_dtype float->int: mismatch at " + i.__str__()
+            result[i] == Int32(i), "to_dtype float->int: mismatch at " + String(i)
         )
     print("test_to_dtype_float_to_int passed")
 
@@ -844,7 +844,7 @@ fn test_to_dtype_to_bool() raises:
     print("test_to_dtype_to_bool")
     var buffer = Buffer[DType.int32](10)
     for i in range(10):
-        buffer[i] = i  # 0, 1, 2, ...
+        buffer[i] = (i)  # 0, 1, 2, ...
 
     var result = buffer.to_dtype[DType.bool]()
     assert_true(result[0] == False, "to_dtype to bool: 0 should be False")
@@ -866,7 +866,7 @@ fn test_to_dtype_from_bool() raises:
         expected = 1 if i % 2 == 0 else 0
         assert_true(
             result[i] == expected,
-            "to_dtype from bool: mismatch at " + i.__str__(),
+            "to_dtype from bool: mismatch at " + String(i),
         )
     print("test_to_dtype_from_bool passed")
 
@@ -904,7 +904,7 @@ fn test_mul_bool_buffers() raises:
     for i in range(MEDIUM_SIZE):
         expected = (i % 2 == 0) and (i % 3 == 0)  # Divisible by 6
         assert_true(
-            result[i] == expected, "mul bool: mismatch at " + i.__str__()
+            result[i] == expected, "mul bool: mismatch at " + String(i)
         )
     print("test_mul_bool_buffers passed")
 
@@ -926,9 +926,9 @@ fn test_imul_bool_scalar() raises:
 # ============================================
 fn test_simd_boundary_sizes() raises:
     print("test_simd_boundary_sizes")
-    comptime sizes = VariadicList[Int](
+    comptime sizes : List[Int] = [
         1, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65
-    )
+        ]
 
     @parameter
     for idx in range(len(sizes)):
@@ -941,10 +941,10 @@ fn test_simd_boundary_sizes() raises:
 
         for i in range(size):
             assert_true(
-                sum_result[i] == 15, "SIMD boundary add: size " + size.__str__()
+                sum_result[i] == 15, "SIMD boundary add: size " + String(size)
             )
             assert_true(
-                mul_result[i] == 50, "SIMD boundary mul: size " + size.__str__()
+                mul_result[i] == 50, "SIMD boundary mul: size " + String(size)
             )
 
     print("test_simd_boundary_sizes passed")
@@ -1383,24 +1383,24 @@ fn test_dunder_compare_empty() raises:
 fn test_dunder_compare_simd_boundary() raises:
     print("test_dunder_compare_simd_boundary")
     # Test sizes around SIMD width (8 for int32)
-    comptime sizes = VariadicList[Int](1, 7, 8, 9, 15, 16, 17, 31, 32, 33)
+    comptime sizes: List[Int] = [1, 7, 8, 9, 15, 16, 17, 31, 32, 33]
 
     @parameter
     for idx in range(len(sizes)):
         comptime size = sizes[idx]
         var buffer = Buffer[DType.int32].full(10, size)
 
-        assert_true(buffer == 10, "Size " + size.__str__() + ": ==")
-        assert_true(buffer >= 10, "Size " + size.__str__() + ": >=")
-        assert_true(buffer <= 10, "Size " + size.__str__() + ": <=")
+        assert_true(buffer == 10, "Size " + String(size) + ": ==")
+        assert_true(buffer >= 10, "Size " + String(size) + ": >=")
+        assert_true(buffer <= 10, "Size " + String(size) + ": <=")
 
         buffer[size - 1] = 11
         assert_true(
-            not (buffer == 10), "Size " + size.__str__() + ": != after change"
+            not (buffer == 10), "Size " + String(size) + ": != after change"
         )
         assert_true(
             not (buffer <= 10),
-            "Size " + size.__str__() + ": not <= after change",
+            "Size " + String(size) + ": not <= after change",
         )
 
     print("test_dunder_compare_simd_boundary passed")
@@ -1408,7 +1408,7 @@ fn test_dunder_compare_simd_boundary() raises:
 
 fn test_dunder_compare_position_sensitivity() raises:
     print("test_dunder_compare_position_sensitivity")
-    comptime positions = VariadicList[Int](0, 7, 8, 9, 16, 33, 64, 67)
+    comptime positions: List[Int] = [0, 7, 8, 9, 16, 33, 64, 67]
 
     @parameter
     for idx in range(len(positions)):
@@ -1418,10 +1418,10 @@ fn test_dunder_compare_position_sensitivity() raises:
             buffer[pos] = 99
 
             assert_true(
-                not (buffer >= 100), "Position " + pos.__str__() + ": >= fails"
+                not (buffer >= 100), "Position " + String(pos) + ": >= fails"
             )
             assert_true(
-                not (buffer == 100), "Position " + pos.__str__() + ": == fails"
+                not (buffer == 100), "Position " + String(pos) + ": == fails"
             )
 
     print("test_dunder_compare_position_sensitivity passed")
@@ -1500,9 +1500,9 @@ fn test_eq_int32() raises:
         assert_true(
             result[i] == expected,
             "test_eq_int32: index "
-            + i.__str__()
+            + String(i)
             + " expected "
-            + expected.__str__(),
+            + String(expected),
         )
     print("test_eq_int32 passed")
 
@@ -1520,7 +1520,7 @@ fn test_eq_float64() raises:
         expected = (i % 5) == 3
         assert_true(
             result[i] == expected,
-            "test_eq_float64: index " + i.__str__() + " failed",
+            "test_eq_float64: index " + String(i) + " failed",
         )
     print("test_eq_float64 passed")
 
@@ -1556,7 +1556,7 @@ fn test_eq_small_buffer() raises:
         expected = i == 3
         assert_true(
             result[i] == expected,
-            "test_eq_small_buffer: index " + i.__str__() + " failed",
+            "test_eq_small_buffer: index " + String(i) + " failed",
         )
     print("test_eq_small_buffer passed")
 
@@ -1577,7 +1577,7 @@ fn test_ne_int32() raises:
         expected = (i % 10) != 5
         assert_true(
             result[i] == expected,
-            "test_ne_int32: index " + i.__str__() + " failed",
+            "test_ne_int32: index " + String(i) + " failed",
         )
     print("test_ne_int32 passed")
 
@@ -1595,7 +1595,7 @@ fn test_ne_float32() raises:
         expected = i != 10
         assert_true(
             result[i] == expected,
-            "test_ne_float32: index " + i.__str__() + " failed",
+            "test_ne_float32: index " + String(i) + " failed",
         )
     print("test_ne_float32 passed")
 
@@ -1631,7 +1631,7 @@ fn test_gt_int64() raises:
         expected = i > 50
         assert_true(
             result[i] == expected,
-            "test_gt_int64: index " + i.__str__() + " failed",
+            "test_gt_int64: index " + String(i) + " failed",
         )
     print("test_gt_int64 passed")
 
@@ -1649,7 +1649,7 @@ fn test_gt_float32() raises:
         expected = (Scalar[DType.float32](i) * 0.5) > 15.0
         assert_true(
             result[i] == expected,
-            "test_gt_float32: index " + i.__str__() + " failed",
+            "test_gt_float32: index " + String(i) + " failed",
         )
     print("test_gt_float32 passed")
 
@@ -1667,7 +1667,7 @@ fn test_gt_negative_values() raises:
         expected = (i - 30) > 0
         assert_true(
             result[i] == expected,
-            "test_gt_negative_values: index " + i.__str__() + " failed",
+            "test_gt_negative_values: index " + String(i) + " failed",
         )
     print("test_gt_negative_values passed")
 
@@ -1714,7 +1714,7 @@ fn test_ge_int32() raises:
         expected = i >= 50
         assert_true(
             result[i] == expected,
-            "test_ge_int32: index " + i.__str__() + " failed",
+            "test_ge_int32: index " + String(i) + " failed",
         )
     print("test_ge_int32 passed")
 
@@ -1732,7 +1732,7 @@ fn test_ge_float64() raises:
         expected = i >= 33
         assert_true(
             result[i] == expected,
-            "test_ge_float64: index " + i.__str__() + " failed",
+            "test_ge_float64: index " + String(i) + " failed",
         )
     print("test_ge_float64 passed")
 
@@ -1787,7 +1787,7 @@ fn test_lt_float32() raises:
         expected = i < 10
         assert_true(
             result[i] == expected,
-            "test_lt_float32: index " + i.__str__() + " failed",
+            "test_lt_float32: index " + String(i) + " failed",
         )
     print("test_lt_float32 passed")
 
@@ -1834,7 +1834,7 @@ fn test_le_int32() raises:
         expected = i <= 50
         assert_true(
             result[i] == expected,
-            "test_le_int32: index " + i.__str__() + " failed",
+            "test_le_int32: index " + String(i) + " failed",
         )
     print("test_le_int32 passed")
 
@@ -1852,7 +1852,7 @@ fn test_le_float64() raises:
         expected = i <= 33
         assert_true(
             result[i] == expected,
-            "test_le_float64: index " + i.__str__() + " failed",
+            "test_le_float64: index " + String(i) + " failed",
         )
     print("test_le_float64 passed")
 
@@ -1891,9 +1891,9 @@ fn test_compare_single_element() raises:
 fn test_compare_simd_boundary() raises:
     print("test_compare_simd_boundary")
     # Test sizes around typical SIMD widths
-    comptime sizes = VariadicList[Int](
+    comptime sizes: List[Int] = [
         1, 2, 4, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65
-    )
+        ]
 
     @parameter
     for s_idx in range(len(sizes)):
@@ -1909,9 +1909,9 @@ fn test_compare_simd_boundary() raises:
             assert_true(
                 result[i] == expected,
                 "test_compare_simd_boundary: size "
-                + size.__str__()
+                + String(size)
                 + " index "
-                + i.__str__()
+                + String(i)
                 + " failed",
             )
 
@@ -1931,7 +1931,7 @@ fn test_compare_large_buffer() raises:
         expected = i >= 500
         assert_true(
             result[i] == expected,
-            "test_compare_large_buffer: index " + i.__str__() + " failed",
+            "test_compare_large_buffer: index " + String(i) + " failed",
         )
     print("test_compare_large_buffer passed")
 
@@ -1949,7 +1949,7 @@ fn test_compare_uint8() raises:
         expected = (i % 256) > 100
         assert_true(
             result[i] == expected,
-            "test_compare_uint8: index " + i.__str__() + " failed",
+            "test_compare_uint8: index " + String(i) + " failed",
         )
     print("test_compare_uint8 passed")
 
@@ -1967,7 +1967,7 @@ fn test_compare_int8() raises:
         expected = (i - 30) >= 0
         assert_true(
             result[i] == expected,
-            "test_compare_int8: index " + i.__str__() + " failed",
+            "test_compare_int8: index " + String(i) + " failed",
         )
     print("test_compare_int8 passed")
 
@@ -1985,7 +1985,7 @@ fn test_compare_int16() raises:
         expected = (i * 100) < 3000
         assert_true(
             result[i] == expected,
-            "test_compare_int16: index " + i.__str__() + " failed",
+            "test_compare_int16: index " + String(i) + " failed",
         )
     print("test_compare_int16 passed")
 
@@ -2003,7 +2003,7 @@ fn test_compare_uint64() raises:
         expected = (i * 1000) <= 50000
         assert_true(
             result[i] == expected,
-            "test_compare_uint64: index " + i.__str__() + " failed",
+            "test_compare_uint64: index " + String(i) + " failed",
         )
     print("test_compare_uint64 passed")
 
@@ -2166,9 +2166,9 @@ fn test_what_values() raises:
                 assert_true(
                     cmp[k] == False,
                     "Block 1: cmp["
-                    + k.__str__()
+                    + String(k)
                     + "] (value "
-                    + (8 + k).__str__()
+                    + String((8 + k))
                     + ") should be >= 10",
                 )
 
@@ -2262,7 +2262,7 @@ fn test_to_dtype_large_buffer() raises:
         expected = Int32(i * 0.5)
         assert_true(
             result[i] == expected,
-            "Large buffer conversion failed at index " + i.__str__(),
+            "Large buffer conversion failed at index " + String(i),
         )
 
     print("test_to_dtype_large_buffer passed")
@@ -2407,7 +2407,7 @@ fn test_buffer_iter() raises:
     sliced = buff[4:1:-1]
     var expect = 5
     for elem in sliced:
-        assert_true(elem == expect, "Buffer iter assertion failed")
+        assert_true(elem == Float32(expect), "Buffer iter assertion failed")
         expect -= 1
 
 
@@ -2721,7 +2721,7 @@ fn test_overwrite_orig() raises:
     size = 21
     l = List[Scalar[dtype]](capacity=Int(size))
     for i in range(size):
-        l.append(i)
+        l.append(Int32(i))
 
     buffer = Buffer[dtype](l)
     result = Buffer[dtype]([42, 42, 42])
@@ -2810,7 +2810,7 @@ fn test_count_basic_cnt() raises:
     print("test_count_basic_cnt")
     var buffer = Buffer[DType.int32](68)
     for i in range(68):
-        buffer[i] = i % 10
+        buffer[i] = Int32(i % 10)
 
     var count_5 = buffer.count(5)
     # Values 0-67, with i % 10 == 5 at indices: 5, 15, 25, 35, 45, 55, 65 = 7 occurrences
@@ -3174,12 +3174,12 @@ fn test_inplace_subtract_scalar_ips() raises:
     print("test_inplace_subtract_scalar_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
-        buffer[i] = i + 50
+        buffer[i] = Int32(i + 50)
 
     buffer.inplace_ops_scalar[Subtract](50)
 
     for i in range(100):
-        assert_true(buffer[i] == i)
+        assert_true(buffer[i] == Int32(i))
 
 
 fn test_inplace_divide_scalar_ips() raises:
@@ -3222,9 +3222,9 @@ fn test_inplace_add_with_range_ips() raises:
 
     for i in range(100):
         if i >= 50 and i < 60:
-            assert_true(buffer[i] == i + 100)
+            assert_true(buffer[i] == Int32(i + 100))
         else:
-            assert_true(buffer[i] == i)
+            assert_true(buffer[i] == Int32(i))
 
 
 fn test_inplace_empty_buffer_ips() raises:
@@ -3241,7 +3241,7 @@ fn test_inplace_multiply_by_zero_ips() raises:
     print("test_inplace_multiply_by_zero_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
-        buffer[i] = i + 1
+        buffer[i] = Int32(i + 1)
 
     buffer.inplace_ops_scalar[Multiply](0)
 
@@ -3254,12 +3254,12 @@ fn test_inplace_multiply_by_one_ips() raises:
     print("test_inplace_multiply_by_one_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
-        buffer[i] = i
+        buffer[i] = Int32(i)
 
     buffer.inplace_ops_scalar[Multiply](1)
 
     for i in range(50):
-        assert_true(buffer[i] == i)
+        assert_true(buffer[i] == Int32(i))
 
 
 fn test_inplace_add_zero_ips() raises:
@@ -3267,12 +3267,12 @@ fn test_inplace_add_zero_ips() raises:
     print("test_inplace_add_zero_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
-        buffer[i] = i
+        buffer[i] = Int32(i)
 
     buffer.inplace_ops_scalar[Add](0)
 
     for i in range(50):
-        assert_true(buffer[i] == i)
+        assert_true(buffer[i] == Int32(i))
 
 
 fn test_inplace_subtract_zero_ips() raises:
@@ -3280,12 +3280,12 @@ fn test_inplace_subtract_zero_ips() raises:
     print("test_inplace_subtract_zero_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
-        buffer[i] = i
+        buffer[i] = Int32(i)
 
     buffer.inplace_ops_scalar[Subtract](0)
 
     for i in range(50):
-        assert_true(buffer[i] == i)
+        assert_true(buffer[i] == Int32(i))
 
 
 fn test_inplace_divide_by_one_ips() raises:
@@ -3306,12 +3306,12 @@ fn test_inplace_multiply_negative_ips() raises:
     print("test_inplace_multiply_negative_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
-        buffer[i] = i
+        buffer[i] = Int32(i)
 
     buffer.inplace_ops_scalar[Multiply](-1)
 
     for i in range(50):
-        assert_true(buffer[i] == -i)
+        assert_true(buffer[i] == Int32(-i))
 
 
 fn test_inplace_add_negative_ips() raises:
@@ -3319,12 +3319,12 @@ fn test_inplace_add_negative_ips() raises:
     print("test_inplace_add_negative_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
-        buffer[i] = i + 100
+        buffer[i] = Int32(i + 100)
 
     buffer.inplace_ops_scalar[Add](-50)
 
     for i in range(50):
-        assert_true(buffer[i] == i + 50)
+        assert_true(buffer[i] == Int32(i + 50))
 
 
 fn test_inplace_float32_precision_ips() raises:
@@ -3455,14 +3455,14 @@ fn test_inplace_chained_operations_ips() raises:
     print("test_inplace_chained_operations_ips")
     var buffer = Buffer[DType.int32](50)
     for i in range(50):
-        buffer[i] = i
+        buffer[i] = Int32(i)
 
     buffer.inplace_ops_scalar[Multiply](2)
     buffer.inplace_ops_scalar[Add](10)
     buffer.inplace_ops_scalar[Subtract](5)
 
     for i in range(50):
-        assert_true(buffer[i] == i * 2 + 10 - 5)
+        assert_true(buffer[i] == Int32(i * 2 + 10 - 5))
 
 
 fn test_inplace_large_buffer_ips() raises:
@@ -3470,7 +3470,7 @@ fn test_inplace_large_buffer_ips() raises:
     print("test_inplace_large_buffer_ips")
     var buffer = Buffer[DType.int32](10000)
     for i in range(10000):
-        buffer[i] = i
+        buffer[i] = Int32(i)
 
     buffer.inplace_ops_scalar[Multiply](3)
 
@@ -3486,13 +3486,13 @@ fn test_inplace_start_equals_end_ips() raises:
     print("test_inplace_start_equals_end_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
-        buffer[i] = i
+        buffer[i] = Int32(i)
 
     buffer.inplace_ops_scalar[Multiply](999, 50, 50)
 
     # Nothing should change
     for i in range(100):
-        assert_true(buffer[i] == i)
+        assert_true(buffer[i] == Int32(i))
 
 
 fn test_inplace_invalid_range_ips() raises:
@@ -3500,13 +3500,13 @@ fn test_inplace_invalid_range_ips() raises:
     print("test_inplace_invalid_range_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
-        buffer[i] = i
+        buffer[i] = Int32(i)
 
     buffer.inplace_ops_scalar[Multiply](999, 70, 50)
 
     # Nothing should change
     for i in range(100):
-        assert_true(buffer[i] == i)
+        assert_true(buffer[i] == Int32(i))
 
 
 fn test_inplace_full_range_explicit_ips() raises:
@@ -3514,12 +3514,12 @@ fn test_inplace_full_range_explicit_ips() raises:
     print("test_inplace_full_range_explicit_ips")
     var buffer = Buffer[DType.int32](100)
     for i in range(100):
-        buffer[i] = i
+        buffer[i] = Int32(i)
 
     buffer.inplace_ops_scalar[Add](100, 0, 100)
 
     for i in range(100):
-        assert_true(buffer[i] == i + 100)
+        assert_true(buffer[i] == Int32(i + 100))
 
 
 # ============================================================================
@@ -5069,7 +5069,7 @@ fn test_compare_buffer_manual() raises:
 
     for i in range(MEDIUM_SIZE):
         buf1[i] = i
-        buf2[i] = i if i < 30 else i + 1
+        buf2[i] = Int32(i) if i < 30 else Int32(i + 1)
 
     var result = buf1.compare_buffer_full[Equal](buf2)
 
@@ -5082,7 +5082,7 @@ fn test_compare_buffer_manual() raises:
     assert_true(
         equal_count == 30,
         "compare_buffer_manual: expected 30 equal, got "
-        + equal_count.__str__(),
+        + String(equal_count),
     )
     print("test_compare_buffer_manual passed")
 
@@ -5091,7 +5091,7 @@ fn test_compare_scalar_manual() raises:
     print("test_compare_scalar_manual")
     var buffer = Buffer[DType.int32](MEDIUM_SIZE)
     for i in range(MEDIUM_SIZE):
-        buffer[i] = i % 10
+        buffer[i] = Int32( i % 10)
 
     var result = buffer.compare_scalar_full[Equal](5)
 
@@ -5104,7 +5104,7 @@ fn test_compare_scalar_manual() raises:
     # Values 0-67, with i % 10 == 5 at indices: 5, 15, 25, 35, 45, 55, 65 = 7 occurrences
     assert_true(
         count == 7,
-        "compare_scalar_manual: expected 7 fives, got " + count.__str__(),
+        "compare_scalar_manual: expected 7 fives, got " + String(count),
     )
     print("test_compare_scalar_manual passed")
 
@@ -5158,7 +5158,7 @@ fn test_compare_buffer_manual_gt() raises:
     var buf2 = Buffer[DType.int32](MEDIUM_SIZE)
 
     for i in range(MEDIUM_SIZE):
-        buf1[i] = i
+        buf1[i] = Int32(i)
         buf2[i] = 30
 
     var result = buf1.compare_buffer_full[GreaterThan](buf2)
@@ -5172,7 +5172,7 @@ fn test_compare_buffer_manual_gt() raises:
     # Elements 31-67 are > 30, so 37 elements
     assert_true(
         count == 37,
-        "compare_buffer_manual_gt: expected 37, got " + count.__str__(),
+        "compare_buffer_manual_gt: expected 37, got " + String(count),
     )
     print("test_compare_buffer_manual_gt passed")
 

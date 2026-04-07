@@ -9,7 +9,7 @@ from broadcasthelper import ShapeBroadcaster
 from strides import Strides
 from std.sys import simd_width_of, has_accelerator
 from matmul import Matmul
-from random import seed, random_float64
+from std.random import seed, random_float64
 from buffers import Buffer
 from forwards import Mean, Sqrt
 from utilities import Utils
@@ -220,9 +220,9 @@ struct Gradbox[dtype: DType](
         if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
             panic(
                 "Gradbox → broadcast_to: shape "
-                + self.shape().__str__()
+                + String(self.shape())
                 + " not broadcastable to "
-                + target_shape.__str__()
+                + String(target_shape)
             )
 
         var broadcasted_buffer = self.buffer.broadcast_to(target_shape)
@@ -266,7 +266,7 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn __getitem__(self, indices: IntArray) -> Scalar[Self.dtype]:
-        if self.rank() == 0 and indices.size() != 0:
+        if self.rank() == 0 and len(indices) != 0:
             panic(
                 "Gradbox → __getitem__(IntArray): Scalar gradbox expects empty"
                 " indices"
@@ -296,7 +296,7 @@ struct Gradbox[dtype: DType](
 
     @always_inline
     fn __setitem__(self, indices: IntArray, value: Scalar[Self.dtype]):
-        if self.rank() == 0 and indices.size() != 0:
+        if self.rank() == 0 and len(indices) != 0:
             panic(
                 "Gradbox → __setitem__(IntArray): Scalar gradbox expects empty"
                 " indices"
@@ -389,9 +389,9 @@ struct Gradbox[dtype: DType](
         if self.shape() != other.shape():
             panic(
                 "Gradbox → __eq__(other): shape mismatch",
-                self.shape().__str__(),
+                String(self.shape()),
                 "≠",
-                other.shape().__str__(),
+                String(other.shape()),
             )
         return self.buffer.compare[Equal](other.buffer).buffer.all_true()
 
@@ -399,9 +399,9 @@ struct Gradbox[dtype: DType](
         if self.shape() != other.shape():
             panic(
                 "Gradbox → __ne__(other): shape mismatch",
-                self.shape().__str__(),
+                String(self.shape()),
                 "≠",
-                other.shape().__str__(),
+                String(other.shape()),
             )
         return self.buffer.compare[NotEqual](other.buffer).buffer.all_true()
 
@@ -417,8 +417,7 @@ struct Gradbox[dtype: DType](
         return self.is_on_gpu() == False
 
     fn to_cpu(self) raises -> Self:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             return DeviceTransfer[Self.dtype].forward(self, CPU().into())
         raise Error("System does not have any accelerator")
 
@@ -426,8 +425,7 @@ struct Gradbox[dtype: DType](
         self,
         gpu: Optional[GPU] = None,
     ) raises -> Self:
-        @parameter
-        if has_accelerator():
+        comptime if has_accelerator():
             if gpu:
                 return DeviceTransfer[Self.dtype].forward(
                     self, gpu.value().into()
@@ -455,15 +453,15 @@ struct Gradbox[dtype: DType](
             s += "5D Gradbox"
         else:
             s += "Gradbox"
-        s += self.shape().__str__()
-        s += ", Type: " + Self.dtype.__str__()
-        s += ", Shared : " + self.shared().__str__()
-        s += ", Strides : " + self.strides().__str__()
-        s += ", Offset : " + self.offset().__str__()
+        s += String(self.shape())
+        s += ", Type: " + String(Self.dtype)
+        s += ", Shared : " + String(self.shared())
+        s += ", Strides : " + String(self.strides())
+        s += ", Offset : " + String(self.offset())
         s += (
             ", Device : "
             + "gpu: "
-            + self.buffer.gpu_id().__str__() if self.is_on_gpu() else ", Device : "
+            + String(self.buffer.gpu_id()) if self.is_on_gpu() else ", Device : "
             + "cpu"
         )
         s += "]"
@@ -622,16 +620,15 @@ struct Gradbox[dtype: DType](
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Self) -> Bool:
-        constrained[
+        comptime assert
             Self.dtype.is_floating_point(),
-            "Gradbox → all_close(Self): is for floating point data types only",
-        ]()
+            "Gradbox → all_close(Self): is for floating point data types only"
         if self.shape() != other.shape():
             panic(
                 "Gradbox → all_close(Self): expects same shaped gradboxes: "
-                + self.shape().__str__()
+                + String(self.shape())
                 + ", "
-                + other.shape().__str__()
+                + String(other.shape())
             )
 
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
@@ -640,19 +637,18 @@ struct Gradbox[dtype: DType](
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Tensor[Self.dtype]) -> Bool:
-        constrained[
+        comptime assert
             Self.dtype.is_floating_point(),
             (
                 "Gradbox → all_close(Tensor): is for floating point data types"
                 " only"
-            ),
-        ]()
+            )
         if self.shape() != other.shape():
             panic(
                 "Gradbox → all_close(Tensor): expects same shaped tensor: "
-                + self.shape().__str__()
+                + String(self.shape())
                 + ", "
-                + other.shape().__str__()
+                + String(other.shape())
             )
 
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
@@ -678,16 +674,16 @@ struct Gradbox[dtype: DType](
         if self.shape() != tensor.shape():
             panic(
                 "Gradbox __eq__(tensor) → dimension mismatch:",
-                self.shape().__str__(),
+                String(self.shape()),
                 ",",
-                tensor.shape().__str__(),
+                String(tensor.shape()),
             )
         return self.buffer.compare[Equal](tensor.buffer).buffer.all_true()
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
         print(
             "\n",
-            self.__str__(),
+            String(self),
             end="\n",
         )
         empty = List[Int]()

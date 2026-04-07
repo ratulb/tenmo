@@ -48,9 +48,9 @@ struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if stack_size != self.num_tensors:
             panic(
                 "StackBackward: Expected stack dimension size",
-                self.num_tensors.__str__(),
+                String(self.num_tensors),
                 "but got",
-                stack_size.__str__(),
+                String(stack_size),
             )
 
         # ===== SPLIT GRADIENT ALONG STACKED AXIS =====

@@ -31,10 +31,10 @@ from mnemonics import (
     MAXPOOL2D,
 )
 from blashandle import BLASHandle, BLASHandleLite
-from utils.numerics import neg_inf
+from std.utils.numerics import neg_inf
 from std.algorithm import parallelize
 from ndbuffer import NDBuffer
-from random import seed, random_float64
+from std.random import seed, random_float64
 from std.sys import simd_width_of
 
 @fieldwise_init
@@ -79,7 +79,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         if init_method == "xavier":
             # Xavier/Glorot uniform initialization
             var limit = Scalar[Self.dtype](
-                sqrt(6.0 / (in_features + out_features))
+                sqrt(6.0 / Float64(in_features + out_features))
             )
             self.weight = (
                 Tensor[Self.dtype].rand(

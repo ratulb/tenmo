@@ -47,7 +47,7 @@ from net import (
 from dataloader import TensorDataset, DataLoader, Batch
 from time import perf_counter_ns
 from std.math import sqrt, cos, sin, pi
-from random import randn_float64
+from std.random import randn_float64
 from intarray import IntArray
 
 

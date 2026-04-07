@@ -1,4 +1,4 @@
-from gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
+from std.gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
 from std.memory import AddressSpace, stack_allocation
 
 from array import Array
@@ -62,10 +62,10 @@ fn reduce[
     total_output: Int,
     reduced_volume: Int,
 ):
-    constrained[
+    comptime assert
         max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size",
-    ]()
+        "Invalid max_block_size"
+
     var smem = stack_allocation[
         max_block_size, Scalar[dtype], address_space = AddressSpace.SHARED
     ]()
@@ -127,10 +127,10 @@ fn log_sum_exp_f32[
     total_output: Int,
     reduced_volume: Int,
 ):
-    constrained[
+    comptime assert
         max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size",
-    ]()
+        "Invalid max_block_size"
+
     var smem = stack_allocation[
         max_block_size, Scalar[DType.float32],
         address_space = AddressSpace.SHARED
@@ -185,10 +185,10 @@ fn log_sum_exp_f64[
     total_output: Int,
     reduced_volume: Int,
 ):
-    constrained[
+    comptime assert
         max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size",
-    ]()
+        "Invalid max_block_size"
+
     var smem = stack_allocation[
         max_block_size, Scalar[DType.float64],
         address_space = AddressSpace.SHARED

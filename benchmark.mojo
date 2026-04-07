@@ -1,5 +1,5 @@
 from time import perf_counter_ns
-from random import random_float64
+from std.random import random_float64
 from tenmo import Tensor
 from shapes import Shape
 

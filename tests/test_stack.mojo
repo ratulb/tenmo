@@ -202,7 +202,7 @@ fn test_stack_many_tensors() raises:
 
     # Create 5 tensors
     for i in range(5):
-        var t = Tensor[dtype].ones(2, 3) * (i + 1)
+        var t = Tensor[dtype].ones(2, 3) * Float32((i + 1))
         tensors.append(t)
 
     var result = Tensor[dtype].stack(tensors, axis=0)

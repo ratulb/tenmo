@@ -46,8 +46,13 @@ struct Strides(
     fn __len__(self) -> Int:
         return len(self.data)
 
+    @always_inline("nodebug")
     fn array(self) -> Array:
-        return Array(self)
+        var result = Array()
+        result.size = len(self)
+        for i in range(len(self)):
+            result[i] = self[i]
+        return result^
 
     @always_inline("nodebug")
     fn __getitem__(self, i: Int) -> Int:
@@ -124,3 +129,4 @@ fn main():
     var s = Strides(10, 5, 2, 3, 8, 7, 1, 1)
     #var array = s.array()
     print(s[:-2].array())
+    print(s[:-2])

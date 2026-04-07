@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from common_utils import panic
-from random import shuffle as reshuffle
-from python import PythonObject
+from std.random import shuffle as reshuffle
+from std.python import PythonObject
 from numpy_interop import from_ndarray, numpy_dtype
 from std.memory import memcpy, Pointer
 from shapes import Shape
@@ -124,21 +124,21 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
     ]
     var _last_batch_size: Int
 
-    fn __copyinit__(out self, other: Self):
-        self.dataset = other.dataset
-        self.batch_size = other.batch_size
-        self.shuffle_data = other.shuffle_data
-        self.drop_last = other.drop_last
-        self._current_idx = other._current_idx
-        self._indices = other._indices.copy()
-        self._num_batches = other._num_batches
-        self._feature_shape = other._feature_shape
-        self._label_shape = other._label_shape
-        self._features_per_sample = other._features_per_sample
-        self._labels_per_sample = other._labels_per_sample
-        self._batch = other._batch
-        self._last_batch = other._last_batch
-        self._last_batch_size = other._last_batch_size
+    fn __copyinit__(out self, copy: Self):
+        self.dataset = copy.dataset
+        self.batch_size = copy.batch_size
+        self.shuffle_data = copy.shuffle_data
+        self.drop_last = copy.drop_last
+        self._current_idx = copy._current_idx
+        self._indices = copy._indices.copy()
+        self._num_batches = copy._num_batches
+        self._feature_shape = copy._feature_shape
+        self._label_shape = copy._label_shape
+        self._features_per_sample = copy._features_per_sample
+        self._labels_per_sample = copy._labels_per_sample
+        self._batch = copy._batch
+        self._last_batch = copy._last_batch
+        self._last_batch_size = copy._last_batch_size
 
     fn __init__(
         out self,

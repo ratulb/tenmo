@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from random import seed
+from std.random import seed
 from std.testing import assert_true
 from net import Dropout
 
@@ -154,7 +154,7 @@ fn test_dropout_forward_expected_value_preservation() raises:
     var sum_val = Scalar[DType.float32](0.0)
     for i in range(size):
         sum_val += out[i]
-    var mean = sum_val / size
+    var mean = sum_val / Float64(size)
 
     # Expected value should be close to 10.0 (within statistical variance)
     var expected = Tensor[DType.float32](1)
@@ -548,7 +548,7 @@ fn test_dropout_large_tensor_backward() raises:
             assert_true(actual.all_close[atol=1e-5](expected))
 
     # Roughly 50% should be zero, 50% should be scale
-    var zero_ratio = Float64(num_zero_grads) / size
+    var zero_ratio = Float64(num_zero_grads) / Float64(size)
     assert_true(zero_ratio > 0.45 and zero_ratio < 0.55)
 
 

@@ -5,12 +5,12 @@ from mnemonics import AddTensor
 from gradbox import Gradbox
 from shapes import Shape
 from std.memory import stack_allocation, AddressSpace
-from gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
+from std.gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
 from std.os.atomic import Atomic, Consistency
 from std.sys import has_accelerator
-from gpu.primitives.id import lane_id, warp_id
-from gpu.primitives.warp import shuffle_down
-from gpu.globals import WARP_SIZE
+from std.gpu.primitives.id import lane_id, warp_id
+from std.gpu.primitives.warp import shuffle_down
+from std.gpu.globals import WARP_SIZE
 
 from std.sys import simd_width_of
 
@@ -70,8 +70,8 @@ struct Dot[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if not numels_lhs == numels_rhs:
             panic(
                 "Tensor → dot: size does not match",
-                numels_lhs.__str__(),
-                numels_rhs.__str__(),
+                String(numels_lhs),
+                String(numels_rhs),
             )
 
         var out: Tensor[Self.dtype]
@@ -192,7 +192,7 @@ fn dot_product_32[
     # =================================================================
     if warp == 0:
         # Each thread in first warp loads one warp sum
-        accum = warp_sums[lane] if lane < NUM_WARPS else Scalar[dtype](0)
+        accum = warp_sums[lane] if lane < UInt(NUM_WARPS) else Scalar[dtype](0)
 
         # Shuffle reduction
         offset = UInt32(NUM_WARPS // 2)
@@ -252,10 +252,9 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) raises -> Tensor[
         Self.dtype
     ]:
-        constrained[
+        comptime assert
             threads_per_block <= 512,
-            "Threads per block should be <= 512",
-        ]()
+            "Threads per block should be <= 512"
         var rank = A.rank()
         var numels = A.numels()
 
@@ -264,17 +263,17 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 panic(
                     "Dot product expects 1D tensors. Found",
                     "A rank: ",
-                    rank.__str__(),
+                    String(rank),
                     "and B rank: ",
-                    B.rank().__str__(),
+                    String(B.rank()),
                 )
             if numels != B.numels():
                 panic(
                     "Tensor lengths do not match.",
                     "A length: ",
-                    numels.__str__(),
+                    String(numels),
                     "B length: ",
-                    B.numels().__str__(),
+                    String(B.numels()),
                 )
 
         ref A_device_state = A.buffer.device_state.value()

@@ -1,4 +1,4 @@
-from gpu import thread_idx, block_idx, block_dim, barrier
+from std.gpu import thread_idx, block_idx, block_dim, barrier
 from std.memory import AddressSpace, stack_allocation
 
 from array import Array

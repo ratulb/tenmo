@@ -16,9 +16,9 @@ struct MatrixShapeValidator(RegisterPassable, ImplicitlyCopyable):
             panic(
                 "MatrixShapeValidator → validate_matrix_shapes_nd: matmul_nd expects rank >="
                 " 2. Got A = "
-                + A_shape.__str__()
+                + String(A_shape)
                 + ", B = "
-                + B_shape.__str__()
+                + String(B_shape)
             )
 
         if A_shape[-1] != B_shape[-2]:
@@ -26,15 +26,15 @@ struct MatrixShapeValidator(RegisterPassable, ImplicitlyCopyable):
                 "MatrixShapeValidator → validate_matrix_shapes_nd: inner dimensions"
                 " mismatch: "
                 + "A(...,"
-                + A_shape[-1].__str__()
+                + String(A_shape[-1])
                 + ") vs "
                 + "B("
-                + B_shape[-2].__str__()
+                + String(B_shape[-2])
                 + ",...). "
                 + "Full A = "
-                + A_shape.__str__()
+                + String(A_shape)
                 + ", B = "
-                + B_shape.__str__()
+                + String(B_shape)
             )
 
         A_batch = A_shape[0:-2]
@@ -50,9 +50,9 @@ struct MatrixShapeValidator(RegisterPassable, ImplicitlyCopyable):
             panic(
                 "MatrixShapeValidator → validate_matrix_shapes_2d: matmul_2d expects rank =="
                 " 2. Got A = "
-                + A_shape.__str__()
+                + String(A_shape)
                 + ", B = "
-                + B_shape.__str__()
+                + String(B_shape)
             )
 
         if A_shape[1] != B_shape[0]:
@@ -60,13 +60,13 @@ struct MatrixShapeValidator(RegisterPassable, ImplicitlyCopyable):
                 "MatrixShapeValidator → validate_matrix_shapes_2d: inner dimensions mismatch"
                 " in matmul_2d: "
                 + "A(m,"
-                + A_shape[1].__str__()
+                + String(A_shape[1])
                 + ") vs "
                 + "B("
-                + B_shape[0].__str__()
+                + String(B_shape[0])
                 + ",n). "
                 + "Full A = "
-                + A_shape.__str__()
+                + String(A_shape)
                 + ", B = "
-                + B_shape.__str__()
+                + String(B_shape)
             )

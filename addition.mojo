@@ -93,8 +93,7 @@ struct AddScalar[dtype: DType](RegisterPassable, Copyable):
             self.buffer.scalar_ops[Add](scalar), requires_grad=False
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
                 backward_fn = AddBackwardScalar[Self.dtype]().into_backward_fn()
@@ -116,9 +115,9 @@ struct Adder[dtype: DType](RegisterPassable, Copyable):
         if not self.broadcastable(other):
             panic(
                 "Tensor addition dimension mismatch: cannot broadcast shape "
-                + self.shape().__str__()
+                + String(self.shape())
                 + " with "
-                + other.shape().__str__(),
+                + String(other.shape()),
                 "at Adder → forward",
             )
 
@@ -127,8 +126,7 @@ struct Adder[dtype: DType](RegisterPassable, Copyable):
             requires_grad=False,
         )
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             if self.requires_grad or other.requires_grad:
                 out.requires_grad_(True)
 

@@ -2,7 +2,7 @@ from shapes import Shape
 from tenmo import Tensor
 from gradbox import Gradbox
 from std.sys import simd_width_of
-from std.sys.param_env import env_get_string
+from std.sys.defines import get_defined_string
 from std.logger import Level, Logger
 from net import Sequential, Linear, ReLU
 from std.time import perf_counter_ns, monotonic
@@ -11,11 +11,11 @@ from std.os import abort
 from std.utils import Variant
 from std.testing import assert_true
 from intarray import IntArray
-from random import randn_float64
+from std.random import randn_float64
 from ndbuffer import NDBuffer
 from std.sys import prefetch, PrefetchOptions
 
-comptime LOG_LEVEL = env_get_string["LOGGING_LEVEL", "INFO"]()
+comptime LOG_LEVEL = get_defined_string["LOGGING_LEVEL", "INFO"]()
 comptime log = Logger[Level._from_str(LOG_LEVEL)]()
 
 # Color codes
@@ -229,10 +229,9 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
     Returns:
         The +inf value of the given dtype.
     """
-    constrained[
+    comptime assert
         dtype.is_floating_point(),
-        "Only floating point dtypes support +inf.",
-    ]()
+        "Only floating point dtypes support +inf."
 
     comptime if dtype == DType.bfloat16:
         return rebind[Scalar[dtype]](
@@ -251,8 +250,7 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
         )
     else:
-        constrained[False, "unsupported float type"]()
-        return {}
+        comptime assert False, "unsupported float type"
 
 
 @always_inline("nodebug")

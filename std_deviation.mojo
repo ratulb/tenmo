@@ -104,8 +104,7 @@ struct StdDev[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             else:
                 result = result.squeeze[track_grad=False]()
 
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)

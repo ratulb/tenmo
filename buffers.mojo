@@ -4,7 +4,7 @@ from std.sys import simd_width_of, size_of
 from std.memory import memset_zero, memcpy, AddressSpace
 from std.math import exp, log, ceil, tanh, sqrt
 from common_utils import log_debug, panic, Epsilon
-from utils.numerics import max_finite
+from std.utils.numerics import max_finite
 from std.os.atomic import Atomic, Consistency, fence
 from mnemonics import (
     Multiply,
@@ -361,17 +361,16 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __add__(other) is for numeric data types only",
-        ]()
+            "Buffer → __add__(other) is for numeric data types only"
 
         if not self.size == other.size:
             panic(
                 "Buffer → __add__(other): buffer size does not match -> self:",
-                self.size.__str__(),
+                String(self.size),
                 "vs. other:",
-                other.size.__str__(),
+                String(other.size),
             )
         if self.size == 0:
             panic("Buffer → __add__(other): buffer size 0")
@@ -380,17 +379,16 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __iadd__(self, other: Buffer[Self.dtype]):
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __iadd__(other) is for numeric data types only",
-        ]()
+            "Buffer → __iadd__(other) is for numeric data types only"
 
         if self.size != other.size:
             panic(
                 "Buffer __iadd__: buffer sizes must match: self.size ->",
-                self.size.__str__(),
+                String(self.size),
                 ", and other size:",
-                other.size.__str__(),
+                String(other.size),
             )
 
         if self.size == 0:
@@ -400,17 +398,16 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __isub__(self, other: Buffer[Self.dtype]):
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __isub__(other) is for numeric data types only",
-        ]()
+            "Buffer → __isub__(other) is for numeric data types only"
 
         if self.size != other.size:
             panic(
                 "Buffer __isub__(other): buffer sizes must match: self.size: ",
-                self.size.__str__(),
+                String(self.size),
                 "and other size: ",
-                other.size.__str__(),
+                String(other.size),
             )
 
         if self.size == 0:
@@ -423,17 +420,16 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __sub__(other) is for numeric data types only",
-        ]()
+            "Buffer → __sub__(other) is for numeric data types only"
 
         if not self.size == other.size:
             panic(
                 "Buffer → __sub__(other): buffer size does not match -> self:",
-                self.size.__str__(),
+                String(self.size),
                 "vs. other:",
-                other.size.__str__(),
+                String(other.size),
             )
         if self.size == 0:
             panic("Buffer → __sub__(other): buffer size 0")
@@ -449,9 +445,9 @@ struct Buffer[dtype: DType = DType.float32](
         if not self.size == other.size:
             panic(
                 "Buffer → __mul__(other): buffer size does not match -> self:",
-                self.size.__str__(),
+                String(self.size),
                 "vs. other:",
-                other.size.__str__(),
+                String(other.size),
             )
         if self.size == 0:
             panic("Buffer → __mul__(other): buffer size 0")
@@ -467,9 +463,9 @@ struct Buffer[dtype: DType = DType.float32](
                     "Buffer → __imul__(Buffer[Self.dtype]:"
                     " buffer size does not match -> self:"
                 ),
-                self.size.__str__(),
+                String(self.size),
                 "vs. other:",
-                other.size.__str__(),
+                String(other.size),
             )
 
         if self.size == 0:
@@ -565,9 +561,9 @@ struct Buffer[dtype: DType = DType.float32](
             ):
                 log_debug(
                     "Buffer -> inplace_ops: range mismatch: self range -> "
-                    + self_extent.__str__()
+                    + String(self_extent)
                     + ", other range: "
-                    + other_extent.__str__(),
+                    + String(other_extent),
                 )
                 return
 
@@ -666,9 +662,9 @@ struct Buffer[dtype: DType = DType.float32](
             ):
                 panic(
                     "Buffer -> arithmetic_ops: range mismatch: self range -> "
-                    + self_extent.__str__()
+                    + String(self_extent)
                     + ", other range: "
-                    + other_extent.__str__()
+                    + String(other_extent)
                 )
 
         var out = Buffer[Self.dtype](self_extent)
@@ -822,10 +818,9 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __truediv__(other) is for numeric data types only",
-        ]()
+            "Buffer → __truediv__(other) is for numeric data types only"
 
         if not self.size == other.size:
             panic(
@@ -833,9 +828,9 @@ struct Buffer[dtype: DType = DType.float32](
                     "Buffer → __truediv__(other): buffer size does not match ->"
                     " self:"
                 ),
-                self.size.__str__(),
+                String(self.size),
                 "vs. other:",
-                other.size.__str__(),
+                String(other.size),
             )
 
         if self.size == 0:
@@ -848,10 +843,9 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ):
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __itruediv__(other) is for numeric data types only",
-        ]()
+            "Buffer → __itruediv__(other) is for numeric data types only"
 
         if not self.size == other.size:
             panic(
@@ -859,9 +853,9 @@ struct Buffer[dtype: DType = DType.float32](
                     "Buffer → __itruediv__(other): buffer size does not"
                     " match -> self:"
                 ),
-                self.size.__str__(),
+                String(self.size),
                 "vs. other:",
-                other.size.__str__(),
+                String(other.size),
             )
         if self.size == 0:
             return
@@ -870,19 +864,17 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __iadd__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __iadd__(scalar) is for numeric data types only",
-        ]()
+            "Buffer → __iadd__(scalar) is for numeric data types only"
 
         self.inplace_ops_scalar[Add](scalar)
 
     @always_inline
     fn __isub__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __isub__(scalar) is for numeric data types only",
-        ]()
+            "Buffer → __isub__(scalar) is for numeric data types only"
 
         self.inplace_ops_scalar[Subtract](scalar)
 
@@ -893,10 +885,10 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __itruediv__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
-        constrained[
+
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __itruediv__(scalar) is for numeric data types only",
-        ]()
+            "Buffer → __itruediv__(scalar) is for numeric data types only"
 
         if scalar == Scalar[Self.dtype](0):
             panic("Buffer → __itruediv__(scalar): can not divide by zero")
@@ -907,13 +899,12 @@ struct Buffer[dtype: DType = DType.float32](
     fn __rsub__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
             (
                 "Buffer → __rsub__(scalar) -> Buffer is for numeric data types"
                 " only"
-            ),
-        ]()
+            )
 
         return self.arithmetic_ops_scalar[ReverseSubtract](scalar)
 
@@ -921,10 +912,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn __sub__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __sub__(scalar) -> Buffer is for numeric data types only",
-        ]()
+            "Buffer → __sub__(scalar) -> Buffer is for numeric data types only"
 
         return self.arithmetic_ops_scalar[Subtract](scalar)
 
@@ -932,13 +922,12 @@ struct Buffer[dtype: DType = DType.float32](
     fn __rmul__(
         self: Buffer[Self.dtype], factor: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
             (
                 "Buffer → __rmul__(scalar) -> Buffer is for numeric data types"
                 " only"
-            ),
-        ]()
+            )
 
         return self.__mul__(factor)
 
@@ -953,13 +942,12 @@ struct Buffer[dtype: DType = DType.float32](
     fn __radd__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
             (
                 "Buffer → __radd__(scalar) -> Buffer is for numeric data types"
                 " only"
-            ),
-        ]()
+            )
 
         return self.__add__(scalar)
 
@@ -967,13 +955,12 @@ struct Buffer[dtype: DType = DType.float32](
     fn __add__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
             (
                 "Buffer → __add__(scalar) -> Buffer  is for numeric data types"
                 " only"
-            ),
-        ]()
+            )
 
         return self.arithmetic_ops_scalar[Add](scalar)
 
@@ -982,13 +969,12 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         divisor: Scalar[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
             (
                 "Buffer → __truediv__(scalar) -> Buffer  is for numeric data"
                 " types only"
-            ),
-        ]()
+            )
 
         return self.arithmetic_ops_scalar[Divide](divisor)
 
@@ -996,13 +982,12 @@ struct Buffer[dtype: DType = DType.float32](
     fn __rtruediv__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
             (
                 "Buffer → __rtruediv__(scalar) -> Buffer  is for numeric data"
                 " types only"
-            ),
-        ]()
+            )
 
         return self.arithmetic_ops_scalar[ReverseDivide](scalar)
 
@@ -1038,9 +1023,9 @@ struct Buffer[dtype: DType = DType.float32](
                     "Buffer → compare_buffer_full: buffer size does not match"
                     " -> self:"
                 ),
-                self.size.__str__(),
+                String(self.size),
                 "vs. other:",
-                other.size.__str__(),
+                String(other.size),
             )
 
         var total = self.size
@@ -1197,9 +1182,9 @@ struct Buffer[dtype: DType = DType.float32](
             ):
                 panic(
                     "Buffer -> select: range mismatch: self range -> "
-                    + self_extent.__str__()
+                    + String(self_extent)
                     + ", other range: ",
-                    other_extent.__str__(),
+                    String(other_extent),
                 )
 
         var out = Buffer[Self.dtype].zeros(self_extent)
@@ -1514,10 +1499,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn arange[
         max_arange_elements: Int = 10000000  # Safety limit to prevent infinite loops with very small steps
     ](args: VariadicList[Scalar[Self.dtype], _]) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → arange is for numeric data types only",
-        ]()
+            "Buffer → arange is for numeric data types only"
 
         start: Scalar[Self.dtype] = 0
         end: Scalar[Self.dtype] = max_finite[Self.dtype]()
@@ -1584,10 +1568,9 @@ struct Buffer[dtype: DType = DType.float32](
         end: Scalar[Self.dtype],
         steps: Int,
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → linspace is for numeric data types only",
-        ]()
+            "Buffer → linspace is for numeric data types only"
 
         if steps < 1:
             panic("Buffer → linspace: steps must be at least 1")
@@ -1615,10 +1598,9 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Scalar[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → sum is for numeric data types only",
-        ]()
+            "Buffer → sum is for numeric data types only"
 
         var accum = Scalar[Self.dtype](0)
         if self.size == 0:
@@ -1648,10 +1630,9 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Scalar[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → product is for numeric data types only",
-        ]()
+            "Buffer → product is for numeric data types only"
 
         var result = Scalar[Self.dtype](1)
         var extent = end_index.or_else(self.size) - start_index
@@ -1678,13 +1659,12 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         exponent: Scalar[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
             (
                 "Buffer → __pow__(exponent) -> Buffer is for numeric data types"
                 " only"
-            ),
-        ]()
+            )
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -1704,10 +1684,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __abs__(self) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __abs__ is for numeric data types only",
-        ]()
+            "Buffer → __abs__ is for numeric data types only"
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -1729,10 +1708,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn clamp(
         self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → clamp is for numeric data types only",
-        ]()
+            "Buffer → clamp is for numeric data types only"
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -1761,10 +1739,9 @@ struct Buffer[dtype: DType = DType.float32](
         end_index: Optional[Int] = None,
     ) -> Buffer[Self.dtype]:
         """Self could be input and other incoming grad buffer."""
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → log_back is for numeric data types only",
-        ]()
+            "Buffer → log_back is for numeric data types only"
 
         var actual_end = end_index.or_else(self.size)
         var extent = actual_end - start_index
@@ -1792,10 +1769,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn clamp_in_place(
         self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
     ):
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → clamp is for numeric data types only",
-        ]()
+            "Buffer → clamp is for numeric data types only"
 
         comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
@@ -1843,10 +1819,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __neg__(self: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → __neg__ is for numeric data types only",
-        ]()
+            "Buffer → __neg__ is for numeric data types only"
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -1891,10 +1866,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __invert__(self) -> Buffer[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_integral() or DType.bool == Self.dtype,
-            "Buffer → __invert__ is for Bool or integral data types only",
-        ]()
+            "Buffer → __invert__ is for Bool or integral data types only"
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -2090,9 +2064,9 @@ struct Buffer[dtype: DType = DType.float32](
         if not self.size == other.size:
             panic(
                 "Buffer → compare_buffer: buffer sizes do not match -> self:",
-                self.size.__str__(),
+                String(self.size),
                 "vs. other:",
-                other.size.__str__(),
+                String(other.size),
             )
 
         total = self.size
@@ -2269,16 +2243,15 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Scalar[Self.dtype]:
-        constrained[
+        comptime assert
             Self.dtype.is_numeric(),
-            "Buffer → dot is for numeric data types only",
-        ]()
+            "Buffer → dot is for numeric data types only"
         if not lhs.size == rhs.size:
             panic(
                 "Buffer → dot: buffer size does not match -> lhs:",
-                lhs.size.__str__(),
+                String(lhs.size),
                 "vs. rhs:",
-                rhs.size.__str__(),
+                String(rhs.size),
             )
         var actual_end = end_index.or_else(lhs.size)
         var extent = actual_end - start_index
@@ -2380,10 +2353,9 @@ struct Buffer[dtype: DType = DType.float32](
     ](self: Buffer[Self.dtype], other: Buffer[Self.dtype],) -> Bool:
         """Check if all elements are close within tolerance: |a - b| <= atol + rtol * |b|.
         """
-        constrained[
+        comptime assert
             Self.dtype.is_floating_point(),
-            "Buffer → all_close is for floating point data types only",
-        ]()
+            "Buffer → all_close is for floating point data types only"
 
         if self.size != other.size:
             return False
@@ -2485,26 +2457,26 @@ struct Buffer[dtype: DType = DType.float32](
         # Use self.size instead of len(self) - self.size has actual count
         if self.size <= 60:
             for i in range(self.size):
-                result += self.load(i).__str__()
+                result += String(self.load(i))
                 if i < self.size - 1:
                     result += ", "
         else:
             for i in range(15):
-                result += self.load(i).__str__()
+                result += String(self.load(i))
                 result += ", "
 
             result += "..., "
 
             for i in range(self.size - 15, self.size):
-                result += self.load(i).__str__()
+                result += String(self.load(i))
                 if i < self.size - 1:
                     result += ", "
 
         result += (
             "], dtype="
-            + self.dtype.__str__()
+            + String(self.dtype)
             + ", size="
-            + self.size.__str__()
+            + String(self.size)
             + "]"
         )
         return result

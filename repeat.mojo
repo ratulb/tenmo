@@ -17,9 +17,9 @@ struct Repeat[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if len(repeat) < self.rank():
             panic(
                 "repeat: Number of dimensions of repeat dims ("
-                + len(repeat).__str__()
+                + String(len(repeat))
                 + ") cannot be smaller than number of dimensions of tensor ("
-                + self.rank().__str__()
+                + String(self.rank())
                 + ")"
             )
         return Tile[Self.dtype].forward[track_grad](self, repeat, requires_grad)

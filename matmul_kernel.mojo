@@ -1,4 +1,4 @@
-from gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
+from std.gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
 from std.gpu.host import Dim
 from std.memory import AddressSpace, stack_allocation
 from shapes import Shape
@@ -52,10 +52,7 @@ fn matmul_2d_tiled[
     B_row_stride: Int,
     B_col_stride: Int,
 ):
-    constrained[
-        TILE_SIZE == 16 or TILE_SIZE == 32,
-        "TILE_SIZE must be 16 or 32",
-    ]()
+    comptime assert TILE_SIZE == 16 or TILE_SIZE == 32, "TILE_SIZE must be 16 or 32"
 
     # Shared memory tiles
     var smem_A = stack_allocation[
@@ -154,9 +151,9 @@ struct MatmulNdGpu[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCop
         if k_A != k_B:
             raise Error(
                 "MatmulNdGpu: inner dims must match, got "
-                + k_A.__str__()
+                + String(k_A)
                 + " and "
-                + k_B.__str__()
+                + String(k_B)
             )
 
         var k = k_A
@@ -231,12 +228,12 @@ struct MatmulNdGpu[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCop
 
         with A_offsets_buf.map_to_host() as h:
             for b in range(total_batch):
-                h[b] = A_offsets[b]
+                h[b] = Int64(A_offsets[b])
         with B_offsets_buf.map_to_host() as h:
             for b in range(total_batch):
-                h[b] = B_offsets[b]
+                h[b] = Int64(B_offsets[b])
 
-        # ── FIX 4: consistent names A_buf/B_buf ───────────────────────────────
+        # ── 4: consistent names A_buf/B_buf ───────────────────────────────
         ref A_buf = A_device_state.device_buffer()
         ref B_buf = B.device_state.value().device_buffer()
 

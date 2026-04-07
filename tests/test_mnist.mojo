@@ -3,7 +3,7 @@ from layers import Linear, ReLU, Sequential
 from crossentropy import CrossEntropyLoss
 from sgd import SGD
 from std.testing import assert_true
-from python import Python, PythonObject
+from std.python import Python, PythonObject
 from numpy_interop import from_ndarray
 
 

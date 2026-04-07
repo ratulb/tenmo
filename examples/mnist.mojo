@@ -7,7 +7,7 @@ from tenmo import Tensor
 from sgd import SGD
 from net import Linear, ReLU, Sequential
 from crossentropy import CrossEntropyLoss
-from python import Python
+from std.python import Python
 from numpy_interop import from_ndarray, numpy_dtype
 from dataloader import NumpyDataset
 from time import perf_counter_ns

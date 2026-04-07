@@ -30,8 +30,7 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
         "Only floating point dtypes support +inf.",
     ]()
 
-    @parameter
-    if dtype == DType.bfloat16:
+    comptime if dtype == DType.bfloat16:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<bf16>`,
         )
@@ -78,8 +77,7 @@ fn nan[dtype: DType]() -> Scalar[dtype]:
         "Only floating point dtypes support NaN.",
     ]()
 
-    @parameter
-    if dtype == DType.float32:
+    comptime if dtype == DType.float32:
         return rebind[Scalar[dtype]](
             __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f32>`,
         )
@@ -3463,8 +3461,7 @@ fn test_ce_mode_train_eval_toggle() raises:
 
 
 fn test_ce_gpu_ci_basic_mean() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_ci_basic_mean")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
@@ -3479,8 +3476,7 @@ fn test_ce_gpu_ci_basic_mean() raises:
 
 
 fn test_ce_gpu_ci_basic_sum() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_ci_basic_sum")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]]).to_gpu()
@@ -3496,8 +3492,7 @@ fn test_ce_gpu_ci_basic_sum() raises:
 
 
 fn test_ce_gpu_ci_ignore_index() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_ci_ignore_index")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2(
@@ -3519,8 +3514,7 @@ fn test_ce_gpu_ci_ignore_index() raises:
 
 
 fn test_ce_gpu_ci_label_smoothing() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_ci_label_smoothing")
         comptime dtype = DType.float32
         var logits = Tensor[dtype].d2([[2.0, 1.0, 0.5]]).to_gpu()
@@ -3537,8 +3531,7 @@ fn test_ce_gpu_ci_label_smoothing() raises:
         assert_true(allclose(loss.item(), loss_cpu.item()))
 
 fn test_ce_gpu_ci_3d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_ci_3d")
         comptime dtype = DType.float32
 
@@ -3595,8 +3588,7 @@ fn test_ce_gpu_ci_3d() raises:
 
 
 fn test_ce_gpu_bwd_ci_grad_shape() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_grad_shape")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]], requires_grad=True)
@@ -3609,8 +3601,7 @@ fn test_ce_gpu_bwd_ci_grad_shape() raises:
 
 
 fn test_ce_gpu_bwd_ci_parity() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_parity")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -3633,8 +3624,7 @@ fn test_ce_gpu_bwd_ci_parity() raises:
 
 
 fn test_ce_gpu_bwd_ci_ignore_zeros_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_ignore_zeros_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -3652,8 +3642,7 @@ fn test_ce_gpu_bwd_ci_ignore_zeros_grad() raises:
 
 
 fn test_ce_gpu_bwd_ci_3d_ignore() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_3d_ignore")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -3677,8 +3666,7 @@ fn test_ce_gpu_bwd_ci_3d_ignore() raises:
 
 
 fn test_ce_gpu_bwd_ci_label_smoothing() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_bwd_ci_label_smoothing")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True)
@@ -3701,8 +3689,7 @@ fn test_ce_gpu_bwd_ci_label_smoothing() raises:
 
 
 fn test_ce_gpu_prob_forward_parity() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_prob_forward_parity")
         comptime dtype = DType.float32
         var logits_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5], [0.5, 2.0, 0.1]])
@@ -3715,8 +3702,7 @@ fn test_ce_gpu_prob_forward_parity() raises:
 
 
 fn test_ce_gpu_prob_backward_parity() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_prob_backward_parity")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -3739,8 +3725,7 @@ fn test_ce_gpu_prob_backward_parity() raises:
 
 
 fn test_ce_gpu_prob_label_smoothing_parity() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_ce_gpu_prob_label_smoothing_parity")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[2.0, 1.0, 0.5]], requires_grad=True)
