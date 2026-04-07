@@ -3,7 +3,7 @@ clear
 # Check if an argument was provided
 if [ $# -eq 0 ]; then
     echo "Error: No test specified"
-    echo "Usage: $0 [summean|exp|transmute|count_unique|compare|allany|power|onehot|maxmin_scalar|contiguous|item|scalar|broadcast|gpu_expand|expand|gpusummean|gpu|npiop|sgd|matmul|cnn|chunk|fill|pad|logarithm|stack|concat|std_variance|blas|dropout|indexhelper|utils|variance|tanh|losses|data|intarray|tensors|mmnd|mm2d|mv|vm|argminmax|minmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|shapes|strides|bench|validators|ce|synth_mnist|shapebroadcast|all]"
+    echo "Usage: $0 [sigmoid|summean|exp|transmute|count_unique|compare|allany|power|onehot|maxmin_scalar|contiguous|item|scalar|broadcast|gpu_expand|expand|gpusummean|gpu|npiop|sgd|matmul|cnn|chunk|fill|pad|logarithm|stack|concat|std_variance|blas|dropout|indexhelper|utils|variance|tanh|losses|data|intarray|tensors|mmnd|mm2d|mv|vm|argminmax|minmax|repeat|tiles|slice|linspace|softmax|relu|shuffle|buffers|flatten|permute|squeeze|unsqueeze|views|gradbox|ndb|transpose|shapes|strides|bench|validators|ce|synth_mnist|shapebroadcast|all]"
     exit 1
 fi
 
@@ -66,7 +66,10 @@ case $1 in
         echo "Running mojo -I . tests/test_sum_mean.mojo"
         mojo -I . $DEBUG_MODE tests/test_sum_mean.mojo
         ;;
-
+    sigmoid)
+        echo "Running mojo -I . tests/test_sigmoid.mojo"
+        mojo -I . $DEBUG_MODE tests/test_sigmoid.mojo
+        ;;
     gpusummean)
         echo "Running mojo -I . tests/test_gpu_sum_mean.mojo"
         mojo -I . $DEBUG_MODE tests/test_gpu_sum_mean.mojo
@@ -316,6 +319,9 @@ case $1 in
         ;;
 
     all)
+        echo "Running -I . tests/test_sigmoid.mojo"
+        mojo -I . tests/test_sigmoid.mojo
+
         echo "Running -I . tests/test_sum_mean.mojo"
         mojo -I . tests/test_sum_mean.mojo
 
@@ -504,7 +510,7 @@ case $1 in
         ;;
     *)
         echo "Error: Unknown test '$1'"
-        echo "Available tests: summean|exp, transmute, count_unique, compare, allany, power, onehot, maxmin_scalar, contiguous, item, scalar, broadcast, gpu_expand, expand, gpusummean, gpu, npiop, sgd, matmul, cnn, chunk, fill, pad, logarithm, stack, concat, std_variance, dropout, blas, indexhelper, utils, variance, tanh, losses, data, intarray, mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax, permute, shuffle, argminmax, minmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, strides, shapebroadcast, bench, validators, ce, synth_mnist, all"
+        echo "Available tests: sigmoid, summean, exp, transmute, count_unique, compare, allany, power, onehot, maxmin_scalar, contiguous, item, scalar, broadcast, gpu_expand, expand, gpusummean, gpu, npiop, sgd, matmul, cnn, chunk, fill, pad, logarithm, stack, concat, std_variance, dropout, blas, indexhelper, utils, variance, tanh, losses, data, intarray, mmnd, mm2d, vm, mv, repeat, tiles, linspace, slice, relu, softmax, permute, shuffle, argminmax, minmax, tensors, flatten, squeeze, unsqueeze, transpose, gradbox, ndb, buffers, views, shapes, strides, shapebroadcast, bench, validators, ce, synth_mnist, all"
         exit 1
         ;;
 esac
