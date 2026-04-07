@@ -94,6 +94,16 @@ struct Utils[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn invert_scalar(s: Scalar[DType.bool]) -> Scalar[DType.bool]:
         return ~s
 
+    @staticmethod
+    @always_inline
+    fn tanh_stable(x: Scalar[Self.dtype]) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+        """
+        More numerically stable tanh implementation.
+        """
+        if x > 0:
+            return (1 - exp(-2 * x)) / (1 + exp(-2 * x))
+        else:
+            return (exp(2 * x) - 1) / (exp(2 * x) + 1)
 
 fn main() raises:
     pass

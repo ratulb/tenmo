@@ -51,3 +51,5 @@ comptime MIN = 41
 comptime POW = 42
 comptime TANH_FORWARD = 43
 comptime SIGMOID_FORWARD = 44
+comptime SIGMOID_BACKWARD = 45
+comptime TANH_BACKWARD = 46

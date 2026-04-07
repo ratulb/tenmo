@@ -1218,7 +1218,7 @@ fn test_pad_asymmetric_padding_backward() raises:
                 grad_image[0, 0, i, j],
                 4.0,
                 atol=1e-5,
-                msg="Gradient at " + String(i) + "," + String(j.__str__(),
+                msg="Gradient at " + String(i) + "," + String(j),
             )
 
     print("✓ Asymmetric padding backward pass correct")
@@ -1535,7 +1535,7 @@ fn test_pad_kernel_gradient() raises:
         for j in range(2):
             assert_true(
                 grad_kernel[0, 0, i, j] > 0,
-                "Kernel grad :" + String(i) + "," + String(j.__str__() + "positive",
+                "Kernel grad :" + String(i) + "," + String(j) + "positive",
             )
 
     print("✓ Kernel gradient test correct")

@@ -1,7 +1,7 @@
 from std.sys import simd_width_of
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim
 from std.memory import stack_allocation, AddressSpace
-from mnemonics import Add, Multiply, Subtract, Divide, max_rank
+from mnemonics import Add, Multiply, Subtract, Divide, max_rank, SIGMOID_BACKWARD, TANH_BACKWARD
 from tenmo import Tensor
 from strides import Strides
 from broadcasthelper import ShapeBroadcaster
@@ -41,6 +41,7 @@ fn arithmetic_ops_both_contiguous[
                 var vec_a = A.load[width=simd_width](A_offset + i)
                 var vec_b = B.load[width=simd_width](B_offset + i)
                 var vec_result: SIMD[dtype, simd_width]
+                var one = SIMD[dtype, simd_width](1)
 
                 comptime if op_code == Add:
                     vec_result = vec_a + vec_b
@@ -48,9 +49,14 @@ fn arithmetic_ops_both_contiguous[
                     vec_result = vec_a - vec_b
                 elif op_code == Multiply:
                     vec_result = vec_a * vec_b
-                else:
+                elif op_code == Divide:
                     vec_result = vec_a / vec_b
-
+                elif op_code == SIGMOID_BACKWARD:
+                    # A = sigmoid output, B = grad
+                    vec_result = vec_b * vec_a * (one - vec_a)
+                else: # Tanh backward
+                    # A = tanh output, B = grad
+                    vec_result = vec_b * (one - vec_a * vec_a)
                 result.store[width=simd_width](i, vec_result)
 
             else:
@@ -64,9 +70,14 @@ fn arithmetic_ops_both_contiguous[
                         res = A[A_offset + idx] - B[B_offset + idx]
                     elif op_code == Multiply:
                         res = A[A_offset + idx] * B[B_offset + idx]
-                    else:
+                    elif op_code == Divide:
                         res = A[A_offset + idx] / B[B_offset + idx]
-
+                    elif op_code == SIGMOID_BACKWARD:
+                        var a_val = A[A_offset + idx]
+                        res = B[B_offset + idx] * a_val * (Scalar[dtype](1) - a_val)
+                    else:  # TANH_BACKWARD
+                        var a_val = A[A_offset + idx]
+                        res = B[B_offset + idx] * (Scalar[dtype](1) - a_val * a_val)
                     result[idx] = res
 
         base_idx += grid_stride * CHUNK_SIZE
@@ -123,9 +134,14 @@ fn arithmetic_ops_A_contiguous[
                         vec_result[lane] = vec_a[lane] - B[b_idx]
                     elif op_code == Multiply:
                         vec_result[lane] = vec_a[lane] * B[b_idx]
-                    else:
+                    elif op_code == Divide:
                         vec_result[lane] = vec_a[lane] / B[b_idx]
-
+                    elif op_code == SIGMOID_BACKWARD:
+                        # A = sigmoid output, B = grad
+                        vec_result[lane] = B[b_idx] * vec_a[lane] * (Scalar[dtype](1) - vec_a[lane])
+                    else:  # TANH_BACKWARD
+                        # A = tanh output, B = grad
+                        vec_result[lane] = B[b_idx] * (Scalar[dtype](1) - vec_a[lane] * vec_a[lane])
                 result.store[width=simd_width](i, vec_result)
 
             else:
@@ -147,125 +163,19 @@ fn arithmetic_ops_A_contiguous[
                         res = A[A_offset + linear_idx] - B[b_idx]
                     elif op_code == Multiply:
                         res = A[A_offset + linear_idx] * B[b_idx]
-                    else:
+                    elif op_code == Divide:
                         res = A[A_offset + linear_idx] / B[b_idx]
+                    elif op_code == SIGMOID_BACKWARD:
+                        var a_val = A[A_offset + linear_idx]
+                        res = B[b_idx] * a_val * (Scalar[dtype](1) - a_val)
+                    else: #
+                        # TANH_BACKWARD
+                        var a_val = A[A_offset + linear_idx]
+                        res = B[b_idx] * (Scalar[dtype](1) - a_val * a_val)
 
                     result[linear_idx] = res
 
         base_idx += grid_stride * CHUNK_SIZE
-
-        _ = """fn arithmetic_ops_B_contiguous[
-    op_code: Int,
-    dtype: DType,
-    simd_width: Int = simd_width_of[dtype](),
-    simd_vectors_per_thread: Int = 2 * simd_width,
-](
-    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    result_shape: UnsafePointer[Int64, ImmutAnyOrigin],
-    A_strides: UnsafePointer[Int64, ImmutAnyOrigin],
-    A_offset: Int,
-    B_offset: Int,
-    size: Int,
-    rank: Int,
-):
-    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var grid_stride = Int(block_dim.x * grid_dim.x)
-
-    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-
-    var shape_local = stack_allocation[
-        max_rank, Int, address_space = AddressSpace.SHARED
-    ]()
-    var strides_A_local = stack_allocation[
-        max_rank, Int, address_space = AddressSpace.SHARED
-    ]()
-    var coords = stack_allocation[
-        max_rank, Int, address_space = AddressSpace.SHARED
-    ]()
-
-    for i in range(rank):
-        shape_local[i] = Int(result_shape[i + 2])
-        strides_A_local[i] = Int(A_strides[i + 2])
-
-    var base_idx = gtid * CHUNK_SIZE
-
-    while base_idx < size:
-        # ---- compute starting coords once ----
-        var tmp = base_idx
-        var a_idx = A_offset
-
-        for dim in range(rank - 1, -1, -1):
-            coords[dim] = tmp % shape_local[dim]
-            tmp //= shape_local[dim]
-            a_idx += coords[dim] * strides_A_local[dim]
-
-        @parameter
-        for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
-
-            if i >= size:
-                break
-
-            if i + simd_width <= size:
-                var vec_b = B.load[width=simd_width](B_offset + i)
-                var vec_result: SIMD[dtype, simd_width] = 0
-
-                @parameter
-                for lane in range(simd_width):
-
-                    @parameter
-                    if op_code == Add:
-                        vec_result[lane] = A[a_idx] + vec_b[lane]
-                    elif op_code == Subtract:
-                        vec_result[lane] = A[a_idx] - vec_b[lane]
-                    elif op_code == Multiply:
-                        vec_result[lane] = A[a_idx] * vec_b[lane]
-                    else:
-                        vec_result[lane] = A[a_idx] / vec_b[lane]
-
-                    # increment odometer
-                    for dim in range(rank - 1, -1, -1):
-                        coords[dim] += 1
-                        a_idx += strides_A_local[dim]
-
-                        if coords[dim] < shape_local[dim]:
-                            break
-                        else:
-                            coords[dim] = 0
-                            a_idx -= strides_A_local[dim] * shape_local[dim]
-
-                result.store[width=simd_width](i, vec_result)
-
-            else:
-                for j in range(size - i):
-
-                    @parameter
-                    if op_code == Add:
-                        result[i + j] = A[a_idx] + B[B_offset + i + j]
-                    elif op_code == Subtract:
-                        result[i + j] = A[a_idx] - B[B_offset + i + j]
-                    elif op_code == Multiply:
-                        result[i + j] = A[a_idx] * B[B_offset + i + j]
-                    else:
-                        result[i + j] = A[a_idx] / B[B_offset + i + j]
-
-                    # increment odometer
-                    for dim in range(rank - 1, -1, -1):
-                        coords[dim] += 1
-                        a_idx += strides_A_local[dim]
-
-                        if coords[dim] < shape_local[dim]:
-                            break
-                        else:
-                            coords[dim] = 0
-                            a_idx -= strides_A_local[dim] * shape_local[dim]
-
-                break
-
-        base_idx += grid_stride * CHUNK_SIZE"""
-
 
 fn arithmetic_ops_B_contiguous[
     op_code: Int,
@@ -320,8 +230,14 @@ fn arithmetic_ops_B_contiguous[
                         vec_result[lane] = A[a_idx] - vec_b[lane]
                     elif op_code == Multiply:
                         vec_result[lane] = A[a_idx] * vec_b[lane]
-                    else:
+                    elif op_code == Divide:
                         vec_result[lane] = A[a_idx] / vec_b[lane]
+                    elif op_code == SIGMOID_BACKWARD:
+                        # A = sigmoid output, B = grad
+                        vec_result[lane] = vec_b[lane] * A[a_idx] * (Scalar[dtype](1) - A[a_idx])
+                    else: # TANH_BACKWARD
+                        # A = tanh output, B = grad
+                        vec_result[lane] = vec_b[lane] * (Scalar[dtype](1) - A[a_idx] * A[a_idx])
 
                 result.store[width=simd_width](i, vec_result)
 
@@ -345,8 +261,12 @@ fn arithmetic_ops_B_contiguous[
                         res = A[a_idx] - B[B_offset + linear_idx]
                     elif op_code == Multiply:
                         res = A[a_idx] * B[B_offset + linear_idx]
-                    else:
+                    elif op_code == Divide:
                         res = A[a_idx] / B[B_offset + linear_idx]
+                    elif op_code == SIGMOID_BACKWARD:
+                        res = B[B_offset + linear_idx] * A[a_idx] * (Scalar[dtype](1) - A[a_idx])
+                    else:  # TANH_BACKWARD
+                        res = B[B_offset + linear_idx] * (Scalar[dtype](1) - A[a_idx] * A[a_idx])
 
                     result[linear_idx] = res
 
@@ -406,9 +326,14 @@ fn arithmetic_ops_both_strided[
                         vec_result[lane] = A[a_idx] - B[b_idx]
                     elif op_code == Multiply:
                         vec_result[lane] = A[a_idx] * B[b_idx]
-                    else:
+                    elif op_code == Divide:
                         vec_result[lane] = A[a_idx] / B[b_idx]
-
+                    elif op_code == SIGMOID_BACKWARD:
+                        # A = sigmoid, B = grad
+                        vec_result[lane] = B[b_idx] * A[a_idx] * (Scalar[dtype](1) - A[a_idx])
+                    else: # TANH_BACKWARD
+                        # A = tanh output, B = grad
+                        vec_result[lane] = B[b_idx] * (Scalar[dtype](1) - A[a_idx] * A[a_idx])
                 result.store[width=simd_width](i, vec_result)
 
             else:
@@ -432,8 +357,12 @@ fn arithmetic_ops_both_strided[
                         res = A[a_idx] - B[b_idx]
                     elif op_code == Multiply:
                         res = A[a_idx] * B[b_idx]
-                    else:
+                    elif op_code == Divide:
                         res = A[a_idx] / B[b_idx]
+                    elif op_code == SIGMOID_BACKWARD:
+                        res = B[b_idx] * A[a_idx] * (Scalar[dtype](1) - A[a_idx])
+                    else: # TANH_BACKWARD
+                        res = B[b_idx] * (Scalar[dtype](1) - A[a_idx] * A[a_idx])
 
                     result[linear_idx] = res
 

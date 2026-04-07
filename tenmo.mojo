@@ -15,7 +15,6 @@ from common_utils import (
     Idx,
     print_buffer,
     panic,
-    #variadic1or2,
     Epsilon,
 )
 from mnemonics import *

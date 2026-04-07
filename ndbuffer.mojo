@@ -25,6 +25,7 @@ from reduction_kernel import Reduction
 from minmax_kernel import ReductionMinMax
 from minmax_reducer import MinMaxReducer
 from std.math import sqrt, log, exp
+from utilities import Utils
 from mnemonics import (
     Multiply,
     Add,
@@ -39,6 +40,10 @@ from mnemonics import (
     ABS,
     LOG,
     EXP,
+    SIGMOID_FORWARD,
+    SIGMOID_BACKWARD,
+    TANH_FORWARD,
+    TANH_BACKWARD,
     Overwrite,
     ReverseDivide,
     Equal,
@@ -1953,6 +1958,14 @@ struct NDBuffer[dtype: DType](
         return self.float_unary_ops[EXP]()
 
     @always_inline
+    fn sigmoid(self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        return self.float_unary_ops[SIGMOID_FORWARD]()
+
+    @always_inline
+    fn tanh(self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+        return self.float_unary_ops[TANH_FORWARD]()
+
+    @always_inline
     fn __mul__(self, other: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         return self.arithmetic_ops[Multiply](other)
 
@@ -2052,10 +2065,15 @@ struct NDBuffer[dtype: DType](
             self_end = self_start + self.numels()
             other_start = other.offset
             other_end = other_start + other.numels()
-
-            var result_buffer = self.buffer.arithmetic_ops[op_code](
-                other.buffer, self_start, self_end, other_start, other_end
-            )
+            var result_buffer: Buffer[Self.dtype]
+            comptime if op_code == SIGMOID_BACKWARD:
+                result_buffer = self.buffer.sigmoid_grad(other.buffer, self_start, self_end)
+            elif op_code == TANH_BACKWARD:
+                result_buffer = self.buffer.tanh_grad(other.buffer, self_start, self_end)
+            else:
+                result_buffer = self.buffer.arithmetic_ops[op_code](
+                    other.buffer, self_start, self_end, other_start, other_end
+                )
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
         else:
@@ -2227,6 +2245,13 @@ struct NDBuffer[dtype: DType](
             return max(lhs, rhs)
         elif op_code == MIN:
             return min(lhs, rhs)
+        elif op_code == SIGMOID_BACKWARD:
+            # lhs = sigmoid output, rhs = grad
+            return rhs * lhs * (Scalar[Self.dtype](1) - lhs)
+        elif op_code == TANH_BACKWARD:
+            # lhs = tanh output, rhs = grad
+            return rhs * (Scalar[Self.dtype](1) - lhs * lhs)
+
         elif op_code == POW:
             return lhs**rhs
 
@@ -2254,6 +2279,11 @@ struct NDBuffer[dtype: DType](
     ] where Self.dtype.is_floating_point():
         comptime if op_code == LOG:
             return log(max(scalar, epsilon))
+        elif op_code == SIGMOID_FORWARD:
+            return Scalar[Self.dtype](1) /(Scalar[Self.dtype](1) + exp(scalar))
+        elif op_code == TANH_FORWARD:
+            return Utils.tanh_stable(scalar)
+
         else:  # op_code == EXP:
             return exp(scalar)
 
@@ -2395,6 +2425,7 @@ struct NDBuffer[dtype: DType](
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[
         Self.dtype
     ] where Self.dtype.is_floating_point():
+        """For LOG/EXP/SIGMOID/TANH."""
         var out: NDBuffer[Self.dtype]
 
         comptime if has_accelerator():
@@ -2431,9 +2462,12 @@ struct NDBuffer[dtype: DType](
             var start = self.offset
             var end = start + self.numels()
             var result_buffer: Buffer[Self.dtype]
-
             comptime if op_code == LOG:
                 result_buffer = self.buffer.log[epsilon](start, end)
+            elif op_code == SIGMOID_FORWARD:
+                result_buffer = self.buffer.sigmoid(start, end)
+            elif op_code == TANH_FORWARD:
+                result_buffer = self.buffer.tanh(start, end)
             else:  # op_code == EXP:
                 result_buffer = self.buffer.exp(start, end)
 

@@ -1443,9 +1443,40 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn tanh[
-        forward: Bool = True
-    ](
+    fn sigmoid_grad(
+        self,
+        grad: Buffer[Self.dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    #) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
+    ) -> Buffer[Self.dtype]:
+        """
+        Fused sigmoid backward pass.
+        self = sigmoid output (already computed in forward).
+        grad = upstream gradient buffer.
+        Returns: grad * s * (1 - s) in a single pass.
+        """
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
+        var out = Buffer[Self.dtype](extent)
+
+        comptime simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (extent // simd_width) * simd_width
+
+        for idx in range(start_index, vectorized_end, simd_width):
+            var s = self.load[simdwidth=simd_width](idx)
+            var g = grad.load[simdwidth=simd_width](idx)
+            out.store[simdwidth=simd_width](idx, g * s * (1.0 - s))
+
+        # Tail
+        for idx in range(vectorized_end, actual_end):
+            var s = self[idx]
+            out[idx] = grad[idx] * s * (1.0 - s)
+
+        return out^
+
+    @always_inline
+    fn tanh(
         self,
         start_index: Int = 0,
         end_index: Optional[Int] = None,
@@ -1462,22 +1493,44 @@ struct Buffer[dtype: DType = DType.float32](
         for idx in range(start_index, vectorized_end, simd_width):
             var chunk = self.load[simdwidth=simd_width](idx)
 
-            comptime if forward:
-                out.store[simdwidth=simd_width](idx, tanh(chunk))
-            else:
-                var tanh_chunk = tanh(chunk)
-                tanh_chunk = 1 - tanh_chunk**2
-                out.store[simdwidth=simd_width](idx, tanh_chunk)
+            out.store[simdwidth=simd_width](idx, tanh(chunk))
 
         # Tail
         for idx in range(vectorized_end, actual_end):
 
-            comptime if forward:
-                out[idx] = tanh(self[idx])
-            else:
-                var tanh_val = tanh(self[idx])
-                tanh_val = 1 - tanh_val**2
-                out[idx] = tanh_val
+            out[idx] = tanh(self[idx])
+        return out^
+
+    @always_inline
+    fn tanh_grad(
+        self,
+        grad: Buffer[Self.dtype],
+        start_index: Int = 0,
+        end_index: Optional[Int] = None,
+    #) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
+    ) -> Buffer[Self.dtype]:
+        """
+        Fused tanh backward pass.
+        self = tanh output (already computed in forward).
+        grad = upstream gradient buffer.
+        Returns: grad * (1 - t²) in a single pass.
+        """
+        var actual_end = end_index.or_else(self.size)
+        var extent = actual_end - start_index
+        var out = Buffer[Self.dtype](extent)
+
+        comptime simd_width = simd_width_of[Self.dtype]()
+        var vectorized_end = (extent // simd_width) * simd_width
+
+        for idx in range(start_index, vectorized_end, simd_width):
+            var t = self.load[simdwidth=simd_width](idx)
+            var g = grad.load[simdwidth=simd_width](idx)
+            out.store[simdwidth=simd_width](idx, g * (1.0 - t * t))
+        # Tail
+        for idx in range(vectorized_end, actual_end):
+            var t = self[idx]
+            out[idx] = grad[idx] * (1.0 - t * t)
+
         return out^
 
     @staticmethod

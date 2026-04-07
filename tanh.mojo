@@ -1,10 +1,10 @@
 from tenmo import Tensor
-from mnemonics import AddTensor
+from mnemonics import AddTensor, TANH_BACKWARD
 from backpropagation import Delegate, BackwardFn, BACKWARD_TANH
 from gradbox import Gradbox
 from std.math import tanh, exp
 from ndbuffer import NDBuffer
-
+from utilities import Utils
 
 @fieldwise_init
 struct TanhBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
@@ -14,42 +14,16 @@ struct TanhBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ] where Self.dtype.is_floating_point():
         ref gradbox = output.gradients()[]
-        ref input_tensor = output.ancestry().get(0)
-        ref shape = input_tensor.shape()
-        var gradbox_ancestor: Gradbox[Self.dtype]
+        ref parent = output.ancestry().get(0)
+        var ndb = output.buffer.arithmetic_ops[TANH_BACKWARD](gradbox.buffer)
+        var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
 
-        if input_tensor.is_contiguous():
-            var start = input_tensor.offset()
-            var end = start + input_tensor.numels()
-            var buffer = input_tensor.buffer.data_buffer().tanh[forward=False](
-                start, end
-            )
-            var ancestor_grad_buffer = gradbox.buffer.data_buffer() * buffer
-            var ndb = NDBuffer[Self.dtype](ancestor_grad_buffer^, shape)
-            gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
-
-        else:
-            gradbox_ancestor = Gradbox[Self.dtype].zeros(shape, share=False)
-            var index = 0
-            ref gradbox_buffer = gradbox.buffer.data_buffer()
-            ref ancestor_gradbox_buffer = gradbox_ancestor.buffer.data_buffer()
-            for idx in input_tensor.index_iterator():
-                var tanh_value = (
-                    1
-                    - Tanh[Self.dtype].tanh_stable(input_tensor.buffer.get(idx))
-                    ** 2
-                )
-                ancestor_gradbox_buffer[index] = (
-                    gradbox_buffer[index] * tanh_value
-                )
-                index += 1
-
-        return [(input_tensor, gradbox_ancestor^, AddTensor)]
+        return [(parent, gradbox_ancestor^, AddTensor)]
 
 
 @fieldwise_init
@@ -61,25 +35,8 @@ struct Tanh[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        var out: Tensor[Self.dtype]
-        ref shape = self.shape()
-        if self.is_contiguous():
-            var start = self.offset()
-            var end = start + self.numels()
-            var buffer = self.buffer.data_buffer().tanh[forward=True](
-                start, end
-            )
-            out = Tensor[Self.dtype](
-                NDBuffer[Self.dtype](buffer^, shape), requires_grad=False
-            )
-
-        else:
-            out = Tensor[Self.dtype].zeros(shape, requires_grad=False)
-            var index = 0
-            ref out_buffer = out.buffer.data_buffer()
-            for coord in shape:
-                out_buffer[index] = Self.tanh_stable(self[coord])
-                index += 1
+        var ndb = self.buffer.tanh()
+        var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
             grad_required = requires_grad.or_else(self.requires_grad)
@@ -89,7 +46,6 @@ struct Tanh[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 backward_fn = TanhBackward[Self.dtype]().into_backward_fn()
                 out.backwardFn = Optional(backward_fn^)
                 out.add_ancestry(self)
-
         return out^
 
     @staticmethod

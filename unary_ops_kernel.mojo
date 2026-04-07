@@ -19,15 +19,8 @@ from std.math import log, exp, sqrt
 
 
 # ── Generic unary ops kernel (SQRT, NEGATE, ABS, RELU) ───────────────────────
-# LOG, EXP, TANH, SIGMOID are handled by dedicated typed kernels because:
-# - log(), exp() require where dtype.is_floating_point()
-# - GPU compiler doesn't yet support that constraint on generic kernels
-#   in current stable Mojo — even with hardcoded dtype, the runtime proof
-#   fails. Dedicated typed kernels sidestep the constraint entirely.
-# - tanh() additionally requires PTX ISA 7.0+ — implemented via exp() identity
-# - sigmoid() is 1 / (1 + e^-x) — also requires exp()
-#
-# RELU = max(x, 0) — pure arithmetic, no float constraint — lives here.
+# Works for any dtype — no floating point constraint needed.
+# LOG, EXP, TANH, SIGMOID live in float_unary_ops below.
 
 
 fn unary_ops[
@@ -41,7 +34,7 @@ fn unary_ops[
     size: Int,
 ):
     """Generic unary ops kernel — SQRT, NEGATE, ABS, RELU.
-    LOG, EXP, TANH, SIGMOID are handled by dedicated typed kernels.
+    LOG, EXP, TANH, SIGMOID are handled by float_unary_ops.
     RELU = max(x, 0) — pure arithmetic, safe for any dtype.
     """
     var tid = thread_idx.x
@@ -90,89 +83,34 @@ fn unary_ops[
         base_idx += stride * CHUNK_SIZE
 
 
-# ── Dedicated exp kernels ─────────────────────────────────────────────────────
+# ── Floating point unary ops kernel (LOG, EXP, TANH, SIGMOID) ────────────────
+# Single merged kernel — requires dtype.is_floating_point().
+# Supported in Mojo 0.26.2+; previously crashed the compiler.
+#
+# tanh notes:
+#   tanh() requires PTX ISA 7.0+ — implemented via exp() identity:
+#   tanh(x) = (e^2x - 1) / (e^2x + 1)  — works on all PTX ISA versions.
+#
+# log notes:
+#   epsilon-clamped: log(max(x, epsilon)) to avoid log(0) = -inf.
+#   epsilon defaults differ by dtype:
+#     float32 → 1e-7  (1e-12 flushes to 0.0 in float32 — silent breakage)
+#     float64 → 1e-12
 
 
-fn exp_op_f32[
-    simd_width: Int = simd_width_of[DType.float32](),
+fn float_unary_ops[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
     simd_vectors_per_thread: Int = 2 * simd_width,
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ](
-    result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     size: Int,
-):
-    """Dedicated float32 exp kernel."""
-    var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
-
-    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-    var base_idx = gtid * CHUNK_SIZE
-
-    while base_idx < size:
-
-        comptime for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
-
-            if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](i)
-                result.store[width=simd_width](i, exp(vec_a))
-
-            elif i < size:
-                for j in range(size - i):
-                    result[i + j] = exp(A[i + j])
-
-        base_idx += stride * CHUNK_SIZE
-
-
-fn exp_op_f64[
-    simd_width: Int = simd_width_of[DType.float64](),
-    simd_vectors_per_thread: Int = 2 * simd_width,
-](
-    result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
-    A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
-    size: Int,
-):
-    """Dedicated float64 exp kernel."""
-    var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
-
-    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-    var base_idx = gtid * CHUNK_SIZE
-
-    while base_idx < size:
-
-        comptime for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
-
-            if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](i)
-                result.store[width=simd_width](i, exp(vec_a))
-
-            elif i < size:
-                for j in range(size - i):
-                    result[i + j] = exp(A[i + j])
-
-        base_idx += stride * CHUNK_SIZE
-
-
-# ── Dedicated tanh kernels ────────────────────────────────────────────────────
-# tanh() requires PTX ISA 7.0+ which is not generally available.
-# Identity used: tanh(x) = (e^2x - 1) / (e^2x + 1)
-# Only requires exp() — available on all PTX ISA versions.
-
-
-fn tanh_op_f32[
-    simd_width: Int = simd_width_of[DType.float32](),
-    simd_vectors_per_thread: Int = 2 * simd_width,
-](
-    result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
-    size: Int,
-):
-    """Dedicated float32 tanh kernel.
-    Implemented as (e^2x - 1) / (e^2x + 1) to avoid PTX ISA 7.0 requirement.
+) where dtype.is_floating_point():
+    """Floating point unary ops kernel — LOG, EXP, TANH, SIGMOID.
+    Requires dtype.is_floating_point() — supported in Mojo 0.26.2+.
     """
     var tid = thread_idx.x
     var gtid = Int(tid + block_dim.x * block_idx.x)
@@ -188,218 +126,40 @@ fn tanh_op_f32[
 
             if i + simd_width <= size:
                 var vec_a = A.load[width=simd_width](i)
-                var e2x = exp(vec_a + vec_a)
-                var one = SIMD[DType.float32, simd_width](1.0)
-                result.store[width=simd_width](i, (e2x - one) / (e2x + one))
+                var one = SIMD[dtype, simd_width](1.0)
+                var vec_result: SIMD[dtype, simd_width]
+
+                comptime if op_code == LOG:
+                    vec_result = log(max(vec_a, SIMD[dtype, simd_width](epsilon)))
+                elif op_code == EXP:
+                    vec_result = exp(vec_a)
+                elif op_code == TANH_FORWARD:
+                    var e2x = exp(vec_a + vec_a)
+                    vec_result = (e2x - one) / (e2x + one)
+                else:  # SIGMOID_FORWARD
+                    vec_result = one / (one + exp(-vec_a))
+
+                result.store[width=simd_width](i, vec_result)
 
             elif i < size:
                 for j in range(size - i):
                     var x = A[i + j]
-                    var e2x = exp(x + x)
-                    result[i + j] = (e2x - 1.0) / (e2x + 1.0)
+                    var res: Scalar[dtype]
+
+                    comptime if op_code == LOG:
+                        res = log(max(x, epsilon))
+                    elif op_code == EXP:
+                        res = exp(x)
+                    elif op_code == TANH_FORWARD:
+                        var e2x = exp(x + x)
+                        res = (e2x - 1.0) / (e2x + 1.0)
+                    else:  # SIGMOID_FORWARD
+                        res = 1.0 / (1.0 + exp(-x))
+
+                    result[i + j] = res
 
         base_idx += stride * CHUNK_SIZE
 
-
-fn tanh_op_f64[
-    simd_width: Int = simd_width_of[DType.float64](),
-    simd_vectors_per_thread: Int = 2 * simd_width,
-](
-    result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
-    A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
-    size: Int,
-):
-    """Dedicated float64 tanh kernel.
-    Implemented as (e^2x - 1) / (e^2x + 1) to avoid PTX ISA 7.0 requirement.
-    """
-    var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
-
-    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-    var base_idx = gtid * CHUNK_SIZE
-
-    while base_idx < size:
-
-        comptime for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
-
-            if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](i)
-                var e2x = exp(vec_a + vec_a)
-                var one = SIMD[DType.float64, simd_width](1.0)
-                result.store[width=simd_width](i, (e2x - one) / (e2x + one))
-
-            elif i < size:
-                for j in range(size - i):
-                    var x = A[i + j]
-                    var e2x = exp(x + x)
-                    result[i + j] = (e2x - 1.0) / (e2x + 1.0)
-
-        base_idx += stride * CHUNK_SIZE
-
-
-# ── Dedicated sigmoid kernels ─────────────────────────────────────────────────
-# sigmoid(x) = 1 / (1 + e^-x)
-# Requires exp() — same is_floating_point() constraint — dedicated kernels.
-
-
-fn sigmoid_op_f32[
-    simd_width: Int = simd_width_of[DType.float32](),
-    simd_vectors_per_thread: Int = 2 * simd_width,
-](
-    result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
-    size: Int,
-):
-    """Dedicated float32 sigmoid kernel.
-    Implemented as 1 / (1 + e^-x).
-    """
-    var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
-
-    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-    var base_idx = gtid * CHUNK_SIZE
-
-    while base_idx < size:
-
-        comptime for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
-
-            if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](i)
-                var one = SIMD[DType.float32, simd_width](1.0)
-                result.store[width=simd_width](i, one / (one + exp(-vec_a)))
-
-            elif i < size:
-                for j in range(size - i):
-                    var x = A[i + j]
-                    result[i + j] = 1.0 / (1.0 + exp(-x))
-
-        base_idx += stride * CHUNK_SIZE
-
-
-fn sigmoid_op_f64[
-    simd_width: Int = simd_width_of[DType.float64](),
-    simd_vectors_per_thread: Int = 2 * simd_width,
-](
-    result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
-    A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
-    size: Int,
-):
-    """Dedicated float64 sigmoid kernel.
-    Implemented as 1 / (1 + e^-x).
-    """
-    var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
-
-    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-    var base_idx = gtid * CHUNK_SIZE
-
-    while base_idx < size:
-
-        comptime for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
-
-            if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](i)
-                var one = SIMD[DType.float64, simd_width](1.0)
-                result.store[width=simd_width](i, one / (one + exp(-vec_a)))
-
-            elif i < size:
-                for j in range(size - i):
-                    var x = A[i + j]
-                    result[i + j] = 1.0 / (1.0 + exp(-x))
-
-        base_idx += stride * CHUNK_SIZE
-
-
-# ── Dedicated log kernels ─────────────────────────────────────────────────────
-# epsilon defaults differ by dtype:
-#   float32 → 1e-7  (1e-12 flushes to 0.0 in float32 — silent breakage)
-#   float64 → 1e-12
-
-
-fn log_op_f32[
-    simd_width: Int = simd_width_of[DType.float32](),
-    simd_vectors_per_thread: Int = 2 * simd_width,
-    epsilon: Scalar[DType.float32] = Epsilon[DType.float32].value(),
-](
-    result: UnsafePointer[Scalar[DType.float32], MutAnyOrigin],
-    A: UnsafePointer[Scalar[DType.float32], ImmutAnyOrigin],
-    size: Int,
-):
-    """Dedicated float32 log kernel with epsilon clamping.
-    epsilon defaults to 1e-7 (safe for float32 precision floor).
-    """
-    var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
-
-    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-    var base_idx = gtid * CHUNK_SIZE
-
-    while base_idx < size:
-
-        comptime for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
-
-            if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](i)
-                var clamped = max(
-                    vec_a, SIMD[DType.float32, simd_width](epsilon)
-                )
-                result.store[width=simd_width](i, log(clamped))
-
-            elif i < size:
-                for j in range(size - i):
-                    var val = A[i + j]
-                    var clamped = max(val, epsilon)
-                    result[i + j] = log(clamped)
-
-        base_idx += stride * CHUNK_SIZE
-
-
-fn log_op_f64[
-    simd_width: Int = simd_width_of[DType.float64](),
-    simd_vectors_per_thread: Int = 2 * simd_width,
-    epsilon: Scalar[DType.float64] = Epsilon[DType.float64].value(),
-](
-    result: UnsafePointer[Scalar[DType.float64], MutAnyOrigin],
-    A: UnsafePointer[Scalar[DType.float64], ImmutAnyOrigin],
-    size: Int,
-):
-    """Dedicated float64 log kernel with epsilon clamping.
-    epsilon defaults to 1e-12 (safe for float64 precision).
-    """
-    var tid = thread_idx.x
-    var gtid = Int(tid + block_dim.x * block_idx.x)
-    var stride = Int(block_dim.x * grid_dim.x)
-
-    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-    var base_idx = gtid * CHUNK_SIZE
-
-    while base_idx < size:
-
-        comptime for item in range(simd_vectors_per_thread):
-            var i = base_idx + item * simd_width
-
-            if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](i)
-                var clamped = max(
-                    vec_a, SIMD[DType.float64, simd_width](epsilon)
-                )
-                result.store[width=simd_width](i, log(clamped))
-
-            elif i < size:
-                for j in range(size - i):
-                    var val = A[i + j]
-                    var clamped = max(val, epsilon)
-                    result[i + j] = log(clamped)
-
-        base_idx += stride * CHUNK_SIZE
 
 
 # ── UnaryOpsKernel launcher ───────────────────────────────────────────────────
@@ -416,12 +176,11 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         Result is contiguous with zero offset.
 
         Dispatch:
-          LOG              → log_op_f32 / log_op_f64     (epsilon-clamped)
-          EXP              → exp_op_f32 / exp_op_f64
-          TANH             → tanh_op_f32 / tanh_op_f64   (via exp identity)
-          SIGMOID          → sigmoid_op_f32 / sigmoid_op_f64 (via exp)
+          LOG, EXP,
+          TANH_FORWARD,
+          SIGMOID_FORWARD  → float_unary_ops  (dtype.is_floating_point())
           SQRT, NEGATE,
-          ABS, RELU        → unary_ops                   (any dtype)
+          ABS, RELU        → unary_ops        (any dtype)
         """
         debug_assert(A.is_on_gpu())
 
@@ -435,207 +194,53 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         ref device_state = A.device_state.value()
         var device_context = device_state.gpu()
 
-        # Ensure contiguous GPU input
         var contig_state = A.contiguous_device_state()
 
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
             numels
         )
 
-        comptime if op_code == LOG:
-
-            comptime if Self.dtype == DType.float32:
-                var compiled = device_context.compile_function[
-                    log_op_f32[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                        epsilon = epsilon.cast[DType.float32](),
-                    ],
-                    log_op_f32[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                        epsilon = epsilon.cast[DType.float32](),
-                    ],
-                ]()
-                device_context.enqueue_function(
-                    compiled,
-                    result_buffer,
-                    contig_state.device_buffer(),
-                    numels,
-                    grid_dim=num_blocks,
-                    block_dim=threads_per_block,
-                )
-            elif Self.dtype == DType.float64:
-                var compiled = device_context.compile_function[
-                    log_op_f64[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                        epsilon = epsilon.cast[DType.float64](),
-                    ],
-                    log_op_f64[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                        epsilon = epsilon.cast[DType.float64](),
-                    ],
-                ]()
-                device_context.enqueue_function(
-                    compiled,
-                    result_buffer,
-                    contig_state.device_buffer(),
-                    numels,
-                    grid_dim=num_blocks,
-                    block_dim=threads_per_block,
-                )
-            else:
+        comptime if op_code == LOG or op_code == EXP or op_code == TANH_FORWARD or op_code == SIGMOID_FORWARD:
+            comptime if not Self.dtype.is_floating_point():
                 panic(
-                    "UnaryOpsKernel: LOG only supported for float32 and float64"
+                    "UnaryOpsKernel: LOG/EXP/TANH/SIGMOID require a floating"
+                    " point dtype"
                 )
-        elif op_code == EXP:
-
-            comptime if Self.dtype == DType.float32:
-                var compiled = device_context.compile_function[
-                    exp_op_f32[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                    exp_op_f32[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                ]()
-                device_context.enqueue_function(
-                    compiled,
-                    result_buffer,
-                    contig_state.device_buffer(),
-                    numels,
-                    grid_dim=num_blocks,
-                    block_dim=threads_per_block,
-                )
-            elif Self.dtype == DType.float64:
-                var compiled = device_context.compile_function[
-                    exp_op_f64[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                    exp_op_f64[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                ]()
-                device_context.enqueue_function(
-                    compiled,
-                    result_buffer,
-                    contig_state.device_buffer(),
-                    numels,
-                    grid_dim=num_blocks,
-                    block_dim=threads_per_block,
-                )
-            else:
-                panic(
-                    "UnaryOpsKernel: EXP only supported for float32 and float64"
-                )
-        elif op_code == TANH_FORWARD:
-
-            comptime if Self.dtype == DType.float32:
-                var compiled = device_context.compile_function[
-                    tanh_op_f32[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                    tanh_op_f32[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                ]()
-                device_context.enqueue_function(
-                    compiled,
-                    result_buffer,
-                    contig_state.device_buffer(),
-                    numels,
-                    grid_dim=num_blocks,
-                    block_dim=threads_per_block,
-                )
-            elif Self.dtype == DType.float64:
-                var compiled = device_context.compile_function[
-                    tanh_op_f64[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                    tanh_op_f64[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                ]()
-                device_context.enqueue_function(
-                    compiled,
-                    result_buffer,
-                    contig_state.device_buffer(),
-                    numels,
-                    grid_dim=num_blocks,
-                    block_dim=threads_per_block,
-                )
-            else:
-                panic(
-                    "UnaryOpsKernel: TANH only supported for float32 and"
-                    " float64"
-                )
-        elif op_code == SIGMOID_FORWARD:
-
-            comptime if Self.dtype == DType.float32:
-                var compiled = device_context.compile_function[
-                    sigmoid_op_f32[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                    sigmoid_op_f32[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                ]()
-                device_context.enqueue_function(
-                    compiled,
-                    result_buffer,
-                    contig_state.device_buffer(),
-                    numels,
-                    grid_dim=num_blocks,
-                    block_dim=threads_per_block,
-                )
-            elif Self.dtype == DType.float64:
-                var compiled = device_context.compile_function[
-                    sigmoid_op_f64[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                    sigmoid_op_f64[
-                        simd_width=simdwidth,
-                        simd_vectors_per_thread = 2 * simdwidth,
-                    ],
-                ]()
-                device_context.enqueue_function(
-                    compiled,
-                    result_buffer,
-                    contig_state.device_buffer(),
-                    numels,
-                    grid_dim=num_blocks,
-                    block_dim=threads_per_block,
-                )
-            else:
-                panic(
-                    "UnaryOpsKernel: SIGMOID only supported for float32 and"
-                    " float64"
-                )
+            var compiled = device_context.compile_function[
+                float_unary_ops[
+                    op_code=op_code,
+                    dtype=Self.dtype,
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread = 2 * simdwidth,
+                    epsilon=epsilon,
+                ],
+                float_unary_ops[
+                    op_code=op_code,
+                    dtype=Self.dtype,
+                    simd_width=simdwidth,
+                    simd_vectors_per_thread = 2 * simdwidth,
+                    epsilon=epsilon,
+                ],
+            ]()
+            device_context.enqueue_function(
+                compiled,
+                result_buffer,
+                contig_state.device_buffer(),
+                numels,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
         else:
-            # Generic unary_ops kernel for SQRT, NEGATE, ABS, RELU
             var compiled = device_context.compile_function[
                 unary_ops[
                     op_code=op_code,
-                    dtype = Self.dtype,
+                    dtype=Self.dtype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread = 2 * simdwidth,
                 ],
                 unary_ops[
                     op_code=op_code,
-                    dtype = Self.dtype,
+                    dtype=Self.dtype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread = 2 * simdwidth,
                 ],
@@ -657,18 +262,6 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         return NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
 
     @staticmethod
-    fn launch_parked[
-        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ](A: Tensor[Self.dtype]) raises -> Tensor[Self.dtype]:
-        """
-        Convenience overload — takes Tensor, returns Tensor.
-        Delegates to NDBuffer overload.
-        """
-        debug_assert(A.is_on_gpu())
-        var result_ndb = Self.launch[op_code, epsilon](A.buffer)
-        return Tensor[Self.dtype](result_ndb^, requires_grad=False)
-
-    @staticmethod
     fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:
         threads_per_block: Int
         num_blocks: Int
@@ -686,7 +279,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             )
             num_blocks = min(
                 (total_chunks + 255) // 256, 512
-            )  # Cap at 512 blocks
+            )
         return threads_per_block, num_blocks
 
 
@@ -732,7 +325,7 @@ fn main() raises:
     assert_true(result.to_cpu().all_close(expect))
 
     # Test RELU
-    tensor_A = Tensor[dtype].randn(SIZE)  # mix of positive and negative
+    tensor_A = Tensor[dtype].randn(SIZE)
     var tensor_a_relu = tensor_A.to_gpu()
     expect = tensor_A.relu()
     start = now()

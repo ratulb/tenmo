@@ -44,8 +44,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             for i in range(len(self.parameters)):
                 ref parameter = self.parameters[i][]
 
-                @parameter
-                if has_accelerator():
+                comptime if has_accelerator():
                     if parameter.is_on_gpu():
                         self.velocities.append(
                             Gradbox[Self.dtype].full(
@@ -68,25 +67,25 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                         )
                     )
 
-    fn __copyinit__(out self, existing: Self):
-        self.parameters = existing.parameters.copy()
-        self.lr = existing.lr
-        self.momentum = existing.momentum
-        self.weight_decay = existing.weight_decay
-        self.clip_norm = existing.clip_norm
-        self.clip_value = existing.clip_value
-        self.use_momentum = existing.use_momentum
-        self.velocities = existing.velocities.copy()
+    fn __copyinit__(out self, copy: Self):
+        self.parameters = copy.parameters.copy()
+        self.lr = copy.lr
+        self.momentum = copy.momentum
+        self.weight_decay = copy.weight_decay
+        self.clip_norm = copy.clip_norm
+        self.clip_value = copy.clip_value
+        self.use_momentum = copy.use_momentum
+        self.velocities = copy.velocities.copy()
 
-    fn __moveinit__(out self, deinit existing: Self):
-        self.parameters = existing.parameters^
-        self.lr = existing.lr
-        self.momentum = existing.momentum
-        self.weight_decay = existing.weight_decay
-        self.clip_norm = existing.clip_norm
-        self.clip_value = existing.clip_value
-        self.use_momentum = existing.use_momentum
-        self.velocities = existing.velocities^
+    fn __moveinit__(out self, deinit take: Self):
+        self.parameters = take.parameters^
+        self.lr = take.lr
+        self.momentum = take.momentum
+        self.weight_decay = take.weight_decay
+        self.clip_norm = take.clip_norm
+        self.clip_value = take.clip_value
+        self.use_momentum = take.use_momentum
+        self.velocities = take.velocities^
 
     # ── Core SIMD update logic — device-agnostic ──────────────────────────────
 
@@ -211,8 +210,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             ref grad = parameter.gradients()[]
             var num_elements = grad.num_elements()
 
-            @parameter
-            if has_accelerator():
+            comptime if has_accelerator():
                 if parameter.is_on_gpu():
                     try:
                         var ds = grad.buffer.device_state.value()
@@ -231,7 +229,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                                 total_norm_sq += g * g
                     except e:
                         panic(
-                            "SGD.compute_grad_norm GPU failed: " + e.__str__()
+                            "SGD.compute_grad_norm GPU failed: " + String(e)
                         )
                     continue
 
@@ -267,8 +265,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     ref grad = parameter.gradients()[]
                     var num_elements = grad.num_elements()
 
-                    @parameter
-                    if has_accelerator():
+                    comptime if has_accelerator():
                         if parameter.is_on_gpu():
                             try:
                                 var ds = grad.buffer.device_state.value()
@@ -280,7 +277,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                                     )
                             except e:
                                 panic(
-                                    "SGD.clip_norm GPU failed: " + e.__str__()
+                                    "SGD.clip_norm GPU failed: " + String(e)
                                 )
                             continue
 
@@ -296,8 +293,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                 ref grad = parameter.gradients()[]
                 var num_elements = grad.num_elements()
 
-                @parameter
-                if has_accelerator():
+                comptime if has_accelerator():
                     if parameter.is_on_gpu():
                         try:
                             var ds = grad.buffer.device_state.value()
@@ -306,7 +302,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                                     host.unsafe_ptr().bitcast[Scalar[Self.dtype]](), num_elements
                                 )
                         except e:
-                            panic("SGD.clip_value GPU failed: " + e.__str__())
+                            panic("SGD.clip_value GPU failed: " + String(e))
                         continue
 
                 self._apply_clip_value_to_ptr[simd_w](
@@ -339,8 +335,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
             ref grad = parameter.gradients()[]
             var num_elements = parameter.num_elements()
 
-            @parameter
-            if has_accelerator():
+            comptime if has_accelerator():
                 if parameter.is_on_gpu():
                     try:
                         var param_ds = parameter.buffer.device_state.value()
@@ -366,7 +361,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
                         param_ds.sync()
                     except e:
-                        panic("SGD.step GPU failed: " + e.__str__())
+                        panic("SGD.step GPU failed: " + String(e))
                     continue
 
             # CPU path

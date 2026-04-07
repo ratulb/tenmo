@@ -483,7 +483,7 @@ fn test_sum_large_1d_cpu() raises:
     var a = Tensor[dtype].d1(data)
     var result = a.sum()
     var expected = (size * (size + 1)) // 2
-    assert_true(result.item() == expected)
+    assert_true(result.item() == Float32(expected))
     print("✓ CPU large 1D sum passed")
 
 fn test_sum_large_1d_gpu() raises:

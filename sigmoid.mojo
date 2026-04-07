@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from mnemonics import AddTensor
+from mnemonics import AddTensor, SIGMOID_BACKWARD
 from backpropagation import Delegate, BackwardFn, BACKWARD_SIGMOID
 from gradbox import Gradbox
 from std.math import exp
@@ -14,12 +14,16 @@ struct SigmoidBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         self, output: Tensor[Self.dtype]
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ] where Self.dtype.is_floating_point():
+    #] where Self.dtype.is_floating_point():
+    ]:
         ref gradbox = output.gradients()[]
-        var input_tensor = output.ancestry().get(0)
-        ref shape = input_tensor.shape()
-        var gradbox_ancestor: Gradbox[Self.dtype]
-        if input_tensor.is_contiguous():
+        var parent = output.ancestry().get(0)
+        #ref shape = input_tensor.shape()
+        var ndb = output.buffer.arithmetic_ops[SIGMOID_BACKWARD](gradbox.buffer)
+        var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
+
+
+        _="""if input_tensor.is_contiguous():
             var output_buffer = output.buffer.data_buffer()
             var ancestor_grad_buffer = gradbox.buffer.data_buffer() * (
                 output_buffer * (Scalar[Self.dtype](1) - output_buffer)
@@ -36,8 +40,8 @@ struct SigmoidBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 ancestor_gradbox_buffer[index] = (
                     gradbox_buffer[index] * sigmoid_value * (Scalar[Self.dtype](1) - sigmoid_value)
                 )
-                index += 1
-        return [(input_tensor^, gradbox_ancestor^, AddTensor)]
+                index += 1"""
+        return [(parent^, gradbox_ancestor^, AddTensor)]
 
 
 struct Sigmoid[dtype: DType](RegisterPassable, ImplicitlyCopyable):
@@ -48,8 +52,9 @@ struct Sigmoid[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         self: Tensor[Self.dtype],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
-        var out: Tensor[Self.dtype]
-        ref shape = self.shape()
+        var ndb = self.buffer.sigmoid()
+        var out = Tensor[Self.dtype](ndb^, requires_grad=False)
+        _="""ref shape = self.shape()
         if self.is_contiguous():
             var start = self.offset()
             var end = start + self.numels()
@@ -64,7 +69,7 @@ struct Sigmoid[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             for idx in self.index_iterator():
                 var sigmoid_value = Scalar[Self.dtype](1) / (Scalar[Self.dtype](1) + exp(-self.buffer.get(idx)))
                 out_buffer[index] = sigmoid_value
-                index += 1
+                index += 1"""
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:

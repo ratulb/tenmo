@@ -312,16 +312,6 @@ def assert_grad[
     )
 
 
-# Create a single or two element(s) VariadicList
-    _="""fn variadic1or2(m: Int, n: Int = -1) -> VariadicList[Int, True]:
-    fn create_variadic_list(*elems: Int) -> VariadicList[Int, True]:
-        return {elems, True}
-
-    if n == -1:
-        return create_variadic_list(m)
-    return create_variadic_list(m, n)"""
-
-
 @fieldwise_init
 struct NewAxis(Copyable & Movable):  # Empty struct as a sentinel
     pass
