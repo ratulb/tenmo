@@ -561,8 +561,7 @@ fn test_argmax_with_zeros_cpu() raises:
 
 
 fn test_argmin_1d_basic_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_1d_basic_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
@@ -574,8 +573,7 @@ fn test_argmin_1d_basic_gpu() raises:
 
 
 fn test_argmax_1d_basic_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmax_1d_basic_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d1([5.0, 2.0, 8.0, 1.0, 9.0])
@@ -587,8 +585,7 @@ fn test_argmax_1d_basic_gpu() raises:
 
 
 fn test_argmin_1d_negative_values_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_1d_negative_values_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
@@ -600,8 +597,7 @@ fn test_argmin_1d_negative_values_gpu() raises:
 
 
 fn test_argmax_1d_negative_values_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmax_1d_negative_values_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d1([-5.0, -2.0, -8.0, -1.0, -9.0])
@@ -618,8 +614,7 @@ fn test_argmax_1d_negative_values_gpu() raises:
 
 
 fn test_argmin_2d_axis0_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_2d_axis0_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d2(
@@ -633,8 +628,7 @@ fn test_argmin_2d_axis0_gpu() raises:
 
 
 fn test_argmin_2d_axis1_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_2d_axis1_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d2(
@@ -648,8 +642,7 @@ fn test_argmin_2d_axis1_gpu() raises:
 
 
 fn test_argmax_2d_axis0_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmax_2d_axis0_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d2(
@@ -663,8 +656,7 @@ fn test_argmax_2d_axis0_gpu() raises:
 
 
 fn test_argmax_2d_axis1_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmax_2d_axis1_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d2(
@@ -678,8 +670,7 @@ fn test_argmax_2d_axis1_gpu() raises:
 
 
 fn test_argmin_2d_keepdims_axis0_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_2d_keepdims_axis0_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d2([[3.0, 1.0, 4.0], [2.0, 0.5, 6.0]])
@@ -692,8 +683,7 @@ fn test_argmin_2d_keepdims_axis0_gpu() raises:
 
 
 fn test_argmax_2d_keepdims_axis1_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmax_2d_keepdims_axis1_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d2([[3.0, 1.0, 4.0], [2.0, 0.5, 6.0]])
@@ -706,8 +696,7 @@ fn test_argmax_2d_keepdims_axis1_gpu() raises:
 
 
 fn test_argmin_2d_negative_axis_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_2d_negative_axis_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d2([[3.0, 1.0, 4.0], [2.0, 0.5, 6.0]])
@@ -724,8 +713,7 @@ fn test_argmin_2d_negative_axis_gpu() raises:
 
 
 fn test_argmin_3d_axis0_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_3d_axis0_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d3(
@@ -739,8 +727,7 @@ fn test_argmin_3d_axis0_gpu() raises:
 
 
 fn test_argmin_3d_axis1_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_3d_axis1_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d3(
@@ -754,8 +741,7 @@ fn test_argmin_3d_axis1_gpu() raises:
 
 
 fn test_argmin_3d_axis2_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_3d_axis2_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d3(
@@ -769,8 +755,7 @@ fn test_argmin_3d_axis2_gpu() raises:
 
 
 fn test_argmax_3d_axis0_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmax_3d_axis0_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d3(
@@ -784,8 +769,7 @@ fn test_argmax_3d_axis0_gpu() raises:
 
 
 fn test_argmax_3d_axis1_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmax_3d_axis1_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d3(
@@ -799,8 +783,7 @@ fn test_argmax_3d_axis1_gpu() raises:
 
 
 fn test_argmax_3d_axis2_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmax_3d_axis2_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d3(
@@ -814,8 +797,7 @@ fn test_argmax_3d_axis2_gpu() raises:
 
 
 fn test_argmin_3d_keepdims_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_3d_keepdims_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d3(
@@ -834,8 +816,7 @@ fn test_argmin_3d_keepdims_gpu() raises:
 
 
 fn test_argmin_4d_axis0_gpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_argmin_4d_axis0_gpu")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d4(

@@ -422,8 +422,7 @@ fn test_squz_unsquz_cpu_round_trip_axis1() raises:
 # ============================================================
 
 fn test_squz_gpu_single_axis_dim0() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_single_axis_dim0")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -440,8 +439,7 @@ fn test_squz_gpu_single_axis_dim0() raises:
 
 
 fn test_squz_gpu_single_axis_dim1() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_single_axis_dim1")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -457,8 +455,7 @@ fn test_squz_gpu_single_axis_dim1() raises:
 
 
 fn test_squz_gpu_single_axis_last() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_single_axis_last")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -474,8 +471,7 @@ fn test_squz_gpu_single_axis_last() raises:
 
 
 fn test_squz_gpu_all_size1_dims() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_all_size1_dims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3([[[5.0]]], requires_grad=True)  # (1,1,1)
@@ -488,8 +484,7 @@ fn test_squz_gpu_all_size1_dims() raises:
 
 
 fn test_squz_gpu_negative_axis() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_negative_axis")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -504,8 +499,7 @@ fn test_squz_gpu_negative_axis() raises:
 
 
 fn test_squz_gpu_multiple_axes() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_multiple_axes")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(1, 4, 1, 6)
@@ -520,8 +514,7 @@ fn test_squz_gpu_multiple_axes() raises:
 
 
 fn test_squz_gpu_matches_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_matches_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(1, 3, 1, 4)
@@ -540,8 +533,7 @@ fn test_squz_gpu_matches_cpu() raises:
 
 
 fn test_squz_gpu_grad_lands_on_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_grad_lands_on_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3([[[1.0, 2.0, 3.0]]], requires_grad=True)
@@ -554,8 +546,7 @@ fn test_squz_gpu_grad_lands_on_cpu() raises:
 
 
 fn test_squz_gpu_chained_squeeze() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_chained_squeeze")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3([[[3.0, 6.0]]], requires_grad=True)  # (1,1,2)
@@ -568,8 +559,7 @@ fn test_squz_gpu_chained_squeeze() raises:
 
 
 fn test_squz_gpu_grad_accumulation() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_gpu_grad_accumulation")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3([[[1.0, 2.0]]], requires_grad=True)
@@ -590,8 +580,7 @@ fn test_squz_gpu_grad_accumulation() raises:
 
 
 fn test_unsquz_gpu_single_axis_front() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_single_axis_front")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -606,8 +595,7 @@ fn test_unsquz_gpu_single_axis_front() raises:
 
 
 fn test_unsquz_gpu_single_axis_middle() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_single_axis_middle")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -621,8 +609,7 @@ fn test_unsquz_gpu_single_axis_middle() raises:
 
 
 fn test_unsquz_gpu_single_axis_end() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_single_axis_end")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -635,8 +622,7 @@ fn test_unsquz_gpu_single_axis_end() raises:
 
 
 fn test_unsquz_gpu_negative_axis() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_negative_axis")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -649,8 +635,7 @@ fn test_unsquz_gpu_negative_axis() raises:
 
 
 fn test_unsquz_gpu_multiple_axes() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_multiple_axes")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -663,8 +648,7 @@ fn test_unsquz_gpu_multiple_axes() raises:
 
 
 fn test_unsquz_gpu_1d_to_4d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_1d_to_4d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -677,8 +661,7 @@ fn test_unsquz_gpu_1d_to_4d() raises:
 
 
 fn test_unsquz_gpu_matches_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_matches_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(3, 4)
@@ -697,8 +680,7 @@ fn test_unsquz_gpu_matches_cpu() raises:
 
 
 fn test_unsquz_gpu_grad_lands_on_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_grad_lands_on_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -711,8 +693,7 @@ fn test_unsquz_gpu_grad_lands_on_cpu() raises:
 
 
 fn test_unsquz_gpu_chained_unsqueeze() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_chained_unsqueeze")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -725,8 +706,7 @@ fn test_unsquz_gpu_chained_unsqueeze() raises:
 
 
 fn test_unsquz_gpu_grad_accumulation() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_unsquz_gpu_grad_accumulation")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -746,8 +726,7 @@ fn test_unsquz_gpu_grad_accumulation() raises:
 # ============================================================
 
 fn test_squz_unsquz_gpu_round_trip_axis0() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_unsquz_gpu_round_trip_axis0")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -762,8 +741,7 @@ fn test_squz_unsquz_gpu_round_trip_axis0() raises:
 
 
 fn test_squz_unsquz_gpu_round_trip_multi() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_squz_unsquz_gpu_round_trip_multi")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(3, 5)

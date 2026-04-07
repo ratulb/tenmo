@@ -105,8 +105,7 @@ fn main() raises:
     test_item_cpu_1d_tensor()
     test_item_cpu_gradbox_scalar()
 
-    @parameter
-    if not has_accelerator():
+    comptime if not has_accelerator():
         print("No GPU — skipping GPU item tests")
         return
 

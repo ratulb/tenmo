@@ -324,8 +324,7 @@ fn test_contig_cpu_chained_contiguous() raises:
 
 
 fn test_contig_gpu_scalar_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_scalar_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].scalar(42.0)
@@ -337,8 +336,7 @@ fn test_contig_gpu_scalar_forward() raises:
 
 
 fn test_contig_gpu_scalar_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_scalar_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].scalar(3.0)
@@ -356,8 +354,7 @@ fn test_contig_gpu_scalar_backward() raises:
 
 
 fn test_contig_gpu_1d_already_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_1d_already_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -372,8 +369,7 @@ fn test_contig_gpu_1d_already_contiguous() raises:
 
 
 fn test_contig_gpu_1d_values_preserved() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_1d_values_preserved")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([10.0, 20.0, 30.0], requires_grad=True)
@@ -391,8 +387,7 @@ fn test_contig_gpu_1d_values_preserved() raises:
 
 
 fn test_contig_gpu_2d_already_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_2d_already_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -407,8 +402,7 @@ fn test_contig_gpu_2d_already_contiguous() raises:
 
 
 fn test_contig_gpu_2d_transpose_non_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_2d_transpose_non_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -433,8 +427,7 @@ fn test_contig_gpu_2d_transpose_non_contiguous() raises:
 
 
 fn test_contig_gpu_2d_matches_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_2d_matches_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(8, 16)
@@ -455,8 +448,7 @@ fn test_contig_gpu_2d_matches_cpu() raises:
 
 
 fn test_contig_gpu_2d_non_uniform_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_2d_non_uniform_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -477,8 +469,7 @@ fn test_contig_gpu_2d_non_uniform_grad() raises:
 
 
 fn test_contig_gpu_3d_already_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_3d_already_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -495,8 +486,7 @@ fn test_contig_gpu_3d_already_contiguous() raises:
 
 
 fn test_contig_gpu_3d_transpose_last_axes() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_3d_transpose_last_axes")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -520,8 +510,7 @@ fn test_contig_gpu_3d_transpose_last_axes() raises:
 
 
 fn test_contig_gpu_3d_unsqueeze_then_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_3d_unsqueeze_then_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -542,8 +531,7 @@ fn test_contig_gpu_3d_unsqueeze_then_contiguous() raises:
 
 
 fn test_contig_gpu_3d_squeeze_then_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_3d_squeeze_then_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -562,8 +550,7 @@ fn test_contig_gpu_3d_squeeze_then_contiguous() raises:
 
 
 fn test_contig_gpu_3d_matches_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_3d_matches_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(4, 5, 6)
@@ -589,8 +576,7 @@ fn test_contig_gpu_3d_matches_cpu() raises:
 
 
 fn test_contig_gpu_4d_already_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_4d_already_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(2, 3, 4, 5)
@@ -605,8 +591,7 @@ fn test_contig_gpu_4d_already_contiguous() raises:
 
 
 fn test_contig_gpu_4d_transpose_non_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_4d_transpose_non_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(2, 3, 4, 5)
@@ -633,8 +618,7 @@ fn test_contig_gpu_4d_transpose_non_contiguous() raises:
 
 
 fn test_contig_gpu_track_grad_false() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_track_grad_false")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -650,8 +634,7 @@ fn test_contig_gpu_track_grad_false() raises:
 
 
 fn test_contig_gpu_grad_accumulation() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_grad_accumulation")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -674,8 +657,7 @@ fn test_contig_gpu_grad_accumulation() raises:
 
 
 fn test_contig_gpu_grad_lands_on_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_grad_lands_on_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -693,8 +675,7 @@ fn test_contig_gpu_grad_lands_on_cpu() raises:
 
 
 fn test_contig_gpu_chained_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_chained_contiguous")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -716,8 +697,7 @@ fn test_contig_gpu_chained_contiguous() raises:
 
 
 fn test_contig_gpu_cpu_tensor_unchanged() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_contig_gpu_cpu_tensor_unchanged")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)

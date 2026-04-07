@@ -578,8 +578,7 @@ fn main() raises:
     test_sgd_cpu_backward_integration()
     test_sgd_cpu_set_lr()
 
-    @parameter
-    if not has_accelerator():
+    comptime if not has_accelerator():
         print("No GPU — skipping GPU SGD tests")
         return
 

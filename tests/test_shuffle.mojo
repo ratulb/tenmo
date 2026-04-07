@@ -561,8 +561,7 @@ fn test_shuf_cpu_shuffle_then_mean() raises:
 
 
 fn test_shuf_gpu_1d_identity_perm() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_1d_identity_perm")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -579,8 +578,7 @@ fn test_shuf_gpu_1d_identity_perm() raises:
 
 
 fn test_shuf_gpu_1d_reverse_perm() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_1d_reverse_perm")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0], requires_grad=True)
@@ -595,8 +593,7 @@ fn test_shuf_gpu_1d_reverse_perm() raises:
 
 
 fn test_shuf_gpu_1d_arbitrary_perm() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_1d_arbitrary_perm")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1(
@@ -615,8 +612,7 @@ fn test_shuf_gpu_1d_arbitrary_perm() raises:
 
 
 fn test_shuf_gpu_1d_grad_non_uniform() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_1d_grad_non_uniform")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -634,8 +630,7 @@ fn test_shuf_gpu_1d_grad_non_uniform() raises:
 
 
 fn test_shuf_gpu_2d_axis0_reverse() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_2d_axis0_reverse")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -656,8 +651,7 @@ fn test_shuf_gpu_2d_axis0_reverse() raises:
 
 
 fn test_shuf_gpu_2d_axis0_arbitrary() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_2d_axis0_arbitrary")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -676,8 +670,7 @@ fn test_shuf_gpu_2d_axis0_arbitrary() raises:
 
 
 fn test_shuf_gpu_2d_axis0_grad_non_uniform() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_2d_axis0_grad_non_uniform")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -697,8 +690,7 @@ fn test_shuf_gpu_2d_axis0_grad_non_uniform() raises:
 
 
 fn test_shuf_gpu_2d_axis1_reverse() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_2d_axis1_reverse")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -717,8 +709,7 @@ fn test_shuf_gpu_2d_axis1_reverse() raises:
 
 
 fn test_shuf_gpu_2d_axis1_arbitrary() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_2d_axis1_arbitrary")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -742,8 +733,7 @@ fn test_shuf_gpu_2d_axis1_arbitrary() raises:
 
 
 fn test_shuf_gpu_3d_axis0_reverse() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_3d_axis0_reverse")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -774,8 +764,7 @@ fn test_shuf_gpu_3d_axis0_reverse() raises:
 
 
 fn test_shuf_gpu_3d_axis1_arbitrary() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_3d_axis1_arbitrary")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -803,8 +792,7 @@ fn test_shuf_gpu_3d_axis1_arbitrary() raises:
 
 
 fn test_shuf_gpu_3d_axis2_reverse() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_3d_axis2_reverse")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -832,8 +820,7 @@ fn test_shuf_gpu_3d_axis2_reverse() raises:
 
 
 fn test_shuf_gpu_3d_grad_non_uniform() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_3d_grad_non_uniform")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -864,8 +851,7 @@ fn test_shuf_gpu_3d_grad_non_uniform() raises:
 
 
 fn test_shuf_gpu_4d_axis0() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_4d_axis0")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(4, 3, 2, 5)
@@ -879,8 +865,7 @@ fn test_shuf_gpu_4d_axis0() raises:
 
 
 fn test_shuf_gpu_4d_axis2() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_4d_axis2")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(2, 3, 4, 5)
@@ -899,8 +884,7 @@ fn test_shuf_gpu_4d_axis2() raises:
 
 
 fn test_shuf_gpu_matches_cpu_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_matches_cpu_2d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(5, 6)
@@ -919,8 +903,7 @@ fn test_shuf_gpu_matches_cpu_2d() raises:
 
 
 fn test_shuf_gpu_matches_cpu_3d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_matches_cpu_3d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(4, 4, 6)
@@ -939,8 +922,7 @@ fn test_shuf_gpu_matches_cpu_3d() raises:
 
 
 fn test_shuf_gpu_matches_cpu_non_uniform_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_matches_cpu_non_uniform_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(3, 4)
@@ -964,8 +946,7 @@ fn test_shuf_gpu_matches_cpu_non_uniform_grad() raises:
 
 
 fn test_shuf_gpu_random_perm_grad_flow() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_random_perm_grad_flow")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(5, 4)
@@ -984,8 +965,7 @@ fn test_shuf_gpu_random_perm_grad_flow() raises:
 
 
 fn test_shuf_gpu_track_grad_false() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_track_grad_false")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -1001,8 +981,7 @@ fn test_shuf_gpu_track_grad_false() raises:
 
 
 fn test_shuf_gpu_grad_lands_on_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_grad_lands_on_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -1022,8 +1001,7 @@ fn test_shuf_gpu_grad_lands_on_cpu() raises:
 
 
 fn test_shuf_gpu_double_shuffle_roundtrip() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_double_shuffle_roundtrip")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -1044,8 +1022,7 @@ fn test_shuf_gpu_double_shuffle_roundtrip() raises:
 
 
 fn test_shuf_gpu_large_axis_dim() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_large_axis_dim")
         comptime dtype = DType.float32
         # axis dim = 42 — exceeds Array max_rank of 8
@@ -1064,8 +1041,7 @@ fn test_shuf_gpu_large_axis_dim() raises:
 
 
 fn test_shuf_gpu_large_axis_dim_matches_cpu() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_shuf_gpu_large_axis_dim_matches_cpu")
         comptime dtype = DType.float32
         var a = Tensor[dtype].randn(42, 4)

@@ -2804,8 +2804,7 @@ fn ndb_minmax_4d_mixed_strides() raises:
 
 
 fn ndb_minmax_gpu_1d_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("ndb_minmax_gpu_1d_contiguous")
         comptime dtype = DType.float32
         var t = Tensor[dtype].arange(0, 5).to_gpu()
@@ -2820,8 +2819,7 @@ fn ndb_minmax_gpu_1d_contiguous() raises:
 
 
 fn ndb_minmax_gpu_2d_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("ndb_minmax_gpu_2d_contiguous")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
@@ -2837,8 +2835,7 @@ fn ndb_minmax_gpu_2d_contiguous() raises:
 
 
 fn ndb_minmax_gpu_2d_transposed() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("ndb_minmax_gpu_2d_transposed")
         comptime dtype = DType.float32
         var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
@@ -2856,8 +2853,7 @@ fn ndb_minmax_gpu_2d_transposed() raises:
 
 
 fn ndb_minmax_gpu_2d_flipped_axis0() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("ndb_minmax_gpu_2d_flipped_axis0")
         comptime dtype = DType.float32
         _ = """var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
@@ -2872,8 +2868,7 @@ fn ndb_minmax_gpu_2d_flipped_axis0() raises:
 
 
 fn ndb_minmax_gpu_2d_flipped_axis1() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("ndb_minmax_gpu_2d_flipped_axis1")
         comptime dtype = DType.float32
         _ = """var t = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
@@ -2888,8 +2883,7 @@ fn ndb_minmax_gpu_2d_flipped_axis1() raises:
 
 
 fn ndb_minmax_gpu_3d_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("ndb_minmax_gpu_3d_contiguous")
         comptime dtype = DType.float32
         var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4)).to_gpu()
@@ -2906,8 +2900,7 @@ fn ndb_minmax_gpu_3d_contiguous() raises:
 
 
 fn ndb_minmax_gpu_3d_flipped_all_axes() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("ndb_minmax_gpu_3d_flipped_all_axes")
         comptime dtype = DType.float32
         _ = """var t = Tensor[dtype].arange(0, 24).reshape(Shape(2, 3, 4)).to_gpu()
@@ -2920,8 +2913,7 @@ fn ndb_minmax_gpu_3d_flipped_all_axes() raises:
 
 
 fn ndb_minmax_gpu_4d_contiguous() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("ndb_minmax_gpu_4d_contiguous")
         comptime dtype = DType.float32
         var t = Tensor[dtype].arange(0, 16).reshape(Shape(2, 2, 2, 2)).to_gpu()

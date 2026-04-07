@@ -685,8 +685,7 @@ fn test_log_cpu_backward_chained_with_exp() raises:
 
 
 fn test_log_gpu_1d_basic_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_1d_basic_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
@@ -699,8 +698,7 @@ fn test_log_gpu_1d_basic_forward() raises:
 
 
 fn test_log_gpu_2d_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_2d_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
@@ -716,8 +714,7 @@ fn test_log_gpu_2d_forward() raises:
 
 
 fn test_log_gpu_3d_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_3d_forward")
         comptime dtype = DType.float32
         var a = (
@@ -743,8 +740,7 @@ fn test_log_gpu_3d_forward() raises:
 
 
 fn test_log_gpu_ones_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_ones_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].ones(Shape(4)).to_gpu()
@@ -754,8 +750,7 @@ fn test_log_gpu_ones_forward() raises:
 
 
 fn test_log_gpu_epsilon_clamping() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_epsilon_clamping")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([0.0, -1.0, 1.0]).to_gpu()
@@ -768,8 +763,7 @@ fn test_log_gpu_epsilon_clamping() raises:
 
 
 fn test_log_gpu_large_values() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_large_values")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([100.0, 1000.0, 10000.0]).to_gpu()
@@ -784,8 +778,7 @@ fn test_log_gpu_large_values() raises:
 
 
 fn test_log_gpu_1d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_1d_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
@@ -797,8 +790,7 @@ fn test_log_gpu_1d_backward() raises:
 
 
 fn test_log_gpu_2d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_2d_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [4.0, 8.0]], requires_grad=True)
@@ -812,8 +804,7 @@ fn test_log_gpu_2d_backward() raises:
 
 
 fn test_log_gpu_3d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_3d_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -837,8 +828,7 @@ fn test_log_gpu_3d_backward() raises:
 
 
 fn test_log_gpu_backward_chain() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_backward_chain")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 4.0], requires_grad=True)
@@ -850,8 +840,7 @@ fn test_log_gpu_backward_chain() raises:
 
 
 fn test_log_gpu_backward_epsilon_clamping() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_backward_epsilon_clamping")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([0.0, 1.0, 2.0], requires_grad=True)
@@ -865,8 +854,7 @@ fn test_log_gpu_backward_epsilon_clamping() raises:
 
 
 fn test_log_gpu_backward_chained_with_exp() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_backward_chained_with_exp")
         comptime dtype = DType.float32
         # log(exp(x)) = x, grad should be 1.0 everywhere
@@ -879,8 +867,7 @@ fn test_log_gpu_backward_chained_with_exp() raises:
 
 
 fn test_log_gpu_backward_custom_epsilon() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_gpu_backward_custom_epsilon")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([0.0, 1.0, 4.0], requires_grad=True)
@@ -897,8 +884,7 @@ fn test_log_gpu_backward_custom_epsilon() raises:
 
 
 fn test_log_parity_1d_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_parity_1d_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -909,8 +895,7 @@ fn test_log_parity_1d_forward() raises:
 
 
 fn test_log_parity_2d_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_parity_2d_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -921,8 +906,7 @@ fn test_log_parity_2d_forward() raises:
 
 
 fn test_log_parity_1d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_parity_1d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 4.0, 8.0], requires_grad=True)
@@ -938,8 +922,7 @@ fn test_log_parity_1d_backward() raises:
 
 
 fn test_log_parity_2d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_parity_2d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -957,8 +940,7 @@ fn test_log_parity_2d_backward() raises:
 
 
 fn test_log_parity_epsilon_clamping() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_parity_epsilon_clamping")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([0.0, -1.0, 1.0, 2.0], requires_grad=True)
@@ -974,8 +956,7 @@ fn test_log_parity_epsilon_clamping() raises:
 
 
 fn test_log_parity_chain_exp() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_log_parity_chain_exp")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)

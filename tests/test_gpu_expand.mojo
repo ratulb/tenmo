@@ -475,8 +475,7 @@ fn test_gpu_expand_is_zero_stride_view() raises:
 # ============================================================
 
 fn main() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         # 1D → nD
         test_gpu_expand_1d_to_2d_new_batch_dim()
         test_gpu_expand_1d_to_3d()

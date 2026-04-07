@@ -444,8 +444,7 @@ fn main() raises:
     test_roundtrip_gradbox_tensor_gradbox_cpu()
     print("=== All CPU tests passed ===\n")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("=== as_gradbox / as_tensor GPU tests ===")
         test_as_gradbox_gpu_1d_contiguous()
         test_as_gradbox_gpu_2d_contiguous()

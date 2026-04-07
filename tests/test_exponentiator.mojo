@@ -225,8 +225,7 @@ fn test_exp_cpu_backward_one_exponent() raises:
 
 
 fn test_exp_gpu_1d_square() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_1d_square")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0]).to_gpu()
@@ -238,8 +237,7 @@ fn test_exp_gpu_1d_square() raises:
 
 
 fn test_exp_gpu_1d_cube() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_1d_cube")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0]).to_gpu()
@@ -251,8 +249,7 @@ fn test_exp_gpu_1d_cube() raises:
 
 
 fn test_exp_gpu_1d_fractional() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_1d_fractional")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([4.0, 9.0, 16.0]).to_gpu()
@@ -264,8 +261,7 @@ fn test_exp_gpu_1d_fractional() raises:
 
 
 fn test_exp_gpu_1d_zero_exponent() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_1d_zero_exponent")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0]).to_gpu()
@@ -275,8 +271,7 @@ fn test_exp_gpu_1d_zero_exponent() raises:
 
 
 fn test_exp_gpu_2d_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_2d_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[2.0, 3.0], [4.0, 5.0]]).to_gpu()
@@ -290,8 +285,7 @@ fn test_exp_gpu_2d_forward() raises:
 
 
 fn test_exp_gpu_3d_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_3d_forward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -312,8 +306,7 @@ fn test_exp_gpu_3d_forward() raises:
 
 
 fn test_exp_gpu_ones_any_exponent() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_ones_any_exponent")
         comptime dtype = DType.float32
         var a = Tensor[dtype].ones(Shape(4)).to_gpu()
@@ -326,8 +319,7 @@ fn test_exp_gpu_ones_any_exponent() raises:
 
 
 fn test_exp_gpu_1d_backward_square() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_1d_backward_square")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -341,8 +333,7 @@ fn test_exp_gpu_1d_backward_square() raises:
 
 
 fn test_exp_gpu_1d_backward_cube() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_1d_backward_cube")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -356,8 +347,7 @@ fn test_exp_gpu_1d_backward_cube() raises:
 
 
 fn test_exp_gpu_1d_backward_fractional() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_1d_backward_fractional")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([4.0, 9.0, 16.0], requires_grad=True)
@@ -373,8 +363,7 @@ fn test_exp_gpu_1d_backward_fractional() raises:
 
 
 fn test_exp_gpu_2d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_2d_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -392,8 +381,7 @@ fn test_exp_gpu_2d_backward() raises:
 
 
 fn test_exp_gpu_3d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_3d_backward")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -417,8 +405,7 @@ fn test_exp_gpu_3d_backward() raises:
 
 
 fn test_exp_gpu_backward_chain() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_backward_chain")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -432,8 +419,7 @@ fn test_exp_gpu_backward_chain() raises:
 
 
 fn test_exp_gpu_backward_chained_pow() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_backward_chained_pow")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 3.0], requires_grad=True)
@@ -447,8 +433,7 @@ fn test_exp_gpu_backward_chained_pow() raises:
 
 
 fn test_exp_gpu_backward_one_exponent() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_gpu_backward_one_exponent")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -463,8 +448,7 @@ fn test_exp_gpu_backward_one_exponent() raises:
 
 
 fn test_exp_parity_1d_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_parity_1d_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 3.0, 4.0, 5.0])
@@ -475,8 +459,7 @@ fn test_exp_parity_1d_forward() raises:
 
 
 fn test_exp_parity_2d_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_parity_2d_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[2.0, 3.0], [4.0, 5.0]])
@@ -487,8 +470,7 @@ fn test_exp_parity_2d_forward() raises:
 
 
 fn test_exp_parity_fractional_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_parity_fractional_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([4.0, 9.0, 16.0, 25.0])
@@ -499,8 +481,7 @@ fn test_exp_parity_fractional_forward() raises:
 
 
 fn test_exp_parity_1d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_parity_1d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -516,8 +497,7 @@ fn test_exp_parity_1d_backward() raises:
 
 
 fn test_exp_parity_2d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_parity_2d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -537,8 +517,7 @@ fn test_exp_parity_2d_backward() raises:
 
 
 fn test_exp_parity_chain_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_parity_chain_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([2.0, 3.0, 4.0], requires_grad=True)
@@ -554,8 +533,7 @@ fn test_exp_parity_chain_backward() raises:
 
 
 fn test_exp_parity_using_zero_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_exp_parity_using_zero_grad")
         comptime dtype = DType.float32
         # Use same tensor for both passes — zero_grad between them

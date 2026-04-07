@@ -371,8 +371,7 @@ fn test_v2_ndbuffer_mean_keepdims() raises:
 fn test_v2_gpu_tensor_sum_1d() raises:
     print("test_v2_gpu_tensor_sum_1d")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1, 2, 3, 4, 5])
         var a_gpu = a.to_gpu()
@@ -385,8 +384,7 @@ fn test_v2_gpu_tensor_sum_1d() raises:
 fn test_v2_gpu_tensor_sum_2d_axis0() raises:
     print("test_v2_gpu_tensor_sum_2d_axis0")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
         var a_gpu = a.to_gpu()
@@ -399,8 +397,7 @@ fn test_v2_gpu_tensor_sum_2d_axis0() raises:
 fn test_v2_gpu_tensor_sum_2d_axis1() raises:
     print("test_v2_gpu_tensor_sum_2d_axis1")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
         var a_gpu = a.to_gpu()
@@ -413,8 +410,7 @@ fn test_v2_gpu_tensor_sum_2d_axis1() raises:
 fn test_v2_gpu_tensor_sum_3d_axis1() raises:
     print("test_v2_gpu_tensor_sum_3d_axis1")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
         a = a.reshape(2, 3, 4)
@@ -428,8 +424,7 @@ fn test_v2_gpu_tensor_sum_3d_axis1() raises:
 fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
     print("test_v2_gpu_tensor_sum_3d_axes_0_2")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
         a = a.reshape(2, 3, 4)
@@ -443,8 +438,7 @@ fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
 fn test_v2_gpu_tensor_sum_keepdims() raises:
     print("test_v2_gpu_tensor_sum_keepdims")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
         a = a.reshape(2, 3, 4)
@@ -458,8 +452,7 @@ fn test_v2_gpu_tensor_sum_keepdims() raises:
 fn test_v2_gpu_tensor_sum_all_axes() raises:
     print("test_v2_gpu_tensor_sum_all_axes")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].ones(2, 3, 4)
         var a_gpu = a.to_gpu()
@@ -472,8 +465,7 @@ fn test_v2_gpu_tensor_sum_all_axes() raises:
 fn test_v2_gpu_tensor_mean_2d_axis0() raises:
     print("test_v2_gpu_tensor_mean_2d_axis0")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [3, 4, 5]])
         var a_gpu = a.to_gpu()
@@ -486,8 +478,7 @@ fn test_v2_gpu_tensor_mean_2d_axis0() raises:
 fn test_v2_gpu_tensor_mean_2d_axis1() raises:
     print("test_v2_gpu_tensor_mean_2d_axis1")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
         var a_gpu = a.to_gpu()
@@ -500,8 +491,7 @@ fn test_v2_gpu_tensor_mean_2d_axis1() raises:
 fn test_v2_gpu_tensor_mean_3d_axis1() raises:
     print("test_v2_gpu_tensor_mean_3d_axis1")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
         a = a.reshape(2, 3, 4)
@@ -515,8 +505,7 @@ fn test_v2_gpu_tensor_mean_3d_axis1() raises:
 fn test_v2_gpu_tensor_mean_keepdims() raises:
     print("test_v2_gpu_tensor_mean_keepdims")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
         a = a.reshape(2, 3, 4)
@@ -530,8 +519,7 @@ fn test_v2_gpu_tensor_mean_keepdims() raises:
 fn test_v2_gpu_tensor_mean_all_axes() raises:
     print("test_v2_gpu_tensor_mean_all_axes")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(24)
         a = a.reshape(2, 3, 4)
@@ -550,8 +538,7 @@ fn test_v2_gpu_tensor_mean_all_axes() raises:
 fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
     print("test_v2_gpu_ndbuffer_sum_2d_axis1")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
         var a_gpu = a.to_gpu()
@@ -566,8 +553,7 @@ fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
 fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
     print("test_v2_gpu_ndbuffer_mean_2d_axis0")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1, 2, 3], [3, 4, 5]])
         var a_gpu = a.to_gpu()
@@ -703,8 +689,7 @@ fn main() raises:
     # Tensor tensor multiplication
     test_tensor_tensor_multiplications()
 
-    @parameter
-    if not has_accelerator():
+    comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
     else:
@@ -740,8 +725,7 @@ fn test_vmnd_1d_v_2d_M() raises:
     """V[k] @ M[k, n] → out[n]. Simplest case, no batch dims."""
     print("test_vmnd_1d_v_2d_M")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # v = [1, 2, 3],  M = [[1,0],[0,1],[1,1]]
         # out = [1*1+2*0+3*1, 1*0+2*1+3*1] = [4, 5]
@@ -759,8 +743,7 @@ fn test_vmnd_identity_matrix() raises:
     """V @ I = v."""
     print("test_vmnd_identity_matrix")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].d1([3, 1, 4, 1, 5])
         var I = Tensor[dtype].eye(5)
@@ -776,8 +759,7 @@ fn test_vmnd_zero_vector() raises:
     """Zero vector gives zero output."""
     print("test_vmnd_zero_vector")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].zeros(4)
         var M = Tensor[dtype].arange(12)
@@ -794,8 +776,7 @@ fn test_vmnd_ones_vector() raises:
     """Ones vector sums columns of M."""
     print("test_vmnd_ones_vector")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].ones(3)
         var M = Tensor[dtype].d2([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
@@ -812,8 +793,7 @@ fn test_vmnd_single_output_element() raises:
     """N=1: output is a scalar-like vector."""
     print("test_vmnd_single_output_element")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].d1([2, 3, 4])
         var M = Tensor[dtype].d2([[1], [2], [3]])
@@ -830,8 +810,7 @@ fn test_vmnd_large_k() raises:
     """Large k to stress the dot product loop."""
     print("test_vmnd_large_k")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var k = 512
         var n = 64
@@ -850,8 +829,7 @@ fn test_vmnd_large_n() raises:
     """N > block_size to exercise multi-block coverage."""
     print("test_vmnd_large_n")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var k = 8
         var n = 1024  # larger than default block_size=256
@@ -874,8 +852,7 @@ fn test_vmnd_batched_2d_v_3d_M() raises:
     """V[b, k] @ M[b, k, n] → out[b, n]."""
     print("test_vmnd_batched_2d_v_3d_M")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].arange(6)
         v = v.reshape(2, 3)  # (2, 3)
@@ -896,8 +873,7 @@ fn test_vmnd_batched_3d_v_4d_M() raises:
     """V[a, b, k] @ M[a, b, k, n] → out[a, b, n]."""
     print("test_vmnd_batched_3d_v_4d_M")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].ones(2, 3, 4)  # (2, 3, 4)
         var M = Tensor[dtype].ones(2, 3, 4, 5)  # (2, 3, 4, 5)
@@ -914,8 +890,7 @@ fn test_vmnd_batched_arange_values() raises:
     """Batched with non-trivial values to catch index mapping errors."""
     print("test_vmnd_batched_arange_values")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # v: (3, 4),  M: (3, 4, 2)
         var v = Tensor[dtype].arange(12)
@@ -939,8 +914,7 @@ fn test_vmnd_broadcast_v1d_M3d() raises:
     """V[k] broadcast against M[b, k, n] → out[b, n]."""
     print("test_vmnd_broadcast_v1d_M3d")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].d1([1, 0, 1])  # (3,)
         var M = Tensor[dtype].arange(18)
@@ -957,8 +931,7 @@ fn test_vmnd_broadcast_v2d_M3d() raises:
     """V[1, k] broadcast against M[b, k, n] → out[b, n]."""
     print("test_vmnd_broadcast_v2d_M3d")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].ones(1, 4)  # (1, 4)
         var M = Tensor[dtype].arange(48)
@@ -975,8 +948,7 @@ fn test_vmnd_broadcast_v3d_M2d() raises:
     """V[a, b, k] broadcast against M[k, n] → out[a, b, n]."""
     print("test_vmnd_broadcast_v3d_M2d")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].arange(24)
         v = v.reshape(2, 3, 4)  # (2, 3, 4)
@@ -994,8 +966,7 @@ fn test_vmnd_broadcast_both_size1() raises:
     """Both v and M have a size-1 batch dim that broadcasts."""
     print("test_vmnd_broadcast_both_size1")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var v = Tensor[dtype].ones(1, 4)  # (1, 4) → broadcasts to (3, 4)
         var M = Tensor[dtype].ones(3, 4, 5)  # (3, 4, 5)
@@ -1011,8 +982,7 @@ fn test_vmnd_broadcast_large_batch() raises:
     """Large broadcast batch to stress multi-block output coverage."""
     print("test_vmnd_broadcast_large_batch")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # v: (32, k), M: (k, n) — M broadcast across 32 batch elements
         var k = 64
@@ -1036,8 +1006,7 @@ fn test_vmnd_known_values_no_batch() raises:
     """Hand-computed result verified against GPU."""
     print("test_vmnd_known_values_no_batch")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # v = [1, 2],  M = [[3, 4, 5], [6, 7, 8]]
         # out = [1*3+2*6, 1*4+2*7, 1*5+2*8] = [15, 18, 21]
@@ -1055,8 +1024,7 @@ fn test_vmnd_known_values_batched() raises:
     """Hand-computed batched result verified against GPU."""
     print("test_vmnd_known_values_batched")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # batch 0: v=[1,0] @ M=[[1,2],[3,4]] = [1, 2]
         # batch 1: v=[0,1] @ M=[[5,6],[7,8]] = [7, 8]
@@ -1074,8 +1042,7 @@ fn test_vmnd_known_values_broadcast() raises:
     """Hand-computed broadcast result verified against GPU."""
     print("test_vmnd_known_values_broadcast")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # v = [1, 1]  (no batch)
         # M[0] = [[1,2],[3,4]] → out[0] = [4, 6]
@@ -1132,8 +1099,7 @@ fn test_mvnd_2d_M_1d_v() raises:
     """M[m, k] @ v[k] → out[m]. Simplest case, no batch dims."""
     print("test_mvnd_2d_M_1d_v")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # M = [[1,2,3],[4,5,6]], v = [1,1,1]
         # out = [1+2+3, 4+5+6] = [6, 15]
@@ -1151,8 +1117,7 @@ fn test_mvnd_known_values() raises:
     """Hand-computed result verified directly against GPU output."""
     print("test_mvnd_known_values")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # M = [[1,0],[0,1],[1,1]], v = [3, 4]
         # out = [1*3+0*4, 0*3+1*4, 1*3+1*4] = [3, 4, 7]
@@ -1170,8 +1135,7 @@ fn test_mvnd_identity_matrix() raises:
     """I @ v = v."""
     print("test_mvnd_identity_matrix")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].eye(4)
         var v = Tensor[dtype].d1([2, 5, 1, 8])
@@ -1187,8 +1151,7 @@ fn test_mvnd_zero_vector() raises:
     """M @ zero_vector = zero output."""
     print("test_mvnd_zero_vector")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].arange(12)
         M = M.reshape(3, 4)
@@ -1205,8 +1168,7 @@ fn test_mvnd_ones_vector() raises:
     """M @ ones = row sums of M."""
     print("test_mvnd_ones_vector")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # row sums: [1+2+3+4, 5+6+7+8, 9+10+11+12] = [10, 26, 42]
         var M = Tensor[dtype].d2([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
@@ -1223,8 +1185,7 @@ fn test_mvnd_single_row_matrix() raises:
     """M[1, k] @ v[k] → out[1]. Single row edge case."""
     print("test_mvnd_single_row_matrix")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].d2([[2, 3, 4]])  # (1, 3)
         var v = Tensor[dtype].d1([1, 2, 3])
@@ -1241,8 +1202,7 @@ fn test_mvnd_single_col_matrix() raises:
     """M[m, 1] @ v[1] → out[m]. k=1 edge case."""
     print("test_mvnd_single_col_matrix")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].d2([[2], [3], [5]])  # (3, 1)
         var v = Tensor[dtype].d1([4])
@@ -1259,8 +1219,7 @@ fn test_mvnd_large_k() raises:
     """Large k to stress the dot product loop."""
     print("test_mvnd_large_k")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var k = 512
         var m = 32
@@ -1279,8 +1238,7 @@ fn test_mvnd_large_m() raises:
     """M > block_size to exercise multi-block coverage."""
     print("test_mvnd_large_m")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var m = 1024  # larger than default block_size=256
         var k = 8
@@ -1298,8 +1256,7 @@ fn test_mvnd_negative_values() raises:
     """Negative values in both M and v."""
     print("test_mvnd_negative_values")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].d2([[-1, 2], [3, -4]])
         var v = Tensor[dtype].d1([-1, 2])
@@ -1321,8 +1278,7 @@ fn test_mvnd_batched_3d_M_2d_v() raises:
     """M[b, m, k] @ v[b, k] → out[b, m]."""
     print("test_mvnd_batched_3d_M_2d_v")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].arange(18)
         M = M.reshape(2, 3, 3)  # (2, 3, 3)
@@ -1340,8 +1296,7 @@ fn test_mvnd_batched_4d_M_3d_v() raises:
     """M[a, b, m, k] @ v[a, b, k] → out[a, b, m]."""
     print("test_mvnd_batched_4d_M_3d_v")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].ones(2, 3, 4, 5)  # (2, 3, 4, 5)
         var v = Tensor[dtype].ones(2, 3, 5)  # (2, 3, 5)
@@ -1358,8 +1313,7 @@ fn test_mvnd_batched_arange_values() raises:
     """Batched with non-trivial arange values to catch index mapping errors."""
     print("test_mvnd_batched_arange_values")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # M: (3, 4, 2),  v: (3, 2)
         var M = Tensor[dtype].arange(24)
@@ -1378,8 +1332,7 @@ fn test_mvnd_known_values_batched() raises:
     """Hand-computed batched result verified directly against GPU."""
     print("test_mvnd_known_values_batched")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # batch 0: [[1,0],[0,1]] @ [1,2] = [1, 2]
         # batch 1: [[2,0],[0,2]] @ [3,4] = [6, 8]
@@ -1402,8 +1355,7 @@ fn test_mvnd_broadcast_3d_M_1d_v() raises:
     """M[b, m, k] broadcast against v[k] → out[b, m]."""
     print("test_mvnd_broadcast_3d_M_1d_v")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].arange(18)
         M = M.reshape(2, 3, 3)  # (2, 3, 3)
@@ -1420,8 +1372,7 @@ fn test_mvnd_broadcast_2d_M_3d_v() raises:
     """M[m, k] broadcast against v[b, k] → out[b, m]."""
     print("test_mvnd_broadcast_2d_M_3d_v")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].arange(12)
         M = M.reshape(4, 3)  # (4, 3) — no batch
@@ -1439,8 +1390,7 @@ fn test_mvnd_broadcast_4d_M_2d_v() raises:
     """M[a, b, m, k] broadcast against v[b, k] → out[a, b, m]."""
     print("test_mvnd_broadcast_4d_M_2d_v")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].ones(2, 3, 4, 5)  # (2, 3, 4, 5)
         var v = Tensor[dtype].ones(3, 5)  # (3, 5) — broadcasts over dim 0
@@ -1456,8 +1406,7 @@ fn test_mvnd_broadcast_size1_batch() raises:
     """V with size-1 batch dim that broadcasts across M's batch."""
     print("test_mvnd_broadcast_size1_batch")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var M = Tensor[dtype].ones(4, 3, 5)  # (4, 3, 5)
         var v = Tensor[dtype].ones(1, 5)  # (1, 5) → broadcasts to (4, 5)
@@ -1473,8 +1422,7 @@ fn test_mvnd_broadcast_known_values() raises:
     """Hand-computed broadcast result verified directly against GPU."""
     print("test_mvnd_broadcast_known_values")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # M[0] = [[1,2],[3,4]], M[1] = [[5,6],[7,8]]
         # v = [1, 1]  (no batch — broadcasts across both)
@@ -1493,8 +1441,7 @@ fn test_mvnd_broadcast_large_batch() raises:
     """Large broadcast batch to stress multi-block output coverage."""
     print("test_mvnd_broadcast_large_batch")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var m = 64
         var k = 32
@@ -1550,8 +1497,7 @@ fn test_mmnd_2d_known_values() raises:
     """Hand-computed 2D matmul verified directly against GPU."""
     print("test_mmnd_2d_known_values")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # A = [[1,2],[3,4]], B = [[5,6],[7,8]]
         # C[0,0]=1*5+2*7=19, C[0,1]=1*6+2*8=22
@@ -1570,8 +1516,7 @@ fn test_mmnd_2d_identity() raises:
     """A @ I = A."""
     print("test_mmnd_2d_identity")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].arange(9)
         A = A.reshape(3, 3)
@@ -1588,8 +1533,7 @@ fn test_mmnd_2d_zero_matrix() raises:
     """A @ zeros = zeros."""
     print("test_mmnd_2d_zero_matrix")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].arange(12)
         A = A.reshape(3, 4)
@@ -1606,8 +1550,7 @@ fn test_mmnd_2d_ones() raises:
     """Ones @ ones = matrix of k."""
     print("test_mmnd_2d_ones")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var k = 8
         var A = Tensor[dtype].ones(4, k)
@@ -1625,8 +1568,7 @@ fn test_mmnd_2d_rectangular() raises:
     """Non-square matrices: (m, k) @ (k, n) where m != k != n."""
     print("test_mmnd_2d_rectangular")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].arange(15)
         A = A.reshape(3, 5)  # (3, 5)
@@ -1644,8 +1586,7 @@ fn test_mmnd_2d_negative_values() raises:
     """Negative values in both A and B."""
     print("test_mmnd_2d_negative_values")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].d2([[-1, 2], [3, -4]])
         var B = Tensor[dtype].d2([[1, -2], [-3, 4]])
@@ -1661,8 +1602,7 @@ fn test_mmnd_2d_single_element() raises:
     """(1, k) @ (k, 1) → (1, 1): inner product as matmul."""
     print("test_mmnd_2d_single_element")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].d2([[1, 2, 3, 4]])  # (1, 4)
         var B = Tensor[dtype].d2([[1], [2], [3], [4]])  # (4, 1)
@@ -1684,8 +1624,7 @@ fn test_mmnd_2d_non_tile_multiple_m() raises:
     """M(m) not a multiple of TILE_SIZE."""
     print("test_mmnd_2d_non_tile_multiple_m")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(17, 16)  # m=17, not multiple of 16
         var B = Tensor[dtype].ones(16, 16)
@@ -1701,8 +1640,7 @@ fn test_mmnd_2d_non_tile_multiple_n() raises:
     """N(n) not a multiple of TILE_SIZE."""
     print("test_mmnd_2d_non_tile_multiple_n")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(16, 16)
         var B = Tensor[dtype].ones(16, 19)  # n=19, not multiple of 16
@@ -1718,8 +1656,7 @@ fn test_mmnd_2d_non_tile_multiple_k() raises:
     """K(k) not a multiple of TILE_SIZE."""
     print("test_mmnd_2d_non_tile_multiple_k")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(16, 13)  # k=13, not multiple of 16
         var B = Tensor[dtype].ones(13, 16)
@@ -1735,8 +1672,7 @@ fn test_mmnd_2d_all_non_tile_multiples() raises:
     """M(m), k, n all non-multiples of TILE_SIZE simultaneously."""
     print("test_mmnd_2d_all_non_tile_multiples")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].arange(17 * 13)
         A = A.reshape(17, 13)
@@ -1754,8 +1690,7 @@ fn test_mmnd_2d_smaller_than_tile() raises:
     """M(m), k, n all smaller than TILE_SIZE."""
     print("test_mmnd_2d_smaller_than_tile")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].arange(12)
         A = A.reshape(3, 4)  # both < 16
@@ -1778,8 +1713,7 @@ fn test_mmnd_2d_large_square() raises:
     """Large square matrices well beyond tile size."""
     print("test_mmnd_2d_large_square")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(128, 128)
         var B = Tensor[dtype].ones(128, 128)
@@ -1795,8 +1729,7 @@ fn test_mmnd_2d_large_rectangular() raises:
     """Large rectangular matrices with non-tile-multiple dimensions."""
     print("test_mmnd_2d_large_rectangular")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(65, 100)
         var B = Tensor[dtype].ones(100, 70)
@@ -1817,8 +1750,7 @@ fn test_mmnd_batched_3d_known_values() raises:
     """Hand-computed batched matmul verified directly against GPU."""
     print("test_mmnd_batched_3d_known_values")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # batch 0: [[1,0],[0,1]] @ [[2,3],[4,5]] = [[2,3],[4,5]]
         # batch 1: [[1,1],[1,1]] @ [[1,0],[0,1]] = [[1,1],[1,1]]
@@ -1836,8 +1768,7 @@ fn test_mmnd_batched_3d_arange() raises:
     """A[b, m, k] @ B[b, k, n] with arange values."""
     print("test_mmnd_batched_3d_arange")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].arange(24)
         A = A.reshape(2, 3, 4)  # (2, 3, 4)
@@ -1855,8 +1786,7 @@ fn test_mmnd_batched_4d() raises:
     """A[a, b, m, k] @ B[a, b, k, n] — 4D batch."""
     print("test_mmnd_batched_4d")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(2, 3, 4, 5)  # (2, 3, 4, 5)
         var B = Tensor[dtype].ones(2, 3, 5, 4)  # (2, 3, 5, 4)
@@ -1872,8 +1802,7 @@ fn test_mmnd_batched_large_batch() raises:
     """Many batch elements to stress grid.z coverage."""
     print("test_mmnd_batched_large_batch")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(32, 16, 8)  # 32 batch elements
         var B = Tensor[dtype].ones(32, 8, 16)
@@ -1889,8 +1818,7 @@ fn test_mmnd_batched_non_tile_multiples() raises:
     """Batched with m, k, n not multiples of TILE_SIZE."""
     print("test_mmnd_batched_non_tile_multiples")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].arange(2 * 11 * 7)
         A = A.reshape(2, 11, 7)
@@ -1913,8 +1841,7 @@ fn test_mmnd_broadcast_3d_A_2d_B() raises:
     """A[b, m, k] @ B[k, n] — B broadcasts across batch."""
     print("test_mmnd_broadcast_3d_A_2d_B")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].arange(24)
         A = A.reshape(2, 3, 4)  # (2, 3, 4)
@@ -1932,8 +1859,7 @@ fn test_mmnd_broadcast_2d_A_3d_B() raises:
     """A[m, k] @ B[b, k, n] — A broadcasts across batch."""
     print("test_mmnd_broadcast_2d_A_3d_B")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].arange(12)
         A = A.reshape(3, 4)  # (3, 4) — no batch, broadcasts
@@ -1951,8 +1877,7 @@ fn test_mmnd_broadcast_4d_A_3d_B() raises:
     """A[a, b, m, k] @ B[b, k, n] — B missing leading batch dim."""
     print("test_mmnd_broadcast_4d_A_3d_B")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(2, 3, 4, 5)  # (2, 3, 4, 5)
         var B = Tensor[dtype].ones(3, 5, 4)  # (3, 5, 4) — broadcasts over dim 0
@@ -1968,8 +1893,7 @@ fn test_mmnd_broadcast_size1_batch_dim() raises:
     """Size-1 batch dim in A broadcasts across B's batch."""
     print("test_mmnd_broadcast_size1_batch_dim")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(
             1, 4, 5
@@ -1987,8 +1911,7 @@ fn test_mmnd_broadcast_known_values() raises:
     """Hand-computed broadcast result verified directly against GPU."""
     print("test_mmnd_broadcast_known_values")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         # A = [[1,0],[0,1]] (identity, no batch)
         # B[0] = [[2,3],[4,5]], B[1] = [[6,7],[8,9]]
@@ -2008,8 +1931,7 @@ fn test_mmnd_broadcast_large() raises:
     """Large broadcast batch to stress multi-block and multi-z coverage."""
     print("test_mmnd_broadcast_large")
 
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         comptime dtype = DType.float32
         var A = Tensor[dtype].ones(16, 32, 32)  # (16, 32, 32)
         var B = Tensor[dtype].ones(32, 32)  # (32, 32) — broadcasts over 16

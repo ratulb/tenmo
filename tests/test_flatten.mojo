@@ -748,8 +748,7 @@ fn test_flat_cpu_backward_4d_partial() raises:
 
 
 fn test_flat_gpu_1d_noop() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_1d_noop")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0, 4.0]).to_gpu()
@@ -762,8 +761,7 @@ fn test_flat_gpu_1d_noop() raises:
 
 
 fn test_flat_gpu_2d_full() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_2d_full")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
@@ -778,8 +776,7 @@ fn test_flat_gpu_2d_full() raises:
 
 
 fn test_flat_gpu_3d_full() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_3d_full")
         comptime dtype = DType.float32
         var a = (
@@ -798,8 +795,7 @@ fn test_flat_gpu_3d_full() raises:
 
 
 fn test_flat_gpu_3d_start0_end1() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_3d_start0_end1")
         comptime dtype = DType.float32
         var a = (
@@ -820,8 +816,7 @@ fn test_flat_gpu_3d_start0_end1() raises:
 
 
 fn test_flat_gpu_3d_start1_end2() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_3d_start1_end2")
         comptime dtype = DType.float32
         var a = (
@@ -840,8 +835,7 @@ fn test_flat_gpu_3d_start1_end2() raises:
 
 
 fn test_flat_gpu_4d_middle() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_4d_middle")
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5)).to_gpu()
@@ -852,8 +846,7 @@ fn test_flat_gpu_4d_middle() raises:
 
 
 fn test_flat_gpu_values_preserved() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_values_preserved")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(6).reshape(Shape(2, 3))
@@ -865,8 +858,7 @@ fn test_flat_gpu_values_preserved() raises:
 
 
 fn test_flat_gpu_no_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_no_grad")
         comptime dtype = DType.float32
         var a = (
@@ -879,8 +871,7 @@ fn test_flat_gpu_no_grad() raises:
 
 
 fn test_flat_gpu_requires_grad_propagates() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_requires_grad_propagates")
         comptime dtype = DType.float32
         var a = (
@@ -898,8 +889,7 @@ fn test_flat_gpu_requires_grad_propagates() raises:
 
 
 fn test_flat_gpu_backward_2d_full() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_backward_2d_full")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -913,8 +903,7 @@ fn test_flat_gpu_backward_2d_full() raises:
 
 
 fn test_flat_gpu_backward_3d_full() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_backward_3d_full")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -929,8 +918,7 @@ fn test_flat_gpu_backward_3d_full() raises:
 
 
 fn test_flat_gpu_backward_3d_partial() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_backward_3d_partial")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -945,8 +933,7 @@ fn test_flat_gpu_backward_3d_partial() raises:
 
 
 fn test_flat_gpu_backward_chain() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_backward_chain")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -958,8 +945,7 @@ fn test_flat_gpu_backward_chain() raises:
 
 
 fn test_flat_gpu_backward_grad_shape() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_backward_grad_shape")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
@@ -973,8 +959,7 @@ fn test_flat_gpu_backward_grad_shape() raises:
 
 
 fn test_flat_gpu_backward_nonuniform_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_backward_nonuniform_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -989,8 +974,7 @@ fn test_flat_gpu_backward_nonuniform_grad() raises:
 
 
 fn test_flat_gpu_backward_4d_partial() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_gpu_backward_4d_partial")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5))
@@ -1011,8 +995,7 @@ fn test_flat_gpu_backward_4d_partial() raises:
 
 
 fn test_flat_parity_2d_full_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_parity_2d_full_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -1021,8 +1004,7 @@ fn test_flat_parity_2d_full_forward() raises:
 
 
 fn test_flat_parity_3d_partial_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_parity_3d_partial_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
@@ -1031,8 +1013,7 @@ fn test_flat_parity_3d_partial_forward() raises:
 
 
 fn test_flat_parity_4d_forward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_parity_4d_forward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(120).reshape(Shape(2, 3, 4, 5))
@@ -1041,8 +1022,7 @@ fn test_flat_parity_4d_forward() raises:
 
 
 fn test_flat_parity_2d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_parity_2d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -1064,8 +1044,7 @@ fn test_flat_parity_2d_backward() raises:
 
 
 fn test_flat_parity_3d_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_parity_3d_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
@@ -1083,8 +1062,7 @@ fn test_flat_parity_3d_backward() raises:
 
 
 fn test_flat_parity_chain_backward() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_parity_chain_backward")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -1106,8 +1084,7 @@ fn test_flat_parity_chain_backward() raises:
 
 
 fn test_flat_parity_using_zero_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_flat_parity_using_zero_grad")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(

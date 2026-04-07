@@ -1075,8 +1075,7 @@ fn test_gpu_mean_keepdims_then_sum_backward() raises:
 
 
 fn main() raises:
-    @parameter
-    if not has_accelerator():
+    comptime if not has_accelerator():
         print("No GPU available — skipping GPU sum/mean tests")
         return
 

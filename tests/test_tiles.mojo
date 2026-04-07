@@ -613,8 +613,7 @@ fn test_tile_cpu_backward_2d_extra_dims() raises:
 
 
 fn test_tile_gpu_1d_basic() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_1d_basic")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
@@ -629,8 +628,7 @@ fn test_tile_gpu_1d_basic() raises:
 
 
 fn test_tile_gpu_1d_once() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_1d_once")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
@@ -643,8 +641,7 @@ fn test_tile_gpu_1d_once() raises:
 
 
 fn test_tile_gpu_2d_both_dims() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_2d_both_dims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
@@ -659,8 +656,7 @@ fn test_tile_gpu_2d_both_dims() raises:
 
 
 fn test_tile_gpu_2d_rows_only() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_2d_rows_only")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
@@ -670,8 +666,7 @@ fn test_tile_gpu_2d_rows_only() raises:
 
 
 fn test_tile_gpu_2d_extra_repeat_dims() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_2d_extra_repeat_dims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
@@ -681,8 +676,7 @@ fn test_tile_gpu_2d_extra_repeat_dims() raises:
 
 
 fn test_tile_gpu_3d_basic() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_3d_basic")
         comptime dtype = DType.float32
         var a = (
@@ -696,8 +690,7 @@ fn test_tile_gpu_3d_basic() raises:
 
 
 fn test_tile_gpu_values_preserved() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_values_preserved")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([10.0, 20.0]).to_gpu()
@@ -709,8 +702,7 @@ fn test_tile_gpu_values_preserved() raises:
 
 
 fn test_tile_gpu_no_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_no_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=False).to_gpu()
@@ -719,8 +711,7 @@ fn test_tile_gpu_no_grad() raises:
 
 
 fn test_tile_gpu_requires_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_requires_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True).to_gpu()
@@ -734,8 +725,7 @@ fn test_tile_gpu_requires_grad() raises:
 
 
 fn test_tile_gpu_backward_1d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_backward_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -747,8 +737,7 @@ fn test_tile_gpu_backward_1d() raises:
 
 
 fn test_tile_gpu_backward_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_backward_2d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -760,8 +749,7 @@ fn test_tile_gpu_backward_2d() raises:
 
 
 fn test_tile_gpu_backward_chain() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_backward_chain")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -773,8 +761,7 @@ fn test_tile_gpu_backward_chain() raises:
 
 
 fn test_tile_gpu_backward_nonuniform_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_backward_nonuniform_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
@@ -787,8 +774,7 @@ fn test_tile_gpu_backward_nonuniform_grad() raises:
 
 
 fn test_tile_gpu_backward_extra_dims() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_gpu_backward_extra_dims")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -805,8 +791,7 @@ fn test_tile_gpu_backward_extra_dims() raises:
 
 
 fn test_tile_parity_1d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_parity_1d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -815,8 +800,7 @@ fn test_tile_parity_1d() raises:
 
 
 fn test_tile_parity_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_parity_2d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -825,8 +809,7 @@ fn test_tile_parity_2d() raises:
 
 
 fn test_tile_parity_extra_dims() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_parity_extra_dims")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]])
@@ -837,8 +820,7 @@ fn test_tile_parity_extra_dims() raises:
 
 
 fn test_tile_parity_backward_1d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_parity_backward_1d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)
@@ -856,8 +838,7 @@ fn test_tile_parity_backward_1d() raises:
 
 
 fn test_tile_parity_backward_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_parity_backward_2d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -879,8 +860,7 @@ fn test_tile_parity_backward_2d() raises:
 
 
 fn test_tile_parity_using_zero_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_tile_parity_using_zero_grad")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0], requires_grad=True)

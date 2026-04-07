@@ -426,8 +426,7 @@ fn test_perm_cpu_backward_multiple_uses() raises:
 
 
 fn test_perm_gpu_2d_identity() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_2d_identity")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
@@ -442,8 +441,7 @@ fn test_perm_gpu_2d_identity() raises:
 
 
 fn test_perm_gpu_2d_transpose() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_2d_transpose")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]).to_gpu()
@@ -458,8 +456,7 @@ fn test_perm_gpu_2d_transpose() raises:
 
 
 fn test_perm_gpu_3d_021() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_3d_021")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -479,8 +476,7 @@ fn test_perm_gpu_3d_021() raises:
 
 
 fn test_perm_gpu_3d_120() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_3d_120")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
@@ -496,8 +492,7 @@ fn test_perm_gpu_3d_120() raises:
 
 
 fn test_perm_gpu_3d_210() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_3d_210")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
@@ -513,8 +508,7 @@ fn test_perm_gpu_3d_210() raises:
 
 
 fn test_perm_gpu_shape_preserved() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_shape_preserved")
         comptime dtype = DType.float32
         var a = Tensor[dtype].arange(60).reshape(Shape(3, 4, 5)).to_gpu()
@@ -524,8 +518,7 @@ fn test_perm_gpu_shape_preserved() raises:
 
 
 fn test_perm_gpu_no_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_no_grad")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -536,8 +529,7 @@ fn test_perm_gpu_no_grad() raises:
 
 
 fn test_perm_gpu_requires_grad_propagates() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_requires_grad_propagates")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -553,8 +545,7 @@ fn test_perm_gpu_requires_grad_propagates() raises:
 
 
 fn test_perm_gpu_backward_2d_transpose() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_backward_2d_transpose")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2(
@@ -568,8 +559,7 @@ fn test_perm_gpu_backward_2d_transpose() raises:
 
 
 fn test_perm_gpu_backward_3d_021() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_backward_3d_021")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -584,8 +574,7 @@ fn test_perm_gpu_backward_3d_021() raises:
 
 
 fn test_perm_gpu_backward_3d_210() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_backward_3d_210")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
@@ -598,8 +587,7 @@ fn test_perm_gpu_backward_3d_210() raises:
 
 
 fn test_perm_gpu_backward_chain() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_backward_chain")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -611,8 +599,7 @@ fn test_perm_gpu_backward_chain() raises:
 
 
 fn test_perm_gpu_backward_double_permute() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_backward_double_permute")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3(
@@ -628,8 +615,7 @@ fn test_perm_gpu_backward_double_permute() raises:
 
 
 fn test_perm_gpu_backward_gradient_values() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_gpu_backward_gradient_values")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
@@ -651,8 +637,7 @@ fn test_perm_gpu_backward_gradient_values() raises:
 
 
 fn test_perm_parity_2d_transpose() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_parity_2d_transpose")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -665,8 +650,7 @@ fn test_perm_parity_2d_transpose() raises:
 
 
 fn test_perm_parity_3d_120() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_parity_3d_120")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
@@ -679,8 +663,7 @@ fn test_perm_parity_3d_120() raises:
 
 
 fn test_perm_parity_3d_210() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_parity_3d_210")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
@@ -693,8 +676,7 @@ fn test_perm_parity_3d_210() raises:
 
 
 fn test_perm_parity_backward_transpose() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_parity_backward_transpose")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -714,8 +696,7 @@ fn test_perm_parity_backward_transpose() raises:
 
 
 fn test_perm_parity_backward_3d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_parity_backward_3d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].arange(24).reshape(Shape(2, 3, 4))
@@ -733,8 +714,7 @@ fn test_perm_parity_backward_3d() raises:
 
 
 fn test_perm_parity_backward_chain() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_parity_backward_chain")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(
@@ -754,8 +734,7 @@ fn test_perm_parity_backward_chain() raises:
 
 
 fn test_perm_parity_using_zero_grad() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_perm_parity_using_zero_grad")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2(

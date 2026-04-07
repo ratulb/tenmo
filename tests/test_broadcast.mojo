@@ -508,8 +508,7 @@ fn test_bcast_cpu_requires_grad() raises:
 
 
 fn test_bcast_gpu_1d_to_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_gpu_1d_to_2d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
@@ -524,8 +523,7 @@ fn test_bcast_gpu_1d_to_2d() raises:
 
 
 fn test_bcast_gpu_scalar_to_1d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_gpu_scalar_to_1d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([5.0]).to_gpu()
@@ -538,8 +536,7 @@ fn test_bcast_gpu_scalar_to_1d() raises:
 
 
 fn test_bcast_gpu_1d_to_3d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_gpu_1d_to_3d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d1([1.0, 2.0, 3.0]).to_gpu()
@@ -556,8 +553,7 @@ fn test_bcast_gpu_1d_to_3d() raises:
 
 
 fn test_bcast_gpu_2d_col_to_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_gpu_2d_col_to_2d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0], [2.0], [3.0]]).to_gpu()
@@ -572,8 +568,7 @@ fn test_bcast_gpu_2d_col_to_2d() raises:
 
 
 fn test_bcast_gpu_2d_row_to_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_gpu_2d_row_to_2d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0, 3.0]]).to_gpu()
@@ -588,8 +583,7 @@ fn test_bcast_gpu_2d_row_to_2d() raises:
 
 
 fn test_bcast_gpu_identity() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_gpu_identity")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d2([[1.0, 2.0], [3.0, 4.0]]).to_gpu()
@@ -603,8 +597,7 @@ fn test_bcast_gpu_identity() raises:
 
 
 fn test_bcast_gpu_3d_to_3d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_gpu_3d_to_3d")
         comptime dtype = DType.float32
         var a = Tensor[dtype].d3([[[1.0], [2.0]]]).to_gpu()
@@ -624,8 +617,7 @@ fn test_bcast_gpu_3d_to_3d() raises:
 
 
 fn test_bcast_parity_1d_to_2d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_parity_1d_to_2d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d1([1.0, 2.0, 3.0])
@@ -638,8 +630,7 @@ fn test_bcast_parity_1d_to_2d() raises:
 
 
 fn test_bcast_parity_2d_col() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_parity_2d_col")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d2([[1.0], [2.0], [3.0]])
@@ -652,8 +643,7 @@ fn test_bcast_parity_2d_col() raises:
 
 
 fn test_bcast_parity_3d() raises:
-    @parameter
-    if has_accelerator():
+    comptime if has_accelerator():
         print("test_bcast_parity_3d")
         comptime dtype = DType.float32
         var a_cpu = Tensor[dtype].d3([[[1.0], [2.0]]])
@@ -702,8 +692,7 @@ fn main() raises:
     print("All new broadcast_to tests passed")
 
     # Old tests
-    @parameter
-    if not has_accelerator():
+    comptime if not has_accelerator():
         print("No GPU available — skipping tests")
         return
 
