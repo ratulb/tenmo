@@ -17,6 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         test:
+          - sigmoid
           - summean
           - exp
           - transmute
@@ -116,6 +117,7 @@ jobs:
       fail-fast: false
       matrix:
         test:
+          - sigmoid
           - summean
           - exp
           - transmute
