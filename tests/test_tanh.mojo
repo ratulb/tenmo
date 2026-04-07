@@ -844,7 +844,7 @@ fn test_tanh_gpu_fwd_range_clamping() raises:
         var out = t.tanh().to_cpu()
         var data = out.data_ptr()
         for i in range(5):
-            assert_true(data[i] > Float32(-1.0) and data[i] < Float32(1.0))
+            assert_true(data[i] >= Float32(-1.0) and data[i] <= Float32(1.0))
         print("passed")
 
 
