@@ -235,11 +235,11 @@ struct CECommon[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             Shape(spatial_dims) if len(spatial_dims) > 0 else Shape()
         )
         return (
-            logits_2d,
-            target_1d,
+            logits_2d^,
+            target_1d^,
             M,
             C,
-            spatial_shape,
+            spatial_shape^,
             N,
         )
 

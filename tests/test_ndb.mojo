@@ -79,7 +79,7 @@ fn ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous() raises:
     # Create non-contiguous other
     var other_buffer = Buffer[DType.int32](12)
     for i in range(12):
-        other_buffer[i] = i
+        other_buffer[i] = Int32(i)
     var b = NDBuffer[DType.int32](
         other_buffer^, Shape(2, 3), Strides(1, 2), offset=0  # Non-contiguous
     )
@@ -91,7 +91,7 @@ fn ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous() raises:
             var expected = 10 + b[IntArray(i, j)]
             assert_true(
                 result[IntArray(i, j)] == expected,
-                "Mismatch at " + i.__str__() + "," + j.__str__(),
+                "Mismatch at " + String(i) + "," + String(j),
             )
     print("ndb_ops_test_arithmetic_self_contiguous_other_noncontiguous passed")
 
@@ -102,7 +102,7 @@ fn ndb_ops_test_arithmetic_self_noncontiguous_other_contiguous() raises:
     # Create non-contiguous self
     var self_buffer = Buffer[DType.int32](12)
     for i in range(12):
-        self_buffer[i] = i * 10
+        self_buffer[i] =Int32( i * 10)
     var a = NDBuffer[DType.int32](
         self_buffer^, Shape(2, 3), Strides(1, 2), offset=0
     )
@@ -124,8 +124,8 @@ fn ndb_ops_test_arithmetic_both_noncontiguous() raises:
     var a_buffer = Buffer[DType.int32](12)
     var b_buffer = Buffer[DType.int32](12)
     for i in range(12):
-        a_buffer[i] = i
-        b_buffer[i] = i * 2
+        a_buffer[i] = Int32(i)
+        b_buffer[i] = Int32(i * 2)
 
     var a = NDBuffer[DType.int32](a_buffer^, Shape(2, 3), Strides(1, 2), 0)
     var b = NDBuffer[DType.int32](b_buffer^, Shape(2, 3), Strides(1, 2), 0)
@@ -146,8 +146,8 @@ fn ndb_ops_test_arithmetic_with_offset() raises:
     var a_buffer = Buffer[DType.int32](20)
     var b_buffer = Buffer[DType.int32](20)
     for i in range(20):
-        a_buffer[i] = i
-        b_buffer[i] = 100 + i
+        a_buffer[i] = Int32(i)
+        b_buffer[i] = Int32(100 + i)
 
     var a = NDBuffer[DType.int32](
         a_buffer^, Shape(2, 3), Strides.default(Shape(2, 3)), offset=5
@@ -170,14 +170,14 @@ fn ndb_ops_test_arithmetic_broadcast_row() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
     for j in range(4):
-        b[IntArray(0, j)] = j
+        b[IntArray(0, j)] = Int32(j)
 
     var result = a.arithmetic_ops[Add](b)
 
     assert_true(result.shape == Shape(3, 4), "Broadcast shape")
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntArray(i, j)] == 10 + j, "Broadcast row add")
+            assert_true(result[IntArray(i, j)] == Int32(10 + j), "Broadcast row add")
     print("ndb_ops_test_arithmetic_broadcast_row passed")
 
 
@@ -186,13 +186,13 @@ fn ndb_ops_test_arithmetic_broadcast_col() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(3, 1))
     for i in range(3):
-        b[IntArray(i, 0)] = i * 100
+        b[IntArray(i, 0)] = Int32(i * 100)
 
     var result = a.arithmetic_ops[Add](b)
 
     for i in range(3):
         for j in range(4):
-            assert_true(result[IntArray(i, j)] == 10 + i * 100, "Broadcast col")
+            assert_true(result[IntArray(i, j)] == Int32(10 + i * 100), "Broadcast col")
     print("ndb_ops_test_arithmetic_broadcast_col passed")
 
 
@@ -300,7 +300,7 @@ fn ndb_ops_test_inplace_self_contiguous_other_noncontiguous() raises:
 
     var other_buffer = Buffer[DType.int32](12)
     for i in range(12):
-        other_buffer[i] = i
+        other_buffer[i] = Int32(i)
     var b = NDBuffer[DType.int32](other_buffer^, Shape(2, 3), Strides(1, 2), 0)
 
     # Store expected values before inplace op
@@ -324,7 +324,7 @@ fn ndb_ops_test_inplace_self_noncontiguous_other_contiguous() raises:
 
     var self_buffer = Buffer[DType.int32](12)
     for i in range(12):
-        self_buffer[i] = i * 10
+        self_buffer[i] = Int32(i * 10)
     var a = NDBuffer[DType.int32](self_buffer^, Shape(2, 3), Strides(1, 2), 0)
 
     var b = NDBuffer[DType.int32].full(Shape(2, 3), 5)
@@ -352,7 +352,7 @@ fn ndb_ops_test_inplace_both_noncontiguous() raises:
     var b_buffer = Buffer[DType.int32](12)
     for i in range(12):
         a_buffer[i] = 10
-        b_buffer[i] = i
+        b_buffer[i] = Int32(i)
 
     var a = NDBuffer[DType.int32](a_buffer^, Shape(2, 3), Strides(1, 2), 0)
     var b = NDBuffer[DType.int32](b_buffer^, Shape(2, 3), Strides(1, 2), 0)
@@ -378,13 +378,13 @@ fn ndb_ops_test_inplace_broadcast_row() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
     for j in range(4):
-        b[IntArray(0, j)] = j
+        b[IntArray(0, j)] = Int32(j)
 
     a.inplace_ops[Add](b)
 
     for i in range(3):
         for j in range(4):
-            assert_true(a[IntArray(i, j)] == 10 + j, "Broadcast row inplace")
+            assert_true(a[IntArray(i, j)] == Int32(10 + j), "Broadcast row inplace")
     print("ndb_ops_test_inplace_broadcast_row passed")
 
 
@@ -393,14 +393,14 @@ fn ndb_ops_test_inplace_broadcast_col() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(3, 1))
     for i in range(3):
-        b[IntArray(i, 0)] = i * 10
+        b[IntArray(i, 0)] = Int32(i * 10)
 
     a.inplace_ops[Multiply](b)
 
     for i in range(3):
         for j in range(4):
             assert_true(
-                a[IntArray(i, j)] == 10 * i * 10, "Broadcast col inplace"
+                a[IntArray(i, j)] == Int32(10 * i * 10), "Broadcast col inplace"
             )
     print("ndb_ops_test_inplace_broadcast_col passed")
 
@@ -412,7 +412,7 @@ fn ndb_ops_test_inplace_with_offset() raises:
     var b_buffer = Buffer[DType.int32](20)
     for i in range(20):
         a_buffer[i] = 10
-        b_buffer[i] = i
+        b_buffer[i] = Int32(i)
 
     var a = NDBuffer[DType.int32](
         a_buffer^, Shape(2, 3), Strides.default(Shape(2, 3)), offset=5
@@ -999,7 +999,7 @@ fn test_copy_from_equal_shaped_dest_contiguous_src_noncontiguous_overwrite() rai
     # For testing, we'll create a larger buffer and use custom strides
     var src_buffer = Buffer[DType.int32](12)
     for i in range(12):
-        src_buffer[i] = i * 10
+        src_buffer[i] = Int32(i * 10)
 
     # Create NDBuffer with non-default strides (column-major for example)
     # Shape (2, 3) with strides (1, 2) instead of default (3, 1)
@@ -1016,7 +1016,7 @@ fn test_copy_from_equal_shaped_dest_contiguous_src_noncontiguous_overwrite() rai
             var actual = dest[IntArray(i, j)]
             assert_true(
                 actual == expected,
-                "Mismatch at " + i.__str__() + "," + j.__str__(),
+                "Mismatch at " + String(i) + "," + String(j),
             )
     print(
         "test_copy_from_equal_shaped_dest_contiguous_src_noncontiguous_overwrite"
@@ -1044,7 +1044,7 @@ fn test_copy_from_equal_shaped_dest_noncontiguous_src_contiguous_overwrite() rai
         for j in range(3):
             assert_true(
                 dest[IntArray(i, j)] == 99,
-                "Should be 99 at " + i.__str__() + "," + j.__str__(),
+                "Should be 99 at " + String(i) + "," + String(j),
             )
     print(
         "test_copy_from_equal_shaped_dest_noncontiguous_src_contiguous_overwrite"
@@ -1065,7 +1065,7 @@ fn test_copy_from_equal_shaped_both_noncontiguous_overwrite() raises:
     # Non-contiguous src
     var src_buffer = Buffer[DType.int32](12)
     for i in range(12):
-        src_buffer[i] = i + 100
+        src_buffer[i] = Int32(i + 100)
     var src = NDBuffer[DType.int32](
         src_buffer^, Shape(2, 3), Strides(1, 2), offset=0
     )
@@ -1078,7 +1078,7 @@ fn test_copy_from_equal_shaped_both_noncontiguous_overwrite() raises:
             var actual = dest[IntArray(i, j)]
             assert_true(
                 actual == expected,
-                "Mismatch at " + i.__str__() + "," + j.__str__(),
+                "Mismatch at " + String(i) + "," + String(j),
             )
     print("test_copy_from_equal_shaped_both_noncontiguous_overwrite passed")
 
@@ -1124,7 +1124,7 @@ fn test_copy_from_equal_shaped_with_offset() raises:
     # Src with offset
     var src_buffer = Buffer[DType.int32](20)
     for i in range(20):
-        src_buffer[i] = i * 10
+        src_buffer[i] = Int32(i * 10)
     var src = NDBuffer[DType.int32](
         src_buffer^,
         Shape(2, 3),
@@ -1141,7 +1141,7 @@ fn test_copy_from_equal_shaped_with_offset() raises:
             var actual = dest[IntArray(i, j)]
             assert_true(
                 actual == expected,
-                "Mismatch at " + i.__str__() + "," + j.__str__(),
+                "Mismatch at " + String(i) + "," + String(j),
             )
     print("test_copy_from_equal_shaped_with_offset passed")
 
@@ -1167,14 +1167,14 @@ fn test_copy_from_equal_shaped_3d() raises:
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                src[IntArray(i, j, k)] = i * 100 + j * 10 + k
+                src[IntArray(i, j, k)] = Int32(i * 100 + j * 10 + k)
 
     dest.copy_from_alike[overwrite=True](src)
 
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                var expected = i * 100 + j * 10 + k
+                var expected = Int32(i * 100 + j * 10 + k)
                 assert_true(
                     dest[IntArray(i, j, k)] == expected, "3D copy mismatch"
                 )
@@ -1245,14 +1245,14 @@ fn test_fill_broadcast_row() raises:
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var src = NDBuffer[DType.int32](Shape(1, 4))
     for j in range(4):
-        src[IntArray(0, j)] = j * 10
+        src[IntArray(0, j)] = Int32(j * 10)
 
     dest.fill(src)
 
     for i in range(3):
         for j in range(4):
             assert_true(
-                dest[IntArray(i, j)] == j * 10, "Broadcast row fill mismatch"
+                dest[IntArray(i, j)] == Int32(j * 10), "Broadcast row fill mismatch"
             )
     print("test_fill_broadcast_row passed")
 
@@ -1262,14 +1262,14 @@ fn test_fill_broadcast_col() raises:
     var dest = NDBuffer[DType.int32].zeros(Shape(3, 4))
     var src = NDBuffer[DType.int32](Shape(3, 1))
     for i in range(3):
-        src[IntArray(i, 0)] = i * 100
+        src[IntArray(i, 0)] = Int32(i * 100)
 
     dest.fill(src)
 
     for i in range(3):
         for j in range(4):
             assert_true(
-                dest[IntArray(i, j)] == i * 100, "Broadcast col fill mismatch"
+                dest[IntArray(i, j)] == Int32(i * 100), "Broadcast col fill mismatch"
             )
     print("test_fill_broadcast_col passed")
 
@@ -1279,7 +1279,7 @@ fn test_fill_broadcast_3d() raises:
     var dest = NDBuffer[DType.int32].zeros(Shape(2, 3, 4))
     var src = NDBuffer[DType.int32](Shape(1, 3, 1))
     for j in range(3):
-        src[IntArray(0, j, 0)] = j + 1
+        src[IntArray(0, j, 0)] = Int32(j + 1)
 
     dest.fill(src)
 
@@ -1287,7 +1287,7 @@ fn test_fill_broadcast_3d() raises:
         for j in range(3):
             for k in range(4):
                 assert_true(
-                    dest[IntArray(i, j, k)] == j + 1,
+                    dest[IntArray(i, j, k)] == Int32(j + 1),
                     "3D broadcast fill mismatch",
                 )
     print("test_fill_broadcast_3d passed")
@@ -1443,14 +1443,14 @@ fn test_ndbuffer_getitem_setitem() raises:
     for i in range(3):
         for j in range(4):
             var idx = IntArray(i, j)
-            ndb[idx] = i * 10 + j
+            ndb[idx] = Int32(i * 10 + j)
 
     for i in range(3):
         for j in range(4):
             var idx = IntArray(i, j)
             assert_true(
-                ndb[idx] == i * 10 + j,
-                "Value mismatch at " + i.__str__() + "," + j.__str__(),
+                ndb[idx] == Int32(i * 10 + j),
+                "Value mismatch at " + String(i) + "," + String(j),
             )
     print("test_ndbuffer_getitem_setitem passed")
 
@@ -1539,7 +1539,7 @@ fn test_ndbuffer_broadcast_row() raises:
     var a = NDBuffer[DType.int32].full(Shape(3, 4), 10)
     var b = NDBuffer[DType.int32](Shape(1, 4))
     for j in range(4):
-        b[IntArray(0, j)] = j
+        b[IntArray(0, j)] =Int32( j)
 
     var result = a + b
     assert_true(result.shape == Shape(3, 4), "Broadcast shape")
@@ -1547,7 +1547,7 @@ fn test_ndbuffer_broadcast_row() raises:
     for i in range(3):
         for j in range(4):
             var idx = IntArray(i, j)
-            assert_true(result[idx] == 10 + j, "Broadcast row add")
+            assert_true(result[idx] == Int32(10 + j), "Broadcast row add")
     print("test_ndbuffer_broadcast_row passed")
 
 
@@ -1573,7 +1573,7 @@ fn test_ndbuffer_sum_all() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = val
+            ndb[IntArray(i, j)] = Int32(val)
             val += 1
     # Values: 1,2,3,4,5,6 -> sum = 21
 
@@ -1591,7 +1591,7 @@ fn test_ndbuffer_sum_axis() raises:
         var val = 1
         for i in range(2):
             for j in range(3):
-                ndb[IntArray(i, j)] = val
+                ndb[IntArray(i, j)] = Int32(val)
                 val += 1
 
         # Sum over axis 0 (rows) -> shape (3,)
@@ -1612,7 +1612,7 @@ fn test_ndbuffer_sum_axis_keepdims() raises:
     var val = 1
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = val
+            ndb[IntArray(i, j)] = Int32(val)
             val += 1
 
     var result = ndb.reduce(IntArray(0), keepdims=True)
@@ -1628,7 +1628,7 @@ fn test_ndbuffer_contiguous() raises:
     var ndb = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = i * 10 + j
+            ndb[IntArray(i, j)] = Int32(i * 10 + j)
 
     assert_true(ndb.is_contiguous(), "Should be contiguous")
 
@@ -1645,7 +1645,7 @@ fn test_ndbuffer_contiguous_buffer() raises:
     var ndb = NDBuffer[DType.int32](Shape(2, 3))
     for i in range(2):
         for j in range(3):
-            ndb[IntArray(i, j)] = i * 10 + j
+            ndb[IntArray(i, j)] = Int32(i * 10 + j)
 
     var buf = ndb.contiguous_buffer()
     assert_true(buf.size == 6, "Contiguous buffer size")
@@ -1672,7 +1672,7 @@ fn test_ndbuffer_compare_elementwise() raises:
     print("test_ndbuffer_compare_elementwise")
     var a = NDBuffer[DType.int32](Shape(4))
     for i in range(4):
-        a[IntArray(i)] = i  # 0, 1, 2, 3
+        a[IntArray(i)] = Int32(i)  # 0, 1, 2, 3
 
     var result = a.compare_scalar[LessThan](2)
     assert_true(result[IntArray(0)] == True, "0 < 2")
@@ -1712,7 +1712,7 @@ fn test_ndbuffer_count() raises:
     var ndb = NDBuffer[DType.int32](Shape(3, 4))
     for i in range(3):
         for j in range(4):
-            ndb[IntArray(i, j)] = (i + j) % 3
+            ndb[IntArray(i, j)] =Int32( (i + j) % 3)
 
     var count_0 = ndb.count(0)
     var count_1 = ndb.count(1)
@@ -1728,7 +1728,7 @@ fn test_ndbuffer_flatten() raises:
     for i in range(2):
         for j in range(3):
             for k in range(4):
-                ndb[IntArray(i, j, k)] = i * 100 + j * 10 + k
+                ndb[IntArray(i, j, k)] = Int32(i * 100 + j * 10 + k)
 
     var flat = ndb.flatten()
     assert_true(flat.shape == Shape(24), "Flatten shape")
@@ -1950,7 +1950,7 @@ fn test_buffer_sum() raises:
     size = 21
     l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
-        l.append(i)
+        l.append(Int32(i))
 
     buffer = Buffer[dtype](l)
     ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
@@ -1978,7 +1978,7 @@ fn test_buffer_sum_all() raises:
         size = 21
         l = List[Scalar[dtype]](capacity=size)
         for i in range(size):
-            l.append(i)
+            l.append(Int32(i))
 
         buffer = Buffer[dtype](l)
         ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
@@ -2012,7 +2012,7 @@ fn test_buffer_overwrite() raises:
     size = 21
     l = List[Scalar[dtype]](capacity=size)
     for i in range(size):
-        l.append(i)
+        l.append(Int32(i))
 
     buffer = Buffer[dtype](l)
     ndb = NDBuffer[dtype](buffer^, Shape(3, 7))
