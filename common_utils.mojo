@@ -215,6 +215,23 @@ struct Epsilon[dtype: DType](RegisterPassable):
             panic("Epsilon value not supported for: ", String(Self.dtype))
             return Scalar[Self.dtype](0)
 
+struct One[dtype: DType](RegisterPassable):
+    @staticmethod
+    fn value() -> Scalar[Self.dtype]:
+        comptime if Self.dtype.is_floating_point():
+            return Scalar[Self.dtype](1.0)
+        else:
+            return Scalar[Self.dtype](1)
+
+struct Zero[dtype: DType](RegisterPassable):
+    @staticmethod
+    fn value() -> Scalar[Self.dtype]:
+        comptime if Self.dtype.is_floating_point():
+            return Scalar[Self.dtype](0.0)
+        else:
+            return Scalar[Self.dtype](0)
+
+
 
 @always_inline("nodebug")
 fn inf[dtype: DType]() -> Scalar[dtype]:

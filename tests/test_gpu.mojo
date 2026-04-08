@@ -378,7 +378,7 @@ fn test_v2_gpu_tensor_sum_1d() raises:
         var cpu_result = a.sum()
         var gpu_result = a_gpu.sum()
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_sum_1d passed")
+        print("test_v2_gpu_tensor_sum_1d passed")
 
 
 fn test_v2_gpu_tensor_sum_2d_axis0() raises:
@@ -391,7 +391,7 @@ fn test_v2_gpu_tensor_sum_2d_axis0() raises:
         var cpu_result = a.sum(axes=[0])
         var gpu_result = a_gpu.sum(axes=[0])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_sum_2d_axis0 passed")
+        print("test_v2_gpu_tensor_sum_2d_axis0 passed")
 
 
 fn test_v2_gpu_tensor_sum_2d_axis1() raises:
@@ -404,7 +404,7 @@ fn test_v2_gpu_tensor_sum_2d_axis1() raises:
         var cpu_result = a.sum(axes=[1])
         var gpu_result = a_gpu.sum(axes=[1])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_sum_2d_axis1 passed")
+        print("test_v2_gpu_tensor_sum_2d_axis1 passed")
 
 
 fn test_v2_gpu_tensor_sum_3d_axis1() raises:
@@ -418,7 +418,7 @@ fn test_v2_gpu_tensor_sum_3d_axis1() raises:
         var cpu_result = a.sum(axes=[1])
         var gpu_result = a_gpu.sum(axes=[1])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_sum_3d_axis1 passed")
+        print("test_v2_gpu_tensor_sum_3d_axis1 passed")
 
 
 fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
@@ -432,7 +432,7 @@ fn test_v2_gpu_tensor_sum_3d_axes_0_2() raises:
         var cpu_result = a.sum(axes=[0, 2])
         var gpu_result = a_gpu.sum(axes=[0, 2])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_sum_3d_axes_0_2 passed")
+        print("test_v2_gpu_tensor_sum_3d_axes_0_2 passed")
 
 
 fn test_v2_gpu_tensor_sum_keepdims() raises:
@@ -446,7 +446,7 @@ fn test_v2_gpu_tensor_sum_keepdims() raises:
         var cpu_result = a.sum(axes=[1], keepdims=True)
         var gpu_result = a_gpu.sum(axes=[1], keepdims=True)
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_sum_keepdims passed")
+        print("test_v2_gpu_tensor_sum_keepdims passed")
 
 
 fn test_v2_gpu_tensor_sum_all_axes() raises:
@@ -459,7 +459,7 @@ fn test_v2_gpu_tensor_sum_all_axes() raises:
         var cpu_result = a.sum()
         var gpu_result = a_gpu.sum()
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_sum_all_axes passed")
+        print("test_v2_gpu_tensor_sum_all_axes passed")
 
 
 fn test_v2_gpu_tensor_mean_2d_axis0() raises:
@@ -472,7 +472,7 @@ fn test_v2_gpu_tensor_mean_2d_axis0() raises:
         var cpu_result = a.mean(axes=[0])
         var gpu_result = a_gpu.mean(axes=[0])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_mean_2d_axis0 passed")
+        print("test_v2_gpu_tensor_mean_2d_axis0 passed")
 
 
 fn test_v2_gpu_tensor_mean_2d_axis1() raises:
@@ -485,7 +485,7 @@ fn test_v2_gpu_tensor_mean_2d_axis1() raises:
         var cpu_result = a.mean(axes=[1])
         var gpu_result = a_gpu.mean(axes=[1])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_mean_2d_axis1 passed")
+        print("test_v2_gpu_tensor_mean_2d_axis1 passed")
 
 
 fn test_v2_gpu_tensor_mean_3d_axis1() raises:
@@ -499,7 +499,7 @@ fn test_v2_gpu_tensor_mean_3d_axis1() raises:
         var cpu_result = a.mean(axes=[1])
         var gpu_result = a_gpu.mean(axes=[1])
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_mean_3d_axis1 passed")
+        print("test_v2_gpu_tensor_mean_3d_axis1 passed")
 
 
 fn test_v2_gpu_tensor_mean_keepdims() raises:
@@ -513,7 +513,7 @@ fn test_v2_gpu_tensor_mean_keepdims() raises:
         var cpu_result = a.mean(axes=[1], keepdims=True)
         var gpu_result = a_gpu.mean(axes=[1], keepdims=True)
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_mean_keepdims passed")
+        print("test_v2_gpu_tensor_mean_keepdims passed")
 
 
 fn test_v2_gpu_tensor_mean_all_axes() raises:
@@ -527,7 +527,7 @@ fn test_v2_gpu_tensor_mean_all_axes() raises:
         var cpu_result = a.mean()
         var gpu_result = a_gpu.mean()
         assert_true(cpu_result.to_gpu().all_close(gpu_result))
-    print("test_v2_gpu_tensor_mean_all_axes passed")
+        print("test_v2_gpu_tensor_mean_all_axes passed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -547,7 +547,7 @@ fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
         var tensor = Tensor[dtype].d1([6, 15])
         var g_tensor = tensor.to_gpu()
         assert_true(g_tensor.buffer.all_close(gpu_result))
-    print("test_v2_gpu_ndbuffer_sum_2d_axis1 passed")
+        print("test_v2_gpu_ndbuffer_sum_2d_axis1 passed")
 
 
 fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
@@ -562,7 +562,7 @@ fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
         var expected = Tensor[dtype].d1([2, 3, 4])
         expected = expected.to_gpu()
         assert_true(expected.buffer.all_close(gpu_result))
-    print("test_v2_gpu_ndbuffer_mean_2d_axis0 passed")
+        print("test_v2_gpu_ndbuffer_mean_2d_axis0 passed")
 
 
 fn test_cpu_grad_flow() raises:

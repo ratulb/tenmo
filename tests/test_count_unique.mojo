@@ -539,7 +539,8 @@ fn main() raises:
     test_countuniq_gpu_count_large()
     test_countuniq_gpu_count_int()
     test_countuniq_gpu_count_noncontiguous()
-    print("GPU count passed!")
+    comptime if has_accelerator():
+        print("GPU count passed!")
 
     # GPU unique
     test_countuniq_gpu_unique_1d_basic()
@@ -550,7 +551,8 @@ fn main() raises:
     test_countuniq_gpu_unique_int()
     test_countuniq_gpu_unique_noncontiguous()
     test_countuniq_gpu_unique_result_always_cpu()
-    print("GPU unique passed!")
+    comptime if has_accelerator():
+        print("GPU unique passed!")
 
     # Parity
     test_countuniq_parity_count_1d()

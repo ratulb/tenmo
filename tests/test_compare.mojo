@@ -802,7 +802,8 @@ fn main() raises:
     test_compare_gpu_large_gt_scalar()
     test_compare_gpu_large_lt_scalar()
     test_compare_gpu_large_mixed()
-    print("GPU compare tests passed!")
+    comptime if has_accelerator():
+        print("GPU compare tests passed!")
 
     # Parity
     test_compare_parity_eq_1d()

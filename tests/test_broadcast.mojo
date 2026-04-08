@@ -682,7 +682,8 @@ fn main() raises:
     test_bcast_gpu_2d_row_to_2d()
     test_bcast_gpu_identity()
     test_bcast_gpu_3d_to_3d()
-    print("GPU broadcast_to forward passed!")
+    comptime if has_accelerator():
+        print("GPU broadcast_to forward passed!")
 
     # Parity
     test_bcast_parity_1d_to_2d()

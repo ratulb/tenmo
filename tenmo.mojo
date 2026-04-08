@@ -16,6 +16,7 @@ from common_utils import (
     print_buffer,
     panic,
     Epsilon,
+    One,
 )
 from mnemonics import *
 from indexhelper import IndexIterator
@@ -1287,12 +1288,7 @@ struct Tensor[dtype: DType](
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
         var target_device = device.or_else(CPU().into())
-        var value: Scalar[Self.dtype]
-
-        comptime if Self.dtype.is_floating_point():
-            value = Scalar[Self.dtype](1.0)
-        else:
-            value = Scalar[Self.dtype](1)
+        var value = One[Self.dtype].value()
         return Tensor[Self.dtype](
             NDBuffer[Self.dtype].full(shape, value, target_device),
             requires_grad=requires_grad,

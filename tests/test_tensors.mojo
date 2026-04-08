@@ -3757,12 +3757,12 @@ fn test_batched_matmul_vector_rhs_broadcast() raises:
     v = Tensor[dtype].ones(4, requires_grad=True)
     out = r.matmul(v)  # row sums over last axis
     # forward check: sums along last axis
-    s00 = 0 + 1 + 2 + 3
-    s01 = 4 + 5 + 6 + 7
-    s02 = 8 + 9 + 10 + 11
-    s10 = 12 + 13 + 14 + 15
-    s11 = 16 + 17 + 18 + 19
-    s12 = 20 + 21 + 22 + 23
+    s00 = Float32(0 + 1 + 2 + 3)
+    s01 = Float32(4 + 5 + 6 + 7)
+    s02 = Float32(8 + 9 + 10 + 11)
+    s10 = Float32(12 + 13 + 14 + 15)
+    s11 = Float32(16 + 17 + 18 + 19)
+    s12 = Float32(20 + 21 + 22 + 23)
     assert_true(
         out.all_close(Tensor[dtype].d2([[s00, s01, s02], [s10, s11, s12]]))
     )
@@ -4067,8 +4067,8 @@ fn test_mask() raises:
 
 fn test_randint() raises:
     print("test_randint")
-    low = 10
-    high = 30
+    low = Int32(10)
+    high = Int32(30)
     a = Tensor[DType.int32].rand([3, 4], low, high)
     count_low = a.count(low)
     count_high = a.count(high)

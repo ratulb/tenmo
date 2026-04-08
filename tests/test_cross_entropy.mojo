@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from std.testing import assert_true
 from std.testing import assert_false
-from time import perf_counter_ns
+from std.time import perf_counter_ns
 from shapes import Shape
 from common_utils import log_warning
 from gradbox import Gradbox
@@ -9,7 +9,7 @@ from intarray import IntArray
 from std.sys import has_accelerator
 from crossentropy import CrossEntropyLoss, Reduction
 from std.math import log, exp
-
+from std.utils.numerics import min_finite
 
 
 @always_inline("nodebug")
@@ -25,10 +25,9 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
     Returns:
         The +inf value of the given dtype.
     """
-    constrained[
+    comptime assert
         dtype.is_floating_point(),
-        "Only floating point dtypes support +inf.",
-    ]()
+        "Only floating point dtypes support +inf."
 
     comptime if dtype == DType.bfloat16:
         return rebind[Scalar[dtype]](
@@ -47,8 +46,7 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
             __mlir_attr.`#pop.simd<"inf"> : !pop.scalar<f64>`,
         )
     else:
-        constrained[False, "unsupported float type"]()
-        return {}
+        comptime assert False, "unsupported float type"
 
 
 fn isinf[dtype: DType, //](value: Scalar[dtype]) -> Bool:
@@ -72,10 +70,9 @@ fn nan[dtype: DType]() -> Scalar[dtype]:
     Returns:
         The NaN value of the given dtype.
     """
-    constrained[
+    comptime assert
         dtype.is_floating_point(),
-        "Only floating point dtypes support NaN.",
-    ]()
+        "Only floating point dtypes support NaN."
 
     comptime if dtype == DType.float32:
         return rebind[Scalar[dtype]](
@@ -86,8 +83,7 @@ fn nan[dtype: DType]() -> Scalar[dtype]:
             __mlir_attr.`#pop.simd<"nan"> : !pop.scalar<f64>`,
         )
     else:
-        constrained[False, "unsupported float type"]()
-        return {}
+        comptime assert False, "unsupported float type"
 
 
 # ============================================================================
@@ -609,7 +605,7 @@ fn test_ce_spatial_with_ignore_index() raises:
         assert_true(
             abs(logits.grad()[0, c, 1]) < 1e-10,
             "Batch 0, spatial pos 1, class "
-            + c.__str__()
+            + String(c)
             + " grad should be 0",
         )
         print(logits.grad()[0, c, 1])
@@ -620,7 +616,7 @@ fn test_ce_spatial_with_ignore_index() raises:
         assert_true(
             abs(logits.grad()[1, c, 2]) < 1e-10,
             "Batch 1, spatial pos 2, class "
-            + c.__str__()
+            + String(c)
             + " grad should be 0",
         )
 
@@ -708,7 +704,7 @@ fn test_ce_large_batch() raises:
     # Create targets (cycling through classes)
     var targets = Tensor[DType.int32](Shape([batch_size]))
     for i in range(batch_size):
-        targets[i] = i % num_classes
+        targets[i] = Int32(i % num_classes)
 
     var criterion = CrossEntropyLoss[DType.float32](reduction="mean")
     var loss = criterion(logits, targets)
@@ -2349,14 +2345,14 @@ fn test_ce_rank3_ignore_v2() raises:
     for c in range(3):
         assert_true(
             abs(logits.grad()[0, c, 1]) < 1e-10,
-            "Rank-3: Batch 0, pos 1, class " + c.__str__() + " grad should be 0",
+            "Rank-3: Batch 0, pos 1, class " + String(c) + " grad should be 0",
         )
 
     # Batch 1, spatial position 2 is ignored (target=-100)
     for c in range(3):
         assert_true(
             abs(logits.grad()[1, c, 2]) < 1e-10,
-            "Rank-3: Batch 1, pos 2, class " + c.__str__() + " grad should be 0",
+            "Rank-3: Batch 1, pos 2, class " + String(c) + " grad should be 0",
         )
 
     # Non-ignored positions should have non-zero gradients
@@ -2425,7 +2421,7 @@ fn test_ce_rank4_ignore_v2() raises:
         var grad_val = logits.grad()[0, c, 0, 1]
         assert_true(
             abs(grad_val) < 1e-10,
-            "Rank-4: Batch 0, [0,1], class " + c.__str__() + " grad should be 0, got " + grad_val.__str__(),
+            "Rank-4: Batch 0, [0,1], class " + String(c) + " grad should be 0, got " + String(grad_val),
         )
 
     # Check ignored position [1, :, 0, 0] (batch 1, height 0, width 0)
@@ -2434,7 +2430,7 @@ fn test_ce_rank4_ignore_v2() raises:
         var grad_val = logits.grad()[1, c, 0, 0]
         assert_true(
             abs(grad_val) < 1e-10,
-            "Rank-4: Batch 1, [0,0], class " + c.__str__() + " grad should be 0, got " + grad_val.__str__(),
+            "Rank-4: Batch 1, [0,0], class " + String(c) + " grad should be 0, got " + String(grad_val),
         )
 
     # Check non-ignored position [0, :, 0, 0] has non-zero grads
@@ -2552,7 +2548,7 @@ fn test_ce_rank3_all_ignored_v2() raises:
                 var grad_val = logits.grad()[b, c, s]
                 assert_true(
                     abs(grad_val) < 1e-10,
-                    "Rank-3: All ignored - grad should be 0, got " + grad_val.__str__(),
+                    "Rank-3: All ignored - grad should be 0, got " + String(grad_val),
                 )
 
     # Loss should be 0 (no valid samples)
@@ -2588,14 +2584,14 @@ fn test_ce_rank4_partial_ignore_v2() raises:
     for c in range(3):
         assert_true(
             abs(logits.grad()[0, c, 0, 1]) < 1e-10,
-            "Rank-4: Ignored [0,1] class " + c.__str__() + " should be 0",
+            "Rank-4: Ignored [0,1] class " + String(c) + " should be 0",
         )
 
     # Check ignored position [0, :, 1, 2]
     for c in range(3):
         assert_true(
             abs(logits.grad()[0, c, 1, 2]) < 1e-10,
-            "Rank-4: Ignored [1,2] class " + c.__str__() + " should be 0",
+            "Rank-4: Ignored [1,2] class " + String(c) + " should be 0",
         )
 
     # Check non-ignored [0, :, 0, 0] has non-zero
@@ -2633,7 +2629,7 @@ fn test_ce_rank3_label_smoothing_ignore_v2() raises:
     for c in range(3):
         assert_true(
             abs(logits.grad()[0, c, 1]) < 1e-10,
-            "Rank-3: Label smoothing + ignore - class " + c.__str__() + " should be 0",
+            "Rank-3: Label smoothing + ignore - class " + String(c) + " should be 0",
         )
 
     # Non-ignored positions should have non-zero gradients
@@ -2678,9 +2674,10 @@ fn test_ce_rank3_reduction_none_v2() raises:
 
     # Ignored position should have zero gradient
     for c in range(3):
+        print(logits.grad()[0, c, 1])
         assert_true(
             abs(logits.grad()[0, c, 1]) < 1e-10,
-            "Rank-3: reduction=none - ignored class " + c.__str__() + " should be 0",
+            "Rank-3: reduction=none - ignored class " + String(c) + " should be 0",
         )
 
     print("✓ Rank-3 reduction=none test passed")

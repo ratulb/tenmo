@@ -6,7 +6,7 @@ from broadcasthelper import ShapeBroadcaster
 from device import DeviceState
 from array import Array
 from ndbuffer import NDBuffer
-
+from common_utils import One
 
 fn arithmetic_ops_both_contiguous[
     op_code: Int,
@@ -21,7 +21,7 @@ fn arithmetic_ops_both_contiguous[
 ):
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
     var grid_stride = Int(block_dim.x * grid_dim.x)
-
+    var one: SIMD[dtype, simd_width]
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
@@ -37,7 +37,11 @@ fn arithmetic_ops_both_contiguous[
                 var vec_a = A.load[width=simd_width](i)
                 var vec_b = B.load[width=simd_width](i)
                 var vec_result: SIMD[dtype, simd_width]
-                var one = SIMD[dtype, simd_width](1.0)       # FIX: float literal
+
+                comptime if dtype.is_floating_point():
+                    one = SIMD[dtype, simd_width](1.0)
+                else:
+                    one = SIMD[dtype, simd_width](1)
 
                 comptime if op_code == Add:
                     vec_result = vec_a + vec_b
@@ -70,9 +74,9 @@ fn arithmetic_ops_both_contiguous[
                     elif op_code == Divide:
                         res = a / b
                     elif op_code == SIGMOID_BACKWARD:
-                        res = b * a * (Scalar[dtype](1.0) - a)
+                        res = b * a * (One[dtype].value() - a)
                     else:  # TANH_BACKWARD
-                        res = b * (Scalar[dtype](1.0) - a * a)
+                        res = b * (One[dtype].value() - a * a)
 
                     result[idx] = res
 

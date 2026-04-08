@@ -271,9 +271,6 @@ struct CECommon[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         var logits_2d = logits.buffer.reshape(Shape(M, C))
         var target_2d = target.buffer.reshape(Shape(M, C))
 
-        logits_2d.print()
-        target_2d.print()
-
         var spatial_shape = (
             Shape(spatial_dims) if len(spatial_dims) > 0 else Shape()
         )
