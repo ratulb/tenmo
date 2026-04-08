@@ -1,8 +1,6 @@
 from std.sys import simd_width_of
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim
-from std.memory import stack_allocation, AddressSpace
 from mnemonics import Add, Multiply, Subtract, Divide, max_rank, SIGMOID_BACKWARD, TANH_BACKWARD
-from tenmo import Tensor
 from strides import Strides
 from broadcasthelper import ShapeBroadcaster
 from device import DeviceState
@@ -19,8 +17,6 @@ fn arithmetic_ops_both_contiguous[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    A_offset: Int,
-    B_offset: Int,
     size: Int,
 ):
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
@@ -38,10 +34,10 @@ fn arithmetic_ops_both_contiguous[
                 break
 
             if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](A_offset + i)
-                var vec_b = B.load[width=simd_width](B_offset + i)
+                var vec_a = A.load[width=simd_width](i)
+                var vec_b = B.load[width=simd_width](i)
                 var vec_result: SIMD[dtype, simd_width]
-                var one = SIMD[dtype, simd_width](1)
+                var one = SIMD[dtype, simd_width](1.0)       # FIX: float literal
 
                 comptime if op_code == Add:
                     vec_result = vec_a + vec_b
@@ -52,32 +48,32 @@ fn arithmetic_ops_both_contiguous[
                 elif op_code == Divide:
                     vec_result = vec_a / vec_b
                 elif op_code == SIGMOID_BACKWARD:
-                    # A = sigmoid output, B = grad
                     vec_result = vec_b * vec_a * (one - vec_a)
-                else: # Tanh backward
-                    # A = tanh output, B = grad
+                else:  # TANH_BACKWARD
                     vec_result = vec_b * (one - vec_a * vec_a)
+
                 result.store[width=simd_width](i, vec_result)
 
             else:
                 for j in range(size - i):
                     var idx = i + j
-                    var res: Scalar[dtype] = 0
+                    var a = A[idx]
+                    var b = B[idx]
+                    var res: Scalar[dtype]
 
                     comptime if op_code == Add:
-                        res = A[A_offset + idx] + B[B_offset + idx]
+                        res = a + b
                     elif op_code == Subtract:
-                        res = A[A_offset + idx] - B[B_offset + idx]
+                        res = a - b
                     elif op_code == Multiply:
-                        res = A[A_offset + idx] * B[B_offset + idx]
+                        res = a * b
                     elif op_code == Divide:
-                        res = A[A_offset + idx] / B[B_offset + idx]
+                        res = a / b
                     elif op_code == SIGMOID_BACKWARD:
-                        var a_val = A[A_offset + idx]
-                        res = B[B_offset + idx] * a_val * (Scalar[dtype](1) - a_val)
+                        res = b * a * (Scalar[dtype](1.0) - a)
                     else:  # TANH_BACKWARD
-                        var a_val = A[A_offset + idx]
-                        res = B[B_offset + idx] * (Scalar[dtype](1) - a_val * a_val)
+                        res = b * (Scalar[dtype](1.0) - a * a)
+
                     result[idx] = res
 
         base_idx += grid_stride * CHUNK_SIZE
@@ -92,10 +88,8 @@ fn arithmetic_ops_A_contiguous[
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    A_offset: Int,
     result_shape: Array,
     B_strides: Array,
-    B_offset: Int,
     size: Int,
     rank: Int,
 ):
@@ -103,7 +97,6 @@ fn arithmetic_ops_A_contiguous[
     var grid_stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
@@ -115,13 +108,13 @@ fn arithmetic_ops_A_contiguous[
                 break
 
             if i + simd_width <= size:
-                var vec_a = A.load[width=simd_width](A_offset + i)
+                var vec_a = A.load[width=simd_width](i)
                 var vec_result: SIMD[dtype, simd_width] = 0
 
                 comptime for lane in range(simd_width):
                     var linear_idx = i + lane
                     var remaining = linear_idx
-                    var b_idx = B_offset
+                    var b_idx = 0
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = remaining % result_shape[dim]
@@ -137,45 +130,44 @@ fn arithmetic_ops_A_contiguous[
                     elif op_code == Divide:
                         vec_result[lane] = vec_a[lane] / B[b_idx]
                     elif op_code == SIGMOID_BACKWARD:
-                        # A = sigmoid output, B = grad
-                        vec_result[lane] = B[b_idx] * vec_a[lane] * (Scalar[dtype](1) - vec_a[lane])
+                        vec_result[lane] = B[b_idx] * vec_a[lane] * (Scalar[dtype](1.0) - vec_a[lane])
                     else:  # TANH_BACKWARD
-                        # A = tanh output, B = grad
-                        vec_result[lane] = B[b_idx] * (Scalar[dtype](1) - vec_a[lane] * vec_a[lane])
+                        vec_result[lane] = B[b_idx] * (Scalar[dtype](1.0) - vec_a[lane] * vec_a[lane])
+
                 result.store[width=simd_width](i, vec_result)
 
             else:
                 for j in range(size - i):
                     var linear_idx = i + j
                     var remaining = linear_idx
-                    var b_idx = B_offset
+                    var b_idx = 0
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = remaining % result_shape[dim]
                         b_idx += coord * B_strides[dim]
                         remaining //= result_shape[dim]
 
-                    var res: Scalar[dtype] = 0
+                    var a = A[linear_idx]
+                    var b = B[b_idx]
+                    var res: Scalar[dtype]
 
                     comptime if op_code == Add:
-                        res = A[A_offset + linear_idx] + B[b_idx]
+                        res = a + b
                     elif op_code == Subtract:
-                        res = A[A_offset + linear_idx] - B[b_idx]
+                        res = a - b
                     elif op_code == Multiply:
-                        res = A[A_offset + linear_idx] * B[b_idx]
+                        res = a * b
                     elif op_code == Divide:
-                        res = A[A_offset + linear_idx] / B[b_idx]
+                        res = a / b
                     elif op_code == SIGMOID_BACKWARD:
-                        var a_val = A[A_offset + linear_idx]
-                        res = B[b_idx] * a_val * (Scalar[dtype](1) - a_val)
-                    else: #
-                        # TANH_BACKWARD
-                        var a_val = A[A_offset + linear_idx]
-                        res = B[b_idx] * (Scalar[dtype](1) - a_val * a_val)
+                        res = b * a * (Scalar[dtype](1.0) - a)
+                    else:  # TANH_BACKWARD
+                        res = b * (Scalar[dtype](1.0) - a * a)
 
                     result[linear_idx] = res
 
         base_idx += grid_stride * CHUNK_SIZE
+
 
 fn arithmetic_ops_B_contiguous[
     op_code: Int,
@@ -188,18 +180,15 @@ fn arithmetic_ops_B_contiguous[
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     result_shape: Array,
     A_strides: Array,
-    A_offset: Int,
-    B_offset: Int,
     size: Int,
     rank: Int,
 ):
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
-    var grid_stride = Int(block_dim.x * grid_dim.x)  # total threads in grid
+    var grid_stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-
-    # Grid-stride loop over CHUNK_SIZE blocks
     var base_idx = gtid * CHUNK_SIZE
+
     while base_idx < size:
 
         comptime for item in range(simd_vectors_per_thread):
@@ -209,16 +198,14 @@ fn arithmetic_ops_B_contiguous[
                 break
 
             if i + simd_width <= size:
-                # B: Vectorized load (contiguous)
-                var vec_b = B.load[width=simd_width](B_offset + i)
+                var vec_b = B.load[width=simd_width](i)
                 var vec_result: SIMD[dtype, simd_width] = 0
 
                 comptime for lane in range(simd_width):
                     var linear_idx = i + lane
                     var remaining = linear_idx
+                    var a_idx = 0
 
-                    # Coordinate decomposition
-                    var a_idx = A_offset
                     for dim in range(rank - 1, -1, -1):
                         var coord = remaining % result_shape[dim]
                         a_idx += coord * A_strides[dim]
@@ -233,44 +220,44 @@ fn arithmetic_ops_B_contiguous[
                     elif op_code == Divide:
                         vec_result[lane] = A[a_idx] / vec_b[lane]
                     elif op_code == SIGMOID_BACKWARD:
-                        # A = sigmoid output, B = grad
-                        vec_result[lane] = vec_b[lane] * A[a_idx] * (Scalar[dtype](1) - A[a_idx])
-                    else: # TANH_BACKWARD
-                        # A = tanh output, B = grad
-                        vec_result[lane] = vec_b[lane] * (Scalar[dtype](1) - A[a_idx] * A[a_idx])
+                        vec_result[lane] = vec_b[lane] * A[a_idx] * (Scalar[dtype](1.0) - A[a_idx])
+                    else:  # TANH_BACKWARD
+                        vec_result[lane] = vec_b[lane] * (Scalar[dtype](1.0) - A[a_idx] * A[a_idx])
 
                 result.store[width=simd_width](i, vec_result)
 
             else:
-                # Scalar tail
                 for j in range(size - i):
                     var linear_idx = i + j
                     var remaining = linear_idx
-                    var a_idx = A_offset
+                    var a_idx = 0
 
-                    for dim in range(Int(rank) - 1, -1, -1):
+                    for dim in range(rank - 1, -1, -1):
                         var coord = remaining % result_shape[dim]
                         a_idx += coord * A_strides[dim]
                         remaining //= result_shape[dim]
 
-                    var res: Scalar[dtype] = 0
+                    var a = A[a_idx]
+                    var b = B[linear_idx]
+                    var res: Scalar[dtype]
 
                     comptime if op_code == Add:
-                        res = A[a_idx] + B[B_offset + linear_idx]
+                        res = a + b
                     elif op_code == Subtract:
-                        res = A[a_idx] - B[B_offset + linear_idx]
+                        res = a - b
                     elif op_code == Multiply:
-                        res = A[a_idx] * B[B_offset + linear_idx]
+                        res = a * b
                     elif op_code == Divide:
-                        res = A[a_idx] / B[B_offset + linear_idx]
+                        res = a / b
                     elif op_code == SIGMOID_BACKWARD:
-                        res = B[B_offset + linear_idx] * A[a_idx] * (Scalar[dtype](1) - A[a_idx])
+                        res = b * a * (Scalar[dtype](1.0) - a)
                     else:  # TANH_BACKWARD
-                        res = B[B_offset + linear_idx] * (Scalar[dtype](1) - A[a_idx] * A[a_idx])
+                        res = b * (Scalar[dtype](1.0) - a * a)
 
                     result[linear_idx] = res
 
         base_idx += grid_stride * CHUNK_SIZE
+
 
 
 fn arithmetic_ops_both_strided[
@@ -285,8 +272,6 @@ fn arithmetic_ops_both_strided[
     result_shape: Array,
     A_strides: Array,
     B_strides: Array,
-    A_offset: Int,
-    B_offset: Int,
     size: Int,
     rank: Int,
 ):
@@ -294,7 +279,6 @@ fn arithmetic_ops_both_strided[
     var grid_stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
-
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
@@ -311,8 +295,8 @@ fn arithmetic_ops_both_strided[
                 comptime for lane in range(simd_width):
                     var linear_idx = i + lane
                     var remaining = linear_idx
-                    var a_idx = A_offset
-                    var b_idx = B_offset
+                    var a_idx = 0
+                    var b_idx = 0
 
                     for dim in range(rank - 1, -1, -1):
                         var coord = remaining % result_shape[dim]
@@ -329,40 +313,41 @@ fn arithmetic_ops_both_strided[
                     elif op_code == Divide:
                         vec_result[lane] = A[a_idx] / B[b_idx]
                     elif op_code == SIGMOID_BACKWARD:
-                        # A = sigmoid, B = grad
-                        vec_result[lane] = B[b_idx] * A[a_idx] * (Scalar[dtype](1) - A[a_idx])
-                    else: # TANH_BACKWARD
-                        # A = tanh output, B = grad
-                        vec_result[lane] = B[b_idx] * (Scalar[dtype](1) - A[a_idx] * A[a_idx])
+                        vec_result[lane] = B[b_idx] * A[a_idx] * (Scalar[dtype](1.0) - A[a_idx])
+                    else:  # TANH_BACKWARD
+                        vec_result[lane] = B[b_idx] * (Scalar[dtype](1.0) - A[a_idx] * A[a_idx])
+
                 result.store[width=simd_width](i, vec_result)
 
             else:
                 for j in range(size - i):
                     var linear_idx = i + j
                     var remaining = linear_idx
-                    var a_idx = A_offset
-                    var b_idx = B_offset
+                    var a_idx = 0
+                    var b_idx = 0
 
-                    for dim in range(Int(rank) - 1, -1, -1):
+                    for dim in range(rank - 1, -1, -1):
                         var coord = remaining % result_shape[dim]
                         a_idx += coord * A_strides[dim]
                         b_idx += coord * B_strides[dim]
                         remaining //= result_shape[dim]
 
-                    var res: Scalar[dtype] = 0
+                    var a = A[a_idx]
+                    var b = B[b_idx]
+                    var res: Scalar[dtype]
 
                     comptime if op_code == Add:
-                        res = A[a_idx] + B[b_idx]
+                        res = a + b
                     elif op_code == Subtract:
-                        res = A[a_idx] - B[b_idx]
+                        res = a - b
                     elif op_code == Multiply:
-                        res = A[a_idx] * B[b_idx]
+                        res = a * b
                     elif op_code == Divide:
-                        res = A[a_idx] / B[b_idx]
+                        res = a / b
                     elif op_code == SIGMOID_BACKWARD:
-                        res = B[b_idx] * A[a_idx] * (Scalar[dtype](1) - A[a_idx])
-                    else: # TANH_BACKWARD
-                        res = B[b_idx] * (Scalar[dtype](1) - A[a_idx] * A[a_idx])
+                        res = b * a * (Scalar[dtype](1.0) - a)
+                    else:  # TANH_BACKWARD
+                        res = b * (Scalar[dtype](1.0) - a * a)
 
                     result[linear_idx] = res
 
@@ -385,11 +370,10 @@ struct BinaryOperations[dtype: DType = DType.float32](
 
         var broadcast_shape = ShapeBroadcaster.broadcast_shape(A_shape, B_shape)
         var output_size = broadcast_shape.product()
+        var rank = broadcast_shape.rank()
 
-        # Launch configuration
         var (threads_per_block, num_blocks) = Self.launch_config(output_size)
 
-        # Check if broadcasting is needed
         var needs_broadcasting = (
             A_shape != broadcast_shape or B_shape != broadcast_shape
         )
@@ -405,47 +389,36 @@ struct BinaryOperations[dtype: DType = DType.float32](
         ref A_buffer = A_device_state.device_buffer()
         ref B_buffer = B_device_state.device_buffer()
 
+        var A_is_contiguous = A.is_contiguous()
+        var B_is_contiguous = B.is_contiguous()
+
         # ================================================================
         # PATH 1: Both contiguous, same shape, no broadcasting
         # ================================================================
         if (
             A_shape == B_shape
-            and A.is_contiguous()
-            and B.is_contiguous()
+            and A_is_contiguous
+            and B_is_contiguous
             and not needs_broadcasting
         ):
-            #print("[GPU] Using Kernel 1: Both contiguous")
             var compiled_func = device_context.compile_function[
-                arithmetic_ops_both_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
-                arithmetic_ops_both_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
+                arithmetic_ops_both_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
+                arithmetic_ops_both_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
             ]()
-
             device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
                 A_buffer,
                 B_buffer,
-                0,  # A.offset(),
-                0,  # B.offset(),
                 output_size,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-
             device_context.synchronize()
             var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-            var out = NDBuffer[Self.dtype].with_device_state(
-                device_state^, broadcast_shape
-            )
+            return NDBuffer[Self.dtype].with_device_state(device_state^, broadcast_shape)
 
-            return out^
-
-        # Prepare for strided kernels
-        var rank = broadcast_shape.rank()
+        # Broadcast strides needed for all remaining paths
         var A_broadcast_strides = ShapeBroadcaster.broadcast_strides(
             A_shape, Strides.default(A_shape), broadcast_shape
         )
@@ -453,62 +426,40 @@ struct BinaryOperations[dtype: DType = DType.float32](
             B_shape, Strides.default(B_shape), broadcast_shape
         )
 
-        var A_is_contiguous = A.is_contiguous()
-        var B_is_contiguous = B.is_contiguous()
-
         # ================================================================
-        # PATH 2: A contiguous, B strided
+        # PATH 2: A contiguous and not broadcast-expanded, B strided/broadcast
+        # FIX: guard A_shape == broadcast_shape so A's linear index is valid
         # ================================================================
-        if A_is_contiguous and not B_is_contiguous:
-            #print("[GPU] Using Kernel 2: A contiguous, B strided")
-
+        if A_is_contiguous and A_shape == broadcast_shape and not B_is_contiguous:
             var compiled_func = device_context.compile_function[
-                arithmetic_ops_A_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
-                arithmetic_ops_A_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
+                arithmetic_ops_A_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
+                arithmetic_ops_A_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
             ]()
-
             device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
                 A_buffer,
                 B_buffer,
-                0,  # A.offset(),
                 broadcast_shape.array(),
-                # B.strides().array(),
                 B_broadcast_strides.array(),
-                0,  # B.offset(),
                 output_size,
                 rank,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-
             device_context.synchronize()
             var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-            var out = NDBuffer[Self.dtype].with_device_state(
-                device_state^, broadcast_shape
-            )
+            return NDBuffer[Self.dtype].with_device_state(device_state^, broadcast_shape)
 
-            return out^
         # ================================================================
-        # PATH 3: A strided, B contiguous
+        # PATH 3: B contiguous and not broadcast-expanded, A strided/broadcast
+        # FIX: guard B_shape == broadcast_shape so B's linear index is valid
         # ================================================================
-        if not A_is_contiguous and B_is_contiguous:
-            #print("[GPU] Using Kernel 3: A strided, B contiguous (MEDIUM-FAST)")
-
+        if B_is_contiguous and B_shape == broadcast_shape and not A_is_contiguous:
             var compiled_func = device_context.compile_function[
-                arithmetic_ops_B_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
-                arithmetic_ops_B_contiguous[
-                    op_code, Self.dtype, simdwidth, 2 * simdwidth
-                ],
+                arithmetic_ops_B_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
+                arithmetic_ops_B_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
             ]()
-
             device_context.enqueue_function(
                 compiled_func,
                 result_buffer,
@@ -516,36 +467,23 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 B_buffer,
                 broadcast_shape.array(),
                 A_broadcast_strides.array(),
-                0,  # A.offset(),
-                0,  # B.offset(),
                 output_size,
                 rank,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-
             device_context.synchronize()
             var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-            var out = NDBuffer[Self.dtype].with_device_state(
-                device_state^, broadcast_shape
-            )
+            return NDBuffer[Self.dtype].with_device_state(device_state^, broadcast_shape)
 
-            return out^
         # ================================================================
-        # PATH 4: Both strided (or broadcasting)
+        # PATH 4: Both strided, or either operand needs broadcasting.
+        # Handles all remaining cases correctly via stride decomposition.
         # ================================================================
-
-        #print("[GPU] Using Kernel 4: Both strided")
-
         var compiled_func = device_context.compile_function[
-            arithmetic_ops_both_strided[
-                op_code, Self.dtype, simdwidth, 2 * simdwidth
-            ],
-            arithmetic_ops_both_strided[
-                op_code, Self.dtype, simdwidth, 2 * simdwidth
-            ],
+            arithmetic_ops_both_strided[op_code, Self.dtype, simdwidth, 2 * simdwidth],
+            arithmetic_ops_both_strided[op_code, Self.dtype, simdwidth, 2 * simdwidth],
         ]()
-
         device_context.enqueue_function(
             compiled_func,
             result_buffer,
@@ -554,25 +492,17 @@ struct BinaryOperations[dtype: DType = DType.float32](
             broadcast_shape.array(),
             A_broadcast_strides.array(),
             B_broadcast_strides.array(),
-            0,  # A.offset(),
-            0,  # B.offset(),
             output_size,
             rank,
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )
-
         device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        var out = NDBuffer[Self.dtype].with_device_state(
-            device_state^, broadcast_shape
-        )
-
-        return out^
+        return NDBuffer[Self.dtype].with_device_state(device_state^, broadcast_shape)
 
     @staticmethod
     fn launch_config(output_size: Int) -> Tuple[Int, Int]:
-        """Launch configuration."""
         var threads_per_block: Int
         var num_blocks: Int
 
@@ -587,7 +517,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
             num_blocks = min((output_size + 511) // 512, 512)
 
         return num_blocks, threads_per_block
-
 
 fn main() raises:
     print("=" * 60)
@@ -612,7 +541,7 @@ fn main() raises:
     print("ALL TESTS PASSED (Including Offset Tests)")
     print("=" * 60)
 
-
+from tenmo import Tensor
 from common_utils import now
 from std.testing import assert_true
 from shapes import Shape
