@@ -154,7 +154,7 @@ fn test_dropout_forward_expected_value_preservation() raises:
     var sum_val = Scalar[DType.float32](0.0)
     for i in range(size):
         sum_val += out[i]
-    var mean = sum_val / Float64(size)
+    var mean = sum_val / Float32(size)
 
     # Expected value should be close to 10.0 (within statistical variance)
     var expected = Tensor[DType.float32](1)

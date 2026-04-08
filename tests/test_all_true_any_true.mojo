@@ -584,7 +584,8 @@ fn main() raises:
     test_alltrue_gpu_from_comparison_false()
     test_alltrue_gpu_large_all_true()
     test_alltrue_gpu_large_one_false()
-    print("GPU all_true passed!")
+    comptime if has_accelerator():
+        print("GPU all_true passed!")
 
     # GPU any_true
     test_anytrue_gpu_1d_all_true()
@@ -601,7 +602,10 @@ fn main() raises:
     test_anytrue_gpu_from_comparison_none()
     test_anytrue_gpu_large_all_false()
     test_anytrue_gpu_large_one_true()
-    print("GPU any_true passed!")
+    comptime if has_accelerator():
+        print("GPU any_true passed!")
+
+
 
     # Parity
     test_alltrue_parity_all_true()

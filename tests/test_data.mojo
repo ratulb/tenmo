@@ -1327,7 +1327,7 @@ fn test_multi_epoch_no_memory_growth() raises:
     # Track ALL batch buffer pointers across epochs
     var epoch_pointers = List[List[Int]]()
 
-    for epoch in range(3):
+    for _ in range(3):
         var batch_ptrs = List[Int]()
         for batch in loader:
             var ptr = Int(batch.features.buffer.data_buffer().data)
@@ -1498,7 +1498,7 @@ fn test_shuffle_uses_two_buffers() raises:
     # Track unique buffer pointers across multiple epochs
     var all_pointers = List[Int]()
 
-    for epoch in range(10):  # Multiple epochs to see both buffers
+    for _ in range(10):  # Multiple epochs to see both buffers
         for batch in loader:
             var ptr = Int(batch.features.buffer.data_buffer().data)
 
