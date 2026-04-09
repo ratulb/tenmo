@@ -407,6 +407,8 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         # Step 1: grad = softmax — (M, C)
         var grad = self.softmax_probs
+        print("\nincoming grad: \n")
+        grad.print()
 
         # Step 2: Build onehot from target — ignore_index rows → all zeros
         # onehot with ignore_index: those rows stay zero (no subtraction needed)
@@ -888,4 +890,10 @@ struct CrossEntropyLoss[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 fn main() raises:
+    comptime dtype = DType.uint8
+    var ndb = NDBuffer[dtype](1, 2, 3, 4, 5, 6, 7, 8)
+    ndb.print()
+    var ndb_unsq = ndb.unsqueeze(IntArray(-1)).broadcast_to(Shape(8, 2))
+    ndb_unsq.print()
+
     print("passes")
