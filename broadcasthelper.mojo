@@ -145,6 +145,43 @@ struct ShapeBroadcaster(RegisterPassable, ImplicitlyCopyable):
 
     @always_inline
     @staticmethod
+    fn expandable_to(own: Shape, target: Shape) -> Bool:
+        """
+        Directed broadcast check: can `own` be expanded to exactly `target`?
+
+        Rules (right-aligned):
+            own_dim == target_dim  → ok (exact match)
+            own_dim == 1           → ok (will be stretched)
+            else                   → False
+
+        Unlike broadcastable(), target dims are fixed — they never stretch.
+
+        Examples:
+            (2, 1, 3) → (2, 4, 3)  : True   (dim1: 1 stretches to 4)
+            (1,)      → (2, 4, 3)  : True   (all dims stretch)
+            (2, 1, 3) → (2, 4, 5)  : False  (dim2: 3 != 5 and 3 != 1)
+            (1, 2, 1) → (2, 3)     : False  (dim1: 2 != 3 and 2 != 1)
+            (3, 4)    → (2, 3, 4)  : True   (own rank < target, prepend handled)
+            (5, 4)    → (2, 3, 4)  : False  (dim1: 5 != 3 and 5 != 1)
+        """
+        var own_rank = own.rank()
+        var target_rank = target.rank()
+
+        if own_rank > target_rank:
+            return False
+
+        var offset = target_rank - own_rank   # leading dims own doesn't have
+
+        for i in range(own_rank):
+            var own_dim    = own[i]
+            var target_dim = target[i + offset]
+            if own_dim != target_dim and own_dim != 1:
+                return False
+
+        return True
+
+    @always_inline
+    @staticmethod
     fn broadcast_mask(original_shape: Shape, target_shape: Shape) -> IntArray:
         """Create a broadcast mask indicating which dimensions are broadcasted.
         """

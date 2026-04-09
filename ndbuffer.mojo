@@ -2189,15 +2189,23 @@ struct NDBuffer[dtype: DType](
                   contiguous_device_state() on GPU.
         CPU safe: contiguous() uses contiguous_buffer().
         """
+        if not ShapeBroadcaster.expandable_to(self.shape, target_shape):
+            panic(
+                "NDBuffer.broadcast_to: cannot expand "
+                + String(self.shape)
+                + " to "
+                + String(target_shape)
+            )
+
         var own_shape = self.shape
         var own_rank = own_shape.rank()
         var target_rank = target_shape.rank()
 
-        if own_rank > target_rank:
-            panic("NDBuffer broadcast_to: own rank exceeds target rank")
+        _="""if own_rank > target_rank:
+            panic("NDBuffer broadcast_to: own rank exceeds target rank")"""
 
         var extra_dims = target_rank - own_rank
-        for i in range(own_rank):
+        _="""for i in range(own_rank):
             var own_dim = own_shape[i]
             var target_dim = target_shape[i + extra_dims]
             if own_dim != target_dim and own_dim != 1:
@@ -2206,7 +2214,7 @@ struct NDBuffer[dtype: DType](
                     + String(i + extra_dims)
                     + ": own=" + String(own_dim)
                     + " target=" + String(target_dim)
-                )
+                )"""
 
         # Build expanded strides — prepend zeros for extra leading dims
         var new_strides = IntArray.with_capacity(target_rank)
