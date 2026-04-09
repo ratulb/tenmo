@@ -1,12 +1,12 @@
 from std.sys import simd_width_of
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim
-from mnemonics import Add, Multiply, Subtract, Divide, max_rank, SIGMOID_BACKWARD, TANH_BACKWARD
+from mnemonics import Add, Multiply, Subtract, Divide, max_rank, SIGMOID_BACKWARD, TANH_BACKWARD, LOG_BACKWARD
 from strides import Strides
 from broadcasthelper import ShapeBroadcaster
 from device import DeviceState
 from array import Array
 from ndbuffer import NDBuffer
-from common_utils import One
+from common_utils import One, Epsilon
 
 fn arithmetic_ops_both_contiguous[
     op_code: Int,
@@ -18,6 +18,7 @@ fn arithmetic_ops_both_contiguous[
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     size: Int,
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
     var grid_stride = Int(block_dim.x * grid_dim.x)
@@ -53,8 +54,10 @@ fn arithmetic_ops_both_contiguous[
                     vec_result = vec_a / vec_b
                 elif op_code == SIGMOID_BACKWARD:
                     vec_result = vec_b * vec_a * (one - vec_a)
-                else:  # TANH_BACKWARD
+                elif op_code ==  TANH_BACKWARD:
                     vec_result = vec_b * (one - vec_a * vec_a)
+                else: #Log backward
+                    vec_result = vec_b /max(vec_a, epsilon)
 
                 result.store[width=simd_width](i, vec_result)
 
@@ -75,8 +78,10 @@ fn arithmetic_ops_both_contiguous[
                         res = a / b
                     elif op_code == SIGMOID_BACKWARD:
                         res = b * a * (One[dtype].value() - a)
-                    else:  # TANH_BACKWARD
+                    elif op_code == TANH_BACKWARD:
                         res = b * (One[dtype].value() - a * a)
+                    else:
+                        res = b / max(a, epsilon)
 
                     result[idx] = res
 
@@ -96,6 +101,7 @@ fn arithmetic_ops_A_contiguous[
     B_strides: Array,
     size: Int,
     rank: Int,
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
     var grid_stride = Int(block_dim.x * grid_dim.x)
@@ -134,9 +140,11 @@ fn arithmetic_ops_A_contiguous[
                     elif op_code == Divide:
                         vec_result[lane] = vec_a[lane] / B[b_idx]
                     elif op_code == SIGMOID_BACKWARD:
-                        vec_result[lane] = B[b_idx] * vec_a[lane] * (Scalar[dtype](1.0) - vec_a[lane])
-                    else:  # TANH_BACKWARD
-                        vec_result[lane] = B[b_idx] * (Scalar[dtype](1.0) - vec_a[lane] * vec_a[lane])
+                        vec_result[lane] = B[b_idx] * vec_a[lane] * (One[dtype].value() - vec_a[lane])
+                    elif op_code == TANH_BACKWARD:
+                        vec_result[lane] = B[b_idx] * (One[dtype].value() - vec_a[lane] * vec_a[lane])
+                    else: #Log backward
+                        vec_result[lane] = B[b_idx]/max(vec_a[lane], epsilon)
 
                 result.store[width=simd_width](i, vec_result)
 
@@ -164,9 +172,11 @@ fn arithmetic_ops_A_contiguous[
                     elif op_code == Divide:
                         res = a / b
                     elif op_code == SIGMOID_BACKWARD:
-                        res = b * a * (Scalar[dtype](1.0) - a)
-                    else:  # TANH_BACKWARD
-                        res = b * (Scalar[dtype](1.0) - a * a)
+                        res = b * a * (One[dtype].value() - a)
+                    elif op_code == TANH_BACKWARD:
+                        res = b * (One[dtype].value() - a * a)
+                    else:
+                        res = b /max(a, epsilon)
 
                     result[linear_idx] = res
 
@@ -186,6 +196,7 @@ fn arithmetic_ops_B_contiguous[
     A_strides: Array,
     size: Int,
     rank: Int,
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
     var grid_stride = Int(block_dim.x * grid_dim.x)
@@ -224,9 +235,11 @@ fn arithmetic_ops_B_contiguous[
                     elif op_code == Divide:
                         vec_result[lane] = A[a_idx] / vec_b[lane]
                     elif op_code == SIGMOID_BACKWARD:
-                        vec_result[lane] = vec_b[lane] * A[a_idx] * (Scalar[dtype](1.0) - A[a_idx])
-                    else:  # TANH_BACKWARD
-                        vec_result[lane] = vec_b[lane] * (Scalar[dtype](1.0) - A[a_idx] * A[a_idx])
+                        vec_result[lane] = vec_b[lane] * A[a_idx] * (One[dtype].value() - A[a_idx])
+                    elif op_code == TANH_BACKWARD:
+                        vec_result[lane] = vec_b[lane] * (One[dtype].value() - A[a_idx] * A[a_idx])
+                    else: #Log backward
+                        vec_result[lane] = vec_b[lane] /max(A[a_idx], epsilon)
 
                 result.store[width=simd_width](i, vec_result)
 
@@ -254,9 +267,11 @@ fn arithmetic_ops_B_contiguous[
                     elif op_code == Divide:
                         res = a / b
                     elif op_code == SIGMOID_BACKWARD:
-                        res = b * a * (Scalar[dtype](1.0) - a)
-                    else:  # TANH_BACKWARD
-                        res = b * (Scalar[dtype](1.0) - a * a)
+                        res = b * a * (One[dtype].value() - a)
+                    elif op_code == TANH_BACKWARD:
+                        res = b * (One[dtype].value() - a * a)
+                    else:
+                        res = b / max(a, epsilon)
 
                     result[linear_idx] = res
 
@@ -278,6 +293,7 @@ fn arithmetic_ops_both_strided[
     B_strides: Array,
     size: Int,
     rank: Int,
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ):
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
     var grid_stride = Int(block_dim.x * grid_dim.x)
@@ -317,9 +333,12 @@ fn arithmetic_ops_both_strided[
                     elif op_code == Divide:
                         vec_result[lane] = A[a_idx] / B[b_idx]
                     elif op_code == SIGMOID_BACKWARD:
-                        vec_result[lane] = B[b_idx] * A[a_idx] * (Scalar[dtype](1.0) - A[a_idx])
-                    else:  # TANH_BACKWARD
-                        vec_result[lane] = B[b_idx] * (Scalar[dtype](1.0) - A[a_idx] * A[a_idx])
+                        vec_result[lane] = B[b_idx] * A[a_idx] * (One[dtype].value() - A[a_idx])
+                    elif op_code == TANH_BACKWARD:
+                        vec_result[lane] = B[b_idx] * (One[dtype].value() - A[a_idx] * A[a_idx])
+                    else: # Log backward
+                        vec_result[lane] = B[b_idx] / max(A[a_idx], epsilon)
+
 
                 result.store[width=simd_width](i, vec_result)
 
@@ -349,9 +368,11 @@ fn arithmetic_ops_both_strided[
                     elif op_code == Divide:
                         res = a / b
                     elif op_code == SIGMOID_BACKWARD:
-                        res = b * a * (Scalar[dtype](1.0) - a)
-                    else:  # TANH_BACKWARD
-                        res = b * (Scalar[dtype](1.0) - a * a)
+                        res = b * a * (One[dtype].value() - a)
+                    elif op_code == TANH_BACKWARD:
+                        res = b * (One[dtype].value() - a * a)
+                    else: # Log backward
+                        res = b /max(a, epsilon)
 
                     result[linear_idx] = res
 
@@ -365,7 +386,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
     @staticmethod
     fn launch[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) raises -> NDBuffer[
+    ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype], epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()) raises -> NDBuffer[
         Self.dtype
     ]:
         comptime simdwidth = simd_width_of[Self.dtype]()
@@ -415,6 +436,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 A_buffer,
                 B_buffer,
                 output_size,
+                epsilon,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -448,6 +470,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 B_broadcast_strides.array(),
                 output_size,
                 rank,
+                epsilon,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -473,6 +496,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
                 A_broadcast_strides.array(),
                 output_size,
                 rank,
+                epsilon,
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
@@ -498,6 +522,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
             B_broadcast_strides.array(),
             output_size,
             rank,
+            epsilon,
             grid_dim=num_blocks,
             block_dim=threads_per_block,
         )

@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from mnemonics import AddTensor, LOG
+from mnemonics import AddTensor, LOG, LOG_BACKWARD
 from backpropagation import Delegate, BackwardFn, BACKWARD_LOG
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
@@ -26,7 +26,7 @@ struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         parent_buffer: NDBuffer[Self.dtype],
         grad_output: NDBuffer[Self.dtype],
         epsilon: Scalar[Self.dtype],
-    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+    ) -> NDBuffer[Self.dtype]:
         """
         Core gradient computation: grad_output / max(parent, epsilon).
         grad_output is guaranteed contiguous + zero offset (Gradbox contract).
@@ -35,7 +35,7 @@ struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             1. parent_buffer.max(epsilon)  → scalar_ops[MAX]  — GPU safe
             2. grad_output / clamped       → arithmetic_ops[Divide] — GPU safe
         CPU contiguous fast path:
-            parent_buffer.data_buffer().log_back(...)
+            parent_buffer.data_buffer().log(...)
         CPU non-contiguous fallback:
             iterate strided indices
         """
@@ -53,10 +53,10 @@ struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if parent_buffer.is_contiguous():
             var start = parent_buffer.offset
             var end = start + parent_buffer.numels()
-            var parent_data = parent_buffer.data_buffer()
-            var grad_data = grad_output.data_buffer()
-            var result_buffer = parent_data.log_back(
-                grad_data, epsilon, start, end
+            var parent_buffer = parent_buffer.data_buffer()
+            var grad_buffer = grad_output.data_buffer()
+            var result_buffer = parent_buffer.arithmetic_ops[LOG_BACKWARD](
+                grad_buffer, start, end, epsilon=epsilon
             )
             return NDBuffer[Self.dtype](result_buffer^, shape)
 
@@ -76,14 +76,14 @@ struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         self, output: Tensor[Self.dtype]
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ] where Self.dtype.is_floating_point():
+    ]:
         """Thin wrapper — delegates to static backward(NDBuffer)."""
-        ref grad_output = output.gradients()[]
+        ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
-
-        var result_ndb = Self.backward(
+        var result_ndb = parent.buffer.arithmetic_ops[LOG_BACKWARD](gradbox.buffer, self.epsilon)
+        _="""var result_ndb = Self.backward(
             parent.buffer, grad_output.buffer, self.epsilon
-        )
+        )"""
         var parent_gradbox = Gradbox[Self.dtype](result_ndb^, share=False)
 
         return [(parent^, parent_gradbox^, AddTensor)]
@@ -107,7 +107,6 @@ struct Logarithm[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         Thin wrapper — delegates compute to forward(NDBuffer).
         Attaches autograd machinery if needed.
         """
-        #var result_ndb = Self.forward[epsilon](self.buffer)
         var result_ndb = self.buffer.log[epsilon]()
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
 

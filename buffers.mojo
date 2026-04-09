@@ -18,6 +18,7 @@ from mnemonics import (
     RELU_BACKWARD,
     RELU_FORWARD,
     SIGMOID_BACKWARD,
+    LOG_BACKWARD,
     ReverseDivide,
     SQRT,
     SQRT_BACKWARD,
@@ -376,7 +377,7 @@ struct Buffer[dtype: DType = DType.float32](
         if self.size == 0:
             panic("Buffer → __add__(other): buffer size 0")
 
-        return self.arithmetic_ops[Add, False](other)
+        return self.arithmetic_ops[Add, validate=False](other)
 
     @always_inline
     fn __iadd__(self, other: Buffer[Self.dtype]):
@@ -435,7 +436,7 @@ struct Buffer[dtype: DType = DType.float32](
         if self.size == 0:
             panic("Buffer → __sub__(other): buffer size 0")
 
-        return self.arithmetic_ops[Subtract, False](other)
+        return self.arithmetic_ops[Subtract, validate=False](other)
 
     @always_inline
     fn __mul__(
@@ -453,7 +454,7 @@ struct Buffer[dtype: DType = DType.float32](
         if self.size == 0:
             panic("Buffer → __mul__(other): buffer size 0")
 
-        return self.arithmetic_ops[Multiply, False](other)
+        return self.arithmetic_ops[Multiply, validate=False](other)
 
     @always_inline
     fn __imul__(self, other: Buffer[Self.dtype]):
@@ -641,7 +642,8 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn arithmetic_ops[
-        op_code: Int, validate: Bool = True
+        op_code: Int,
+        validate: Bool = True,
     ](
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
@@ -649,6 +651,7 @@ struct Buffer[dtype: DType = DType.float32](
         self_end: Optional[Int] = None,
         other_start: Int = 0,
         other_end: Optional[Int] = None,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ) -> Buffer[Self.dtype]:
         var self_actual_end = self_end.or_else(self.size)
         var other_actual_end = other_end.or_else(other.size)
@@ -705,6 +708,8 @@ struct Buffer[dtype: DType = DType.float32](
                 op_result = self_block - other_block
             elif op_code == Divide:
                 op_result = self_block / other_block
+            elif op_code == LOG_BACKWARD:
+                op_result = other_block / max(self_block, epsilon)
             elif op_code == SIGMOID_BACKWARD:
                 #Fused sigmoid backward pass.
                 #self = sigmoid output (already computed in forward).
@@ -735,6 +740,8 @@ struct Buffer[dtype: DType = DType.float32](
                 out[i] = self[self_start + i] - other[other_start + i]
             elif op_code == Divide:
                 out[i] = self[self_start + i] / other[other_start + i]
+            elif op_code == LOG_BACKWARD:
+                out[i] =  other[other_start + i] / max(self[self_start + i], epsilon)
             elif op_code == SIGMOID_BACKWARD:
                 out[i] = other[other_start + i] * self[self_start + i] * (One[Self.dtype].value() - self[self_start + i])
             else: # Tanh backward
@@ -854,7 +861,7 @@ struct Buffer[dtype: DType = DType.float32](
         if self.size == 0:
             panic("Buffer → __truediv__(other): buffer size 0")
 
-        return self.arithmetic_ops[Divide, False](other)
+        return self.arithmetic_ops[Divide, validate=False](other)
 
     @always_inline
     fn __itruediv__(
@@ -1734,41 +1741,6 @@ struct Buffer[dtype: DType = DType.float32](
         # Scalar tail
         for idx in range(vectorized_end, self.size):
             out[idx] = self[idx].clamp(lower_bound, upper_bound)
-
-        return out^
-
-    @always_inline
-    fn log_back(
-        self,
-        other: Buffer[Self.dtype],
-        min_value: Scalar[Self.dtype],
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
-    ) -> Buffer[Self.dtype]:
-        """Self could be input and other incoming grad buffer."""
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → log_back is for numeric data types only"
-
-        var actual_end = end_index.or_else(self.size)
-        var extent = actual_end - start_index
-        var out = Buffer[Self.dtype](extent)
-
-        comptime simd_width = simd_width_of[Self.dtype]()
-        var vectorized_end = (extent // simd_width) * simd_width
-
-        # Vectorized absolute value
-        for idx in range(start_index, vectorized_end, simd_width):
-            var chunk = self.load[simdwidth=simd_width](idx)
-            var chunk_other = other.load[simdwidth=simd_width](idx)
-            out.store[simdwidth=simd_width](
-                idx, chunk_other / max(chunk, min_value)
-            )
-
-        # Scalar tail
-        for idx in range(vectorized_end, actual_end):
-            var other_value = other[idx]
-            out[idx] = other_value / max(self[idx], min_value)
 
         return out^
 

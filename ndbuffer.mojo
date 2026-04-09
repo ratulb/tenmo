@@ -5,7 +5,7 @@ from intarray import IntArray
 from indexhelper import IndexCalculator, IndexIterator
 from matrixshapevalidator import MatrixShapeValidator
 from broadcasthelper import ShapeBroadcaster
-from common_utils import panic, log_debug, print_buffer, Epsilon
+from common_utils import panic, log_debug, print_buffer, Epsilon, One
 from validators import Validator
 from std.memory import memcpy, AddressSpace, ArcPointer
 from std.gpu.host import DeviceBuffer, DeviceContext
@@ -2012,7 +2012,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn arithmetic_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype], epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()) -> NDBuffer[
         Self.dtype
     ]:
         # Broadcast validation
@@ -2030,7 +2030,7 @@ struct NDBuffer[dtype: DType](
             if self.is_on_gpu() and other.is_on_gpu():
                 try:
                     out = BinaryOperations[Self.dtype].launch[op_code](
-                        self, other
+                        self, other, epsilon
                     )
                 except e:
                     print(e)
@@ -2044,16 +2044,16 @@ struct NDBuffer[dtype: DType](
                     # Unreachable
                     out = NDBuffer[Self.dtype].Empty()
             else:
-                out = self.arithmetic_ops_cpu[op_code](other)
+                out = self.arithmetic_ops_cpu[op_code](other, epsilon)
         else:
-            out = self.arithmetic_ops_cpu[op_code](other)
+            out = self.arithmetic_ops_cpu[op_code](other, epsilon)
 
         return out^
 
     @always_inline
     fn arithmetic_ops_cpu[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype]) -> NDBuffer[
+    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype], epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()) -> NDBuffer[
         Self.dtype
     ]:
         # Handle broadcasting case
@@ -2065,8 +2065,8 @@ struct NDBuffer[dtype: DType](
             self_end = self_start + self.numels()
             other_start = other.offset
             other_end = other_start + other.numels()
-            var result_buffer = self.buffer.arithmetic_ops[op_code](
-                other.buffer, self_start, self_end, other_start, other_end
+            var result_buffer = self.buffer.arithmetic_ops[op_code=op_code](
+                other.buffer, self_start, self_end, other_start, other_end, epsilon=epsilon
             )
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
@@ -2078,7 +2078,7 @@ struct NDBuffer[dtype: DType](
                 var offset = self.offset
                 for idx in other.index_iterator():
                     result_buffer[index] = Self.scalar_fn[op_code](
-                        self.buffer[offset + index], other.buffer[idx]
+                        self.buffer[offset + index], other.buffer[idx], epsilon
                     )
                     index += 1
 
@@ -2086,7 +2086,7 @@ struct NDBuffer[dtype: DType](
                 var offset = other.offset
                 for idx in self.index_iterator():
                     result_buffer[index] = Self.scalar_fn[op_code](
-                        self.buffer[idx], other.buffer[offset + index]
+                        self.buffer[idx], other.buffer[offset + index], epsilon
                     )
                     index += 1
 
@@ -2103,7 +2103,7 @@ struct NDBuffer[dtype: DType](
                         )
 
                     result_buffer[index] = Self.scalar_fn[op_code](
-                        self.buffer[idx], other.buffer[next_index]
+                        self.buffer[idx], other.buffer[next_index], epsilon
                     )
                     index += 1
 
@@ -2237,8 +2237,8 @@ struct NDBuffer[dtype: DType](
     @staticmethod
     @always_inline
     fn scalar_fn[
-        op_code: Int
-    ](lhs: Scalar[Self.dtype], rhs: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
+        op_code: Int,
+    ](lhs: Scalar[Self.dtype], rhs: Scalar[Self.dtype], epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()) -> Scalar[Self.dtype]:
         comptime if op_code == Add:
             return lhs + rhs
         elif op_code == Subtract:
@@ -2255,10 +2255,10 @@ struct NDBuffer[dtype: DType](
             return min(lhs, rhs)
         elif op_code == SIGMOID_BACKWARD:
             # lhs = sigmoid output, rhs = grad
-            return rhs * lhs * (Scalar[Self.dtype](1) - lhs)
+            return rhs * lhs * (One[Self.dtype].value() - lhs)
         elif op_code == TANH_BACKWARD:
             # lhs = tanh output, rhs = grad
-            return rhs * (Scalar[Self.dtype](1) - lhs * lhs)
+            return rhs * (One[Self.dtype].value() - lhs * lhs)
 
         elif op_code == POW:
             return lhs**rhs
@@ -2340,6 +2340,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn scalar_ops_cpu[
         op_code: Int,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
@@ -2362,7 +2363,7 @@ struct NDBuffer[dtype: DType](
 
             for idx in self.index_iterator():
                 result_buffer[index] = Self.scalar_fn[op_code](
-                    self.buffer[idx], scalar
+                    self.buffer[idx], scalar, epsilon
                 )
                 index += 1
 
