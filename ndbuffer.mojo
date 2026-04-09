@@ -2194,7 +2194,7 @@ struct NDBuffer[dtype: DType](
         var target_rank = target_shape.rank()
 
         if own_rank > target_rank:
-            panic("broadcast_to: own rank exceeds target rank")
+            panic("NDBuffer broadcast_to: own rank exceeds target rank")
 
         var extra_dims = target_rank - own_rank
         for i in range(own_rank):

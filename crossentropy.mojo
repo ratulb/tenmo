@@ -404,8 +404,6 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         # Step 1: grad = softmax — (M, C)
         var grad = self.softmax_probs
-        print("\nincoming grad: \n")
-        grad.print()
 
         # Step 2: Build onehot from target — ignore_index rows → all zeros
         # onehot with ignore_index: those rows stay zero (no subtraction needed)
@@ -415,8 +413,6 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             device,
             ignore_index=self.ignore_index,
         )
-        print("onehot:\n")
-        onehot.print()
         # Step 3: Apply smoothing
         var ls = self.label_smoothing
         if ls > Scalar[Self.dtype](0):
@@ -430,13 +426,9 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
             self.target_1d, self.ignore_index
         )
-        print("ignore_mask: \n")
-        ignore_mask.print()
         var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(
             Shape(self.M, self.C)
         )
-        print("ignore_mask_2d: \n")
-        ignore_mask_2d.print()
         grad = grad * ignore_mask_2d
 
         # Step 5: Scale by upstream grad and reduction
@@ -448,14 +440,10 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             self.M,
             self.C,
         )
-        print("scaled: \n")
-        scaled.print()
         # Step 6: Reshape back to original logits shape
         var grad_final = Gradbox[Self.dtype](scaled^, share=False).reshape(
             self.logits_shape
         )
-        print("grad_final: \n")
-        grad_final.print()
         # Step 6: Reshape and UNPERMUTE back to original logits shape
         var rank = self.logits_shape.rank()
         if rank > 2:
@@ -475,12 +463,8 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             for i in range(1, rank - 1):
                 inv_perm.append(i)  # d1..dk shift right
             grad_final = reshaped.permute(inv_perm)
-            print("grad_final rank > 2: \n")
-            grad_final.print()
-        else:
-            grad_final = grad_final.reshape(self.logits_shape)
-            print("grad_final reshaped again:\n")
-            grad_final.print()
+            #else:
+            #grad_final = grad_final.reshape(self.logits_shape)
 
         return [(logits^, grad_final, AddTensor)]
 
@@ -887,13 +871,6 @@ struct CrossEntropyLoss[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 fn main() raises:
-    _="""comptime dtype = DType.uint8
-    var ndb = NDBuffer[dtype](1, 2, 3, 4, 5, 6, 7, 8)
-    ndb.print()
-    var ndb_unsq = ndb.unsqueeze(IntArray(-1)).broadcast_to(Shape(8, 2))
-    ndb_unsq.print()"""
-
-    print("passes")
     test_ce_rank3_reduction_none_v2()
 
 from std.testing import assert_true
@@ -926,8 +903,6 @@ fn test_ce_rank3_reduction_none_v2() raises:
     loss.backward()
 
     # Ignored position should have zero gradient
-    print("\nprinting grad inside test: \n")
-    logits.grad().print()
     for c in range(3):
         assert_true(
             abs(logits.grad()[0, c, 1]) < 1e-10,

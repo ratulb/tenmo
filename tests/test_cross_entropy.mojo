@@ -2673,8 +2673,6 @@ fn test_ce_rank3_reduction_none_v2() raises:
     loss.backward()
 
     # Ignored position should have zero gradient
-    print("\nprinting grad inside test: \n")
-    logits.grad().print()
     for c in range(3):
         assert_true(
             abs(logits.grad()[0, c, 1]) < 1e-10,
