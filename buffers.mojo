@@ -3,7 +3,7 @@ from std.sys.info import num_physical_cores
 from std.sys import simd_width_of, size_of
 from std.memory import memset_zero, memcpy, AddressSpace
 from std.math import exp, log, ceil, tanh, sqrt
-from common_utils import log_debug, panic, Epsilon
+from common_utils import log_debug, panic, Epsilon, One
 from std.utils.numerics import max_finite
 from std.os.atomic import Atomic, Consistency, fence
 from mnemonics import (
@@ -17,6 +17,7 @@ from mnemonics import (
     Overwrite,
     RELU_BACKWARD,
     RELU_FORWARD,
+    SIGMOID_BACKWARD,
     ReverseDivide,
     SQRT,
     SQRT_BACKWARD,
@@ -702,8 +703,21 @@ struct Buffer[dtype: DType = DType.float32](
                 op_result = self_block + other_block
             elif op_code == Subtract:
                 op_result = self_block - other_block
-            else:  # Divide
+            elif op_code == Divide:
                 op_result = self_block / other_block
+            elif op_code == SIGMOID_BACKWARD:
+                #Fused sigmoid backward pass.
+                #self = sigmoid output (already computed in forward).
+                #other = upstream gradient buffer.
+                #Returns: grad * self * (1 - self) in a single pass.
+                op_result = other_block * self_block * (One[Self.dtype].value() - self_block)
+
+            else: # Tanh backward
+                #fused tanh backward pass.
+                #self = tanh output (already computed in forward).
+                #other = upstream gradient buffer.
+                #returns: grad * (1 - t²) in a single pass.
+                op_result = other_block * (One[Self.dtype].value() - self_block * self_block)
 
             out.store[simdwidth=simd_width](idx, op_result)
 
@@ -719,8 +733,12 @@ struct Buffer[dtype: DType = DType.float32](
                 out[i] = self[self_start + i] + other[other_start + i]
             elif op_code == Subtract:
                 out[i] = self[self_start + i] - other[other_start + i]
-            else:  # Divide
+            elif op_code == Divide:
                 out[i] = self[self_start + i] / other[other_start + i]
+            elif op_code == SIGMOID_BACKWARD:
+                out[i] = other[other_start + i] * self[self_start + i] * (One[Self.dtype].value() - self[self_start + i])
+            else: # Tanh backward
+                out[i] = other[other_start + i] * (One[Self.dtype].value() - self[self_start + i] * self[self_start + i])
 
         return out^
 
@@ -1443,39 +1461,6 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn sigmoid_grad(
-        self,
-        grad: Buffer[Self.dtype],
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
-    #) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
-    ) -> Buffer[Self.dtype]:
-        """
-        Fused sigmoid backward pass.
-        self = sigmoid output (already computed in forward).
-        grad = upstream gradient buffer.
-        Returns: grad * s * (1 - s) in a single pass.
-        """
-        var actual_end = end_index.or_else(self.size)
-        var extent = actual_end - start_index
-        var out = Buffer[Self.dtype](extent)
-
-        comptime simd_width = simd_width_of[Self.dtype]()
-        var vectorized_end = (extent // simd_width) * simd_width
-
-        for idx in range(start_index, vectorized_end, simd_width):
-            var s = self.load[simdwidth=simd_width](idx)
-            var g = grad.load[simdwidth=simd_width](idx)
-            out.store[simdwidth=simd_width](idx, g * s * (1.0 - s))
-
-        # Tail
-        for idx in range(vectorized_end, actual_end):
-            var s = self[idx]
-            out[idx] = grad[idx] * s * (1.0 - s)
-
-        return out^
-
-    @always_inline
     fn tanh(
         self,
         start_index: Int = 0,
@@ -1501,37 +1486,6 @@ struct Buffer[dtype: DType = DType.float32](
             out[idx] = tanh(self[idx])
         return out^
 
-    @always_inline
-    fn tanh_grad(
-        self,
-        grad: Buffer[Self.dtype],
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
-    #) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
-    ) -> Buffer[Self.dtype]:
-        """
-        Fused tanh backward pass.
-        self = tanh output (already computed in forward).
-        grad = upstream gradient buffer.
-        Returns: grad * (1 - t²) in a single pass.
-        """
-        var actual_end = end_index.or_else(self.size)
-        var extent = actual_end - start_index
-        var out = Buffer[Self.dtype](extent)
-
-        comptime simd_width = simd_width_of[Self.dtype]()
-        var vectorized_end = (extent // simd_width) * simd_width
-
-        for idx in range(start_index, vectorized_end, simd_width):
-            var t = self.load[simdwidth=simd_width](idx)
-            var g = grad.load[simdwidth=simd_width](idx)
-            out.store[simdwidth=simd_width](idx, g * (1.0 - t * t))
-        # Tail
-        for idx in range(vectorized_end, actual_end):
-            var t = self[idx]
-            out[idx] = grad[idx] * (1.0 - t * t)
-
-        return out^
 
     @staticmethod
     @always_inline

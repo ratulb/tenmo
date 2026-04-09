@@ -2065,15 +2065,9 @@ struct NDBuffer[dtype: DType](
             self_end = self_start + self.numels()
             other_start = other.offset
             other_end = other_start + other.numels()
-            var result_buffer: Buffer[Self.dtype]
-            comptime if op_code == SIGMOID_BACKWARD:
-                result_buffer = self.buffer.sigmoid_grad(other.buffer, self_start, self_end)
-            elif op_code == TANH_BACKWARD:
-                result_buffer = self.buffer.tanh_grad(other.buffer, self_start, self_end)
-            else:
-                result_buffer = self.buffer.arithmetic_ops[op_code](
-                    other.buffer, self_start, self_end, other_start, other_end
-                )
+            var result_buffer = self.buffer.arithmetic_ops[op_code](
+                other.buffer, self_start, self_end, other_start, other_end
+            )
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
         else:
