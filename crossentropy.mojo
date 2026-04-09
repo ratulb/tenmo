@@ -351,13 +351,10 @@ struct CECommon[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         """
         if reduction.is_none():
             var ug = upstream.buffer.copy()
-            print("ug: \n")
-            ug.print()
-            var ug_expanded = ug.unsqueeze(IntArray(-1)).broadcast_to(
-                Shape(M, C)
-            )
-            print("ug_expanded: \n")
-            ug_expanded.print()
+            var ug_flat = ug.reshape(Shape(M))
+            var ug_expanded = ug_flat
+                .unsqueeze(IntArray(-1))
+                .broadcast_to(Shape(M, C))
             return grad * ug_expanded
         else:
             var ug_scalar = upstream.buffer.sum(IntArray()).item()
@@ -890,10 +887,51 @@ struct CrossEntropyLoss[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 fn main() raises:
-    comptime dtype = DType.uint8
+    _="""comptime dtype = DType.uint8
     var ndb = NDBuffer[dtype](1, 2, 3, 4, 5, 6, 7, 8)
     ndb.print()
     var ndb_unsq = ndb.unsqueeze(IntArray(-1)).broadcast_to(Shape(8, 2))
-    ndb_unsq.print()
+    ndb_unsq.print()"""
 
     print("passes")
+    test_ce_rank3_reduction_none_v2()
+
+from std.testing import assert_true
+
+fn test_ce_rank3_reduction_none_v2() raises:
+    """Test rank-3 with reduction='none'."""
+    print("test_ce_rank3_reduction_none_v2")
+
+    var logits = Tensor[DType.float32].d3(
+        [
+            [[2.0, 1.0], [1.0, 2.0], [0.5, 0.5]],
+        ],
+        requires_grad=True,
+    )
+    var targets = Tensor[DType.int32].d2([[0, -100]])
+
+    var criterion = CrossEntropyLoss[DType.float32](
+        ignore_index=-100,
+        reduction="none",
+    )
+    var loss = criterion(logits, targets)
+
+    # Loss shape should match target shape [1, 2]
+    assert_true(
+        loss.shape().rank() == 2 and loss.shape()[0] == 1 and loss.shape()[1] == 2,
+        "Rank-3: reduction=none should preserve target shape",
+    )
+
+    # Backward with ones
+    loss.backward()
+
+    # Ignored position should have zero gradient
+    print("\nprinting grad inside test: \n")
+    logits.grad().print()
+    for c in range(3):
+        assert_true(
+            abs(logits.grad()[0, c, 1]) < 1e-10,
+            "Rank-3: reduction=none - ignored class " + String(c) + " should be 0",
+        )
+
+    print("✓ Rank-3 reduction=none test passed")

@@ -2190,17 +2190,23 @@ struct NDBuffer[dtype: DType](
         CPU safe: contiguous() uses contiguous_buffer().
         """
         var own_shape = self.shape
-        if not ShapeBroadcaster.broadcastable(own_shape, target_shape):
-            panic(
-                "NDBuffer → broadcast_to(target_shape): "
-                + String(own_shape)
-                + " not broadcastable to "
-                + String(target_shape)
-            )
-
-        var target_rank = target_shape.rank()
         var own_rank = own_shape.rank()
+        var target_rank = target_shape.rank()
+
+        if own_rank > target_rank:
+            panic("broadcast_to: own rank exceeds target rank")
+
         var extra_dims = target_rank - own_rank
+        for i in range(own_rank):
+            var own_dim = own_shape[i]
+            var target_dim = target_shape[i + extra_dims]
+            if own_dim != target_dim and own_dim != 1:
+                panic(
+                    "NDBuffer → broadcast_to: cannot broadcast dim "
+                    + String(i + extra_dims)
+                    + ": own=" + String(own_dim)
+                    + " target=" + String(target_dim)
+                )
 
         # Build expanded strides — prepend zeros for extra leading dims
         var new_strides = IntArray.with_capacity(target_rank)
