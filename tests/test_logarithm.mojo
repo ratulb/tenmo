@@ -390,7 +390,7 @@ fn run_all_log_tests() raises:
 # ============================================================================
 
 
-fn main() raises:
+fn main_1() raises:
     """Example usage and quick verification."""
     print("Example: Basic logarithm with epsilon")
 
@@ -775,9 +775,11 @@ fn test_log_gpu_large_values() raises:
 
 
 # ── GPU Backward Tests ────────────────────────────────────────────────────────
-
-
 fn test_log_gpu_1d_backward() raises:
+    comptime if has_accelerator():
+
+
+fn main() raises:
     comptime if has_accelerator():
         print("test_log_gpu_1d_backward")
         comptime dtype = DType.float32
@@ -786,6 +788,7 @@ fn test_log_gpu_1d_backward() raises:
         var result = a_gpu.log()
         var loss = result.sum()
         loss.backward()
+        a.grad().print()
         assert_true(a.grad().all_close(Tensor[dtype].d1([1.0, 0.5, 0.25])))
 
 
