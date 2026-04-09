@@ -351,9 +351,13 @@ struct CECommon[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         """
         if reduction.is_none():
             var ug = upstream.buffer.copy()
+            print("ug: \n")
+            ug.print()
             var ug_expanded = ug.unsqueeze(IntArray(-1)).broadcast_to(
                 Shape(M, C)
             )
+            print("ug_expanded: \n")
+            ug_expanded.print()
             return grad * ug_expanded
         else:
             var ug_scalar = upstream.buffer.sum(IntArray()).item()
@@ -412,7 +416,8 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             device,
             ignore_index=self.ignore_index,
         )
-
+        print("onehot:\n")
+        onehot.print()
         # Step 3: Apply smoothing
         var ls = self.label_smoothing
         if ls > Scalar[Self.dtype](0):
@@ -426,9 +431,13 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
             self.target_1d, self.ignore_index
         )
+        print("ignore_mask: \n")
+        ignore_mask.print()
         var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(
             Shape(self.M, self.C)
         )
+        print("ignore_mask_2d: \n")
+        ignore_mask_2d.print()
         grad = grad * ignore_mask_2d
 
         # Step 5: Scale by upstream grad and reduction
@@ -440,11 +449,14 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             self.M,
             self.C,
         )
-
+        print("scaled: \n")
+        scaled.print()
         # Step 6: Reshape back to original logits shape
         var grad_final = Gradbox[Self.dtype](scaled^, share=False).reshape(
             self.logits_shape
         )
+        print("grad_final: \n")
+        grad_final.print()
         # Step 6: Reshape and UNPERMUTE back to original logits shape
         var rank = self.logits_shape.rank()
         if rank > 2:
@@ -464,8 +476,12 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             for i in range(1, rank - 1):
                 inv_perm.append(i)  # d1..dk shift right
             grad_final = reshaped.permute(inv_perm)
+            print("grad_final rank > 2: \n")
+            grad_final.print()
         else:
             grad_final = grad_final.reshape(self.logits_shape)
+            print("grad_final reshaped again:\n")
+            grad_final.print()
 
         return [(logits^, grad_final, AddTensor)]
 
