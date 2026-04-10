@@ -317,7 +317,6 @@ struct Buffer[dtype: DType = DType.float32](
             self.size,
             index,
         )
-        # return self.data.load[width=1](index)
         return (self.data + index)[]
 
     @always_inline
@@ -328,8 +327,8 @@ struct Buffer[dtype: DType = DType.float32](
             self.size,
             index,
         )
-        self.data.store[width=1](index, scalar)
-        # (self.data + index)[] = scalar
+        #self.data.store[width=1](index, scalar)
+        (self.data + index)[] = scalar
 
     @always_inline
     fn load[

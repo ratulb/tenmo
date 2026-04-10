@@ -273,8 +273,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
 
         # Setup gradient tracking
-        @parameter
-        if track_grad:
+        comptime if track_grad:
             var grad_required = requires_grad.or_else(
                 input_tensor.requires_grad
             )
@@ -393,7 +392,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                             max_idx = in_y1 * W_in + in_x1
 
                     output_ptr[out_y_base + out_x] = max_val
-                    argmax_ptr[argmax_y_base + out_x] = max_idx
+                    argmax_ptr[argmax_y_base + out_x] = Int64(max_idx)
 
         parallelize[pool_nc](N * C)
 
@@ -441,11 +440,9 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                     var max_idx = -1
 
                     # Unrolled 3×3 window (9 comparisons)
-                    @parameter
-                    for ky in range(3):
+                    comptime for ky in range(3):
 
-                        @parameter
-                        for kx in range(3):
+                        comptime for kx in range(3):
                             var in_y = in_y_start + ky
                             var in_x = in_x_start + kx
 
@@ -462,7 +459,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                                     max_idx = in_y * W_in + in_x
 
                     output_ptr[out_y_base + out_x] = max_val
-                    argmax_ptr[argmax_y_base + out_x] = max_idx
+                    argmax_ptr[argmax_y_base + out_x] = Int64(max_idx)
 
         parallelize[pool_nc](N * C)
 
@@ -529,7 +526,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                                     max_idx = in_y * W_in + in_x
 
                     output_ptr[out_y_base + out_x] = max_val
-                    argmax_ptr[argmax_y_base + out_x] = max_idx
+                    argmax_ptr[argmax_y_base + out_x] = Int64(max_idx)
 
         parallelize[pool_nc](N * C)
 

@@ -163,9 +163,9 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         if xs_shape[-1] != weight_shape[0]:
             panic(
                 "LinearBLAS forward: input dim mismatch: input shape → ",
-                xs_shape.__str__(),
+                String(xs_shape),
                 "and  weights shape → ",
-                weight_shape.__str__(),
+                String(weight_shape),
             )
         var result: Tensor[Self.dtype]
 
@@ -298,7 +298,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         if init_method == "xavier":
             # Xavier/Glorot uniform initialization
             var limit = Scalar[Self.dtype](
-                sqrt(6.0 / (in_features + out_features))
+                sqrt(6.0 / Float64(in_features + out_features))
             )
             self.weight = (
                 Tensor[Self.dtype].rand(
@@ -382,9 +382,9 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         if xs_shape[-1] != weight_shape[0]:
             panic(
                 "LinearBLAS forward: input dim mismatch: input shape → ",
-                xs_shape.__str__(),
+                String(xs_shape),
                 "and  weights shape → ",
-                weight_shape.__str__(),
+                String(weight_shape),
             )
 
         ref profile = (
@@ -1136,7 +1136,7 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         if init_method == "xavier":
             # Xavier/Glorot uniform initialization
             var fan_out = out_channels * kernel_size * kernel_size
-            var limit = Scalar[Self.dtype](sqrt(6.0 / (fan_in + fan_out)))
+            var limit = Scalar[Self.dtype](sqrt(6.0 / Float64(fan_in + fan_out)))
             self.weight = (
                 Tensor[Self.dtype].rand(
                     shape=weight_shape,
@@ -1232,15 +1232,15 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         if img_shape.rank() != 4:
             panic(
                 "Conv2D input must be 4D: (N, C, H, W), got shape: ",
-                img_shape.__str__(),
+                String(img_shape),
             )
 
         if img_shape[1] != self.in_channels:
             panic(
                 "Conv2D input channels mismatch: expected ",
-                self.in_channels.__str__(),
+                String(self.in_channels),
                 ", got ",
-                img_shape[1].__str__(),
+                String(img_shape[1]),
             )
 
         # Forward pass

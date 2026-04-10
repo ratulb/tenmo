@@ -2288,10 +2288,9 @@ struct NDBuffer[dtype: DType](
         comptime if op_code == LOG:
             return log(max(scalar, epsilon))
         elif op_code == SIGMOID_FORWARD:
-            return Scalar[Self.dtype](1) /(Scalar[Self.dtype](1) + exp(scalar))
+            return One[Self.dtype].value() /(One[Self.dtype].value() + exp(scalar))
         elif op_code == TANH_FORWARD:
             return Utils.tanh_stable(scalar)
-
         else:  # op_code == EXP:
             return exp(scalar)
 
@@ -2310,7 +2309,6 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-
                     comptime if op_code == POW:
                         out = ScalarOperations[Self.dtype].launch_pow(
                             self, scalar

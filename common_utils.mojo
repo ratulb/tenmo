@@ -9,6 +9,7 @@ from std.time import perf_counter_ns, monotonic
 from std.math import cos, sin, pi
 from std.os import abort
 from std.utils import Variant
+from std.utils.numerics import min_finite
 from std.testing import assert_true
 from intarray import IntArray
 from std.random import randn_float64
@@ -211,6 +212,18 @@ struct Epsilon[dtype: DType](RegisterPassable):
             return Scalar[Self.dtype](1e-7)
         elif Self.dtype == DType.float64:
             return Scalar[Self.dtype](1e-12)
+        elif Self.dtype == DType.float16:
+            return rebind[Scalar[Self.dtype]](min_finite[DType.float16]())
+        elif Self.dtype == DType.int32:
+            return rebind[Scalar[Self.dtype]](min_finite[DType.int32]())
+        elif Self.dtype == DType.int64:
+            return rebind[Scalar[Self.dtype]](min_finite[DType.int64]())
+        elif Self.dtype == DType.int8:
+            return rebind[Scalar[Self.dtype]](min_finite[DType.int8]())
+        elif Self.dtype == DType.uint8:
+            return rebind[Scalar[Self.dtype]](min_finite[DType.uint8]())
+        elif Self.dtype == DType.int16:
+            return rebind[Scalar[Self.dtype]](min_finite[DType.int16]())
         else:
             panic("Epsilon value not supported for: ", String(Self.dtype))
             return Scalar[Self.dtype](0)
@@ -460,7 +473,7 @@ fn print_summary[
                     "Linear",
                     input_shape,
                     output_shape,
-                    String(arams),
+                    String(params),
                     String(l.weight.requires_grad or l.bias.requires_grad),
                 ]
             )

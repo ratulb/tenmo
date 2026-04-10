@@ -1990,12 +1990,12 @@ fn test_backward_grad_A_fidelity() raises:
 
     C_cpu.backward()
 
-    assert_true(A_gpu.grad().all_close(Tensor[dtype].zeros(Shape(9, 30))))
+    assert_true(A_gpu.grad().to_cpu().all_close(Tensor[dtype].zeros(Shape(9, 30))))
 
     C_gpu.backward()
 
     A_gpu.grad().print()
-    assert_true(AA.grad().reshape(Shape(9, 30)).all_close(A_gpu.grad() * 2))
+    assert_true(AA.grad().to_gpu().reshape(Shape(9, 30)).all_close(A_gpu.grad() * 2))
     print("PASSED: GPU backward grad_A == CPU backward grad_A")
 
 

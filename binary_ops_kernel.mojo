@@ -58,7 +58,6 @@ fn arithmetic_ops_both_contiguous[
                     vec_result = vec_b * (one - vec_a * vec_a)
                 else: #Log backward
                     vec_result = vec_b /max(vec_a, epsilon)
-                    print("vec_result: ", vec_result)
                 result.store[width=simd_width](i, vec_result)
 
             else:
@@ -82,8 +81,6 @@ fn arithmetic_ops_both_contiguous[
                         res = b * (One[dtype].value() - a * a)
                     else:
                         res = b / max(a, epsilon)
-                        print("scalar res: ", res)
-
                     result[idx] = res
 
         base_idx += grid_stride * CHUNK_SIZE
@@ -417,7 +414,6 @@ struct BinaryOperations[dtype: DType = DType.float32](
 
         var A_is_contiguous = A.is_contiguous()
         var B_is_contiguous = B.is_contiguous()
-        print("Contiguity: ", A_is_contiguous, B_is_contiguous)
         # ================================================================
         # PATH 1: Both contiguous, same shape, no broadcasting
         # ================================================================
@@ -572,7 +568,6 @@ fn main() raises:
     print("=" * 60)
 
 from tenmo import Tensor
-from common_utils import now
 from std.testing import assert_true
 from shapes import Shape
 
@@ -585,15 +580,12 @@ fn test_to_gpu_and_back() raises:
     a_gpu = a.to_gpu()
     back_cpu = a_gpu.to_cpu()
 
-    back_cpu.print()
-
     assert_true(back_cpu.all_close(a))
     print("  Passed")
 
 
 fn test_contiguous_same_shape() raises:
     """Test fast path: contiguous, same shape."""
-    print("=== Test 1: Contiguous Same Shape ===")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].rand(1000, 10000)
@@ -602,22 +594,15 @@ fn test_contiguous_same_shape() raises:
     ag = a.to_gpu()
     bg = b.to_gpu()
 
-    var start = now()
     var gpu_result = ag * bg
-    var gpu_time = (now() - start) * 1000
-    start = now()
     var cpu_result = a * b
-    var cpu_time = (now() - start) * 1000
 
     assert_true(gpu_result.to_cpu().all_close(cpu_result))
-    print("  GPU:", gpu_time, "ms")
-    print("  CPU:", cpu_time, "ms")
     print("  Passed")
 
 
 fn test_broadcasting() raises:
     """Test broadcasting path."""
-    print("\n=== Test 2: Broadcasting ===")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].rand(3, 1, 4)  # [3, 1, 4]
@@ -635,13 +620,11 @@ fn test_broadcasting() raises:
 
     assert_true(cpu_ag == a)
     assert_true(cpu_bg == b)
-    print("  Shape:", gpu_result.shape())
     print("  Passed")
 
 
 fn test_scalar_broadcast() raises:
     """Test scalar broadcasting."""
-    print("\n=== Test 3: Scalar Broadcast ===")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].rand(100, 100)
@@ -664,7 +647,6 @@ fn test_scalar_broadcast() raises:
 
 fn test_non_contiguous() raises:
     """Test non-contiguous tensors (views/transposes)."""
-    print("\n=== Test 4: Non-Contiguous (Transpose) ===")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].rand(3000, 2000)
@@ -689,7 +671,6 @@ fn test_non_contiguous() raises:
 
 fn test_complex_broadcasting() raises:
     """Test complex multi-dimensional broadcasting."""
-    print("\n=== Test 5: Complex Broadcasting ===")
 
     comptime dtype = DType.float32
     var a = Tensor[dtype].rand(1, 5, 1, 7)  # [1, 5, 1, 7]
@@ -704,7 +685,6 @@ fn test_complex_broadcasting() raises:
 
     assert_true(gpu_result.shape() == Shape(3, 5, 4, 7))
     assert_true(gpu_result.to_cpu().all_close(cpu_result))
-    print("  Shape:", gpu_result.shape())
     print("  Passed")
 
 
@@ -720,25 +700,17 @@ fn test_large_arrays() raises:
     ag = a.to_gpu()
     bg = b.to_gpu()
 
-    var start = now()
     var gpu_result = ag + bg
-    var gpu_time = (now() - start) * 1000
 
-    start = now()
     var cpu_result = a + b
-    var cpu_time = (now() - start) * 1000
 
     assert_true(gpu_result.to_cpu().all_close(cpu_result))
     print("  Size:", size, "elements")
-    print("  GPU:", gpu_time, "ms")
-    print("  CPU:", cpu_time, "ms")
-    print("  Speedup:", cpu_time / gpu_time, "x")
     print("  Passed")
 
 
 fn test_contiguous_view_with_offset() raises:
     """Test contiguous view/slice with non-zero offset."""
-    print("\n=== Test: Contiguous View with Offset ===")
 
     comptime dtype = DType.float32
 
