@@ -58,7 +58,7 @@ fn arithmetic_ops_both_contiguous[
                     vec_result = vec_b * (one - vec_a * vec_a)
                 else: #Log backward
                     vec_result = vec_b /max(vec_a, epsilon)
-
+                    print("vec_result: ", vec_result)
                 result.store[width=simd_width](i, vec_result)
 
             else:
@@ -82,6 +82,7 @@ fn arithmetic_ops_both_contiguous[
                         res = b * (One[dtype].value() - a * a)
                     else:
                         res = b / max(a, epsilon)
+                        print("scalar res: ", res)
 
                     result[idx] = res
 
@@ -416,7 +417,7 @@ struct BinaryOperations[dtype: DType = DType.float32](
 
         var A_is_contiguous = A.is_contiguous()
         var B_is_contiguous = B.is_contiguous()
-
+        print("Contiguity: ", A_is_contiguous, B_is_contiguous)
         # ================================================================
         # PATH 1: Both contiguous, same shape, no broadcasting
         # ================================================================

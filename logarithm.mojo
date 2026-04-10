@@ -80,7 +80,9 @@ struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         """Thin wrapper — delegates to static backward(NDBuffer)."""
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
+        print("backward kicking in: ", LOG_BACKWARD)
         var result_ndb = parent.buffer.arithmetic_ops[LOG_BACKWARD](gradbox.buffer, self.epsilon)
+        print("\nThe result_nd: ", result_ndb)
         _="""var result_ndb = Self.backward(
             parent.buffer, grad_output.buffer, self.epsilon
         )"""
@@ -109,6 +111,9 @@ struct Logarithm[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         """
         var result_ndb = self.buffer.log[epsilon]()
         var out = Tensor[Self.dtype](result_ndb^, requires_grad=False)
+        print("\n The forward out: \n")
+        out.print()
+        print()
 
         comptime if track_grad:
             var grad_required = requires_grad.or_else(self.requires_grad)
