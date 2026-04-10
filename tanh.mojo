@@ -2,9 +2,6 @@ from tenmo import Tensor
 from mnemonics import AddTensor, TANH_BACKWARD
 from backpropagation import Delegate, BackwardFn, BACKWARD_TANH
 from gradbox import Gradbox
-from std.math import tanh, exp
-from ndbuffer import NDBuffer
-from utilities import Utils
 
 @fieldwise_init
 struct TanhBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
@@ -48,12 +45,5 @@ struct Tanh[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out.add_ancestry(self)
         return out^
 
-    @staticmethod
-    fn tanh_stable(x: Scalar[Self.dtype]) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
-        """
-        More numerically stable tanh implementation.
-        """
-        if x > 0:
-            return (1 - exp(-2 * x)) / (1 + exp(-2 * x))
-        else:
-            return (exp(2 * x) - 1) / (exp(2 * x) + 1)
+fn main() raises:
+    print("passes")

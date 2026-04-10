@@ -24,8 +24,7 @@ from compare_kernel import AllClose, Compare, CompareScalar
 from reduction_kernel import Reduction
 from minmax_kernel import ReductionMinMax
 from minmax_reducer import MinMaxReducer
-from std.math import sqrt, log, exp
-from utilities import Utils
+from std.math import sqrt, log, exp, tanh
 from mnemonics import (
     Multiply,
     Add,
@@ -2290,7 +2289,7 @@ struct NDBuffer[dtype: DType](
         elif op_code == SIGMOID_FORWARD:
             return One[Self.dtype].value() /(One[Self.dtype].value() + exp(scalar))
         elif op_code == TANH_FORWARD:
-            return Utils.tanh_stable(scalar)
+            return tanh(scalar)
         else:  # op_code == EXP:
             return exp(scalar)
 
@@ -2468,7 +2467,7 @@ struct NDBuffer[dtype: DType](
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
-            var result_buffer: Buffer[Self.dtype]
+            _="""var result_buffer: Buffer[Self.dtype]
             comptime if op_code == LOG:
                 result_buffer = self.buffer.log[epsilon](start, end)
             elif op_code == SIGMOID_FORWARD:
@@ -2476,7 +2475,8 @@ struct NDBuffer[dtype: DType](
             elif op_code == TANH_FORWARD:
                 result_buffer = self.buffer.tanh(start, end)
             else:  # op_code == EXP:
-                result_buffer = self.buffer.exp(start, end)
+                result_buffer = self.buffer.exp(start, end)"""
+            var result_buffer = self.buffer.float_unary_ops[op_code, epsilon](start, end)
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 

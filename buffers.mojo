@@ -18,6 +18,9 @@ from mnemonics import (
     RELU_BACKWARD,
     RELU_FORWARD,
     SIGMOID_BACKWARD,
+    LOG,
+    EXP,
+    TANH_FORWARD,
     LOG_BACKWARD,
     ReverseDivide,
     SQRT,
@@ -1376,7 +1379,7 @@ struct Buffer[dtype: DType = DType.float32](
         return (out^, mask^)
 
     @always_inline
-    fn exp(
+    fn float_unary_ops[op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()](
         self,
         start_index: Int = 0,
         end_index: Optional[Int] = None,
@@ -1397,12 +1400,26 @@ struct Buffer[dtype: DType = DType.float32](
             for out_idx in range(0, vectorized_end, simd_width):
                 var src_idx = start_index + out_idx
                 var chunk = self.load[simdwidth=simd_width](src_idx)
-                out.store[simdwidth=simd_width](out_idx, exp(chunk))
+                comptime if op_code == EXP:
+                    out.store[simdwidth=simd_width](out_idx, exp(chunk))
+                elif op_code == LOG:
+                    out.store[simdwidth=simd_width](out_idx, log(max(chunk, epsilon)))
+                elif op_code == TANH_FORWARD:
+                    out.store[simdwidth=simd_width](out_idx, tanh(chunk))
+                else: # Sigmoid
+                    out.store[simdwidth=simd_width](out_idx, One[Self.dtype].value() / (One[Self.dtype].value() + exp(-chunk)))
 
             # Tail loop
             for out_idx in range(vectorized_end, extent):
                 var src_idx = start_index + out_idx
-                out[out_idx] = exp(self[src_idx])
+                comptime if op_code == EXP:
+                    out[out_idx] = exp(self[src_idx])
+                elif op_code == LOG:
+                    out[out_idx] = log(max(self[src_idx], epsilon))
+                elif op_code == TANH_FORWARD:
+                    out[out_idx] = tanh(self[src_idx])
+                else: # Sigmoid
+                    out[out_idx] = One[Self.dtype].value()/ (One[Self.dtype].value() + exp(-self[src_idx]))
 
             return out^
 
@@ -1429,14 +1446,29 @@ struct Buffer[dtype: DType = DType.float32](
                 var src_idx = src_start + i
                 var out_idx = out_start + i
                 var vec = src_data.load[width=simd_width](src_idx)
-                dst_data.store[width=simd_width](out_idx, exp(vec))
+                comptime if op_code == EXP:
+                    dst_data.store[width=simd_width](out_idx, exp(vec))
+                elif op_code == LOG:
+                    dst_data.store[width=simd_width](out_idx, log(max(vec, epsilon)))
+                elif op_code == TANH_FORWARD:
+                    dst_data.store[width=simd_width](out_idx, tanh(vec))
+
+                else: # Sigmoid
+                    dst_data.store[width=simd_width](out_idx, One[Self.dtype].value() / (One[Self.dtype].value() + exp(-vec)))
                 i += simd_width
 
             # Tail loop
             while i < chunk_extent:
                 var src_idx = src_start + i
                 var out_idx = out_start + i
-                dst_data[out_idx] = exp(src_data[src_idx])
+                comptime if op_code == EXP:
+                    dst_data[out_idx] = exp(src_data[src_idx])
+                elif op_code == LOG:
+                    dst_data[out_idx] = log(max(src_data[src_idx], epsilon))
+                elif op_code == TANH_FORWARD:
+                    dst_data[out_idx] = tanh(src_data[src_idx])
+                else: # Sigmoid
+                    dst_data[out_idx] = One[Self.dtype].value()/ (One[Self.dtype].value() + exp(-src_data[src_idx]))
                 i += 1
 
         parallelize[process_chunk](num_cores)
@@ -1465,33 +1497,6 @@ struct Buffer[dtype: DType = DType.float32](
         for idx in range(vectorized_end, actual_end):
             out[idx] = 1.0 / (1.0 + exp(-self[idx]))
         return out^
-
-    @always_inline
-    fn tanh(
-        self,
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
-    ) -> Buffer[
-        Self.dtype
-    ] where Self.dtype.is_floating_point():
-        var actual_end = end_index.or_else(self.size)
-        var extent = actual_end - start_index
-        var out = Buffer[Self.dtype](extent)
-
-        comptime simd_width = simd_width_of[Self.dtype]()
-        var vectorized_end = (extent // simd_width) * simd_width
-
-        for idx in range(start_index, vectorized_end, simd_width):
-            var chunk = self.load[simdwidth=simd_width](idx)
-
-            out.store[simdwidth=simd_width](idx, tanh(chunk))
-
-        # Tail
-        for idx in range(vectorized_end, actual_end):
-
-            out[idx] = tanh(self[idx])
-        return out^
-
 
     @staticmethod
     @always_inline
@@ -1815,31 +1820,6 @@ struct Buffer[dtype: DType = DType.float32](
         for idx in range(vectorized_end, self.size):
             out[idx] = self[idx].__neg__()
 
-        return out^
-
-    @always_inline
-    fn log[
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
-    ](
-        self: Buffer[Self.dtype],
-        start_index: Int = 0,
-        end_index: Optional[Int] = None,
-    ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
-        var extent = end_index.or_else(self.size) - start_index
-        var out = Buffer[Self.dtype](extent)
-
-        comptime simd_width = simd_width_of[Self.dtype]()
-
-        var chunks = extent // simd_width
-
-        for chunk in range(chunks):
-            var idx = chunk * simd_width
-            var block = self.load[simdwidth=simd_width](start_index + idx)
-            out.store[simdwidth=simd_width](idx, log(max(block, epsilon)))
-
-        var rest_start_idx = chunks * simd_width
-        for idx in range(rest_start_idx, extent):
-            out[idx] = log(max(self[idx], epsilon))
         return out^
 
     @always_inline

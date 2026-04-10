@@ -2,7 +2,7 @@ from tenmo import Tensor
 from mnemonics import AddTensor, LOG, LOG_BACKWARD
 from backpropagation import Delegate, BackwardFn, BACKWARD_LOG
 from gradbox import Gradbox
-from common_utils import panic, Epsilon
+from common_utils import Epsilon
 
 @fieldwise_init
 struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):

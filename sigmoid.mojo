@@ -2,8 +2,6 @@ from tenmo import Tensor
 from mnemonics import AddTensor, SIGMOID_BACKWARD
 from backpropagation import Delegate, BackwardFn, BACKWARD_SIGMOID
 from gradbox import Gradbox
-from std.math import exp
-from ndbuffer import NDBuffer
 
 @fieldwise_init
 struct SigmoidBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
@@ -41,3 +39,5 @@ struct Sigmoid[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out.add_ancestry(self)
         return out^
 
+fn main() raises:
+    print("passes")
