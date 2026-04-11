@@ -364,4 +364,11 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
 
 fn main():
-    pass
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
+    var s = Tensor[dtype].scalar(42, requires_grad=True)
+    var r =  a.reshape(3,1)
+    var m = r * 42
+    m.backward()
+    a.grad().print()
+    s.grad().print()
