@@ -1,17 +1,15 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn
 from gradbox import Gradbox
 
 
 @fieldwise_init
 struct BroadcastBackward[
-    dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int, TAG: Int
+    dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int
 ](RegisterPassable, ImplicitlyCopyable):
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         # This is the gradient flowing *into* this broadcasted op.
         # We need to call copy explicitly because we have not annotated Gradbox with `ImplicitlyCopyable` yet - Intententionally

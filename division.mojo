@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from backpropagation import (
-    Delegate,
-    BackwardFn,
+    FnArg,
+    ScalarArg,
     BACKWARD_DIVIDE,
     BACKWARD_DIV_SCALAR,
     BACKWARD_RIGHT_DIV_SCALAR,
@@ -9,24 +9,20 @@ from backpropagation import (
 from mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
 from gradbox import Gradbox
-from std.sys import has_accelerator
 
 
 @fieldwise_init
 struct TrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_DIV_SCALAR
-    var factor: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var scalar = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
-        var divided = gradbox / self.factor
+        var divided = gradbox / scalar
         return [
             (
                 ancestor^,
@@ -38,20 +34,17 @@ struct TrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable)
 
 @fieldwise_init
 struct RightTrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_RIGHT_DIV_SCALAR
-    var scalar: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var scalar = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
         var gradbox = output.grad()
         var tensor = output.ancestry().get(0)
         squared = tensor.__pow__[track_grad=False](2)
         squared_reciprocal = 1.0 / squared
-        gradbox = (gradbox * self.scalar) * squared_reciprocal
+        gradbox = (gradbox * scalar) * squared_reciprocal
 
         return [
             (
@@ -64,13 +57,10 @@ struct RightTrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopy
 
 @fieldwise_init
 struct DivideBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_DIVIDE
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var tensor_top = output.ancestry().get(0)
@@ -137,10 +127,7 @@ struct DivideScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                backward_fn = RightTrueDivBackwardScalar[Self.dtype](
-                    scalar
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].scalar(scalar, BACKWARD_RIGHT_DIV_SCALAR))
                 out.add_ancestry(self)
 
         return out^
@@ -168,11 +155,7 @@ struct DivideByScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-
-                backward_fn = TrueDivBackwardScalar[Self.dtype](
-                    scalar
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].scalar(scalar, BACKWARD_DIV_SCALAR))
                 out.add_ancestry(self)
 
         return out^
@@ -205,8 +188,7 @@ struct Divider[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             requires_grad = self.requires_grad or other.requires_grad
             if requires_grad:
                 out.requires_grad_(True)
-                backward_fn = DivideBackward[Self.dtype]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_DIVIDE))
                 out.add_ancestry(self, other)
 
         return out^

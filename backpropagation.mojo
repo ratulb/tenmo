@@ -6,6 +6,7 @@ from common_utils import panic
 from gradbox import Gradbox
 from buffers import Buffer
 from ndbuffer import NDBuffer
+from intarray import IntArray
 
 # Centralized backward operation tags
 
@@ -17,85 +18,187 @@ comptime BACKWARD_MATMUL_2D = 4
 comptime BACKWARD_TRANSPOSE = 5
 comptime BACKWARD_PERMUTE = 6
 comptime BACKWARD_SIGMOID = 7
-comptime BACKWARD_ADD_BROADCAST = 8
-comptime BACKWARD_MULTIPLY_BROADCAST = 9
-comptime BACKWARD_SOFTMAX = 10
-comptime BACKWARD_CE_CLASS_INDICES = 11
-comptime BACKWARD_CE_PROBABILITIES = 12
-comptime BACKWARD_TANH = 13
-comptime BACKWARD_SUB = 14
-comptime BACKWARD_RESHAPE = 15
-comptime BACKWARD_VIEW = 16
-comptime BACKWARD_MEAN = 17
-comptime BACKWARD_SUM = 18
-comptime BACKWARD_LOG_SOFTMAX = 19
-comptime BACKWARD_CONTIGUOUS = 20
-comptime BACKWARD_DIVIDE = 21
-comptime BACKWARD_MATRIX_VECTOR_MUL = 22
-comptime BACKWARD_VECTOR_MATMUL = 23
-comptime BACKWARD_ADD_SCALAR = 24
-comptime BACKWARD_MULTIPLY_SCALAR = 25
-comptime BACKWARD_SUB_SCALAR = 26
-comptime BACKWARD_DIV_SCALAR = 27
-comptime BACKWARD_RIGHT_DIV_SCALAR = 28
-comptime BACKWARD_EXPONENTIATION = 29
-comptime BACKWARD_DOT = 30
-comptime BACKWARD_EXPAND = 31
-comptime BACKWARD_FLATTEN = 32
-comptime BACKWARD_SQUEEZE = 33
-comptime BACKWARD_UNSQUEEZE = 34
-comptime BACKWARD_SHUFFLE = 35
-comptime BACKWARD_MINMAX = 36
-comptime BACKWARD_TILE = 37
-comptime BACKWARD_LOG = 38
-comptime BACKWARD_SQRT = 39
-comptime BACKWARD_CLIP = 40
-comptime BACKWARD_VARIANCE = 41
-comptime BACKWARD_STD = 42
-comptime BACKWARD_SUBTRACT_BROADCAST = 43
-comptime BLAS_BACKWARD_MATMUL_2D = 44
-comptime BACKWARD_CONCAT = 45
-comptime BACKWARD_STACK = 46
-comptime BACKWARD_PAD = 47
-comptime BACKWARD_FUSED_CONV = 48
-comptime BACKWARD_MAXPOOL2D = 49
-comptime BACKWARD_DROPOUT = 50
-comptime BACKWARD_EXPONENTIAL = 51
-comptime BACKWARD_DEVICE_TRANSFER = 52
-comptime BACKWARD_MINMAX_GPU = 53
-comptime BACKWARD_MAX_SCALAR = 54
-comptime BACKWARD_MIN_SCALAR = 55
+comptime BACKWARD_SOFTMAX = 8
+comptime BACKWARD_CE_CLASS_INDICES = 9
+comptime BACKWARD_CE_PROBABILITIES = 10
+comptime BACKWARD_TANH = 11
+comptime BACKWARD_SUB = 12
+comptime BACKWARD_RESHAPE = 13
+comptime BACKWARD_VIEW = 14
+comptime BACKWARD_MEAN = 15
+comptime BACKWARD_SUM = 16
+comptime BACKWARD_LOG_SOFTMAX = 17
+comptime BACKWARD_CONTIGUOUS = 18
+comptime BACKWARD_DIVIDE = 19
+comptime BACKWARD_MATRIX_VECTOR_MUL = 20
+comptime BACKWARD_VECTOR_MATMUL = 21
+comptime BACKWARD_ADD_SCALAR = 22
+comptime BACKWARD_MULTIPLY_SCALAR = 23
+comptime BACKWARD_SUB_SCALAR = 24
+comptime BACKWARD_DIV_SCALAR = 25
+comptime BACKWARD_RIGHT_DIV_SCALAR = 26
+comptime BACKWARD_EXPONENTIATION = 27
+comptime BACKWARD_DOT = 28
+comptime BACKWARD_EXPAND = 29
+comptime BACKWARD_FLATTEN = 30
+comptime BACKWARD_SQUEEZE = 31
+comptime BACKWARD_UNSQUEEZE = 32
+comptime BACKWARD_SHUFFLE = 33
+comptime BACKWARD_MINMAX = 34
+comptime BACKWARD_TILE = 35
+comptime BACKWARD_LOG = 36
+comptime BACKWARD_SQRT = 37
+comptime BACKWARD_CLIP = 38
+comptime BACKWARD_VARIANCE = 39
+comptime BACKWARD_STD = 40
+comptime BLAS_BACKWARD_MATMUL_2D = 41
+comptime BACKWARD_CONCAT = 42
+comptime BACKWARD_STACK = 43
+comptime BACKWARD_PAD = 44
+comptime BACKWARD_FUSED_CONV = 45
+comptime BACKWARD_MAXPOOL2D = 46
+comptime BACKWARD_DROPOUT = 47
+comptime BACKWARD_EXPONENTIAL = 48
+comptime BACKWARD_DEVICE_TRANSFER = 49
+comptime BACKWARD_MINMAX_GPU = 50
+comptime BACKWARD_MAX_SCALAR = 51
+comptime BACKWARD_MIN_SCALAR = 52
 # ========== Delegate (Variant) ==========
+
+@fieldwise_init
+struct NullArg(RegisterPassable & ImplicitlyCopyable):
+    pass
+
+@fieldwise_init
+struct ScalarArg[dtype: DType](RegisterPassable & ImplicitlyCopyable):
+    var scalar: Scalar[Self.dtype]
+
+@fieldwise_init
+struct BooleanArg(RegisterPassable & ImplicitlyCopyable):
+    var is_true: Bool
+
+@fieldwise_init
+struct SubtractArg(RegisterPassable, ImplicitlyCopyable):
+    var signs: IntArray
+
+    fn __init__(out self):
+        self.signs = IntArray()
+
+    fn __copyinit__(out self, copy: Self):
+        self.signs = copy.signs.copy()
+
+    fn negate(mut self, neg: Bool):
+        if neg:
+            self.signs.append(1)
+        else:
+            self.signs.append(0)
+
+    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), BACKWARD_SUB)
+
+@fieldwise_init
+struct ReductionArgs(RegisterPassable, ImplicitlyCopyable):
+    var axes: IntArray
+    var keepdims: Bool
+    fn into_arg[dtype: DType](self, tag: Int) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), tag) # BACKWARD_SUM/BACKWARD_MEAN
+
+comptime ArgType[dtype: DType] = Variant[
+    NullArg,
+    ScalarArg[dtype],
+    BooleanArg,
+    SubtractArg,
+    ReductionArgs,
+]
+
+struct FnArg[dtype: DType](Copyable & Movable):
+    var arg: ArgType[Self.dtype]
+    var tag: Int  # O(1) dispatch key
+
+    fn __init__(out self, var arg: ArgType[Self.dtype], tag: Int):
+        self.arg= arg^
+        self.tag = tag
+
+    fn __moveinit__(out self, deinit take: Self):
+        self.arg = take.arg^
+        self.tag = take.tag
+
+    fn __copyinit__(out self, copy: Self):
+        self.arg = copy.arg.copy()
+        self.tag = copy.tag
+
+    @staticmethod
+    fn null(tag: Int) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](NullArg()), tag)
+
+    @staticmethod
+    fn scalar(scalar: Scalar[Self.dtype], tag: Int) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](ScalarArg[Self.dtype](scalar)), tag)
+
+    @staticmethod
+    fn boolean(is_true: Bool, tag: Int) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](BooleanArg(is_true)), tag)
+
+@fieldwise_init
+struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
+
+    @staticmethod
+    fn invoke(
+            output: Tensor[Self.dtype]
+    ) -> List[
+        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
+    ]:
+        """O(1) dispatch using integer tag comparison.
+        Order: Most common operations first for branch prediction.
+        """
+
+        # ========== TIER 1: MOST COMMON ==========
+        ref arg = output.fn_arg()
+        var tag = arg.tag
+        print("Tag is: ", tag)
+        if tag == BACKWARD_ADD:
+            return AddBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_ADD_SCALAR:
+            return AddBackwardScalar[Self.dtype].backward(output)
+        elif tag == BACKWARD_MULTIPLY_SCALAR:
+            return MultiplyBackwardScalar[Self.dtype].backward(output)
+        elif tag == BACKWARD_MULTIPLY:
+            return MultiplyBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_SUB:
+            return SubBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_SUB_SCALAR:
+            return SubLeftRightBackwardScalar[Self.dtype].backward(output)
+        elif tag == BACKWARD_DIV_SCALAR:
+            return TrueDivBackwardScalar[Self.dtype].backward(output)
+        elif tag == BACKWARD_RIGHT_DIV_SCALAR:
+            return RightTrueDivBackwardScalar[Self.dtype].backward(output)
+        elif tag == BACKWARD_DIVIDE:
+            return DivideBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_SUM:
+            return SumBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_MEAN:
+            return MeanBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_RESHAPE:
+            return ReshapeBackward[Self.dtype].backward(output)
+
+
+
+        else: return []
 
 comptime Delegate[dtype: DType] = Variant[
     MatmulNdBackward[dtype],
     Matmul2dBackward[dtype],
     BLASMatmul2dBackward[dtype],
     ReLUBackward[dtype],
-    AddBackwardScalar[dtype],
-    AddBackward[dtype],
-    AddBroadcastBackward[dtype],
-    SubBackward[dtype],
-    SubtractBroadcastBackward[dtype],
-    SumBackward[dtype],
-    MeanBackward[dtype],
-    ReshapeBackward[dtype],
     ViewBackward[dtype],
     TransposeBackward[dtype],
     CEClassIndicesBackward[dtype],
     CEProbabilitiesBackward[dtype],
     ContiguousBackward[dtype],
-    MultiplyBackwardScalar[dtype],
-    MultiplyBackward[dtype],
-    MultiplyBroadcastBackward[dtype],
     SigmoidBackward[dtype],
     VectorMatmulNdBackward[dtype],
     MatrixVectorMulNdBackward[dtype],
-    SubLeftRightBackwardScalar[dtype],
     ExponentiationBackward[dtype],
-    TrueDivBackwardScalar[dtype],
-    RightTrueDivBackwardScalar[dtype],
-    DivideBackward[dtype],
     DotBackward[dtype],
     ExpandBackward[dtype],
     FlattenBackward[dtype],
@@ -155,18 +258,8 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         """
 
         # ========== TIER 1: MOST COMMON ==========
-        if self.tag == BACKWARD_ADD:
-            return self.grad_fn[AddBackward[Self.dtype]].backward(output)
 
-        elif self.tag == BACKWARD_MULTIPLY:
-            return self.grad_fn[MultiplyBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_MULTIPLY_SCALAR:
-            return self.grad_fn[MultiplyBackwardScalar[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_RELU:
+        if self.tag == BACKWARD_RELU:
             return self.grad_fn[ReLUBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_MATMUL_ND:
@@ -191,32 +284,9 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
             return self.grad_fn[PermuteBackward[Self.dtype]].backward(output)
 
         # ========== TIER 3: COMMON OPERATIONS ==========
-        elif self.tag == BACKWARD_ADD_BROADCAST:
-            return self.grad_fn[AddBroadcastBackward[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_MULTIPLY_BROADCAST:
-            return self.grad_fn[MultiplyBroadcastBackward[Self.dtype]].backward(
-                output
-            )
 
         elif self.tag == BACKWARD_SOFTMAX:
             return self.grad_fn[SoftmaxBackward[Self.dtype]].backward(output)
-        elif self.tag == BACKWARD_SUB:
-            return self.grad_fn[SubBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_ADD_SCALAR:
-            return self.grad_fn[AddBackwardScalar[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_SUB_SCALAR:
-            return self.grad_fn[
-                SubLeftRightBackwardScalar[Self.dtype]
-            ].backward(output)
-
-        elif self.tag == BACKWARD_RESHAPE:
-            return self.grad_fn[ReshapeBackward[Self.dtype]].backward(output)
-
         elif self.tag == BACKWARD_VIEW:
             return self.grad_fn[ViewBackward[Self.dtype]].backward(output)
 
@@ -232,21 +302,12 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.tag == BACKWARD_TANH:
             return self.grad_fn[TanhBackward[Self.dtype]].backward(output)
 
-        elif self.tag == BACKWARD_MEAN:
-            return self.grad_fn[MeanBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_SUM:
-            return self.grad_fn[SumBackward[Self.dtype]].backward(output)
-
         # ========== TIER 4: MODERATELY COMMON ==========
         elif self.tag == BACKWARD_LOG_SOFTMAX:
             return self.grad_fn[LogSoftmaxBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_CONTIGUOUS:
             return self.grad_fn[ContiguousBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_DIVIDE:
-            return self.grad_fn[DivideBackward[Self.dtype]].backward(output)
 
         elif self.tag == BACKWARD_MATRIX_VECTOR_MUL:
             return self.grad_fn[MatrixVectorMulNdBackward[Self.dtype]].backward(
@@ -270,16 +331,6 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         elif self.tag == BACKWARD_UNSQUEEZE:
             return self.grad_fn[UnsqueezeBackward[Self.dtype]].backward(output)
 
-        # ========== TIER 5: SCALAR OPERATIONS ==========
-        elif self.tag == BACKWARD_DIV_SCALAR:
-            return self.grad_fn[TrueDivBackwardScalar[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_RIGHT_DIV_SCALAR:
-            return self.grad_fn[
-                RightTrueDivBackwardScalar[Self.dtype]
-            ].backward(output)
 
         # ========== TIER 6: SPECIALIZED OPERATIONS ==========
         elif self.tag == BACKWARD_EXPONENTIATION:
@@ -298,11 +349,6 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
 
         elif self.tag == BACKWARD_CLIP:
             return self.grad_fn[ClipBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_SUBTRACT_BROADCAST:
-            return self.grad_fn[SubtractBroadcastBackward[Self.dtype]].backward(
-                output
-            )
 
         elif self.tag == BACKWARD_SHUFFLE:
             return self.grad_fn[ShuffleBackward[Self.dtype]].backward(output)
@@ -363,5 +409,13 @@ struct BackwardFn[dtype: DType](Copyable & Movable):
         return []
 
 
-fn main():
-    pass
+fn main() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
+    var s = Tensor[dtype].scalar(42, requires_grad=True)
+    var r =  a.reshape(3,1)
+    var m = r * 42
+    m.backward()
+    a.grad().print()
+    s.grad().print()
+

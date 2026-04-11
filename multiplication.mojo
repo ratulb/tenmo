@@ -1,32 +1,27 @@
 from tenmo import Tensor
 from backpropagation import (
-    Delegate,
-    BackwardFn,
+    BooleanArg,
+    ScalarArg,
+    FnArg,
     BACKWARD_MULTIPLY,
     BACKWARD_MULTIPLY_SCALAR,
-    BACKWARD_MULTIPLY_BROADCAST,
 )
 from mnemonics import AddTensor, Multiply
 from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
-from std.sys import has_accelerator
-
 
 @fieldwise_init
 struct MultiplyBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_MULTIPLY_SCALAR
-    var factor: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var factor = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
-        scaled_gradbox = gradbox * self.factor
+        scaled_gradbox = gradbox * factor
         return [
             (
                 ancestor^,
@@ -35,17 +30,16 @@ struct MultiplyBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable
             )
         ]
 
-
 @fieldwise_init
 struct MultiplyBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_MULTIPLY
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var broadcast = output.fn_arg().arg[BooleanArg].is_true
+        if broadcast:
+            return MultiplyBroadcastBackward[Self.dtype].backward(output)
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
         var ancestor_lhs = output.ancestry().get(0)
@@ -90,7 +84,6 @@ comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
     augment=True,
     lhs_op=AddTensor,
     rhs_op=AddTensor,
-    TAG=BACKWARD_MULTIPLY_BROADCAST,
 ]
 
 
@@ -109,10 +102,7 @@ struct MultiplyScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                backward_fn = MultiplyBackwardScalar[Self.dtype](
-                    factor
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].scalar(factor, BACKWARD_MULTIPLY_SCALAR))
                 out.add_ancestry(self)
 
         return out^
@@ -148,19 +138,13 @@ struct Multiplicator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out.requires_grad_(True)
 
                 if self.shape() == other.shape():
-                    backward_fn = MultiplyBackward[
-                        Self.dtype
-                    ]().into_backward_fn()
-                    out.backwardFn = Optional(backward_fn^)
+                    out.fnArg = Optional(FnArg[Self.dtype].boolean(False, BACKWARD_MULTIPLY))
                     if id(self) == id(other):  # B = A * A, self == other == A
                         out.add_ancestry(self)
                     else:
                         out.add_ancestry(self, other)
                 else:
-                    backward_fn = MultiplyBroadcastBackward[
-                        Self.dtype
-                    ]().into_backward_fn()
-                    out.backwardFn = Optional(backward_fn^)
+                    out.fnArg = Optional(FnArg[Self.dtype].boolean(True, BACKWARD_MULTIPLY))
                     out.add_ancestry(self, other)
 
         return out^

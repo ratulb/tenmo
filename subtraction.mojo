@@ -2,41 +2,25 @@ from tenmo import Tensor
 from intarray import IntArray
 from mnemonics import AddTensor, SubtractTensor, Subtract, ReverseSubtract
 from backpropagation import (
-    Delegate,
-    BackwardFn,
-    BACKWARD_SUB,
-    BACKWARD_SUBTRACT_BROADCAST,
+    SubtractArg,
+    BooleanArg,
+    FnArg,
     BACKWARD_SUB_SCALAR,
 )
 from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
-from std.sys import has_accelerator
-
 
 @fieldwise_init
 struct SubBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_SUB
-    var signs: IntArray
 
-    fn __init__(out self):
-        self.signs = IntArray()
-
-    fn __copyinit__(out self, copy: Self):
-        self.signs = copy.signs.copy()
-
-    fn negate(mut self, neg: Bool):
-        if neg:
-            self.signs.append(1)
-        else:
-            self.signs.append(0)
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var signs = output.fn_arg().arg[SubtractArg].signs
+        if len(signs) == 0:
+            return SubtractBroadcastBackward[Self.dtype].backward(output)
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
         grad_shares = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]](
@@ -48,30 +32,26 @@ struct SubBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 (
                     ancestor^,
                     gradbox,
-                    AddTensor if self.signs[i] == 0 else SubtractTensor,
+                    AddTensor if signs[i] == 0 else SubtractTensor,
                 )
             )
         return grad_shares^
 
-
 @fieldwise_init
 struct SubLeftRightBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_SUB_SCALAR
-    var negate: Bool
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var negate = output.fn_arg().arg[BooleanArg].is_true
         ref gradbox = output.gradients()[]
         ref ancestor = output.ancestry().get(0)
         return [
             (
                 ancestor,
                 gradbox,
-                SubtractTensor if self.negate else AddTensor,
+                SubtractTensor if negate else AddTensor,
             )
         ]
 
@@ -81,7 +61,6 @@ comptime SubtractBroadcastBackward[dtype: DType] = BroadcastBackward[
     augment=False,
     lhs_op=AddTensor,
     rhs_op=SubtractTensor,
-    TAG=BACKWARD_SUBTRACT_BROADCAST,
 ]
 
 
@@ -100,10 +79,7 @@ struct SubtractScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                backward_fn = SubLeftRightBackwardScalar[Self.dtype](
-                    False
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].boolean(False, BACKWARD_SUB_SCALAR))
                 out.add_ancestry(self)
 
         return out^
@@ -124,10 +100,7 @@ struct SubtractFromScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                backward_fn = SubLeftRightBackwardScalar[Self.dtype](
-                    True
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].boolean(True, BACKWARD_SUB_SCALAR))
                 out.add_ancestry(self)
 
         return out^
@@ -161,25 +134,18 @@ struct Subtractor[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             if requires_grad:
                 out.requires_grad_(True)
 
+                var subract_arg = SubtractArg()
                 if self.shape() == other.shape():
-                    sub_backward = SubBackward[Self.dtype]()
                     if self.requires_grad:
                         out.add_ancestry(self)
-                        sub_backward.negate(False)
+                        subract_arg.negate(False)
                     if other.requires_grad:
                         out.add_ancestry(other)
-                        sub_backward.negate(True)
-                    backward_fn = sub_backward.into_backward_fn()
-                    out.backwardFn = Optional(backward_fn^)
-
+                        subract_arg.negate(True)
                 else:
-                    backward_fn = SubtractBroadcastBackward[
-                        Self.dtype
-                    ]().into_backward_fn()
-
-                    out.backwardFn = Optional(backward_fn^)
                     out.add_ancestry(self, other)
 
+                out.fnArg = Optional(subract_arg.into_arg[Self.dtype]())
         return out^
 
 

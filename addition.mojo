@@ -1,26 +1,21 @@
 from tenmo import Tensor
 from backpropagation import (
-    Delegate,
-    BackwardFn,
+    BooleanArg,
+    FnArg,
     BACKWARD_ADD,
     BACKWARD_ADD_SCALAR,
-    BACKWARD_ADD_BROADCAST,
 )
 from mnemonics import AddTensor, Add
 from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 
-
 @fieldwise_init
 struct AddBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_ADD_SCALAR
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
@@ -29,26 +24,23 @@ struct AddBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         # Gradient of addition is 1 → just pass through incoming grad
         return [(ancestor^, gradbox, AddTensor)]
 
-
 comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
     dtype,
     augment=False,
     lhs_op=AddTensor,
     rhs_op=AddTensor,
-    TAG=BACKWARD_ADD_BROADCAST,
 ]
-
 
 @fieldwise_init
 struct AddBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_ADD
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var broadcast = output.fn_arg().arg[BooleanArg].is_true
+        if broadcast:
+            return AddBroadcastBackward[Self.dtype].backward(output)
         var gradbox = output.gradients()[]
         count = len(output.ancestry())
 
@@ -80,7 +72,6 @@ struct AddBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         return grad_shares^
 
-
 @fieldwise_init
 struct AddScalar[dtype: DType](RegisterPassable, Copyable):
     @staticmethod
@@ -96,8 +87,7 @@ struct AddScalar[dtype: DType](RegisterPassable, Copyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                backward_fn = AddBackwardScalar[Self.dtype]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_ADD_SCALAR))
                 out.add_ancestry(self)
 
         return out^
@@ -131,17 +121,13 @@ struct Adder[dtype: DType](RegisterPassable, Copyable):
                 out.requires_grad_(True)
 
                 if self.shape() == other.shape():
-                    var bwd = AddBackward[Self.dtype]().into_backward_fn()
-                    out.backwardFn = Optional(bwd^)
+                    out.fnArg = Optional(FnArg[Self.dtype].boolean(False, BACKWARD_ADD))
                     if self.requires_grad:
                         out.add_ancestry(self)
                     if other.requires_grad:
                         out.add_ancestry(other)
                 else:
-                    var bwd = AddBroadcastBackward[
-                        Self.dtype
-                    ]().into_backward_fn()
-                    out.backwardFn = Optional(bwd^)
+                    out.fnArg = Optional(FnArg[Self.dtype].boolean(True, BACKWARD_ADD))
                     out.add_ancestry(self, other)
 
         return out^

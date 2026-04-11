@@ -2,7 +2,7 @@ from tenmo import Tensor
 from intarray import IntArray
 from mnemonics import AddTensor
 from shapes import Shape
-from backpropagation import Delegate, BackwardFn, BACKWARD_MEAN
+from backpropagation import ReductionArgs, BACKWARD_MEAN
 from validators import Validator
 from gradbox import Gradbox
 from common_utils import panic
@@ -21,9 +21,11 @@ struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         self.axes = copy.axes.copy()
         self.keepdims = copy.keepdims
 
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var reduction_inf = output.fn_arg().arg[ReductionArgs]
         ref gradbox = output.gradients()[]
         var gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
@@ -46,12 +48,12 @@ struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         var expanded = gradbox.copy()
 
-        if not self.keepdims:
+        if not reduction_inf.keepdims:
             expanded = expanded.reshape(
                 Shape(
                     gradbox_shape.intarray().insert(
-                        self.axes,
-                        IntArray.filled(len(self.axes), 1),
+                        reduction_inf.axes,
+                        IntArray.filled(len(reduction_inf.axes), 1),
                     )
                 )
             )
@@ -59,7 +61,7 @@ struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         # Broadcast and divide
         var broadcasted = expanded.broadcast_to(ancestor.shape())
         # Compute total count of elements being reduced
-        var count = ancestor.shape().reduced_shape(self.axes).product()
+        var count = ancestor.shape().reduced_shape(reduction_inf.axes).product()
         count = count if count > 0 else 1
         var average = broadcasted / Scalar[Self.dtype](count)
 
@@ -70,9 +72,6 @@ struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 AddTensor,
             )
         ]
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -98,10 +97,10 @@ struct Mean[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = MeanBackward[Self.dtype](
+                var backward_fn_args = ReductionArgs(
                     normalized_axes.copy(), keepdims
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                ).into_arg[Self.dtype](BACKWARD_MEAN)
+                out.fnArg = Optional(backward_fn_args^)
                 out.add_ancestry(tensor)
 
         return out^

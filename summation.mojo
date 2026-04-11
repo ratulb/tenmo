@@ -2,20 +2,18 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from intarray import IntArray
 from shapes import Shape
-from backpropagation import Delegate, BackwardFn, BACKWARD_SUM
+from backpropagation import ReductionArgs, BACKWARD_SUM
 from validators import Validator
 from gradbox import Gradbox
 
 
 @fieldwise_init
 struct SumBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_SUM
-    var axes: IntArray
-    var keepdims: Bool
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var reduction_inf = output.fn_arg().arg[ReductionArgs]
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         shape = ancestor.shape()
@@ -26,14 +24,14 @@ struct SumBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             )
         else:
             # Handle keepdims=False case (need to reshape gradient)
-            if not self.keepdims:
+            if not reduction_inf.keepdims:
                 # Determine axes/unsqueeze (insert dims of size 1)
                 axes = (
                     gradbox.shape()
                     .intarray()
                     .insert(
-                        self.axes,
-                        IntArray.filled(len(self.axes), 1),
+                        reduction_inf.axes,
+                        IntArray.filled(len(reduction_inf.axes), 1),
                     )
                 )
                 unsqueezed_shape = Shape(axes)
@@ -51,10 +49,6 @@ struct SumBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 AddTensor,
             )
         ]
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
 
 @fieldwise_init
 struct Summer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
@@ -77,10 +71,13 @@ struct Summer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = SumBackward[Self.dtype](
+                var reduction_fn_args = ReductionArgs(
                     reduction_axes, keepdims
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                ).into_arg[Self.dtype](BACKWARD_SUM)
+                out.fnArg = Optional(reduction_fn_args^)
                 out.add_ancestry(tensor)
 
         return out^
+
+fn main():
+    pass

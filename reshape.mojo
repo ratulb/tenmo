@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, ZeroGrad
-from backpropagation import BackwardFn, Delegate, BACKWARD_RESHAPE
+from backpropagation import FnArg, BACKWARD_RESHAPE
 from shapes import Shape
 from validators import Validator
 from gradbox import Gradbox
@@ -10,22 +10,21 @@ from strides import Strides
 
 @fieldwise_init
 struct ReshapeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_RESHAPE
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
+        print("\nThe gradbox here\n")
+        gradbox.print()
+        print()
         var ancestor = output.ancestry().get(0)
         var reshaped = gradbox.reshape(ancestor.shape())
-        output.zero_grad()
+        #output.zero_grad()
         return [
             (ancestor^, reshaped^, AddTensor),
+            (output, gradbox, ZeroGrad),
         ]
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
 
 @fieldwise_init
 struct Reshape[dtype: DType](RegisterPassable, ImplicitlyCopyable):
@@ -46,8 +45,9 @@ struct Reshape[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = ReshapeBackward[Self.dtype]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                var fn_arg = FnArg[Self.dtype].null(BACKWARD_RESHAPE)
+                out.fnArg = Optional(fn_arg^)
+                print("patched to output", BACKWARD_RESHAPE)
                 out.add_ancestry(tensor)
 
         return out^
@@ -64,7 +64,6 @@ fn main() raises:
     d = c.reshape(2, 2, 3)
     e = d * 5
     e.backward()
-    a.grad().print()
     a.grad().print()
 
     _="""var a_gpu = a.to_gpu()

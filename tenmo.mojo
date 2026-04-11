@@ -20,7 +20,7 @@ from common_utils import (
 )
 from mnemonics import *
 from indexhelper import IndexIterator
-from backpropagation import BackwardFn
+from backpropagation import Backward, BackwardFn, FnArg
 from forwards import *
 from buffers import Buffer
 from validators import Validator
@@ -55,6 +55,7 @@ struct Tensor[dtype: DType](
     var gradbox: UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]
     var ancestors: Optional[Ancestors[Self.dtype]]
     var backwardFn: Optional[BackwardFn[Self.dtype]]
+    var fnArg: Optional[FnArg[Self.dtype]]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -70,6 +71,7 @@ struct Tensor[dtype: DType](
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
         self.backwardFn = None
+        self.fnArg = None
         self.init_gradbox()
 
     fn __init__(out self):
@@ -78,6 +80,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = False
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
+        self.fnArg = None
         self.backwardFn = None
 
     fn __init__(
@@ -102,6 +105,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
+        self.fnArg = None
         self.backwardFn = None
         self.init_gradbox()
 
@@ -116,6 +120,7 @@ struct Tensor[dtype: DType](
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
         self.backwardFn = None
+        self.fnArg = None
         self.init_gradbox()
 
     @staticmethod
@@ -160,6 +165,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = take.requires_grad
         self.gradbox = take.gradbox
         self.ancestors = take.ancestors^
+        self.fnArg = take.fnArg^
         self.backwardFn = take.backwardFn^
 
     fn __copyinit__(out self, copy: Self):
@@ -172,6 +178,7 @@ struct Tensor[dtype: DType](
         else:
             self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = copy.ancestors.copy()
+        self.fnArg = copy.fnArg.copy()
         self.backwardFn = copy.backwardFn.copy()
 
     fn shallow_copy(self) -> Tensor[Self.dtype]:
@@ -521,6 +528,14 @@ struct Tensor[dtype: DType](
     @always_inline
     fn has_backward_fn(self) -> Bool:
         return self.backwardFn is not None
+
+    @always_inline
+    fn fn_arg(ref self) -> ref[self.fnArg.value()]FnArg[Self.dtype]:
+        return self.fnArg.value()
+
+    @always_inline
+    fn has_fn_arg(self) -> Bool:
+        return self.fnArg is not None
 
     @always_inline
     fn has_grad(self) -> Bool:
@@ -1917,8 +1932,10 @@ struct Tensor[dtype: DType](
                     panic(String(key_err))
                 var node_idx = id_to_index[node_id]
                 ref node = node_list[node_idx]
-                if node.has_backward_fn():
-                    for result in node.backward_fn()(node):
+                #if node.has_backward_fn():
+                if node.has_fn_arg():
+                    #for result in node.backward_fn()(node):
+                    for result in Backward[Self.dtype].invoke(node):
                         ref target_node = result[0]
                         ref grad = result[1]
                         var op_code = result[2]
