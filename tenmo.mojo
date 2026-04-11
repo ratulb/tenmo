@@ -1955,7 +1955,8 @@ struct Tensor[dtype: DType](
                             fanin[target_id] -= 1
                             if fanin[target_id] == 0:
                                 var target_idx = id_to_index[target_id]
-                                if node_list[target_idx].has_backward_fn():
+                                #if node_list[target_idx].has_backward_fn():
+                                if node_list[target_idx].has_fn_arg():
                                     ready_queue.append(target_id)
         except e:
             print(e)
