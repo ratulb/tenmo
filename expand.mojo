@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_EXPAND
+from backpropagation import FnArg, BACKWARD_EXPAND
 from shapes import Shape
 from intarray import IntArray
 from strides import Strides
@@ -11,13 +11,10 @@ from views import View
 
 @fieldwise_init
 struct ExpandBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_EXPAND
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
@@ -75,8 +72,7 @@ struct Expand[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_()
-                var bfn = ExpandBackward[Self.dtype]().into_backward_fn()
-                out.backwardFn = Optional(bfn^)
+                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_EXPAND))
                 out.add_ancestry(tensor)
 
         return out^

@@ -1,25 +1,22 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
-from backpropagation import Delegate, BackwardFn, BACKWARD_UNSQUEEZE
+from backpropagation import IntArrayArg, BACKWARD_UNSQUEEZE
 from squeeze import Squeeze
 from gradbox import Gradbox
 
 
 @fieldwise_init
 struct UnsqueezeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_UNSQUEEZE
-    var axes: IntArray  # where axes were inserted
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var axes = output.fn_arg().arg[IntArrayArg].axes
         var gradbox = output.gradients()[]
         # Remove the axis we had inserted
-        var squeezed_gradbox = gradbox.squeeze(self.axes)
+        var squeezed_gradbox = gradbox.squeeze(axes)
 
         var ancestor = output.ancestry().get(0)
         return [
@@ -57,25 +54,10 @@ struct Unsqueeze[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                     var n = axis if axis >= 0 else new_rank + axis
                     normalized.append(n)
                 normalized.sort()
-                var bfn = UnsqueezeBackward[Self.dtype](
+                var bwd_arg = IntArrayArg(
                     axes=normalized
-                ).into_backward_fn()
-                out.backwardFn = Optional(bfn^)
+                ).into_arg[Self.dtype](BACKWARD_UNSQUEEZE)
+                out.fnArg = Optional(bwd_arg^)
                 out.add_ancestry(tensor)
 
         return out^
-
-    @staticmethod
-    fn forward_unshared(
-        tensor: Tensor[Self.dtype],
-        axes: IntArray,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
-        if len(axes) == 0:
-            return tensor.copy()
-
-        var buffer = tensor.buffer.copy()
-        var unsqueezed_ndb = buffer.unsqueeze(axes, shared=False)
-        return Tensor[Self.dtype](
-            unsqueezed_ndb^, requires_grad=requires_grad.or_else(False)
-        )

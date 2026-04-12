@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
 from validators import Validator
-from backpropagation import Delegate, BackwardFn, BACKWARD_SHUFFLE
+from backpropagation import ShuffleArg
 from std.random import shuffle, seed
 from gradbox import Gradbox
 
@@ -256,10 +256,10 @@ struct Shuffle[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = ShuffleBackward[Self.dtype](
+                var bwd_arg = ShuffleArg(
                     axis, permutation^
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                ).into_arg[Self.dtype]()
+                out.fnArg = Optional(bwd_arg^)
                 out.add_ancestry(self)
 
         return out^
@@ -270,24 +270,12 @@ struct Shuffle[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 @fieldwise_init
 struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    comptime TAG = BACKWARD_SHUFFLE
-    var axis: Int
-    var permutation: List[Int]
 
-    fn __copyinit__(out self, copy: Self):
-        self.axis = copy.axis
-        self.permutation = copy.permutation.copy()
-
-    fn __moveinit__(out self, deinit take: Self):
-        self.axis = take.axis
-        self.permutation = take.permutation^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.fn_arg().arg[ShuffleArg]
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         var shape = gradbox.shape()
@@ -297,13 +285,14 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
             if gradbox.is_on_gpu():
                 try:
                     var result_ndb = ShuffleGPU[Self.dtype].launch_scatter(
-                        gradbox.buffer, self.permutation, self.axis
+                        gradbox.buffer, bwd_arg.permutation, bwd_arg.axis
                     )
                     gradbox_parent = Gradbox[Self.dtype](
                         result_ndb^, share=False
                     )
                 except e:
                     panic("ShuffleBackward GPU scatter failed: " + String(e))
+                    #Unreachable
                     gradbox_parent = Gradbox[Self.dtype].zeros(
                         shape, share=False
                     )
@@ -318,7 +307,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
         gradbox_parent = Gradbox[Self.dtype].zeros(shape, share=False)
         for grad_coord in shape:
             var parent_coord = grad_coord
-            parent_coord[self.axis] = self.permutation[grad_coord[self.axis]]
+            parent_coord[bwd_arg.axis] = bwd_arg.permutation[grad_coord[bwd_arg.axis]]
             gradbox_parent[parent_coord] = gradbox[grad_coord]
 
         return [(parent^, gradbox_parent^, AddTensor)]

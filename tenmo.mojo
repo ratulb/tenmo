@@ -20,7 +20,7 @@ from common_utils import (
 )
 from mnemonics import *
 from indexhelper import IndexIterator
-from backpropagation import Backward, BackwardFn, FnArg
+from backpropagation import Backward, FnArg
 from forwards import *
 from buffers import Buffer
 from validators import Validator
@@ -54,7 +54,6 @@ struct Tensor[dtype: DType](
     var requires_grad: Bool
     var gradbox: UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]
     var ancestors: Optional[Ancestors[Self.dtype]]
-    var backwardFn: Optional[BackwardFn[Self.dtype]]
     var fnArg: Optional[FnArg[Self.dtype]]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
@@ -70,7 +69,6 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.backwardFn = None
         self.fnArg = None
         self.init_gradbox()
 
@@ -81,7 +79,6 @@ struct Tensor[dtype: DType](
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
         self.fnArg = None
-        self.backwardFn = None
 
     fn __init__(
         out self,
@@ -106,7 +103,6 @@ struct Tensor[dtype: DType](
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
         self.fnArg = None
-        self.backwardFn = None
         self.init_gradbox()
 
     fn __init__(
@@ -119,7 +115,6 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.backwardFn = None
         self.fnArg = None
         self.init_gradbox()
 
@@ -166,7 +161,6 @@ struct Tensor[dtype: DType](
         self.gradbox = take.gradbox
         self.ancestors = take.ancestors^
         self.fnArg = take.fnArg^
-        self.backwardFn = take.backwardFn^
 
     fn __copyinit__(out self, copy: Self):
         self._id = copy._id
@@ -179,7 +173,6 @@ struct Tensor[dtype: DType](
             self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = copy.ancestors.copy()
         self.fnArg = copy.fnArg.copy()
-        self.backwardFn = copy.backwardFn.copy()
 
     fn shallow_copy(self) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype]()
@@ -236,7 +229,7 @@ struct Tensor[dtype: DType](
         return self.buffer.shared()
 
     fn is_leaf(self) -> Bool:
-        return self.requires_grad and not self.has_backward_fn()
+        return self.requires_grad and not self.has_fn_arg()
 
     @always_inline
     fn __len__(self) -> Int:
@@ -519,15 +512,6 @@ struct Tensor[dtype: DType](
             else:
                 return None
         return None
-
-    # Check if it has a backward fn before calling this API
-    @always_inline
-    fn backward_fn(self) -> BackwardFn[Self.dtype]:
-        return self.backwardFn.value().copy()
-
-    @always_inline
-    fn has_backward_fn(self) -> Bool:
-        return self.backwardFn is not None
 
     @always_inline
     fn fn_arg(ref self) -> ref[self.fnArg.value()]FnArg[Self.dtype]:
@@ -1855,7 +1839,6 @@ struct Tensor[dtype: DType](
             self.gradbox.destroy_pointee()
             self.gradbox.free()
         _ = self.ancestors^
-        _ = self.backwardFn^
 
     fn mse[
         track_grad: Bool = True
@@ -2183,13 +2166,6 @@ struct Tensor[dtype: DType](
             self, IntArray(axes), requires_grad
         )
 
-    fn unsqueeze_unshared(
-        self, *axes: Int, requires_grad: Optional[Bool] = None
-    ) -> Tensor[Self.dtype]:
-        return Unsqueeze[Self.dtype].forward_unshared(
-            self, IntArray(axes), requires_grad
-        )
-
     fn unsqueeze[
         track_grad: Bool = True
     ](mut self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[
@@ -2234,11 +2210,6 @@ struct Tensor[dtype: DType](
         return Permute[Self.dtype].forward[track_grad](
             self, axes, requires_grad
         )
-
-    fn permute_unshared(
-        self, axes: IntArray, requires_grad: Optional[Bool] = None
-    ) -> Tensor[Self.dtype]:
-        return Permute[Self.dtype].forward_unshared(self, axes, requires_grad)
 
     fn argmax(
         self, axis: Int = 0, keepdims: Bool = False

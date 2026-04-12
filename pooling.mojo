@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
 from gradbox import Gradbox
-from backpropagation import BackwardFn, Delegate, BACKWARD_MAXPOOL2D
+from backpropagation import MaxPool2dArgs
 from mnemonics import AddTensor
 from ndbuffer import NDBuffer
 from std.utils.numerics import neg_inf
@@ -12,26 +12,12 @@ from net import Module, Layer, MAXPOOL2D
 
 @fieldwise_init
 struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    """
-    Backward pass for MaxPool2d.
 
-    Key optimizations:
-    1. Direct buffer access (no tensor indexing)
-    2. Precomputed strides
-    3. Vectorized accumulation where possible
-    """
-
-    comptime TAG = BACKWARD_MAXPOOL2D
-    var kernel_size: Int
-    var stride: Int
-    var padding: Int
-    var input_shape: Shape
-    var argmax_mask: NDBuffer[DType.int64]
-
+    @staticmethod
     fn backward(
-        self,
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_args = output.fn_arg().arg[MaxPool2dArgs]
         ref grad_output = output.gradients()[]
         var results = List[
             Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -39,17 +25,17 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var input_tensor = output.ancestry().get(0)
 
         if input_tensor.requires_grad:
-            var N = self.input_shape[0]
-            var C = self.input_shape[1]
-            var H_in = self.input_shape[2]
-            var W_in = self.input_shape[3]
+            var N = bwd_args.input_shape[0]
+            var C = bwd_args.input_shape[1]
+            var H_in = bwd_args.input_shape[2]
+            var W_in = bwd_args.input_shape[3]
 
             ref output_shape = grad_output.shape()
             var H_out = output_shape[2]
             var W_out = output_shape[3]
 
             var grad_input = Gradbox[Self.dtype].zeros(
-                self.input_shape, share=False
+                bwd_args.input_shape, share=False
             )
 
             # Direct buffer access
@@ -59,7 +45,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
                 .unsafe_mut_cast[True]()
                 .unsafe_origin_cast[MutAnyOrigin]()
             )
-            var argmax_ptr = self.argmax_mask.data_ptr()
+            var argmax_ptr = bwd_args.argmax_mask.data_ptr()
 
             # Precompute strides
             var grad_out_stride_N = C * H_out * W_out
@@ -104,8 +90,6 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         return results^
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -279,14 +263,14 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
             if grad_required:
                 output.requires_grad_(True)
-                var backward_fn = MaxPool2dBackward[Self.dtype](
+                var bwd_args = MaxPool2dArgs(
                     kernel_size=kernel_size,
                     stride=s,
                     padding=pad,
                     input_shape=input_shape,
                     argmax_mask=argmax_mask,
-                ).into_backward_fn()
-                output.backwardFn = Optional(backward_fn^)
+                ).into_arg[Self.dtype]()
+                output.fnArg = Optional(bwd_args^)
                 output.add_ancestry(input_tensor)
 
         return output^

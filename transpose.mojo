@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_TRANSPOSE
+from backpropagation import IntArrayArg, BACKWARD_TRANSPOSE
 from mnemonics import AddTensor
 from validators import Validator
 from gradbox import Gradbox
@@ -8,19 +8,15 @@ from intarray import IntArray
 
 @fieldwise_init
 struct TransposeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_TRANSPOSE
-    var axes: IntArray
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var axes = output.fn_arg().arg[IntArrayArg].axes
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
-        var inverted_axes = IntArray.invert_permutation(self.axes)
-        var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes)
+        var inverted_axes = IntArray.invert_permutation(axes^)
+        var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes^)
 
         return [
             (
@@ -55,10 +51,10 @@ struct Transpose[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                     > 0 else IntArray.range(0, shape.rank()).reversed()
                 )
                 out.requires_grad_(True)
-                backward_fn = TransposeBackward[Self.dtype](
+                var bwd_fn_arg = IntArrayArg(
                     normalized_axes
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                ).into_arg[Self.dtype](BACKWARD_TRANSPOSE)
+                out.fnArg = Optional(bwd_fn_arg^)
                 out.add_ancestry(self)
 
         return out^

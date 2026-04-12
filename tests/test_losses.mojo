@@ -57,7 +57,7 @@ fn test_mse_loss_no_grad_mode() raises:
     var loss = pred.mse[track_grad=False](target)
     # Should not build graph
     assert_true(
-        not loss.has_backward_fn(),
+        not loss.has_fn_arg(),
         "Loss should not have backward function in no_grad mode",
     )
 
@@ -87,7 +87,7 @@ fn test_mse_loss_struct_eval_mode() raises:
     var target = Tensor[dtype].d2([[1.0, 2.0]])
     var loss = criterion(pred, target)
     assert_true(
-        not loss.has_backward_fn(),
+        not loss.has_fn_arg(),
         "Loss should not have backward function in eval mode",
     )
 
@@ -213,7 +213,7 @@ fn test_bce_loss_no_grad_mode() raises:
     var target = Tensor[dtype].d2([[1.0, 0.0]])
     var loss = pred.binary_cross_entropy[track_grad=False](target)
     assert_true(
-        not loss.has_backward_fn(), "BCE should not build graph in no_grad mode"
+        not loss.has_fn_arg(), "BCE should not build graph in no_grad mode"
     )
 
 
@@ -228,14 +228,14 @@ fn test_bce_loss_struct_train_eval() raises:
     criterion.train()
     var train_loss = criterion(pred, target)
     assert_true(
-        train_loss.has_backward_fn(), "BCE should build graph in train mode"
+        train_loss.has_fn_arg(), "BCE should build graph in train mode"
     )
 
     # Eval mode
     criterion.eval()
     var eval_loss = criterion(pred, target)
     assert_true(
-        not eval_loss.has_backward_fn(),
+        not eval_loss.has_fn_arg(),
         "BCE should not build graph in eval mode",
     )
 
@@ -279,7 +279,7 @@ fn test_bce_with_logits_no_grad_mode() raises:
     var target = Tensor[dtype].d2([[1.0]])
     var loss = logits.binary_cross_entropy_with_logits[track_grad=False](target)
     assert_true(
-        not loss.has_backward_fn(),
+        not loss.has_fn_arg(),
         "BCE with logits should not build graph in no_grad mode",
     )
 
@@ -300,7 +300,7 @@ fn test_bce_with_logits_struct() raises:
     criterion.eval()
     var eval_loss = criterion(logits, target)
     assert_true(
-        not eval_loss.has_backward_fn(), "Should not build graph in eval mode"
+        not eval_loss.has_fn_arg(), "Should not build graph in eval mode"
     )
 
 

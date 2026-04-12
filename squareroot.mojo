@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, SQRT, SQRT_BACKWARD
-from backpropagation import Delegate, BackwardFn, BACKWARD_SQRT
+from backpropagation import ScalarArg, FnArg, BACKWARD_SQRT
 from gradbox import Gradbox
 from std.math import sqrt
 from ndbuffer import NDBuffer
@@ -9,15 +9,12 @@ from common_utils import Epsilon
 
 @fieldwise_init
 struct SqrtBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_SQRT
-    var epsilon: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var epsilon = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
         ref gradbox = output.gradients()[]
         var input_tensor = output.ancestry().get(0)
         ref shape = input_tensor.shape()
@@ -44,7 +41,7 @@ struct SqrtBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             for coord in shape:
                 # gradient = grad_output * (1 / (2 * sqrt(x)))
                 var sqrt_grad = 1.0 / (
-                    self.epsilon + (2.0 * input_tensor[coord])
+                    epsilon + (2.0 * input_tensor[coord])
                 )
                 ancestor_gradbox_buffer[index] = (
                     gradbox_buffer[index] * sqrt_grad
@@ -86,10 +83,7 @@ struct Sqrt[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = SqrtBackward[Self.dtype](
-                    epsilon
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].scalar(epsilon, BACKWARD_SQRT))
                 out.add_ancestry(self)
 
         return out^

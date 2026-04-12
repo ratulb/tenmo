@@ -1,8 +1,8 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, MAX, MIN
 from backpropagation import (
-    Delegate,
-    BackwardFn,
+    ScalarArg,
+    FnArg,
     BACKWARD_MAX_SCALAR,
     BACKWARD_MIN_SCALAR,
 )
@@ -16,16 +16,12 @@ from mnemonics import GreaterThan, LessThan
 
 @fieldwise_init
 struct MaxBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_MAX_SCALAR
 
-    var scalar: Scalar[Self.dtype]
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var scalar = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
@@ -35,15 +31,15 @@ struct MaxBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if has_accelerator():
             if parent.is_on_gpu():
                 mask_bool = parent.buffer.compare_scalar[GreaterThan](
-                    self.scalar
+                    scalar
                 )
             else:
                 mask_bool = parent.buffer.compare_scalar_cpu[GreaterThan](
-                    self.scalar
+                    scalar
                 )
         else:
             mask_bool = parent.buffer.compare_scalar_cpu[GreaterThan](
-                self.scalar
+                scalar
             )
 
         var mask_float = mask_bool.to_dtype[Self.dtype]()
@@ -60,15 +56,12 @@ struct MaxBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 @fieldwise_init
 struct MinBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_MIN_SCALAR
-    var scalar: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var scalar = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
@@ -76,13 +69,13 @@ struct MinBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         comptime if has_accelerator():
             if parent.is_on_gpu():
-                mask_bool = parent.buffer.compare_scalar[LessThan](self.scalar)
+                mask_bool = parent.buffer.compare_scalar[LessThan](scalar)
             else:
                 mask_bool = parent.buffer.compare_scalar_cpu[LessThan](
-                    self.scalar
+                    scalar
                 )
         else:
-            mask_bool = parent.buffer.compare_scalar_cpu[LessThan](self.scalar)
+            mask_bool = parent.buffer.compare_scalar_cpu[LessThan](scalar)
 
         var mask_float = mask_bool.to_dtype[Self.dtype]()
         var grad_input = Gradbox[Self.dtype](
@@ -112,10 +105,7 @@ struct MaxScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = MaxBackwardScalar[Self.dtype](
-                    scalar
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].scalar(scalar, BACKWARD_MAX_SCALAR))
                 out.add_ancestry(self)
 
         return out^
@@ -142,10 +132,7 @@ struct MinScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = MinBackwardScalar[Self.dtype](
-                    scalar
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].scalar(scalar, BACKWARD_MIN_SCALAR))
                 out.add_ancestry(self)
 
         return out^

@@ -2,6 +2,7 @@ from tenmo import Tensor
 from std.sys import simd_width_of
 from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import (
+    FnArg,
     Delegate,
     BackwardFn,
     BACKWARD_MATMUL_ND,
@@ -20,11 +21,11 @@ from intarray import IntArray
 
 @fieldwise_init
 struct Matmul2dBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_MATMUL_2D
 
     @always_inline
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
@@ -51,8 +52,6 @@ struct Matmul2dBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         return result^
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -69,10 +68,10 @@ struct Matmul2d[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var backward_fn = Matmul2dBackward[
+                var bwd_fn_arg = FnArg[
                     Self.dtype
-                ]().into_backward_fn()
-                C.backwardFn = Optional(backward_fn^)
+                ].null(BACKWARD_MATMUL_2D)
+                C.fnArg = Optional(bwd_fn_arg^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
 
@@ -99,10 +98,10 @@ struct Matmul2d[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 @fieldwise_init
 struct MatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_MATMUL_ND
 
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
@@ -138,10 +137,6 @@ struct MatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         return results^
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
-
 @fieldwise_init
 struct MatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     @always_inline
@@ -163,10 +158,10 @@ struct MatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var backward_fn = MatmulNdBackward[
+                var bwd_fn_arg = FnArg[
                     Self.dtype
-                ]().into_backward_fn()
-                C.backwardFn = Optional(backward_fn^)
+                ].null(BACKWARD_MATMUL_ND)
+                C.fnArg = Optional(bwd_fn_arg^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
 

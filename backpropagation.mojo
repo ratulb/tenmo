@@ -1,5 +1,4 @@
 from tenmo import Tensor
-from mnemonics import AddTensor, SubtractTensor
 from std.utils import Variant
 from walkback import *
 from common_utils import panic
@@ -7,6 +6,10 @@ from gradbox import Gradbox
 from buffers import Buffer
 from ndbuffer import NDBuffer
 from intarray import IntArray
+from strides import Strides
+from shapes import Shape
+from device_transfer import Flow
+from device import GPU
 
 # Centralized backward operation tags
 
@@ -60,9 +63,8 @@ comptime BACKWARD_MAXPOOL2D = 46
 comptime BACKWARD_DROPOUT = 47
 comptime BACKWARD_EXPONENTIAL = 48
 comptime BACKWARD_DEVICE_TRANSFER = 49
-comptime BACKWARD_MINMAX_GPU = 50
-comptime BACKWARD_MAX_SCALAR = 51
-comptime BACKWARD_MIN_SCALAR = 52
+comptime BACKWARD_MAX_SCALAR = 50
+comptime BACKWARD_MIN_SCALAR = 51
 # ========== Delegate (Variant) ==========
 
 @fieldwise_init
@@ -103,12 +105,212 @@ struct ReductionArgs(RegisterPassable, ImplicitlyCopyable):
     fn into_arg[dtype: DType](self, tag: Int) -> FnArg[dtype]:
         return FnArg[dtype](ArgType[dtype](self), tag) # BACKWARD_SUM/BACKWARD_MEAN
 
+@fieldwise_init
+struct IntArrayArg(RegisterPassable, ImplicitlyCopyable):
+    var axes: IntArray
+    fn into_arg[dtype: DType](self, tag: Int) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), tag)
+
+@fieldwise_init
+struct IntArg(RegisterPassable, ImplicitlyCopyable):
+    var value: Int
+    fn into_arg[dtype: DType](self, tag: Int) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), tag)
+
+
+@fieldwise_init
+struct BufferArg[dtype: DType](ImplicitlyCopyable & Movable):
+    var buffer: Buffer[Self.dtype]
+
+    fn into_arg(self, tag: Int) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](self), tag)
+
+@fieldwise_init
+struct ViewArg(RegisterPassable, ImplicitlyCopyable):
+    var shape: Shape
+    var strides: Strides
+    var offset: Int
+
+    fn into_arg[dtype: DType](self, tag: Int) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), tag)
+
+@fieldwise_init
+struct ShuffleArg(ImplicitlyCopyable & Movable):
+    var axis: Int
+    var permutation: List[Int]
+
+    fn __copyinit__(out self, copy: Self):
+        self.axis = copy.axis
+        self.permutation = copy.permutation.copy()
+
+    fn __moveinit__(out self, deinit take: Self):
+        self.axis = take.axis
+        self.permutation = take.permutation^
+
+    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), BACKWARD_SHUFFLE)
+
+
+@fieldwise_init
+struct MinMaxArg[dtype: DType](ImplicitlyCopyable & Movable):
+    var axes: IntArray
+    var keepdims: Bool
+    var mask: NDBuffer[Self.dtype]  # shape == ancestor.shape, contiguous
+
+    fn into_arg(self) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_MINMAX)
+
+@fieldwise_init
+struct SoftmaxArg[dtype: DType](ImplicitlyCopyable & Movable):
+    var axes: IntArray
+    var softmax_out: NDBuffer[Self.dtype]
+
+    fn into_arg(self, tag: Int) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](self), tag)
+
+@fieldwise_init
+struct TileArg(RegisterPassable, ImplicitlyCopyable):
+    var repeat: IntArray
+    var orig_shape: Shape
+
+    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), BACKWARD_TILE)
+
+@fieldwise_init
+struct ClipArgs[dtype: DType](RegisterPassable & ImplicitlyCopyable):
+    var min_val: Scalar[Self.dtype]
+    var max_val: Scalar[Self.dtype]
+    fn into_arg(self) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_CLIP)
+
+@fieldwise_init
+struct VarianceArgs[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+    var axis: Int
+    var unbiased: Bool
+    var keepdims: Bool  # Track if user wanted keepdims
+
+    fn into_arg(self) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_VARIANCE)
+
+@fieldwise_init
+struct StdArgs[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+    var axis: Int
+    var unbiased: Bool
+    var keepdims: Bool
+    var epsilon: Scalar[Self.dtype]
+
+    fn into_arg(self) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_STD)
+
+@fieldwise_init
+struct StackArgs(RegisterPassable, ImplicitlyCopyable):
+    var axis: Int
+    var num_tensors: Int
+
+    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), BACKWARD_STACK)
+
+
+@fieldwise_init
+struct PadArgs(ImplicitlyCopyable & Movable):
+
+    var pad: List[Tuple[Int, Int]]
+    var mode: String
+
+    fn __copyinit__(out self, copy: Self):
+        self.pad = copy.pad.copy()
+        self.mode = copy.mode
+
+    fn __moveinit__(out self, deinit take: Self):
+        self.pad = take.pad.copy()
+        self.mode = take.mode
+
+    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), BACKWARD_PAD)
+
+@fieldwise_init
+struct FusedCol2ImArgs(RegisterPassable, ImplicitlyCopyable):
+    var N: Int
+    var C_in: Int
+    var H_pad: Int
+    var W_pad: Int
+    var C_out: Int
+    var KH: Int
+    var KW: Int
+    var H_out: Int
+    var W_out: Int
+    var stride: Int
+    var dilation: Int
+
+    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), BACKWARD_FUSED_CONV)
+
+@fieldwise_init
+struct MaxPool2dArgs(ImplicitlyCopyable & Movable):
+    comptime TAG = BACKWARD_MAXPOOL2D
+    var kernel_size: Int
+    var stride: Int
+    var padding: Int
+    var input_shape: Shape
+    var argmax_mask: NDBuffer[DType.int64]
+
+    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), BACKWARD_MAXPOOL2D)
+
+
+struct DeviceTransferArgs(ImplicitlyCopyable):
+    var flow: Flow
+    var gpu: Optional[GPU]
+
+    fn __init__(out self):
+        self.flow = Flow.UnMoved
+        self.gpu = None
+
+    fn __init__(out self, flow: Flow):
+        self.flow = flow
+        self.gpu = None
+
+    fn __init__(out self, flow: Flow, gpu: GPU):
+        self.flow = flow
+        self.gpu = gpu
+
+    fn __copyinit__(out self, copy: Self):
+        self.flow = copy.flow.copy()
+        self.gpu = copy.gpu.copy()
+
+    fn __moveinit__(out self, deinit take: Self):
+        self.flow = take.flow
+        self.gpu = take.gpu^
+
+    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
+        return FnArg[dtype](ArgType[dtype](self), BACKWARD_DEVICE_TRANSFER)
+
+
 comptime ArgType[dtype: DType] = Variant[
     NullArg,
     ScalarArg[dtype],
     BooleanArg,
     SubtractArg,
     ReductionArgs,
+    BLASMatmul2dBwdArg[dtype],
+    BufferArg[dtype],
+    ViewArg,
+    IntArrayArg,
+    CEClassIndicesArg[dtype],
+    CEProbabilitiesArg[dtype],
+    ShuffleArg,
+    MinMaxArg[dtype],
+    SoftmaxArg[dtype],
+    TileArg,
+    ClipArgs[dtype],
+    VarianceArgs[dtype],
+    StdArgs[dtype],
+    IntArg,
+    StackArgs,
+    PadArgs,
+    FusedCol2ImArgs,
+    MaxPool2dArgs,
+    DeviceTransferArgs,
 ]
 
 struct FnArg[dtype: DType](Copyable & Movable):
@@ -147,7 +349,7 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             output: Tensor[Self.dtype]
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
+    ] where Self.dtype.is_floating_point():
         """O(1) dispatch using integer tag comparison.
         Order: Most common operations first for branch prediction.
         """
@@ -155,7 +357,6 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         # ========== TIER 1: MOST COMMON ==========
         ref arg = output.fn_arg()
         var tag = arg.tag
-        print("Tag is: ", tag)
         if tag == BACKWARD_ADD:
             return AddBackward[Self.dtype].backward(output)
         elif tag == BACKWARD_ADD_SCALAR:
@@ -180,243 +381,105 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             return MeanBackward[Self.dtype].backward(output)
         elif tag == BACKWARD_RESHAPE:
             return ReshapeBackward[Self.dtype].backward(output)
-
-
+        elif tag == BACKWARD_MATMUL_2D:
+            return Matmul2dBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_MATMUL_ND:
+            return MatmulNdBackward[Self.dtype].backward(output)
+        elif tag == BLAS_BACKWARD_MATMUL_2D:
+            return BLASMatmul2dBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_RELU:
+            return ReLUBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_VIEW:
+            return ViewBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_TRANSPOSE:
+            return TransposeBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_CE_CLASS_INDICES:
+            return CEClassIndicesBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_CE_PROBABILITIES:
+            return CEProbabilitiesBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_CONTIGUOUS:
+            return ContiguousBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_SIGMOID:
+            return SigmoidBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_VECTOR_MATMUL:
+            return VectorMatmulNdBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_MATRIX_VECTOR_MUL:
+            return MatrixVectorMulNdBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_EXPONENTIATION:
+            return ExponentiationBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_DOT:
+            return DotBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_EXPAND:
+            return ExpandBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_FLATTEN:
+            return FlattenBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_SQUEEZE:
+            return SqueezeBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_UNSQUEEZE:
+            return UnsqueezeBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_PERMUTE:
+            return PermuteBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_SHUFFLE:
+            return ShuffleBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_MINMAX:
+            return MinMaxBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_SOFTMAX:
+            return SoftmaxBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_LOG_SOFTMAX:
+            return LogSoftmaxBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_TILE:
+            return TileBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_TANH:
+            return TanhBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_LOG:
+            return LogBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_CLIP:
+            return ClipBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_SQRT:
+            return SqrtBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_VARIANCE:
+            return VarianceBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_STD:
+            return StdBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_CONCAT:
+            return ConcatBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_STACK:
+            return StackBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_PAD:
+            return PadBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_FUSED_CONV:
+            return FusedCol2ImBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_MAXPOOL2D:
+            return MaxPool2dBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_DROPOUT:
+            return DropoutBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_EXPONENTIAL:
+            return ExponentialBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_DEVICE_TRANSFER:
+            return DeviceTransferBackward[Self.dtype].backward(output)
+        elif tag == BACKWARD_MAX_SCALAR:
+            return MaxBackwardScalar[Self.dtype].backward(output)
+        elif tag == BACKWARD_MIN_SCALAR:
+            return MinBackwardScalar[Self.dtype].backward(output)
 
         else: return []
-
-comptime Delegate[dtype: DType] = Variant[
-    MatmulNdBackward[dtype],
-    Matmul2dBackward[dtype],
-    BLASMatmul2dBackward[dtype],
-    ReLUBackward[dtype],
-    ViewBackward[dtype],
-    TransposeBackward[dtype],
-    CEClassIndicesBackward[dtype],
-    CEProbabilitiesBackward[dtype],
-    ContiguousBackward[dtype],
-    SigmoidBackward[dtype],
-    VectorMatmulNdBackward[dtype],
-    MatrixVectorMulNdBackward[dtype],
-    ExponentiationBackward[dtype],
-    DotBackward[dtype],
-    ExpandBackward[dtype],
-    FlattenBackward[dtype],
-    SqueezeBackward[dtype],
-    UnsqueezeBackward[dtype],
-    PermuteBackward[dtype],
-    ShuffleBackward[dtype],
-    MinMaxBackward[dtype],
-    SoftmaxBackward[dtype],
-    LogSoftmaxBackward[dtype],
-    TileBackward[dtype],
-    TanhBackward[dtype],
-    LogBackward[dtype],
-    ClipBackward[dtype],
-    SqrtBackward[dtype],
-    VarianceBackward[dtype],
-    StdBackward[dtype],
-    ConcatBackward[dtype],
-    StackBackward[dtype],
-    PadBackward[dtype],
-    FusedCol2ImBackward[dtype],
-    MaxPool2dBackward[dtype],
-    DropoutBackward[dtype],
-    ExponentialBackward[dtype],
-    DeviceTransferBackward[dtype],
-    MinMaxBackwardGPU[dtype],
-    MaxBackwardScalar[dtype],
-    MinBackwardScalar[dtype],
-]
-
-# ========== BackwardFn with Tag-Based Dispatch ==========
-
-
-struct BackwardFn[dtype: DType](Copyable & Movable):
-    var grad_fn: Delegate[Self.dtype]
-    var tag: Int  # O(1) lookup key
-
-    fn __init__(out self, grad_fn: Delegate[Self.dtype], tag: Int):
-        self.grad_fn = grad_fn
-        self.tag = tag
-
-    fn __moveinit__(out self, deinit take: Self):
-        self.grad_fn = take.grad_fn^
-        self.tag = take.tag
-
-    fn __copyinit__(out self, copy: Self):
-        self.grad_fn = copy.grad_fn.copy()
-        self.tag = copy.tag
-
-    fn __call__(
-        self, output: Tensor[Self.dtype]
-    ) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ] where Self.dtype.is_floating_point():
-        """O(1) dispatch using integer tag comparison.
-        Order: Most common operations first for branch prediction.
-        """
-
-        # ========== TIER 1: MOST COMMON ==========
-
-        if self.tag == BACKWARD_RELU:
-            return self.grad_fn[ReLUBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_MATMUL_ND:
-            return self.grad_fn[MatmulNdBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BLAS_BACKWARD_MATMUL_2D:
-            return self.grad_fn[BLASMatmul2dBackward[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_SIGMOID:
-            return self.grad_fn[SigmoidBackward[Self.dtype]].backward(output)
-
-        # ========== TIER 2: MATMUL CHAIN (Called by MatmulNd) ==========
-        elif self.tag == BACKWARD_MATMUL_2D:
-            return self.grad_fn[Matmul2dBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_TRANSPOSE:
-            return self.grad_fn[TransposeBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_PERMUTE:
-            return self.grad_fn[PermuteBackward[Self.dtype]].backward(output)
-
-        # ========== TIER 3: COMMON OPERATIONS ==========
-
-        elif self.tag == BACKWARD_SOFTMAX:
-            return self.grad_fn[SoftmaxBackward[Self.dtype]].backward(output)
-        elif self.tag == BACKWARD_VIEW:
-            return self.grad_fn[ViewBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_CE_CLASS_INDICES:
-            return self.grad_fn[CEClassIndicesBackward[Self.dtype]].backward(
-                output
-            )
-        elif self.tag == BACKWARD_CE_PROBABILITIES:
-            return self.grad_fn[CEProbabilitiesBackward[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_TANH:
-            return self.grad_fn[TanhBackward[Self.dtype]].backward(output)
-
-        # ========== TIER 4: MODERATELY COMMON ==========
-        elif self.tag == BACKWARD_LOG_SOFTMAX:
-            return self.grad_fn[LogSoftmaxBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_CONTIGUOUS:
-            return self.grad_fn[ContiguousBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_MATRIX_VECTOR_MUL:
-            return self.grad_fn[MatrixVectorMulNdBackward[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_VECTOR_MATMUL:
-            return self.grad_fn[VectorMatmulNdBackward[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_EXPAND:
-            return self.grad_fn[ExpandBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_FLATTEN:
-            return self.grad_fn[FlattenBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_SQUEEZE:
-            return self.grad_fn[SqueezeBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_UNSQUEEZE:
-            return self.grad_fn[UnsqueezeBackward[Self.dtype]].backward(output)
-
-
-        # ========== TIER 6: SPECIALIZED OPERATIONS ==========
-        elif self.tag == BACKWARD_EXPONENTIATION:
-            return self.grad_fn[ExponentiationBackward[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_DOT:
-            return self.grad_fn[DotBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_LOG:
-            return self.grad_fn[LogBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_SQRT:
-            return self.grad_fn[SqrtBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_CLIP:
-            return self.grad_fn[ClipBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_SHUFFLE:
-            return self.grad_fn[ShuffleBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_MINMAX:
-            return self.grad_fn[MinMaxBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_MINMAX_GPU:
-            return self.grad_fn[MinMaxBackwardGPU[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_TILE:
-            return self.grad_fn[TileBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_VARIANCE:
-            return self.grad_fn[VarianceBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_STD:
-            return self.grad_fn[StdBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_CONCAT:
-            return self.grad_fn[ConcatBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_STACK:
-            return self.grad_fn[StackBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_PAD:
-            return self.grad_fn[PadBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_FUSED_CONV:
-            return self.grad_fn[FusedCol2ImBackward[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_MAXPOOL2D:
-            return self.grad_fn[MaxPool2dBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_DROPOUT:
-            return self.grad_fn[DropoutBackward[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_EXPONENTIAL:
-            return self.grad_fn[ExponentialBackward[Self.dtype]].backward(
-                output
-            )
-
-        elif self.tag == BACKWARD_DEVICE_TRANSFER:
-            return self.grad_fn[DeviceTransferBackward[Self.dtype]].backward(
-                output
-            )
-        elif self.tag == BACKWARD_MAX_SCALAR:
-            return self.grad_fn[MaxBackwardScalar[Self.dtype]].backward(output)
-
-        elif self.tag == BACKWARD_MIN_SCALAR:
-            return self.grad_fn[MinBackwardScalar[Self.dtype]].backward(output)
-
-        else:
-            panic("BackwardFn: Unknown backward tag: " + String(self.tag))
-
-        return []
 
 
 fn main() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d1([1, 2, 3], requires_grad=True)
-    var s = Tensor[dtype].scalar(42, requires_grad=True)
-    var r =  a.reshape(3,1)
-    print("r requires_grad? ", r.requires_grad)
-    var m = r * 42
+    var a = Tensor[dtype].d3([[[1, 0, 3]]], requires_grad=True)
+    var b = Tensor[dtype].d2([[1], [2], [3]], requires_grad=True)
+    #var r =  a.reshape(3,1)
+    #print("r requires_grad? ", r.requires_grad)
+    var v = a.into_view()
+    var m = v.sigmoid()
     m.backward()
     a.grad().print()
-    s.grad().print()
+    b.grad().print()
+    m.print()
 
+    var A = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    var B = A.transpose(-1, 0)
+    var C = B * 89
+    C.backward()
+    A.grad().print()

@@ -3,8 +3,7 @@ from shapes import Shape
 from common_utils import panic
 from subtraction import Subtractor
 from backpropagation import (
-    Delegate,
-    BackwardFn,
+    FnArg,
     BACKWARD_CE_CLASS_INDICES,
     BACKWARD_CE_PROBABILITIES,
 )
@@ -368,19 +367,9 @@ struct CECommon[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 # CEClassIndicesBackward
 # ═════════════════════════════════════════════════════════════════════════════
 
-
 @fieldwise_init
-struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    """
-    Backward for class index targets.
+struct CEClassIndicesArg[dtype: DType](ImplicitlyCopyable & Movable):
 
-    grad[m,c] = (softmax[m,c] - (1-ls)*onehot[m,c] - ls/C)
-                * ignore_mask[m] * upstream / scale
-
-    Stores NDBuffers only — no Tensor (avoids self-recursive Tensor struct).
-    """
-
-    comptime TAG = BACKWARD_CE_CLASS_INDICES
     var softmax_probs: NDBuffer[Self.dtype]  # shape (M, C)
     var target_1d: NDBuffer[DType.int32]  # shape (M,) — ORIGINAL values
     var logits_shape: Shape  # original logits shape
@@ -391,32 +380,44 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     var M: Int
     var C: Int
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
+    fn into_arg(self) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_CE_CLASS_INDICES)
 
+@fieldwise_init
+struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
+    """
+    Backward for class index targets.
+
+    grad[m,c] = (softmax[m,c] - (1-ls)*onehot[m,c] - ls/C)
+                * ignore_mask[m] * upstream / scale
+
+    Stores NDBuffers only.
+    """
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.fn_arg().arg[CEClassIndicesArg[Self.dtype]]
         ref upstream = output.gradients()[]
         var logits = output.ancestry().get(0)
 
         var device = upstream.device()
 
         # Step 1: grad = softmax — (M, C)
-        var grad = self.softmax_probs
+        var grad = bwd_arg.softmax_probs
 
         # Step 2: Build onehot from target — ignore_index rows → all zeros
         # onehot with ignore_index: those rows stay zero (no subtraction needed)
         var onehot = NDBuffer[Self.dtype].onehot(
-            self.target_1d.to_dtype[Self.dtype](),
-            self.C,
+            bwd_arg.target_1d.to_dtype[Self.dtype](),
+            bwd_arg.C,
             device,
-            ignore_index=self.ignore_index,
+            ignore_index=bwd_arg.ignore_index,
         )
         # Step 3: Apply smoothing
-        var ls = self.label_smoothing
+        var ls = bwd_arg.label_smoothing
         if ls > Scalar[Self.dtype](0):
-            var ls_uniform = ls / Scalar[Self.dtype](self.C)
+            var ls_uniform = ls / Scalar[Self.dtype](bwd_arg.C)
             grad = grad - onehot * (Scalar[Self.dtype](1) - ls) - ls_uniform
         else:
             grad = grad - onehot
@@ -424,10 +425,10 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         # Step 4: Zero out ignored positions via ignore mask
         # ignore_mask: 1=valid, 0=ignored — built from ORIGINAL target
         var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
-            self.target_1d, self.ignore_index
+            bwd_arg.target_1d, bwd_arg.ignore_index
         )
         var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(
-            Shape(self.M, self.C)
+            Shape(bwd_arg.M, bwd_arg.C)
         )
         grad = grad * ignore_mask_2d
 
@@ -435,24 +436,24 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var scaled = CECommon[Self.dtype].scale_grad_by_upstream(
             grad,
             upstream,
-            self.reduction,
-            self.valid_count,
-            self.M,
-            self.C,
+            bwd_arg.reduction,
+            bwd_arg.valid_count,
+            bwd_arg.M,
+            bwd_arg.C,
         )
         # Step 6: Reshape back to original logits shape
         var grad_final = Gradbox[Self.dtype](scaled^, share=False).reshape(
-            self.logits_shape
+            bwd_arg.logits_shape
         )
         # Step 6: Reshape and UNPERMUTE back to original logits shape
-        var rank = self.logits_shape.rank()
+        var rank = bwd_arg.logits_shape.rank()
         if rank > 2:
             # Reshape (M, C) → (N, d1..dk, C)
             var intermediate_dims = IntArray()
-            intermediate_dims.append(self.logits_shape[0])  # N
+            intermediate_dims.append(bwd_arg.logits_shape[0])  # N
             for i in range(2, rank):
-                intermediate_dims.append(self.logits_shape[i])  # d1..dk
-            intermediate_dims.append(self.logits_shape[1])  # C last
+                intermediate_dims.append(bwd_arg.logits_shape[i])  # d1..dk
+            intermediate_dims.append(bwd_arg.logits_shape[1])  # C last
             var reshaped = grad_final.reshape(Shape(intermediate_dims))
             # Unpermute: (N, d1..dk, C) → (N, C, d1..dk)
             # Forward perm was [0, 2, 3, ..., rank-1, 1]
@@ -578,7 +579,7 @@ struct CEClassIndicesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable)
         comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
-                var bwd = CEClassIndicesBackward[Self.dtype](
+                var bwd_arg = CEClassIndicesArg[Self.dtype](
                     softmax_probs=softmax_probs_ndb^,
                     target_1d=target_1d_ndb^,
                     logits_shape=logits_shape^,
@@ -589,7 +590,7 @@ struct CEClassIndicesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable)
                     M=M,
                     C=C2,
                 )
-                out.backwardFn = Optional(bwd.into_backward_fn())
+                out.fnArg = Optional(bwd_arg^.into_arg())
                 out.add_ancestry(logits)
 
         return out^
@@ -598,6 +599,19 @@ struct CEClassIndicesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable)
 # ═════════════════════════════════════════════════════════════════════════════
 # CEProbabilitiesBackward
 # ═════════════════════════════════════════════════════════════════════════════
+@fieldwise_init
+struct CEProbabilitiesArg[dtype: DType](ImplicitlyCopyable & Movable):
+
+    var softmax_probs: NDBuffer[Self.dtype]  # shape (M, C)
+    var smoothed_target: NDBuffer[Self.dtype]  # shape (M, C)
+    var logits_shape: Shape
+    var reduction: Reduction
+    var valid_count: Int
+    var M: Int
+    var C: Int
+
+    fn into_arg(self) -> FnArg[Self.dtype]:
+        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_CE_PROBABILITIES)
 
 
 @fieldwise_init
@@ -610,39 +624,29 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     Stores NDBuffers only.
     """
 
-    comptime TAG = BACKWARD_CE_PROBABILITIES
-    var softmax_probs: NDBuffer[Self.dtype]  # shape (M, C)
-    var smoothed_target: NDBuffer[Self.dtype]  # shape (M, C)
-    var logits_shape: Shape
-    var reduction: Reduction
-    var valid_count: Int
-    var M: Int
-    var C: Int
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.fn_arg().arg[CEProbabilitiesArg[Self.dtype]]
         ref upstream = output.gradients()[]
         var logits = output.ancestry().get(0)
 
         # grad = softmax - smoothed_target
-        var grad = self.softmax_probs - self.smoothed_target
+        var grad = bwd_arg.softmax_probs - bwd_arg.smoothed_target
 
         # Scale by upstream and reduction
         var scaled = CECommon[Self.dtype].scale_grad_by_upstream(
             grad,
             upstream,
-            self.reduction,
-            self.valid_count,
-            self.M,
-            self.C,
+            bwd_arg.reduction,
+            bwd_arg.valid_count,
+            bwd_arg.M,
+            bwd_arg.C,
         )
 
         # Reshape to original logits shape
-        var grad_final = scaled.reshape(self.logits_shape)
+        var grad_final = scaled.reshape(bwd_arg.logits_shape)
 
         return [
             (
@@ -730,7 +734,7 @@ struct CEProbabilitiesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable
         comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
-                var bwd = CEProbabilitiesBackward[Self.dtype](
+                var bwd_arg = CEProbabilitiesArg[Self.dtype](
                     softmax_probs=softmax_probs_ndb^,
                     smoothed_target=smoothed_target_ndb^,
                     logits_shape=logits_shape^,
@@ -739,7 +743,7 @@ struct CEProbabilitiesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable
                     M=M,
                     C=C,
                 )
-                out.backwardFn = Optional(bwd.into_backward_fn())
+                out.fnArg = Optional(bwd_arg^.into_arg())
                 out.add_ancestry(logits)
 
         return out^

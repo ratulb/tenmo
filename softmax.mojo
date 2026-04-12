@@ -2,15 +2,12 @@ from intarray import IntArray
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from backpropagation import (
-    BackwardFn,
-    Delegate,
+    SoftmaxArg,
     BACKWARD_SOFTMAX,
     BACKWARD_LOG_SOFTMAX,
 )
 from mnemonics import AddTensor
 from tenmo import Tensor
-from std.sys import has_accelerator
-from common_utils import panic
 from validators import Validator
 
 comptime SoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, False]
@@ -21,31 +18,26 @@ comptime LogSoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, True]
 struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
     ImplicitlyCopyable & Movable
 ):
-    comptime TAG = BACKWARD_LOG_SOFTMAX if Self.is_log else BACKWARD_SOFTMAX
-    var axes: IntArray
-    var softmax_out: NDBuffer[Self.dtype]
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.fn_arg().arg[SoftmaxArg[Self.dtype]]
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var local_grad_ndb: NDBuffer[Self.dtype]
 
         comptime if Self.is_log:
             # g - softmax(x) * sum(g, axes, keepdims=True)
-            var sum_grad = gradbox.buffer.sum(self.axes, keepdims=True)
-            var softmax_sum = self.softmax_out * sum_grad
+            var sum_grad = gradbox.buffer.sum(bwd_arg.axes, keepdims=True)
+            var softmax_sum = bwd_arg.softmax_out * sum_grad
             local_grad_ndb = gradbox.buffer - softmax_sum
         else:
             # y * (g - sum(g * y, axes, keepdims=True))
-            var gy = gradbox.buffer * self.softmax_out
-            var gy_sum = gy.sum(self.axes, keepdims=True)
+            var gy = gradbox.buffer * bwd_arg.softmax_out
+            var gy_sum = gy.sum(bwd_arg.axes, keepdims=True)
             var grad_diff = gradbox.buffer - gy_sum
-            local_grad_ndb = self.softmax_out * grad_diff
+            local_grad_ndb = bwd_arg.softmax_out * grad_diff
 
         var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
         return [(ancestor^, local_grad^, AddTensor)]
@@ -78,12 +70,12 @@ struct Softmax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out.requires_grad_(True)
 
                 # Store NDBuffer — carries device state, GPU safe
-                var backward_fn = SoftmaxBackward[Self.dtype](
+                var bwd_arg = SoftmaxArg[Self.dtype](
                     normalized_axes^,
                     ndb,
-                ).into_backward_fn()
+                ).into_arg(BACKWARD_SOFTMAX)
 
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(bwd_arg^)
                 out.add_ancestry(this)
 
         return out^
@@ -116,12 +108,12 @@ struct LogSoftmax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(this.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = LogSoftmaxBackward[Self.dtype](
+                var bwd_arg = SoftmaxArg[Self.dtype](
                     normalized_axes^,
                     softmax_vals,
-                ).into_backward_fn()
+                ).into_arg(BACKWARD_LOG_SOFTMAX)
 
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(bwd_arg^)
                 out.add_ancestry(this)
 
         return out^

@@ -1,15 +1,14 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, SIGMOID_BACKWARD
-from backpropagation import Delegate, BackwardFn, BACKWARD_SIGMOID
+from backpropagation import FnArg, BACKWARD_SIGMOID
 from gradbox import Gradbox
 
 @fieldwise_init
 struct SigmoidBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_SIGMOID
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
+
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
@@ -34,8 +33,7 @@ struct Sigmoid[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = SigmoidBackward[Self.dtype]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_SIGMOID))
                 out.add_ancestry(self)
         return out^
 

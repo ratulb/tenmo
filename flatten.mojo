@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_FLATTEN
+from backpropagation import FnArg, BACKWARD_FLATTEN
 from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
@@ -7,13 +7,10 @@ from gradbox import Gradbox
 
 @fieldwise_init
 struct FlattenBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_FLATTEN
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
@@ -43,8 +40,7 @@ struct FlattenForward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = FlattenBackward[Self.dtype]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_FLATTEN))
                 out.add_ancestry(self)
 
         return out^

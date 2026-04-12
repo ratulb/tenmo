@@ -1,26 +1,22 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, LOG, LOG_BACKWARD
-from backpropagation import Delegate, BackwardFn, BACKWARD_LOG
+from backpropagation import FnArg, ScalarArg, BACKWARD_LOG
 from gradbox import Gradbox
 from common_utils import Epsilon
 
 @fieldwise_init
 struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_LOG
 
-    var epsilon: Scalar[Self.dtype]
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
+        var epsilon = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
-        var result_ndb = parent.buffer.arithmetic_ops[LOG_BACKWARD](gradbox.buffer, self.epsilon)
+        var result_ndb = parent.buffer.arithmetic_ops[LOG_BACKWARD](gradbox.buffer, epsilon)
         var parent_gradbox = Gradbox[Self.dtype](result_ndb^, share=False)
 
         return [(parent^, parent_gradbox^, AddTensor)]
@@ -43,10 +39,7 @@ struct Logarithm[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = LogBackward[Self.dtype](
-                    epsilon
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].scalar(epsilon, BACKWARD_LOG))
                 out.add_ancestry(self)
 
         return out^

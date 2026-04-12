@@ -1,44 +1,38 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_STD
+from backpropagation import StdArgs
 from gradbox import Gradbox
 from common_utils import panic, Epsilon
 
 
 @fieldwise_init
 struct StdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_STD
-    var axis: Int
-    var unbiased: Bool
-    var keepdims: Bool
-    var epsilon: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.fn_arg().arg[StdArgs[Self.dtype]]
         var gradbox = output.grad()  # Copy
         var input_tensor = output.ancestry().get(0)
         ref input_shape = input_tensor.shape()
 
         var dim = List[Int]()
-        if self.axis != -100:
-            dim.append(self.axis)
+        if bwd_arg.axis != -100:
+            dim.append(bwd_arg.axis)
 
         # Always use keepdims=True internally
         var mean_val = input_tensor.mean[track_grad=False](dim, keepdims=True)
         var diff = input_tensor.__sub__[track_grad=False](mean_val)
 
         var n: Scalar[Self.dtype]
-        if self.axis != -100:
-            n = Scalar[Self.dtype](input_shape[self.axis])
+        if bwd_arg.axis != -100:
+            n = Scalar[Self.dtype](input_shape[bwd_arg.axis])
         else:
             n = Scalar[Self.dtype](input_shape.num_elements())
 
         var divisor = n
-        if self.unbiased and n > 1:
+        if bwd_arg.unbiased and n > 1:
             divisor = n - 1
 
         # Compute std (recompute from input for numerical stability)
@@ -47,13 +41,13 @@ struct StdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 dim, keepdims=True
             )
         ).__truediv__[track_grad=False](divisor)
-        var std_val = var_val.sqrt[track_grad=False](epsilon=self.epsilon)
+        var std_val = var_val.sqrt[track_grad=False](epsilon=bwd_arg.epsilon)
 
         # Gradient: (1 / (std * divisor)) * (x - mean)
         # var local_grad = diff / ((std_val + self.epsilon) * divisor)
         var local_grad = diff.__truediv__[track_grad=False](
             (
-                (std_val.__add__[track_grad=False](self.epsilon)).__mul__[
+                (std_val.__add__[track_grad=False](bwd_arg.epsilon)).__mul__[
                     track_grad=False
                 ](divisor)
             )
@@ -61,9 +55,9 @@ struct StdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         # Handle keepdims
         var gradbox_ancestor: Gradbox[Self.dtype]
-        if not self.keepdims:
-            if self.axis != -100:
-                gradbox_ancestor = gradbox.unsqueeze([self.axis])
+        if not bwd_arg.keepdims:
+            if bwd_arg.axis != -100:
+                gradbox_ancestor = gradbox.unsqueeze([bwd_arg.axis])
             else:
                 var scalar_grad = gradbox.item()
                 gradbox_ancestor = Gradbox[Self.dtype].full(
@@ -108,13 +102,13 @@ struct StdDev[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
-                backward_fn = StdBackward[Self.dtype](
+                var bwd_args = StdArgs[Self.dtype](
                     axis=axis,
                     unbiased=unbiased,
                     keepdims=keepdims,
                     epsilon=epsilon,
-                ).into_backward_fn()
-                result.backwardFn = Optional(backward_fn^)
+                ).into_arg()
+                result.fnArg = Optional(bwd_args^)
                 result.add_ancestry(self)
 
         return result^

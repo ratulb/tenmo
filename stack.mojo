@@ -1,8 +1,6 @@
 from tenmo import Tensor
 from backpropagation import (
-    Delegate,
-    BackwardFn,
-    BACKWARD_STACK,
+    StackArgs,
 )
 from mnemonics import AddTensor
 from common_utils import panic
@@ -17,13 +15,9 @@ from forwards import Concate
 struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     """Backward pass for stack operation."""
 
-    comptime TAG = BACKWARD_STACK
-
-    var axis: Int
-    var num_tensors: Int
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         Split gradient and squeeze the stacked dimension.
@@ -33,7 +27,7 @@ struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                                                   grad_B(d0, d1, d2),
                                                   grad_C(d0, d1, d2)]
         """
-
+        var bwd_arg = output.fn_arg().arg[StackArgs]
         ref grad_output = output.gradients()[]
         # var grad_data = grad_output.buffer.buffer.data
         var grad_data = grad_output.data_ptr()
@@ -44,11 +38,11 @@ struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
 
         # Size of stacked dimension should equal num_tensors
-        var stack_size = grad_shape[self.axis]
-        if stack_size != self.num_tensors:
+        var stack_size = grad_shape[bwd_arg.axis]
+        if stack_size != bwd_arg.num_tensors:
             panic(
                 "StackBackward: Expected stack dimension size",
-                String(self.num_tensors),
+                String(bwd_arg.num_tensors),
                 "but got",
                 String(stack_size),
             )
@@ -63,7 +57,7 @@ struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             # Build grad_input shape (without the stacked dimension)
             var grad_input_shape_dims = List[Int]()
             for d in range(grad_shape.rank()):
-                if d != self.axis:
+                if d != bwd_arg.axis:
                     grad_input_shape_dims.append(grad_shape[d])
 
             var grad_input_shape = Shape(grad_input_shape_dims)
@@ -77,7 +71,7 @@ struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             # Iterate over all elements in the OUTPUT gradient shape
             for coord in grad_shape:
                 # Only process elements where coord[self.axis] == tensor_idx
-                if coord[self.axis] == tensor_idx:
+                if coord[bwd_arg.axis] == tensor_idx:
                     # Get flat index in grad_output
                     var src_idx = IndexCalculator.flatten_index(
                         grad_shape, coord, grad_strides, 0
@@ -90,10 +84,6 @@ struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             result.append((tensor^, grad_input^, AddTensor))
 
         return result^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
 
 @fieldwise_init
 struct Stack[dtype: DType](RegisterPassable, ImplicitlyCopyable):
@@ -164,10 +154,10 @@ struct Stack[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if grad_required:
                 result.requires_grad_(True)
-                var backward_fn = StackBackward[Self.dtype](
+                var bwd_args = StackArgs(
                     stack_axis, len(tensors)
-                ).into_backward_fn()
-                result.backwardFn = Optional(backward_fn^)
+                ).into_arg[Self.dtype]()
+                result.fnArg = Optional(bwd_args^)
 
                 # Add original tensors (not expanded) to ancestry
                 for i in range(len(tensors)):

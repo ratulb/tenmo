@@ -1,9 +1,6 @@
 from tenmo import Tensor
 from backpropagation import (
-    BackwardFn,
-    Delegate,
-    BACKWARD_FUSED_CONV,
-    BACKWARD_MAXPOOL2D,
+    FusedCol2ImArgs,
 )
 from mnemonics import AddTensor
 from common_utils import panic
@@ -506,7 +503,7 @@ struct FusedIm2Col[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             if grad_required:
                 output.requires_grad_(True)
 
-                var backward_fn = FusedCol2ImBackward[Self.dtype](
+                var bwd_args = FusedCol2ImArgs(
                     N=N,
                     C_in=C_in,
                     H_pad=H_pad,
@@ -518,9 +515,9 @@ struct FusedIm2Col[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                     W_out=W_out,
                     stride=stride,
                     dilation=dilation,
-                ).into_backward_fn()
+                ).into_arg[Self.dtype]()
 
-                output.backwardFn = Optional(backward_fn^)
+                output.fnArg = Optional(bwd_args^)
                 output.add_ancestry(padded_image)
                 output.add_ancestry(kernel)
                 output.add_ancestry(bias)
@@ -545,23 +542,11 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     - Input grad: Over N (each thread owns grad_padded[n, :, :, :])
     """
 
-    comptime TAG = BACKWARD_FUSED_CONV
-    var N: Int
-    var C_in: Int
-    var H_pad: Int
-    var W_pad: Int
-    var C_out: Int
-    var KH: Int
-    var KW: Int
-    var H_out: Int
-    var W_out: Int
-    var stride: Int
-    var dilation: Int
-
+    @staticmethod
     fn backward(
-        self,
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_args = output.fn_arg().arg[FusedCol2ImArgs]
         ref grad_output = output.gradients()[]
         var results = List[
             Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -573,7 +558,7 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         # BIAS GRADIENT
         if bias.requires_grad:
             var grad_bias = Self.compute_bias_gradient(
-                grad_output, self.N, self.C_out, self.H_out, self.W_out
+                grad_output, bwd_args.N, bwd_args.C_out, bwd_args.H_out, bwd_args.W_out
             )
             results.append((bias^, grad_bias^, AddTensor))
 
@@ -582,17 +567,17 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_kernel = Self.compute_kernel_gradient(
                 grad_output,
                 padded_image,
-                self.N,
-                self.C_in,
-                self.C_out,
-                self.H_pad,
-                self.W_pad,
-                self.H_out,
-                self.W_out,
-                self.KH,
-                self.KW,
-                self.stride,
-                self.dilation,
+                bwd_args.N,
+                bwd_args.C_in,
+                bwd_args.C_out,
+                bwd_args.H_pad,
+                bwd_args.W_pad,
+                bwd_args.H_out,
+                bwd_args.W_out,
+                bwd_args.KH,
+                bwd_args.KW,
+                bwd_args.stride,
+                bwd_args.dilation,
             )
             results.append((kernel, grad_kernel^, AddTensor))
 
@@ -601,17 +586,17 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_padded = Self.compute_input_gradient(
                 grad_output,
                 kernel,
-                self.N,
-                self.C_in,
-                self.C_out,
-                self.H_pad,
-                self.W_pad,
-                self.H_out,
-                self.W_out,
-                self.KH,
-                self.KW,
-                self.stride,
-                self.dilation,
+                bwd_args.N,
+                bwd_args.C_in,
+                bwd_args.C_out,
+                bwd_args.H_pad,
+                bwd_args.W_pad,
+                bwd_args.H_out,
+                bwd_args.W_out,
+                bwd_args.KH,
+                bwd_args.KW,
+                bwd_args.stride,
+                bwd_args.dilation,
             )
             results.append((padded_image^, grad_padded^, AddTensor))
 
@@ -906,5 +891,3 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         parallelize[compute_input_for_n](N)
         return grad_padded^
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)

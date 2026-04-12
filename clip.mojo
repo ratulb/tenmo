@@ -1,23 +1,19 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_CLIP
+from backpropagation import ClipArgs
 from gradbox import Gradbox
 from std.sys import simd_width_of
 
 
 @fieldwise_init
 struct ClipBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_CLIP
-    var min_val: Scalar[Self.dtype]
-    var max_val: Scalar[Self.dtype]
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """Gradient passes where min ≤ x ≤ max, blocked elsewhere."""
+        var bwd_arg = output.fn_arg().arg[ClipArgs[Self.dtype]]
         ref grad_output = output.gradients()[]
         var parent = output.ancestry().get(0)
         ref shape = parent.shape()
@@ -37,7 +33,7 @@ struct ClipBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 var grad_out = grad_output_data.load[width=simd_width](i)
 
                 # Mask: gradient passes only if min ≤ x ≤ max
-                var in_range = x.ge(self.min_val) & x.le(self.max_val)
+                var in_range = x.ge(bwd_arg.min_val) & x.le(bwd_arg.max_val)
 
                 var mask_float = in_range.cast[Self.dtype]()
                 var grad_in = grad_out * mask_float
@@ -49,7 +45,7 @@ struct ClipBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 var x = src[offset + i]
                 var grad_out = grad_output_data[i]
 
-                if x >= self.min_val and x <= self.max_val:
+                if x >= bwd_arg.min_val and x <= bwd_arg.max_val:
                     dest[i] = grad_out  # Pass through
                 else:
                     dest[i] = Scalar[Self.dtype](0)  # Block
@@ -57,7 +53,7 @@ struct ClipBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             # Non-contiguous fallback
             for coord in shape:
                 var x = parent[coord]
-                if x >= self.min_val and x <= self.max_val:
+                if x >= bwd_arg.min_val and x <= bwd_arg.max_val:
                     parent_gradbox[coord] = grad_output[coord]
                 else:
                     parent_gradbox[coord] = Scalar[Self.dtype](0)
@@ -107,10 +103,10 @@ struct Clip[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = ClipBackward[Self.dtype](
+                var bwd_arg = ClipArgs[Self.dtype](
                     min_val, max_val
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                ).into_arg()
+                out.fnArg = Optional(bwd_arg^)
                 out.add_ancestry(self)
 
         return out^

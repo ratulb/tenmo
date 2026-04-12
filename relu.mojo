@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, RELU_FORWARD, RELU_BACKWARD
-from backpropagation import Delegate, BackwardFn, BACKWARD_RELU
+from backpropagation import BufferArg, BACKWARD_RELU
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from buffers import Buffer
@@ -8,21 +8,18 @@ from buffers import Buffer
 
 @fieldwise_init
 struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    comptime TAG = BACKWARD_RELU
-    var mask: Buffer[Self.dtype]  # Stores 0.0 or 1.0 in same Self.dtype
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.fn_arg().arg[BufferArg[Self.dtype]]
         ref gradbox = output.gradients()[]
         var input_tensor = output.ancestry().get(0)
         ref shape = input_tensor.shape()
 
         var grad_buffer = gradbox.buffer.data_buffer()
-        var result_buffer = grad_buffer * self.mask
+        var result_buffer = grad_buffer * bwd_arg.buffer
 
         var ndb = NDBuffer[Self.dtype](result_buffer^, shape)
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
@@ -94,10 +91,10 @@ struct ReLU[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = ReLUBackward[Self.dtype](
-                    mask=mask^
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                var bwd_fn_arg = BufferArg[Self.dtype](
+                    buffer=mask^
+                ).into_arg(BACKWARD_RELU)
+                out.fnArg = Optional(bwd_fn_arg^)
                 out.add_ancestry(self)
 
         return out^

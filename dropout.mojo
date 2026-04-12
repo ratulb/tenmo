@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, DROPOUT
-from backpropagation import Delegate, BackwardFn, BACKWARD_DROPOUT
+from backpropagation import BufferArg, BACKWARD_DROPOUT
 from gradbox import Gradbox
 from common_utils import panic
 from ndbuffer import NDBuffer
@@ -12,23 +12,20 @@ from std.random import random_float64, seed
 
 @fieldwise_init
 struct DropoutBackward[dtype: DType](ImplicitlyCopyable):
-    comptime TAG = BACKWARD_DROPOUT
-    var mask_buffer: Buffer[Self.dtype]  # Store the dropout mask
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var grad_output = output.grad()
+        var mask_buffer = output.fn_arg().arg[BufferArg[Self.dtype]].buffer
+        var grad_output = output.gradients()[]
         var ancestor = output.ancestry().get(0)
 
         # Gradient flows through the same mask that was used in forward
         # grad_input = grad_output * mask
         # Since mask already has scale baked in, we just multiply
         var grad_input = grad_output * Tensor[Self.dtype](
-            NDBuffer[Self.dtype](self.mask_buffer, grad_output.shape()),
+            NDBuffer[Self.dtype](mask_buffer, grad_output.shape()),
             requires_grad=False,
         )
 
@@ -136,11 +133,11 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             output.requires_grad_(True)
 
             # Attach backward handler with the mask
-            var backward_fn = DropoutBackward[Self.dtype](
-                mask_buffer=mask.buffer.buffer,  # Store the mask buffer
-            ).into_backward_fn()
+            var bwd_arg = BufferArg[Self.dtype](
+                buffer=mask.buffer.buffer,  # Store the mask buffer
+            ).into_arg(BACKWARD_DROPOUT)
 
-            output.backwardFn = Optional(backward_fn^)
+            output.fnArg = Optional(bwd_arg^)
             output.add_ancestry(x)
 
         return output^

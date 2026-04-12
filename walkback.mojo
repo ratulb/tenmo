@@ -30,12 +30,12 @@ from dotproduct import DotBackward
 from unsqueeze import UnsqueezeBackward
 from squeeze import SqueezeBackward
 from expand import ExpandBackward
-from minmax import MinMaxBackward, MinMaxBackwardGPU
+from minmax import MinMaxBackward
 from shuffle import ShuffleBackward
 from relu import ReLUBackward
 from softmax import SoftmaxBackward, LogSoftmaxBackward
 from logarithm import LogBackward
-from crossentropy import CEClassIndicesBackward, CEProbabilitiesBackward
+from crossentropy import CEClassIndicesBackward, CEProbabilitiesBackward, CEClassIndicesArg, CEProbabilitiesArg
 from tiles import TileBackward
 from flatten import FlattenBackward
 from contiguous import ContiguousBackward
@@ -46,7 +46,7 @@ from clip import ClipBackward
 from squareroot import SqrtBackward
 from variance import VarianceBackward
 from std_deviation import StdBackward
-from blashandle import BLASMatmul2dBackward
+from blashandle import BLASMatmul2dBackward, BLASMatmul2dBwdArg
 from concate import ConcatBackward
 from stack import StackBackward
 from pad import PadBackward

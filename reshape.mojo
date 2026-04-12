@@ -15,12 +15,8 @@ struct ReshapeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
-        print("\nThe gradbox here\n")
-        gradbox.print()
-        print()
         var ancestor = output.ancestry().get(0)
         var reshaped = gradbox.reshape(ancestor.shape())
-        #output.zero_grad()
         return [
             (ancestor^, reshaped^, AddTensor),
             (output, gradbox, ZeroGrad),
@@ -47,7 +43,6 @@ struct Reshape[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out.requires_grad_(True)
                 var fn_arg = FnArg[Self.dtype].null(BACKWARD_RESHAPE)
                 out.fnArg = Optional(fn_arg^)
-                print("patched to output", BACKWARD_RESHAPE)
                 out.add_ancestry(tensor)
 
         return out^

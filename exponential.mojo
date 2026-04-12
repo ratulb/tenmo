@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, EXP
-from backpropagation import Delegate, BackwardFn, BACKWARD_EXPONENTIAL
+from backpropagation import FnArg, BACKWARD_EXPONENTIAL
 from gradbox import Gradbox
 
 
@@ -8,11 +8,9 @@ from gradbox import Gradbox
 struct ExponentialBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     comptime TAG = BACKWARD_EXPONENTIAL
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ] where Self.dtype.is_floating_point():
@@ -39,10 +37,7 @@ struct Exponential[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = ExponentialBackward[
-                    Self.dtype
-                ]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_EXPONENTIAL))
                 out.add_ancestry(tensor)
 
         return out^

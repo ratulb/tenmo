@@ -220,7 +220,6 @@ fn test_dropout_backward_simple() raises:
 
     var out = dropout(x)
     var loss = out.sum()
-    print(loss.has_backward_fn(), out.has_backward_fn(), out.requires_grad)
     loss.backward()
 
     print()

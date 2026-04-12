@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
-from backpropagation import Delegate, BackwardFn, BACKWARD_SQUEEZE
+from backpropagation import FnArg, BACKWARD_SQUEEZE
 from gradbox import Gradbox
 from shapes import Shape
 from common_utils import panic
@@ -9,13 +9,10 @@ from common_utils import panic
 
 @fieldwise_init
 struct SqueezeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_SQUEEZE
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ancestor = output.ancestry().get(0)
         var gradbox = output.gradients()[]
@@ -64,8 +61,7 @@ struct Squeeze[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bfn = SqueezeBackward[Self.dtype]().into_backward_fn()
-                out.backwardFn = Optional(bfn^)
+                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_SQUEEZE))
                 out.add_ancestry(tensor)
 
         return out^

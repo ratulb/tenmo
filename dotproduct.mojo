@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from common_utils import panic
-from backpropagation import Delegate, BackwardFn, BACKWARD_DOT
+from backpropagation import FnArg, BACKWARD_DOT
 from mnemonics import AddTensor
 from gradbox import Gradbox
 from shapes import Shape
@@ -17,13 +17,10 @@ from std.sys import simd_width_of
 
 @fieldwise_init
 struct DotBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_DOT
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var scalar_grad_value = gradbox.item()  # Scalar
@@ -79,22 +76,15 @@ struct Dot[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if has_accelerator():
             if lhs.is_on_gpu() and rhs.is_on_gpu():
                 try:
-                    start = now()
                     out = DotproductKernel[Self.dtype].launch[
                         suppress_validation=True
                     ](lhs, rhs)
 
-                    print("GPU dot took: ", (now() - start) * 1000, "ms")
                 except e:
                     print(e)
-                    print("Dot - GPU operation failed. Failling back on CPU")
-
-                    out = Tensor[Self.dtype].scalar(
-                        lhs.buffer.contiguous_buffer().dot(
-                            rhs.buffer.contiguous_buffer()
-                        ),
-                        requires_grad=False,
-                    )
+                    panic("Dot - GPU operation failed")
+                    # Not reachable
+                    out = Tensor[Self.dtype].scalar(0)
             else:
                 out = Tensor[Self.dtype].scalar(
                     lhs.buffer.contiguous_buffer().dot(
@@ -115,8 +105,7 @@ struct Dot[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = DotBackward[Self.dtype]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_DOT))
                 out.add_ancestry(lhs, rhs)
 
         return out^

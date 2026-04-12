@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_VECTOR_MATMUL
+from backpropagation import FnArg, BACKWARD_VECTOR_MATMUL
 from mnemonics import AddTensor
 from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
@@ -10,182 +10,12 @@ from vectormatrix_kernel import VectorMatmulNdGpu
 
 
 @fieldwise_init
-struct VectorMatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    @staticmethod
-    fn forward[
-        simdwidth: Int = simd_width_of[Self.dtype]()
-    ](v: NDBuffer[Self.dtype], M: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
-        var v_shape = v.shape
-        var M_shape = M.shape
-
-        # Validate: v[..., k] × M[..., k, n] → out[..., n]
-        if v_shape.rank() < 1:
-            panic("VectorMatmulNd: vector must have rank >= 1")
-        if M_shape.rank() < 2:
-            panic("VectorMatmulNd: matrix must have rank >= 2")
-
-        var k = v_shape[-1]
-        var k_M = M_shape[-2]
-        var n = M_shape[-1]
-
-        if k != k_M:
-            panic("VectorMatmulNd: inner dimensions must match")
-
-        # Broadcast batch dimensions
-        var v_batch_shape = v_shape[:-1]
-        var M_batch_shape = M_shape[:-2]
-        var batch_shape = ShapeBroadcaster.broadcast_shape(
-            v_batch_shape, M_batch_shape
-        )
-
-        var out_shape = batch_shape + [n]
-        var result = NDBuffer[Self.dtype].zeros(out_shape)
-
-        # Hoist metadata for vector and matrix
-        var v_stride = v.strides[-1]
-        var v_offset = v.offset
-        var v_data = v.data_ptr()
-
-        var M_stride0 = M.strides[-2]
-        var M_stride1 = M.strides[-1]
-        var M_offset = M.offset
-        var M_data = M.data_ptr()
-        var M_contiguous = M.is_contiguous()
-
-        var result_stride = result.strides[-1]
-        var result_offset = result.offset
-        var result_data = (
-            result.data_ptr()
-            .unsafe_mut_cast[True]()
-            .unsafe_origin_cast[MutAnyOrigin]()
-        )
-
-        # Process each batch element
-        for indices in batch_shape:
-            var v_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, v_batch_shape
-            )
-            var M_indices = ShapeBroadcaster.broadcasted_indices(
-                indices, batch_shape, M_batch_shape
-            )
-
-            # Calculate base offsets for this batch
-            var v_base = v_offset
-            for i in range(len(v_indices)):
-                v_base += v_indices[i] * v.strides[i]
-
-            var M_base = M_offset
-            for i in range(len(M_indices)):
-                M_base += M_indices[i] * M.strides[i]
-
-            var result_base = result_offset
-            for i in range(len(indices)):
-                result_base += indices[i] * result.strides[i]
-
-            # Optimized vector-matrix multiply: result[n] = v[k] @ M[k, n]
-            if M_contiguous:
-                # Fast path: M has contiguous rows - MANUAL VECTORIZATION
-                comptime simd_width = simdwidth
-                var num_full_vectors = n // simd_width
-                var remainder = n % simd_width
-
-                # Process full SIMD vectors
-                for vec_idx in range(num_full_vectors):
-                    var j = vec_idx * simd_width
-                    var accumulator = SIMD[Self.dtype, simd_width](0)
-
-                    # Dot product: sum over k
-                    for i in range(k):
-                        var v_val = v_data[v_base + i * v_stride]
-                        var m_addr = M_base + i * M_stride0 + j * M_stride1
-                        var m_vec = M_data.load[width=simd_width](m_addr)
-                        accumulator += v_val * m_vec
-
-                    var result_addr = result_base + j * result_stride
-                    result_data.store[width=simd_width](
-                        result_addr, accumulator
-                    )
-
-                # Process remaining elements
-                if remainder > 0:
-                    var j = num_full_vectors * simd_width
-                    for offset in range(remainder):
-                        var accumulator: Scalar[Self.dtype] = 0
-
-                        for i in range(k):
-                            var v_val = v_data[v_base + i * v_stride]
-                            var m_val = M_data[
-                                M_base
-                                + i * M_stride0
-                                + (j + offset) * M_stride1
-                            ]
-                            accumulator += v_val * m_val
-
-                        result_data[
-                            result_base + (j + offset) * result_stride
-                        ] = accumulator
-            else:
-                # Slow path: non-contiguous M
-                for j in range(n):
-                    var accumulator: Scalar[Self.dtype] = 0
-
-                    for i in range(k):
-                        var v_val = v_data[v_base + i * v_stride]
-                        var m_val = M_data[
-                            M_base + i * M_stride0 + j * M_stride1
-                        ]
-                        accumulator += v_val * m_val
-
-                    result_data[result_base + j * result_stride] = accumulator
-
-        return result
-
-    @staticmethod
-    fn forward[
-        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
-    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        var out: NDBuffer[Self.dtype]
-
-        comptime if has_accelerator():
-            if v.is_on_gpu() and M.is_on_gpu():
-                try:
-                    out = VectorMatmulNdGpu[Self.dtype].launch[block_size=256](
-                        v.buffer, M.buffer
-                    )
-                except e:
-                    print(e)
-                    print(
-                        "VectorMatmulNd - GPU vector matrix multiplication",
-                    )
-                    out = Self.forward[simdwidth=simdwidth](v.buffer, M.buffer)
-            else:
-                out = Self.forward[simdwidth=simdwidth](v.buffer, M.buffer)
-        else:
-            out = Self.forward[simdwidth=simdwidth](v.buffer, M.buffer)
-
-        var result = Tensor[Self.dtype](out^, requires_grad=False)
-
-        comptime if track_grad:
-            var requires_grad = v.requires_grad or M.requires_grad
-            if requires_grad:
-                result.requires_grad_(True)
-                var backward_fn = VectorMatmulNdBackward[
-                    Self.dtype
-                ]().into_backward_fn()
-                result.backwardFn = Optional(backward_fn^)
-                result.add_ancestry(v)
-                result.add_ancestry(M)
-
-        return result^
-
-
-@fieldwise_init
 struct VectorMatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_VECTOR_MATMUL
 
+    @staticmethod
     fn backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
-    ](self, read output: Tensor[Self.dtype]) -> List[
+    ](output: Tensor[Self.dtype]) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
         ref grad_out = output.gradients()[]
@@ -367,5 +197,167 @@ struct VectorMatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable
 
         return results^
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
+@fieldwise_init
+struct VectorMatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+    @staticmethod
+    fn forward[
+        simdwidth: Int = simd_width_of[Self.dtype]()
+    ](v: NDBuffer[Self.dtype], M: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
+        var v_shape = v.shape
+        var M_shape = M.shape
+
+        # Validate: v[..., k] × M[..., k, n] → out[..., n]
+        if v_shape.rank() < 1:
+            panic("VectorMatmulNd: vector must have rank >= 1")
+        if M_shape.rank() < 2:
+            panic("VectorMatmulNd: matrix must have rank >= 2")
+
+        var k = v_shape[-1]
+        var k_M = M_shape[-2]
+        var n = M_shape[-1]
+
+        if k != k_M:
+            panic("VectorMatmulNd: inner dimensions must match")
+
+        # Broadcast batch dimensions
+        var v_batch_shape = v_shape[:-1]
+        var M_batch_shape = M_shape[:-2]
+        var batch_shape = ShapeBroadcaster.broadcast_shape(
+            v_batch_shape, M_batch_shape
+        )
+
+        var out_shape = batch_shape + [n]
+        var result = NDBuffer[Self.dtype].zeros(out_shape)
+
+        # Hoist metadata for vector and matrix
+        var v_stride = v.strides[-1]
+        var v_offset = v.offset
+        var v_data = v.data_ptr()
+
+        var M_stride0 = M.strides[-2]
+        var M_stride1 = M.strides[-1]
+        var M_offset = M.offset
+        var M_data = M.data_ptr()
+        var M_contiguous = M.is_contiguous()
+
+        var result_stride = result.strides[-1]
+        var result_offset = result.offset
+        var result_data = (
+            result.data_ptr()
+            .unsafe_mut_cast[True]()
+            .unsafe_origin_cast[MutAnyOrigin]()
+        )
+
+        # Process each batch element
+        for indices in batch_shape:
+            var v_indices = ShapeBroadcaster.broadcasted_indices(
+                indices, batch_shape, v_batch_shape
+            )
+            var M_indices = ShapeBroadcaster.broadcasted_indices(
+                indices, batch_shape, M_batch_shape
+            )
+
+            # Calculate base offsets for this batch
+            var v_base = v_offset
+            for i in range(len(v_indices)):
+                v_base += v_indices[i] * v.strides[i]
+
+            var M_base = M_offset
+            for i in range(len(M_indices)):
+                M_base += M_indices[i] * M.strides[i]
+
+            var result_base = result_offset
+            for i in range(len(indices)):
+                result_base += indices[i] * result.strides[i]
+
+            # Optimized vector-matrix multiply: result[n] = v[k] @ M[k, n]
+            if M_contiguous:
+                # Fast path: M has contiguous rows - MANUAL VECTORIZATION
+                comptime simd_width = simdwidth
+                var num_full_vectors = n // simd_width
+                var remainder = n % simd_width
+
+                # Process full SIMD vectors
+                for vec_idx in range(num_full_vectors):
+                    var j = vec_idx * simd_width
+                    var accumulator = SIMD[Self.dtype, simd_width](0)
+
+                    # Dot product: sum over k
+                    for i in range(k):
+                        var v_val = v_data[v_base + i * v_stride]
+                        var m_addr = M_base + i * M_stride0 + j * M_stride1
+                        var m_vec = M_data.load[width=simd_width](m_addr)
+                        accumulator += v_val * m_vec
+
+                    var result_addr = result_base + j * result_stride
+                    result_data.store[width=simd_width](
+                        result_addr, accumulator
+                    )
+
+                # Process remaining elements
+                if remainder > 0:
+                    var j = num_full_vectors * simd_width
+                    for offset in range(remainder):
+                        var accumulator: Scalar[Self.dtype] = 0
+
+                        for i in range(k):
+                            var v_val = v_data[v_base + i * v_stride]
+                            var m_val = M_data[
+                                M_base
+                                + i * M_stride0
+                                + (j + offset) * M_stride1
+                            ]
+                            accumulator += v_val * m_val
+
+                        result_data[
+                            result_base + (j + offset) * result_stride
+                        ] = accumulator
+            else:
+                # Slow path: non-contiguous M
+                for j in range(n):
+                    var accumulator: Scalar[Self.dtype] = 0
+
+                    for i in range(k):
+                        var v_val = v_data[v_base + i * v_stride]
+                        var m_val = M_data[
+                            M_base + i * M_stride0 + j * M_stride1
+                        ]
+                        accumulator += v_val * m_val
+
+                    result_data[result_base + j * result_stride] = accumulator
+
+        return result
+
+    @staticmethod
+    fn forward[
+        track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
+    ](v: Tensor[Self.dtype], M: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        var out: NDBuffer[Self.dtype]
+
+        comptime if has_accelerator():
+            if v.is_on_gpu() and M.is_on_gpu():
+                try:
+                    out = VectorMatmulNdGpu[Self.dtype].launch[block_size=256](
+                        v.buffer, M.buffer
+                    )
+                except e:
+                    print(e)
+                    print(
+                        "VectorMatmulNd - GPU vector matrix multiplication",
+                    )
+                    out = Self.forward[simdwidth=simdwidth](v.buffer, M.buffer)
+            else:
+                out = Self.forward[simdwidth=simdwidth](v.buffer, M.buffer)
+        else:
+            out = Self.forward[simdwidth=simdwidth](v.buffer, M.buffer)
+
+        var result = Tensor[Self.dtype](out^, requires_grad=False)
+
+        comptime if track_grad:
+            var requires_grad = v.requires_grad or M.requires_grad
+            if requires_grad:
+                result.requires_grad_(True)
+                result.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_VECTOR_MATMUL))
+                result.add_ancestry(v, M)
+
+        return result^

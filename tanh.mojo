@@ -1,17 +1,14 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, TANH_BACKWARD
-from backpropagation import Delegate, BackwardFn, BACKWARD_TANH
+from backpropagation import FnArg, BACKWARD_TANH
 from gradbox import Gradbox
 
 @fieldwise_init
 struct TanhBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_TANH
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ] where Self.dtype.is_floating_point():
@@ -40,8 +37,7 @@ struct Tanh[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                backward_fn = TanhBackward[Self.dtype]().into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_TANH))
                 out.add_ancestry(self)
         return out^
 

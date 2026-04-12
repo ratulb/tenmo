@@ -1,7 +1,6 @@
 from tenmo import Tensor
 from backpropagation import (
-    Delegate,
-    BackwardFn,
+    IntArg,
     BACKWARD_CONCAT,
 )
 from mnemonics import AddTensor
@@ -14,12 +13,12 @@ from shapes import Shape
 
 @fieldwise_init
 struct ConcatBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_CONCAT
-    var axis: Int
 
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var axis = output.fn_arg().arg[IntArg].value
         ref grad_output = output.gradients()[]
         var grad_data = grad_output.data_ptr()
         ref grad_shape = grad_output.shape()
@@ -29,7 +28,7 @@ struct ConcatBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
 
         # Fast path: axis 0
-        if self.axis == 0:
+        if axis == 0:
             var src_offset = 0
             for i in range(count):
                 var tensor = output.ancestry().get(i)
@@ -48,7 +47,7 @@ struct ConcatBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         for i in range(count):
             var tensor = output.ancestry().get(i)
             if not tensor.requires_grad:
-                offset += tensor.shape()[self.axis]
+                offset += tensor.shape()[axis]
                 continue
 
             ref tensor_shape = tensor.shape()
@@ -62,20 +61,17 @@ struct ConcatBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 )
                 var grad_coord = IntArray.filled(grad_shape.rank(), 0)
                 for d in range(grad_shape.rank()):
-                    grad_coord[d] = coord[d] + (offset if d == self.axis else 0)
+                    grad_coord[d] = coord[d] + (offset if d == axis else 0)
                 var src_idx = IndexCalculator.flatten_index(
                     grad_shape, grad_coord, grad_strides, 0
                 )
                 grad_input_data[dest_idx] = grad_data[src_idx]
                 elem_idx += 1
 
-            offset += tensor.shape()[self.axis]
+            offset += tensor.shape()[axis]
             result.append((tensor^, grad_input^, AddTensor))
 
         return result^
-
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
 
 @fieldwise_init
@@ -175,10 +171,10 @@ struct Concate[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(grad_required)
             if grad_required:
                 result.requires_grad_(True)
-                var backward_fn = ConcatBackward[Self.dtype](
+                var bwd_arg = IntArg(
                     concat_axis
-                ).into_backward_fn()
-                result.backwardFn = Optional(backward_fn^)
+                ).into_arg[Self.dtype](BACKWARD_CONCAT)
+                result.fnArg = Optional(bwd_arg^)
                 for i in range(len(tensors)):
                     result.add_ancestry(tensors[i])
 

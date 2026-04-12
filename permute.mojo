@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import Delegate, BackwardFn, BACKWARD_PERMUTE
+from backpropagation import IntArrayArg, BACKWARD_PERMUTE
 from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
 from shapes import Shape
@@ -11,14 +11,10 @@ from gradbox import Gradbox
 
 @fieldwise_init
 struct PermuteBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    comptime TAG = BACKWARD_PERMUTE
-    var permutation: IntArray
 
-    fn into_backward_fn(self) -> BackwardFn[Self.dtype]:
-        return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
-
+    @staticmethod
     fn backward(
-        self, output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         Backward pass for permute.
@@ -26,11 +22,12 @@ struct PermuteBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         GPU safe: Gradbox.permute → NDBuffer.permute(shared=False)
                   → contiguous() → contiguous_device_state() on GPU.
         """
+        var permutation = output.fn_arg().arg[IntArrayArg].axes
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
         # Invert the forward permutation
-        var inverted = IntArray.invert_permutation(self.permutation)
+        var inverted = IntArray.invert_permutation(permutation)
 
         # Apply inverse permutation — GPU safe via NDBuffer.permute
         var parent_gradbox = gradbox.permute(inverted^)
@@ -60,26 +57,10 @@ struct Permute[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backward_fn = PermuteBackward[Self.dtype](
+                var bwd_fn_arg = IntArrayArg(
                     axes.copy()
-                ).into_backward_fn()
-                out.backwardFn = Optional(backward_fn^)
+                ).into_arg[Self.dtype](BACKWARD_PERMUTE)
+                out.fnArg = Optional(bwd_fn_arg^)
                 out.add_ancestry(self)
 
         return out^
-
-    @staticmethod
-    fn forward_unshared(
-        self: Tensor[Self.dtype],
-        axes: IntArray,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
-        """
-        Takes unmutable self. Creates a copy of 'buffer'.
-        Original buffer is not muted.
-        """
-        var buffer = self.buffer.copy()
-        var result_ndb = buffer.permute(axes, shared=False)
-        return Tensor[Self.dtype](
-            result_ndb^, requires_grad=requires_grad.or_else(False)
-        )
