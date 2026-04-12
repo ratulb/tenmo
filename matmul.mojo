@@ -3,8 +3,6 @@ from std.sys import simd_width_of
 from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import (
     FnArg,
-    Delegate,
-    BackwardFn,
     BACKWARD_MATMUL_ND,
     BACKWARD_MATMUL_2D,
 )
