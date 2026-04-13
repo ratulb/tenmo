@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from backpropagation import (
-    IntArg,
+    BackwardFnArg,
     BACKWARD_CONCAT,
 )
 from mnemonics import AddTensor
@@ -18,7 +18,7 @@ struct ConcatBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axis = output.fn_arg().arg[IntArg].value
+        var axis = output.bwd_fn_arg().arg[Int]
         ref grad_output = output.gradients()[]
         var grad_data = grad_output.data_ptr()
         ref grad_shape = grad_output.shape()
@@ -171,10 +171,7 @@ struct Concate[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(grad_required)
             if grad_required:
                 result.requires_grad_(True)
-                var bwd_arg = IntArg(
-                    concat_axis
-                ).into_arg[Self.dtype](BACKWARD_CONCAT)
-                result.fnArg = Optional(bwd_arg^)
+                result.bwdFnArg = Optional(BackwardFnArg[Self.dtype].integer(BACKWARD_CONCAT,concat_axis))
                 for i in range(len(tensors)):
                     result.add_ancestry(tensors[i])
 

@@ -2,7 +2,7 @@ from tenmo import Tensor
 from std.sys import simd_width_of
 from matrixshapevalidator import MatrixShapeValidator
 from backpropagation import (
-    FnArg,
+    BackwardFnArg,
     BACKWARD_MATMUL_ND,
     BACKWARD_MATMUL_2D,
 )
@@ -66,10 +66,10 @@ struct Matmul2d[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var bwd_fn_arg = FnArg[
+                var bwd_fn_arg = BackwardFnArg[
                     Self.dtype
-                ].null(BACKWARD_MATMUL_2D)
-                C.fnArg = Optional(bwd_fn_arg^)
+                ].null_arg(BACKWARD_MATMUL_2D)
+                C.bwdFnArg = Optional(bwd_fn_arg^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
 
@@ -156,10 +156,10 @@ struct MatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var bwd_fn_arg = FnArg[
+                var bwd_fn_arg = BackwardFnArg[
                     Self.dtype
-                ].null(BACKWARD_MATMUL_ND)
-                C.fnArg = Optional(bwd_fn_arg^)
+                ].null_arg(BACKWARD_MATMUL_ND)
+                C.bwdFnArg = Optional(bwd_fn_arg^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
 

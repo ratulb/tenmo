@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, TANH_BACKWARD
-from backpropagation import FnArg, BACKWARD_TANH
+from backpropagation import BackwardFnArg, BACKWARD_TANH
 from gradbox import Gradbox
 
 @fieldwise_init
@@ -37,7 +37,7 @@ struct Tanh[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_TANH))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_TANH))
                 out.add_ancestry(self)
         return out^
 

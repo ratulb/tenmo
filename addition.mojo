@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from backpropagation import (
-    BooleanArg,
-    FnArg,
+    ArgumentType,
+    BackwardFnArg,
     BACKWARD_ADD,
     BACKWARD_ADD_SCALAR,
 )
@@ -38,7 +38,7 @@ struct AddBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var broadcast = output.fn_arg().arg[BooleanArg].is_true
+        var broadcast = output.bwd_fn_arg().arg[Bool]
         if broadcast:
             return AddBroadcastBackward[Self.dtype].backward(output)
         var gradbox = output.gradients()[]
@@ -87,7 +87,7 @@ struct AddScalar[dtype: DType](RegisterPassable, Copyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_ADD_SCALAR))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_ADD_SCALAR))
                 out.add_ancestry(self)
 
         return out^
@@ -121,13 +121,13 @@ struct Adder[dtype: DType](RegisterPassable, Copyable):
                 out.requires_grad_(True)
 
                 if self.shape() == other.shape():
-                    out.fnArg = Optional(FnArg[Self.dtype].boolean(False, BACKWARD_ADD))
+                    out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].boolean(BACKWARD_ADD, False))
                     if self.requires_grad:
                         out.add_ancestry(self)
                     if other.requires_grad:
                         out.add_ancestry(other)
                 else:
-                    out.fnArg = Optional(FnArg[Self.dtype].boolean(True, BACKWARD_ADD))
+                    out.bwdFnArg = Optional(BackwardFnArg[Self.dtype](BACKWARD_ADD, True))
                     out.add_ancestry(self, other)
 
         return out^

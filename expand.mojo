@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
-from backpropagation import FnArg, BACKWARD_EXPAND
+from backpropagation import BackwardFnArg, BACKWARD_EXPAND
 from shapes import Shape
 from intarray import IntArray
 from strides import Strides
@@ -72,7 +72,7 @@ struct Expand[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_()
-                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_EXPAND))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_EXPAND))
                 out.add_ancestry(tensor)
 
         return out^

@@ -3,21 +3,10 @@ from tenmo import Tensor
 from shapes import Shape
 from common_utils import panic
 from mnemonics import AddTensor
-from backpropagation import ArgType, FnArg, BLAS_BACKWARD_MATMUL_2D
+from backpropagation import ArgumentType, BackwardFnArg, BLAS_BACKWARD_MATMUL_2D
 from std.sys.defines import get_defined_string
 from gradbox import Gradbox
 from std.memory import ArcPointer
-
-@fieldwise_init
-struct BLASMatmul2dBwdArg[dtype: DType](RegisterPassable & ImplicitlyCopyable):
-    var transpose_A: Bool
-    var transpose_B: Bool
-    var blas: BLASHandleLite[Self.dtype]
-
-    fn into_arg(self) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](self), BLAS_BACKWARD_MATMUL_2D)
-
-
 
 @fieldwise_init
 struct BLASMatmul2dBackward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
@@ -26,7 +15,7 @@ struct BLASMatmul2dBackward[dtype: DType](RegisterPassable & ImplicitlyCopyable)
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.fn_arg().arg[BLASMatmul2dBwdArg[Self.dtype]]
+        var (transpose_A, transpose_B, blas) = output.bwd_fn_arg().arg[Tuple[Bool, Bool, BLASHandleLite[Self.dtype]]]
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
@@ -35,25 +24,25 @@ struct BLASMatmul2dBackward[dtype: DType](RegisterPassable & ImplicitlyCopyable)
         if A.requires_grad:
             var grad_A: Gradbox[Self.dtype]
 
-            if not bwd_arg.transpose_A and not bwd_arg.transpose_B:
+            if not transpose_A and not transpose_B:
                 # Case 1: C = A @ B
                 # grad_A = grad_out @ B^T
-                grad_A = bwd_arg.blas.matmul(grad_out, B, transpose_B=True)
+                grad_A = blas.matmul(grad_out, B, transpose_B=True)
 
-            elif bwd_arg.transpose_A and not bwd_arg.transpose_B:
+            elif transpose_A and not transpose_B:
                 # Case 2: C = A^T @ B
                 # grad_A = B @ grad_out^T  (NOT grad_out @ B^T!)
-                grad_A = bwd_arg.blas.matmul(B, grad_out, transpose_B=True)
+                grad_A = blas.matmul(B, grad_out, transpose_B=True)
 
-            elif not bwd_arg.transpose_A and bwd_arg.transpose_B:
+            elif not transpose_A and transpose_B:
                 # Case 3: C = A @ B^T
                 # grad_A = grad_out @ B
-                grad_A = bwd_arg.blas.matmul(grad_out, B)
+                grad_A = blas.matmul(grad_out, B)
 
             else:  # both transpose_A and transpose_B
                 # Case 4: C = A^T @ B^T
                 # grad_A = B^T @ grad_out^T
-                grad_A = bwd_arg.blas.matmul(
+                grad_A = blas.matmul(
                     B, grad_out, transpose_A=True, transpose_B=True
                 )
 
@@ -63,25 +52,25 @@ struct BLASMatmul2dBackward[dtype: DType](RegisterPassable & ImplicitlyCopyable)
         if B.requires_grad:
             var grad_B: Gradbox[Self.dtype]
 
-            if not bwd_arg.transpose_A and not bwd_arg.transpose_B:
+            if not transpose_A and not transpose_B:
                 # Case 1: C = A @ B
                 # grad_B = A^T @ grad_out
-                grad_B = bwd_arg.blas.matmul(A, grad_out, transpose_A=True)
+                grad_B = blas.matmul(A, grad_out, transpose_A=True)
 
-            elif bwd_arg.transpose_A and not bwd_arg.transpose_B:
+            elif transpose_A and not transpose_B:
                 # Case 2: C = A^T @ B
                 # grad_B = A @ grad_out
-                grad_B = bwd_arg.blas.matmul(A, grad_out)
+                grad_B = blas.matmul(A, grad_out)
 
-            elif not bwd_arg.transpose_A and bwd_arg.transpose_B:
+            elif not transpose_A and transpose_B:
                 # Case 3: C = A @ B^T
                 # grad_B = grad_out^T @ A
-                grad_B = bwd_arg.blas.matmul(grad_out, A, transpose_A=True)
+                grad_B = blas.matmul(grad_out, A, transpose_A=True)
 
             else:  # both transpose_A and transpose_B
                 # Case 4: C = A^T @ B^T
                 # grad_B = grad_out^T @ A^T
-                grad_B = bwd_arg.blas.matmul(
+                grad_B = blas.matmul(
                     grad_out, A, transpose_A=True, transpose_B=True
                 )
 
@@ -392,11 +381,11 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
             )
             if grad_required:
                 C.requires_grad_(True)
-                var bwd_fn_arg = BLASMatmul2dBwdArg[Self.dtype](
-                    transpose_A, transpose_B, self.lite_handle()
-                ).into_arg()
+                var bwd_fn_arg = BackwardFnArg[Self.dtype](BLAS_BACKWARD_MATMUL_2D,
+                    ArgumentType[Self.dtype]((transpose_A, transpose_B, self.lite_handle()))
+                )
 
-                C.fnArg = Optional(bwd_fn_arg^)
+                C.bwdFnArg = Optional(bwd_fn_arg^)
                 C.add_ancestry(A, B)
 
         return C^
@@ -815,11 +804,11 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
             if grad_required:
                 C.requires_grad_(True)
-                var bwd_fn_arg = BLASMatmul2dBwdArg[Self.dtype](
-                    transpose_A, transpose_B, self
-                ).into_arg()
+                var bwd_fn_arg = BackwardFnArg[Self.dtype](BLAS_BACKWARD_MATMUL_2D,
+                    ArgumentType[Self.dtype]((transpose_A, transpose_B, self)
+                ))
 
-                C.fnArg = Optional(bwd_fn_arg^)
+                C.bwdFnArg = Optional(bwd_fn_arg^)
                 C.add_ancestry(A, B)
 
         return C^

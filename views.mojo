@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
 from strides import Strides
-from backpropagation import ViewArg, BACKWARD_VIEW
+from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_VIEW
 from mnemonics import AddTensor, ZeroGrad
 from validators import Validator
 from gradbox import Gradbox
@@ -30,7 +30,7 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward_cpu(output: Tensor[Self.dtype]) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
-        var bwd_arg = output.fn_arg().arg[ViewArg]
+        var (shape, strides, offset) = output.bwd_fn_arg().arg[Tuple[Shape, Strides, Int]]
         var parent = output.ancestry().get(0)
         ref gradbox = output.gradients()[]
 
@@ -44,7 +44,7 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if parent_shape.rank() == 0:
             parent_gradbox[IntArray()] = gradbox.item()
         else:
-            var view_rank = bwd_arg.shape.rank()
+            var view_rank = shape.rank()
             var parent_rank = parent_shape.rank()
 
             var view_data = gradbox.data_ptr()
@@ -55,10 +55,10 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var parent_grad_offset = parent_gradbox.offset()
             ref parent_grad_strides = parent_gradbox.strides()
 
-            var use_fast_path = bwd_arg.shape == parent_shape
+            var use_fast_path = shape == parent_shape
 
             if use_fast_path:
-                var numel = bwd_arg.shape.num_elements()
+                var numel = shape.num_elements()
                 for i in range(numel):
                     parent_grad_data[parent_grad_offset + i] += view_data[
                         view_offset + i
@@ -66,11 +66,11 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             else:
                 var position = IntArray.with_capacity(parent_rank)
 
-                for child_coord in bwd_arg.shape:
+                for child_coord in shape:
                     position.clear()
-                    var abs_index = bwd_arg.offset
+                    var abs_index = offset
                     for i in range(view_rank):
-                        abs_index += bwd_arg.strides[i] * child_coord[i]
+                        abs_index += strides[i] * child_coord[i]
 
                         if (
                             abs_index < parent_offset
@@ -114,7 +114,7 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward_gpu(output: Tensor[Self.dtype]) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
-        var bwd_arg = output.fn_arg().arg[ViewArg]
+        var (shape, strides, offset) = output.bwd_fn_arg().arg[Tuple[Shape, Strides, Int]]
         var parent = output.ancestry().get(0)
         ref gradbox = output.gradients()[]  # GPU gradbox
 
@@ -136,7 +136,7 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             # Re-attach the view's logical shape/strides/offset
             # so backward_cpu coordinate mapping works correctly
             var cpu_ndb = cpu_ndb_flat.share(
-                bwd_arg.shape, Strides.default(bwd_arg.shape), bwd_arg.offset
+                shape, Strides.default(shape), offset
             )
             cpu_gradbox = Gradbox[Self.dtype](cpu_ndb^, share=False)
         except e:
@@ -145,7 +145,7 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 + String(e)
             )
             # Unreachable — satisfies compiler
-            cpu_gradbox = Gradbox[Self.dtype].zeros(bwd_arg.shape)
+            cpu_gradbox = Gradbox[Self.dtype].zeros(shape)
 
         # ── Run CPU backward logic on materialised gradbox ────────────────────
 
@@ -154,7 +154,7 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if parent_shape.rank() == 0:
             parent_gradbox[IntArray()] = cpu_gradbox.item()
         else:
-            var view_rank = bwd_arg.shape.rank()
+            var view_rank = shape.rank()
             var parent_rank = parent_shape.rank()
 
             ref parent_strides = parent.strides()
@@ -166,10 +166,10 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var view_offset = cpu_gradbox.offset()
             ref view_strides = cpu_gradbox.strides()
 
-            var use_fast_path = bwd_arg.shape == parent_shape
+            var use_fast_path = shape == parent_shape
 
             if use_fast_path:
-                var numel = bwd_arg.shape.num_elements()
+                var numel = shape.num_elements()
                 for i in range(numel):
                     parent_grad_data[parent_grad_offset + i] += view_data[
                         view_offset + i
@@ -177,11 +177,11 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             else:
                 var position = IntArray.with_capacity(parent_rank)
 
-                for child_coord in bwd_arg.shape:
+                for child_coord in shape:
                     position.clear()
-                    var abs_index = bwd_arg.offset
+                    var abs_index = offset
                     for i in range(view_rank):
-                        abs_index += bwd_arg.strides[i] * child_coord[i]
+                        abs_index += strides[i] * child_coord[i]
 
                         if (
                             abs_index < parent_offset
@@ -277,14 +277,20 @@ struct View[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_fn_arg = ViewArg(
-                    shape, abs_strides, abs_offset
-                ).into_arg[Self.dtype](BACKWARD_VIEW)
-                out.fnArg = Optional(bwd_fn_arg^)
+                var bwd_fn_arg = BackwardFnArg[Self.dtype](BACKWARD_VIEW,
+                    ArgumentType[Self.dtype]((shape, abs_strides, abs_offset)
+                ))
+                out.bwdFnArg = Optional(bwd_fn_arg^)
                 out.add_ancestry(tensor)
 
         return out^
 
 
 fn main() raises:
+    comptime dtype = DType.float32
+    a = Tensor[dtype].arange(10, requires_grad=True)
+    b = a.view(Shape(2, 5))
+    c = b * 42
+    c.backward()
+    a.grad().print()
     pass

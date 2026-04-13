@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import IntArrayArg, BACKWARD_PERMUTE
+from backpropagation import BackwardFnArg, BACKWARD_PERMUTE
 from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
 from shapes import Shape
@@ -22,7 +22,7 @@ struct PermuteBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         GPU safe: Gradbox.permute → NDBuffer.permute(shared=False)
                   → contiguous() → contiguous_device_state() on GPU.
         """
-        var permutation = output.fn_arg().arg[IntArrayArg].axes
+        var permutation = output.bwd_fn_arg().arg[IntArray]
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
@@ -57,10 +57,7 @@ struct Permute[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_fn_arg = IntArrayArg(
-                    axes.copy()
-                ).into_arg[Self.dtype](BACKWARD_PERMUTE)
-                out.fnArg = Optional(bwd_fn_arg^)
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].from_intarray(BACKWARD_PERMUTE, axes))
                 out.add_ancestry(self)
 
         return out^

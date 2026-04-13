@@ -190,7 +190,7 @@ fn test_tanh_no_grad_mode() raises:
     var x = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var y = x.tanh[track_grad=False]()
 
-    assert_true(not y.has_fn_arg(), "Should not build graph in no_grad mode")
+    assert_true(not y.has_bwd_fn_arg(), "Should not build graph in no_grad mode")
     assert_true(not y.requires_grad, "Output should not require grad")
 
 fn test_tanh_layer_train_mode() raises:
@@ -215,7 +215,7 @@ fn test_tanh_layer_eval_mode() raises:
     var x = Tensor[dtype].d1([1.0], requires_grad=True)
     var y = activation(x)
 
-    assert_true(not y.has_fn_arg(), "Should not build graph in eval mode")
+    assert_true(not y.has_bwd_fn_arg(), "Should not build graph in eval mode")
 
 fn test_tanh_numerical_stability_positive() raises:
     print("test_tanh_numerical_stability_positive")
@@ -516,7 +516,7 @@ fn test_tanh_cpu_fwd_no_requires_grad() raises:
     var t = Tensor[dtype].d1([1.0, 2.0, 3.0])
     var out = t.tanh[track_grad=False]()
     assert_true(not out.requires_grad)
-    assert_true(not out.has_fn_arg())
+    assert_true(not out.has_bwd_fn_arg())
     print("passed")
 
 
@@ -525,7 +525,7 @@ fn test_tanh_cpu_fwd_requires_grad_propagates() raises:
     var t = Tensor[dtype].d1([1.0, 2.0], requires_grad=True)
     var out = t.tanh()
     assert_true(out.requires_grad)
-    assert_true(out.has_fn_arg())
+    assert_true(out.has_bwd_fn_arg())
     assert_true(out.has_ancestry())
     print("passed")
 
@@ -822,7 +822,7 @@ fn test_tanh_gpu_fwd_no_requires_grad() raises:
         var t = Tensor[dtype].d1([1.0, 2.0]).to_gpu()
         var out = t.tanh[track_grad=False]()
         assert_true(not out.requires_grad)
-        assert_true(not out.has_fn_arg())
+        assert_true(not out.has_bwd_fn_arg())
         print("passed")
 
 
@@ -833,7 +833,7 @@ fn test_tanh_gpu_fwd_requires_grad_propagates() raises:
         var out = t.tanh()
         assert_true(out.is_on_gpu())
         assert_true(out.requires_grad)
-        assert_true(out.has_fn_arg())
+        assert_true(out.has_bwd_fn_arg())
         print("passed")
 
 

@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import IntArrayArg, BACKWARD_TRANSPOSE
+from backpropagation import BackwardFnArg, BACKWARD_TRANSPOSE
 from mnemonics import AddTensor
 from validators import Validator
 from gradbox import Gradbox
@@ -12,7 +12,7 @@ struct TransposeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axes = output.fn_arg().arg[IntArrayArg].axes
+        var axes = output.bwd_fn_arg().arg[IntArray]
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var inverted_axes = IntArray.invert_permutation(axes^)
@@ -51,10 +51,13 @@ struct Transpose[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                     > 0 else IntArray.range(0, shape.rank()).reversed()
                 )
                 out.requires_grad_(True)
-                var bwd_fn_arg = IntArrayArg(
+                var bwd_fn_arg = BackwardFnArg[Self.dtype].from_intarray(BACKWARD_TRANSPOSE,
                     normalized_axes
-                ).into_arg[Self.dtype](BACKWARD_TRANSPOSE)
-                out.fnArg = Optional(bwd_fn_arg^)
+                )
+                out.bwdFnArg = Optional(bwd_fn_arg^)
                 out.add_ancestry(self)
 
         return out^
+
+fn main() raises:
+    print("pass")

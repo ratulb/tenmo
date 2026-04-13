@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import FnArg, BACKWARD_FLATTEN
+from backpropagation import BackwardFnArg, BACKWARD_FLATTEN
 from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
@@ -40,7 +40,7 @@ struct FlattenForward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_FLATTEN))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_FLATTEN))
                 out.add_ancestry(self)
 
         return out^

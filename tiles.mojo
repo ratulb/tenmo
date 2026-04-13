@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import TileArg
+from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_TILE
 from intarray import IntArray
 from mnemonics import AddTensor
 from shapes import Shape
@@ -15,12 +15,12 @@ struct TileBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.fn_arg().arg[TileArg]
+        var (repeat, orig_shape) = output.bwd_fn_arg().arg[Tuple[IntArray, Shape]]
         ref grad_out = output.gradients()[]
         var parent = output.ancestry().get(0)
-        var parent_shape = bwd_arg.orig_shape
+        var parent_shape = orig_shape
         var parent_rank = len(parent_shape)
-        var repeat_rank = len(bwd_arg.repeat)
+        var repeat_rank = len(repeat)
 
         # Handle scalar case
         if parent_rank == 0:
@@ -42,7 +42,7 @@ struct TileBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             var orig_dim = 1 if parent_index < 0 else parent_shape[parent_index]
             var repeat_factor = (
-                1 if repeat_index < 0 else bwd_arg.repeat[repeat_index]
+                1 if repeat_index < 0 else repeat[repeat_index]
             )
 
             reshaped_dims.append(repeat_factor)  # repeat dim first
@@ -125,10 +125,10 @@ struct Tile[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = TileArg(
+                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_TILE, ArgumentType[Self.dtype]((
                     repeat, orig_shape
-                ).into_arg[Self.dtype]()
-                out.fnArg = Optional(bwd_arg^)
+                )))
+                out.bwdFnArg = Optional(bwd_arg^)
                 out.add_ancestry(self)
 
         return out^

@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, ZeroGrad
-from backpropagation import FnArg, BACKWARD_RESHAPE
+from backpropagation import BackwardFnArg, BACKWARD_RESHAPE
 from shapes import Shape
 from validators import Validator
 from gradbox import Gradbox
@@ -41,8 +41,8 @@ struct Reshape[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                var fn_arg = FnArg[Self.dtype].null(BACKWARD_RESHAPE)
-                out.fnArg = Optional(fn_arg^)
+                var fn_arg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_RESHAPE)
+                out.bwdFnArg = Optional(fn_arg^)
                 out.add_ancestry(tensor)
 
         return out^

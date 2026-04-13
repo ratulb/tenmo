@@ -1,8 +1,7 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, MAX, MIN
 from backpropagation import (
-    ScalarArg,
-    FnArg,
+    BackwardFnArg,
     BACKWARD_MAX_SCALAR,
     BACKWARD_MIN_SCALAR,
 )
@@ -21,7 +20,7 @@ struct MaxBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
+        var scalar = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
@@ -61,7 +60,7 @@ struct MinBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
+        var scalar = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
@@ -105,7 +104,7 @@ struct MaxScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].scalar(scalar, BACKWARD_MAX_SCALAR))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_MAX_SCALAR, scalar))
                 out.add_ancestry(self)
 
         return out^
@@ -132,7 +131,7 @@ struct MinScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].scalar(scalar, BACKWARD_MIN_SCALAR))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_MIN_SCALAR, scalar))
                 out.add_ancestry(self)
 
         return out^

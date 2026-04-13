@@ -1,7 +1,6 @@
 from tenmo import Tensor
 from backpropagation import (
-    FnArg,
-    ScalarArg,
+    BackwardFnArg,
     BACKWARD_DIVIDE,
     BACKWARD_DIV_SCALAR,
     BACKWARD_RIGHT_DIV_SCALAR,
@@ -18,7 +17,7 @@ struct TrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable)
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
+        var scalar = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
@@ -39,7 +38,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopy
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
+        var scalar = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
         var gradbox = output.grad()
         var tensor = output.ancestry().get(0)
         squared = tensor.__pow__[track_grad=False](2)
@@ -127,7 +126,7 @@ struct DivideScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].scalar(scalar, BACKWARD_RIGHT_DIV_SCALAR))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_RIGHT_DIV_SCALAR, scalar))
                 out.add_ancestry(self)
 
         return out^
@@ -155,7 +154,7 @@ struct DivideByScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].scalar(scalar, BACKWARD_DIV_SCALAR))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_DIV_SCALAR, scalar))
                 out.add_ancestry(self)
 
         return out^
@@ -188,7 +187,7 @@ struct Divider[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             requires_grad = self.requires_grad or other.requires_grad
             if requires_grad:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_DIVIDE))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_DIVIDE))
                 out.add_ancestry(self, other)
 
         return out^
@@ -200,12 +199,14 @@ from std.testing import assert_true
 
 fn main() raises:
     comptime dtype = DType.float32
-    a1 = Tensor[dtype].rand(5000, 1000)
+    a1 = Tensor[dtype].rand(5000, 1000, requires_grad=True)
     b1 = Tensor[dtype].rand(5000, 1000)
     a = a1.transpose(0, 1)
     b = b1.transpose(0, 1)
     start = now()
-    r1 = a / b
+    r1 = a1 / b1
+    r1.backward()
+    a1.grad().print()
     print("CPU divide took: ", (now() - start) * 1000, "ms")
     start = now()
     ag = a.to_gpu()

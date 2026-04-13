@@ -10,7 +10,8 @@ from strides import Strides
 from shapes import Shape
 from device_transfer import Flow
 from device import GPU
-
+from blashandle import BLASHandleLite
+from crossentropy import Reduction
 # Centralized backward operation tags
 
 comptime BACKWARD_ADD = 0
@@ -65,281 +66,54 @@ comptime BACKWARD_EXPONENTIAL = 48
 comptime BACKWARD_DEVICE_TRANSFER = 49
 comptime BACKWARD_MAX_SCALAR = 50
 comptime BACKWARD_MIN_SCALAR = 51
-# ========== Delegate (Variant) ==========
 
 @fieldwise_init
-struct NullArg(RegisterPassable & ImplicitlyCopyable):
+struct NullArgument(RegisterPassable & ImplicitlyCopyable):
     pass
 
-@fieldwise_init
-struct ScalarArg[dtype: DType](RegisterPassable & ImplicitlyCopyable):
-    var scalar: Scalar[Self.dtype]
+#comptime ArgumentType[dtype: DType] = Variant[NullArgument, Bool, Int, Scalar[dtype], IntArray, Buffer[dtype], Tuple[Shape, Strides, Int], Tuple[IntArray, Bool], Tuple[Int, List[Int]], Tuple[IntArray, Bool, NDBuffer[dtype]], Tuple[IntArray, NDBuffer[dtype]], Tuple[IntArray, Shape], Tuple[Scalar[dtype], Scalar[dtype]], Tuple[Int, Bool, Bool], Tuple[Int, Bool, Bool, Scalar[dtype]],Tuple[Int, Int], Tuple[List[Tuple[Int, Int]], String], Tuple[Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int], Tuple[Int, Int, Int, Shape, NDBuffer[dtype]], Tuple[Flow, Optional[GPU]], Tuple[Bool, Bool, BLASHandleLite[dtype]], Tuple[NDBuffer[dtype], NDBuffer[DType.int32], Shape, Reduction, Int, Scalar[dtype], Int, Int, Int], Tuple[NDBuffer[dtype], NDBuffer[dtype], Shape, Reduction, Int, Int, Int]]
+comptime CEProbabilitiesArg[dtype: DType] = Tuple[NDBuffer[dtype], NDBuffer[dtype], Shape, Reduction, Int, Int, Int]
+comptime CEClassIndices[dtype: DType] = Tuple[NDBuffer[dtype], NDBuffer[DType.int32], Shape, Reduction, Int, Scalar[dtype], Int, Int, Int]
+comptime ArgShuffle = Tuple[Int, List[Int]]
+comptime ArgMinmax[dtype: DType] = Tuple[IntArray, Bool, NDBuffer[dtype]]
+comptime ArgSoftmax[dtype: DType] = Tuple[IntArray, NDBuffer[dtype]]
+comptime ArgTile = Tuple[IntArray, Shape]
+comptime ArgClip[dtype: DType] = Tuple[Scalar[dtype], Scalar[dtype]]
+comptime ArgVariance = Tuple[Int, Bool, Bool]
+comptime ArgStd[dtype: DType] = Tuple[Int, Bool, Bool, Scalar[dtype]]
+comptime ArgStack = Tuple[Int, Int]
+comptime ArgPad = Tuple[List[Tuple[Int, Int]], String]
+comptime ArgFusedCol2Im = Tuple[Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int]
+comptime ArgMaxPool2d = Tuple[Int, Int, Int, Shape, NDBuffer[DType.int64]]
+comptime ArgDeviceTransfer = Tuple[Flow, Optional[GPU]]
+comptime ArgumentType[dtype: DType] = Variant[NullArgument, Bool, Int, Scalar[dtype], IntArray, Buffer[dtype], Tuple[Shape, Strides, Int], Tuple[IntArray, Bool], ArgShuffle, ArgMinmax[dtype], ArgSoftmax[dtype], ArgTile, ArgClip[dtype], ArgVariance, ArgStd[dtype], ArgStack, ArgPad, ArgFusedCol2Im, ArgMaxPool2d, ArgDeviceTransfer, Tuple[Bool, Bool, BLASHandleLite[dtype]], CEClassIndices[dtype], CEProbabilitiesArg[dtype]]
 
 @fieldwise_init
-struct BooleanArg(RegisterPassable & ImplicitlyCopyable):
-    var is_true: Bool
-
-@fieldwise_init
-struct SubtractArg(RegisterPassable, ImplicitlyCopyable):
-    var signs: IntArray
-
-    fn __init__(out self):
-        self.signs = IntArray()
-
-    fn __copyinit__(out self, copy: Self):
-        self.signs = copy.signs.copy()
-
-    fn negate(mut self, neg: Bool):
-        if neg:
-            self.signs.append(1)
-        else:
-            self.signs.append(0)
-
-    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), BACKWARD_SUB)
-
-@fieldwise_init
-struct ReductionArgs(RegisterPassable, ImplicitlyCopyable):
-    var axes: IntArray
-    var keepdims: Bool
-    fn into_arg[dtype: DType](self, tag: Int) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), tag) # BACKWARD_SUM/BACKWARD_MEAN
-
-@fieldwise_init
-struct IntArrayArg(RegisterPassable, ImplicitlyCopyable):
-    var axes: IntArray
-    fn into_arg[dtype: DType](self, tag: Int) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), tag)
-
-@fieldwise_init
-struct IntArg(RegisterPassable, ImplicitlyCopyable):
-    var value: Int
-    fn into_arg[dtype: DType](self, tag: Int) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), tag)
-
-
-@fieldwise_init
-struct BufferArg[dtype: DType](ImplicitlyCopyable & Movable):
-    var buffer: Buffer[Self.dtype]
-
-    fn into_arg(self, tag: Int) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](self), tag)
-
-@fieldwise_init
-struct ViewArg(RegisterPassable, ImplicitlyCopyable):
-    var shape: Shape
-    var strides: Strides
-    var offset: Int
-
-    fn into_arg[dtype: DType](self, tag: Int) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), tag)
-
-@fieldwise_init
-struct ShuffleArg(ImplicitlyCopyable & Movable):
-    var axis: Int
-    var permutation: List[Int]
-
-    fn __copyinit__(out self, copy: Self):
-        self.axis = copy.axis
-        self.permutation = copy.permutation.copy()
-
-    fn __moveinit__(out self, deinit take: Self):
-        self.axis = take.axis
-        self.permutation = take.permutation^
-
-    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), BACKWARD_SHUFFLE)
-
-
-@fieldwise_init
-struct MinMaxArg[dtype: DType](ImplicitlyCopyable & Movable):
-    var axes: IntArray
-    var keepdims: Bool
-    var mask: NDBuffer[Self.dtype]  # shape == ancestor.shape, contiguous
-
-    fn into_arg(self) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_MINMAX)
-
-@fieldwise_init
-struct SoftmaxArg[dtype: DType](ImplicitlyCopyable & Movable):
-    var axes: IntArray
-    var softmax_out: NDBuffer[Self.dtype]
-
-    fn into_arg(self, tag: Int) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](self), tag)
-
-@fieldwise_init
-struct TileArg(RegisterPassable, ImplicitlyCopyable):
-    var repeat: IntArray
-    var orig_shape: Shape
-
-    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), BACKWARD_TILE)
-
-@fieldwise_init
-struct ClipArgs[dtype: DType](RegisterPassable & ImplicitlyCopyable):
-    var min_val: Scalar[Self.dtype]
-    var max_val: Scalar[Self.dtype]
-    fn into_arg(self) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_CLIP)
-
-@fieldwise_init
-struct VarianceArgs[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    var axis: Int
-    var unbiased: Bool
-    var keepdims: Bool  # Track if user wanted keepdims
-
-    fn into_arg(self) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_VARIANCE)
-
-@fieldwise_init
-struct StdArgs[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-    var axis: Int
-    var unbiased: Bool
-    var keepdims: Bool
-    var epsilon: Scalar[Self.dtype]
-
-    fn into_arg(self) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](self), BACKWARD_STD)
-
-@fieldwise_init
-struct StackArgs(RegisterPassable, ImplicitlyCopyable):
-    var axis: Int
-    var num_tensors: Int
-
-    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), BACKWARD_STACK)
-
-
-@fieldwise_init
-struct PadArgs(ImplicitlyCopyable & Movable):
-
-    var pad: List[Tuple[Int, Int]]
-    var mode: String
-
-    fn __copyinit__(out self, copy: Self):
-        self.pad = copy.pad.copy()
-        self.mode = copy.mode
-
-    fn __moveinit__(out self, deinit take: Self):
-        self.pad = take.pad.copy()
-        self.mode = take.mode
-
-    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), BACKWARD_PAD)
-
-@fieldwise_init
-struct FusedCol2ImArgs(RegisterPassable, ImplicitlyCopyable):
-    var N: Int
-    var C_in: Int
-    var H_pad: Int
-    var W_pad: Int
-    var C_out: Int
-    var KH: Int
-    var KW: Int
-    var H_out: Int
-    var W_out: Int
-    var stride: Int
-    var dilation: Int
-
-    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), BACKWARD_FUSED_CONV)
-
-@fieldwise_init
-struct MaxPool2dArgs(ImplicitlyCopyable & Movable):
-    comptime TAG = BACKWARD_MAXPOOL2D
-    var kernel_size: Int
-    var stride: Int
-    var padding: Int
-    var input_shape: Shape
-    var argmax_mask: NDBuffer[DType.int64]
-
-    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), BACKWARD_MAXPOOL2D)
-
-
-struct DeviceTransferArgs(ImplicitlyCopyable):
-    var flow: Flow
-    var gpu: Optional[GPU]
-
-    fn __init__(out self):
-        self.flow = Flow.UnMoved
-        self.gpu = None
-
-    fn __init__(out self, flow: Flow):
-        self.flow = flow
-        self.gpu = None
-
-    fn __init__(out self, flow: Flow, gpu: GPU):
-        self.flow = flow
-        self.gpu = gpu
-
-    fn __copyinit__(out self, copy: Self):
-        self.flow = copy.flow.copy()
-        self.gpu = copy.gpu.copy()
-
-    fn __moveinit__(out self, deinit take: Self):
-        self.flow = take.flow
-        self.gpu = take.gpu^
-
-    fn into_arg[dtype: DType](self) -> FnArg[dtype]:
-        return FnArg[dtype](ArgType[dtype](self), BACKWARD_DEVICE_TRANSFER)
-
-
-comptime ArgType[dtype: DType] = Variant[
-    NullArg,
-    ScalarArg[dtype],
-    BooleanArg,
-    SubtractArg,
-    ReductionArgs,
-    BLASMatmul2dBwdArg[dtype],
-    BufferArg[dtype],
-    ViewArg,
-    IntArrayArg,
-    CEClassIndicesArg[dtype],
-    CEProbabilitiesArg[dtype],
-    ShuffleArg,
-    MinMaxArg[dtype],
-    SoftmaxArg[dtype],
-    TileArg,
-    ClipArgs[dtype],
-    VarianceArgs[dtype],
-    StdArgs[dtype],
-    IntArg,
-    StackArgs,
-    PadArgs,
-    FusedCol2ImArgs,
-    MaxPool2dArgs,
-    DeviceTransferArgs,
-]
-
-struct FnArg[dtype: DType](Copyable & Movable):
-    var arg: ArgType[Self.dtype]
-    var tag: Int  # O(1) dispatch key
-
-    fn __init__(out self, var arg: ArgType[Self.dtype], tag: Int):
-        self.arg= arg^
-        self.tag = tag
-
-    fn __moveinit__(out self, deinit take: Self):
-        self.arg = take.arg^
-        self.tag = take.tag
-
-    fn __copyinit__(out self, copy: Self):
-        self.arg = copy.arg.copy()
-        self.tag = copy.tag
+struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
+    var op_code: Int
+    var arg: ArgumentType[Self.dtype]
 
     @staticmethod
-    fn null(tag: Int) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](NullArg()), tag)
+    fn boolean(op_code: Int, is_true: Bool) -> BackwardFnArg[Self.dtype]:
+        return BackwardFnArg[Self.dtype](op_code, ArgumentType[Self.dtype](is_true))
 
     @staticmethod
-    fn scalar(scalar: Scalar[Self.dtype], tag: Int) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](ScalarArg[Self.dtype](scalar)), tag)
+    fn integer(op_code: Int, value: Int) -> BackwardFnArg[Self.dtype]:
+        return BackwardFnArg[Self.dtype](op_code, ArgumentType[Self.dtype](value))
+
 
     @staticmethod
-    fn boolean(is_true: Bool, tag: Int) -> FnArg[Self.dtype]:
-        return FnArg[Self.dtype](ArgType[Self.dtype](BooleanArg(is_true)), tag)
+    fn scalar(op_code: Int, scalar: Scalar[Self.dtype]) -> BackwardFnArg[Self.dtype]:
+        return BackwardFnArg[Self.dtype](op_code, ArgumentType[Self.dtype](scalar))
+
+    @staticmethod
+    fn from_intarray(op_code: Int, array: IntArray) -> BackwardFnArg[Self.dtype]:
+        return BackwardFnArg[Self.dtype](op_code, ArgumentType[Self.dtype](array))
+
+    @staticmethod
+    fn null_arg(op_code: Int) -> BackwardFnArg[Self.dtype]:
+        return BackwardFnArg[Self.dtype](op_code, ArgumentType[Self.dtype](NullArgument()))
+
 
 @fieldwise_init
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
@@ -355,112 +129,112 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         """
 
         # ========== TIER 1: MOST COMMON ==========
-        ref arg = output.fn_arg()
-        var tag = arg.tag
-        if tag == BACKWARD_ADD:
+        ref arg = output.bwd_fn_arg()
+        var op_code = arg.op_code
+        if op_code == BACKWARD_ADD:
             return AddBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_ADD_SCALAR:
+        elif op_code == BACKWARD_ADD_SCALAR:
             return AddBackwardScalar[Self.dtype].backward(output)
-        elif tag == BACKWARD_MULTIPLY_SCALAR:
+        elif op_code == BACKWARD_MULTIPLY_SCALAR:
             return MultiplyBackwardScalar[Self.dtype].backward(output)
-        elif tag == BACKWARD_MULTIPLY:
+        elif op_code == BACKWARD_MULTIPLY:
             return MultiplyBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_SUB:
+        elif op_code == BACKWARD_SUB:
             return SubBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_SUB_SCALAR:
+        elif op_code == BACKWARD_SUB_SCALAR:
             return SubLeftRightBackwardScalar[Self.dtype].backward(output)
-        elif tag == BACKWARD_DIV_SCALAR:
+        elif op_code == BACKWARD_DIV_SCALAR:
             return TrueDivBackwardScalar[Self.dtype].backward(output)
-        elif tag == BACKWARD_RIGHT_DIV_SCALAR:
+        elif op_code == BACKWARD_RIGHT_DIV_SCALAR:
             return RightTrueDivBackwardScalar[Self.dtype].backward(output)
-        elif tag == BACKWARD_DIVIDE:
+        elif op_code == BACKWARD_DIVIDE:
             return DivideBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_SUM:
+        elif op_code == BACKWARD_SUM:
             return SumBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_MEAN:
+        elif op_code == BACKWARD_MEAN:
             return MeanBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_RESHAPE:
+        elif op_code == BACKWARD_RESHAPE:
             return ReshapeBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_MATMUL_2D:
+        elif op_code == BACKWARD_MATMUL_2D:
             return Matmul2dBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_MATMUL_ND:
+        elif op_code == BACKWARD_MATMUL_ND:
             return MatmulNdBackward[Self.dtype].backward(output)
-        elif tag == BLAS_BACKWARD_MATMUL_2D:
+        elif op_code == BLAS_BACKWARD_MATMUL_2D:
             return BLASMatmul2dBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_RELU:
+        elif op_code == BACKWARD_RELU:
             return ReLUBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_VIEW:
+        elif op_code == BACKWARD_VIEW:
             return ViewBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_TRANSPOSE:
+        elif op_code == BACKWARD_TRANSPOSE:
             return TransposeBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_CE_CLASS_INDICES:
+        elif op_code == BACKWARD_CE_CLASS_INDICES:
             return CEClassIndicesBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_CE_PROBABILITIES:
+        elif op_code == BACKWARD_CE_PROBABILITIES:
             return CEProbabilitiesBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_CONTIGUOUS:
+        elif op_code == BACKWARD_CONTIGUOUS:
             return ContiguousBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_SIGMOID:
+        elif op_code == BACKWARD_SIGMOID:
             return SigmoidBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_VECTOR_MATMUL:
-            return VectorMatmulNdBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_MATRIX_VECTOR_MUL:
-            return MatrixVectorMulNdBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_EXPONENTIATION:
+        elif op_code == BACKWARD_EXPONENTIATION:
             return ExponentiationBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_DOT:
-            return DotBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_EXPAND:
+        elif op_code == BACKWARD_EXPAND:
             return ExpandBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_FLATTEN:
+        elif op_code == BACKWARD_FLATTEN:
             return FlattenBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_SQUEEZE:
+        elif op_code == BACKWARD_SQUEEZE:
             return SqueezeBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_UNSQUEEZE:
+        elif op_code == BACKWARD_UNSQUEEZE:
             return UnsqueezeBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_PERMUTE:
+        elif op_code == BACKWARD_PERMUTE:
             return PermuteBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_SHUFFLE:
+        elif op_code == BACKWARD_SHUFFLE:
             return ShuffleBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_MINMAX:
+        elif op_code == BACKWARD_MINMAX:
             return MinMaxBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_SOFTMAX:
+        elif op_code == BACKWARD_SOFTMAX:
             return SoftmaxBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_LOG_SOFTMAX:
+        elif op_code == BACKWARD_LOG_SOFTMAX:
             return LogSoftmaxBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_TILE:
+        elif op_code == BACKWARD_TILE:
             return TileBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_TANH:
+        elif op_code == BACKWARD_TANH:
             return TanhBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_LOG:
+        elif op_code == BACKWARD_LOG:
             return LogBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_CLIP:
+        elif op_code == BACKWARD_CLIP:
             return ClipBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_SQRT:
+        elif op_code == BACKWARD_SQRT:
             return SqrtBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_VARIANCE:
+        elif op_code == BACKWARD_VARIANCE:
             return VarianceBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_STD:
+        elif op_code == BACKWARD_STD:
             return StdBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_CONCAT:
+        elif op_code == BACKWARD_CONCAT:
             return ConcatBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_STACK:
+        elif op_code == BACKWARD_STACK:
             return StackBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_PAD:
+        elif op_code == BACKWARD_PAD:
             return PadBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_FUSED_CONV:
+        elif op_code == BACKWARD_FUSED_CONV:
             return FusedCol2ImBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_MAXPOOL2D:
+        elif op_code == BACKWARD_MAXPOOL2D:
             return MaxPool2dBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_DROPOUT:
+        elif op_code == BACKWARD_DROPOUT:
             return DropoutBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_EXPONENTIAL:
+        elif op_code == BACKWARD_EXPONENTIAL:
             return ExponentialBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_DEVICE_TRANSFER:
+        elif op_code == BACKWARD_DEVICE_TRANSFER:
             return DeviceTransferBackward[Self.dtype].backward(output)
-        elif tag == BACKWARD_MAX_SCALAR:
+        elif op_code == BACKWARD_MAX_SCALAR:
             return MaxBackwardScalar[Self.dtype].backward(output)
-        elif tag == BACKWARD_MIN_SCALAR:
+        elif op_code == BACKWARD_MIN_SCALAR:
             return MinBackwardScalar[Self.dtype].backward(output)
+        elif op_code == BACKWARD_VECTOR_MATMUL:
+            return VectorMatmulNdBackward[Self.dtype].backward(output)
+        elif op_code == BACKWARD_MATRIX_VECTOR_MUL:
+            return MatrixVectorMulNdBackward[Self.dtype].backward(output)
+        elif op_code == BACKWARD_DOT:
+            return DotBackward[Self.dtype].backward(output)
 
         else: return []
 

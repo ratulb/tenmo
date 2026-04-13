@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, SQRT, SQRT_BACKWARD
-from backpropagation import ScalarArg, FnArg, BACKWARD_SQRT
+from backpropagation import BackwardFnArg, BACKWARD_SQRT
 from gradbox import Gradbox
 from std.math import sqrt
 from ndbuffer import NDBuffer
@@ -14,7 +14,7 @@ struct SqrtBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var epsilon = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
+        var epsilon = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
         ref gradbox = output.gradients()[]
         var input_tensor = output.ancestry().get(0)
         ref shape = input_tensor.shape()
@@ -83,7 +83,7 @@ struct Sqrt[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].scalar(epsilon, BACKWARD_SQRT))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_SQRT, epsilon))
                 out.add_ancestry(self)
 
         return out^

@@ -2,9 +2,9 @@ from tenmo import Tensor
 from intarray import IntArray
 from mnemonics import AddTensor, SubtractTensor, Subtract, ReverseSubtract
 from backpropagation import (
-    SubtractArg,
-    BooleanArg,
-    FnArg,
+    ArgumentType,
+    BackwardFnArg,
+    BACKWARD_SUB,
     BACKWARD_SUB_SCALAR,
 )
 from common_utils import panic
@@ -18,7 +18,7 @@ struct SubBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var signs = output.fn_arg().arg[SubtractArg].signs
+        var signs = output.bwd_fn_arg().arg[IntArray]
         if len(signs) == 0:
             return SubtractBroadcastBackward[Self.dtype].backward(output)
         ref gradbox = output.gradients()[]
@@ -44,7 +44,7 @@ struct SubLeftRightBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopy
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var negate = output.fn_arg().arg[BooleanArg].is_true
+        var negate = output.bwd_fn_arg().arg[Bool]
         ref gradbox = output.gradients()[]
         ref ancestor = output.ancestry().get(0)
         return [
@@ -79,7 +79,7 @@ struct SubtractScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].boolean(False, BACKWARD_SUB_SCALAR))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].boolean(BACKWARD_SUB_SCALAR, False))
                 out.add_ancestry(self)
 
         return out^
@@ -100,7 +100,7 @@ struct SubtractFromScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].boolean(True, BACKWARD_SUB_SCALAR))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].boolean(BACKWARD_SUB_SCALAR, True))
                 out.add_ancestry(self)
 
         return out^
@@ -134,18 +134,18 @@ struct Subtractor[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             if requires_grad:
                 out.requires_grad_(True)
 
-                var subract_arg = SubtractArg()
+                var signs = IntArray()
                 if self.shape() == other.shape():
                     if self.requires_grad:
                         out.add_ancestry(self)
-                        subract_arg.negate(False)
+                        signs.append(0)
                     if other.requires_grad:
                         out.add_ancestry(other)
-                        subract_arg.negate(True)
+                        signs.append(1)
                 else:
                     out.add_ancestry(self, other)
 
-                out.fnArg = Optional(subract_arg.into_arg[Self.dtype]())
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].from_intarray(BACKWARD_SUB, signs))
         return out^
 
 
@@ -155,13 +155,16 @@ from std.testing import assert_true
 
 fn main() raises:
     comptime dtype = DType.float32
-    a1 = Tensor[dtype].rand(5000, 1000)
-    b1 = Tensor[dtype].rand(5000, 1000)
+    a1 = Tensor[dtype].rand(5000, 1000, requires_grad=True)
+    b1 = Tensor[dtype].rand(5000, 1000, requires_grad=True)
     a = a1.transpose(0, 1)
     b = b1.transpose(0, 1)
     start = now()
-    r1 = a - b
+    r1 = a1 - b1 - b1
     print("CPU subtract took: ", (now() - start) * 1000, "ms")
+    r1.backward()
+    a1.grad().print()
+    b1.grad().print()
     start = now()
     ag = a.to_gpu()
     bg = b.to_gpu()

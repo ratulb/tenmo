@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from common_utils import panic
-from backpropagation import FnArg, BACKWARD_DOT
+from backpropagation import BackwardFnArg, BACKWARD_DOT
 from mnemonics import AddTensor
 from gradbox import Gradbox
 from shapes import Shape
@@ -105,7 +105,7 @@ struct Dot[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_DOT))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_DOT))
                 out.add_ancestry(lhs, rhs)
 
         return out^

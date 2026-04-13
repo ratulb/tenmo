@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import FnArg, BACKWARD_CONTIGUOUS
+from backpropagation import BackwardFnArg, BACKWARD_CONTIGUOUS
 from mnemonics import AddTensor
 from gradbox import Gradbox
 from shapes import Shape
@@ -54,7 +54,16 @@ struct Contiguous[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_CONTIGUOUS))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_CONTIGUOUS))
                 out.add_ancestry(self)
 
         return out^
+
+fn main() raises:
+    comptime dtype = DType.float32
+    var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
+    var v = a.view(Shape(2, 2), requires_grad=True)
+    var c = v.contiguous()
+    var d = c * 42
+    d.backward()
+    a.grad().print()

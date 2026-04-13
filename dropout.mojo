@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, DROPOUT
-from backpropagation import BufferArg, BACKWARD_DROPOUT
+from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_DROPOUT
 from gradbox import Gradbox
 from common_utils import panic
 from ndbuffer import NDBuffer
@@ -17,7 +17,7 @@ struct DropoutBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var mask_buffer = output.fn_arg().arg[BufferArg[Self.dtype]].buffer
+        var mask_buffer = output.bwd_fn_arg().arg[Buffer[Self.dtype]]
         var grad_output = output.gradients()[]
         var ancestor = output.ancestry().get(0)
 
@@ -133,11 +133,11 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             output.requires_grad_(True)
 
             # Attach backward handler with the mask
-            var bwd_arg = BufferArg[Self.dtype](
-                buffer=mask.buffer.buffer,  # Store the mask buffer
-            ).into_arg(BACKWARD_DROPOUT)
+            var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_DROPOUT, ArgumentType[Self.dtype]((
+                mask.buffer.buffer,  # Store the mask buffer
+            )))
 
-            output.fnArg = Optional(bwd_arg^)
+            output.bwdFnArg = Optional(bwd_arg^)
             output.add_ancestry(x)
 
         return output^

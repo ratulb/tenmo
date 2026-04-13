@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, RELU_FORWARD, RELU_BACKWARD
-from backpropagation import BufferArg, BACKWARD_RELU
+from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_RELU
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from buffers import Buffer
@@ -13,13 +13,13 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.fn_arg().arg[BufferArg[Self.dtype]]
+        var buffer = output.bwd_fn_arg().arg[Buffer[Self.dtype]]
         ref gradbox = output.gradients()[]
         var input_tensor = output.ancestry().get(0)
         ref shape = input_tensor.shape()
 
         var grad_buffer = gradbox.buffer.data_buffer()
-        var result_buffer = grad_buffer * bwd_arg.buffer
+        var result_buffer = grad_buffer * buffer
 
         var ndb = NDBuffer[Self.dtype](result_buffer^, shape)
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
@@ -91,10 +91,13 @@ struct ReLU[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_fn_arg = BufferArg[Self.dtype](
-                    buffer=mask^
-                ).into_arg(BACKWARD_RELU)
-                out.fnArg = Optional(bwd_fn_arg^)
+                var bwd_fn_arg = BackwardFnArg[Self.dtype](BACKWARD_RELU,
+                    ArgumentType[Self.dtype](mask^)
+                )
+                out.bwdFnArg = Optional(bwd_fn_arg^)
                 out.add_ancestry(self)
 
         return out^
+
+fn main() raises:
+    pass

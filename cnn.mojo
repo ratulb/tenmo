@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from backpropagation import (
-    FusedCol2ImArgs,
+    BackwardFnArg, ArgumentType, BACKWARD_FUSED_CONV
 )
 from mnemonics import AddTensor
 from common_utils import panic
@@ -503,21 +503,21 @@ struct FusedIm2Col[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             if grad_required:
                 output.requires_grad_(True)
 
-                var bwd_args = FusedCol2ImArgs(
-                    N=N,
-                    C_in=C_in,
-                    H_pad=H_pad,
-                    W_pad=W_pad,
-                    C_out=C_out,
-                    KH=KH,
-                    KW=KW,
-                    H_out=H_out,
-                    W_out=W_out,
-                    stride=stride,
-                    dilation=dilation,
-                ).into_arg[Self.dtype]()
+                var bwd_args = BackwardFnArg[Self.dtype](BACKWARD_FUSED_CONV, ArgumentType[Self.dtype]((
+                    N,
+                    C_in,
+                    H_pad,
+                    W_pad,
+                    C_out,
+                    KH,
+                    KW,
+                    H_out,
+                    W_out,
+                    stride,
+                    dilation,
+                )))
 
-                output.fnArg = Optional(bwd_args^)
+                output.bwdFnArg = Optional(bwd_args^)
                 output.add_ancestry(padded_image)
                 output.add_ancestry(kernel)
                 output.add_ancestry(bias)
@@ -546,7 +546,7 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_args = output.fn_arg().arg[FusedCol2ImArgs]
+        var (N, C_in, H_pad, W_pad, C_out, KH, KW, H_out, W_out, stride, dilation) = output.bwd_fn_arg().arg[Tuple[Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int]]
         ref grad_output = output.gradients()[]
         var results = List[
             Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -558,7 +558,7 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         # BIAS GRADIENT
         if bias.requires_grad:
             var grad_bias = Self.compute_bias_gradient(
-                grad_output, bwd_args.N, bwd_args.C_out, bwd_args.H_out, bwd_args.W_out
+                grad_output, N, C_out, H_out, W_out
             )
             results.append((bias^, grad_bias^, AddTensor))
 
@@ -567,17 +567,17 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_kernel = Self.compute_kernel_gradient(
                 grad_output,
                 padded_image,
-                bwd_args.N,
-                bwd_args.C_in,
-                bwd_args.C_out,
-                bwd_args.H_pad,
-                bwd_args.W_pad,
-                bwd_args.H_out,
-                bwd_args.W_out,
-                bwd_args.KH,
-                bwd_args.KW,
-                bwd_args.stride,
-                bwd_args.dilation,
+                N,
+                C_in,
+                C_out,
+                H_pad,
+                W_pad,
+                H_out,
+                W_out,
+                KH,
+                KW,
+                stride,
+                dilation,
             )
             results.append((kernel, grad_kernel^, AddTensor))
 
@@ -586,17 +586,17 @@ struct FusedCol2ImBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_padded = Self.compute_input_gradient(
                 grad_output,
                 kernel,
-                bwd_args.N,
-                bwd_args.C_in,
-                bwd_args.C_out,
-                bwd_args.H_pad,
-                bwd_args.W_pad,
-                bwd_args.H_out,
-                bwd_args.W_out,
-                bwd_args.KH,
-                bwd_args.KW,
-                bwd_args.stride,
-                bwd_args.dilation,
+                N,
+                C_in,
+                C_out,
+                H_pad,
+                W_pad,
+                H_out,
+                W_out,
+                KH,
+                KW,
+                stride,
+                dilation,
             )
             results.append((padded_image^, grad_padded^, AddTensor))
 

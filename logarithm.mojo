@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, LOG, LOG_BACKWARD
-from backpropagation import FnArg, ScalarArg, BACKWARD_LOG
+from backpropagation import BackwardFnArg, BACKWARD_LOG
 from gradbox import Gradbox
 from common_utils import Epsilon
 
@@ -13,7 +13,7 @@ struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
-        var epsilon = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
+        var epsilon = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         var result_ndb = parent.buffer.arithmetic_ops[LOG_BACKWARD](gradbox.buffer, epsilon)
@@ -39,7 +39,7 @@ struct Logarithm[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].scalar(epsilon, BACKWARD_LOG))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_LOG, epsilon))
                 out.add_ancestry(self)
 
         return out^

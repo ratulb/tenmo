@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import FnArg, ScalarArg, BACKWARD_EXPONENTIATION
+from backpropagation import BackwardFnArg, BACKWARD_EXPONENTIATION
 from mnemonics import AddTensor, Multiply
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
@@ -18,7 +18,7 @@ struct ExponentiationBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable
         ∂(x**n)/∂x = n * x**(n-1)
         All ops at NDBuffer level — GPU safe, no LLVM lowering issues.
         """
-        var exponent = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
+        var exponent = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
 
@@ -62,7 +62,7 @@ struct Exponentiator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].scalar(exponent, BACKWARD_EXPONENTIATION))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_EXPONENTIATION, exponent))
                 out.add_ancestry(self)
 
         return out^

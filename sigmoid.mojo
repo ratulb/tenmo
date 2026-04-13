@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, SIGMOID_BACKWARD
-from backpropagation import FnArg, BACKWARD_SIGMOID
+from backpropagation import BackwardFnArg, BACKWARD_SIGMOID
 from gradbox import Gradbox
 
 @fieldwise_init
@@ -33,7 +33,7 @@ struct Sigmoid[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_SIGMOID))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_SIGMOID))
                 out.add_ancestry(self)
         return out^
 

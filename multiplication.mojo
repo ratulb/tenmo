@@ -1,8 +1,6 @@
 from tenmo import Tensor
 from backpropagation import (
-    BooleanArg,
-    ScalarArg,
-    FnArg,
+    BackwardFnArg,
     BACKWARD_MULTIPLY,
     BACKWARD_MULTIPLY_SCALAR,
 )
@@ -18,7 +16,7 @@ struct MultiplyBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var factor = output.fn_arg().arg[ScalarArg[Self.dtype]].scalar
+        var factor = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * factor
@@ -37,7 +35,7 @@ struct MultiplyBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var broadcast = output.fn_arg().arg[BooleanArg].is_true
+        var broadcast = output.bwd_fn_arg().arg[Bool]
         if broadcast:
             return MultiplyBroadcastBackward[Self.dtype].backward(output)
         ref gradbox = output.gradients()[]
@@ -102,7 +100,7 @@ struct MultiplyScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.fnArg = Optional(FnArg[Self.dtype].scalar(factor, BACKWARD_MULTIPLY_SCALAR))
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_MULTIPLY_SCALAR, factor))
                 out.add_ancestry(self)
 
         return out^
@@ -138,13 +136,13 @@ struct Multiplicator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out.requires_grad_(True)
 
                 if self.shape() == other.shape():
-                    out.fnArg = Optional(FnArg[Self.dtype].boolean(False, BACKWARD_MULTIPLY))
+                    out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].boolean(BACKWARD_MULTIPLY, False))
                     if id(self) == id(other):  # B = A * A, self == other == A
                         out.add_ancestry(self)
                     else:
                         out.add_ancestry(self, other)
                 else:
-                    out.fnArg = Optional(FnArg[Self.dtype].boolean(True, BACKWARD_MULTIPLY))
+                    out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].boolean(BACKWARD_MULTIPLY, True))
                     out.add_ancestry(self, other)
 
         return out^
@@ -163,10 +161,12 @@ from std.testing import assert_true
 
 fn main() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].arange(5000000)
-    b = Tensor[dtype].arange(5000000)
+    a = Tensor[dtype].arange(5000, requires_grad=True)
+    b = Tensor[dtype].arange(5000)
     start = now()
     r1 = a * b
+    r1.backward()
+    a.grad().print()
     print("CPU took: ", (now() - start) * 1000, "ms")
     start = now()
     ag = a.to_gpu()

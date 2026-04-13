@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
-from backpropagation import VarianceArgs
+from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_VARIANCE
 from gradbox import Gradbox
 from common_utils import panic
 
@@ -12,19 +12,19 @@ struct VarianceBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.fn_arg().arg[VarianceArgs[Self.dtype]]
+        var (axis, unbiased, keepdims) = output.bwd_fn_arg().arg[Tuple[Int, Bool, Bool]]
         var gradbox = output.grad()  # Copying
         var input_tensor = output.ancestry().get(0)
         ref input_shape = input_tensor.shape()
 
         # Compute mean of input (always with keepdims=True)
         var dim = List[Int]()
-        if bwd_arg.axis != -100:
-            dim.append(bwd_arg.axis)
+        if axis != -100:
+            dim.append(axis)
 
         # var mean_val = input_tensor.mean[track_grad=False](dim, keepdims=True)
         var mean_val: Tensor[Self.dtype]
-        if bwd_arg.axis == -100:
+        if axis == -100:
             # Global mean - scalar
             # mean_val = input_tensor.mean[track_grad=False](keepdims=True)
             mean_val = input_tensor.mean[track_grad=False]()
@@ -36,13 +36,13 @@ struct VarianceBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         # Calculate divisor
         var n: Scalar[Self.dtype]
-        if bwd_arg.axis != -100:
-            n = Scalar[Self.dtype](input_shape[bwd_arg.axis])
+        if axis != -100:
+            n = Scalar[Self.dtype](input_shape[axis])
         else:
             n = Scalar[Self.dtype](input_shape.num_elements())
 
         var divisor = n
-        if bwd_arg.unbiased and n > 1:
+        if unbiased and n > 1:
             divisor = n - 1
 
         # Gradient: (2/divisor) * (x - mean)
@@ -51,10 +51,10 @@ struct VarianceBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         # Handle gradient shape
         var gradbox_ancestor: Gradbox[Self.dtype]
 
-        if not bwd_arg.keepdims:
-            if bwd_arg.axis != -100:
+        if not keepdims:
+            if axis != -100:
                 # Specific axis was reduced - unsqueeze that axis
-                gradbox_ancestor = gradbox.unsqueeze([bwd_arg.axis])
+                gradbox_ancestor = gradbox.unsqueeze([axis])
             else:
                 gradbox_ancestor = gradbox^
         else:
@@ -130,12 +130,12 @@ struct Variance[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
-                var bwd_args = VarianceArgs[Self.dtype](
-                    axis=axis,
-                    unbiased=unbiased,
-                    keepdims=keepdims,
-                ).into_arg()
-                result.fnArg = Optional(bwd_args^)
+                var bwd_args = BackwardFnArg[Self.dtype](BACKWARD_VARIANCE, ArgumentType[Self.dtype]((
+                    axis,
+                    unbiased,
+                    keepdims,
+                )))
+                result.bwdFnArg = Optional(bwd_args^)
                 result.add_ancestry(self)
 
         return result^

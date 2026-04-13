@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import FnArg, BACKWARD_VECTOR_MATMUL
+from backpropagation import BackwardFnArg, BACKWARD_VECTOR_MATMUL
 from mnemonics import AddTensor
 from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
@@ -357,7 +357,7 @@ struct VectorMatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var requires_grad = v.requires_grad or M.requires_grad
             if requires_grad:
                 result.requires_grad_(True)
-                result.fnArg = Optional(FnArg[Self.dtype].null(BACKWARD_VECTOR_MATMUL))
+                result.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_VECTOR_MATMUL))
                 result.add_ancestry(v, M)
 
         return result^

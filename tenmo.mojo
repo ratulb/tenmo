@@ -20,7 +20,7 @@ from common_utils import (
 )
 from mnemonics import *
 from indexhelper import IndexIterator
-from backpropagation import Backward, FnArg
+from backpropagation import Backward, BackwardFnArg
 from forwards import *
 from buffers import Buffer
 from validators import Validator
@@ -54,7 +54,7 @@ struct Tensor[dtype: DType](
     var requires_grad: Bool
     var gradbox: UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]
     var ancestors: Optional[Ancestors[Self.dtype]]
-    var fnArg: Optional[FnArg[Self.dtype]]
+    var bwdFnArg: Optional[BackwardFnArg[Self.dtype]]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -69,7 +69,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.fnArg = None
+        self.bwdFnArg = None
         self.init_gradbox()
 
     fn __init__(out self):
@@ -78,7 +78,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = False
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.fnArg = None
+        self.bwdFnArg = None
 
     fn __init__(
         out self,
@@ -102,7 +102,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.fnArg = None
+        self.bwdFnArg = None
         self.init_gradbox()
 
     fn __init__(
@@ -115,7 +115,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.fnArg = None
+        self.bwdFnArg = None
         self.init_gradbox()
 
     @staticmethod
@@ -160,7 +160,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = take.requires_grad
         self.gradbox = take.gradbox
         self.ancestors = take.ancestors^
-        self.fnArg = take.fnArg^
+        self.bwdFnArg = take.bwdFnArg^
 
     fn __copyinit__(out self, copy: Self):
         self._id = copy._id
@@ -172,7 +172,7 @@ struct Tensor[dtype: DType](
         else:
             self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = copy.ancestors.copy()
-        self.fnArg = copy.fnArg.copy()
+        self.bwdFnArg = copy.bwdFnArg.copy()
 
     fn shallow_copy(self) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype]()
@@ -229,7 +229,7 @@ struct Tensor[dtype: DType](
         return self.buffer.shared()
 
     fn is_leaf(self) -> Bool:
-        return self.requires_grad and not self.has_fn_arg()
+        return self.requires_grad and not self.has_bwd_fn_arg()
 
     @always_inline
     fn __len__(self) -> Int:
@@ -513,13 +513,14 @@ struct Tensor[dtype: DType](
                 return None
         return None
 
-    @always_inline
-    fn fn_arg(ref self) -> ref[self.fnArg.value()]FnArg[Self.dtype]:
-        return self.fnArg.value()
 
     @always_inline
-    fn has_fn_arg(self) -> Bool:
-        return self.fnArg is not None
+    fn bwd_fn_arg(ref self) -> ref[self.bwdFnArg.value()]BackwardFnArg[Self.dtype]:
+        return self.bwdFnArg.value()
+
+    @always_inline
+    fn has_bwd_fn_arg(self) -> Bool:
+        return self.bwdFnArg is not None
 
     @always_inline
     fn has_grad(self) -> Bool:
@@ -1916,7 +1917,7 @@ struct Tensor[dtype: DType](
                 var node_idx = id_to_index[node_id]
                 ref node = node_list[node_idx]
                 #if node.has_backward_fn():
-                if node.has_fn_arg():
+                if node.has_bwd_fn_arg():
                     #for result in node.backward_fn()(node):
                     for result in Backward[Self.dtype].invoke(node):
                         ref target_node = result[0]
@@ -1939,7 +1940,7 @@ struct Tensor[dtype: DType](
                             if fanin[target_id] == 0:
                                 var target_idx = id_to_index[target_id]
                                 #if node_list[target_idx].has_backward_fn():
-                                if node_list[target_idx].has_fn_arg():
+                                if node_list[target_idx].has_bwd_fn_arg():
                                     ready_queue.append(target_id)
         except e:
             print(e)

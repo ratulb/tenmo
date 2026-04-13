@@ -24,7 +24,7 @@ Examples:
 from tenmo import Tensor
 from shapes import Shape
 from gradbox import Gradbox
-from backpropagation import PadArgs
+from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_PAD
 from mnemonics import AddTensor
 from common_utils import panic
 from intarray import IntArray
@@ -46,7 +46,9 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         """
         Backward pass: Accumulate gradients based on padding mode.
         """
-        var bwd_arg = output.fn_arg().arg[PadArgs]
+        var bwd_arg = output.bwd_fn_arg().arg[Tuple[List[Tuple[Int, Int]], String]].copy()
+        var pad = bwd_arg[0].copy()
+        var mode = bwd_arg[1].copy()
         ref grad_out = output.gradients()[]
         var parent = output.ancestry().get(0)
 
@@ -61,26 +63,26 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
             )
 
             # Different backward pass based on mode
-            if bwd_arg.mode == "constant":
+            if mode == "constant":
                 if parent_shape.rank() == 4:
                     Self._extract_4d_constant_simd(
-                        grad_out, grad_parent, bwd_arg.pad, parent_shape
+                        grad_out, grad_parent, pad, parent_shape
                     )
                 else:
                     Self._extract_constant(
-                        grad_out, grad_parent, bwd_arg.pad, parent_shape
+                        grad_out, grad_parent, pad, parent_shape
                     )
-            elif bwd_arg.mode == "circular":
+            elif mode == "circular":
                 Self._extract_circular(
-                    grad_out, grad_parent, bwd_arg.pad, parent_shape
+                    grad_out, grad_parent, pad, parent_shape
                 )
-            elif bwd_arg.mode == "replicate":
+            elif mode == "replicate":
                 Self._extract_replicate(
-                    grad_out, grad_parent, bwd_arg.pad, parent_shape
+                    grad_out, grad_parent, pad, parent_shape
                 )
-            elif bwd_arg.mode == "reflect":
+            elif mode == "reflect":
                 Self._extract_reflect(
-                    grad_out, grad_parent, bwd_arg.pad, parent_shape
+                    grad_out, grad_parent, pad, parent_shape
                 )
 
             results.append((parent^, grad_parent^, AddTensor))
@@ -361,10 +363,10 @@ struct Pad[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             if req_grad:
                 result.requires_grad_(True)
                 # PASS MODE TO BACKWARD!
-                var bwd_arg = PadArgs(
+                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_PAD, ArgumentType[Self.dtype]((
                     pad.copy(), mode  # Add mode here
-                ).into_arg[Self.dtype]()
-                result.fnArg = Optional(bwd_arg^)
+                )))
+                result.bwdFnArg = Optional(bwd_arg^)
                 result.add_ancestry(x)
 
         return result^

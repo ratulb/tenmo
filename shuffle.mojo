@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
 from validators import Validator
-from backpropagation import ShuffleArg
+from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_SHUFFLE
 from std.random import shuffle, seed
 from gradbox import Gradbox
 
@@ -256,10 +256,7 @@ struct Shuffle[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = ShuffleArg(
-                    axis, permutation^
-                ).into_arg[Self.dtype]()
-                out.fnArg = Optional(bwd_arg^)
+                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype](BACKWARD_SHUFFLE, ArgumentType[Self.dtype]((axis, permutation^))))
                 out.add_ancestry(self)
 
         return out^
@@ -275,7 +272,9 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.fn_arg().arg[ShuffleArg]
+        var bwd_fn_arg = output.bwd_fn_arg().arg[Tuple[Int, List[Int]]].copy()
+        var axis = bwd_fn_arg[0]
+        var permutation = bwd_fn_arg[1].copy()
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         var shape = gradbox.shape()
@@ -285,7 +284,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
             if gradbox.is_on_gpu():
                 try:
                     var result_ndb = ShuffleGPU[Self.dtype].launch_scatter(
-                        gradbox.buffer, bwd_arg.permutation, bwd_arg.axis
+                        gradbox.buffer, permutation, axis
                     )
                     gradbox_parent = Gradbox[Self.dtype](
                         result_ndb^, share=False
@@ -307,7 +306,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
         gradbox_parent = Gradbox[Self.dtype].zeros(shape, share=False)
         for grad_coord in shape:
             var parent_coord = grad_coord
-            parent_coord[bwd_arg.axis] = bwd_arg.permutation[grad_coord[bwd_arg.axis]]
+            parent_coord[axis] = permutation[grad_coord[axis]]
             gradbox_parent[parent_coord] = gradbox[grad_coord]
 
         return [(parent^, gradbox_parent^, AddTensor)]

@@ -2,7 +2,7 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from shapes import Shape
 from backpropagation import (
-    MinMaxArg,
+    BackwardFnArg, ArgumentType, BACKWARD_MINMAX
 )
 from validators import Validator
 from intarray import IntArray
@@ -17,11 +17,11 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.fn_arg().arg[MinMaxArg[Self.dtype]]
+        var (axes, keepdims, mask) = output.bwd_fn_arg().arg[Tuple[IntArray, Bool, NDBuffer[Self.dtype]]]
         var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var shape = ancestor.shape()
-        var mask_grad = Gradbox[Self.dtype](bwd_arg.mask, share=False)
+        var mask_grad = Gradbox[Self.dtype](mask, share=False)
 
         if shape.rank() == 0:
             return [(ancestor^, mask_grad^, AddTensor)]
@@ -29,10 +29,10 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var grad_expanded: Gradbox[Self.dtype]
         if gradbox.shape() == Shape():
             grad_expanded = Gradbox[Self.dtype].full(
-                shape, gradbox.item(), share=False, device=bwd_arg.mask.device()
+                shape, gradbox.item(), share=False, device=mask.device()
             )
-        elif not bwd_arg.keepdims:
-            grad_expanded = gradbox.unsqueeze(bwd_arg.axes).broadcast_to(
+        elif not keepdims:
+            grad_expanded = gradbox.unsqueeze(axes).broadcast_to(
                 shape, share=False
             )
         else:
@@ -67,10 +67,10 @@ struct MinMax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = MinMaxArg[Self.dtype](
+                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_MINMAX, ArgumentType[Self.dtype]((
                     normalized_axes, keepdims, mask_ndb^
-                ).into_arg()
-                out.fnArg = Optional(bwd_arg^)
+                )))
+                out.bwdFnArg = Optional(bwd_arg^)
                 out.add_ancestry(self)
 
         return out^
