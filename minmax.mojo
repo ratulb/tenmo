@@ -21,7 +21,7 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
     var mask: NDBuffer[Self.dtype]  # shape == ancestor.shape, contiguous
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)

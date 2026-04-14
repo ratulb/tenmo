@@ -22,7 +22,7 @@ struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         self.keepdims = copy.keepdims
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var gradbox_shape = gradbox.shape()

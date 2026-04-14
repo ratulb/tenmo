@@ -15,7 +15,7 @@ struct ClipBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """Gradient passes where min ≤ x ≤ max, blocked elsewhere."""
         ref grad_output = output.gradients()[]

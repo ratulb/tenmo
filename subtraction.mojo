@@ -35,7 +35,7 @@ struct SubBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
@@ -63,7 +63,7 @@ struct SubLeftRightBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopy
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ref ancestor = output.ancestry().get(0)

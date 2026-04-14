@@ -15,7 +15,7 @@ struct UnsqueezeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.gradients()[]
         # Remove the axis we had inserted

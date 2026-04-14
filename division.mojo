@@ -21,7 +21,7 @@ struct TrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable)
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
@@ -45,7 +45,7 @@ struct RightTrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopy
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.grad()
         var tensor = output.ancestry().get(0)
@@ -70,7 +70,7 @@ struct DivideBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var tensor_top = output.ancestry().get(0)

@@ -217,7 +217,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopya
     comptime TAG = BACKWARD_MATRIX_VECTOR_MUL
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         comptime simdwidth = simd_width_of[Self.dtype]()
 

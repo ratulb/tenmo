@@ -185,7 +185,7 @@ struct VectorMatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable
 
     fn backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
-    ](self, read output: Tensor[Self.dtype]) -> List[
+    ](self, output: Tensor[Self.dtype]) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
         ref grad_out = output.gradients()[]

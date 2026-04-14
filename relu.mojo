@@ -14,7 +14,7 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
         return BackwardFn[Self.dtype](Delegate[Self.dtype](self), Self.TAG)
 
     fn backward(
-        self, read output: Tensor[Self.dtype]
+        self, output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var input_tensor = output.ancestry().get(0)
