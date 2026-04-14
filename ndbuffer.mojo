@@ -43,6 +43,7 @@ from mnemonics import (
     SIGMOID_BACKWARD,
     TANH_FORWARD,
     TANH_BACKWARD,
+    RELU_FORWARD,
     Overwrite,
     ReverseDivide,
     Equal,
@@ -749,13 +750,6 @@ struct NDBuffer[dtype: DType](
                 min_idx += (self.shape[i] - 1) * self.strides[i]
             # positive stride: lowest address is already at offset
         return min_idx
-
-    @always_inline
-    fn max_index_parked(self) -> Int:
-        var max_index = self.offset
-        for i in range(self.shape.rank()):
-            max_index += (self.shape[i] - 1) * abs(self.strides[i])
-        return max_index
 
     @always_inline
     fn offset_at(self, indices: IntArray) -> Int:
@@ -2423,6 +2417,84 @@ struct NDBuffer[dtype: DType](
                 index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    @always_inline
+    fn unary_ops_with_mask[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype]) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        """Device-aware unary op + mask. Returns (output, mask).
+
+        CPU path: delegates to Buffer.unary_ops_with_mask (vectorized).
+        GPU path: single kernel pass via UnaryOpsKernel.launch_with_mask.
+
+        Non-contiguous input is handled efficiently on both paths:
+        - CPU: index_iterator() loop (acceptable, matches existing slow path).
+        - GPU: contiguous_device_state() does ONE map_to_host copy, then
+               the kernel runs on the flat buffer — no per-element host calls.
+
+        Returns:
+            Tuple of (output NDBuffer, mask NDBuffer).
+            Both share the same device as self.
+        """
+        var out:  NDBuffer[Self.dtype]
+        var mask: NDBuffer[Self.dtype]
+
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    var result = UnaryOpsKernel[Self.dtype].launch_with_mask[op_code](self)
+                    out  = result[0]
+                    mask = result[1]
+                except e:
+                    panic("NDBuffer unary_ops_with_mask → GPU launch failed: ", String(e))
+                    # Unreachable
+                    out  = Self.Empty()
+                    mask = Self.Empty()
+            else:
+                (out, mask) = self.unary_ops_with_mask_cpu[op_code]()
+        else:
+            (out, mask) = self.unary_ops_with_mask_cpu[op_code]()
+
+        return (out^, mask^)
+
+    @always_inline
+    fn unary_ops_with_mask_cpu[
+        op_code: Int,
+    ](self: NDBuffer[Self.dtype]) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        """CPU path for unary_ops_with_mask. Delegates to Buffer."""
+        if self.is_contiguous():
+            var start = self.offset
+            var end   = start + self.numels()
+            var result = self.buffer.unary_ops_with_mask[op_code](start, end)
+            var out_ndb  = NDBuffer[Self.dtype](result[0], self.shape)
+            var mask_ndb = NDBuffer[Self.dtype](result[1], self.shape)
+            return (out_ndb^, mask_ndb^)
+        else:
+            # Non-contiguous CPU slow path
+            var numels = self.numels()
+            var out_buf  = Buffer[Self.dtype](numels)
+            var mask_buf = Buffer[Self.dtype](numels)
+            var zero = Scalar[Self.dtype](0)
+            var one  = Scalar[Self.dtype](1)
+            var index = 0
+            for idx in self.index_iterator():
+                var val = self.buffer[idx]
+                comptime if op_code == RELU_FORWARD:
+                    if val > zero:
+                        out_buf[index]  = val
+                        mask_buf[index] = one
+                    else:
+                        out_buf[index]  = zero
+                        mask_buf[index] = zero
+                else:
+                    out_buf[index]  = val
+                    mask_buf[index] = one
+                index += 1
+            return (
+                NDBuffer[Self.dtype](out_buf^,  self.shape),
+                NDBuffer[Self.dtype](mask_buf^, self.shape),
+            )
+
 
     @always_inline
     fn float_unary_ops[

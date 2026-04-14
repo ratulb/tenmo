@@ -160,7 +160,95 @@ fn float_unary_ops[
 
         base_idx += stride * CHUNK_SIZE
 
+# =============================================================================
+#
+# Writes two output buffers in a single kernel pass:
+#   result  — the activated values  (ReLU: max(x, 0))
+#   mask    — the gradient gate     (ReLU: 1.0 if x > 0 else 0.0)
+#
+# No floating-point constraint — ReLU is safe for any dtype.
+# =============================================================================
 
+fn unary_ops_with_mask[
+    op_code: Int,
+    dtype: DType,
+    simd_width: Int = simd_width_of[dtype](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    mask:   UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A:      UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    size:   Int,
+):
+    """Single-pass kernel: compute activation output AND gradient mask.
+
+    Both result and mask are written in one GPU pass — no second kernel needed.
+
+    For RELU_FORWARD:
+        result[i] = max(A[i], 0)
+        mask[i]   = 1.0 if A[i] > 0 else 0.0
+
+    Args:
+        result: Output buffer for activated values.
+        mask:   Output buffer for gradient mask.
+        A:      Input buffer (contiguous, same device).
+        size:   Total number of elements.
+    """
+    var tid   = thread_idx.x
+    var gtid  = Int(tid + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
+
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    var zero_vec  = SIMD[dtype, simd_width](0)
+    var one_vec   = SIMD[dtype, simd_width](1)
+    var zero_s    = Scalar[dtype](0)
+    var one_s     = Scalar[dtype](1)
+
+    while base_idx < size:
+
+        comptime for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+
+            if i + simd_width <= size:
+                # Full SIMD chunk
+                var vec_a = A.load[width=simd_width](i)
+
+                var vec_result: SIMD[dtype, simd_width]
+                var vec_mask:   SIMD[dtype, simd_width]
+
+                comptime if op_code == RELU_FORWARD:
+                    vec_result = max(vec_a, zero_vec)
+                    # mask = 1 where input > 0, else 0
+                    vec_mask = vec_a.gt(zero_vec).select(one_vec, zero_vec)
+
+                # Extend here for other ops that need a mask (e.g. leaky ReLU)
+                else:
+                    vec_result = vec_a   # identity fallback
+                    vec_mask   = one_vec
+
+                result.store[width=simd_width](i, vec_result)
+                mask.store[width=simd_width](i, vec_mask)
+
+            elif i < size:
+                # Scalar tail
+                for j in range(size - i):
+                    var val = A[i + j]
+                    var res: Scalar[dtype]
+                    var msk: Scalar[dtype]
+
+                    comptime if op_code == RELU_FORWARD:
+                        res = max(val, zero_s)
+                        msk = one_s if val > zero_s else zero_s
+                    else:
+                        res = val
+                        msk = one_s
+
+                    result[i + j] = res
+                    mask[i + j]   = msk
+
+        base_idx += stride * CHUNK_SIZE
 
 # ── UnaryOpsKernel launcher ───────────────────────────────────────────────────
 
@@ -260,6 +348,79 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             result_buffer^, device_state.gpu
         )
         return NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
+
+    # ──launch_with_mask() ───────────────────────────────────────────────
+    @staticmethod
+    fn launch_with_mask[
+        op_code: Int,
+    ](A: NDBuffer[Self.dtype]) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+        """Launch unary op + mask kernel. Returns (output, mask) as GPU NDBuffers.
+
+        Both buffers are written in a single GPU kernel pass.
+
+        Non-contiguous input is handled via contiguous_device_state() —
+        which performs ONE map_to_host copy (not one per element), then
+        the kernel operates on the resulting flat buffer.
+
+        Args:
+            A: Input NDBuffer. Must be on GPU.
+
+        Returns:
+            Tuple of (output NDBuffer, mask NDBuffer), both contiguous on GPU.
+        """
+        debug_assert(A.is_on_gpu())
+
+        var numels = A.numels()
+        comptime simdwidth = simd_width_of[Self.dtype]()
+
+        var (threads_per_block, num_blocks) = Self.launch_config(numels, simdwidth)
+
+        ref device_state   = A.device_state.value()
+        var device_context = device_state.gpu()
+
+        # Non-contiguous fix: produce one contiguous GPU buffer in a single
+        # map_to_host sweep — NOT one map_to_host call per index.
+        var contig_state = A.contiguous_device_state()
+
+        # Allocate both output buffers on the same device
+        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](numels)
+        var mask_buffer   = device_context.enqueue_create_buffer[Self.dtype](numels)
+
+        var compiled = device_context.compile_function[
+            unary_ops_with_mask[
+                op_code=op_code,
+                dtype=Self.dtype,
+                simd_width=simdwidth,
+                simd_vectors_per_thread=2*simdwidth,
+            ],
+            unary_ops_with_mask[
+                op_code=op_code,
+                dtype=Self.dtype,
+                simd_width=simdwidth,
+                simd_vectors_per_thread=2*simdwidth,
+            ],
+        ]()
+
+        # Single kernel dispatch — writes result AND mask simultaneously
+        device_context.enqueue_function(
+            compiled,
+            result_buffer,          # out: activated values
+            mask_buffer,            # out: gradient mask
+            contig_state.device_buffer(),  # in:  contiguous source
+            numels,
+            grid_dim=num_blocks,
+            block_dim=threads_per_block,
+        )
+
+        device_context.synchronize()
+
+        var result_state = DeviceState[Self.dtype](result_buffer^, device_state.gpu)
+        var mask_state   = DeviceState[Self.dtype](mask_buffer^,   device_state.gpu)
+
+        var out_ndb  = NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
+        var mask_ndb = NDBuffer[Self.dtype].with_device_state(mask_state^,   A.shape)
+
+        return (out_ndb^, mask_ndb^)
 
     @staticmethod
     fn launch_config(numels: Int, simdwidth: Int) -> Tuple[Int, Int]:

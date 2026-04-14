@@ -86,7 +86,7 @@ comptime ArgPad = Tuple[List[Tuple[Int, Int]], String]
 comptime ArgFusedCol2Im = Tuple[Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int]
 comptime ArgMaxPool2d = Tuple[Int, Int, Int, Shape, NDBuffer[DType.int64]]
 comptime ArgDeviceTransfer = Tuple[Flow, Device]
-comptime ArgumentType[dtype: DType] = Variant[NullArgument, Bool, Int, Scalar[dtype], IntArray, Buffer[dtype], Tuple[Shape, Strides, Int], Tuple[IntArray, Bool], ArgShuffle, ArgMinmax[dtype], ArgSoftmax[dtype], ArgTile, ArgClip[dtype], ArgVariance, ArgStd[dtype], ArgStack, ArgPad, ArgFusedCol2Im, ArgMaxPool2d, ArgDeviceTransfer, Tuple[Bool, Bool, BLASHandleLite[dtype]], CEClassIndices[dtype], CEProbabilitiesArg[dtype]]
+comptime ArgumentType[dtype: DType] = Variant[NullArgument, Bool, Int, Scalar[dtype], IntArray, Buffer[dtype], NDBuffer[dtype], Tuple[Shape, Strides, Int], Tuple[IntArray, Bool], ArgShuffle, ArgMinmax[dtype], ArgSoftmax[dtype], ArgTile, ArgClip[dtype], ArgVariance, ArgStd[dtype], ArgStack, ArgPad, ArgFusedCol2Im, ArgMaxPool2d, ArgDeviceTransfer, Tuple[Bool, Bool, BLASHandleLite[dtype]], CEClassIndices[dtype], CEProbabilitiesArg[dtype]]
 
 @fieldwise_init
 struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
@@ -100,7 +100,6 @@ struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     fn integer(op_code: Int, value: Int) -> BackwardFnArg[Self.dtype]:
         return BackwardFnArg[Self.dtype](op_code, ArgumentType[Self.dtype](value))
-
 
     @staticmethod
     fn scalar(op_code: Int, scalar: Scalar[Self.dtype]) -> BackwardFnArg[Self.dtype]:
@@ -243,8 +242,6 @@ fn main() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d3([[[1, 0, 3]]], requires_grad=True)
     var b = Tensor[dtype].d2([[1], [2], [3]], requires_grad=True)
-    #var r =  a.reshape(3,1)
-    #print("r requires_grad? ", r.requires_grad)
     var v = a.into_view()
     var m = v.sigmoid()
     m.backward()
