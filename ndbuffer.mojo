@@ -43,6 +43,7 @@ from mnemonics import (
     SIGMOID_BACKWARD,
     TANH_FORWARD,
     TANH_BACKWARD,
+    RELU_FORWARD,
     Overwrite,
     ReverseDivide,
     Equal,
@@ -749,13 +750,6 @@ struct NDBuffer[dtype: DType](
                 min_idx += (self.shape[i] - 1) * self.strides[i]
             # positive stride: lowest address is already at offset
         return min_idx
-
-    @always_inline
-    fn max_index_parked(self) -> Int:
-        var max_index = self.offset
-        for i in range(self.shape.rank()):
-            max_index += (self.shape[i] - 1) * abs(self.strides[i])
-        return max_index
 
     @always_inline
     fn offset_at(self, indices: IntArray) -> Int:
