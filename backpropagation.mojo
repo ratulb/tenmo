@@ -9,7 +9,7 @@ from intarray import IntArray
 from strides import Strides
 from shapes import Shape
 from device_transfer import Flow
-from device import GPU
+from device import Device
 from blashandle import BLASHandleLite
 from crossentropy import Reduction
 # Centralized backward operation tags
@@ -71,7 +71,7 @@ comptime BACKWARD_MIN_SCALAR = 51
 struct NullArgument(RegisterPassable & ImplicitlyCopyable):
     pass
 
-#comptime ArgumentType[dtype: DType] = Variant[NullArgument, Bool, Int, Scalar[dtype], IntArray, Buffer[dtype], Tuple[Shape, Strides, Int], Tuple[IntArray, Bool], Tuple[Int, List[Int]], Tuple[IntArray, Bool, NDBuffer[dtype]], Tuple[IntArray, NDBuffer[dtype]], Tuple[IntArray, Shape], Tuple[Scalar[dtype], Scalar[dtype]], Tuple[Int, Bool, Bool], Tuple[Int, Bool, Bool, Scalar[dtype]],Tuple[Int, Int], Tuple[List[Tuple[Int, Int]], String], Tuple[Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int], Tuple[Int, Int, Int, Shape, NDBuffer[dtype]], Tuple[Flow, Optional[GPU]], Tuple[Bool, Bool, BLASHandleLite[dtype]], Tuple[NDBuffer[dtype], NDBuffer[DType.int32], Shape, Reduction, Int, Scalar[dtype], Int, Int, Int], Tuple[NDBuffer[dtype], NDBuffer[dtype], Shape, Reduction, Int, Int, Int]]
+#comptime ArgumentType[dtype: DType] = Variant[NullArgument, Bool, Int, Scalar[dtype], IntArray, Buffer[dtype], Tuple[Shape, Strides, Int], Tuple[IntArray, Bool], Tuple[Int, List[Int]], Tuple[IntArray, Bool, NDBuffer[dtype]], Tuple[IntArray, NDBuffer[dtype]], Tuple[IntArray, Shape], Tuple[Scalar[dtype], Scalar[dtype]], Tuple[Int, Bool, Bool], Tuple[Int, Bool, Bool, Scalar[dtype]],Tuple[Int, Int], Tuple[List[Tuple[Int, Int]], String], Tuple[Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int], Tuple[Int, Int, Int, Shape, NDBuffer[dtype]], Tuple[Flow, Device], Tuple[Bool, Bool, BLASHandleLite[dtype]], Tuple[NDBuffer[dtype], NDBuffer[DType.int32], Shape, Reduction, Int, Scalar[dtype], Int, Int, Int], Tuple[NDBuffer[dtype], NDBuffer[dtype], Shape, Reduction, Int, Int, Int]]
 comptime CEProbabilitiesArg[dtype: DType] = Tuple[NDBuffer[dtype], NDBuffer[dtype], Shape, Reduction, Int, Int, Int]
 comptime CEClassIndices[dtype: DType] = Tuple[NDBuffer[dtype], NDBuffer[DType.int32], Shape, Reduction, Int, Scalar[dtype], Int, Int, Int]
 comptime ArgShuffle = Tuple[Int, List[Int]]
@@ -85,7 +85,7 @@ comptime ArgStack = Tuple[Int, Int]
 comptime ArgPad = Tuple[List[Tuple[Int, Int]], String]
 comptime ArgFusedCol2Im = Tuple[Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int]
 comptime ArgMaxPool2d = Tuple[Int, Int, Int, Shape, NDBuffer[DType.int64]]
-comptime ArgDeviceTransfer = Tuple[Flow, Optional[GPU]]
+comptime ArgDeviceTransfer = Tuple[Flow, Device]
 comptime ArgumentType[dtype: DType] = Variant[NullArgument, Bool, Int, Scalar[dtype], IntArray, Buffer[dtype], Tuple[Shape, Strides, Int], Tuple[IntArray, Bool], ArgShuffle, ArgMinmax[dtype], ArgSoftmax[dtype], ArgTile, ArgClip[dtype], ArgVariance, ArgStd[dtype], ArgStack, ArgPad, ArgFusedCol2Im, ArgMaxPool2d, ArgDeviceTransfer, Tuple[Bool, Bool, BLASHandleLite[dtype]], CEClassIndices[dtype], CEProbabilitiesArg[dtype]]
 
 @fieldwise_init

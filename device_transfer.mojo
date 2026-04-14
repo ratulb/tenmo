@@ -7,7 +7,7 @@ from backpropagation import (
 from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
-from device import Device, GPU
+from device import Device, CPU, GPU
 from std.sys import has_accelerator
 
 
@@ -41,7 +41,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
     fn backward(
         output: Tensor[Self.dtype]
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (flow, gpu) = output.bwd_fn_arg().arg[Tuple[Flow, Optional[GPU]]]
+        var (flow, device) = output.bwd_fn_arg().arg[Tuple[Flow, Device]]
         var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         debug_assert(
@@ -76,7 +76,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                         (
                             ancestor^,
                             Gradbox[Self.dtype](
-                                gradbox.buffer.to_gpu(gpu.value()),
+                                gradbox.buffer.to_gpu(device.kind[GPU]),
                                 share=False,
                             ),
                             AddTensor,
@@ -117,12 +117,12 @@ struct DeviceTransfer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                     # Forward was GPU→CPU
                     bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_DEVICE_TRANSFER, ArgumentType[Self.dtype]((
                         Flow.Gpu2Cpu,
-                        self.buffer.device_state.value().get_gpu(),
+                        self.buffer.device_state.value().get_gpu().into(),
                     )))
                 else:
                     # Forward was CPU→GPU
                     bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_DEVICE_TRANSFER, ArgumentType[Self.dtype]((
-                        Flow.Cpu2Gpu
+                        Flow.Cpu2Gpu, CPU().into()
                     )))
                 out.bwdFnArg = Optional(bwd_arg^)
                 out.add_ancestry(self)
