@@ -1378,6 +1378,12 @@ struct Buffer[dtype: DType = DType.float32](
 
         return (out^, mask^)
 
+    fn exp(self, start_index: Int = 0, end_index: Optional[Int] = None)-> Buffer[Self.dtype] where Self.dtype.is_floating_point():
+        return self.float_unary_ops[op_code=EXP](start_index, end_index)
+
+    fn log(self, start_index: Int = 0, end_index: Optional[Int] = None)-> Buffer[Self.dtype] where Self.dtype.is_floating_point():
+        return self.float_unary_ops[op_code=LOG](start_index, end_index)
+
     @always_inline
     fn float_unary_ops[op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()](
         self,

@@ -536,7 +536,7 @@ fn test_into_tensor_large_contiguous_copy() raises:
     N = 1024 * 1024
     var t = Tensor[dtype].zeros(Shape.of(N))
     for i in range(N):
-        t[i] = i
+        t[i] = Float32(i)
     var v = t.view(Shape.of(N))
     var out = v.contiguous()
     assert_true(out.shape() == Shape.of(N))
