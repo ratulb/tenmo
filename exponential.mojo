@@ -5,11 +5,10 @@ from gradbox import Gradbox
 
 
 @fieldwise_init
-struct ExponentialBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ] where Self.dtype.is_floating_point():
@@ -21,7 +20,7 @@ struct ExponentialBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Exponential[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Exponential[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -36,7 +35,9 @@ struct Exponential[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_EXPONENTIAL))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_EXPONENTIAL)
+                )
                 out.add_ancestry(tensor)
 
         return out^

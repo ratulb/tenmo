@@ -1,19 +1,19 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_CLIP
+from backpropagation import BackwardFnArg, ClipArg, BACKWARD_CLIP
 from gradbox import Gradbox
 from std.sys import simd_width_of
 
 
 @fieldwise_init
-struct ClipBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct ClipBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """Gradient passes where min ≤ x ≤ max, blocked elsewhere."""
-        var (min_val, max_val) = output.bwd_fn_arg().arg[Tuple[Scalar[Self.dtype], Scalar[Self.dtype]]]
+        var bwd_arg = output.backward_fn_arg().get[ClipArg[Self.dtype]]()
+        var (min_val, max_val) = bwd_arg.min_val, bwd_arg.max_val
         ref grad_output = output.gradients()[]
         var parent = output.ancestry().get(0)
         ref shape = parent.shape()
@@ -62,7 +62,7 @@ struct ClipBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Clip[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Clip[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -103,10 +103,10 @@ struct Clip[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_CLIP, ArgumentType[Self.dtype]((
-                    min_val, max_val
-                )))
-                out.bwdFnArg = Optional(bwd_arg^)
+                var bwd_arg = BackwardFnArg[Self.dtype](
+                    BACKWARD_CLIP, ClipArg[Self.dtype](min_val, max_val)
+                )
+                out.backwardFnArg = Optional(bwd_arg^)
                 out.add_ancestry(self)
 
         return out^

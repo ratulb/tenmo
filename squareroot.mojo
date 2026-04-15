@@ -1,6 +1,6 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, SQRT, SQRT_BACKWARD
-from backpropagation import BackwardFnArg, BACKWARD_SQRT
+from backpropagation import BackwardFnArg, ScalarArg, BACKWARD_SQRT
 from gradbox import Gradbox
 from std.math import sqrt
 from ndbuffer import NDBuffer
@@ -8,13 +8,14 @@ from common_utils import Epsilon
 
 
 @fieldwise_init
-struct SqrtBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var epsilon = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
+        var epsilon = (
+            output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        )
         ref gradbox = output.gradients()[]
         var input_tensor = output.ancestry().get(0)
         ref shape = input_tensor.shape()
@@ -40,9 +41,7 @@ struct SqrtBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             for coord in shape:
                 # gradient = grad_output * (1 / (2 * sqrt(x)))
-                var sqrt_grad = 1.0 / (
-                    epsilon + (2.0 * input_tensor[coord])
-                )
+                var sqrt_grad = 1.0 / (epsilon + (2.0 * input_tensor[coord]))
                 ancestor_gradbox_buffer[index] = (
                     gradbox_buffer[index] * sqrt_grad
                 )
@@ -52,7 +51,7 @@ struct SqrtBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Sqrt[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Sqrt[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -83,7 +82,9 @@ struct Sqrt[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_SQRT, epsilon))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].scalar_arg(BACKWARD_SQRT, epsilon)
+                )
                 out.add_ancestry(self)
 
         return out^

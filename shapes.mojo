@@ -4,11 +4,11 @@ from array import Array
 
 
 struct Shape(
-    RegisterPassable,
     Equatable,
     ImplicitlyCopyable,
     Iterable,
     Movable,
+    RegisterPassable,
     Sized,
     Writable,
 ):
@@ -117,7 +117,7 @@ struct Shape(
     @no_inline
     fn __str__(self) -> String:
         var s = self.dims.__str__()
-        return "(" + s[byte=1:len(s)-1] + ")"
+        return "(" + s[byte = 1 : len(s) - 1] + ")"
 
     @no_inline
     fn __repr__(self) -> String:

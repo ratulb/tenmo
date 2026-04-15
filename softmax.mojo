@@ -3,7 +3,7 @@ from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from backpropagation import (
     BackwardFnArg,
-    ArgumentType,
+    SoftmaxArg,
     BACKWARD_SOFTMAX,
     BACKWARD_LOG_SOFTMAX,
 )
@@ -21,9 +21,10 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
 ):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (axes, softmax_out) = output.bwd_fn_arg().arg[Tuple[IntArray, NDBuffer[Self.dtype]]]
+        var bwd_arg = output.backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
+        var (axes, softmax_out) = bwd_arg.axes, bwd_arg.softmax_out
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var local_grad_ndb: NDBuffer[Self.dtype]
@@ -48,7 +49,7 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
 
 
 @fieldwise_init
-struct Softmax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -71,12 +72,15 @@ struct Softmax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out.requires_grad_(True)
 
                 # Store NDBuffer — carries device state, GPU safe
-                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_SOFTMAX, ArgumentType[Self.dtype]((
-                    normalized_axes^,
-                    ndb,
-                )))
+                var bwd_arg = BackwardFnArg[Self.dtype](
+                    BACKWARD_SOFTMAX,
+                    SoftmaxArg[Self.dtype](
+                        normalized_axes^,
+                        ndb,
+                    ),
+                )
 
-                out.bwdFnArg = Optional(bwd_arg^)
+                out.backwardFnArg = Optional(bwd_arg^)
                 out.add_ancestry(this)
 
         return out^
@@ -86,7 +90,7 @@ struct Softmax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct LogSoftmax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct LogSoftmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -109,12 +113,15 @@ struct LogSoftmax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(this.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_LOG_SOFTMAX, ArgumentType[Self.dtype]((
-                    normalized_axes^,
-                    softmax_vals,
-                )))
+                var bwd_arg = BackwardFnArg[Self.dtype](
+                    BACKWARD_LOG_SOFTMAX,
+                    SoftmaxArg[Self.dtype](
+                        normalized_axes^,
+                        softmax_vals,
+                    ),
+                )
 
-                out.bwdFnArg = Optional(bwd_arg^)
+                out.backwardFnArg = Optional(bwd_arg^)
                 out.add_ancestry(this)
 
         return out^

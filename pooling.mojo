@@ -11,13 +11,28 @@ from net import Module, Layer, MAXPOOL2D
 
 
 @fieldwise_init
-struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
+struct MaxPool2dBwdArg(ArgumentType):
+    var kernel_size: Int
+    var stride: Int
+    var padding: Int
+    var input_shape: Shape
+    var argmax_mask: NDBuffer[DType.int64]
 
+
+@fieldwise_init
+struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     fn backward(
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (kernel_size, stride, padding, input_shape, argmax_mask) = output.bwd_fn_arg().arg[Tuple[Int, Int, Int, Shape, NDBuffer[DType.int64]]]
+        var bwd_arg = output.backward_fn_arg().get[MaxPool2dBwdArg]()
+        var (kernel_size, stride, padding, input_shape, argmax_mask) = (
+            bwd_arg.kernel_size,
+            bwd_arg.stride,
+            bwd_arg.padding,
+            bwd_arg.input_shape,
+            bwd_arg.argmax_mask,
+        )
         ref grad_output = output.gradients()[]
         var results = List[
             Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -34,9 +49,7 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             var H_out = output_shape[2]
             var W_out = output_shape[3]
 
-            var grad_input = Gradbox[Self.dtype].zeros(
-                input_shape, share=False
-            )
+            var grad_input = Gradbox[Self.dtype].zeros(input_shape, share=False)
 
             # Direct buffer access
             var grad_out_ptr = grad_output.data_ptr()
@@ -89,7 +102,6 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
             results.append((input_tensor^, grad_input^, AddTensor))
 
         return results^
-
 
 
 @fieldwise_init
@@ -263,14 +275,17 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
             if grad_required:
                 output.requires_grad_(True)
-                var bwd_args = BackwardFnArg[Self.dtype](BACKWARD_MAXPOOL2D, ArgumentType[Self.dtype]((
-                    kernel_size,
-                    s,#Stride
-                    pad,
-                    input_shape,
-                    argmax_mask,
-                )))
-                output.bwdFnArg = Optional(bwd_args^)
+                var bwd_args = BackwardFnArg[Self.dtype](
+                    BACKWARD_MAXPOOL2D,
+                    MaxPool2dBwdArg(
+                        kernel_size,
+                        s,  # Stride
+                        pad,
+                        input_shape,
+                        argmax_mask,
+                    ),
+                )
+                output.backwardFnArg = Optional(bwd_args^)
                 output.add_ancestry(input_tensor)
 
         return output^
@@ -425,7 +440,6 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
                     # Unrolled 3×3 window (9 comparisons)
                     comptime for ky in range(3):
-
                         comptime for kx in range(3):
                             var in_y = in_y_start + ky
                             var in_x = in_x_start + kx

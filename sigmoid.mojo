@@ -3,15 +3,13 @@ from mnemonics import AddTensor, SIGMOID_BACKWARD
 from backpropagation import BackwardFnArg, BACKWARD_SIGMOID
 from gradbox import Gradbox
 
-@fieldwise_init
-struct SigmoidBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
-    ) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
+        output: Tensor[Self.dtype],
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         var ndb = output.buffer.arithmetic_ops[SIGMOID_BACKWARD](gradbox.buffer)
@@ -19,7 +17,8 @@ struct SigmoidBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         return [(parent^, gradbox_ancestor^, AddTensor)]
 
-struct Sigmoid[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+
+struct Sigmoid[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -33,9 +32,12 @@ struct Sigmoid[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_SIGMOID))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_SIGMOID)
+                )
                 out.add_ancestry(self)
         return out^
+
 
 fn main() raises:
     print("passes")

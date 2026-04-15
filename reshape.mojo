@@ -9,10 +9,10 @@ from strides import Strides
 
 
 @fieldwise_init
-struct ReshapeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct ReshapeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
@@ -22,8 +22,9 @@ struct ReshapeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             (output, gradbox, ZeroGrad),
         ]
 
+
 @fieldwise_init
-struct Reshape[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Reshape[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -41,8 +42,10 @@ struct Reshape[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                var fn_arg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_RESHAPE)
-                out.bwdFnArg = Optional(fn_arg^)
+                var fn_arg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_RESHAPE
+                )
+                out.backwardFnArg = Optional(fn_arg^)
                 out.add_ancestry(tensor)
 
         return out^
@@ -50,9 +53,13 @@ struct Reshape[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 fn main() raises:
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(12, requires_grad=True).reshape(3, 4, requires_grad=True)
-    #var a =aa.reshape(3, 4, requires_grad=True)
-    #a.print()
+    var a = (
+        Tensor[dtype]
+        .arange(12, requires_grad=True)
+        .reshape(3, 4, requires_grad=True)
+    )
+    # var a =aa.reshape(3, 4, requires_grad=True)
+    # a.print()
 
     var b = a * 42
     c = b.reshape(4, 3)
@@ -61,11 +68,10 @@ fn main() raises:
     e.backward()
     a.grad().print()
 
-    _="""var a_gpu = a.to_gpu()
+    _ = """var a_gpu = a.to_gpu()
     var a_gpu_reshaped = a_gpu.reshape(2, 2, 3)
     var res = a_gpu_reshaped * 42
     res.backward()
     a.grad().print()
     a_gpu.grad().print()
     a_gpu_reshaped.grad().print()"""
-

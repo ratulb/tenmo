@@ -1,7 +1,7 @@
 from tenmo import Tensor
 from shapes import Shape
 from strides import Strides
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_VIEW
+from backpropagation import BackwardFnArg, ViewArg, BACKWARD_VIEW
 from mnemonics import AddTensor, ZeroGrad
 from validators import Validator
 from gradbox import Gradbox
@@ -14,23 +14,27 @@ from ndbuffer import NDBuffer
 
 
 @fieldwise_init
-struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
-    fn backward(output: Tensor[Self.dtype]) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
-
+    fn backward(
+        output: Tensor[Self.dtype],
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         comptime if has_accelerator():
             if output.is_on_gpu():
                 return Self.backward_gpu(output)
         return Self.backward_cpu(output)
 
     @staticmethod
-    fn backward_cpu(output: Tensor[Self.dtype]) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
-        var (shape, strides, offset) = output.bwd_fn_arg().arg[Tuple[Shape, Strides, Int]]
+    fn backward_cpu(
+        output: Tensor[Self.dtype],
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_arg = output.backward_fn_arg().get[ViewArg]()
+        var (shape, strides, offset) = (
+            bwd_arg.shape,
+            bwd_arg.strides,
+            bwd_arg.offset,
+        )
+
         var parent = output.ancestry().get(0)
         ref gradbox = output.gradients()[]
 
@@ -111,10 +115,15 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         return [(parent^, parent_gradbox^, AddTensor)]
 
     @staticmethod
-    fn backward_gpu(output: Tensor[Self.dtype]) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
-        var (shape, strides, offset) = output.bwd_fn_arg().arg[Tuple[Shape, Strides, Int]]
+    fn backward_gpu(
+        output: Tensor[Self.dtype],
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_arg = output.backward_fn_arg().get[ViewArg]()
+        var (shape, strides, offset) = (
+            bwd_arg.shape,
+            bwd_arg.strides,
+            bwd_arg.offset,
+        )
         var parent = output.ancestry().get(0)
         ref gradbox = output.gradients()[]  # GPU gradbox
 
@@ -245,8 +254,9 @@ struct ViewBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         output.zero_grad()
         return [(parent^, final_gradbox^, AddTensor)]
 
+
 @fieldwise_init
-struct View[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct View[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
     fn forward[
@@ -277,10 +287,10 @@ struct View[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_fn_arg = BackwardFnArg[Self.dtype](BACKWARD_VIEW,
-                    ArgumentType[Self.dtype]((shape, abs_strides, abs_offset)
-                ))
-                out.bwdFnArg = Optional(bwd_fn_arg^)
+                var bwd_fn_arg = BackwardFnArg[Self.dtype](
+                    BACKWARD_VIEW, ViewArg(shape, abs_strides, abs_offset)
+                )
+                out.backwardFnArg = Optional(bwd_fn_arg^)
                 out.add_ancestry(tensor)
 
         return out^

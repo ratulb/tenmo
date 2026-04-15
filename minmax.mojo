@@ -1,9 +1,7 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
 from shapes import Shape
-from backpropagation import (
-    BackwardFnArg, ArgumentType, BACKWARD_MINMAX
-)
+from backpropagation import BackwardFnArg, MinMaxArg, BACKWARD_MINMAX
 from validators import Validator
 from intarray import IntArray
 from gradbox import Gradbox
@@ -12,12 +10,16 @@ from ndbuffer import NDBuffer
 
 @fieldwise_init
 struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
-
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (axes, keepdims, mask) = output.bwd_fn_arg().arg[Tuple[IntArray, Bool, NDBuffer[Self.dtype]]]
+        var bwd_arg = output.backward_fn_arg().get[MinMaxArg[Self.dtype]]()
+        var (axes, keepdims, mask) = (
+            bwd_arg.axes,
+            bwd_arg.keepdims,
+            bwd_arg.mask,
+        )
         var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var shape = ancestor.shape()
@@ -43,7 +45,7 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 @fieldwise_init
-struct MinMax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         max: Bool, track_grad: Bool = True
@@ -67,13 +69,15 @@ struct MinMax[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_MINMAX, ArgumentType[Self.dtype]((
-                    normalized_axes, keepdims, mask_ndb^
-                )))
-                out.bwdFnArg = Optional(bwd_arg^)
+                var bwd_arg = BackwardFnArg[Self.dtype](
+                    BACKWARD_MINMAX,
+                    MinMaxArg[Self.dtype](normalized_axes, keepdims, mask_ndb^),
+                )
+                out.backwardFnArg = Optional(bwd_arg^)
                 out.add_ancestry(self)
 
         return out^
+
 
 fn main() raises:
     pass

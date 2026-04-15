@@ -3,19 +3,26 @@ from tenmo import Tensor
 from shapes import Shape
 from common_utils import panic
 from mnemonics import AddTensor
-from backpropagation import ArgumentType, BackwardFnArg, BLAS_BACKWARD_MATMUL_2D
+from backpropagation import BlasArg, BackwardFnArg, BLAS_BACKWARD_MATMUL_2D
 from std.sys.defines import get_defined_string
 from gradbox import Gradbox
 from std.memory import ArcPointer
 
-@fieldwise_init
-struct BLASMatmul2dBackward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
+@fieldwise_init
+struct BLASMatmul2dBackward[dtype: DType](
+    RegisterPassable & ImplicitlyCopyable
+):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (transpose_A, transpose_B, blas) = output.bwd_fn_arg().arg[Tuple[Bool, Bool, BLASHandleLite[Self.dtype]]]
+        var bwd_arg = output.backward_fn_arg().get[BlasArg[Self.dtype]]()
+        var (transpose_A, transpose_B, blas) = (
+            bwd_arg.transpose_A,
+            bwd_arg.transpose_B,
+            bwd_arg.blas,
+        )
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
@@ -78,6 +85,7 @@ struct BLASMatmul2dBackward[dtype: DType](RegisterPassable & ImplicitlyCopyable)
 
         return result^
 
+
 comptime BLAS_PATH = get_defined_string[
     "BLAS_PATH", "/lib/x86_64-linux-gnu/libopenblas.so.0"
 ]()
@@ -106,7 +114,7 @@ comptime CblasNoTrans = Int32(111)
 comptime CblasTrans = Int32(112)
 
 # Function type aliases
-comptime CBLAS_SGEMM_FN = fn (
+comptime CBLAS_SGEMM_FN = fn(
     Int32,  # order
     Int32,  # transA
     Int32,  # transB
@@ -123,7 +131,7 @@ comptime CBLAS_SGEMM_FN = fn (
     Int32,  # ldc
 ) -> None
 
-comptime CBLAS_DGEMM_FN = fn (
+comptime CBLAS_DGEMM_FN = fn(
     Int32,
     Int32,
     Int32,
@@ -173,7 +181,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
     fn is_initialized(self) -> Bool:
         return not self._handle_ptr == None
 
-    fn get_error(ref self) -> ref [self._error_msg] String:
+    fn get_error(ref self) -> ref[self._error_msg] String:
         return self._error_msg
 
     # ========== FIXED: REQUIRED PARAMS BEFORE OPTIONAL ==========
@@ -381,11 +389,14 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
             )
             if grad_required:
                 C.requires_grad_(True)
-                var bwd_fn_arg = BackwardFnArg[Self.dtype](BLAS_BACKWARD_MATMUL_2D,
-                    ArgumentType[Self.dtype]((transpose_A, transpose_B, self.lite_handle()))
+                var backward_fn_arg = BackwardFnArg[Self.dtype](
+                    BLAS_BACKWARD_MATMUL_2D,
+                    BlasArg[Self.dtype](
+                        transpose_A, transpose_B, self.lite_handle()
+                    ),
                 )
 
-                C.bwdFnArg = Optional(bwd_fn_arg^)
+                C.backwardFnArg = Optional(backward_fn_arg^)
                 C.add_ancestry(A, B)
 
         return C^
@@ -804,11 +815,12 @@ struct BLASHandleLite[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
             if grad_required:
                 C.requires_grad_(True)
-                var bwd_fn_arg = BackwardFnArg[Self.dtype](BLAS_BACKWARD_MATMUL_2D,
-                    ArgumentType[Self.dtype]((transpose_A, transpose_B, self)
-                ))
+                var backward_fn_arg = BackwardFnArg[Self.dtype](
+                    BLAS_BACKWARD_MATMUL_2D,
+                    BlasArg[Self.dtype](transpose_A, transpose_B, self),
+                )
 
-                C.bwdFnArg = Optional(bwd_fn_arg^)
+                C.backwardFnArg = Optional(backward_fn_arg^)
                 C.add_ancestry(A, B)
 
         return C^

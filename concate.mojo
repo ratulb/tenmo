@@ -1,6 +1,7 @@
 from tenmo import Tensor
 from backpropagation import (
     BackwardFnArg,
+    Integer,
     BACKWARD_CONCAT,
 )
 from mnemonics import AddTensor
@@ -12,13 +13,12 @@ from shapes import Shape
 
 
 @fieldwise_init
-struct ConcatBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axis = output.bwd_fn_arg().arg[Int]
+        var axis = output.backward_fn_arg().get[Integer]().value
         ref grad_output = output.gradients()[]
         var grad_data = grad_output.data_ptr()
         ref grad_shape = grad_output.shape()
@@ -75,7 +75,7 @@ struct ConcatBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Concate[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Concate[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -171,7 +171,11 @@ struct Concate[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(grad_required)
             if grad_required:
                 result.requires_grad_(True)
-                result.bwdFnArg = Optional(BackwardFnArg[Self.dtype].integer(BACKWARD_CONCAT,concat_axis))
+                result.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].integer_arg(
+                        BACKWARD_CONCAT, concat_axis
+                    )
+                )
                 for i in range(len(tensors)):
                     result.add_ancestry(tensors[i])
 

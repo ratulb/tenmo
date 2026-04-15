@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import BackwardFnArg, BACKWARD_PERMUTE
+from backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_PERMUTE
 from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
 from shapes import Shape
@@ -10,11 +10,10 @@ from gradbox import Gradbox
 
 
 @fieldwise_init
-struct PermuteBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         Backward pass for permute.
@@ -22,7 +21,7 @@ struct PermuteBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         GPU safe: Gradbox.permute → NDBuffer.permute(shared=False)
                   → contiguous() → contiguous_device_state() on GPU.
         """
-        var permutation = output.bwd_fn_arg().arg[IntArray]
+        var permutation = output.backward_fn_arg().get[IntArrayArg]().array
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
@@ -39,7 +38,7 @@ struct PermuteBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Permute[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Permute[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -57,7 +56,11 @@ struct Permute[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].from_intarray(BACKWARD_PERMUTE, axes))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].from_intarray(
+                        BACKWARD_PERMUTE, axes
+                    )
+                )
                 out.add_ancestry(self)
 
         return out^

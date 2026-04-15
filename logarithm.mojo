@@ -1,29 +1,31 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, LOG, LOG_BACKWARD
-from backpropagation import BackwardFnArg, BACKWARD_LOG
+from backpropagation import BackwardFnArg, ScalarArg, BACKWARD_LOG
 from gradbox import Gradbox
 from common_utils import Epsilon
 
-@fieldwise_init
-struct LogBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
-    ) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ]:
-        var epsilon = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
+        output: Tensor[Self.dtype],
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var epsilon = (
+            output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        )
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
-        var result_ndb = parent.buffer.arithmetic_ops[LOG_BACKWARD](gradbox.buffer, epsilon)
+        var result_ndb = parent.buffer.arithmetic_ops[LOG_BACKWARD](
+            gradbox.buffer, epsilon
+        )
         var parent_gradbox = Gradbox[Self.dtype](result_ndb^, share=False)
 
         return [(parent^, parent_gradbox^, AddTensor)]
 
-@fieldwise_init
-struct Logarithm[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct Logarithm[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True,
@@ -39,10 +41,13 @@ struct Logarithm[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_LOG, epsilon))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].scalar_arg(BACKWARD_LOG, epsilon)
+                )
                 out.add_ancestry(self)
 
         return out^
+
 
 fn main() raises:
     pass

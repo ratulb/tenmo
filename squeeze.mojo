@@ -8,11 +8,10 @@ from common_utils import panic
 
 
 @fieldwise_init
-struct SqueezeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ancestor = output.ancestry().get(0)
         var gradbox = output.gradients()[]
@@ -36,8 +35,9 @@ struct SqueezeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             ),  # Send out a signal to this output of squeeze op to zero out its grad(No accumulation of grad for view)
         ]
 
+
 @fieldwise_init
-struct Squeeze[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Squeeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     # Squeeze specified axes or all dims of size 1 if no axes provided
     @staticmethod
     fn forward[
@@ -61,7 +61,9 @@ struct Squeeze[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_SQUEEZE))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_SQUEEZE)
+                )
                 out.add_ancestry(tensor)
 
         return out^

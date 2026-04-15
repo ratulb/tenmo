@@ -3,12 +3,12 @@ from mnemonics import AddTensor, TANH_BACKWARD
 from backpropagation import BackwardFnArg, BACKWARD_TANH
 from gradbox import Gradbox
 
-@fieldwise_init
-struct TanhBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[
         Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
     ] where Self.dtype.is_floating_point():
@@ -21,7 +21,7 @@ struct TanhBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Tanh[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Tanh[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -37,9 +37,12 @@ struct Tanh[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_TANH))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_TANH)
+                )
                 out.add_ancestry(self)
         return out^
+
 
 fn main() raises:
     print("passes")

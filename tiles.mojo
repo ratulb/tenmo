@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_TILE
+from backpropagation import BackwardFnArg, TilesArg, BACKWARD_TILE
 from intarray import IntArray
 from mnemonics import AddTensor
 from shapes import Shape
@@ -9,13 +9,13 @@ from indexhelper import IndexCalculator
 
 
 @fieldwise_init
-struct TileBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (repeat, orig_shape) = output.bwd_fn_arg().arg[Tuple[IntArray, Shape]]
+        var bwd_arg = output.backward_fn_arg().get[TilesArg]()
+        var (repeat, orig_shape) = bwd_arg.repeat, bwd_arg.orig_shape
         ref grad_out = output.gradients()[]
         var parent = output.ancestry().get(0)
         var parent_shape = orig_shape
@@ -41,9 +41,7 @@ struct TileBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var repeat_index = repeat_rank - effective_rank + i
 
             var orig_dim = 1 if parent_index < 0 else parent_shape[parent_index]
-            var repeat_factor = (
-                1 if repeat_index < 0 else repeat[repeat_index]
-            )
+            var repeat_factor = 1 if repeat_index < 0 else repeat[repeat_index]
 
             reshaped_dims.append(repeat_factor)  # repeat dim first
             reshaped_dims.append(orig_dim)  # original dim second
@@ -61,7 +59,7 @@ struct TileBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Tile[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Tile[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -125,10 +123,10 @@ struct Tile[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_TILE, ArgumentType[Self.dtype]((
-                    repeat, orig_shape
-                )))
-                out.bwdFnArg = Optional(bwd_arg^)
+                var bwd_arg = BackwardFnArg[Self.dtype](
+                    BACKWARD_TILE, TilesArg(repeat, orig_shape)
+                )
+                out.backwardFnArg = Optional(bwd_arg^)
                 out.add_ancestry(self)
 
         return out^

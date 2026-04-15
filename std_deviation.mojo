@@ -1,18 +1,23 @@
 from tenmo import Tensor
 from mnemonics import AddTensor
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_STD
+from backpropagation import BackwardFnArg, StdArg, BACKWARD_STD
 from gradbox import Gradbox
 from common_utils import panic, Epsilon
 
 
 @fieldwise_init
-struct StdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (axis, unbiased, keepdims, epsilon) = output.bwd_fn_arg().arg[Tuple[Int, Bool, Bool, Scalar[Self.dtype]]]
+        var bwd_arg = output.backward_fn_arg().get[StdArg[Self.dtype]]()
+        var (axis, unbiased, keepdims, epsilon) = (
+            bwd_arg.axis,
+            bwd_arg.unbiased,
+            bwd_arg.keepdims,
+            bwd_arg.epsilon,
+        )
         var gradbox = output.grad()  # Copy
         var input_tensor = output.ancestry().get(0)
         ref input_shape = input_tensor.shape()
@@ -73,7 +78,7 @@ struct StdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct StdDev[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -102,13 +107,16 @@ struct StdDev[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
-                var bwd_args = BackwardFnArg[Self.dtype](BACKWARD_STD, ArgumentType[Self.dtype]((
-                    axis,
-                    unbiased,
-                    keepdims,
-                    epsilon,
-                )))
-                result.bwdFnArg = Optional(bwd_args^)
+                var bwd_args = BackwardFnArg[Self.dtype](
+                    BACKWARD_STD,
+                    StdArg[Self.dtype](
+                        axis,
+                        unbiased,
+                        keepdims,
+                        epsilon,
+                    ),
+                )
+                result.backwardFnArg = Optional(bwd_args^)
                 result.add_ancestry(self)
 
         return result^

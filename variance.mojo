@@ -6,14 +6,25 @@ from common_utils import panic
 
 
 @fieldwise_init
-struct VarianceBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct VarianceBwdArg(ArgumentType):
+    var axis: Int
+    var unbiased: Bool
+    var keepdims: Bool
 
+
+@fieldwise_init
+struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (axis, unbiased, keepdims) = output.bwd_fn_arg().arg[Tuple[Int, Bool, Bool]]
-        var gradbox = output.grad()  # Copying
+        var bwd_arg = output.backward_fn_arg().get[VarianceBwdArg]()
+        var (axis, unbiased, keepdims) = (
+            bwd_arg.axis,
+            bwd_arg.unbiased,
+            bwd_arg.keepdims,
+        )
+        var gradbox = output.gradients()[]
         var input_tensor = output.ancestry().get(0)
         ref input_shape = input_tensor.shape()
 
@@ -67,7 +78,7 @@ struct VarianceBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Variance[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Variance[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
     fn forward[
@@ -130,12 +141,15 @@ struct Variance[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 result.requires_grad_(True)
-                var bwd_args = BackwardFnArg[Self.dtype](BACKWARD_VARIANCE, ArgumentType[Self.dtype]((
-                    axis,
-                    unbiased,
-                    keepdims,
-                )))
-                result.bwdFnArg = Optional(bwd_args^)
+                var bwd_args = BackwardFnArg[Self.dtype](
+                    BACKWARD_VARIANCE,
+                    VarianceBwdArg(
+                        axis,
+                        unbiased,
+                        keepdims,
+                    ),
+                )
+                result.backwardFnArg = Optional(bwd_args^)
                 result.add_ancestry(self)
 
         return result^

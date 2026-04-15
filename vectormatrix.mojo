@@ -10,8 +10,9 @@ from vectormatrix_kernel import VectorMatmulNdGpu
 
 
 @fieldwise_init
-struct VectorMatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct VectorMatmulNdBackward[dtype: DType](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     fn backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
@@ -197,8 +198,9 @@ struct VectorMatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable
 
         return results^
 
+
 @fieldwise_init
-struct VectorMatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         simdwidth: Int = simd_width_of[Self.dtype]()
@@ -357,7 +359,9 @@ struct VectorMatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var requires_grad = v.requires_grad or M.requires_grad
             if requires_grad:
                 result.requires_grad_(True)
-                result.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_VECTOR_MATMUL))
+                result.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_VECTOR_MATMUL)
+                )
                 result.add_ancestry(v, M)
 
         return result^

@@ -54,7 +54,7 @@ struct Tensor[dtype: DType](
     var requires_grad: Bool
     var gradbox: UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]
     var ancestors: Optional[Ancestors[Self.dtype]]
-    var bwdFnArg: Optional[BackwardFnArg[Self.dtype]]
+    var backwardFnArg: Optional[BackwardFnArg[Self.dtype]]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -69,7 +69,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.bwdFnArg = None
+        self.backwardFnArg = None
         self.init_gradbox()
 
     fn __init__(out self):
@@ -78,7 +78,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = False
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.bwdFnArg = None
+        self.backwardFnArg = None
 
     fn __init__(
         out self,
@@ -102,7 +102,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.bwdFnArg = None
+        self.backwardFnArg = None
         self.init_gradbox()
 
     fn __init__(
@@ -115,7 +115,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.bwdFnArg = None
+        self.backwardFnArg = None
         self.init_gradbox()
 
     @staticmethod
@@ -160,7 +160,7 @@ struct Tensor[dtype: DType](
         self.requires_grad = take.requires_grad
         self.gradbox = take.gradbox
         self.ancestors = take.ancestors^
-        self.bwdFnArg = take.bwdFnArg^
+        self.backwardFnArg = take.backwardFnArg^
 
     fn __copyinit__(out self, copy: Self):
         self._id = copy._id
@@ -172,7 +172,7 @@ struct Tensor[dtype: DType](
         else:
             self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = copy.ancestors.copy()
-        self.bwdFnArg = copy.bwdFnArg.copy()
+        self.backwardFnArg = copy.backwardFnArg.copy()
 
     fn shallow_copy(self) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype]()
@@ -229,18 +229,18 @@ struct Tensor[dtype: DType](
         return self.buffer.shared()
 
     fn is_leaf(self) -> Bool:
-        return self.requires_grad and not self.has_bwd_fn_arg()
+        return self.requires_grad and not self.has_backward_fn_arg()
 
     @always_inline
     fn __len__(self) -> Int:
         return self.shape()[0] if self.shape() != Shape() else 0
 
     @always_inline
-    fn shape(ref self) -> ref [self.buffer.shape] Shape:
+    fn shape(ref self) -> ref[self.buffer.shape] Shape:
         return self.buffer.shape
 
     @always_inline
-    fn strides(ref self) -> ref [self.buffer.strides] Strides:
+    fn strides(ref self) -> ref[self.buffer.strides] Strides:
         return self.buffer.strides
 
     @always_inline
@@ -360,10 +360,12 @@ struct Tensor[dtype: DType](
         track_grad: Bool = True
     ](mut self, *indices: Idx) -> Tensor[Self.dtype]:
         # Compute view metadata
-        var(view_shape, view_strides, offset) = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                self.shape(), self.strides(), indices
-            )
+        var (
+            view_shape,
+            view_strides,
+            offset,
+        ) = Validator.validate_and_compute_advanced_indexing_metadata(
+            self.shape(), self.strides(), indices
         )
 
         # Handle scalar (rank-0) case
@@ -445,7 +447,9 @@ struct Tensor[dtype: DType](
         s += (
             ", Device : "
             + "gpu: "
-            + String(self.buffer.gpu_id()) if self.is_on_gpu() else ", Device : "
+            + String(
+                self.buffer.gpu_id()
+            ) if self.is_on_gpu() else ", Device : "
             + "cpu"
         )
         s += "]"
@@ -513,14 +517,15 @@ struct Tensor[dtype: DType](
                 return None
         return None
 
+    @always_inline
+    fn backward_fn_arg(
+        ref self,
+    ) -> ref[self.backwardFnArg.value()] BackwardFnArg[Self.dtype]:
+        return self.backwardFnArg.value()
 
     @always_inline
-    fn bwd_fn_arg(ref self) -> ref[self.bwdFnArg.value()]BackwardFnArg[Self.dtype]:
-        return self.bwdFnArg.value()
-
-    @always_inline
-    fn has_bwd_fn_arg(self) -> Bool:
-        return self.bwdFnArg is not None
+    fn has_backward_fn_arg(self) -> Bool:
+        return self.backwardFnArg is not None
 
     @always_inline
     fn has_grad(self) -> Bool:
@@ -660,7 +665,7 @@ struct Tensor[dtype: DType](
         return self.ancestors != None
 
     @always_inline
-    fn ancestry(ref self) -> ref [self.ancestors.value()] Ancestors[Self.dtype]:
+    fn ancestry(ref self) -> ref[self.ancestors.value()] Ancestors[Self.dtype]:
         if self.ancestors == None:
             panic("Tensor → ancestry: ancestry not initialized")
         return self.ancestors.value()
@@ -688,13 +693,13 @@ struct Tensor[dtype: DType](
     ](self, other: Self,) -> Bool:
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
-    fn all(self, pred: fn (Scalar[Self.dtype]) -> Bool) -> Bool:
+    fn all(self, pred: fn(Scalar[Self.dtype]) -> Bool) -> Bool:
         """Returns True if pred holds for all elements.
         Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.
         """
         return self.buffer.map_to_bool(pred).all_true()
 
-    fn any(self, pred: fn (Scalar[Self.dtype]) -> Bool) -> Bool:
+    fn any(self, pred: fn(Scalar[Self.dtype]) -> Bool) -> Bool:
         """Returns True if pred holds for any element.
         Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.
         """
@@ -717,7 +722,7 @@ struct Tensor[dtype: DType](
 
     fn unsafe_ptr[
         origin: Origin, address_space: AddressSpace, //
-    ](ref [origin, address_space]self) -> UnsafePointer[
+    ](ref[origin, address_space] self) -> UnsafePointer[
         Self, origin, address_space=address_space
     ]:
         return (
@@ -729,7 +734,7 @@ struct Tensor[dtype: DType](
 
     fn data_ptr[
         origin: Origin, address_space: AddressSpace, //
-    ](ref [origin, address_space]self) -> UnsafePointer[
+    ](ref[origin, address_space] self) -> UnsafePointer[
         Scalar[Self.dtype], origin, address_space=address_space
     ]:
         return (
@@ -756,7 +761,7 @@ struct Tensor[dtype: DType](
 
     fn map_where(
         self,
-        pred: fn (Scalar[Self.dtype]) -> Bool,
+        pred: fn(Scalar[Self.dtype]) -> Bool,
         value: Scalar[Self.dtype],
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
@@ -805,9 +810,9 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Tensor → randint: is supported only for numeric type"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Tensor → randint: is supported only for numeric type"
 
         return Self.rand(Shape(dims), low, high, init_seed, requires_grad)
 
@@ -829,9 +834,9 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Tensor → rand: is supported only for numeric type"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Tensor → rand: is supported only for numeric type"
 
         if init_seed:
             seed(init_seed.value())
@@ -868,9 +873,9 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Tensor → randn: is supported only for numeric type"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Tensor → randn: is supported only for numeric type"
 
         if init_seed:
             seed(init_seed.value())
@@ -1238,7 +1243,7 @@ struct Tensor[dtype: DType](
         for i in range(len(elems)):
             tensor[i] = elems[i]
 
-        _="""@staticmethod
+        _ = """@staticmethod
     fn of[
         row_size: Int
     ](*elems: Scalar[Self.dtype], requires_grad: Bool = False) -> Tensor[
@@ -1461,7 +1466,6 @@ struct Tensor[dtype: DType](
                 device=upstream_grad.device(),
             )
         else:
-
             comptime if augment:
                 grad_contrib = upstream_grad * other
             else:
@@ -1648,21 +1652,21 @@ struct Tensor[dtype: DType](
         return self.buffer.count(key)
 
     fn sum_all(self) -> Scalar[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Tensor → sum_all is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Tensor → sum_all is for numeric data types only"
 
         return self.buffer.sum_all()
 
     fn product_all(self) -> Scalar[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Tensor → product_all is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Tensor → product_all is for numeric data types only"
 
         return self.buffer.reduce[
             Utils[Self.dtype].product_buffer,
             Utils[Self.dtype].product_scalars,
-            unit = Scalar[Self.dtype](1),
+            unit=Scalar[Self.dtype](1),
         ]()
 
     fn exp[
@@ -1670,18 +1674,18 @@ struct Tensor[dtype: DType](
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ] where Self.dtype.is_floating_point():
-        comptime assert
-            Self.dtype.is_floating_point(),
-            "Tensor → exp is for floating point data types only"
+        comptime assert (
+            Self.dtype.is_floating_point()
+        ), "Tensor → exp is for floating point data types only"
 
         return Exponential[Self.dtype].forward[track_grad=track_grad](
             self, requires_grad=requires_grad
         )
 
     fn __neg__[track_grad: Bool = True](self) -> Tensor[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Tensor → __neg__ is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Tensor → __neg__ is for numeric data types only"
         # Create a zero tensor with same shape and properties
         var zeros = Tensor[Self.dtype].zeros_like(self, requires_grad=False)
 
@@ -1776,9 +1780,9 @@ struct Tensor[dtype: DType](
     ](
         self, exponent: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Tensor → __pow__ is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Tensor → __pow__ is for numeric data types only"
 
         return Exponentiator[Self.dtype].forward[track_grad](
             self, exponent, requires_grad
@@ -1916,9 +1920,7 @@ struct Tensor[dtype: DType](
                     panic(String(key_err))
                 var node_idx = id_to_index[node_id]
                 ref node = node_list[node_idx]
-                #if node.has_backward_fn():
-                if node.has_bwd_fn_arg():
-                    #for result in node.backward_fn()(node):
+                if node.has_backward_fn_arg():
                     for result in Backward[Self.dtype].invoke(node):
                         ref target_node = result[0]
                         ref grad = result[1]
@@ -1939,8 +1941,7 @@ struct Tensor[dtype: DType](
                             fanin[target_id] -= 1
                             if fanin[target_id] == 0:
                                 var target_idx = id_to_index[target_id]
-                                #if node_list[target_idx].has_backward_fn():
-                                if node_list[target_idx].has_bwd_fn_arg():
+                                if node_list[target_idx].has_backward_fn_arg():
                                     ready_queue.append(target_id)
         except e:
             print(e)
@@ -2512,7 +2513,7 @@ fn main() raises:
     )
     print(a.device())
     # prints () 0 1 0 1 True
-    var b = a.max(31)
-    var c = a.min(31)
-    b.print()
-    c.print()
+    # var b = a.max(31)
+    # var c = a.min(31)
+    # b.print()
+    # c.print()

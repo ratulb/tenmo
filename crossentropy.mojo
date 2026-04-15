@@ -18,7 +18,7 @@ from intarray import IntArray
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-struct Reduction(RegisterPassable, ImplicitlyCopyable):
+struct Reduction(ImplicitlyCopyable, RegisterPassable):
     var reduction: Int
 
     fn __init__(out self, reduction: Int = 0):
@@ -61,7 +61,7 @@ struct Reduction(RegisterPassable, ImplicitlyCopyable):
 #  Cetralized validation
 # ═════════════════════════════════════════════════════════════════════════════
 @fieldwise_init
-struct CEValidation[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn validate_label_smoothing(ls: Scalar[Self.dtype]):
         if ls < 0 or ls > 1:
@@ -175,8 +175,7 @@ struct CEValidation[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn validate_num_classes(C: Int):
         if C < 1:
             panic(
-                "CrossEntropyLoss: num_classes C must be ≥ 1, got "
-                + String(C)
+                "CrossEntropyLoss: num_classes C must be ≥ 1, got " + String(C)
             )
 
 
@@ -186,7 +185,7 @@ struct CEValidation[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct CECommon[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn flatten_spatial_class_indices(
         logits: Tensor[Self.dtype],
@@ -352,9 +351,9 @@ struct CECommon[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         if reduction.is_none():
             var ug = upstream.buffer.copy()
             var ug_flat = ug.reshape(Shape(M))
-            var ug_expanded = ug_flat
-                .unsqueeze(IntArray(-1))
-                .broadcast_to(Shape(M, C))
+            var ug_expanded = ug_flat.unsqueeze(IntArray(-1)).broadcast_to(
+                Shape(M, C)
+            )
             return grad * ug_expanded
         else:
             var ug_scalar = upstream.buffer.sum(IntArray()).item()
@@ -368,6 +367,7 @@ struct CECommon[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 # CEClassIndicesBackward
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 @fieldwise_init
 struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     """
@@ -378,11 +378,35 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     Stores NDBuffers only.
     """
+
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (softmax_probs, target_1d, logits_shape,reduction,ignore_index, label_smoothing,valid_count, M, C) = output.bwd_fn_arg().arg[Tuple[NDBuffer[Self.dtype], NDBuffer[DType.int32], Shape, Reduction, Int, Scalar[Self.dtype], Int, Int, Int]]
+        ref bwd_arg = output.backward_fn_arg().get[
+            ClassIndicesBwdArg[Self.dtype]
+        ]()
+        var (
+            softmax_probs,
+            target_1d,
+            logits_shape,
+            reduction,
+            ignore_index,
+            label_smoothing,
+            valid_count,
+            M,
+            C,
+        ) = (
+            bwd_arg.softmax_probs,
+            bwd_arg.target_1d,
+            bwd_arg.logits_shape,
+            bwd_arg.reduction,
+            bwd_arg.ignore_index,
+            bwd_arg.label_smoothing,
+            bwd_arg.valid_count,
+            bwd_arg.M,
+            bwd_arg.C,
+        )
         ref upstream = output.gradients()[]
         var logits = output.ancestry().get(0)
 
@@ -449,8 +473,8 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             for i in range(1, rank - 1):
                 inv_perm.append(i)  # d1..dk shift right
             grad_final = reshaped.permute(inv_perm)
-            #else:
-            #grad_final = grad_final.reshape(self.logits_shape)
+            # else:
+            # grad_final = grad_final.reshape(self.logits_shape)
 
         return [(logits^, grad_final, AddTensor)]
 
@@ -458,10 +482,23 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 # ═════════════════════════════════════════════════════════════════════════════
 # CEClassIndicesForward
 # ═════════════════════════════════════════════════════════════════════════════
+@fieldwise_init
+struct ClassIndicesBwdArg[dtype: DType](ArgumentType):
+    var softmax_probs: NDBuffer[Self.dtype]
+    var target_1d: NDBuffer[DType.int32]
+    var logits_shape: Shape
+    var reduction: Reduction
+    var ignore_index: Int
+    var label_smoothing: Scalar[Self.dtype]
+    var valid_count: Int
+    var M: Int
+    var C: Int
 
 
 @fieldwise_init
-struct CEClassIndicesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct CEClassIndicesForward[dtype: DType](
+    ImplicitlyCopyable, RegisterPassable
+):
     """
     Forward pass for class index targets.
 
@@ -564,18 +601,21 @@ struct CEClassIndicesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable)
         comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
-                var bwd_fn_arg = BackwardFnArg[Self.dtype](BACKWARD_CE_CLASS_INDICES, ArgumentType[Self.dtype]((
-                    softmax_probs_ndb^,
-                    target_1d_ndb^,
-                    logits_shape^,
-                    reduction,
-                    ignore_index,
-                    ls,
-                    valid_count,
-                    M,
-                    C2,
-                )))
-                out.bwdFnArg = Optional(bwd_fn_arg^)
+                var backward_fn_arg = BackwardFnArg[Self.dtype](
+                    BACKWARD_CE_CLASS_INDICES,
+                    ClassIndicesBwdArg[Self.dtype](
+                        softmax_probs_ndb^,
+                        target_1d_ndb^,
+                        logits_shape^,
+                        reduction,
+                        ignore_index,
+                        ls,
+                        valid_count,
+                        M,
+                        C2,
+                    ),
+                )
+                out.backwardFnArg = Optional(backward_fn_arg^)
                 out.add_ancestry(logits)
 
         return out^
@@ -584,6 +624,7 @@ struct CEClassIndicesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable)
 # ═════════════════════════════════════════════════════════════════════════════
 # CEProbabilitiesBackward
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 @fieldwise_init
 struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
@@ -597,9 +638,28 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (softmax_probs, smoothed_target, logits_shape, reduction, valid_count, M, C) = output.bwd_fn_arg().arg[Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype], Shape, Reduction, Int, Int, Int]]
+        ref bwd_arg = output.backward_fn_arg().get[
+            ClassProbabilitiesBwdArg[Self.dtype]
+        ]()
+        var (
+            softmax_probs,
+            smoothed_target,
+            logits_shape,
+            reduction,
+            valid_count,
+            M,
+            C,
+        ) = (
+            bwd_arg.softmax_probs,
+            bwd_arg.smoothed_target,
+            bwd_arg.logits_shape,
+            bwd_arg.reduction,
+            bwd_arg.valid_count,
+            bwd_arg.M,
+            bwd_arg.C,
+        )
         ref upstream = output.gradients()[]
         var logits = output.ancestry().get(0)
 
@@ -631,10 +691,21 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 # ═════════════════════════════════════════════════════════════════════════════
 # CEProbabilitiesForward
 # ═════════════════════════════════════════════════════════════════════════════
+@fieldwise_init
+struct ClassProbabilitiesBwdArg[dtype: DType](ArgumentType):
+    var softmax_probs: NDBuffer[Self.dtype]
+    var smoothed_target: NDBuffer[Self.dtype]
+    var logits_shape: Shape
+    var reduction: Reduction
+    var valid_count: Int
+    var M: Int
+    var C: Int
 
 
 @fieldwise_init
-struct CEProbabilitiesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct CEProbabilitiesForward[dtype: DType](
+    ImplicitlyCopyable, RegisterPassable
+):
     """
     Forward pass for soft probability targets.
 
@@ -705,16 +776,19 @@ struct CEProbabilitiesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable
         comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_CE_PROBABILITIES, ArgumentType[Self.dtype]((
-                    softmax_probs_ndb^,
-                    smoothed_target_ndb^,
-                    logits_shape^,
-                    reduction,
-                    M,
-                    M,
-                    C,
-                )))
-                out.bwdFnArg = Optional(bwd_arg^)
+                var bwd_arg = BackwardFnArg[Self.dtype](
+                    BACKWARD_CE_PROBABILITIES,
+                    ClassProbabilitiesBwdArg[Self.dtype](
+                        softmax_probs_ndb^,
+                        smoothed_target_ndb^,
+                        logits_shape^,
+                        reduction,
+                        M,
+                        M,
+                        C,
+                    ),
+                )
+                out.backwardFnArg = Optional(bwd_arg^)
                 out.add_ancestry(logits)
 
         return out^
@@ -726,7 +800,7 @@ struct CEProbabilitiesForward[dtype: DType](RegisterPassable, ImplicitlyCopyable
 
 
 @fieldwise_init
-struct CrossEntropyLoss[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """
     CrossEntropyLoss — flexible, modular, GPU-ready.
 
@@ -847,9 +921,10 @@ struct CrossEntropyLoss[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 fn main() raises:
     test_ce_rank3_reduction_none_v2()
-    #pass
+
 
 from std.testing import assert_true
+
 
 fn test_ce_rank3_reduction_none_v2() raises:
     """Test rank-3 with reduction='none'."""
@@ -871,7 +946,9 @@ fn test_ce_rank3_reduction_none_v2() raises:
 
     # Loss shape should match target shape [1, 2]
     assert_true(
-        loss.shape().rank() == 2 and loss.shape()[0] == 1 and loss.shape()[1] == 2,
+        loss.shape().rank() == 2
+        and loss.shape()[0] == 1
+        and loss.shape()[1] == 2,
         "Rank-3: reduction=none should preserve target shape",
     )
 
@@ -882,7 +959,9 @@ fn test_ce_rank3_reduction_none_v2() raises:
     for c in range(3):
         assert_true(
             abs(logits.grad()[0, c, 1]) < 1e-10,
-            "Rank-3: reduction=none - ignored class " + String(c) + " should be 0",
+            "Rank-3: reduction=none - ignored class "
+            + String(c)
+            + " should be 0",
         )
 
     print("✓ Rank-3 reduction=none test passed")

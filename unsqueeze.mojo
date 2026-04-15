@@ -1,19 +1,18 @@
 from tenmo import Tensor
 from mnemonics import AddTensor, ZeroGrad
 from intarray import IntArray
-from backpropagation import BackwardFnArg, BACKWARD_UNSQUEEZE
+from backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_UNSQUEEZE
 from squeeze import Squeeze
 from gradbox import Gradbox
 
 
 @fieldwise_init
-struct UnsqueezeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axes = output.bwd_fn_arg().arg[IntArray]
+        var axes = output.backward_fn_arg().get[IntArrayArg]().array
         var gradbox = output.gradients()[]
         # Remove the axis we had inserted
         var squeezed_gradbox = gradbox.squeeze(axes)
@@ -26,7 +25,7 @@ struct UnsqueezeBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Unsqueeze[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Unsqueeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -54,7 +53,11 @@ struct Unsqueeze[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                     var n = axis if axis >= 0 else new_rank + axis
                     normalized.append(n)
                 normalized.sort()
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].from_intarray(BACKWARD_UNSQUEEZE, normalized))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].from_intarray(
+                        BACKWARD_UNSQUEEZE, normalized
+                    )
+                )
                 out.add_ancestry(tensor)
 
         return out^

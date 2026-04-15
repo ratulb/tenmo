@@ -1,6 +1,7 @@
 from tenmo import Tensor
 from backpropagation import (
     BackwardFnArg,
+    ScalarArg,
     BACKWARD_DIVIDE,
     BACKWARD_DIV_SCALAR,
     BACKWARD_RIGHT_DIV_SCALAR,
@@ -11,13 +12,14 @@ from gradbox import Gradbox
 
 
 @fieldwise_init
-struct TrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct TrueDivBackwardScalar[dtype: DType](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
+        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
@@ -32,13 +34,14 @@ struct TrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable)
 
 
 @fieldwise_init
-struct RightTrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct RightTrueDivBackwardScalar[dtype: DType](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
+        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
         var gradbox = output.grad()
         var tensor = output.ancestry().get(0)
         squared = tensor.__pow__[track_grad=False](2)
@@ -55,11 +58,10 @@ struct RightTrueDivBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopy
 
 
 @fieldwise_init
-struct DivideBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var tensor_top = output.ancestry().get(0)
@@ -108,16 +110,16 @@ struct DivideBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct DivideScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct DivideScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Tensor → __rtruediv__ is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Tensor → __rtruediv__ is for numeric data types only"
 
         var out = Tensor[Self.dtype](
             self.buffer.scalar_ops[ReverseDivide](scalar), requires_grad=False
@@ -126,23 +128,27 @@ struct DivideScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_RIGHT_DIV_SCALAR, scalar))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].scalar_arg(
+                        BACKWARD_RIGHT_DIV_SCALAR, scalar
+                    )
+                )
                 out.add_ancestry(self)
 
         return out^
 
 
 @fieldwise_init
-struct DivideByScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct DivideByScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
     ](self: Tensor[Self.dtype], scalar: Scalar[Self.dtype]) -> Tensor[
         Self.dtype
     ]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Tensor → __truediv__ is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Tensor → __truediv__ is for numeric data types only"
 
         if scalar == Scalar[Self.dtype](0):
             panic("Tensor → __truediv__ : canot divide by " + String(scalar))
@@ -154,7 +160,11 @@ struct DivideByScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_DIV_SCALAR, scalar))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].scalar_arg(
+                        BACKWARD_DIV_SCALAR, scalar
+                    )
+                )
                 out.add_ancestry(self)
 
         return out^
@@ -162,7 +172,7 @@ struct DivideByScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 # Element wise division of two tensors
 @fieldwise_init
-struct Divider[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Divider[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -187,32 +197,18 @@ struct Divider[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             requires_grad = self.requires_grad or other.requires_grad
             if requires_grad:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_DIVIDE))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_DIVIDE)
+                )
                 out.add_ancestry(self, other)
 
         return out^
-
-
-from common_utils import now
-from std.testing import assert_true
 
 
 fn main() raises:
     comptime dtype = DType.float32
     a1 = Tensor[dtype].rand(5000, 1000, requires_grad=True)
     b1 = Tensor[dtype].rand(5000, 1000)
-    a = a1.transpose(0, 1)
-    b = b1.transpose(0, 1)
-    start = now()
     r1 = a1 / b1
     r1.backward()
     a1.grad().print()
-    print("CPU divide took: ", (now() - start) * 1000, "ms")
-    start = now()
-    ag = a.to_gpu()
-    bg = b.to_gpu()
-    print("Transfer to gpu took: ", (now() - start) * 1000, "ms")
-    start = now()
-    r2 = ag / bg
-    print("Overall GPU took: ", (now() - start) * 1000, "ms")
-    assert_true(r1.all_close(r2.to_cpu()))

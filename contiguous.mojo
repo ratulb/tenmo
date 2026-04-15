@@ -6,11 +6,10 @@ from shapes import Shape
 
 
 @fieldwise_init
-struct ContiguousBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct ContiguousBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
@@ -38,7 +37,7 @@ struct ContiguousBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         ]
 
 
-struct Contiguous[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Contiguous[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -54,10 +53,13 @@ struct Contiguous[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_CONTIGUOUS))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_CONTIGUOUS)
+                )
                 out.add_ancestry(self)
 
         return out^
+
 
 fn main() raises:
     comptime dtype = DType.float32

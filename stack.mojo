@@ -1,7 +1,5 @@
 from tenmo import Tensor
-from backpropagation import (
-    BackwardFnArg, ArgumentType, BACKWARD_STACK
-)
+from backpropagation import BackwardFnArg, StackArg, BACKWARD_STACK
 from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
@@ -12,12 +10,12 @@ from forwards import Concate
 
 
 @fieldwise_init
-struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """Backward pass for stack operation."""
 
     @staticmethod
     fn backward(
-         output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         Split gradient and squeeze the stacked dimension.
@@ -27,7 +25,8 @@ struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                                                   grad_B(d0, d1, d2),
                                                   grad_C(d0, d1, d2)]
         """
-        var (axis, num_tensors) = output.bwd_fn_arg().arg[Tuple[Int, Int]]
+        var bwd_arg = output.backward_fn_arg().get[StackArg]()
+        var (axis, num_tensors) = bwd_arg.axis, bwd_arg.num_tensors
         ref grad_output = output.gradients()[]
         # var grad_data = grad_output.buffer.buffer.data
         var grad_data = grad_output.data_ptr()
@@ -85,8 +84,9 @@ struct StackBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         return result^
 
+
 @fieldwise_init
-struct Stack[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
     fn forward[
@@ -154,7 +154,11 @@ struct Stack[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if grad_required:
                 result.requires_grad_(True)
-                result.bwdFnArg = Optional(BackwardFnArg[Self.dtype](BACKWARD_STACK, ArgumentType[Self.dtype]((stack_axis, len(tensors)))))
+                result.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype](
+                        BACKWARD_STACK, StackArg(stack_axis, len(tensors))
+                    )
+                )
 
                 # Add original tensors (not expanded) to ancestry
                 for i in range(len(tensors)):

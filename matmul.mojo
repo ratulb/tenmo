@@ -18,12 +18,11 @@ from intarray import IntArray
 
 
 @fieldwise_init
-struct Matmul2dBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
@@ -51,9 +50,8 @@ struct Matmul2dBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         return result^
 
 
-
 @fieldwise_init
-struct Matmul2d[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     @always_inline
     fn forward[
@@ -66,10 +64,10 @@ struct Matmul2d[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var bwd_fn_arg = BackwardFnArg[
-                    Self.dtype
-                ].null_arg(BACKWARD_MATMUL_2D)
-                C.bwdFnArg = Optional(bwd_fn_arg^)
+                var bwd_fn_arg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_MATMUL_2D
+                )
+                C.backwardFnArg = Optional(bwd_fn_arg^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
 
@@ -95,11 +93,10 @@ struct Matmul2d[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct MatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
@@ -112,9 +109,7 @@ struct MatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         ]()
 
         if A.requires_grad:
-            var B_transposed = B.transpose[track_grad=False](
-                axes=[-1, -2]
-            )
+            var B_transposed = B.transpose[track_grad=False](axes=[-1, -2])
 
             var A_batch_grad = MatmulNd[Self.dtype].forward(
                 grad_out, B_transposed
@@ -135,8 +130,9 @@ struct MatmulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         return results^
 
+
 @fieldwise_init
-struct MatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
     fn forward[
@@ -156,10 +152,10 @@ struct MatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var bwd_fn_arg = BackwardFnArg[
-                    Self.dtype
-                ].null_arg(BACKWARD_MATMUL_ND)
-                C.bwdFnArg = Optional(bwd_fn_arg^)
+                var bwd_fn_arg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_MATMUL_ND
+                )
+                C.backwardFnArg = Optional(bwd_fn_arg^)
                 C.add_ancestry(A)
                 C.add_ancestry(B)
 
@@ -198,7 +194,7 @@ struct MatmulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Matmul[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Matmul[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
     fn forward[
@@ -312,9 +308,7 @@ fn test_gflops_blas() raises:
         print("Could not parse shape dims")
 
     if A_shape[1] != B_shape[0]:
-        panic(
-            "Matrix dimension mismatch: ", String(A_shape), String(B_shape)
-        )
+        panic("Matrix dimension mismatch: ", String(A_shape), String(B_shape))
     # Setup
     var A = Tensor[dtype].randn(A_shape)
     var B = Tensor[dtype].randn(B_shape)
@@ -387,9 +381,7 @@ fn test_gflops() raises:
         print("Could not parse shape dims")
 
     if A_shape[1] != B_shape[0]:
-        panic(
-            "Matrix dimension mismatch: ", String(A_shape), String(B_shape)
-        )
+        panic("Matrix dimension mismatch: ", String(A_shape), String(B_shape))
     # Setup
     var A = Tensor[dtype].randn(A_shape)
     var B = Tensor[dtype].randn(B_shape)

@@ -2,24 +2,25 @@ from tenmo import Tensor
 from intarray import IntArray
 from mnemonics import AddTensor
 from shapes import Shape
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_MEAN
+from backpropagation import BackwardFnArg, ReductionArg, BACKWARD_MEAN
 from validators import Validator
 from gradbox import Gradbox
 from common_utils import panic
 
 
-struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (axes, keepdims) = output.bwd_fn_arg().arg[Tuple[IntArray, Bool]]
+        var bwd_arg = output.backward_fn_arg().get[ReductionArg]()
         ref gradbox = output.gradients()[]
         var gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
         if gradbox_shape == Shape():
-            scalar_grad = gradbox.item() / Scalar[Self.dtype](ancestor.shape().num_elements())
+            scalar_grad = gradbox.item() / Scalar[Self.dtype](
+                ancestor.shape().num_elements()
+            )
             var grad_contrib: Gradbox[Self.dtype]
             grad_contrib = Gradbox[Self.dtype].full(
                 ancestor.shape(),
@@ -37,12 +38,12 @@ struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         var expanded = gradbox.copy()
 
-        if not keepdims:
+        if not bwd_arg.keepdims:
             expanded = expanded.reshape(
                 Shape(
                     gradbox_shape.intarray().insert(
-                        axes,
-                        IntArray.filled(len(axes), 1),
+                        bwd_arg.axes,
+                        IntArray.filled(len(bwd_arg.axes), 1),
                     )
                 )
             )
@@ -50,7 +51,7 @@ struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         # Broadcast and divide
         var broadcasted = expanded.broadcast_to(ancestor.shape())
         # Compute total count of elements being reduced
-        var count = ancestor.shape().reduced_shape(axes).product()
+        var count = ancestor.shape().reduced_shape(bwd_arg.axes).product()
         count = count if count > 0 else 1
         var average = broadcasted / Scalar[Self.dtype](count)
 
@@ -64,7 +65,7 @@ struct MeanBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Mean[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
     fn forward[
@@ -86,7 +87,11 @@ struct Mean[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype](BACKWARD_MEAN, ArgumentType[Self.dtype]((normalized_axes, keepdims))))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype](
+                        BACKWARD_MEAN, ReductionArg(normalized_axes, keepdims)
+                    )
+                )
                 out.add_ancestry(tensor)
 
         return out^
@@ -118,7 +123,7 @@ fn main() raises:
     s.backward()
 
     A.grad().print(num_first=1000, num_last=1000)
-    _="""a_gpu = B.to_gpu()
+    _ = """a_gpu = B.to_gpu()
     b_cpu = a_gpu.reshape(3, 15)
     c_gpu = b_cpu + 10
     d_gpu = c_gpu * 42
@@ -128,4 +133,3 @@ fn main() raises:
 
     s = gpu_mean.sum()
     s.backward()"""
-

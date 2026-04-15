@@ -9,12 +9,14 @@ from std.sys import simd_width_of, has_accelerator
 from ndbuffer import NDBuffer
 from matrixvector_kernel import MatrixVectorNdGpu
 
-@fieldwise_init
-struct MatrixVectorMulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct MatrixVectorMulNdBackward[dtype: DType](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         comptime simdwidth = simd_width_of[Self.dtype]()
 
@@ -193,8 +195,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](RegisterPassable, ImplicitlyCopya
 
 
 @fieldwise_init
-struct MatrixVectorMulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         simdwidth: Int = simd_width_of[Self.dtype]()
@@ -281,7 +282,7 @@ struct MatrixVectorMulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
     fn forward[
         track_grad: Bool = True, simdwidth: Int = simd_width_of[Self.dtype]()
     ](M: Tensor[Self.dtype], v: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
-        _="""var M_shape = M.shape()
+        _ = """var M_shape = M.shape()
         var v_shape = v.shape()
 
         # Validate: M[..., m, k] × v[..., k] → out[..., m]
@@ -368,7 +369,10 @@ struct MatrixVectorMulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 except e:
                     print(e)
                     print(
-                        "MatrixVectorMulNd - GPU vector matrix multiplication failed",
+                        (
+                            "MatrixVectorMulNd - GPU vector matrix"
+                            " multiplication failed"
+                        ),
                     )
                     out = Self.forward[simdwidth=simdwidth](M.buffer, v.buffer)
             else:
@@ -378,14 +382,15 @@ struct MatrixVectorMulNd[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         var result = Tensor[Self.dtype](out^, requires_grad=False)
 
-        #var ndb = Self.forward[simdwidth=simdwidth](M.buffer, v.buffer)
-        #var result = Tensor[Self.dtype](ndb^, requires_grad=False)
-
         comptime if track_grad:
             var requires_grad = M.requires_grad or v.requires_grad
             if requires_grad:
                 result.requires_grad_(True)
-                result.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_MATRIX_VECTOR_MUL))
+                result.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(
+                        BACKWARD_MATRIX_VECTOR_MUL
+                    )
+                )
                 result.add_ancestry(M, v)
 
         return result^

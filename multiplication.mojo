@@ -1,22 +1,27 @@
 from tenmo import Tensor
 from backpropagation import (
     BackwardFnArg,
+    ScalarArg,
     BACKWARD_MULTIPLY,
     BACKWARD_MULTIPLY_SCALAR,
+    BACKWARD_MULTIPLY_BROADCAST,
 )
 from mnemonics import AddTensor, Multiply
 from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 
-@fieldwise_init
-struct MultiplyBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct MultiplyBackwardScalar[dtype: DType](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var factor = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
+        var factor = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        print(factor)
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * factor
@@ -28,16 +33,13 @@ struct MultiplyBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable
             )
         ]
 
-@fieldwise_init
-struct MultiplyBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var broadcast = output.bwd_fn_arg().arg[Bool]
-        if broadcast:
-            return MultiplyBroadcastBackward[Self.dtype].backward(output)
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
         var ancestor_lhs = output.ancestry().get(0)
@@ -86,7 +88,7 @@ comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
 
 
 @fieldwise_init
-struct MultiplyScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct MultiplyScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -100,7 +102,11 @@ struct MultiplyScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_MULTIPLY_SCALAR, factor))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].scalar_arg(
+                        BACKWARD_MULTIPLY_SCALAR, factor
+                    )
+                )
                 out.add_ancestry(self)
 
         return out^
@@ -108,7 +114,7 @@ struct MultiplyScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 # Element wise multiplication of two tensors
 @fieldwise_init
-struct Multiplicator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -136,13 +142,19 @@ struct Multiplicator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
                 out.requires_grad_(True)
 
                 if self.shape() == other.shape():
-                    out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].boolean(BACKWARD_MULTIPLY, False))
+                    out.backwardFnArg = Optional(
+                        BackwardFnArg[Self.dtype].null_arg(BACKWARD_MULTIPLY)
+                    )
                     if id(self) == id(other):  # B = A * A, self == other == A
                         out.add_ancestry(self)
                     else:
                         out.add_ancestry(self, other)
                 else:
-                    out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].boolean(BACKWARD_MULTIPLY, True))
+                    out.backwardFnArg = Optional(
+                        BackwardFnArg[Self.dtype].null_arg(
+                            BACKWARD_MULTIPLY_BROADCAST
+                        )
+                    )
                     out.add_ancestry(self, other)
 
         return out^
@@ -161,18 +173,10 @@ from std.testing import assert_true
 
 fn main() raises:
     comptime dtype = DType.float32
-    a = Tensor[dtype].arange(5000, requires_grad=True)
-    b = Tensor[dtype].arange(5000)
-    start = now()
-    r1 = a * b
-    r1.backward()
-    a.grad().print()
-    print("CPU took: ", (now() - start) * 1000, "ms")
-    start = now()
-    ag = a.to_gpu()
-    bg = b.to_gpu()
-    print("to_gpu took: ", (now() - start) * 1000, "ms")
-    start = now()
-    r2 = ag * bg
-    print("Overall GPU took: ", (now() - start) * 1000, "ms")
-    assert_true(r1.all_close(r2.to_cpu()))
+    var A = Tensor[dtype].rand(2, 5, requires_grad=True)
+    var B = Tensor[dtype].arange(5, requires_grad=True)
+    var C = A * 24
+    var D = C * B
+    D.backward()
+
+    A.grad().print()

@@ -1,21 +1,21 @@
 from tenmo import Tensor
 from backpropagation import (
-    ArgumentType,
     BackwardFnArg,
     BACKWARD_ADD,
     BACKWARD_ADD_SCALAR,
+    BACKWARD_ADD_BROADCAST,
 )
 from mnemonics import AddTensor, Add
 from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
 
-@fieldwise_init
-struct AddBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
@@ -24,6 +24,7 @@ struct AddBackwardScalar[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         # Gradient of addition is 1 → just pass through incoming grad
         return [(ancestor^, gradbox, AddTensor)]
 
+
 comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
     dtype,
     augment=False,
@@ -31,16 +32,13 @@ comptime AddBroadcastBackward[dtype: DType] = BroadcastBackward[
     rhs_op=AddTensor,
 ]
 
-@fieldwise_init
-struct AddBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var broadcast = output.bwd_fn_arg().arg[Bool]
-        if broadcast:
-            return AddBroadcastBackward[Self.dtype].backward(output)
         var gradbox = output.gradients()[]
         count = len(output.ancestry())
 
@@ -72,8 +70,9 @@ struct AddBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
         return grad_shares^
 
+
 @fieldwise_init
-struct AddScalar[dtype: DType](RegisterPassable, Copyable):
+struct AddScalar[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -87,7 +86,9 @@ struct AddScalar[dtype: DType](RegisterPassable, Copyable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_ADD_SCALAR))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_ADD_SCALAR)
+                )
                 out.add_ancestry(self)
 
         return out^
@@ -95,7 +96,7 @@ struct AddScalar[dtype: DType](RegisterPassable, Copyable):
 
 # Element wise addition of two tensors - would broadcast if required
 @fieldwise_init
-struct Adder[dtype: DType](RegisterPassable, Copyable):
+struct Adder[dtype: DType](Copyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -121,13 +122,19 @@ struct Adder[dtype: DType](RegisterPassable, Copyable):
                 out.requires_grad_(True)
 
                 if self.shape() == other.shape():
-                    out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].boolean(BACKWARD_ADD, False))
+                    out.backwardFnArg = Optional(
+                        BackwardFnArg[Self.dtype].null_arg(BACKWARD_ADD)
+                    )
                     if self.requires_grad:
                         out.add_ancestry(self)
                     if other.requires_grad:
                         out.add_ancestry(other)
                 else:
-                    out.bwdFnArg = Optional(BackwardFnArg[Self.dtype](BACKWARD_ADD, True))
+                    out.backwardFnArg = Optional(
+                        BackwardFnArg[Self.dtype].null_arg(
+                            BACKWARD_ADD_BROADCAST
+                        )
+                    )
                     out.add_ancestry(self, other)
 
         return out^
@@ -140,30 +147,8 @@ from shapes import Shape
 
 fn main() raises:
     comptime dtype = DType.float32
-    _ = """a = Tensor[dtype].arange(5000000)
-    b = Tensor[dtype].arange(5000000)
-    start = now()
-    r1 = a - b
-    print("CPU took: ", (now() - start) * 1000, "ms")
-    start = now()
-    ag = a.to_gpu()
-    bg = b.to_gpu()
-    print("to_gpu took: ", (now() - start) * 1000, "ms")
-    start = now()
-    r2 = ag - bg
-    print("Overall GPU took: ", (now() - start) * 1000, "ms")
-    assert_true(r1.all_close(r2))
-    print()"""
-    print("The meaty part")
-
-    A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
-    print("A's id: ", A.id())
-    a = A.to_gpu(requires_grad=True)
-
-    expected = (A * 42) + 2 * A
-    b = (a * 42) + 2 * a
-    b_cpu = b.to_cpu()
-    assert_true(b_cpu.all_close(expected), "Scalar add assertion failed")
-    b_cpu.ancestry().print()
-    b_cpu.backward()
+    var A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
+    var B = Tensor[dtype].full(Shape.of(3, 1), 2, requires_grad=True)
+    var C = A + B
+    C.backward()
     A.grad().print()

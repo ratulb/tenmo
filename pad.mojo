@@ -24,7 +24,7 @@ Examples:
 from tenmo import Tensor
 from shapes import Shape
 from gradbox import Gradbox
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_PAD
+from backpropagation import BackwardFnArg, PadArg, BACKWARD_PAD
 from mnemonics import AddTensor
 from common_utils import panic
 from intarray import IntArray
@@ -41,14 +41,14 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         Backward pass: Accumulate gradients based on padding mode.
         """
-        var bwd_arg = output.bwd_fn_arg().arg[Tuple[List[Tuple[Int, Int]], String]].copy()
-        var pad = bwd_arg[0].copy()
-        var mode = bwd_arg[1].copy()
+        ref bwd_arg = output.backward_fn_arg().get[PadArg]()
+        var pad = bwd_arg.pad.copy()
+        var mode = bwd_arg.mode.copy()
         ref grad_out = output.gradients()[]
         var parent = output.ancestry().get(0)
 
@@ -73,17 +73,13 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
                         grad_out, grad_parent, pad, parent_shape
                     )
             elif mode == "circular":
-                Self._extract_circular(
-                    grad_out, grad_parent, pad, parent_shape
-                )
+                Self._extract_circular(grad_out, grad_parent, pad, parent_shape)
             elif mode == "replicate":
                 Self._extract_replicate(
                     grad_out, grad_parent, pad, parent_shape
                 )
             elif mode == "reflect":
-                Self._extract_reflect(
-                    grad_out, grad_parent, pad, parent_shape
-                )
+                Self._extract_reflect(grad_out, grad_parent, pad, parent_shape)
 
             results.append((parent^, grad_parent^, AddTensor))
 
@@ -304,8 +300,9 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
             # ACCUMULATE gradient
             grad_parent[in_coord] += grad_out[out_coord]
 
+
 @fieldwise_init
-struct Pad[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """
     Generalized padding operation supporting:
     - Arbitrary dimensions.
@@ -363,10 +360,10 @@ struct Pad[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             if req_grad:
                 result.requires_grad_(True)
                 # PASS MODE TO BACKWARD!
-                var bwd_arg = BackwardFnArg[Self.dtype](BACKWARD_PAD, ArgumentType[Self.dtype]((
-                    pad.copy(), mode  # Add mode here
-                )))
-                result.bwdFnArg = Optional(bwd_arg^)
+                var bwd_arg = BackwardFnArg[Self.dtype](
+                    BACKWARD_PAD, PadArg(pad.copy(), mode)  # Add mode here
+                )
+                result.backwardFnArg = Optional(bwd_arg^)
                 result.add_ancestry(x)
 
         return result^

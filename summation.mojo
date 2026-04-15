@@ -2,18 +2,18 @@ from tenmo import Tensor
 from mnemonics import AddTensor
 from intarray import IntArray
 from shapes import Shape
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_SUM
+from backpropagation import BackwardFnArg, ReductionArg, BACKWARD_SUM
 from validators import Validator
 from gradbox import Gradbox
 
 
 @fieldwise_init
-struct SumBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var (axes, keepdims) = output.bwd_fn_arg().arg[Tuple[IntArray, Bool]]
+        var bwd_arg = output.backward_fn_arg().get[ReductionArg]()
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         shape = ancestor.shape()
@@ -24,17 +24,17 @@ struct SumBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             )
         else:
             # Handle keepdims=False case (need to reshape gradient)
-            if not keepdims:
+            if not bwd_arg.keepdims:
                 # Determine axes/unsqueeze (insert dims of size 1)
                 axes = (
                     gradbox.shape()
                     .intarray()
                     .insert(
-                        axes,
-                        IntArray.filled(len(axes), 1),
+                        bwd_arg.axes,
+                        IntArray.filled(len(bwd_arg.axes), 1),
                     )
                 )
-                unsqueezed_shape = Shape(axes)
+                unsqueezed_shape = Shape(bwd_arg.axes)
 
                 unsqueezed_grad = gradbox.reshape(unsqueezed_shape)
                 grad_contrib = unsqueezed_grad.broadcast_to(shape, share=False)
@@ -50,8 +50,9 @@ struct SumBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             )
         ]
 
+
 @fieldwise_init
-struct Summer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -71,10 +72,15 @@ struct Summer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype](BACKWARD_SUM, ArgumentType[Self.dtype]((reduction_axes, keepdims))))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype](
+                        BACKWARD_SUM, ReductionArg(reduction_axes, keepdims)
+                    )
+                )
                 out.add_ancestry(tensor)
 
         return out^
+
 
 fn main():
     comptime dtype = DType.float32

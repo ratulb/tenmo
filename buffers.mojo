@@ -35,12 +35,7 @@ from mnemonics import (
 
 
 struct Buffer[dtype: DType = DType.float32](
-    ImplicitlyCopyable
-    & Movable
-    & Sized
-    & Writable
-    & Absable
-    & Iterable
+    ImplicitlyCopyable & Movable & Sized & Writable & Absable & Iterable
 ):
 
     """
@@ -176,7 +171,7 @@ struct Buffer[dtype: DType = DType.float32](
         Returns:
             The current amount of references to the pointee.
         """
-        return self._refcount[].load[ordering = Consistency.MONOTONIC]()
+        return self._refcount[].load[ordering=Consistency.MONOTONIC]()
 
     # ========================================
     # Copy/Move semantics
@@ -191,7 +186,7 @@ struct Buffer[dtype: DType = DType.float32](
 
         if self.is_shared():
             # Atomic increment (only for shared buffers)
-            _ = self._refcount[].fetch_add[ordering = Consistency.MONOTONIC](1)
+            _ = self._refcount[].fetch_add[ordering=Consistency.MONOTONIC](1)
         else:
             # Not shared - deep copy data
             if self.size > 0 and not self.external:
@@ -215,14 +210,11 @@ struct Buffer[dtype: DType = DType.float32](
 
         if self._refcount and self.is_shared():
             # Shared buffer - atomic decrement
-            if (
-                self._refcount[].fetch_sub[ordering = Consistency.RELEASE](1)
-                != 1
-            ):
+            if self._refcount[].fetch_sub[ordering=Consistency.RELEASE](1) != 1:
                 return  # Other references exist
 
             # Last reference - free everything
-            fence[ordering = Consistency.ACQUIRE]()
+            fence[ordering=Consistency.ACQUIRE]()
 
             # Free allocation (starts at refcount, not data)
             var alloc_start = self._refcount.bitcast[UInt8]()
@@ -235,7 +227,7 @@ struct Buffer[dtype: DType = DType.float32](
 
     fn unsafe_ptr[
         origin: Origin, address_space: AddressSpace, //
-    ](ref [origin, address_space]self) -> UnsafePointer[
+    ](ref[origin, address_space] self) -> UnsafePointer[
         Scalar[Self.dtype], origin, address_space=address_space
     ]:
         """Retrieves a pointer to the underlying memory.
@@ -313,7 +305,7 @@ struct Buffer[dtype: DType = DType.float32](
         return result^
 
     @always_inline
-    fn __getitem__(ref self, index: Int) -> ref [self] Scalar[Self.dtype]:
+    fn __getitem__(ref self, index: Int) -> ref[self] Scalar[Self.dtype]:
         debug_assert(
             index >= 0 and index < self.size,
             "Buffer -> __getitem__: index out of bounds",
@@ -330,7 +322,7 @@ struct Buffer[dtype: DType = DType.float32](
             self.size,
             index,
         )
-        #self.data.store[width=1](index, scalar)
+        # self.data.store[width=1](index, scalar)
         (self.data + index)[] = scalar
 
     @always_inline
@@ -365,9 +357,9 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __add__(other) is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __add__(other) is for numeric data types only"
 
         if not self.size == other.size:
             panic(
@@ -383,9 +375,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __iadd__(self, other: Buffer[Self.dtype]):
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __iadd__(other) is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __iadd__(other) is for numeric data types only"
 
         if self.size != other.size:
             panic(
@@ -402,9 +394,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __isub__(self, other: Buffer[Self.dtype]):
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __isub__(other) is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __isub__(other) is for numeric data types only"
 
         if self.size != other.size:
             panic(
@@ -424,9 +416,9 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __sub__(other) is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __sub__(other) is for numeric data types only"
 
         if not self.size == other.size:
             panic(
@@ -495,7 +487,6 @@ struct Buffer[dtype: DType = DType.float32](
         comptime if Self.dtype == DType.bool:
             # Special handling for bool - process element by element
             for i in range(start_index, actual_end):
-
                 comptime if op_code == Multiply:
                     self[i] = self[i] * scalar
                 elif op_code == Add:
@@ -533,7 +524,6 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Process remaining elements (scalar tail)
         for i in range(idx, actual_end):
-
             comptime if op_code == Multiply:
                 self[i] = self[i] * scalar
             elif op_code == Add:
@@ -678,7 +668,6 @@ struct Buffer[dtype: DType = DType.float32](
         comptime if Self.dtype == DType.bool:
             # Special handling for bool - process element by element
             for i in range(self_extent):
-
                 comptime if op_code == Multiply:
                     out[i] = self[self_start + i] * other[other_start + i]
                 else:
@@ -713,18 +702,24 @@ struct Buffer[dtype: DType = DType.float32](
             elif op_code == LOG_BACKWARD:
                 op_result = other_block / max(self_block, epsilon)
             elif op_code == SIGMOID_BACKWARD:
-                #Fused sigmoid backward pass.
-                #self = sigmoid output (already computed in forward).
-                #other = upstream gradient buffer.
-                #Returns: grad * self * (1 - self) in a single pass.
-                op_result = other_block * self_block * (One[Self.dtype].value() - self_block)
+                # Fused sigmoid backward pass.
+                # self = sigmoid output (already computed in forward).
+                # other = upstream gradient buffer.
+                # Returns: grad * self * (1 - self) in a single pass.
+                op_result = (
+                    other_block
+                    * self_block
+                    * (One[Self.dtype].value() - self_block)
+                )
 
-            else: # Tanh backward
-                #fused tanh backward pass.
-                #self = tanh output (already computed in forward).
-                #other = upstream gradient buffer.
-                #returns: grad * (1 - t²) in a single pass.
-                op_result = other_block * (One[Self.dtype].value() - self_block * self_block)
+            else:  # Tanh backward
+                # fused tanh backward pass.
+                # self = tanh output (already computed in forward).
+                # other = upstream gradient buffer.
+                # returns: grad * (1 - t²) in a single pass.
+                op_result = other_block * (
+                    One[Self.dtype].value() - self_block * self_block
+                )
 
             out.store[simdwidth=simd_width](idx, op_result)
 
@@ -733,7 +728,6 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Process remaining elements (scalar tail)
         for i in range(idx, self_extent):
-
             comptime if op_code == Multiply:
                 out[i] = self[self_start + i] * other[other_start + i]
             elif op_code == Add:
@@ -743,11 +737,20 @@ struct Buffer[dtype: DType = DType.float32](
             elif op_code == Divide:
                 out[i] = self[self_start + i] / other[other_start + i]
             elif op_code == LOG_BACKWARD:
-                out[i] =  other[other_start + i] / max(self[self_start + i], epsilon)
+                out[i] = other[other_start + i] / max(
+                    self[self_start + i], epsilon
+                )
             elif op_code == SIGMOID_BACKWARD:
-                out[i] = other[other_start + i] * self[self_start + i] * (One[Self.dtype].value() - self[self_start + i])
-            else: # Tanh backward
-                out[i] = other[other_start + i] * (One[Self.dtype].value() - self[self_start + i] * self[self_start + i])
+                out[i] = (
+                    other[other_start + i]
+                    * self[self_start + i]
+                    * (One[Self.dtype].value() - self[self_start + i])
+                )
+            else:  # Tanh backward
+                out[i] = other[other_start + i] * (
+                    One[Self.dtype].value()
+                    - self[self_start + i] * self[self_start + i]
+                )
 
         return out^
 
@@ -771,7 +774,6 @@ struct Buffer[dtype: DType = DType.float32](
         comptime if Self.dtype == DType.bool:
             # Special handling for bool - process element by element
             for i in range(extent):
-
                 comptime if op_code == Multiply:
                     out[i] = self[start_index + i] * scalar
                 else:
@@ -819,7 +821,6 @@ struct Buffer[dtype: DType = DType.float32](
 
         # Process remaining elements (scalar tail)
         for i in range(idx, extent):
-
             comptime if op_code == Multiply:
                 out[i] = self[start_index + i] * scalar
             elif op_code == Add:
@@ -845,9 +846,9 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __truediv__(other) is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __truediv__(other) is for numeric data types only"
 
         if not self.size == other.size:
             panic(
@@ -870,9 +871,9 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         other: Buffer[Self.dtype],
     ):
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __itruediv__(other) is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __itruediv__(other) is for numeric data types only"
 
         if not self.size == other.size:
             panic(
@@ -891,17 +892,17 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __iadd__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __iadd__(scalar) is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __iadd__(scalar) is for numeric data types only"
 
         self.inplace_ops_scalar[Add](scalar)
 
     @always_inline
     fn __isub__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __isub__(scalar) is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __isub__(scalar) is for numeric data types only"
 
         self.inplace_ops_scalar[Subtract](scalar)
 
@@ -912,10 +913,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __itruediv__(self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]):
-
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __itruediv__(scalar) is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __itruediv__(scalar) is for numeric data types only"
 
         if scalar == Scalar[Self.dtype](0):
             panic("Buffer → __itruediv__(scalar): can not divide by zero")
@@ -926,12 +926,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn __rsub__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            (
-                "Buffer → __rsub__(scalar) -> Buffer is for numeric data types"
-                " only"
-            )
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __rsub__(scalar) -> Buffer is for numeric data types only"
 
         return self.arithmetic_ops_scalar[ReverseSubtract](scalar)
 
@@ -939,9 +936,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn __sub__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __sub__(scalar) -> Buffer is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __sub__(scalar) -> Buffer is for numeric data types only"
 
         return self.arithmetic_ops_scalar[Subtract](scalar)
 
@@ -949,12 +946,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn __rmul__(
         self: Buffer[Self.dtype], factor: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            (
-                "Buffer → __rmul__(scalar) -> Buffer is for numeric data types"
-                " only"
-            )
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __rmul__(scalar) -> Buffer is for numeric data types only"
 
         return self.__mul__(factor)
 
@@ -969,12 +963,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn __radd__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            (
-                "Buffer → __radd__(scalar) -> Buffer is for numeric data types"
-                " only"
-            )
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __radd__(scalar) -> Buffer is for numeric data types only"
 
         return self.__add__(scalar)
 
@@ -982,12 +973,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn __add__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            (
-                "Buffer → __add__(scalar) -> Buffer  is for numeric data types"
-                " only"
-            )
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __add__(scalar) -> Buffer  is for numeric data types only"
 
         return self.arithmetic_ops_scalar[Add](scalar)
 
@@ -996,12 +984,10 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         divisor: Scalar[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            (
-                "Buffer → __truediv__(scalar) -> Buffer  is for numeric data"
-                " types only"
-            )
+        comptime assert Self.dtype.is_numeric(), (
+            "Buffer → __truediv__(scalar) -> Buffer  is for numeric data"
+            " types only"
+        )
 
         return self.arithmetic_ops_scalar[Divide](divisor)
 
@@ -1009,12 +995,10 @@ struct Buffer[dtype: DType = DType.float32](
     fn __rtruediv__(
         self: Buffer[Self.dtype], scalar: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            (
-                "Buffer → __rtruediv__(scalar) -> Buffer  is for numeric data"
-                " types only"
-            )
+        comptime assert Self.dtype.is_numeric(), (
+            "Buffer → __rtruediv__(scalar) -> Buffer  is for numeric data"
+            " types only"
+        )
 
         return self.arithmetic_ops_scalar[ReverseDivide](scalar)
 
@@ -1378,14 +1362,20 @@ struct Buffer[dtype: DType = DType.float32](
 
         return (out^, mask^)
 
-    fn exp(self, start_index: Int = 0, end_index: Optional[Int] = None)-> Buffer[Self.dtype] where Self.dtype.is_floating_point():
+    fn exp(
+        self, start_index: Int = 0, end_index: Optional[Int] = None
+    ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
         return self.float_unary_ops[op_code=EXP](start_index, end_index)
 
-    fn log(self, start_index: Int = 0, end_index: Optional[Int] = None)-> Buffer[Self.dtype] where Self.dtype.is_floating_point():
+    fn log(
+        self, start_index: Int = 0, end_index: Optional[Int] = None
+    ) -> Buffer[Self.dtype] where Self.dtype.is_floating_point():
         return self.float_unary_ops[op_code=LOG](start_index, end_index)
 
     @always_inline
-    fn float_unary_ops[op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()](
+    fn float_unary_ops[
+        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
+    ](
         self,
         start_index: Int = 0,
         end_index: Optional[Int] = None,
@@ -1409,11 +1399,17 @@ struct Buffer[dtype: DType = DType.float32](
                 comptime if op_code == EXP:
                     out.store[simdwidth=simd_width](out_idx, exp(chunk))
                 elif op_code == LOG:
-                    out.store[simdwidth=simd_width](out_idx, log(max(chunk, epsilon)))
+                    out.store[simdwidth=simd_width](
+                        out_idx, log(max(chunk, epsilon))
+                    )
                 elif op_code == TANH_FORWARD:
                     out.store[simdwidth=simd_width](out_idx, tanh(chunk))
-                else: # Sigmoid
-                    out.store[simdwidth=simd_width](out_idx, One[Self.dtype].value() / (One[Self.dtype].value() + exp(-chunk)))
+                else:  # Sigmoid
+                    out.store[simdwidth=simd_width](
+                        out_idx,
+                        One[Self.dtype].value()
+                        / (One[Self.dtype].value() + exp(-chunk)),
+                    )
 
             # Tail loop
             for out_idx in range(vectorized_end, extent):
@@ -1424,8 +1420,10 @@ struct Buffer[dtype: DType = DType.float32](
                     out[out_idx] = log(max(self[src_idx], epsilon))
                 elif op_code == TANH_FORWARD:
                     out[out_idx] = tanh(self[src_idx])
-                else: # Sigmoid
-                    out[out_idx] = One[Self.dtype].value()/ (One[Self.dtype].value() + exp(-self[src_idx]))
+                else:  # Sigmoid
+                    out[out_idx] = One[Self.dtype].value() / (
+                        One[Self.dtype].value() + exp(-self[src_idx])
+                    )
 
             return out^
 
@@ -1455,12 +1453,18 @@ struct Buffer[dtype: DType = DType.float32](
                 comptime if op_code == EXP:
                     dst_data.store[width=simd_width](out_idx, exp(vec))
                 elif op_code == LOG:
-                    dst_data.store[width=simd_width](out_idx, log(max(vec, epsilon)))
+                    dst_data.store[width=simd_width](
+                        out_idx, log(max(vec, epsilon))
+                    )
                 elif op_code == TANH_FORWARD:
                     dst_data.store[width=simd_width](out_idx, tanh(vec))
 
-                else: # Sigmoid
-                    dst_data.store[width=simd_width](out_idx, One[Self.dtype].value() / (One[Self.dtype].value() + exp(-vec)))
+                else:  # Sigmoid
+                    dst_data.store[width=simd_width](
+                        out_idx,
+                        One[Self.dtype].value()
+                        / (One[Self.dtype].value() + exp(-vec)),
+                    )
                 i += simd_width
 
             # Tail loop
@@ -1473,8 +1477,10 @@ struct Buffer[dtype: DType = DType.float32](
                     dst_data[out_idx] = log(max(src_data[src_idx], epsilon))
                 elif op_code == TANH_FORWARD:
                     dst_data[out_idx] = tanh(src_data[src_idx])
-                else: # Sigmoid
-                    dst_data[out_idx] = One[Self.dtype].value()/ (One[Self.dtype].value() + exp(-src_data[src_idx]))
+                else:  # Sigmoid
+                    dst_data[out_idx] = One[Self.dtype].value() / (
+                        One[Self.dtype].value() + exp(-src_data[src_idx])
+                    )
                 i += 1
 
         parallelize[process_chunk](num_cores)
@@ -1523,9 +1529,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn arange[
         max_arange_elements: Int = 10000000  # Safety limit to prevent infinite loops with very small steps
     ](args: VariadicList[Scalar[Self.dtype], _]) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → arange is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → arange is for numeric data types only"
 
         start: Scalar[Self.dtype] = 0
         end: Scalar[Self.dtype] = max_finite[Self.dtype]()
@@ -1592,9 +1598,9 @@ struct Buffer[dtype: DType = DType.float32](
         end: Scalar[Self.dtype],
         steps: Int,
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → linspace is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → linspace is for numeric data types only"
 
         if steps < 1:
             panic("Buffer → linspace: steps must be at least 1")
@@ -1622,9 +1628,9 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Scalar[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → sum is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → sum is for numeric data types only"
 
         var accum = Scalar[Self.dtype](0)
         if self.size == 0:
@@ -1654,9 +1660,9 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Scalar[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → product is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → product is for numeric data types only"
 
         var result = Scalar[Self.dtype](1)
         var extent = end_index.or_else(self.size) - start_index
@@ -1683,12 +1689,9 @@ struct Buffer[dtype: DType = DType.float32](
         self: Buffer[Self.dtype],
         exponent: Scalar[Self.dtype],
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            (
-                "Buffer → __pow__(exponent) -> Buffer is for numeric data types"
-                " only"
-            )
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __pow__(exponent) -> Buffer is for numeric data types only"
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -1708,9 +1711,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __abs__(self) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __abs__ is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __abs__ is for numeric data types only"
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -1732,9 +1735,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn clamp(
         self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → clamp is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → clamp is for numeric data types only"
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -1758,9 +1761,9 @@ struct Buffer[dtype: DType = DType.float32](
     fn clamp_in_place(
         self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
     ):
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → clamp is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → clamp is for numeric data types only"
 
         comptime simd_width = simd_width_of[Self.dtype]()
         var vectorized_end = (self.size // simd_width) * simd_width
@@ -1808,9 +1811,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __neg__(self: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → __neg__ is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → __neg__ is for numeric data types only"
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -1830,9 +1833,9 @@ struct Buffer[dtype: DType = DType.float32](
 
     @always_inline
     fn __invert__(self) -> Buffer[Self.dtype]:
-        comptime assert
-            Self.dtype.is_integral() or DType.bool == Self.dtype,
-            "Buffer → __invert__ is for Bool or integral data types only"
+        comptime assert (
+            Self.dtype.is_integral() or DType.bool == Self.dtype
+        ), "Buffer → __invert__ is for Bool or integral data types only"
 
         var out = Buffer[Self.dtype](self.size)
 
@@ -2207,9 +2210,9 @@ struct Buffer[dtype: DType = DType.float32](
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Scalar[Self.dtype]:
-        comptime assert
-            Self.dtype.is_numeric(),
-            "Buffer → dot is for numeric data types only"
+        comptime assert (
+            Self.dtype.is_numeric()
+        ), "Buffer → dot is for numeric data types only"
         if not lhs.size == rhs.size:
             panic(
                 "Buffer → dot: buffer size does not match -> lhs:",
@@ -2317,9 +2320,9 @@ struct Buffer[dtype: DType = DType.float32](
     ](self: Buffer[Self.dtype], other: Buffer[Self.dtype],) -> Bool:
         """Check if all elements are close within tolerance: |a - b| <= atol + rtol * |b|.
         """
-        comptime assert
-            Self.dtype.is_floating_point(),
-            "Buffer → all_close is for floating point data types only"
+        comptime assert (
+            Self.dtype.is_floating_point()
+        ), "Buffer → all_close is for floating point data types only"
 
         if self.size != other.size:
             return False
@@ -2353,7 +2356,7 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn any(
         self: Buffer[Self.dtype],
-        pred: fn (Scalar[Self.dtype]) -> Bool,
+        pred: fn(Scalar[Self.dtype]) -> Bool,
     ) -> Bool:
         """Check if any element satisfies the predicate."""
         for i in range(self.size):
@@ -2364,7 +2367,7 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn all(
         self: Buffer[Self.dtype],
-        pred: fn (Scalar[Self.dtype]) -> Bool,
+        pred: fn(Scalar[Self.dtype]) -> Bool,
     ) -> Bool:
         """Check if all elements satisfy the predicate."""
         for i in range(self.size):
@@ -2375,7 +2378,7 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn map_to_bool(
         self: Buffer[Self.dtype],
-        pred: fn (Scalar[Self.dtype]) -> Bool,
+        pred: fn(Scalar[Self.dtype]) -> Bool,
     ) -> Buffer[DType.bool]:
         """Apply predicate to each element, returning a boolean buffer."""
         var out = Buffer[DType.bool](self.size)
@@ -2405,7 +2408,7 @@ struct Buffer[dtype: DType = DType.float32](
     @always_inline
     fn map_where(
         self: Buffer[Self.dtype],
-        pred: fn (Scalar[Self.dtype]) -> Bool,
+        pred: fn(Scalar[Self.dtype]) -> Bool,
         value: Scalar[Self.dtype],
     ) -> Buffer[Self.dtype]:
         """Apply predicate to each element, setting value where predicate holds,
@@ -2482,7 +2485,7 @@ struct ElementIterator[
     dtype: DType,
     origin: Origin[mut=mut],
     forward: Bool = True,
-](RegisterPassable, ImplicitlyCopyable, Iterable, Iterator):
+](ImplicitlyCopyable, Iterable, Iterator, RegisterPassable):
     """Iterator for Buffer."""
 
     comptime Element = Scalar[Self.dtype]
@@ -2499,7 +2502,7 @@ struct ElementIterator[
 
     fn __next__(
         mut self,
-    ) raises StopIteration -> ref [Self.origin] Self.Element:
+    ) raises StopIteration -> ref[Self.origin] Self.Element:
         comptime if Self.forward:
             if self.index >= len(self.src[]):
                 raise StopIteration()

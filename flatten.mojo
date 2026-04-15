@@ -6,11 +6,10 @@ from gradbox import Gradbox
 
 
 @fieldwise_init
-struct FlattenBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct FlattenBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
@@ -22,7 +21,7 @@ struct FlattenBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
         ]
 
 
-struct FlattenForward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct FlattenForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -40,7 +39,9 @@ struct FlattenForward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_FLATTEN))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_FLATTEN)
+                )
                 out.add_ancestry(self)
 
         return out^

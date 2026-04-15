@@ -10,11 +10,10 @@ from views import View
 
 
 @fieldwise_init
-struct ExpandBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
@@ -25,7 +24,7 @@ struct ExpandBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Expand[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Expand[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -72,7 +71,9 @@ struct Expand[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_()
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_EXPAND))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_EXPAND)
+                )
                 out.add_ancestry(tensor)
 
         return out^

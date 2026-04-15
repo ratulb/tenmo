@@ -16,11 +16,10 @@ from std.sys import simd_width_of
 
 
 @fieldwise_init
-struct DotBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var scalar_grad_value = gradbox.item()  # Scalar
@@ -53,7 +52,7 @@ struct DotBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
 
 @fieldwise_init
-struct Dot[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -105,7 +104,9 @@ struct Dot[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].null_arg(BACKWARD_DOT))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_DOT)
+                )
                 out.add_ancestry(lhs, rhs)
 
         return out^
@@ -134,7 +135,7 @@ fn dot_product_32[
     comptime NUM_WARPS = BLOCK_SIZE // WARP_SIZE
 
     var warp_sums = stack_allocation[
-        NUM_WARPS, Scalar[dtype], address_space = AddressSpace.SHARED
+        NUM_WARPS, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
 
     # Thread and block identification
@@ -205,7 +206,7 @@ fn dot_product_64[
     size: UInt,
 ):
     var block_shared_memory = stack_allocation[
-        BLOCK_SIZE, Scalar[dtype], address_space = AddressSpace.SHARED
+        BLOCK_SIZE, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
     var cache_index = thread_idx.x
     var gtid = cache_index + block_dim.x * block_idx.x
@@ -241,9 +242,9 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) raises -> Tensor[
         Self.dtype
     ]:
-        comptime assert
-            threads_per_block <= 512,
-            "Threads per block should be <= 512"
+        comptime assert (
+            threads_per_block <= 512
+        ), "Threads per block should be <= 512"
         var rank = A.rank()
         var numels = A.numels()
 

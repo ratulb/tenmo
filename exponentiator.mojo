@@ -1,5 +1,5 @@
 from tenmo import Tensor
-from backpropagation import BackwardFnArg, BACKWARD_EXPONENTIATION
+from backpropagation import BackwardFnArg, ScalarArg, BACKWARD_EXPONENTIATION
 from mnemonics import AddTensor, Multiply
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
@@ -8,24 +8,25 @@ from ndbuffer import NDBuffer
 
 
 @fieldwise_init
-struct ExponentiationBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable):
-
+struct ExponentiationBackward[dtype: DType](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype]
+        output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         ∂(x**n)/∂x = n * x**(n-1)
         All ops at NDBuffer level — GPU safe, no LLVM lowering issues.
         """
-        var exponent = output.bwd_fn_arg().arg[Scalar[Self.dtype]]
+        var exponent = (
+            output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        )
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
 
         # Step 1: x ** (n-1) — NDBuffer.pow, GPU safe
-        var base_pow = ancestor.buffer ** (
-            exponent - Scalar[Self.dtype](1)
-        )
+        var base_pow = ancestor.buffer ** (exponent - Scalar[Self.dtype](1))
 
         # Step 2: n * x**(n-1) — scalar_ops[Multiply], GPU safe
         var local_grad = base_pow.scalar_ops[Multiply](exponent)
@@ -42,7 +43,7 @@ struct ExponentiationBackward[dtype: DType](RegisterPassable, ImplicitlyCopyable
 
 
 @fieldwise_init
-struct Exponentiator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Exponentiator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn forward[
         track_grad: Bool = True
@@ -62,7 +63,11 @@ struct Exponentiator[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.bwdFnArg = Optional(BackwardFnArg[Self.dtype].scalar(BACKWARD_EXPONENTIATION, exponent))
+                out.backwardFnArg = Optional(
+                    BackwardFnArg[Self.dtype].scalar_arg(
+                        BACKWARD_EXPONENTIATION, exponent
+                    )
+                )
                 out.add_ancestry(self)
 
         return out^

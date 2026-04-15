@@ -58,11 +58,7 @@ comptime TILE_SIZE = 32
 
 
 struct NDBuffer[dtype: DType](
-    ImplicitlyCopyable
-    & Movable
-    & Equatable
-    & Writable
-    & Sized
+    ImplicitlyCopyable & Movable & Equatable & Writable & Sized
 ):
     var shape: Shape
     var strides: Strides
@@ -150,9 +146,7 @@ struct NDBuffer[dtype: DType](
 
     fn __copyinit__(out self, copy: Self):
         """Copy NDBuffer - Buffer handles ref counting automatically."""
-        self.buffer = (
-            copy.buffer.copy()
-        )  # Buffer copy handles shared/unshared!
+        self.buffer = copy.buffer.copy()  # Buffer copy handles shared/unshared!
         self.shape = copy.shape.copy()
         self.strides = copy.strides.copy()
         self.offset = copy.offset
@@ -193,7 +187,6 @@ struct NDBuffer[dtype: DType](
         if device.is_cpu():
             return ndb^
         else:
-
             comptime if has_accelerator():
                 try:
                     var (_, result) = ndb^.to_device(device)
@@ -208,7 +201,7 @@ struct NDBuffer[dtype: DType](
 
     fn get_gpu(
         ref self,
-    ) raises -> ref [self.device_state.value().gpu] GPU:
+    ) raises -> ref[self.device_state.value().gpu] GPU:
         comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.device_state.value().get_gpu()
@@ -242,7 +235,7 @@ struct NDBuffer[dtype: DType](
 
     fn get_device_state(
         ref self,
-    ) raises -> ref [self.device_state.value()] DeviceState[Self.dtype]:
+    ) raises -> ref[self.device_state.value()] DeviceState[Self.dtype]:
         if self.is_on_gpu():
             return self.device_state.value()
         raise "Not on any device"
@@ -344,7 +337,6 @@ struct NDBuffer[dtype: DType](
         if device.is_cpu():
             return ndb^
         else:
-
             comptime if has_accelerator():
                 try:
                     var (_, result) = ndb^.to_device(device)
@@ -492,7 +484,9 @@ struct NDBuffer[dtype: DType](
         )
         return self.get(index)
 
-    fn __setitem__(self, indices: VariadicList[Int, _], value: Scalar[Self.dtype]):
+    fn __setitem__(
+        self, indices: VariadicList[Int, _], value: Scalar[Self.dtype]
+    ):
         index = IndexCalculator.flatten_index(
             self.shape, indices, self.strides, self.offset
         )
@@ -556,9 +550,9 @@ struct NDBuffer[dtype: DType](
         simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
     ](self, row: Int, col: Int) -> SIMD[Self.dtype, simdwidth]:
         """SIMD load of a row segment from a 2D NDBuffer."""
-        comptime assert
-            simdwidth.is_power_of_two(),
-            "NDBuffer → load: SIMD width must be a power of 2"
+        comptime assert (
+            simdwidth.is_power_of_two()
+        ), "NDBuffer → load: SIMD width must be a power of 2"
         if simdwidth > self.numels():
             panic("NDBuffer → load: buffer size is less than simd width")
 
@@ -617,9 +611,9 @@ struct NDBuffer[dtype: DType](
         simdwidth: Int = simd_width_of[Self.dtype](), validated: Bool = False
     ](self, row: Int, col: Int, value: SIMD[Self.dtype, simdwidth]):
         """SIMD store of a row segment into a 2D NDBuffer."""
-        comptime assert
-            simdwidth.is_power_of_two(),
-            "NDBuffer → store: SIMD width must be a power of 2"
+        comptime assert (
+            simdwidth.is_power_of_two()
+        ), "NDBuffer → store: SIMD width must be a power of 2"
         if simdwidth > self.numels():
             panic("NDBuffer → store: buffer size is less than simd width")
 
@@ -713,7 +707,7 @@ struct NDBuffer[dtype: DType](
         writer.write(self.__str__())
 
     @always_inline
-    fn data_buffer(ref self) -> ref [self.buffer] Buffer[Self.dtype]:
+    fn data_buffer(ref self) -> ref[self.buffer] Buffer[Self.dtype]:
         return self.buffer
 
     @always_inline
@@ -902,7 +896,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn data_ptr[
         origin: Origin, address_space: AddressSpace, //
-    ](ref [origin, address_space]self) -> UnsafePointer[
+    ](ref[origin, address_space] self) -> UnsafePointer[
         Scalar[Self.dtype], origin, address_space=address_space
     ]:
         return (
@@ -1010,7 +1004,7 @@ struct NDBuffer[dtype: DType](
         return out^
 
     fn map_where(
-        self, pred: fn (Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
+        self, pred: fn(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         comptime if has_accelerator():
             if self.is_on_gpu():
@@ -1031,7 +1025,7 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn map_where_cpu(
-        self, pred: fn (Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
+        self, pred: fn(Scalar[Self.dtype]) -> Bool, value: Scalar[Self.dtype]
     ) -> NDBuffer[Self.dtype]:
         var buffer = Buffer[Self.dtype](len(self))
         var index = 0
@@ -1041,8 +1035,8 @@ struct NDBuffer[dtype: DType](
         return NDBuffer[Self.dtype](buffer^, self.shape)
 
     fn map[
-        map_buffer: fn (Buffer[Self.dtype]) -> Buffer[Self.dtype],
-        map_element: fn (Scalar[Self.dtype]) -> Scalar[Self.dtype],
+        map_buffer: fn(Buffer[Self.dtype]) -> Buffer[Self.dtype],
+        map_element: fn(Scalar[Self.dtype]) -> Scalar[Self.dtype],
     ](self) -> Buffer[Self.dtype]:
         if self.is_contiguous():
             var start = self.offset
@@ -1057,10 +1051,10 @@ struct NDBuffer[dtype: DType](
             return buffer^
 
     fn reduce[
-        reduce_buffer: fn (Buffer[Self.dtype], Int, Optional[Int]) -> Scalar[
+        reduce_buffer: fn(Buffer[Self.dtype], Int, Optional[Int]) -> Scalar[
             Self.dtype
         ],
-        reduce_elements: fn (Scalar[Self.dtype], Scalar[Self.dtype]) -> Scalar[
+        reduce_elements: fn(Scalar[Self.dtype], Scalar[Self.dtype]) -> Scalar[
             Self.dtype
         ],
         unit: Scalar[Self.dtype] = Scalar[Self.dtype](0),
@@ -1676,7 +1670,6 @@ struct NDBuffer[dtype: DType](
         elif self.is_contiguous() and not other.is_contiguous():
             var index = self.offset
             for idx in other.index_iterator():
-
                 comptime if overwrite:
                     self.buffer[index] = other.buffer[idx]
                 else:
@@ -1686,7 +1679,6 @@ struct NDBuffer[dtype: DType](
         elif not self.is_contiguous() and other.is_contiguous():
             var index = other.offset
             for idx in self.index_iterator():
-
                 comptime if overwrite:
                     self.buffer[idx] = other.buffer[index]
                 else:
@@ -1696,7 +1688,6 @@ struct NDBuffer[dtype: DType](
         else:
             var iterator = other.index_iterator()
             for index in self.index_iterator():
-
                 comptime if overwrite:
                     try:
                         self.buffer[index] = other.buffer[iterator.__next__()]
@@ -1951,7 +1942,9 @@ struct NDBuffer[dtype: DType](
         return self.float_unary_ops[EXP]()
 
     @always_inline
-    fn sigmoid(self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
+    fn sigmoid(
+        self,
+    ) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
         return self.float_unary_ops[SIGMOID_FORWARD]()
 
     @always_inline
@@ -2005,9 +1998,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn arithmetic_ops[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype], epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()) -> NDBuffer[
-        Self.dtype
-    ]:
+    ](
+        self: NDBuffer[Self.dtype],
+        other: NDBuffer[Self.dtype],
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+    ) -> NDBuffer[Self.dtype]:
         # Broadcast validation
         if not ShapeBroadcaster.broadcastable(self.shape, other.shape):
             panic(
@@ -2046,9 +2041,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn arithmetic_ops_cpu[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype], other: NDBuffer[Self.dtype], epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()) -> NDBuffer[
-        Self.dtype
-    ]:
+    ](
+        self: NDBuffer[Self.dtype],
+        other: NDBuffer[Self.dtype],
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+    ) -> NDBuffer[Self.dtype]:
         # Handle broadcasting case
         if self.shape != other.shape:
             return self.broadcast_buffer[op_code](other)
@@ -2059,7 +2056,12 @@ struct NDBuffer[dtype: DType](
             other_start = other.offset
             other_end = other_start + other.numels()
             var result_buffer = self.buffer.arithmetic_ops[op_code=op_code](
-                other.buffer, self_start, self_end, other_start, other_end, epsilon=epsilon
+                other.buffer,
+                self_start,
+                self_end,
+                other_start,
+                other_end,
+                epsilon=epsilon,
             )
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
@@ -2188,11 +2190,11 @@ struct NDBuffer[dtype: DType](
         var own_rank = own_shape.rank()
         var target_rank = target_shape.rank()
 
-        _="""if own_rank > target_rank:
+        _ = """if own_rank > target_rank:
             panic("NDBuffer broadcast_to: own rank exceeds target rank")"""
 
         var extra_dims = target_rank - own_rank
-        _="""for i in range(own_rank):
+        _ = """for i in range(own_rank):
             var own_dim = own_shape[i]
             var target_dim = target_shape[i + extra_dims]
             if own_dim != target_dim and own_dim != 1:
@@ -2231,7 +2233,11 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn scalar_fn[
         op_code: Int,
-    ](lhs: Scalar[Self.dtype], rhs: Scalar[Self.dtype], epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()) -> Scalar[Self.dtype]:
+    ](
+        lhs: Scalar[Self.dtype],
+        rhs: Scalar[Self.dtype],
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+    ) -> Scalar[Self.dtype]:
         comptime if op_code == Add:
             return lhs + rhs
         elif op_code == Subtract:
@@ -2281,7 +2287,9 @@ struct NDBuffer[dtype: DType](
         comptime if op_code == LOG:
             return log(max(scalar, epsilon))
         elif op_code == SIGMOID_FORWARD:
-            return One[Self.dtype].value() /(One[Self.dtype].value() + exp(scalar))
+            return One[Self.dtype].value() / (
+                One[Self.dtype].value() + exp(scalar)
+            )
         elif op_code == TANH_FORWARD:
             return tanh(scalar)
         else:  # op_code == EXP:
@@ -2330,8 +2338,7 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn scalar_ops_cpu[
-        op_code: Int,
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
+        op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](self: NDBuffer[Self.dtype], scalar: Scalar[Self.dtype]) -> NDBuffer[
         Self.dtype
     ]:
@@ -2421,7 +2428,9 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn unary_ops_with_mask[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype]) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+    ](self: NDBuffer[Self.dtype]) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ]:
         """Device-aware unary op + mask. Returns (output, mask).
 
         CPU path: delegates to Buffer.unary_ops_with_mask (vectorized).
@@ -2436,19 +2445,24 @@ struct NDBuffer[dtype: DType](
             Tuple of (output NDBuffer, mask NDBuffer).
             Both share the same device as self.
         """
-        var out:  NDBuffer[Self.dtype]
+        var out: NDBuffer[Self.dtype]
         var mask: NDBuffer[Self.dtype]
 
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    var result = UnaryOpsKernel[Self.dtype].launch_with_mask[op_code](self)
-                    out  = result[0]
+                    var result = UnaryOpsKernel[Self.dtype].launch_with_mask[
+                        op_code
+                    ](self)
+                    out = result[0]
                     mask = result[1]
                 except e:
-                    panic("NDBuffer unary_ops_with_mask → GPU launch failed: ", String(e))
+                    panic(
+                        "NDBuffer unary_ops_with_mask → GPU launch failed: ",
+                        String(e),
+                    )
                     # Unreachable
-                    out  = Self.Empty()
+                    out = Self.Empty()
                     mask = Self.Empty()
             else:
                 (out, mask) = self.unary_ops_with_mask_cpu[op_code]()
@@ -2460,41 +2474,42 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn unary_ops_with_mask_cpu[
         op_code: Int,
-    ](self: NDBuffer[Self.dtype]) -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+    ](self: NDBuffer[Self.dtype]) -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ]:
         """CPU path for unary_ops_with_mask. Delegates to Buffer."""
         if self.is_contiguous():
             var start = self.offset
-            var end   = start + self.numels()
+            var end = start + self.numels()
             var result = self.buffer.unary_ops_with_mask[op_code](start, end)
-            var out_ndb  = NDBuffer[Self.dtype](result[0], self.shape)
+            var out_ndb = NDBuffer[Self.dtype](result[0], self.shape)
             var mask_ndb = NDBuffer[Self.dtype](result[1], self.shape)
             return (out_ndb^, mask_ndb^)
         else:
             # Non-contiguous CPU slow path
             var numels = self.numels()
-            var out_buf  = Buffer[Self.dtype](numels)
+            var out_buf = Buffer[Self.dtype](numels)
             var mask_buf = Buffer[Self.dtype](numels)
             var zero = Scalar[Self.dtype](0)
-            var one  = Scalar[Self.dtype](1)
+            var one = Scalar[Self.dtype](1)
             var index = 0
             for idx in self.index_iterator():
                 var val = self.buffer[idx]
                 comptime if op_code == RELU_FORWARD:
                     if val > zero:
-                        out_buf[index]  = val
+                        out_buf[index] = val
                         mask_buf[index] = one
                     else:
-                        out_buf[index]  = zero
+                        out_buf[index] = zero
                         mask_buf[index] = zero
                 else:
-                    out_buf[index]  = val
+                    out_buf[index] = val
                     mask_buf[index] = one
                 index += 1
             return (
-                NDBuffer[Self.dtype](out_buf^,  self.shape),
+                NDBuffer[Self.dtype](out_buf^, self.shape),
                 NDBuffer[Self.dtype](mask_buf^, self.shape),
             )
-
 
     @always_inline
     fn float_unary_ops[
@@ -2539,7 +2554,7 @@ struct NDBuffer[dtype: DType](
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
-            _="""var result_buffer: Buffer[Self.dtype]
+            _ = """var result_buffer: Buffer[Self.dtype]
             comptime if op_code == LOG:
                 result_buffer = self.buffer.log[epsilon](start, end)
             elif op_code == SIGMOID_FORWARD:
@@ -2548,7 +2563,9 @@ struct NDBuffer[dtype: DType](
                 result_buffer = self.buffer.tanh(start, end)
             else:  # op_code == EXP:
                 result_buffer = self.buffer.exp(start, end)"""
-            var result_buffer = self.buffer.float_unary_ops[op_code, epsilon](start, end)
+            var result_buffer = self.buffer.float_unary_ops[op_code, epsilon](
+                start, end
+            )
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
@@ -2820,9 +2837,9 @@ struct NDBuffer[dtype: DType](
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Self) -> Bool:
-        comptime assert
-            Self.dtype.is_floating_point(),
-            "NDBuffer → all_close is for floating point data types only"
+        comptime assert (
+            Self.dtype.is_floating_point()
+        ), "NDBuffer → all_close is for floating point data types only"
 
         if self.shape != other.shape:
             panic(
@@ -2864,7 +2881,7 @@ struct NDBuffer[dtype: DType](
 
     fn map_to_bool(
         self,
-        pred: fn (Scalar[Self.dtype]) -> Bool,
+        pred: fn(Scalar[Self.dtype]) -> Bool,
     ) -> NDBuffer[DType.bool]:
         """Apply predicate to each element, returning a boolean NDBuffer.
         GPU path: transfers to CPU, applies pred, transfers back if needed.
@@ -2882,9 +2899,7 @@ struct NDBuffer[dtype: DType](
                     )
                     return NDBuffer[DType.bool](bool_buffer^, self.shape)
                 except e:
-                    panic(
-                        "NDBuffer map_to_bool: GPU→CPU failed: " + String(e)
-                    )
+                    panic("NDBuffer map_to_bool: GPU→CPU failed: " + String(e))
                     return NDBuffer[DType.bool].Empty()  # unreachable
 
         # CPU path
