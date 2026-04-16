@@ -163,7 +163,6 @@ struct Buffer[dtype: DType = DType.float32](
         # Update pointers
         self.data = new_data
         self._refcount = refcount_ptr
-        # return self
 
     fn ref_count(self) -> UInt64:
         """Count the amount of current references.
@@ -2537,11 +2536,4 @@ struct ElementIterator[
 
 
 fn main():
-    comptime dtype = DType.int32
-    var buff = Buffer[dtype](1, 2, 3)
-    # var buff = Buffer[dtype]()
-    print(buff)
-    for ref e in buff:
-        print(e)
-        e += 10
-    print(buff)
+   print("passes")

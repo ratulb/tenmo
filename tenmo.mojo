@@ -2496,24 +2496,5 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
     fn bounds(self) -> Tuple[Int, Optional[Int]]:
         return self.index_itr.bounds()
 
-
-from std.testing import assert_true
-
-
 fn main() raises:
-    comptime dtype = DType.float32
-    var a = Tensor[dtype].scalar(42)
-    print(
-        a.shape(),
-        len(a),
-        a.numels(),
-        len(a.shape()),
-        a.shape().product(),
-        a.is_scalar(),
-    )
-    print(a.device())
-    # prints () 0 1 0 1 True
-    # var b = a.max(31)
-    # var c = a.min(31)
-    # b.print()
-    # c.print()
+    print("passes")

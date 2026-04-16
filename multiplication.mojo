@@ -21,7 +21,6 @@ struct MultiplyBackwardScalar[dtype: DType](
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var factor = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
-        print(factor)
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * factor
@@ -167,16 +166,6 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
 
-from common_utils import now
-from std.testing import assert_true
-
 
 fn main() raises:
-    comptime dtype = DType.float32
-    var A = Tensor[dtype].rand(2, 5, requires_grad=True)
-    var B = Tensor[dtype].arange(5, requires_grad=True)
-    var C = A * 24
-    var D = C * B
-    D.backward()
-
-    A.grad().print()
+    print("passes")

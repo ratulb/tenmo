@@ -709,10 +709,4 @@ struct Gradbox[dtype: DType](
 
 
 fn main() raises:
-    comptime dtype = DType.float32
-    var gb = Gradbox[dtype].arange(10)
-    x = gb.detach()
-    x.print()
-    x = x.reshape(Shape(2, 5))
-    x.print()
-    print(x.device())
+   print("passes")

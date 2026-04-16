@@ -418,19 +418,4 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
 
 fn main() raises:
-    comptime dtype = DType.float32
-    _ = """var a = Tensor[dtype].d3([[[1, 0, 3]]], requires_grad=True)
-    var b = Tensor[dtype].d2([[1], [2], [3]], requires_grad=True)
-    var v = a.into_view()
-    var m = v.sigmoid()
-    m.backward()
-    a.grad().print()
-    b.grad().print()
-    m.print()
-
-    var A = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
-    var B = A.transpose(-1, 0)
-    var C = B * 89
-    C.backward()
-    A.grad().print()"""
     print("passes")

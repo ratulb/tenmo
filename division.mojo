@@ -206,9 +206,4 @@ struct Divider[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 
 fn main() raises:
-    comptime dtype = DType.float32
-    a1 = Tensor[dtype].rand(5000, 1000, requires_grad=True)
-    b1 = Tensor[dtype].rand(5000, 1000)
-    r1 = a1 / b1
-    r1.backward()
-    a1.grad().print()
+    print("passes")

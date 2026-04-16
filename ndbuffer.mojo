@@ -3408,27 +3408,4 @@ struct NDBuffer[dtype: DType](
 
 
 fn main() raises:
-    comptime dtype = DType.float32
-    var ndb = NDBuffer[dtype].arange(8)
-    ndb.print()
-    var shape = Shape(4, 2)
-    var reshaped1 = ndb.reshape(shape)
-    var reshaped2 = ndb.reshape(shape, validated=False)
-    var reshaped3 = ndb.reshape(shape, validated=True)
-    print()
-    reshaped1.print()
-    print()
-    reshaped2.print()
-    print()
-    reshaped3.print()
-
-    var permuted = ndb.permute(IntArray(0), shared=False)
-    var reshaped_1 = permuted.reshape(shape)
-    var reshaped_2 = permuted.reshape(shape, validated=False)
-    var reshaped_3 = permuted.reshape(shape, validated=True)
-    print()
-    reshaped_1.print()
-    print()
-    reshaped_2.print()
-    print()
-    reshaped_3.print()
+   print("passes")

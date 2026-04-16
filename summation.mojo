@@ -13,7 +13,8 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     fn backward(
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[ReductionArg]()
+        ref bwd_arg = output.backward_fn_arg().get[ReductionArg]()
+        var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         shape = ancestor.shape()
@@ -24,17 +25,17 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
         else:
             # Handle keepdims=False case (need to reshape gradient)
-            if not bwd_arg.keepdims:
+            if not keepdims:
                 # Determine axes/unsqueeze (insert dims of size 1)
                 axes = (
                     gradbox.shape()
                     .intarray()
                     .insert(
-                        bwd_arg.axes,
-                        IntArray.filled(len(bwd_arg.axes), 1),
+                        axes,
+                        IntArray.filled(len(axes), 1),
                     )
                 )
-                unsqueezed_shape = Shape(bwd_arg.axes)
+                unsqueezed_shape = Shape(axes)
 
                 unsqueezed_grad = gradbox.reshape(unsqueezed_shape)
                 grad_contrib = unsqueezed_grad.broadcast_to(shape, share=False)
@@ -82,9 +83,20 @@ struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return out^
 
 
-fn main():
+
+fn main() raises:
+    test_sum_2d_backward_axis0_cpu()
+
+
+from std.testing import assert_true
+
+fn test_sum_2d_backward_axis0_cpu() raises:
+    """Test backward of sum along axis 0 on CPU."""
+    print("test_sum_2d_backward_axis0_cpu")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].arange(10, requires_grad=True)
-    var s = a.sum()
-    s.backward()
-    a.grad().print()
+    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var loss = a.sum(axes=[0])
+    loss.backward()
+    var expected = Tensor[dtype].d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
+    assert_true(a.grad().all_close(expected))
+    print("✓ CPU 2D sum backward axis0 passed")

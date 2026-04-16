@@ -166,26 +166,5 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     )
         return out^
 
-
-from common_utils import now
-from std.testing import assert_true
-
-
 fn main() raises:
-    comptime dtype = DType.float32
-    var A = Tensor[dtype].rand(5, 5, requires_grad=True)
-    var B = Tensor[dtype].rand(5, requires_grad=True)
-    var C = A - B
-    C.backward()
-    A.grad().print()
-    # B.grad().print()
-
-    var D = A - 7
-    D.backward()
-    A.grad().print()
-    E = 8 - A
-    E.backward()
-    A.grad().print()
-    F = A + Tensor[dtype].rand(5, 5)
-    F.backward()
-    A.grad().print()
+    print("passes")
