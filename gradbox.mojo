@@ -19,7 +19,6 @@ from common_utils import Idx, panic, print_buffer
 from device import Device, CPU, GPU
 from device_transfer import DeviceTransfer
 
-
 struct Gradbox[dtype: DType](
     ImplicitlyCopyable
     & Movable
@@ -37,6 +36,7 @@ struct Gradbox[dtype: DType](
 
     fn __init__(out self, var buffer: NDBuffer[Self.dtype], share: Bool = True):
         self.buffer = buffer.share() if share else buffer^
+
 
     fn __moveinit__(out self, deinit take: Self):
         self.buffer = take.buffer^
@@ -376,6 +376,9 @@ struct Gradbox[dtype: DType](
     @always_inline
     fn strides(ref self) -> ref [self.buffer.strides] Strides:
         return self.buffer.strides
+
+    fn data_buffer(ref self) -> ref[self.buffer]NDBuffer[Self.dtype]:
+        return self.buffer
 
     @always_inline
     fn index_iterator(
