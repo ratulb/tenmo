@@ -7,6 +7,7 @@ from intarray import IntArray
 from indexhelper import IndexCalculator
 from shapes import Shape
 from forwards import Concate
+from ancestors_newest import AncestorRef
 
 
 @fieldwise_init
@@ -84,6 +85,82 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return result^
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        """
+        Split gradient and squeeze the stacked dimension.
+
+        Forward:  stack([A, B, C], axis=1) → Result(d0, 3, d1, d2)
+        Backward: grad_Result(d0, 3, d1, d2) → [grad_A(d0, d1, d2),
+                                                  grad_B(d0, d1, d2),
+                                                  grad_C(d0, d1, d2)]
+        """
+        var bwd_arg = output.backward_fn_arg().get[StackArg]()
+        var (axis, num_tensors) = bwd_arg.axis, bwd_arg.num_tensors
+        ref grad_output = output.gradients()[]
+        # var grad_data = grad_output.buffer.buffer.data
+        var grad_data = grad_output.data_ptr()
+        ref grad_shape = grad_output.shape()
+        ref grad_strides = grad_output.strides()
+
+        var count = len(output.ancestry())
+        var result = List[
+            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
+
+        # Size of stacked dimension should equal num_tensors
+        var stack_size = grad_shape[axis]
+        if stack_size != num_tensors:
+            panic(
+                "StackBackward: Expected stack dimension size",
+                String(num_tensors),
+                "but got",
+                String(stack_size),
+            )
+
+        # ===== SPLIT GRADIENT ALONG STACKED AXIS =====
+        for tensor_idx in range(count):
+            var ancestor_ref = output.ancestry().get(tensor_idx)
+            var tensor = Tensor[Self.dtype](
+                ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad
+            )
+
+            if not tensor.requires_grad:
+                continue
+
+            # Build grad_input shape (without the stacked dimension)
+            var grad_input_shape_dims = List[Int]()
+            for d in range(grad_shape.rank()):
+                if d != axis:
+                    grad_input_shape_dims.append(grad_shape[d])
+
+            var grad_input_shape = Shape(grad_input_shape_dims)
+            var grad_input = Gradbox[Self.dtype].zeros(grad_input_shape)
+            # var grad_input_data = grad_input.buffer.buffer.data
+            var grad_input_data = grad_input.data_ptr()
+
+            # ===== EXTRACT SLICE: grad_output[..., tensor_idx, ...] =====
+            var elem_idx = 0
+
+            # Iterate over all elements in the OUTPUT gradient shape
+            for coord in grad_shape:
+                # Only process elements where coord[self.axis] == tensor_idx
+                if coord[axis] == tensor_idx:
+                    # Get flat index in grad_output
+                    var src_idx = IndexCalculator.flatten_index(
+                        grad_shape, coord, grad_strides, 0
+                    )
+
+                    # Copy to grad_input (contiguous)
+                    grad_input_data[elem_idx] = grad_data[src_idx]
+                    elem_idx += 1
+
+            result.append((ancestor_ref^, grad_input^, AddTensor))
+
+        return result^
+
 
 @fieldwise_init
 struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -154,15 +231,13 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         comptime if track_grad:
             if grad_required:
                 result.requires_grad_(True)
-                result.backwardFnArg = Optional(
-                    BackwardFnArg[Self.dtype](
-                        BACKWARD_STACK, StackArg(stack_axis, len(tensors))
-                    )
+                var backwardFnArg = BackwardFnArg[Self.dtype](
+                    BACKWARD_STACK, StackArg(stack_axis, len(tensors))
                 )
 
                 # Add original tensors (not expanded) to ancestry
                 for i in range(len(tensors)):
-                    result.add_ancestry(tensors[i])
+                    result.add_ancestry(backwardFnArg, tensors[i])
 
         return result^
 
@@ -293,3 +368,6 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return Concate.forward[track_grad](
             tensors, axis=1, requires_grad=requires_grad
         )
+
+def main():
+    print("passes")

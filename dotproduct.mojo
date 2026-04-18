@@ -11,8 +11,8 @@ from std.sys import has_accelerator
 from std.gpu.primitives.id import lane_id, warp_id
 from std.gpu.primitives.warp import shuffle_down
 from std.gpu.globals import WARP_SIZE
-
 from std.sys import simd_width_of
+from ancestors_newest import AncestorRef
 
 
 @fieldwise_init
@@ -47,6 +47,44 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
             grad_shares.append((tensor_rhs^, gradbox_rhs^, AddTensor))
+
+        return grad_shares^
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref gradbox = output.gradients()[]
+        var scalar_grad_value = gradbox.item()  # Scalar
+        var grad_shares: List[
+            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        ] = []
+        var tensor_lhs_ref = output.ancestry().get(0)
+        var tensor_rhs_ref = output.ancestry().get(1)
+
+        var tensor_lhs = Tensor[Self.dtype](tensor_lhs_ref.buffer(), requires_grad=tensor_lhs_ref.requires_grad)
+        var tensor_rhs = Tensor[Self.dtype](tensor_rhs_ref.buffer(), requires_grad=tensor_rhs_ref.requires_grad)
+
+        print("check here 1")
+
+        if tensor_lhs.requires_grad:
+            var grad_tensor = tensor_rhs.__mul__[track_grad=False](
+                scalar_grad_value
+            )
+            var gradbox_lhs = grad_tensor.as_gradbox(
+                share=False, contiguous=False
+            )
+            grad_shares.append((tensor_lhs_ref, gradbox_lhs^, AddTensor))
+
+        if tensor_rhs.requires_grad:
+            var grad_tensor = tensor_lhs.__mul__[track_grad=False](
+                scalar_grad_value
+            )
+            var gradbox_rhs = grad_tensor.as_gradbox(
+                share=False, contiguous=False
+            )
+
+            grad_shares.append((tensor_rhs_ref^, gradbox_rhs^, AddTensor))
 
         return grad_shares^
 
@@ -104,10 +142,9 @@ struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.backwardFnArg = Optional(
-                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_DOT)
-                )
-                out.add_ancestry(lhs, rhs)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_DOT)
+
+                out.add_ancestry(backwardFnArg^, lhs, rhs)
 
         return out^
 
@@ -318,4 +355,47 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
         return Tensor[Self.dtype].from_device_buffer(result_buffer, Shape())
 
 fn main() raises:
+    test_tensor_dot()
     print("passes")
+
+
+from std.testing import assert_true
+
+
+fn test_tensor_dot() raises:
+    print("test_tensor_dot")
+    comptime dtype = DType.float32
+
+    _="""a = Tensor[dtype].scalar(5, requires_grad=True)
+    b = Tensor[dtype].scalar(15, requires_grad=True)
+    c = a.matmul(b)
+    c.backward()
+    assert_true(a.grad().item() == 15)
+    assert_true(b.grad().item() == 5)
+
+    d = a.into_view()
+    e = d.matmul(b)
+    e.backward()
+    assert_true(a.grad().item() == 30)
+    assert_true(b.grad().item() == 10)
+    assert_true(d.grad().item() == 0)
+
+    print("passes till here")"""
+
+    #a = Tensor[dtype].arange(10, requires_grad=True)
+    a = Tensor[dtype].arange(3, requires_grad=True)
+    #b = a[5::2]
+    b = a.into_view()
+    print("Goes past this too")
+    b.print()
+    c = Tensor[dtype].d1([3, 4, 5])
+    print("==============")
+    #d = b.matmul(c)
+    d = c * b
+    d.print()
+    print("**************")
+    _="""print("d")
+    d.backward()
+    assert_true(
+        a.grad().all_close(Tensor[dtype].d1([0, 0, 0, 0, 0, 3, 0, 4, 0, 5]))
+    )"""

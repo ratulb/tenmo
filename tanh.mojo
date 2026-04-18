@@ -2,7 +2,7 @@ from tenmo import Tensor
 from mnemonics import AddTensor, TANH_BACKWARD
 from backpropagation import BackwardFnArg, BACKWARD_TANH
 from gradbox import Gradbox
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -19,6 +19,18 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return [(parent, gradbox_ancestor^, AddTensor)]
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[
+        Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+    ] where Self.dtype.is_floating_point():
+        ref gradbox = output.gradients()[]
+        ref parent = output.ancestry().get(0)
+        var ndb = output.buffer().arithmetic_ops[TANH_BACKWARD](gradbox.buffer)
+        var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
+
+        return [(parent, gradbox_ancestor^, AddTensor)]
 
 @fieldwise_init
 struct Tanh[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -37,10 +49,10 @@ struct Tanh[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.backwardFnArg = Optional(
+                var backwardFnArg =
                     BackwardFnArg[Self.dtype].null_arg(BACKWARD_TANH)
-                )
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
+
         return out^
 
 

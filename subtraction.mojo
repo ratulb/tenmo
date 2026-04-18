@@ -12,6 +12,7 @@ from backpropagation import (
 from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
+from ancestors_newest import AncestorRef
 
 
 @fieldwise_init
@@ -37,6 +38,27 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
         return grad_shares^
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var signs = output.backward_fn_arg().get[IntArrayArg]().array
+        ref gradbox = output.gradients()[]
+        count = len(output.ancestry())
+        grad_shares = List[
+            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        ](capacity=count)
+        for i in range(count):
+            var ancestor = output.ancestry().get(i)
+            grad_shares.append(
+                (
+                    ancestor^,
+                    gradbox,
+                    AddTensor if signs[i] == 0 else SubtractTensor,
+                )
+            )
+        return grad_shares^
+
 
 @fieldwise_init
 struct SubLeftRightBackwardScalar[dtype: DType](
@@ -46,6 +68,21 @@ struct SubLeftRightBackwardScalar[dtype: DType](
     fn backward(
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var negate = output.backward_fn_arg().get[Boolean]().is_true
+        ref gradbox = output.gradients()[]
+        ref ancestor = output.ancestry().get(0)
+        return [
+            (
+                ancestor,
+                gradbox,
+                SubtractTensor if negate else AddTensor,
+            )
+        ]
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
         var negate = output.backward_fn_arg().get[Boolean]().is_true
         ref gradbox = output.gradients()[]
         ref ancestor = output.ancestry().get(0)
@@ -81,12 +118,10 @@ struct SubtractScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.backwardFnArg = Optional(
-                    BackwardFnArg[Self.dtype].boolean_arg(
-                        BACKWARD_SUB_SCALAR, False
-                    )
+                var backwardFnArg = BackwardFnArg[Self.dtype].boolean_arg(
+                    BACKWARD_SUB_SCALAR, False
                 )
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^
 
@@ -106,12 +141,10 @@ struct SubtractFromScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         comptime if track_grad:
             if self.requires_grad:
                 out.requires_grad_(True)
-                out.backwardFnArg = Optional(
-                    BackwardFnArg[Self.dtype].boolean_arg(
-                        BACKWARD_SUB_SCALAR, True
-                    )
+                var backwardFnArg = BackwardFnArg[Self.dtype].boolean_arg(
+                    BACKWARD_SUB_SCALAR, True
                 )
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^
 
@@ -146,25 +179,44 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
                 if self.shape() == other.shape():
                     var signs = IntArray()
-                    if self.requires_grad:
-                        out.add_ancestry(self)
-                        signs.append(0)
-                    if other.requires_grad:
-                        out.add_ancestry(other)
-                        signs.append(1)
-                    out.backwardFnArg = Optional(
-                        BackwardFnArg[Self.dtype].from_intarray(
+                    var backwardFnArg: BackwardFnArg[Self.dtype]
+
+                    if self.requires_grad and other.requires_grad:
+                        signs.append(0, 1)
+                        backwardFnArg = BackwardFnArg[Self.dtype].from_intarray(
                             BACKWARD_SUB, signs
                         )
-                    )
-                else:
-                    out.add_ancestry(self, other)
-                    out.backwardFnArg = Optional(
-                        BackwardFnArg[Self.dtype].null_arg(
-                            BACKWARD_SUBTRACT_BROADCAST
+                        out.add_ancestry(backwardFnArg^, self, other)
+                    elif self.requires_grad:
+                        signs.append(0)
+                        backwardFnArg = BackwardFnArg[Self.dtype].from_intarray(
+                            BACKWARD_SUB, signs
                         )
+                        out.add_ancestry(backwardFnArg^, self)
+                    else:
+                        signs.append(1)
+                        backwardFnArg = BackwardFnArg[Self.dtype].from_intarray(
+                            BACKWARD_SUB, signs
+                        )
+
+                        out.add_ancestry(backwardFnArg^, other)
+
+                else:
+                    var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                        BACKWARD_SUBTRACT_BROADCAST
                     )
+                    out.add_ancestry(backwardFnArg^, self, other)
+
         return out^
 
+
 fn main() raises:
+    comptime dtype = DType.float32
+    var A = Tensor[dtype].rand(5, 3, requires_grad=True)
+    var B = Tensor[dtype].arange(3, requires_grad=True)
+    var C = A - B
+    C.backward(91)
+    A.grad().print()
+    B.grad().print()
+
     print("passes")

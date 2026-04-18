@@ -18,6 +18,7 @@ from filler import Filler
 from common_utils import Idx, panic, print_buffer
 from device import Device, CPU, GPU
 from device_transfer import DeviceTransfer
+from std.os.atomic import Atomic, Consistency, fence
 
 struct Gradbox[dtype: DType](
     ImplicitlyCopyable
@@ -28,21 +29,61 @@ struct Gradbox[dtype: DType](
     & Absable
 ):
     var buffer: NDBuffer[Self.dtype]
+    var _refcount: UnsafePointer[Atomic[DType.uint64], MutExternalOrigin]
     comptime Empty = Gradbox[Self.dtype].zeros(Shape())
 
     fn __init__(out self, shape: Shape, share: Bool = True):
+        var ndb = NDBuffer[Self.dtype](shape)
+        if share:
+            self.buffer = ndb.share()
+            _ = ndb^  # explicitly move/consume ndb to prevent __del__ double-free
+        else:
+            self.buffer = ndb^
+        self._refcount = alloc[Atomic[DType.uint64]](1)
+        self._refcount[] = Atomic[DType.uint64](1)
+
+        _="""fn __init__1(out self: Self, shape: Shape, share: Bool = True):
+        self._refcount = alloc[Atomic[DType.uint64]](1)
+        self._refcount[] = Atomic[DType.uint64](1)
         buffer = NDBuffer[Self.dtype](shape)
-        self.buffer = buffer.share() if share else buffer^
+        self.buffer = buffer.share() if share else buffer^"""
 
     fn __init__(out self, var buffer: NDBuffer[Self.dtype], share: Bool = True):
+        self._refcount = alloc[Atomic[DType.uint64]](1)
+        self._refcount[] = Atomic[DType.uint64](1)
         self.buffer = buffer.share() if share else buffer^
 
 
     fn __moveinit__(out self, deinit take: Self):
+        self._refcount = take._refcount
         self.buffer = take.buffer^
 
     fn __copyinit__(out self, copy: Self):
         self.buffer = copy.buffer.copy()
+        self._refcount = copy._refcount
+        _ = self._refcount[].fetch_add[ordering=Consistency.MONOTONIC](1)
+
+
+    fn __del__(deinit self):
+        if not self._refcount:
+            return
+        if self._refcount[].fetch_sub[ordering=Consistency.RELEASE](1) != 1:
+            return  # other owners exist — do nothing
+        fence[ordering=Consistency.ACQUIRE]()
+        # Last owner — free refcount allocation
+        # buffer.__del__ handles its own cleanup via NDBuffer/Buffer refcount
+        self._refcount.destroy_pointee()
+        self._refcount.free()
+
+    # ========================================
+    # Refcount inspection
+    # ========================================
+
+    fn ref_count(self) -> UInt64:
+        return self._refcount[].load[ordering=Consistency.MONOTONIC]()
+
+    fn is_shared(self) -> Bool:
+        return self.ref_count() > 1
 
     @always_inline
     fn as_tensor(

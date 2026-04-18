@@ -5,7 +5,7 @@ from backpropagation import BackwardFnArg, BACKWARD_SQUEEZE
 from gradbox import Gradbox
 from shapes import Shape
 from common_utils import panic
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -28,6 +28,32 @@ struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             ancestor_gradbox = gradbox.reshape(original_shape)
         return [
             (ancestor^, ancestor_gradbox^, AddTensor),
+            (
+                output,
+                gradbox^,
+                ZeroGrad,
+            ),  # Send out a signal to this output of squeeze op to zero out its grad(No accumulation of grad for view)
+        ]
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref ancestor = output.ancestry().get(0)
+        var gradbox = output.gradients()[]
+        var ancestor_gradbox: Gradbox[Self.dtype]
+        var original_shape = ancestor.shape()
+        if gradbox.shape() == Shape():
+            ancestor_gradbox = Gradbox[Self.dtype].full(
+                original_shape,
+                gradbox.item(),
+                share=False,
+                device=gradbox.device(),
+            )
+        else:
+            ancestor_gradbox = gradbox.reshape(original_shape)
+        return [
+            (ancestor, ancestor_gradbox^, AddTensor),
             (
                 output,
                 gradbox^,
@@ -61,9 +87,7 @@ struct Squeeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.backwardFnArg = Optional(
-                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_SQUEEZE)
-                )
-                out.add_ancestry(tensor)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_SQUEEZE)
+                out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

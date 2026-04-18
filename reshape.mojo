@@ -6,7 +6,7 @@ from validators import Validator
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from strides import Strides
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct ReshapeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -21,6 +21,19 @@ struct ReshapeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             (ancestor^, reshaped^, AddTensor),
             (output, gradbox, ZeroGrad),
         ]
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref gradbox = output.gradients()[]
+        var ancestor = output.ancestry().get(0)
+        var reshaped = gradbox.reshape(ancestor.buffer().shape)
+        return [
+            (ancestor^, reshaped^, AddTensor),
+            (output, gradbox, ZeroGrad),
+        ]
+
 
 
 @fieldwise_init
@@ -42,11 +55,10 @@ struct Reshape[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_(True)
-                var fn_arg = BackwardFnArg[Self.dtype].null_arg(
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_RESHAPE
                 )
-                out.backwardFnArg = Optional(fn_arg^)
-                out.add_ancestry(tensor)
+                out.add_ancestry(backwardFnArg^, tensor)
 
         return out^
 

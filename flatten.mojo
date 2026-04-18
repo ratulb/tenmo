@@ -3,7 +3,7 @@ from backpropagation import BackwardFnArg, BACKWARD_FLATTEN
 from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct FlattenBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -18,6 +18,19 @@ struct FlattenBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var reshaped_grad = gradbox.reshape(ancestor_shape)
         return [
             (ancestor^, reshaped_grad^, AddTensor),
+        ]
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref gradbox = output.gradients()[]
+        ancestor = output.ancestry().get(0)
+        ancestor_shape = ancestor.shape()
+        # Just reshape gradient back to original
+        var reshaped_grad = gradbox.reshape(ancestor_shape)
+        return [
+            (ancestor, reshaped_grad^, AddTensor),
         ]
 
 
@@ -39,9 +52,7 @@ struct FlattenForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_(True)
-                out.backwardFnArg = Optional(
-                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_FLATTEN)
-                )
-                out.add_ancestry(self)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_FLATTEN)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^

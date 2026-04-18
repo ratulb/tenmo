@@ -14,7 +14,7 @@ from ndbuffer import NDBuffer
 from intarray import IntArray
 from array import Array
 from common_utils import panic
-
+from ancestors_newest import AncestorRef
 # ── GPU Kernels ──────────────────────────────────────────────────────────────
 
 
@@ -204,6 +204,96 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
 
+# ── ShuffleBackward ──────────────────────────────────────────────────────────
+
+
+@fieldwise_init
+struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
+    @staticmethod
+    fn backward(
+        output: Tensor[Self.dtype],
+    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_fn_arg = output.backward_fn_arg().get[ShuffleArg]()
+        var axis = bwd_fn_arg.axis
+        var permutation = bwd_fn_arg.permutation.copy()
+        ref gradbox = output.gradients()[]
+        var parent = output.ancestry().get(0)
+        var shape = gradbox.shape()
+        var gradbox_parent: Gradbox[Self.dtype]
+
+        comptime if has_accelerator():
+            if gradbox.is_on_gpu():
+                try:
+                    var result_ndb = ShuffleGPU[Self.dtype].launch_scatter(
+                        gradbox.buffer, permutation, axis
+                    )
+                    gradbox_parent = Gradbox[Self.dtype](
+                        result_ndb^, share=False
+                    )
+                except e:
+                    panic("ShuffleBackward GPU scatter failed: " + String(e))
+                    # Unreachable
+                    gradbox_parent = Gradbox[Self.dtype].zeros(
+                        shape, share=False
+                    )
+                return [(parent^, gradbox_parent^, AddTensor)]
+
+        # CPU path
+        # parent.shape == gradients.shape, only difference is coord postions
+        # along the permuted axis
+        # Scatter gradients back using the original permutation
+        # For each position in the output gradient, find where it came from in the input
+
+        gradbox_parent = Gradbox[Self.dtype].zeros(shape, share=False)
+        for grad_coord in shape:
+            var parent_coord = grad_coord
+            parent_coord[axis] = permutation[grad_coord[axis]]
+            gradbox_parent[parent_coord] = gradbox[grad_coord]
+
+        return [(parent^, gradbox_parent^, AddTensor)]
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_fn_arg = output.backward_fn_arg().get[ShuffleArg]()
+        var axis = bwd_fn_arg.axis
+        var permutation = bwd_fn_arg.permutation.copy()
+        ref gradbox = output.gradients()[]
+        var parent = output.ancestry().get(0)
+        var shape = gradbox.shape()
+        var gradbox_parent: Gradbox[Self.dtype]
+
+        comptime if has_accelerator():
+            if gradbox.is_on_gpu():
+                try:
+                    var result_ndb = ShuffleGPU[Self.dtype].launch_scatter(
+                        gradbox.buffer, permutation, axis
+                    )
+                    gradbox_parent = Gradbox[Self.dtype](
+                        result_ndb^, share=False
+                    )
+                except e:
+                    panic("ShuffleBackward GPU scatter failed: " + String(e))
+                    # Unreachable
+                    gradbox_parent = Gradbox[Self.dtype].zeros(
+                        shape, share=False
+                    )
+                return [(parent, gradbox_parent^, AddTensor)]
+
+        # CPU path
+        # parent.shape == gradients.shape, only difference is coord postions
+        # along the permuted axis
+        # Scatter gradients back using the original permutation
+        # For each position in the output gradient, find where it came from in the input
+
+        gradbox_parent = Gradbox[Self.dtype].zeros(shape, share=False)
+        for grad_coord in shape:
+            var parent_coord = grad_coord
+            parent_coord[axis] = permutation[grad_coord[axis]]
+            gradbox_parent[parent_coord] = gradbox[grad_coord]
+
+        return [(parent, gradbox_parent^, AddTensor)]
 
 # ── Shuffle forward ──────────────────────────────────────────────────────────
 
@@ -255,63 +345,15 @@ struct Shuffle[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.backwardFnArg = Optional(
+                var backwardFnArg =
                     BackwardFnArg[Self.dtype](
                         BACKWARD_SHUFFLE, ShuffleArg(axis, permutation^)
-                    )
+
                 )
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^
 
-
-# ── ShuffleBackward ──────────────────────────────────────────────────────────
-
-
-@fieldwise_init
-struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_fn_arg = output.backward_fn_arg().get[ShuffleArg]()
-        var axis = bwd_fn_arg.axis
-        var permutation = bwd_fn_arg.permutation.copy()
-        ref gradbox = output.gradients()[]
-        var parent = output.ancestry().get(0)
-        var shape = gradbox.shape()
-        var gradbox_parent: Gradbox[Self.dtype]
-
-        comptime if has_accelerator():
-            if gradbox.is_on_gpu():
-                try:
-                    var result_ndb = ShuffleGPU[Self.dtype].launch_scatter(
-                        gradbox.buffer, permutation, axis
-                    )
-                    gradbox_parent = Gradbox[Self.dtype](
-                        result_ndb^, share=False
-                    )
-                except e:
-                    panic("ShuffleBackward GPU scatter failed: " + String(e))
-                    # Unreachable
-                    gradbox_parent = Gradbox[Self.dtype].zeros(
-                        shape, share=False
-                    )
-                return [(parent^, gradbox_parent^, AddTensor)]
-
-        # CPU path
-        # parent.shape == gradients.shape, only difference is coord postions
-        # along the permuted axis
-        # Scatter gradients back using the original permutation
-        # For each position in the output gradient, find where it came from in the input
-
-        gradbox_parent = Gradbox[Self.dtype].zeros(shape, share=False)
-        for grad_coord in shape:
-            var parent_coord = grad_coord
-            parent_coord[axis] = permutation[grad_coord[axis]]
-            gradbox_parent[parent_coord] = gradbox[grad_coord]
-
-        return [(parent^, gradbox_parent^, AddTensor)]
 
 
 fn main() raises:

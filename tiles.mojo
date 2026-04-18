@@ -6,7 +6,7 @@ from shapes import Shape
 from validators import Validator
 from gradbox import Gradbox
 from indexhelper import IndexCalculator
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -57,6 +57,52 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return [(parent^, gradbox_parent^, AddTensor)]
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.backward_fn_arg().get[TilesArg]()
+        var (repeat, orig_shape) = bwd_arg.repeat, bwd_arg.orig_shape
+        ref grad_out = output.gradients()[]
+        var parent = output.ancestry().get(0)
+        var parent_shape = orig_shape
+        var parent_rank = len(parent_shape)
+        var repeat_rank = len(repeat)
+
+        # Handle scalar case
+        if parent_rank == 0:
+            var total_grad = grad_out.sum().item()
+            var gradbox_parent = Gradbox[Self.dtype].full(
+                Shape(), total_grad, device=grad_out.device(), share=False
+            )
+            return [(parent^, gradbox_parent^, AddTensor)]
+
+        var effective_rank = max(parent_rank, repeat_rank)
+
+        # Expand each dim into (repeat_factor, orig_dim) pairs
+        var reshaped_dims = IntArray.with_capacity(effective_rank * 2)
+        var reduce_axes = IntArray.with_capacity(effective_rank)
+
+        for i in range(effective_rank):
+            var parent_index = parent_rank - effective_rank + i
+            var repeat_index = repeat_rank - effective_rank + i
+
+            var orig_dim = 1 if parent_index < 0 else parent_shape[parent_index]
+            var repeat_factor = 1 if repeat_index < 0 else repeat[repeat_index]
+
+            reshaped_dims.append(repeat_factor)  # repeat dim first
+            reshaped_dims.append(orig_dim)  # original dim second
+            reduce_axes.append(i * 2)  # reduce along repeat axis
+
+        var reshaped_shape = Shape(reshaped_dims)
+
+        # Reshape grad_out → sum over repeat axes → reshape to parent shape
+        var reshaped = grad_out.reshape(reshaped_shape)
+        var gradbox_parent = reshaped.sum(reduce_axes, keepdims=False)
+        if gradbox_parent.shape() != parent_shape:
+            gradbox_parent = gradbox_parent.reshape(parent_shape)
+
+        return [(parent^, gradbox_parent^, AddTensor)]
 
 @fieldwise_init
 struct Tile[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -123,11 +169,10 @@ struct Tile[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_TILE, TilesArg(repeat, orig_shape)
                 )
-                out.backwardFnArg = Optional(bwd_arg^)
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^
 

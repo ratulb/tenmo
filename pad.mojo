@@ -31,6 +31,7 @@ from intarray import IntArray
 from std.utils import Variant
 from std.sys import simd_width_of
 from std.algorithm import parallelize
+from ancestors_newest import AncestorRef
 
 comptime Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
 
@@ -84,6 +85,55 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
             results.append((parent^, grad_parent^, AddTensor))
 
         return results^
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        """
+        Backward pass: Accumulate gradients based on padding mode.
+        """
+        ref bwd_arg = output.backward_fn_arg().get[PadArg]()
+        var pad = bwd_arg.pad.copy()
+        var mode = bwd_arg.mode.copy()
+        ref grad_out = output.gradients()[]
+        var ancestor_ref = output.ancestry().get(0)
+        var parent = Tensor[Self.dtype](ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad)
+
+        var results = List[
+            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
+
+        if parent.requires_grad:
+            ref parent_shape = parent.shape()
+            var grad_parent = Gradbox[Self.dtype].zeros(
+                parent_shape, share=False
+            )
+
+            # Different backward pass based on mode
+            if mode == "constant":
+                if parent_shape.rank() == 4:
+                    Self._extract_4d_constant_simd(
+                        grad_out, grad_parent, pad, parent_shape
+                    )
+                else:
+                    Self._extract_constant(
+                        grad_out, grad_parent, pad, parent_shape
+                    )
+            elif mode == "circular":
+                Self._extract_circular(grad_out, grad_parent, pad, parent_shape)
+            elif mode == "replicate":
+                Self._extract_replicate(
+                    grad_out, grad_parent, pad, parent_shape
+                )
+            elif mode == "reflect":
+                Self._extract_reflect(grad_out, grad_parent, pad, parent_shape)
+
+            results.append((ancestor_ref^, grad_parent^, AddTensor))
+
+        return results^
+
+
 
     @staticmethod
     fn _extract_constant(
@@ -360,11 +410,10 @@ struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if req_grad:
                 result.requires_grad_(True)
                 # PASS MODE TO BACKWARD!
-                var bwd_arg = BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_PAD, PadArg(pad.copy(), mode)  # Add mode here
                 )
-                result.backwardFnArg = Optional(bwd_arg^)
-                result.add_ancestry(x)
+                result.add_ancestry(backwardFnArg^, x)
 
         return result^
 

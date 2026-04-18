@@ -4,6 +4,7 @@ from backpropagation import BackwardFnArg, BufferArg, NDBufferArg, BACKWARD_RELU
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from buffers import Buffer
+from ancestors_newest import AncestorRef
 
 
 @fieldwise_init
@@ -29,6 +30,28 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         var gradbox_ancestor = Gradbox[Self.dtype](result_ndb^, share=False)
         return [(input_tensor^, gradbox_ancestor^, AddTensor)]
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref arg = output.backward_fn_arg()
+        ref gradbox = output.gradients()[]
+        var ancestor = output.ancestry().get(0)
+        ref shape = ancestor.shape()
+
+        var result_ndb: NDBuffer[Self.dtype]
+
+        if gradbox.is_on_gpu():
+            var mask_ndb = arg.get[NDBufferArg[Self.dtype]]().ndb
+            result_ndb = gradbox.buffer * mask_ndb
+        else:
+            var mask_buf = arg.get[BufferArg[Self.dtype]]().buffer
+            var result_buf = gradbox.buffer.data_buffer() * mask_buf
+            result_ndb = NDBuffer[Self.dtype](result_buf^, shape)
+
+        var ancestor_gbx = Gradbox[Self.dtype](result_ndb^, share=False)
+        return [(ancestor^, ancestor_gbx^, AddTensor)]
 
 
 @fieldwise_init
@@ -63,19 +86,18 @@ struct ReLU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg: BackwardFnArg[Self.dtype]
+                var backwardFnArg: BackwardFnArg[Self.dtype]
 
                 if self.buffer.is_on_gpu():
-                    bwd_arg = BackwardFnArg[Self.dtype].from_ndbuffer(
+                    backwardFnArg = BackwardFnArg[Self.dtype].from_ndbuffer(
                         BACKWARD_RELU, mask_ndb^
                     )
                 else:
-                    bwd_arg = BackwardFnArg[Self.dtype].from_buffer(
+                    backwardFnArg = BackwardFnArg[Self.dtype].from_buffer(
                         BACKWARD_RELU, mask_ndb.data_buffer()
                     )
 
-                out.backwardFnArg = Optional(bwd_arg^)
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^
 

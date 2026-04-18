@@ -3,7 +3,7 @@ from mnemonics import AddTensor, LOG, LOG_BACKWARD
 from backpropagation import BackwardFnArg, ScalarArg, BACKWARD_LOG
 from gradbox import Gradbox
 from common_utils import Epsilon
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -23,6 +23,21 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return [(parent^, parent_gradbox^, AddTensor)]
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var epsilon = (
+            output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        )
+        ref gradbox = output.gradients()[]
+        var parent = output.ancestry().get(0)
+        var result_ndb = parent.buffer().arithmetic_ops[LOG_BACKWARD](
+            gradbox.buffer, epsilon
+        )
+        var parent_gradbox = Gradbox[Self.dtype](result_ndb^, share=False)
+
+        return [(parent^, parent_gradbox^, AddTensor)]
 
 @fieldwise_init
 struct Logarithm[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -41,10 +56,10 @@ struct Logarithm[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.backwardFnArg = Optional(
+                var backwardFnArg =
                     BackwardFnArg[Self.dtype].scalar_arg(BACKWARD_LOG, epsilon)
-                )
-                out.add_ancestry(self)
+
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^
 

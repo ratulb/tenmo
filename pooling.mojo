@@ -8,7 +8,7 @@ from std.utils.numerics import neg_inf
 from common_utils import panic
 from std.algorithm import parallelize
 from net import Module, Layer, MAXPOOL2D
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct MaxPool2dBwdArg(ArgumentType):
@@ -100,6 +100,90 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
             parallelize[scatter_gradients_optimized](N * C)
             results.append((input_tensor^, grad_input^, AddTensor))
+
+        return results^
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.backward_fn_arg().get[MaxPool2dBwdArg]()
+        var (kernel_size, stride, padding, input_shape, argmax_mask) = (
+            bwd_arg.kernel_size,
+            bwd_arg.stride,
+            bwd_arg.padding,
+            bwd_arg.input_shape,
+            bwd_arg.argmax_mask,
+        )
+        ref grad_output = output.gradients()[]
+        var results = List[
+            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
+
+        var input_tensor_ref = output.ancestry().get(0)
+        var input_tensor = Tensor[Self.dtype](input_tensor_ref.buffer(), requires_grad=input_tensor_ref.requires_grad)
+
+        if input_tensor.requires_grad:
+            var N = input_shape[0]
+            var C = input_shape[1]
+            var H_in = input_shape[2]
+            var W_in = input_shape[3]
+
+            ref output_shape = grad_output.shape()
+            var H_out = output_shape[2]
+            var W_out = output_shape[3]
+
+            var grad_input = Gradbox[Self.dtype].zeros(input_shape, share=False)
+
+            # Direct buffer access
+            var grad_out_ptr = grad_output.data_ptr()
+            var grad_in_ptr = (
+                grad_input.data_ptr()
+                .unsafe_mut_cast[True]()
+                .unsafe_origin_cast[MutAnyOrigin]()
+            )
+            var argmax_ptr = argmax_mask.data_ptr()
+
+            # Precompute strides
+            var grad_out_stride_N = C * H_out * W_out
+            var grad_out_stride_C = H_out * W_out
+            var grad_out_stride_H = W_out
+
+            var grad_in_stride_N = C * H_in * W_in
+            var grad_in_stride_C = H_in * W_in
+
+            @parameter
+            fn scatter_gradients_optimized(idx: Int):
+                var n = idx // C
+                var c = idx % C
+
+                var grad_out_nc_base = (
+                    n * grad_out_stride_N + c * grad_out_stride_C
+                )
+                var grad_in_nc_base = (
+                    n * grad_in_stride_N + c * grad_in_stride_C
+                )
+                var argmax_nc_base = n * C * H_out * W_out + c * H_out * W_out
+
+                # Process all output positions
+                for out_y in range(H_out):
+                    var grad_out_y_base = (
+                        grad_out_nc_base + out_y * grad_out_stride_H
+                    )
+                    var argmax_y_base = argmax_nc_base + out_y * W_out
+
+                    for out_x in range(W_out):
+                        # Direct memory access
+                        var max_idx = Int(argmax_ptr[argmax_y_base + out_x])
+
+                        if max_idx >= 0:
+                            var grad_val = grad_out_ptr[grad_out_y_base + out_x]
+
+                            # Accumulate gradient at max position
+                            grad_in_ptr[grad_in_nc_base + max_idx] += grad_val
+
+            parallelize[scatter_gradients_optimized](N * C)
+            results.append((input_tensor_ref^, grad_input^, AddTensor))
 
         return results^
 
@@ -275,7 +359,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             )
             if grad_required:
                 output.requires_grad_(True)
-                var bwd_args = BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_MAXPOOL2D,
                     MaxPool2dBwdArg(
                         kernel_size,
@@ -285,8 +369,7 @@ struct MaxPool2d[dtype: DType](RegisterPassable & ImplicitlyCopyable):
                         argmax_mask,
                     ),
                 )
-                output.backwardFnArg = Optional(bwd_args^)
-                output.add_ancestry(input_tensor)
+                output.add_ancestry(backwardFnArg^, input_tensor)
 
         return output^
 

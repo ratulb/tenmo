@@ -10,6 +10,7 @@ from backpropagation import (
 from mnemonics import AddTensor
 from tenmo import Tensor
 from validators import Validator
+from ancestors_newest import AncestorRef
 
 comptime SoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, False]
 comptime LogSoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, True]
@@ -23,6 +24,31 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
     fn backward(
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
+        var (axes, softmax_out) = bwd_arg.axes, bwd_arg.softmax_out
+        ref gradbox = output.gradients()[]
+        var ancestor = output.ancestry().get(0)
+        var local_grad_ndb: NDBuffer[Self.dtype]
+
+        comptime if Self.is_log:
+            # g - softmax(x) * sum(g, axes, keepdims=True)
+            var sum_grad = gradbox.buffer.sum(axes, keepdims=True)
+            var softmax_sum = softmax_out * sum_grad
+            local_grad_ndb = gradbox.buffer - softmax_sum
+        else:
+            # y * (g - sum(g * y, axes, keepdims=True))
+            var gy = gradbox.buffer * softmax_out
+            var gy_sum = gy.sum(axes, keepdims=True)
+            var grad_diff = gradbox.buffer - gy_sum
+            local_grad_ndb = softmax_out * grad_diff
+
+        var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
+        return [(ancestor^, local_grad^, AddTensor)]
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
         var bwd_arg = output.backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
         var (axes, softmax_out) = bwd_arg.axes, bwd_arg.softmax_out
         ref gradbox = output.gradients()[]
@@ -72,7 +98,7 @@ struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.requires_grad_(True)
 
                 # Store NDBuffer — carries device state, GPU safe
-                var bwd_arg = BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_SOFTMAX,
                     SoftmaxArg[Self.dtype](
                         normalized_axes^,
@@ -80,8 +106,7 @@ struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     ),
                 )
 
-                out.backwardFnArg = Optional(bwd_arg^)
-                out.add_ancestry(this)
+                out.add_ancestry(backwardFnArg^, this)
 
         return out^
 
@@ -113,7 +138,7 @@ struct LogSoftmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(this.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_LOG_SOFTMAX,
                     SoftmaxArg[Self.dtype](
                         normalized_axes^,
@@ -121,8 +146,7 @@ struct LogSoftmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     ),
                 )
 
-                out.backwardFnArg = Optional(bwd_arg^)
-                out.add_ancestry(this)
+                out.add_ancestry(backwardFnArg^, this)
 
         return out^
 

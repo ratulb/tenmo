@@ -7,7 +7,7 @@ from strides import Strides
 from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
 from views import View
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -22,6 +22,16 @@ struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return [(ancestor^, gradbox_contracted^, AddTensor)]
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref gradbox = output.gradients()[]
+        ancestor = output.ancestry().get(0)
+        parent_shape = ancestor.shape()
+        gradbox_contracted = gradbox.sum_over_broadcasted_axes(parent_shape)
+
+        return [(ancestor, gradbox_contracted^, AddTensor)]
 
 @fieldwise_init
 struct Expand[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -71,9 +81,7 @@ struct Expand[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_()
-                out.backwardFnArg = Optional(
-                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_EXPAND)
-                )
-                out.add_ancestry(tensor)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_EXPAND)
+                out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

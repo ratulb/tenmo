@@ -12,6 +12,7 @@ from mnemonics import AddTensor, NotEqual
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from intarray import IntArray
+from ancestors_newest import AncestorRef
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Reduction
@@ -478,6 +479,106 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
         return [(logits^, grad_final, AddTensor)]
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_arg = output.backward_fn_arg().get[
+            ClassIndicesBwdArg[Self.dtype]
+        ]()
+        var (
+            softmax_probs,
+            target_1d,
+            logits_shape,
+            reduction,
+            ignore_index,
+            label_smoothing,
+            valid_count,
+            M,
+            C,
+        ) = (
+            bwd_arg.softmax_probs,
+            bwd_arg.target_1d,
+            bwd_arg.logits_shape,
+            bwd_arg.reduction,
+            bwd_arg.ignore_index,
+            bwd_arg.label_smoothing,
+            bwd_arg.valid_count,
+            bwd_arg.M,
+            bwd_arg.C,
+        )
+        ref upstream = output.gradients()[]
+        var logits = output.ancestry().get(0)
+
+        var device = upstream.device()
+
+        # Step 1: grad = softmax — (M, C)
+        var grad = softmax_probs
+
+        # Step 2: Build onehot from target — ignore_index rows → all zeros
+        # onehot with ignore_index: those rows stay zero (no subtraction needed)
+        var onehot = NDBuffer[Self.dtype].onehot(
+            target_1d.to_dtype[Self.dtype](),
+            C,
+            device,
+            ignore_index=ignore_index,
+        )
+        # Step 3: Apply smoothing
+        var ls = label_smoothing
+        if ls > Scalar[Self.dtype](0):
+            var ls_uniform = ls / Scalar[Self.dtype](C)
+            grad = grad - onehot * (Scalar[Self.dtype](1) - ls) - ls_uniform
+        else:
+            grad = grad - onehot
+
+        # Step 4: Zero out ignored positions via ignore mask
+        # ignore_mask: 1=valid, 0=ignored — built from ORIGINAL target
+        var ignore_mask = CECommon[Self.dtype].build_ignore_mask(
+            target_1d, ignore_index
+        )
+        var ignore_mask_2d = ignore_mask.unsqueeze(IntArray(-1)).broadcast_to(
+            Shape(M, C)
+        )
+        grad = grad * ignore_mask_2d
+
+        # Step 5: Scale by upstream grad and reduction
+        var scaled = CECommon[Self.dtype].scale_grad_by_upstream(
+            grad,
+            upstream,
+            reduction,
+            valid_count,
+            M,
+            C,
+        )
+        # Step 6: Reshape back to original logits shape
+        var grad_final = Gradbox[Self.dtype](scaled^, share=False).reshape(
+            logits_shape
+        )
+        # Step 6: Reshape and UNPERMUTE back to original logits shape
+        var rank = logits_shape.rank()
+        if rank > 2:
+            # Reshape (M, C) → (N, d1..dk, C)
+            var intermediate_dims = IntArray()
+            intermediate_dims.append(logits_shape[0])  # N
+            for i in range(2, rank):
+                intermediate_dims.append(logits_shape[i])  # d1..dk
+            intermediate_dims.append(logits_shape[1])  # C last
+            var reshaped = grad_final.reshape(Shape(intermediate_dims))
+            # Unpermute: (N, d1..dk, C) → (N, C, d1..dk)
+            # Forward perm was [0, 2, 3, ..., rank-1, 1]
+            # Inverse perm is  [0, rank-1, 1, 2, ..., rank-2]
+            var inv_perm = IntArray.with_capacity(rank)
+            inv_perm.append(0)  # N stays first
+            inv_perm.append(rank - 1)  # C was last → move to dim 1
+            for i in range(1, rank - 1):
+                inv_perm.append(i)  # d1..dk shift right
+            grad_final = reshaped.permute(inv_perm)
+            # else:
+            # grad_final = grad_final.reshape(self.logits_shape)
+
+        return [(logits, grad_final, AddTensor)]
+
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # CEClassIndicesForward
@@ -601,7 +702,7 @@ struct CEClassIndicesForward[dtype: DType](
         comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
-                var backward_fn_arg = BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_CE_CLASS_INDICES,
                     ClassIndicesBwdArg[Self.dtype](
                         softmax_probs_ndb^,
@@ -615,8 +716,7 @@ struct CEClassIndicesForward[dtype: DType](
                         C2,
                     ),
                 )
-                out.backwardFnArg = Optional(backward_fn_arg^)
-                out.add_ancestry(logits)
+                out.add_ancestry(backwardFnArg^, logits)
 
         return out^
 
@@ -682,6 +782,57 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         return [
             (
                 logits^,
+                Gradbox[Self.dtype](grad_final, share=False),
+                AddTensor,
+            )
+        ]
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_arg = output.backward_fn_arg().get[
+            ClassProbabilitiesBwdArg[Self.dtype]
+        ]()
+        var (
+            softmax_probs,
+            smoothed_target,
+            logits_shape,
+            reduction,
+            valid_count,
+            M,
+            C,
+        ) = (
+            bwd_arg.softmax_probs,
+            bwd_arg.smoothed_target,
+            bwd_arg.logits_shape,
+            bwd_arg.reduction,
+            bwd_arg.valid_count,
+            bwd_arg.M,
+            bwd_arg.C,
+        )
+        ref upstream = output.gradients()[]
+        var logits = output.ancestry().get(0)
+
+        # grad = softmax - smoothed_target
+        var grad = softmax_probs - smoothed_target
+
+        # Scale by upstream and reduction
+        var scaled = CECommon[Self.dtype].scale_grad_by_upstream(
+            grad,
+            upstream,
+            reduction,
+            valid_count,
+            M,
+            C,
+        )
+
+        # Reshape to original logits shape
+        var grad_final = scaled.reshape(logits_shape)
+
+        return [
+            (
+                logits,
                 Gradbox[Self.dtype](grad_final, share=False),
                 AddTensor,
             )
@@ -776,7 +927,7 @@ struct CEProbabilitiesForward[dtype: DType](
         comptime if track_grad:
             if logits.requires_grad:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_CE_PROBABILITIES,
                     ClassProbabilitiesBwdArg[Self.dtype](
                         softmax_probs_ndb^,
@@ -788,8 +939,7 @@ struct CEProbabilitiesForward[dtype: DType](
                         C,
                     ),
                 )
-                out.backwardFnArg = Optional(bwd_arg^)
-                out.add_ancestry(logits)
+                out.add_ancestry(backwardFnArg^, logits)
 
         return out^
 
@@ -953,7 +1103,7 @@ fn test_ce_rank3_reduction_none_v2() raises:
     )
 
     # Backward with ones
-    loss.backward()
+    loss.backward_new()
 
     # Ignored position should have zero gradient
     for c in range(3):

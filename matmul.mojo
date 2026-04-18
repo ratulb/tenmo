@@ -15,7 +15,7 @@ from matrixvector import MatrixVectorMulNd
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
 from intarray import IntArray
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -49,6 +49,34 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return result^
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref grad_out = output.gradients()[]
+        var A = output.ancestry().get(0)
+        var B = output.ancestry().get(1)
+
+        var result = List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]()
+
+        # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
+        if A.requires_grad:
+            var ndb = grad_out.buffer.matmul_2d(
+                B.buffer().transpose(IntArray(-1, -2))
+            )
+            var grad_A = Gradbox[Self.dtype](ndb^, share=False)
+
+            result.append((A, grad_A^, AddTensor))
+
+        # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
+        if B.requires_grad:
+            var A_buffer_transposed = A.buffer().transpose(IntArray(-1, -2))
+            var ndb = A_buffer_transposed.matmul_2d(grad_out.buffer)
+            var grad_B = Gradbox[Self.dtype](ndb^, share=False)
+
+            result.append((B^, grad_B^, AddTensor))
+
+        return result^
 
 @fieldwise_init
 struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -64,12 +92,10 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var bwd_fn_arg = BackwardFnArg[Self.dtype].null_arg(
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_MATMUL_2D
                 )
-                C.backwardFnArg = Optional(bwd_fn_arg^)
-                C.add_ancestry(A)
-                C.add_ancestry(B)
+                C.add_ancestry(backwardFnArg^, A, B)
 
         return C^
 
@@ -130,6 +156,43 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return results^
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref grad_out = output.gradients()[]
+        var A = output.ancestry().get(0)
+        var B = output.ancestry().get(1)
+        ref A_buffer = A.buffer()
+        ref B_buffer = B.buffer()
+
+        ref A_shape = A_buffer.shape
+        ref B_shape = B_buffer.shape
+        var results = List[
+            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
+
+        if A.requires_grad:
+            var B_transposed = B_buffer.transpose(axes=IntArray(-1, -2))
+
+            var A_batch_grad = MatmulNd[Self.dtype].forward(
+                grad_out, Tensor[Self.dtype](B_transposed^, requires_grad=False)
+            )
+            var final_grad_A = A_batch_grad^.sum_over_broadcasted_axes(A_shape)
+
+            results.append((A, final_grad_A^, AddTensor))
+
+        if B.requires_grad:
+            var A_transposed = A_buffer.transpose(axes=IntArray(-1, -2))
+            var B_batch_grad = MatmulNd[Self.dtype].forward(
+                Tensor[Self.dtype](A_transposed^, requires_grad=False), grad_out
+            )
+
+            var final_grad_B = B_batch_grad^.sum_over_broadcasted_axes(B_shape)
+
+            results.append((B^, final_grad_B^, AddTensor))
+        return results^
+
 
 @fieldwise_init
 struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -152,12 +215,10 @@ struct MatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var requires_grad = A.requires_grad or B.requires_grad
             if requires_grad:
                 C.requires_grad_(True)
-                var bwd_fn_arg = BackwardFnArg[Self.dtype].null_arg(
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
                     BACKWARD_MATMUL_ND
                 )
-                C.backwardFnArg = Optional(bwd_fn_arg^)
-                C.add_ancestry(A)
-                C.add_ancestry(B)
+                C.add_ancestry(backwardFnArg^, A, B)
 
         return C^
 

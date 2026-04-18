@@ -6,7 +6,7 @@ from validators import Validator
 from intarray import IntArray
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
@@ -43,6 +43,39 @@ struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var grad_contrib = grad_expanded * mask_grad
         return [(ancestor^, grad_contrib^, AddTensor)]
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.backward_fn_arg().get[MinMaxArg[Self.dtype]]()
+        var (axes, keepdims, mask) = (
+            bwd_arg.axes,
+            bwd_arg.keepdims,
+            bwd_arg.mask,
+        )
+        var gradbox = output.gradients()[]
+        var ancestor = output.ancestry().get(0)
+        var shape = ancestor.shape()
+        var mask_grad = Gradbox[Self.dtype](mask, share=False)
+
+        if shape.rank() == 0:
+            return [(ancestor, mask_grad^, AddTensor)]
+
+        var grad_expanded: Gradbox[Self.dtype]
+        if gradbox.shape() == Shape():
+            grad_expanded = Gradbox[Self.dtype].full(
+                shape, gradbox.item(), share=False, device=mask.device()
+            )
+        elif not keepdims:
+            grad_expanded = gradbox.unsqueeze(axes).broadcast_to(
+                shape, share=False
+            )
+        else:
+            grad_expanded = gradbox.broadcast_to(shape, share=False)
+
+        var grad_contrib = grad_expanded * mask_grad
+        return [(ancestor, grad_contrib^, AddTensor)]
+
 
 @fieldwise_init
 struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -69,12 +102,11 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](
+                var backwardFnArg= BackwardFnArg[Self.dtype](
                     BACKWARD_MINMAX,
                     MinMaxArg[Self.dtype](normalized_axes, keepdims, mask_ndb^),
                 )
-                out.backwardFnArg = Optional(bwd_arg^)
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^
 

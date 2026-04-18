@@ -3,7 +3,7 @@ from mnemonics import AddTensor
 from backpropagation import BackwardFnArg, ClipArg, BACKWARD_CLIP
 from gradbox import Gradbox
 from std.sys import simd_width_of
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct ClipBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -60,6 +60,60 @@ struct ClipBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return [(parent^, parent_gradbox^, AddTensor)]
 
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        """Gradient passes where min ≤ x ≤ max, blocked elsewhere."""
+        var bwd_arg = output.backward_fn_arg().get[ClipArg[Self.dtype]]()
+        var (min_val, max_val) = bwd_arg.min_val, bwd_arg.max_val
+        ref grad_output = output.gradients()[]
+        var parent = output.ancestry().get(0)
+        ref shape = parent.shape()
+        ref parent_buffer = parent.buffer()
+        var parent_gradbox = Gradbox[Self.dtype].zeros(shape, share=False)
+
+        if parent_buffer.is_contiguous():
+            var src = parent_buffer.data_ptr()
+            var dest = parent_gradbox.data_ptr()
+            var grad_output_data = grad_output.data_ptr()
+            var offset = parent_buffer.offset
+            var numels = parent_buffer.numels()
+
+            comptime simd_width = simd_width_of[Self.dtype]()
+
+            for i in range(0, numels - simd_width + 1, simd_width):
+                var x = src.load[width=simd_width](offset + i)
+                var grad_out = grad_output_data.load[width=simd_width](i)
+
+                # Mask: gradient passes only if min ≤ x ≤ max
+                var in_range = x.ge(min_val) & x.le(max_val)
+
+                var mask_float = in_range.cast[Self.dtype]()
+                var grad_in = grad_out * mask_float
+
+                dest.store[width=simd_width](i, grad_in)
+
+            # Handle remainder
+            for i in range(numels - numels % simd_width, numels):
+                var x = src[offset + i]
+                var grad_out = grad_output_data[i]
+
+                if x >= min_val and x <= max_val:
+                    dest[i] = grad_out  # Pass through
+                else:
+                    dest[i] = Scalar[Self.dtype](0)  # Block
+        else:
+            # Non-contiguous fallback
+            for coord in shape:
+                var x = parent_buffer[coord]
+                if x >= min_val and x <= max_val:
+                    parent_gradbox[coord] = grad_output[coord]
+                else:
+                    parent_gradbox[coord] = Scalar[Self.dtype](0)
+
+        return [(parent^, parent_gradbox^, AddTensor)]
+
 
 @fieldwise_init
 struct Clip[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -103,10 +157,9 @@ struct Clip[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var bwd_arg = BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_CLIP, ClipArg[Self.dtype](min_val, max_val)
                 )
-                out.backwardFnArg = Optional(bwd_arg^)
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^

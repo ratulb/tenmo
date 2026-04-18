@@ -4,7 +4,7 @@ from mnemonics import AddTensor
 from validators import Validator
 from gradbox import Gradbox
 from intarray import IntArray
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -12,6 +12,23 @@ struct TransposeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     fn backward(
         output: Tensor[Self.dtype],
     ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var axes = output.backward_fn_arg().get[IntArrayArg]().array
+        ref gradbox = output.gradients()[]
+        var ancestor = output.ancestry().get(0)
+        var inverted_axes = IntArray.invert_permutation(axes^)
+        var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes^)
+
+        return [
+            (
+                ancestor^,
+                gradbox_transposed_contiguous^,
+                AddTensor,
+            )
+        ]
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
         var axes = output.backward_fn_arg().get[IntArrayArg]().array
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
@@ -51,11 +68,10 @@ struct Transpose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     > 0 else IntArray.range(0, shape.rank()).reversed()
                 )
                 out.requires_grad_(True)
-                var bwd_fn_arg = BackwardFnArg[Self.dtype].from_intarray(
+                var backwardFnArg = BackwardFnArg[Self.dtype].from_intarray(
                     BACKWARD_TRANSPOSE, normalized_axes
                 )
-                out.backwardFnArg = Optional(bwd_fn_arg^)
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^
 

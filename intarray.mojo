@@ -248,11 +248,12 @@ struct IntArray(
         self._capacity = new_cap
 
     @always_inline
-    fn append(mut self, value: Int):
+    fn append(mut self, *values: Int):
         """Append element."""
-        self.reserve(self._size + 1)
-        self._data[self._size] = value
-        self._size += 1
+        self.reserve(self._size + len(values))
+        for i in range(len(values)):
+            self._data[self._size+i] = values[i]
+        self._size += len(values)
 
     @always_inline
     fn prepend(mut self, value: Int):

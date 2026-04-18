@@ -10,7 +10,7 @@ from std.algorithm import parallelize
 from std.sys import simd_width_of
 from ndbuffer import NDBuffer
 from intarray import IntArray
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
@@ -516,7 +516,7 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if grad_required:
                 output.requires_grad_(True)
 
-                var bwd_args = BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_FUSED_CONV,
                     FusedIm2ColBwdArg(
                         N,
@@ -533,10 +533,7 @@ struct FusedIm2Col[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     ),
                 )
 
-                output.backwardFnArg = Optional(bwd_args^)
-                output.add_ancestry(padded_image)
-                output.add_ancestry(kernel)
-                output.add_ancestry(bias)
+                output.add_ancestry(backwardFnArg^, padded_image, kernel, bias)
 
         return output^
 
@@ -642,6 +639,96 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             results.append((padded_image^, grad_padded^, AddTensor))
 
         return results^
+
+    @staticmethod
+    fn backward(
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.backward_fn_arg().get[FusedIm2ColBwdArg]()
+        var (
+            N,
+            C_in,
+            H_pad,
+            W_pad,
+            C_out,
+            KH,
+            KW,
+            H_out,
+            W_out,
+            stride,
+            dilation,
+        ) = (
+            bwd_arg.N,
+            bwd_arg.C_in,
+            bwd_arg.H_pad,
+            bwd_arg.W_pad,
+            bwd_arg.C_out,
+            bwd_arg.KH,
+            bwd_arg.KW,
+            bwd_arg.H_out,
+            bwd_arg.W_out,
+            bwd_arg.stride,
+            bwd_arg.dilation,
+        )
+        ref grad_output = output.gradients()[]
+        var results = List[
+            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
+
+        var padded_image_ref = output.ancestry().get(0)
+        var padded_image = Tensor[Self.dtype](padded_image_ref.buffer(), requires_grad=padded_image_ref.requires_grad)
+        var kernel_ref = output.ancestry().get(1)
+        var kernel = Tensor[Self.dtype](kernel_ref.buffer(), requires_grad=kernel_ref.requires_grad)
+        var bias_ref = output.ancestry().get(2)
+        var bias = Tensor[Self.dtype](bias_ref.buffer(), requires_grad=bias_ref.requires_grad)
+
+        # BIAS GRADIENT
+        if bias.requires_grad:
+            var grad_bias = Self.compute_bias_gradient(
+                grad_output, N, C_out, H_out, W_out
+            )
+            results.append((bias_ref^, grad_bias^, AddTensor))
+
+        # KERNEL GRADIENT
+        if kernel.requires_grad:
+            var grad_kernel = Self.compute_kernel_gradient(
+                grad_output,
+                padded_image,
+                N,
+                C_in,
+                C_out,
+                H_pad,
+                W_pad,
+                H_out,
+                W_out,
+                KH,
+                KW,
+                stride,
+                dilation,
+            )
+            results.append((kernel_ref^, grad_kernel^, AddTensor))
+
+        # INPUT GRADIENT
+        if padded_image.requires_grad:
+            var grad_padded = Self.compute_input_gradient(
+                grad_output,
+                kernel,
+                N,
+                C_in,
+                C_out,
+                H_pad,
+                W_pad,
+                H_out,
+                W_out,
+                KH,
+                KW,
+                stride,
+                dilation,
+            )
+            results.append((padded_image_ref^, grad_padded^, AddTensor))
+
+        return results^
+
 
     # BIAS GRADIENT
     @always_inline

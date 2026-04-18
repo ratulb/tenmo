@@ -1996,6 +1996,10 @@ struct NDBuffer[dtype: DType](
         return self.scalar_ops[Divide](scalar)
 
     @always_inline
+    fn __rtruediv__(self, scalar: Scalar[Self.dtype]) -> NDBuffer[Self.dtype]:
+        return self.scalar_ops[ReverseDivide](scalar)
+
+    @always_inline
     fn arithmetic_ops[
         op_code: Int,
     ](
