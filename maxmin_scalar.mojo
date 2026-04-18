@@ -16,34 +16,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
-        ref gradbox = output.gradients()[]
-        var parent = output.ancestry().get(0)
-
-        # Work at NDBuffer level — avoids pulling in GPU kernel launchers
-        var mask_bool: NDBuffer[DType.bool]
-
-        comptime if has_accelerator():
-            if parent.is_on_gpu():
-                mask_bool = parent.buffer.compare_scalar[GreaterThan](scalar)
-            else:
-                mask_bool = parent.buffer.compare_scalar_cpu[GreaterThan](
-                    scalar
-                )
-        else:
-            mask_bool = parent.buffer.compare_scalar_cpu[GreaterThan](scalar)
-
-        var mask_float = mask_bool.to_dtype[Self.dtype]()
-        # wrap mask_float as Gradbox and multiply
-        var grad_input = Gradbox[Self.dtype](
-            mask_float * gradbox.buffer, share=False
-        )
-
-        return [(parent^, grad_input^, AddTensor)]
 
     @staticmethod
     fn backward(
@@ -80,29 +52,6 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 @fieldwise_init
 struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
-        ref gradbox = output.gradients()[]
-        var parent = output.ancestry().get(0)
-
-        var mask_bool: NDBuffer[DType.bool]
-
-        comptime if has_accelerator():
-            if parent.is_on_gpu():
-                mask_bool = parent.buffer.compare_scalar[LessThan](scalar)
-            else:
-                mask_bool = parent.buffer.compare_scalar_cpu[LessThan](scalar)
-        else:
-            mask_bool = parent.buffer.compare_scalar_cpu[LessThan](scalar)
-
-        var mask_float = mask_bool.to_dtype[Self.dtype]()
-        var grad_input = Gradbox[Self.dtype](
-            mask_float * gradbox.buffer, share=False
-        )
-        return [(parent^, grad_input^, AddTensor)]
 
     @staticmethod
     fn backward(
@@ -204,7 +153,7 @@ fn main() raises:
     b.print()
     assert_true(b == Tensor[dtype].d1([4.0, 5.0, 4.0, 7.0, 4.0]))
 
-    b.backward_new()
+    b.backward()
     a.grad().print()
     assert_true(a.grad() == Tensor[dtype].d1([0.0, 1.0, 0.0, 1.0, 0.0]))
 
@@ -214,7 +163,7 @@ fn main() raises:
     d.print()
     assert_true(d == Tensor[dtype].d1([1.0, 4.0, 3.0, 4.0, 2.0]))
 
-    d.backward_new()
+    d.backward()
     c.grad().print()
     assert_true(c.grad() == Tensor[dtype].d1([1.0, 0.0, 1.0, 0.0, 1.0]))
 

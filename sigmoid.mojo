@@ -6,16 +6,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        var parent = output.ancestry().get(0)
-        var ndb = output.buffer.arithmetic_ops[SIGMOID_BACKWARD](gradbox.buffer)
-        var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
-
-        return [(parent^, gradbox_ancestor^, AddTensor)]
 
     @staticmethod
     fn backward(

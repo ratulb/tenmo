@@ -9,27 +9,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref arg = output.backward_fn_arg()
-        ref gradbox = output.gradients()[]
-        var input_tensor = output.ancestry().get(0)
-        ref shape = input_tensor.shape()
-
-        var result_ndb: NDBuffer[Self.dtype]
-
-        if output.is_on_gpu():
-            var mask_ndb = arg.get[NDBufferArg[Self.dtype]]().ndb
-            result_ndb = gradbox.buffer * mask_ndb
-        else:
-            var mask_buf = arg.get[BufferArg[Self.dtype]]().buffer
-            var result_buf = gradbox.buffer.data_buffer() * mask_buf
-            result_ndb = NDBuffer[Self.dtype](result_buf^, shape)
-
-        var gradbox_ancestor = Gradbox[Self.dtype](result_ndb^, share=False)
-        return [(input_tensor^, gradbox_ancestor^, AddTensor)]
 
     @staticmethod
     fn backward(

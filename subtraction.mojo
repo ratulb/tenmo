@@ -17,26 +17,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct SubBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var signs = output.backward_fn_arg().get[IntArrayArg]().array
-        ref gradbox = output.gradients()[]
-        count = len(output.ancestry())
-        grad_shares = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]](
-            capacity=count
-        )
-        for i in range(count):
-            var ancestor = output.ancestry().get(i)
-            grad_shares.append(
-                (
-                    ancestor^,
-                    gradbox,
-                    AddTensor if signs[i] == 0 else SubtractTensor,
-                )
-            )
-        return grad_shares^
 
     @staticmethod
     fn backward(
@@ -64,21 +44,6 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 struct SubLeftRightBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var negate = output.backward_fn_arg().get[Boolean]().is_true
-        ref gradbox = output.gradients()[]
-        ref ancestor = output.ancestry().get(0)
-        return [
-            (
-                ancestor,
-                gradbox,
-                SubtractTensor if negate else AddTensor,
-            )
-        ]
-
     @staticmethod
     fn backward(
         output: AncestorRef[Self.dtype],

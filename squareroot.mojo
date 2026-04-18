@@ -9,45 +9,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var epsilon = (
-            output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
-        )
-        ref gradbox = output.gradients()[]
-        var input_tensor = output.ancestry().get(0)
-        ref shape = input_tensor.shape()
-
-        var gradbox_ancestor: Gradbox[Self.dtype]
-
-        if input_tensor.is_contiguous():
-            var start = input_tensor.offset()
-            var end = start + input_tensor.numels()
-            # Compute 1 / (2 * sqrt(x)) - we can not use output - it may have changed
-            # output is sqrt(x), so gradient is 1 / (2 * sqrt(input))
-            var buffer = input_tensor.buffer.data_buffer().unary_ops[
-                SQRT_BACKWARD  # This should compute: 1 / (2 * sqrt(input))
-            ](start, end)
-            var ancestor_grad_buffer = gradbox.buffer.data_buffer() * buffer
-            var ndb = NDBuffer[Self.dtype](ancestor_grad_buffer^, shape)
-            gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
-        else:
-            gradbox_ancestor = Gradbox[Self.dtype].zeros(shape, share=False)
-            var index = 0
-            ref gradbox_buffer = gradbox.buffer.data_buffer()
-            ref ancestor_gradbox_buffer = gradbox_ancestor.buffer.data_buffer()
-
-            for coord in shape:
-                # gradient = grad_output * (1 / (2 * sqrt(x)))
-                var sqrt_grad = 1.0 / (epsilon + (2.0 * input_tensor[coord]))
-                ancestor_gradbox_buffer[index] = (
-                    gradbox_buffer[index] * sqrt_grad
-                )
-                index += 1
-
-        return [(input_tensor^, gradbox_ancestor^, AddTensor)]
 
     @staticmethod
     fn backward(
@@ -149,8 +110,8 @@ fn main() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].ones(10, requires_grad=True)
     var b = a.sqrt()
-    b.backward_new()
+    b.backward()
     a.grad().print()
     s = a.std()
-    s.backward_new()
+    s.backward()
     a.grad().print()

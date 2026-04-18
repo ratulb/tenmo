@@ -8,34 +8,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct ContiguousBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        var parent = output.ancestry().get(0)
-        ref parent_shape = parent.shape()
-        var parent_gradbox: Gradbox[Self.dtype]
-        if gradbox.shape() == Shape():
-            parent_gradbox = Gradbox[Self.dtype].full(
-                parent_shape,
-                gradbox.item(),
-                share=False,
-                device=gradbox.device(),
-            )
-        else:
-            parent_gradbox = Gradbox[Self.dtype].full(
-                parent_shape,
-                Scalar[Self.dtype](0),
-                share=False,
-                device=gradbox.device(),
-            )
-            for coord in parent_shape:
-                parent_gradbox[coord] = gradbox[coord]
-
-        return [
-            (parent^, parent_gradbox^, AddTensor),
-        ]
 
     @staticmethod
     fn backward(
@@ -97,5 +69,5 @@ fn main() raises:
     var v = a.view(Shape(2, 2), requires_grad=True)
     var c = v.contiguous()
     var d = c * 42
-    d.backward_new()
+    d.backward()
     a.grad().print()

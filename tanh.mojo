@@ -6,18 +6,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ] where Self.dtype.is_floating_point():
-        ref gradbox = output.gradients()[]
-        ref parent = output.ancestry().get(0)
-        var ndb = output.buffer.arithmetic_ops[TANH_BACKWARD](gradbox.buffer)
-        var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
-
-        return [(parent, gradbox_ancestor^, AddTensor)]
 
     @staticmethod
     fn backward(

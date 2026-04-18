@@ -9,59 +9,6 @@ from common_utils import panic
 from ancestors_newest import AncestorRef
 
 struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[ReductionArg]()
-        ref gradbox = output.gradients()[]
-        var gradbox_shape = gradbox.shape()
-        var ancestor = output.ancestry().get(0)
-        if gradbox_shape == Shape():
-            scalar_grad = gradbox.item() / Scalar[Self.dtype](
-                ancestor.shape().num_elements()
-            )
-            var grad_contrib: Gradbox[Self.dtype]
-            grad_contrib = Gradbox[Self.dtype].full(
-                ancestor.shape(),
-                scalar_grad,
-                share=False,
-                device=gradbox.device(),
-            )
-            return [
-                (
-                    ancestor^,
-                    grad_contrib^,
-                    AddTensor,
-                )
-            ]
-
-        var expanded = gradbox.copy()
-
-        if not bwd_arg.keepdims:
-            expanded = expanded.reshape(
-                Shape(
-                    gradbox_shape.intarray().insert(
-                        bwd_arg.axes,
-                        IntArray.filled(len(bwd_arg.axes), 1),
-                    )
-                )
-            )
-
-        # Broadcast and divide
-        var broadcasted = expanded.broadcast_to(ancestor.shape())
-        # Compute total count of elements being reduced
-        var count = ancestor.shape().reduced_shape(bwd_arg.axes).product()
-        count = count if count > 0 else 1
-        var average = broadcasted / Scalar[Self.dtype](count)
-
-        return [
-            (
-                ancestor^,
-                average^,
-                AddTensor,
-            )
-        ]
 
     @staticmethod
     fn backward(
@@ -173,7 +120,7 @@ fn main() raises:
     var A = Tensor[DType.float32].arange(5, 50, requires_grad=True)
     var B = A.reshape(5, 9, requires_grad=True)
     s = B.mean(IntArray(1), keepdims=True)
-    s.backward_new()
+    s.backward()
 
     A.grad().print(num_first=1000, num_last=1000)
     _ = """a_gpu = B.to_gpu()

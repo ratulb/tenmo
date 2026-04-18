@@ -8,23 +8,7 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axes = output.backward_fn_arg().get[IntArrayArg]().array
-        ref gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        var inverted_axes = IntArray.invert_permutation(axes^)
-        var gradbox_transposed_contiguous = gradbox.transpose(inverted_axes^)
 
-        return [
-            (
-                ancestor^,
-                gradbox_transposed_contiguous^,
-                AddTensor,
-            )
-        ]
     @staticmethod
     fn backward(
         output: AncestorRef[Self.dtype],

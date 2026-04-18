@@ -19,35 +19,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @always_inline
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref grad_out = output.gradients()[]
-        var A = output.ancestry().get(0)
-        var B = output.ancestry().get(1)
-
-        var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
-
-        # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
-        if A.requires_grad:
-            var ndb = grad_out.buffer.matmul_2d(
-                B.buffer.transpose(IntArray(-1, -2))
-            )
-            var grad_A = Gradbox[Self.dtype](ndb^, share=False)
-
-            result.append((A, grad_A^, AddTensor))
-
-        # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
-        if B.requires_grad:
-            var A_buffer_transposed = A.buffer.transpose(IntArray(-1, -2))
-            var ndb = A_buffer_transposed.matmul_2d(grad_out.buffer)
-            var grad_B = Gradbox[Self.dtype](ndb^, share=False)
-
-            result.append((B^, grad_B^, AddTensor))
-
-        return result^
 
     @staticmethod
     fn backward(
@@ -120,41 +91,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 @fieldwise_init
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref grad_out = output.gradients()[]
-        var A = output.ancestry().get(0)
-        var B = output.ancestry().get(1)
-
-        ref A_shape = A.shape()
-        ref B_shape = B.shape()
-        var results = List[
-            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
-
-        if A.requires_grad:
-            var B_transposed = B.transpose[track_grad=False](axes=[-1, -2])
-
-            var A_batch_grad = MatmulNd[Self.dtype].forward(
-                grad_out, B_transposed
-            )
-            var final_grad_A = A_batch_grad^.sum_over_broadcasted_axes(A_shape)
-
-            results.append((A, final_grad_A^, AddTensor))
-
-        if B.requires_grad:
-            var A_transposed = A.transpose[track_grad=False](axes=[-1, -2])
-            var B_batch_grad = MatmulNd[Self.dtype].forward(
-                A_transposed, grad_out
-            )
-
-            var final_grad_B = B_batch_grad^.sum_over_broadcasted_axes(B_shape)
-
-            results.append((B^, final_grad_B^, AddTensor))
-
-        return results^
 
     @staticmethod
     fn backward(

@@ -12,25 +12,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct DropoutBackward[dtype: DType](ImplicitlyCopyable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var mask_buffer = (
-            output.backward_fn_arg().get[BufferArg[Self.dtype]]().buffer
-        )
-        var grad_output = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-
-        # Gradient flows through the same mask that was used in forward
-        # grad_input = grad_output * mask
-        # Since mask already has scale baked in, we just multiply
-        var grad_input = grad_output * Tensor[Self.dtype](
-            NDBuffer[Self.dtype](mask_buffer, grad_output.shape()),
-            requires_grad=False,
-        )
-
-        return [(ancestor^, grad_input^, AddTensor)]
 
     @staticmethod
     fn backward(

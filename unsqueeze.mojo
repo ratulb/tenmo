@@ -8,20 +8,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axes = output.backward_fn_arg().get[IntArrayArg]().array
-        var gradbox = output.gradients()[]
-        # Remove the axis we had inserted
-        var squeezed_gradbox = gradbox.squeeze(axes)
-
-        var ancestor = output.ancestry().get(0)
-        return [
-            (ancestor^, squeezed_gradbox^, AddTensor),
-            (output, gradbox^, ZeroGrad),
-        ]
 
     @staticmethod
     fn backward(
@@ -67,11 +53,11 @@ struct Unsqueeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     var n = axis if axis >= 0 else new_rank + axis
                     normalized.append(n)
                 normalized.sort()
-                out.backwardFnArg = Optional(
+                var backwardFnArg =
                     BackwardFnArg[Self.dtype].from_intarray(
                         BACKWARD_UNSQUEEZE, normalized
                     )
-                )
-                out.add_ancestry(tensor)
+
+                out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

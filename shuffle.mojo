@@ -209,48 +209,6 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 @fieldwise_init
 struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_fn_arg = output.backward_fn_arg().get[ShuffleArg]()
-        var axis = bwd_fn_arg.axis
-        var permutation = bwd_fn_arg.permutation.copy()
-        ref gradbox = output.gradients()[]
-        var parent = output.ancestry().get(0)
-        var shape = gradbox.shape()
-        var gradbox_parent: Gradbox[Self.dtype]
-
-        comptime if has_accelerator():
-            if gradbox.is_on_gpu():
-                try:
-                    var result_ndb = ShuffleGPU[Self.dtype].launch_scatter(
-                        gradbox.buffer, permutation, axis
-                    )
-                    gradbox_parent = Gradbox[Self.dtype](
-                        result_ndb^, share=False
-                    )
-                except e:
-                    panic("ShuffleBackward GPU scatter failed: " + String(e))
-                    # Unreachable
-                    gradbox_parent = Gradbox[Self.dtype].zeros(
-                        shape, share=False
-                    )
-                return [(parent^, gradbox_parent^, AddTensor)]
-
-        # CPU path
-        # parent.shape == gradients.shape, only difference is coord postions
-        # along the permuted axis
-        # Scatter gradients back using the original permutation
-        # For each position in the output gradient, find where it came from in the input
-
-        gradbox_parent = Gradbox[Self.dtype].zeros(shape, share=False)
-        for grad_coord in shape:
-            var parent_coord = grad_coord
-            parent_coord[axis] = permutation[grad_coord[axis]]
-            gradbox_parent[parent_coord] = gradbox[grad_coord]
-
-        return [(parent^, gradbox_parent^, AddTensor)]
 
     @staticmethod
     fn backward(

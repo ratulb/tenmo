@@ -14,16 +14,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        if ancestor.shape() != gradbox.shape():
-            gradbox = gradbox.reshape(ancestor.shape())
-        # Gradient of addition is 1 → just pass through incoming grad
-        return [(ancestor^, gradbox, AddTensor)]
 
     @staticmethod
     fn backward(
@@ -119,41 +109,6 @@ struct Adder[dtype: DType](Copyable, RegisterPassable):
 struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var gradbox = output.gradients()[]
-        count = len(output.ancestry())
-
-        var grad_shares = List[
-            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-        ](capacity=count)
-
-        if count == 1:
-            var ancestor = output.ancestry().get(0)
-            grad_shares.append((ancestor^, gradbox^, AddTensor))
-        else:
-            var ancestor_lhs = output.ancestry().get(0)
-            var ancestor_rhs = output.ancestry().get(1)
-            lhs_requires_grad = ancestor_lhs.requires_grad
-            rhs_requires_grad = ancestor_rhs.requires_grad
-
-            if lhs_requires_grad and rhs_requires_grad:
-                grad_shares.append((ancestor_lhs^, gradbox, AddTensor))
-                grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))
-
-            elif lhs_requires_grad and not rhs_requires_grad:
-                grad_shares.append((ancestor_lhs^, gradbox^, AddTensor))
-
-            elif not lhs_requires_grad and rhs_requires_grad:
-                grad_shares.append((ancestor_rhs^, gradbox^, AddTensor))
-
-            else:
-                pass
-
-        return grad_shares^
-
-    @staticmethod
-    fn backward(
         output: AncestorRef[Self.dtype],
     ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.gradbox[]
@@ -199,6 +154,6 @@ fn main() raises:
     var B = Tensor[dtype].full(Shape.of(3, 1), 2, requires_grad=True)
     var C = A + B
     # var C = A + 10
-    C.backward_new(42)
+    C.backward(42)
     A.grad().print()  # grad() call detaches
     B.grad().print()

@@ -10,17 +10,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct ReshapeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        var reshaped = gradbox.reshape(ancestor.shape())
-        return [
-            (ancestor^, reshaped^, AddTensor),
-            (output, gradbox, ZeroGrad),
-        ]
 
     @staticmethod
     fn backward(

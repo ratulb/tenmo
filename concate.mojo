@@ -14,64 +14,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axis = output.backward_fn_arg().get[Integer]().value
-        ref grad_output = output.gradients()[]
-        var grad_data = grad_output.data_ptr()
-        ref grad_shape = grad_output.shape()
-        ref grad_strides = grad_output.strides()
-
-        var count = len(output.ancestry())
-        var result = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]()
-
-        # Fast path: axis 0
-        if axis == 0:
-            var src_offset = 0
-            for i in range(count):
-                var tensor = output.ancestry().get(i)
-                var num_elements = tensor.numels()
-                if tensor.requires_grad:
-                    var grad_input = Gradbox[Self.dtype].zeros(tensor.shape())
-                    var grad_input_data = grad_input.data_ptr()
-                    for j in range(num_elements):
-                        grad_input_data[j] = grad_data[src_offset + j]
-                    result.append((tensor^, grad_input^, AddTensor))
-                src_offset += num_elements
-            return result^
-
-        # General path: any axis
-        var offset = 0
-        for i in range(count):
-            var tensor = output.ancestry().get(i)
-            if not tensor.requires_grad:
-                offset += tensor.shape()[axis]
-                continue
-
-            ref tensor_shape = tensor.shape()
-            var grad_input = Gradbox[Self.dtype].zeros(tensor_shape)
-            var grad_input_data = grad_input.data_ptr()
-
-            var elem_idx = 0
-            for dest_idx in grad_input.index_iterator():
-                var coord = IndexCalculator.index_to_coord(
-                    tensor_shape, elem_idx
-                )
-                var grad_coord = IntArray.filled(grad_shape.rank(), 0)
-                for d in range(grad_shape.rank()):
-                    grad_coord[d] = coord[d] + (offset if d == axis else 0)
-                var src_idx = IndexCalculator.flatten_index(
-                    grad_shape, grad_coord, grad_strides, 0
-                )
-                grad_input_data[dest_idx] = grad_data[src_idx]
-                elem_idx += 1
-
-            offset += tensor.shape()[axis]
-            result.append((tensor^, grad_input^, AddTensor))
-
-        return result^
 
     @staticmethod
     fn backward(

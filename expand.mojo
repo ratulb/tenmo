@@ -11,16 +11,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
-        parent_shape = ancestor.shape()
-        gradbox_contracted = gradbox.sum_over_broadcasted_axes(parent_shape)
-
-        return [(ancestor^, gradbox_contracted^, AddTensor)]
 
     @staticmethod
     fn backward(

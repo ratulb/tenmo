@@ -9,31 +9,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ancestor = output.ancestry().get(0)
-        var gradbox = output.gradients()[]
-        var ancestor_gradbox: Gradbox[Self.dtype]
-        var original_shape = ancestor.shape()
-        if gradbox.shape() == Shape():
-            ancestor_gradbox = Gradbox[Self.dtype].full(
-                original_shape,
-                gradbox.item(),
-                share=False,
-                device=gradbox.device(),
-            )
-        else:
-            ancestor_gradbox = gradbox.reshape(original_shape)
-        return [
-            (ancestor^, ancestor_gradbox^, AddTensor),
-            (
-                output,
-                gradbox^,
-                ZeroGrad,
-            ),  # Send out a signal to this output of squeeze op to zero out its grad(No accumulation of grad for view)
-        ]
 
     @staticmethod
     fn backward(

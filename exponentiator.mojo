@@ -14,33 +14,6 @@ struct ExponentiationBackward[dtype: DType](
 ):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        """
-        ∂(x**n)/∂x = n * x**(n-1)
-        All ops at NDBuffer level — GPU safe, no LLVM lowering issues.
-        """
-        var exponent = (
-            output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
-        )
-        ref gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-
-        # Step 1: x ** (n-1) — NDBuffer.pow, GPU safe
-        var base_pow = ancestor.buffer ** (exponent - Scalar[Self.dtype](1))
-
-        # Step 2: n * x**(n-1) — scalar_ops[Multiply], GPU safe
-        var local_grad = base_pow.scalar_ops[Multiply](exponent)
-
-        # Step 3: local_grad * upstream_grad — arithmetic_ops[Multiply], GPU safe
-        var grad_result = local_grad * gradbox.buffer
-
-        var parent_gradbox = Gradbox[Self.dtype](grad_result^, share=False)
-
-        return [(ancestor^, parent_gradbox^, AddTensor)]
-
-    @staticmethod
-    fn backward(
         output: AncestorRef[Self.dtype],
     ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
@@ -121,7 +94,7 @@ fn test_exponentiation() raises:
     expected = Tensor[dtype].full(Shape.of(3, 3), 7.389056)
     b = a.exp(True)
     assert_true(b.all_close(expected), "exponentiation assertion failed")
-    b.backward_new()
+    b.backward()
     a.grad().print()
 
 
@@ -134,5 +107,5 @@ fn test_negation() raises:
     expected = Tensor[dtype].full(Shape.of(3, 3), -2)
     b = -a
     assert_true(b.all_close(expected), "negation assertion failed")
-    b.backward_new()
+    b.backward()
     a.grad().print()

@@ -16,22 +16,6 @@ from ancestors_newest import AncestorRef
 struct TrueDivBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
-        ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
-        # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
-        var divided = gradbox / scalar
-        return [
-            (
-                ancestor^,
-                divided^,
-                AddTensor,
-            )
-        ]
 
     @staticmethod
     fn backward(
@@ -57,25 +41,6 @@ struct RightTrueDivBackwardScalar[dtype: DType](
 ):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
-        var gradbox = output.gradients()[]
-        var tensor = output.ancestry().get(0)
-        squared = tensor.__pow__[track_grad=False](2)
-        squared_reciprocal = 1.0 / squared
-        gradbox = (gradbox * scalar) * squared_reciprocal
-
-        return [
-            (
-                tensor^,
-                gradbox^,
-                SubtractTensor,
-            )
-        ]
-
-    @staticmethod
-    fn backward(
         output: AncestorRef[Self.dtype],
     ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
         var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
@@ -99,54 +64,6 @@ struct RightTrueDivBackwardScalar[dtype: DType](
 
 @fieldwise_init
 struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        var tensor_top = output.ancestry().get(0)
-        var tensor_bottom = output.ancestry().get(1)
-
-        grad_shares = List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]](
-            capacity=2
-        )
-
-        if tensor_top.requires_grad:
-            tensor_bottom_reciprocal = DivideScalar[Self.dtype].forward[
-                track_grad=False
-            ](tensor_bottom, 1)
-            tensor_top_shape = tensor_top.shape()
-            tensor_top_gradbox = tensor_bottom_reciprocal * gradbox
-            if tensor_top_gradbox.shape() != tensor_top_shape:
-                tensor_top_gradbox = (
-                    tensor_top_gradbox.sum_over_broadcasted_axes(
-                        tensor_top_shape
-                    )
-                )
-            grad_shares.append((tensor_top, tensor_top_gradbox^, AddTensor))
-
-        if tensor_bottom.requires_grad:
-            tensor_bottom_squared = tensor_bottom.__mul__[track_grad=False](
-                tensor_bottom
-            )
-            tensor_bottom_squared_reciprocal = DivideScalar[Self.dtype].forward[
-                track_grad=False
-            ](tensor_bottom_squared, 1)
-            tensor_bottom_grad = tensor_top.__mul__[track_grad=False](
-                tensor_bottom_squared_reciprocal
-            )
-            tensor_bottom_gradbox = tensor_bottom_grad * gradbox
-            if tensor_bottom_gradbox.shape() != tensor_bottom.shape():
-                tensor_bottom_gradbox = (
-                    tensor_bottom_gradbox.sum_over_broadcasted_axes(
-                        tensor_bottom.shape()
-                    )
-                )
-            grad_shares.append(
-                (tensor_bottom^, tensor_bottom_gradbox^, SubtractTensor)
-            )
-
-        return grad_shares^
 
     @staticmethod
     fn backward(
@@ -309,7 +226,7 @@ fn main() raises:
     var C = (A / B) - 1 + (B * A) * 42
     #var C = (A / B) - 1
     # var C = 10/ A
-    C.backward_new(42)
+    C.backward(42)
     A.grad().print()  # grad() call detaches
     B.grad().print()
     print("passes")

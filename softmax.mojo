@@ -20,30 +20,6 @@ comptime LogSoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, True]
 struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
     ImplicitlyCopyable & Movable
 ):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
-        var (axes, softmax_out) = bwd_arg.axes, bwd_arg.softmax_out
-        ref gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        var local_grad_ndb: NDBuffer[Self.dtype]
-
-        comptime if Self.is_log:
-            # g - softmax(x) * sum(g, axes, keepdims=True)
-            var sum_grad = gradbox.buffer.sum(axes, keepdims=True)
-            var softmax_sum = softmax_out * sum_grad
-            local_grad_ndb = gradbox.buffer - softmax_sum
-        else:
-            # y * (g - sum(g * y, axes, keepdims=True))
-            var gy = gradbox.buffer * softmax_out
-            var gy_sum = gy.sum(axes, keepdims=True)
-            var grad_diff = gradbox.buffer - gy_sum
-            local_grad_ndb = softmax_out * grad_diff
-
-        var local_grad = Gradbox[Self.dtype](local_grad_ndb^, share=False)
-        return [(ancestor^, local_grad^, AddTensor)]
 
     @staticmethod
     fn backward(

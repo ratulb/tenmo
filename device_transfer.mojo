@@ -42,60 +42,6 @@ struct DeviceTransferBwdArg(ArgumentType):
 
 
 struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[DeviceTransferBwdArg]()
-        var (flow, device) = bwd_arg.flow, bwd_arg.device
-        var gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        debug_assert(
-            ancestor.shape() == gradbox.shape(),
-            "DeviceTransferBackward: gradbox shape and ancestor shape mismatch",
-        )
-
-        if flow == Flow.UnMoved:
-            return [(ancestor^, gradbox, AddTensor)]
-
-        comptime if has_accelerator():
-            if flow == Flow.Cpu2Gpu:
-                # Forward was CPU→GPU, backward transfers grad GPU→CPU
-                try:
-                    return [
-                        (
-                            ancestor^,
-                            Gradbox[Self.dtype](gradbox.buffer.to_cpu()),
-                            AddTensor,
-                        )
-                    ]
-                except e:
-                    panic(
-                        "DeviceTransferBackward: GPU→CPU transfer failed: "
-                        + String(e)
-                    )
-                    return [(ancestor^, gradbox, AddTensor)]  # unreachable
-            else:
-                # Forward was GPU→CPU, backward transfers grad CPU→GPU
-                try:
-                    return [
-                        (
-                            ancestor^,
-                            Gradbox[Self.dtype](
-                                gradbox.buffer.to_gpu(device.kind[GPU]),
-                                share=False,
-                            ),
-                            AddTensor,
-                        )
-                    ]
-                except e:
-                    panic(
-                        "DeviceTransferBackward: CPU→GPU transfer failed: "
-                        + String(e)
-                    )
-                    return [(ancestor^, gradbox, AddTensor)]  # unreachable
-
-        return [(ancestor^, gradbox, AddTensor)]
 
     @staticmethod
     fn backward(

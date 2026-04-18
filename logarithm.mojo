@@ -7,21 +7,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var epsilon = (
-            output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
-        )
-        ref gradbox = output.gradients()[]
-        var parent = output.ancestry().get(0)
-        var result_ndb = parent.buffer.arithmetic_ops[LOG_BACKWARD](
-            gradbox.buffer, epsilon
-        )
-        var parent_gradbox = Gradbox[Self.dtype](result_ndb^, share=False)
-
-        return [(parent^, parent_gradbox^, AddTensor)]
 
     @staticmethod
     fn backward(

@@ -42,52 +42,6 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        """
-        Backward pass: Accumulate gradients based on padding mode.
-        """
-        ref bwd_arg = output.backward_fn_arg().get[PadArg]()
-        var pad = bwd_arg.pad.copy()
-        var mode = bwd_arg.mode.copy()
-        ref grad_out = output.gradients()[]
-        var parent = output.ancestry().get(0)
-
-        var results = List[
-            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-        ]()
-
-        if parent.requires_grad:
-            ref parent_shape = parent.shape()
-            var grad_parent = Gradbox[Self.dtype].zeros(
-                parent_shape, share=False
-            )
-
-            # Different backward pass based on mode
-            if mode == "constant":
-                if parent_shape.rank() == 4:
-                    Self._extract_4d_constant_simd(
-                        grad_out, grad_parent, pad, parent_shape
-                    )
-                else:
-                    Self._extract_constant(
-                        grad_out, grad_parent, pad, parent_shape
-                    )
-            elif mode == "circular":
-                Self._extract_circular(grad_out, grad_parent, pad, parent_shape)
-            elif mode == "replicate":
-                Self._extract_replicate(
-                    grad_out, grad_parent, pad, parent_shape
-                )
-            elif mode == "reflect":
-                Self._extract_reflect(grad_out, grad_parent, pad, parent_shape)
-
-            results.append((parent^, grad_parent^, AddTensor))
-
-        return results^
-
-    @staticmethod
-    fn backward(
         output: AncestorRef[Self.dtype],
     ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
         """

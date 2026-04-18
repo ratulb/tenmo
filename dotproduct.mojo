@@ -17,38 +17,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        var scalar_grad_value = gradbox.item()  # Scalar
-        var grad_shares: List[
-            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-        ] = []
-        var tensor_lhs = output.ancestry().get(0)
-        var tensor_rhs = output.ancestry().get(1)
-
-        if tensor_lhs.requires_grad:
-            var grad_tensor = tensor_rhs.__mul__[track_grad=False](
-                scalar_grad_value
-            )
-            var gradbox_lhs = grad_tensor.as_gradbox(
-                share=False, contiguous=False
-            )
-            grad_shares.append((tensor_lhs, gradbox_lhs^, AddTensor))
-
-        if tensor_rhs.requires_grad:
-            var grad_tensor = tensor_lhs.__mul__[track_grad=False](
-                scalar_grad_value
-            )
-            var gradbox_rhs = grad_tensor.as_gradbox(
-                share=False, contiguous=False
-            )
-
-            grad_shares.append((tensor_rhs^, gradbox_rhs^, AddTensor))
-
-        return grad_shares^
 
     @staticmethod
     fn backward(

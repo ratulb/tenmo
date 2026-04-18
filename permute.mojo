@@ -7,14 +7,14 @@ from strides import Strides
 from common_utils import panic
 from views import View
 from gradbox import Gradbox
-
+from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: AncestorRef[Self.dtype],
+    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         Backward pass for permute.
         Apply inverse permutation to upstream gradients.
@@ -30,7 +30,8 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # Apply inverse permutation — GPU safe via NDBuffer.permute
         var parent_gradbox = gradbox.permute(inverted^)
-
+        print("In permute backward returning: \n")
+        parent_gradbox.print()
         return [
             (parent^, parent_gradbox^, AddTensor),
             (output, gradbox, ZeroGrad),
@@ -56,11 +57,11 @@ struct Permute[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                out.backwardFnArg = Optional(
+                var backwardFnArg =
                     BackwardFnArg[Self.dtype].from_intarray(
                         BACKWARD_PERMUTE, axes
-                    )
+
                 )
-                out.add_ancestry(self)
+                out.add_ancestry(backwardFnArg^, self)
 
         return out^

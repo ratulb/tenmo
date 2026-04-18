@@ -8,18 +8,6 @@ from ancestors_newest import AncestorRef
 struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[
-        Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-    ] where Self.dtype.is_floating_point():
-        ref gradbox = output.gradients()[]
-        var parent = output.ancestry().get(0)
-        # Gradient of exp: incoming grad * exp(A) = incoming grad * output
-        var exp_grad = gradbox * output
-        return [(parent^, exp_grad, AddTensor)]
-
-    @staticmethod
-    fn backward(
         output: AncestorRef[Self.dtype],
     ) -> List[
         Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]

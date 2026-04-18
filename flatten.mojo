@@ -7,18 +7,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct FlattenBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        ancestor = output.ancestry().get(0)
-        ancestor_shape = ancestor.shape()
-        # Just reshape gradient back to original
-        var reshaped_grad = gradbox.reshape(ancestor_shape)
-        return [
-            (ancestor^, reshaped_grad^, AddTensor),
-        ]
 
     @staticmethod
     fn backward(

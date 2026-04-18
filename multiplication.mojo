@@ -17,21 +17,6 @@ from std.os.atomic import Atomic, Consistency, fence
 struct MultiplyBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var factor = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
-        ref gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        scaled_gradbox = gradbox * factor
-        return [
-            (
-                ancestor^,
-                scaled_gradbox^,
-                AddTensor,
-            )
-        ]
 
     @staticmethod
     fn backward(
@@ -93,56 +78,12 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return grad_shares^
 
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref gradbox = output.gradients()[]
-        count = len(output.ancestry())
-        var ancestor_lhs = output.ancestry().get(0)
-
-        if count == 1:  # B = A * A, A is the only ancestor of B
-            gradbox_prod = ancestor_lhs * gradbox
-            gradbox_prod = gradbox_prod * Scalar[Self.dtype](2)
-            return [(ancestor_lhs^, gradbox_prod^, AddTensor)]
-
-        var grad_shares = List[
-            Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]
-        ](capacity=2)
-
-        var ancestor_rhs = output.ancestry().get(1)
-
-        if ancestor_lhs.requires_grad:
-            var gradbox_prod = gradbox * ancestor_rhs
-
-            grad_shares.append(
-                (
-                    ancestor_lhs,
-                    gradbox_prod^,
-                    AddTensor,
-                )
-            )
-
-        if ancestor_rhs.requires_grad:
-            var gradbox_prod = gradbox * ancestor_lhs
-            grad_shares.append(
-                (
-                    ancestor_rhs^,
-                    gradbox_prod^,
-                    AddTensor,
-                )
-            )
-
-        return grad_shares^
-
-
 comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
     dtype,
     augment=True,
     lhs_op=AddTensor,
     rhs_op=AddTensor,
 ]
-
 
 @fieldwise_init
 struct MultiplyScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -226,7 +167,7 @@ fn main() raises:
     var B = Tensor[dtype].full(Shape.of(3, 1), 2, requires_grad=True)
     var C = A * B
     #var C = A * 10
-    C.backward_new(42)
+    C.backward(42)
     A.grad().print()  # grad() call detaches
     B.grad().print()
     print("passes")

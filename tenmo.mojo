@@ -660,15 +660,6 @@ struct Tensor[dtype: DType](
         var grad_required = requires_grad.or_else(self.requires_grad)
         return Tensor[NewType](new_type_buffer^, requires_grad=grad_required)
 
-    @always_inline
-    fn add_ancestry(mut self, *parents: Tensor[Self.dtype]):
-        # Initialize ancestors if needed
-        if not self.ancestors:
-            self.ancestors = Optional(Ancestors[Self.dtype].untracked())
-        ref ancestors = self.ancestors.value()
-        for parent in parents:
-            ancestors.append(parent)
-
     fn add_ancestry(
         mut self,
         backward_arg: BackwardFnArg[Self.dtype],
@@ -694,17 +685,6 @@ struct Tensor[dtype: DType](
         refs.refs.append(AncestorRef[Self.dtype].from_tensor(lhs))
         refs.refs.append(AncestorRef[Self.dtype].from_tensor(rhs))
 
-    fn add_ancestry1(
-        mut self,
-        backward_arg: BackwardFnArg[Self.dtype],
-        *parents: Tensor[Self.dtype],
-    ):
-        self.backwardFnArg = Optional(backward_arg)
-        if not self.parent_refs:
-            self.parent_refs = Optional(ParentRefs[Self.dtype].empty())
-        ref refs = self.parent_refs.value()
-        for parent in parents:
-            refs.refs.append(AncestorRef[Self.dtype].from_tensor(parent))
 
     fn has_ancestry(self) -> Bool:
         return self.ancestors != None
@@ -1908,100 +1888,6 @@ struct Tensor[dtype: DType](
         var seed_tensor = Tensor[Self.dtype].full(shape, start_grad)
         output.backward[graph_size](seed_tensor)
 
-    fn backward_new[
-        graph_size: Int = 50
-    ](
-        mut output: Tensor[Self.dtype], start_grad: Scalar[Self.dtype] = 1.0
-    ) where Self.dtype.is_floating_point():
-        if not output.requires_grad:
-            return
-        var shape = output.shape()
-        var seed_tensor = Tensor[Self.dtype].full(shape, start_grad)
-        output.backward[graph_size](seed_tensor)
-
-    fn backward_new[
-        graph_size: Int = 50
-    ](
-        mut output, seed_tensor: Tensor[Self.dtype]
-    ) where Self.dtype.is_floating_point():
-        if not output.requires_grad:
-            return
-        output.seed_grad(seed_tensor)
-
-        try:
-            var topo_ids = List[UInt](capacity=graph_size)
-            var dfs_stack = List[UInt](capacity=graph_size)
-            var node_list = List[Tensor[Self.dtype]](capacity=graph_size)
-            var visited = Set[UInt]()
-            var fanin = Dict[UInt, Int]()
-            var id_to_index = Dict[UInt, Int]()  # Map ID to List index
-
-            dfs_stack.append(output.id())
-
-            # Add to list and record index
-            node_list.append(output)
-            id_to_index[output.id()] = 0
-
-            while len(dfs_stack) > 0:
-                var node_id = dfs_stack.pop()
-
-                if node_id in visited:
-                    continue
-
-                visited.add(node_id)
-                topo_ids.append(node_id)
-
-                var node_idx = id_to_index[node_id]
-                ref node = node_list[node_idx]  # Access by index
-
-                if node.has_ancestry():
-                    for parent in node.ancestry():
-                        var parent_id = parent.id()
-                        fanin[parent_id] = fanin.get(parent_id, 0) + 1
-
-                        if parent_id not in id_to_index:
-                            var new_idx = len(node_list)
-                            node_list.append(parent)
-                            id_to_index[parent_id] = new_idx
-                            dfs_stack.append(parent_id)
-
-            # Execute backward
-            var ready_queue = Deque[UInt](capacity=graph_size)
-            ready_queue.append(output.id())
-            while len(ready_queue) > 0:
-                var node_id: UInt = 0
-                try:
-                    node_id = ready_queue.popleft()
-                except key_err:
-                    panic(String(key_err))
-                var node_idx = id_to_index[node_id]
-                ref node = node_list[node_idx]
-                if node.has_backward_fn_arg():
-                    for result in Backward[Self.dtype].invoke(node):
-                        ref target_node = result[0]
-                        ref grad = result[1]
-                        var op_code = result[2]
-                        var target_id = target_node.id()
-                        if target_id in id_to_index:
-                            var target_idx = id_to_index[target_id]
-                            if op_code == AddTensor:
-                                node_list[target_idx].update_grad[AddTensor](
-                                    grad
-                                )
-                            else:
-                                node_list[target_idx].update_grad[
-                                    SubtractTensor
-                                ](grad)
-
-                        if target_id in fanin:
-                            fanin[target_id] -= 1
-                            if fanin[target_id] == 0:
-                                var target_idx = id_to_index[target_id]
-                                if node_list[target_idx].has_backward_fn_arg():
-                                    ready_queue.append(target_id)
-        except e:
-            print(e)
-
     fn requires_grad_(mut self, requires_grad: Bool = True):
         # Note cleaning up existing gradbox
         self.requires_grad = requires_grad
@@ -2009,7 +1895,7 @@ struct Tensor[dtype: DType](
             self.init_gradbox()
 
     # ========================================
-    # backward_new — parallel to existing backward
+    # backward — parallel to existing backward
     # Only called for tensors built with add_ancestry.
     # Drop this into Tensor as a new method alongside existing backward.
     # ========================================

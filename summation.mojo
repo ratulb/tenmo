@@ -9,47 +9,6 @@ from ancestors_newest import AncestorRef
 
 @fieldwise_init
 struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    @staticmethod
-    fn backward(
-        output: Tensor[Self.dtype],
-    ) -> List[Tuple[Tensor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_arg = output.backward_fn_arg().get[ReductionArg]()
-        var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
-        ref gradbox = output.gradients()[]
-        var ancestor = output.ancestry().get(0)
-        shape = ancestor.shape()
-        var grad_contrib: Gradbox[Self.dtype]
-        if gradbox.shape() == Shape():
-            grad_contrib = Gradbox[Self.dtype].full(
-                shape, gradbox.item(), share=False, device=gradbox.device()
-            )
-        else:
-            # Handle keepdims=False case (need to reshape gradient)
-            if not keepdims:
-                # Determine axes/unsqueeze (insert dims of size 1)
-                axes = (
-                    gradbox.shape()
-                    .intarray()
-                    .insert(
-                        axes,
-                        IntArray.filled(len(axes), 1),
-                    )
-                )
-                unsqueezed_shape = Shape(axes)
-
-                unsqueezed_grad = gradbox.reshape(unsqueezed_shape)
-                grad_contrib = unsqueezed_grad.broadcast_to(shape, share=False)
-            else:
-                # keepdims=True: shapes match except for broadcasting
-                grad_contrib = gradbox.broadcast_to(shape, share=False)
-
-        return [
-            (
-                ancestor^,
-                grad_contrib^,
-                AddTensor,
-            )
-        ]
 
     @staticmethod
     fn backward(
@@ -139,7 +98,7 @@ fn test_sum_2d_backward_axis0_cpu() raises:
     comptime dtype = DType.float32
     var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
     var loss = a.sum(axes=[0])
-    loss.backward_new()
+    loss.backward()
     var expected = Tensor[dtype].d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
     assert_true(a.grad().all_close(expected))
     print("✓ CPU 2D sum backward axis0 passed")
