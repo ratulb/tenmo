@@ -54,6 +54,120 @@ from mnemonics import (
     GreaterThanEqual,
 )
 
+
+struct Layout(ImplicitlyCopyable & Movable & Equatable):
+    """
+    Pure metadata describing how data is laid out in memory.
+    No data, no device, no allocation.
+    Device-agnostic — same for CPU and GPU.
+    """
+    var shape: Shape
+    var strides: Strides
+    var offset: Int
+    var _contiguous: Bool
+
+    fn __init__(out self):
+        self.shape = Shape()
+        self.strides = Strides.Zero()
+        self.offset = 0
+        self._contiguous = True
+
+    fn __init__(
+        out self,
+        shape: Shape,
+        strides: Strides,
+        offset: Int = 0,
+    ):
+        self.shape = shape
+        self.strides = strides
+        self.offset = offset
+        self._contiguous = strides.is_contiguous(shape)
+
+    fn __copyinit__(out self, copy: Self):
+        self.shape = copy.shape.copy()
+        self.strides = copy.strides.copy()
+        self.offset = copy.offset
+        self._contiguous = copy._contiguous
+
+    fn __moveinit__(out self, deinit take: Self):
+        self.shape = take.shape^
+        self.strides = take.strides^
+        self.offset = take.offset
+        self._contiguous = take._contiguous
+
+    fn __eq__(self, other: Self) -> Bool:
+        return (
+            self.shape == other.shape
+            and self.strides == other.strides
+            and self.offset == other.offset
+        )
+
+    fn __ne__(self, other: Self) -> Bool:
+        return not self.__eq__(other)
+
+    @always_inline
+    fn is_contiguous(self) -> Bool:
+        return self._contiguous
+
+    @always_inline
+    fn num_elements(self) -> Int:
+        return self.shape.num_elements()
+
+    @always_inline
+    fn rank(self) -> Int:
+        return self.shape.rank()
+
+    @always_inline
+    fn max_index(self) -> Int:
+        var max_idx = self.offset
+        for i in range(self.shape.rank()):
+            if self.strides[i] > 0:
+                max_idx += (self.shape[i] - 1) * self.strides[i]
+        return max_idx
+
+struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
+    """
+    Pure data carrier — CPU buffer or GPU device state.
+    No shape knowledge. No layout knowledge.
+    copy() is cheap — just a refcount bump.
+    """
+    var buffer: Buffer[Self.dtype]
+    var device_state: Optional[DeviceState[Self.dtype]]
+
+    fn __init__(out self):
+        self.buffer = Buffer[Self.dtype]()
+        self.device_state = None
+
+    fn __init__(out self, var buffer: Buffer[Self.dtype]):
+        self.buffer = buffer^
+        self.device_state = None
+
+    fn __init__(out self, var device_state: DeviceState[Self.dtype]):
+        self.buffer = Buffer[Self.dtype]()
+        self.device_state = Optional(device_state^)
+
+    fn __copyinit__(out self, copy: Self):
+        self.buffer = copy.buffer.copy()          # Buffer refcount bump if shared
+        self.device_state = copy.device_state.copy()  # ArcPointer bump for GPU
+
+    fn __moveinit__(out self, deinit take: Self):
+        self.buffer = take.buffer^
+        self.device_state = take.device_state^
+
+    @always_inline
+    fn is_on_gpu(self) -> Bool:
+        comptime if has_accelerator():
+            return self.device_state is not None
+        return False
+
+    @always_inline
+    fn is_on_cpu(self) -> Bool:
+        return not self.is_on_gpu()
+
+    fn copy(self) -> Self:
+        """Explicit copy — refcount bump only, no data copy."""
+        return self
+
 comptime TILE_SIZE = 32
 
 
