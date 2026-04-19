@@ -3,15 +3,15 @@ from mnemonics import AddTensor
 from backpropagation import BackwardFnArg, StdArg, BACKWARD_STD
 from gradbox import Gradbox
 from common_utils import panic, Epsilon
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[StdArg[Self.dtype]]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.ancestry().backward_fn_arg().get[StdArg[Self.dtype]]()
         var (axis, unbiased, keepdims, epsilon) = (
             bwd_arg.axis,
             bwd_arg.unbiased,

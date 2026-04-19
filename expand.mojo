@@ -7,15 +7,15 @@ from strides import Strides
 from gradbox import Gradbox
 from broadcasthelper import ShapeBroadcaster
 from views import View
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         parent_shape = ancestor.shape()

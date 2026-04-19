@@ -7,7 +7,7 @@ from intarray import IntArray
 from indexhelper import IndexCalculator
 from shapes import Shape
 from forwards import Concate
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -16,8 +16,8 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         Split gradient and squeeze the stacked dimension.
 
@@ -26,7 +26,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                                                   grad_B(d0, d1, d2),
                                                   grad_C(d0, d1, d2)]
         """
-        var bwd_arg = output.backward_fn_arg().get[StackArg]()
+        var bwd_arg = output.ancestry().backward_fn_arg().get[StackArg]()
         var (axis, num_tensors) = bwd_arg.axis, bwd_arg.num_tensors
         ref grad_output = output.gradients()[]
         # var grad_data = grad_output.buffer.buffer.data
@@ -36,7 +36,7 @@ struct StackBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         var count = len(output.ancestry())
         var result = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
 
         # Size of stacked dimension should equal num_tensors

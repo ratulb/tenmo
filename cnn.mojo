@@ -10,7 +10,7 @@ from std.algorithm import parallelize
 from std.sys import simd_width_of
 from ndbuffer import NDBuffer
 from intarray import IntArray
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
@@ -557,9 +557,9 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[FusedIm2ColBwdArg]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.ancestry().backward_fn_arg().get[FusedIm2ColBwdArg]()
         var (
             N,
             C_in,
@@ -587,7 +587,7 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
         ref grad_output = output.gradients()[]
         var results = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
 
         var padded_image_ref = output.ancestry().get(0)

@@ -3,15 +3,15 @@ from backpropagation import BackwardFnArg, BACKWARD_FLATTEN
 from mnemonics import AddTensor
 from common_utils import panic
 from gradbox import Gradbox
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct FlattenBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         ancestor_shape = ancestor.shape()

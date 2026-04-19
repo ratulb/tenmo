@@ -1,4 +1,4 @@
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 from tenmo import Tensor
 from std.utils import Variant
 from walkback import *
@@ -292,14 +292,14 @@ struct StdArg[dtype: DType](ArgumentType):
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
     fn invoke(
-        output: AncestorRef[Self.dtype],
+        output: Ancestor[Self.dtype],
     ) -> List[
-        Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
     ] where Self.dtype.is_floating_point():
-        if not output.backwardFnArg:          # guard!
-            print("Inside Backward invoke_new: output.new_backward_arg is not set")
+        if not output.has_ancestry():          # guard!
+            print("Inside Backward invoke: output ancestry is not set")
             return []
-        ref arg = output.backwardFnArg.value()
+        ref arg = output.ancestry().backward_fn_arg()
         var op_code = arg.op_code
         if op_code == BACKWARD_ADD_SCALAR:
             return AddBackwardScalar[Self.dtype].backward(output)
@@ -410,7 +410,6 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         elif op_code == BACKWARD_MATRIX_VECTOR_MUL:
             return MatrixVectorMulNdBackward[Self.dtype].backward(output)
         elif op_code == BACKWARD_DOT:
-            print("Coming here: ")
             return DotBackward[Self.dtype].backward(output)
         else:
             return []

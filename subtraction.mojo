@@ -12,7 +12,7 @@ from backpropagation import (
 from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -20,13 +20,13 @@ struct SubBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var signs = output.backward_fn_arg().get[IntArrayArg]().array
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var signs = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
         grad_shares = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ](capacity=count)
         for i in range(count):
             var ancestor = output.ancestry().get(i)
@@ -46,9 +46,9 @@ struct SubLeftRightBackwardScalar[dtype: DType](
 ):
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var negate = output.backward_fn_arg().get[Boolean]().is_true
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var negate = output.ancestry().backward_fn_arg().get[Boolean]().is_true
         ref gradbox = output.gradients()[]
         ref ancestor = output.ancestry().get(0)
         return [

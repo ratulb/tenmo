@@ -3,7 +3,7 @@ from backpropagation import BackwardFnArg, ScalarArg, BACKWARD_EXPONENTIATION
 from mnemonics import AddTensor, Multiply
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 # ── ExponentiationBackward ────────────────────────────────────────────────────
 
@@ -14,14 +14,14 @@ struct ExponentiationBackward[dtype: DType](
 ):
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         ∂(x**n)/∂x = n * x**(n-1)
         All ops at NDBuffer level — GPU safe, no LLVM lowering issues.
         """
         var exponent = (
-            output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+            output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
         )
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)

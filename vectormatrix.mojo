@@ -7,7 +7,7 @@ from common_utils import panic
 from std.sys import simd_width_of, has_accelerator
 from ndbuffer import NDBuffer
 from vectormatrix_kernel import VectorMatmulNdGpu
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct VectorMatmulNdBackward[dtype: DType](
@@ -17,8 +17,8 @@ struct VectorMatmulNdBackward[dtype: DType](
     @staticmethod
     fn backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
-    ](output: AncestorRef[Self.dtype]) -> List[
-        Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+    ](output: Ancestor[Self.dtype]) -> List[
+        Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
     ]:
         ref grad_out = output.gradients()[]
         ref v_ref = output.ancestry().get(0)
@@ -39,7 +39,7 @@ struct VectorMatmulNdBackward[dtype: DType](
         )
 
         var results = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
 
         # Gradient for v: dv[k] = grad_out[n] @ M^T[n, k]

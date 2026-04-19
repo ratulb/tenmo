@@ -10,7 +10,7 @@ from backpropagation import (
 from mnemonics import AddTensor
 from tenmo import Tensor
 from validators import Validator
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 comptime SoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, False]
 comptime LogSoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, True]
@@ -23,9 +23,9 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.ancestry().backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
         var (axes, softmax_out) = bwd_arg.axes, bwd_arg.softmax_out
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)

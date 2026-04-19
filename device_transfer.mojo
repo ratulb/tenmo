@@ -9,7 +9,7 @@ from common_utils import panic
 from gradbox import Gradbox
 from device import Device, CPU, GPU
 from std.sys import has_accelerator
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 struct Flow(RegisterPassable & Equatable, ImplicitlyCopyable):
     var direction: Int
@@ -45,9 +45,9 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[DeviceTransferBwdArg]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.ancestry().backward_fn_arg().get[DeviceTransferBwdArg]()
         var (flow, device) = bwd_arg.flow, bwd_arg.device
         var gradbox = output.gradients()[]
         var ancestor_ref = output.ancestry().get(0)

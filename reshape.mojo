@@ -6,15 +6,15 @@ from validators import Validator
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from strides import Strides
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct ReshapeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var reshaped = gradbox.reshape(ancestor.buffer().shape)

@@ -15,20 +15,20 @@ from matrixvector import MatrixVectorMulNd
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
 from intarray import IntArray
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
 
-        var result = List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]()
+        var result = List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]()
 
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
         if A.requires_grad:
@@ -94,8 +94,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
@@ -105,7 +105,7 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref A_shape = A_buffer.shape
         ref B_shape = B_buffer.shape
         var results = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
 
         if A.requires_grad:

@@ -3,7 +3,7 @@ from mnemonics import AddTensor
 from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_VARIANCE
 from gradbox import Gradbox
 from common_utils import panic
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct VarianceBwdArg(ArgumentType):
@@ -17,9 +17,9 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[VarianceBwdArg]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.ancestry().backward_fn_arg().get[VarianceBwdArg]()
         var (axis, unbiased, keepdims) = (
             bwd_arg.axis,
             bwd_arg.unbiased,

@@ -10,23 +10,23 @@ from gradbox import Gradbox
 from intarray import IntArray
 from indexhelper import IndexCalculator
 from shapes import Shape
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axis = output.backward_fn_arg().get[Integer]().value
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var axis = output.ancestry().backward_fn_arg().get[Integer]().value
         ref grad_output = output.gradients()[]
         var grad_data = grad_output.data_ptr()
         ref grad_shape = grad_output.shape()
         ref grad_strides = grad_output.strides()
 
         var count = len(output.ancestry())
-        var result = List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]()
+        var result = List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]()
 
         # Fast path: axis 0
         if axis == 0:
@@ -178,6 +178,6 @@ struct Concate[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     BACKWARD_CONCAT, concat_axis
                 )
                 for i in range(len(tensors)):
-                    result.add_ancestry(backwardFnArg^, tensors[i])
+                    result.add_ancestry(backwardFnArg, tensors[i])
 
         return result^

@@ -1959,7 +1959,7 @@ fn test_ancestry_storage_fidelity() raises:
     var B = Tensor[dtype].rand(80, 20)
     var B_gpu = B.to_gpu()
     var C_gpu = A_gpu.matmul(B_gpu)
-    var B_from_ancestry = C_gpu.ancestry().get(1)
+    var B_from_ancestry = C_gpu.ancestry().tensor(1)
     var B_ancestry_back = B_from_ancestry.to_cpu()
     assert_true(B.all_close(B_ancestry_back))
     print("PASSED: B from ancestry == original B")
@@ -2044,7 +2044,7 @@ fn test_ancestry_transposed_matmul_fidelity() raises:
     var BT_cpu = B.transpose(axes=IntArray(-1, -2))
     var grad_A_cpu = grad_out.matmul(BT_cpu)
 
-    var B_anc = C_gpu.ancestry().get(1)
+    var B_anc = C_gpu.ancestry().tensor(1)
     var BT_anc = B_anc.buffer.transpose(axes=IntArray(-1, -2))
 
     var grad_A_anc_ndb = MatmulNdGpu[dtype].launch[tile_size=32](

@@ -6,16 +6,16 @@ from validators import Validator
 from intarray import IntArray
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[MinMaxArg[Self.dtype]]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.ancestry().backward_fn_arg().get[MinMaxArg[Self.dtype]]()
         var (axes, keepdims, mask) = (
             bwd_arg.axes,
             bwd_arg.keepdims,

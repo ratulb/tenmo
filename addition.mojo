@@ -9,7 +9,7 @@ from mnemonics import AddTensor, Add
 from common_utils import panic
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -17,9 +17,9 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        if not output.parent_refs:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        if not output.parents:
             panic("Addition add scalar backward: parent_refs is None!")
         ref gradbox = output.gradbox[]
         var parent = output.ancestry().get(0)
@@ -109,13 +109,13 @@ struct Adder[dtype: DType](Copyable, RegisterPassable):
 struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var gradbox = output.gradbox[]
         count = len(output.ancestry())
 
         var grad_shares = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ](capacity=count)
 
         if count == 1:

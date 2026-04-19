@@ -2,7 +2,7 @@ from tenmo import Tensor
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from shapes import Shape
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 from broadcasthelper import ShapeBroadcaster
 
 @fieldwise_init
@@ -12,15 +12,15 @@ struct BroadcastBackward[
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype]
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype]
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         # This is the gradient flowing *into* this broadcasted op.
         # We need to call copy explicitly because we have not annotated Gradbox with `ImplicitlyCopyable` yet - Intententionally
         ref incoming_grad = output.gradbox[]
 
         # capacity = 2 because we always have 2 parents(at most)
         var parent_grad_list = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ](capacity=2)
 
         # Extract parents (ancestors)

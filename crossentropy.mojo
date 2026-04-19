@@ -12,7 +12,7 @@ from mnemonics import AddTensor, NotEqual
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from intarray import IntArray
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Reduction
@@ -382,9 +382,9 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_arg = output.backward_fn_arg().get[
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_arg = output.ancestry().backward_fn_arg().get[
             ClassIndicesBwdArg[Self.dtype]
         ]()
         var (
@@ -639,9 +639,9 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_arg = output.backward_fn_arg().get[
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_arg = output.ancestry().backward_fn_arg().get[
             ClassProbabilitiesBwdArg[Self.dtype]
         ]()
         var (

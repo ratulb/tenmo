@@ -4,7 +4,7 @@ from backpropagation import BackwardFnArg, BufferArg, NDBufferArg, BACKWARD_RELU
 from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from buffers import Buffer
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -12,9 +12,9 @@ struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref arg = output.backward_fn_arg()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref arg = output.ancestry().backward_fn_arg()
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         ref shape = ancestor.shape()

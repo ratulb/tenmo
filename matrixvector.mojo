@@ -8,7 +8,7 @@ from matmul import Matmul2d, MatmulNd
 from std.sys import simd_width_of, has_accelerator
 from ndbuffer import NDBuffer
 from matrixvector_kernel import MatrixVectorNdGpu
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct MatrixVectorMulNdBackward[dtype: DType](
@@ -17,8 +17,8 @@ struct MatrixVectorMulNdBackward[dtype: DType](
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         comptime simdwidth = simd_width_of[Self.dtype]()
 
         ref grad_out = output.gradients()[]
@@ -40,7 +40,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](
         )
 
         var results = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
 
         # Gradient for M: dM[m, k] = grad_out[m] ⊗ v[k] (outer product)

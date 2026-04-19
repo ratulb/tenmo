@@ -12,7 +12,7 @@ from std.gpu.primitives.id import lane_id, warp_id
 from std.gpu.primitives.warp import shuffle_down
 from std.gpu.globals import WARP_SIZE
 from std.sys import simd_width_of
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -20,12 +20,12 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var scalar_grad_value = gradbox.item()  # Scalar
         var grad_shares: List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ] = []
         var tensor_lhs_ref = output.ancestry().get(0)
         var tensor_rhs_ref = output.ancestry().get(1)

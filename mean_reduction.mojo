@@ -6,15 +6,15 @@ from backpropagation import BackwardFnArg, ReductionArg, BACKWARD_MEAN
 from validators import Validator
 from gradbox import Gradbox
 from common_utils import panic
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[ReductionArg]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
         ref gradbox = output.gradients()[]
         ref gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)

@@ -10,7 +10,7 @@ from gradbox import Gradbox
 from std.sys import has_accelerator
 from ndbuffer import NDBuffer
 from mnemonics import GreaterThan, LessThan
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 # ── MaxBackwardScalar ─────────────────────────────────────────────────────────
 
 
@@ -19,9 +19,9 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var scalar = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
         ref gradbox = output.gradients()[]
         var parent_ref = output.ancestry().get(0)
         var parent = Tensor[Self.dtype](parent_ref.buffer(), requires_grad=parent_ref.requires_grad)
@@ -55,9 +55,9 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var scalar = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
         ref gradbox = output.gradients()[]
         var parent_ref = output.ancestry().get(0)
         var parent = Tensor[Self.dtype](parent_ref.buffer(), requires_grad=parent_ref.requires_grad)

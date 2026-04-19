@@ -2,16 +2,16 @@ from tenmo import Tensor
 from mnemonics import AddTensor, TANH_BACKWARD
 from backpropagation import BackwardFnArg, BACKWARD_TANH
 from gradbox import Gradbox
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
+        output: Ancestor[Self.dtype],
     ) -> List[
-        Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
     ] where Self.dtype.is_floating_point():
         ref gradbox = output.gradients()[]
         ref parent = output.ancestry().get(0)

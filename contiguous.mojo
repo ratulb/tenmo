@@ -3,7 +3,7 @@ from backpropagation import BackwardFnArg, BACKWARD_CONTIGUOUS
 from mnemonics import AddTensor
 from gradbox import Gradbox
 from shapes import Shape
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -11,8 +11,8 @@ struct ContiguousBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         ref parent_shape = parent.shape()

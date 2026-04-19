@@ -4,16 +4,16 @@ from intarray import IntArray
 from backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_UNSQUEEZE
 from squeeze import Squeeze
 from gradbox import Gradbox
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axes = output.backward_fn_arg().get[IntArrayArg]().array
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var axes = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
         var gradbox = output.gradients()[]
         # Remove the axis we had inserted
         var squeezed_gradbox = gradbox.squeeze(axes)

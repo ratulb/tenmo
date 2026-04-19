@@ -6,8 +6,7 @@ from std.sys import simd_width_of
 from std.utils.numerics import min_finite
 from std.memory import memcpy, memset, memset_zero, AddressSpace, ArcPointer
 from shapes import Shape, ShapeIndexIterator
-from ancestry import Ancestors
-from ancestors_newest import ParentRefs, AncestorRef
+from ancestry import Ancestors, Ancestor
 from strides import Strides
 from std.os.atomic import Atomic, Consistency, fence
 from common_utils import (
@@ -56,8 +55,6 @@ struct Tensor[dtype: DType](
     var requires_grad: Bool
     var gradbox: UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]
     var ancestors: Optional[Ancestors[Self.dtype]]
-    var parent_refs: Optional[ParentRefs[Self.dtype]]
-    var backwardFnArg: Optional[BackwardFnArg[Self.dtype]]
 
     fn __init__(out self, *axes_spans: Int, requires_grad: Bool = False):
         shape = Shape(axes_spans)
@@ -72,8 +69,6 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.parent_refs = None
-        self.backwardFnArg = None
         self.init_gradbox()
 
     fn __init__(out self):
@@ -82,8 +77,6 @@ struct Tensor[dtype: DType](
         self.requires_grad = False
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.parent_refs = None
-        self.backwardFnArg = None
 
     fn __init__(
         out self,
@@ -107,8 +100,6 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.parent_refs = None
-        self.backwardFnArg = None
         self.init_gradbox()
 
     fn __init__(
@@ -121,8 +112,6 @@ struct Tensor[dtype: DType](
         self.requires_grad = requires_grad
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = None
-        self.parent_refs = None
-        self.backwardFnArg = None
         self.init_gradbox()
 
     @staticmethod
@@ -167,8 +156,6 @@ struct Tensor[dtype: DType](
         self.requires_grad = take.requires_grad
         self.gradbox = take.gradbox
         self.ancestors = take.ancestors^
-        self.parent_refs = take.parent_refs^
-        self.backwardFnArg = take.backwardFnArg^
 
     fn __copyinit__(out self, copy: Self):
         self._id = copy._id
@@ -180,8 +167,6 @@ struct Tensor[dtype: DType](
         else:
             self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         self.ancestors = copy.ancestors.copy()
-        self.parent_refs = copy.parent_refs.copy()
-        self.backwardFnArg = copy.backwardFnArg.copy()
 
     fn shallow_copy(self) -> Tensor[Self.dtype]:
         var out = Tensor[Self.dtype]()
@@ -238,7 +223,7 @@ struct Tensor[dtype: DType](
         return self.buffer.shared()
 
     fn is_leaf(self) -> Bool:
-        return self.requires_grad and not self.has_backward_fn_arg()
+        return self.requires_grad and not self.ancestors is None
 
     @always_inline
     fn __len__(self) -> Int:
@@ -527,16 +512,6 @@ struct Tensor[dtype: DType](
         return None
 
     @always_inline
-    fn backward_fn_arg(
-        ref self,
-    ) -> ref[self.backwardFnArg.value()] BackwardFnArg[Self.dtype]:
-        return self.backwardFnArg.value()
-
-    @always_inline
-    fn has_backward_fn_arg(self) -> Bool:
-        return self.backwardFnArg is not None
-
-    @always_inline
     fn has_grad(self) -> Bool:
         return (
             self.gradbox != UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
@@ -660,37 +635,60 @@ struct Tensor[dtype: DType](
         var grad_required = requires_grad.or_else(self.requires_grad)
         return Tensor[NewType](new_type_buffer^, requires_grad=grad_required)
 
-    fn add_ancestry(
+    fn add_ancestry_1(
         mut self,
-        backward_arg: BackwardFnArg[Self.dtype],
+        var backwardFnArg: BackwardFnArg[Self.dtype],
         ref parent: Tensor[Self.dtype],
     ):
-        self.backwardFnArg = Optional(backward_arg)
-        if not self.parent_refs:
-            self.parent_refs = Optional(ParentRefs[Self.dtype].empty())
-        self.parent_refs.value().refs.append(
-            AncestorRef[Self.dtype].from_tensor(parent)  # ref — no Tensor copy!
-        )
+        if not self.ancestors:
+            self.ancestors = Optional(Ancestors[Self.dtype].empty())
+        ref ancestors = self.ancestors.value()
+        ancestors.set_backward_fn_arg(backwardFnArg^)
+        ancestors.append(parent)  # ref — no Tensor copy!
 
-    fn add_ancestry(
+    fn add_ancestry_2(
         mut self,
-        backward_arg: BackwardFnArg[Self.dtype],
+        var backwardFnArg: BackwardFnArg[Self.dtype],
         ref lhs: Tensor[Self.dtype],
         ref rhs: Tensor[Self.dtype],
     ):
-        self.backwardFnArg = Optional(backward_arg)
-        if not self.parent_refs:
-            self.parent_refs = Optional(ParentRefs[Self.dtype].empty())
-        ref refs = self.parent_refs.value()
-        refs.refs.append(AncestorRef[Self.dtype].from_tensor(lhs))
-        refs.refs.append(AncestorRef[Self.dtype].from_tensor(rhs))
+        if not self.ancestors:
+            self.ancestors = Optional(Ancestors[Self.dtype].empty())
+        ref ancestors = self.ancestors.value()
+        ancestors.set_backward_fn_arg(backwardFnArg^)
+        ancestors.append(lhs)
+        ancestors.append(rhs)
 
+    fn add_ancestry_3(
+        mut self,
+        var backwardFnArg: BackwardFnArg[Self.dtype],
+        ref lhs: Tensor[Self.dtype],
+        ref mid: Tensor[Self.dtype],
+        ref rhs: Tensor[Self.dtype],
+    ):
+        if not self.ancestors:
+            self.ancestors = Optional(Ancestors[Self.dtype].empty())
+        ref ancestors = self.ancestors.value()
+        ancestors.set_backward_fn_arg(backwardFnArg^)
+        ancestors.append(lhs)
+        ancestors.append(mid)
+        ancestors.append(rhs)
+
+    fn add_ancestry(mut self, var backwardFnArg: BackwardFnArg[Self.dtype], *parents: Tensor[Self.dtype]):
+        # Initialize ancestors if needed
+        if not self.ancestors:
+            self.ancestors = Optional(Ancestors[Self.dtype].empty())
+
+        ref ancestors = self.ancestors.value()
+        ancestors.set_backward_fn_arg(backwardFnArg^)
+        for parent in parents:
+            ancestors.append(parent)
 
     fn has_ancestry(self) -> Bool:
         return self.ancestors != None
 
     @always_inline
-    fn ancestry(ref self) -> ref[self.ancestors.value()] Ancestors[Self.dtype]:
+    fn ancestry(ref self) -> ref [self.ancestors.value()] Ancestors[Self.dtype]:
         if self.ancestors == None:
             panic("Tensor → ancestry: ancestry not initialized")
         return self.ancestors.value()
@@ -1909,24 +1907,24 @@ struct Tensor[dtype: DType](
         if not output.requires_grad:
             return
 
-        # seed_grad on the live Tensor before crossing into AncestorRef world
+        # seed_grad on the live Tensor before crossing into Ancestor world
         output.seed_grad(seed_tensor)
 
         try:
             var topo_ids = List[UInt](capacity=graph_size)
             var dfs_stack = List[UInt](capacity=graph_size)
-            var node_list = List[AncestorRef[Self.dtype]](capacity=graph_size)
+            var node_list = List[Ancestor[Self.dtype]](capacity=graph_size)
             var visited = Set[UInt]()
             var fanin = Dict[UInt, Int]()
             var id_to_index = Dict[UInt, Int]()
 
-            # Root — the ONE crossing point from Tensor to AncestorRef
-            var root = AncestorRef[Self.dtype].from_tensor(output)
-            dfs_stack.append(root.id)
+            # Root — the ONE crossing point from Tensor to Ancestor
+            var root = Ancestor[Self.dtype].from_tensor(output)
+            dfs_stack.append(root._id)
             node_list.append(root)
-            id_to_index[root.id] = 0
+            id_to_index[root._id] = 0
 
-            # DFS — pure AncestorRef from here
+            # DFS — pure Ancestor from here
             while len(dfs_stack) > 0:
                 var node_id = dfs_stack.pop()
 
@@ -1941,7 +1939,7 @@ struct Tensor[dtype: DType](
 
                 if node.has_ancestry():
                     for parent in node.ancestry():
-                        var parent_id = parent.id
+                        var parent_id = parent._id
                         fanin[parent_id] = fanin.get(parent_id, 0) + 1
 
                         if parent_id not in id_to_index:
@@ -1952,7 +1950,7 @@ struct Tensor[dtype: DType](
 
             # Execute backward
             var ready_queue = Deque[UInt](capacity=graph_size)
-            ready_queue.append(root.id)
+            ready_queue.append(root._id)
 
             while len(ready_queue) > 0:
                 var node_id: UInt = 0
@@ -1964,12 +1962,12 @@ struct Tensor[dtype: DType](
                 var node_idx = id_to_index[node_id]
                 ref node = node_list[node_idx]
 
-                if node.has_backward_fn_arg():
+                if node.has_ancestry():
                     for result in Backward[Self.dtype].invoke(node):
-                        ref target_ref = result[0]  # AncestorRef
+                        ref target_ref = result[0]  # Ancestor
                         ref grad = result[1]  # Gradbox
                         var op_code = result[2]
-                        var target_id = target_ref.id
+                        var target_id = target_ref._id
 
                         if target_id in id_to_index:
                             var target_idx = id_to_index[target_id]
@@ -1987,7 +1985,7 @@ struct Tensor[dtype: DType](
                             fanin[target_id] -= 1
                             if fanin[target_id] == 0:
                                 var target_idx = id_to_index[target_id]
-                                if node_list[target_idx].has_backward_fn_arg():
+                                if node_list[target_idx].has_ancestry():
                                     ready_queue.append(target_id)
 
         except e:

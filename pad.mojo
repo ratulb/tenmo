@@ -31,7 +31,7 @@ from intarray import IntArray
 from std.utils import Variant
 from std.sys import simd_width_of
 from std.algorithm import parallelize
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 comptime Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
 
@@ -42,12 +42,12 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         Backward pass: Accumulate gradients based on padding mode.
         """
-        ref bwd_arg = output.backward_fn_arg().get[PadArg]()
+        ref bwd_arg = output.ancestry().backward_fn_arg().get[PadArg]()
         var pad = bwd_arg.pad.copy()
         var mode = bwd_arg.mode.copy()
         ref grad_out = output.gradients()[]
@@ -55,7 +55,7 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var parent = Tensor[Self.dtype](ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad)
 
         var results = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
 
         if parent.requires_grad:

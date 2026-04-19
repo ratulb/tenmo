@@ -4,16 +4,16 @@ from mnemonics import AddTensor
 from validators import Validator
 from gradbox import Gradbox
 from intarray import IntArray
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var axes = output.backward_fn_arg().get[IntArrayArg]().array
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var axes = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var inverted_axes = IntArray.invert_permutation(axes^)

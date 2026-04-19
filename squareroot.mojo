@@ -5,17 +5,17 @@ from gradbox import Gradbox
 from std.math import sqrt
 from ndbuffer import NDBuffer
 from common_utils import Epsilon
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var epsilon = (
-            output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+            output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
         )
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)

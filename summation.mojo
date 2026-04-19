@@ -5,16 +5,16 @@ from shapes import Shape
 from backpropagation import BackwardFnArg, ReductionArg, BACKWARD_SUM
 from validators import Validator
 from gradbox import Gradbox
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_arg = output.backward_fn_arg().get[ReductionArg]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_arg = output.ancestry().backward_fn_arg().get[ReductionArg]()
         var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)

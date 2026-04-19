@@ -7,21 +7,21 @@ from strides import Strides
 from common_utils import panic
 from views import View
 from gradbox import Gradbox
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """
         Backward pass for permute.
         Apply inverse permutation to upstream gradients.
         GPU safe: Gradbox.permute → NDBuffer.permute(shared=False)
                   → contiguous() → contiguous_device_state() on GPU.
         """
-        var permutation = output.backward_fn_arg().get[IntArrayArg]().array
+        var permutation = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 

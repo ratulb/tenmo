@@ -2,15 +2,15 @@ from tenmo import Tensor
 from mnemonics import AddTensor, EXP
 from backpropagation import BackwardFnArg, BACKWARD_EXPONENTIAL
 from gradbox import Gradbox
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
+        output: Ancestor[Self.dtype],
     ) -> List[
-        Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+        Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
     ] where Self.dtype.is_floating_point():
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)

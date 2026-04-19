@@ -6,16 +6,16 @@ from shapes import Shape
 from validators import Validator
 from gradbox import Gradbox
 from indexhelper import IndexCalculator
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[TilesArg]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.ancestry().backward_fn_arg().get[TilesArg]()
         var (repeat, orig_shape) = bwd_arg.repeat, bwd_arg.orig_shape
         ref grad_out = output.gradients()[]
         var parent = output.ancestry().get(0)

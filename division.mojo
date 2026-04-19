@@ -9,7 +9,7 @@ from backpropagation import (
 from mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
 from common_utils import panic
 from gradbox import Gradbox
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -19,9 +19,9 @@ struct TrueDivBackwardScalar[dtype: DType](
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var scalar = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
@@ -41,9 +41,9 @@ struct RightTrueDivBackwardScalar[dtype: DType](
 ):
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var scalar = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
         var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         ref nd_buffer = ancestor.buffer()
@@ -67,8 +67,8 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var ancestor_top = output.ancestry().get(0)
         var ancestor_bottom = output.ancestry().get(1)
@@ -76,7 +76,7 @@ struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref buffer_bottom = ancestor_bottom.buffer()
 
         var grad_shares = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ](capacity=2)
 
         if ancestor_top.requires_grad:

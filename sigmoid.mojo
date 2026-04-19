@@ -2,15 +2,15 @@ from tenmo import Tensor
 from mnemonics import AddTensor, SIGMOID_BACKWARD
 from backpropagation import BackwardFnArg, BACKWARD_SIGMOID
 from gradbox import Gradbox
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct SigmoidBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         var ndb = output.buffer().arithmetic_ops[SIGMOID_BACKWARD](gradbox.buffer)

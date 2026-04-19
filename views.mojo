@@ -11,7 +11,7 @@ from std.sys import simd_width_of
 from device import DeviceState
 from std.sys import has_accelerator
 from ndbuffer import NDBuffer
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 
 @fieldwise_init
@@ -19,8 +19,8 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         comptime if has_accelerator():
             if output.is_on_gpu():
                 return Self.backward_gpu(output)
@@ -28,9 +28,9 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward_cpu(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_arg = output.backward_fn_arg().get[ViewArg]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_arg = output.ancestry().backward_fn_arg().get[ViewArg]()
         var (shape, strides, offset) = (
             bwd_arg.shape,
             bwd_arg.strides,
@@ -122,9 +122,9 @@ struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward_gpu(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_arg = output.backward_fn_arg().get[ViewArg]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_arg = output.ancestry().backward_fn_arg().get[ViewArg]()
         var (shape, strides, offset) = (
             bwd_arg.shape,
             bwd_arg.strides,

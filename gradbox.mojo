@@ -36,7 +36,7 @@ struct Gradbox[dtype: DType](
         var ndb = NDBuffer[Self.dtype](shape)
         if share:
             self.buffer = ndb.share()
-            _ = ndb^  # explicitly move/consume ndb to prevent __del__ double-free
+            _= ndb^
         else:
             self.buffer = ndb^
         self._refcount = alloc[Atomic[DType.uint64]](1)

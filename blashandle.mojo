@@ -7,7 +7,7 @@ from backpropagation import BlasArg, BackwardFnArg, BLAS_BACKWARD_MATMUL_2D
 from std.sys.defines import get_defined_string
 from gradbox import Gradbox
 from std.memory import ArcPointer
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct BLASMatmul2dBackward[dtype: DType](
@@ -15,9 +15,9 @@ struct BLASMatmul2dBackward[dtype: DType](
 ):
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.backward_fn_arg().get[BlasArg[Self.dtype]]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var bwd_arg = output.ancestry().backward_fn_arg().get[BlasArg[Self.dtype]]()
         var (transpose_A, transpose_B, blas) = (
             bwd_arg.transpose_A,
             bwd_arg.transpose_B,
@@ -29,7 +29,7 @@ struct BLASMatmul2dBackward[dtype: DType](
 
         var A = Tensor[Self.dtype](A_ancestor.buffer(), requires_grad=A_ancestor.requires_grad)
         var B = Tensor[Self.dtype](B_ancestor.buffer(), requires_grad=B_ancestor.requires_grad)
-        var result = List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]()
+        var result = List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]()
         # ===== GRADIENT FOR A =====
         if A.requires_grad:
             var grad_A: Gradbox[Self.dtype]

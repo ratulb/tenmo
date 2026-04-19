@@ -8,17 +8,17 @@ from buffers import Buffer
 from std.sys import simd_width_of
 from net import Module, Layer
 from std.random import random_float64, seed
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct DropoutBackward[dtype: DType](ImplicitlyCopyable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var mask_buffer = (
-            output.backward_fn_arg().get[BufferArg[Self.dtype]]().buffer
+            output.ancestry().backward_fn_arg().get[BufferArg[Self.dtype]]().buffer
         )
         var grad_output = output.gradients()[]
         var ancestor = output.ancestry().get(0)

@@ -10,7 +10,7 @@ from mnemonics import AddTensor, Multiply
 from common_utils import panic, id
 from gradbox import Gradbox
 from broadcastbackward import BroadcastBackward
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 from std.os.atomic import Atomic, Consistency, fence
 
 @fieldwise_init
@@ -20,9 +20,9 @@ struct MultiplyBackwardScalar[dtype: DType](
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var factor = output.backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        var factor = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * factor
@@ -38,8 +38,8 @@ struct MultiplyBackwardScalar[dtype: DType](
 struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref gradbox = output.gradients()[]
         count = len(output.ancestry())
         var ancestor_lhs = output.ancestry().get(0)
@@ -50,7 +50,7 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             return [(ancestor_lhs^, gradbox_prod^, AddTensor)]
 
         var grad_shares = List[
-            Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ](capacity=2)
 
         var ancestor_rhs = output.ancestry().get(1)

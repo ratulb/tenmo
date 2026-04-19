@@ -5,15 +5,15 @@ from backpropagation import BackwardFnArg, BACKWARD_SQUEEZE
 from gradbox import Gradbox
 from shapes import Shape
 from common_utils import panic
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 
 @fieldwise_init
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         ref ancestor = output.ancestry().get(0)
         var gradbox = output.gradients()[]
         var ancestor_gradbox: Gradbox[Self.dtype]

@@ -14,7 +14,7 @@ from ndbuffer import NDBuffer
 from intarray import IntArray
 from array import Array
 from common_utils import panic
-from ancestors_newest import AncestorRef
+from ancestry import Ancestor
 # ── GPU Kernels ──────────────────────────────────────────────────────────────
 
 
@@ -212,9 +212,9 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
 
     @staticmethod
     fn backward(
-        output: AncestorRef[Self.dtype],
-    ) -> List[Tuple[AncestorRef[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_fn_arg = output.backward_fn_arg().get[ShuffleArg]()
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        ref bwd_fn_arg = output.ancestry().backward_fn_arg().get[ShuffleArg]()
         var axis = bwd_fn_arg.axis
         var permutation = bwd_fn_arg.permutation.copy()
         ref gradbox = output.gradients()[]
