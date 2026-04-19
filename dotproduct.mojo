@@ -36,8 +36,6 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             tensor_rhs_ref.buffer(), requires_grad=tensor_rhs_ref.requires_grad
         )
 
-        print("check here 1")
-
         if tensor_lhs.requires_grad:
             var grad_tensor = tensor_rhs.__mul__[track_grad=False](
                 scalar_grad_value
