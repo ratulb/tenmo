@@ -134,9 +134,9 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     var refs: List[Ancestor[Self.dtype]]
     var backwardFnArg: BackwardFnArg[Self.dtype]
 
-    fn __init__(out self):
+    fn __init__(out self, var backwardFnArg: BackwardFnArg[Self.dtype]):
         self.refs = {}
-        self.backwardFnArg = BackwardFnArg[Self.dtype].null_arg(-1) # Placeholder
+        self.backwardFnArg = backwardFnArg^
 
     fn __copyinit__(out self, copy: Self):
         self.refs = copy.refs.copy()
@@ -159,10 +159,6 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
     @always_inline
     fn append(mut self, ref parent: Tensor[Self.dtype]):
         self.refs.append(Ancestor[Self.dtype].from_tensor(parent))
-
-    @staticmethod
-    fn empty() -> Ancestors[Self.dtype]:
-        return Self()
 
     @always_inline
     fn __del__(deinit self):

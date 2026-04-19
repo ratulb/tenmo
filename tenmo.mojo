@@ -297,7 +297,11 @@ struct Tensor[dtype: DType](
         track_grad: Bool = True
     ](mut self, *slices: Slice) -> Tensor[Self.dtype]:
         # Delegate shape/strides/offset computation
-        var(shape, strides, offset) = Validator.validate_and_compute_view_metadata(
+        var (
+            shape,
+            strides,
+            offset,
+        ) = Validator.validate_and_compute_view_metadata(
             self.shape(),
             self.strides(),
             slices,
@@ -635,52 +639,18 @@ struct Tensor[dtype: DType](
         var grad_required = requires_grad.or_else(self.requires_grad)
         return Tensor[NewType](new_type_buffer^, requires_grad=grad_required)
 
-    fn add_ancestry_1(
+    fn add_ancestry(
         mut self,
         var backwardFnArg: BackwardFnArg[Self.dtype],
-        ref parent: Tensor[Self.dtype],
+        *parents: Tensor[Self.dtype],
     ):
-        if not self.ancestors:
-            self.ancestors = Optional(Ancestors[Self.dtype].empty())
-        ref ancestors = self.ancestors.value()
-        ancestors.set_backward_fn_arg(backwardFnArg^)
-        ancestors.append(parent)  # ref — no Tensor copy!
-
-    fn add_ancestry_2(
-        mut self,
-        var backwardFnArg: BackwardFnArg[Self.dtype],
-        ref lhs: Tensor[Self.dtype],
-        ref rhs: Tensor[Self.dtype],
-    ):
-        if not self.ancestors:
-            self.ancestors = Optional(Ancestors[Self.dtype].empty())
-        ref ancestors = self.ancestors.value()
-        ancestors.set_backward_fn_arg(backwardFnArg^)
-        ancestors.append(lhs)
-        ancestors.append(rhs)
-
-    fn add_ancestry_3(
-        mut self,
-        var backwardFnArg: BackwardFnArg[Self.dtype],
-        ref lhs: Tensor[Self.dtype],
-        ref mid: Tensor[Self.dtype],
-        ref rhs: Tensor[Self.dtype],
-    ):
-        if not self.ancestors:
-            self.ancestors = Optional(Ancestors[Self.dtype].empty())
-        ref ancestors = self.ancestors.value()
-        ancestors.set_backward_fn_arg(backwardFnArg^)
-        ancestors.append(lhs)
-        ancestors.append(mid)
-        ancestors.append(rhs)
-
-    fn add_ancestry(mut self, var backwardFnArg: BackwardFnArg[Self.dtype], *parents: Tensor[Self.dtype]):
         # Initialize ancestors if needed
         if not self.ancestors:
-            self.ancestors = Optional(Ancestors[Self.dtype].empty())
+            self.ancestors = Optional(Ancestors[Self.dtype](backwardFnArg^))
+        else:
+            self.ancestors.value().set_backward_fn_arg(backwardFnArg^)
 
         ref ancestors = self.ancestors.value()
-        ancestors.set_backward_fn_arg(backwardFnArg^)
         for parent in parents:
             ancestors.append(parent)
 
@@ -688,7 +658,7 @@ struct Tensor[dtype: DType](
         return self.ancestors != None
 
     @always_inline
-    fn ancestry(ref self) -> ref [self.ancestors.value()] Ancestors[Self.dtype]:
+    fn ancestry(ref self) -> ref[self.ancestors.value()] Ancestors[Self.dtype]:
         if self.ancestors == None:
             panic("Tensor → ancestry: ancestry not initialized")
         return self.ancestors.value()
@@ -1863,7 +1833,12 @@ struct Tensor[dtype: DType](
 
     fn __del__(deinit self):
         if self.gradbox:
-            if self.gradbox[]._refcount[].fetch_sub[ordering=Consistency.RELEASE](1) == 1:
+            if (
+                self.gradbox[]
+                ._refcount[]
+                .fetch_sub[ordering=Consistency.RELEASE](1)
+                == 1
+            ):
                 fence[ordering=Consistency.ACQUIRE]()
                 self.gradbox.destroy_pointee()
                 self.gradbox.free()
