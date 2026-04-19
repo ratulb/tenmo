@@ -52,7 +52,9 @@ fn all_close[
     B: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
     size: Int,
 ):
-    comptime assert dtype.is_floating_point(), "all_close requires a float dtype"
+    comptime assert (
+        dtype.is_floating_point()
+    ), "all_close requires a float dtype"
 
     var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
     var grid_stride = Int(block_dim.x * grid_dim.x)
@@ -61,7 +63,7 @@ fn all_close[
     var base_idx = gtid * CHUNK_SIZE
 
     var block_result = stack_allocation[
-        1, Scalar[DType.uint8], address_space = AddressSpace.SHARED
+        1, Scalar[DType.uint8], address_space=AddressSpace.SHARED
     ]()
 
     if thread_idx.x == 0:
@@ -146,7 +148,7 @@ fn all_close[
 
 
 @fieldwise_init
-struct AllClose[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn launch[
         rtol: Scalar[Self.dtype] = 1e-5,
@@ -250,7 +252,6 @@ fn compare[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -306,14 +307,18 @@ fn compare[
 
 
 @fieldwise_init
-struct Compare[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyable):
+struct Compare[dtype: DType = DType.float32](
+    ImplicitlyCopyable, RegisterPassable
+):
+    comptime datatype: DType = DType.uint8 if Self.dtype == DType.bool else Self.dtype
+
     @staticmethod
     fn launch[
         op_code: Int,
     ](A: NDBuffer[Self.dtype], B: NDBuffer[Self.dtype]) raises -> NDBuffer[
         DType.bool
     ]:
-        comptime simdwidth = simd_width_of[Self.dtype]()
+        comptime simdwidth = simd_width_of[Self.datatype]()
         var output_shape = A.shape
         var output_size = output_shape.num_elements()
 
@@ -324,8 +329,6 @@ struct Compare[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyabl
         ref gpu = A_device_state.get_gpu()
         var device_context = gpu()
 
-        # enqueue_create_buffer[DType.bool] not supported on GPU —
-        # use uint8 instead. DeviceState[DType.bool] wraps uint8 internally.
         var result_buffer = device_context.enqueue_create_buffer[DType.uint8](
             output_size
         )
@@ -334,8 +337,8 @@ struct Compare[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyabl
         ref B_buffer = B_device_state.device_buffer()
 
         var compiled_func = device_context.compile_function[
-            compare[op_code, Self.dtype, simdwidth, 2 * simdwidth],
-            compare[op_code, Self.dtype, simdwidth, 2 * simdwidth],
+            compare[op_code, Self.datatype, simdwidth, 2 * simdwidth],
+            compare[op_code, Self.datatype, simdwidth, 2 * simdwidth],
         ]()
 
         device_context.enqueue_function(
@@ -352,9 +355,6 @@ struct Compare[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyabl
 
         device_context.synchronize()
 
-        # Wrap uint8 DeviceBuffer in DeviceState[DType.bool].
-        # DeviceState[DType.bool].dtype == DType.uint8 internally —
-        # so DeviceBuffer[DType.uint8] is a valid internal buffer for it.
         var device_state = DeviceState[DType.bool].__init__[True](
             result_buffer^, gpu
         )
@@ -403,7 +403,6 @@ fn compare_scalar[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -456,6 +455,8 @@ fn compare_scalar[
 struct CompareScalar[dtype: DType = DType.float32](
     ImplicitlyCopyable & Movable
 ):
+    comptime datatype: DType = DType.uint8 if Self.dtype == DType.bool else Self.dtype
+
     @staticmethod
     fn launch[
         op_code: Int,
@@ -463,7 +464,7 @@ struct CompareScalar[dtype: DType = DType.float32](
         DType.bool
     ]:
         var numels = A.numels()
-        comptime simdwidth = simd_width_of[Self.dtype]()
+        comptime simdwidth = simd_width_of[Self.datatype]()
 
         var (threads_per_block, num_blocks) = Self.launch_config(
             numels, simdwidth
@@ -475,41 +476,50 @@ struct CompareScalar[dtype: DType = DType.float32](
         var compiled_func = device_context.compile_function[
             compare_scalar[
                 op_code=op_code,
-                dtype = Self.dtype,
+                dtype=Self.datatype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread = 2 * simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
             compare_scalar[
                 op_code=op_code,
-                dtype = Self.dtype,
+                dtype=Self.datatype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread = 2 * simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
         ]()
 
         ref A_buffer = A_device_state.device_buffer()
 
-        # enqueue_create_buffer[DType.bool] not supported on GPU —
-        # use uint8 instead. DeviceState[DType.bool] wraps uint8 internally.
         var result_buffer = device_context.enqueue_create_buffer[DType.uint8](
             numels
         )
 
-        device_context.enqueue_function(
-            compiled_func,
-            result_buffer,
-            A_buffer,
-            scalar,
-            numels,
-            grid_dim=num_blocks,
-            block_dim=threads_per_block,
-        )
+        comptime if Self.dtype == DType.bool:
+            var storage_scalar = rebind[Scalar[Self.datatype]](
+                UInt8(1) if scalar.cast[DType.bool]() else UInt8(0)
+            )
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                storage_scalar,
+                numels,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+        else:
+            device_context.enqueue_function(
+                compiled_func,
+                result_buffer,
+                A_buffer,
+                scalar,
+                numels,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
 
         device_context.synchronize()
 
-        # Wrap uint8 DeviceBuffer in DeviceState[DType.bool].
-        # DeviceState[DType.bool].dtype == DType.uint8 internally —
-        # so DeviceBuffer[DType.uint8] is a valid internal buffer for it.
         var device_state = DeviceState[DType.bool].__init__[True](
             result_buffer^, gpu
         )
