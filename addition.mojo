@@ -23,7 +23,7 @@ struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             panic("Addition add scalar backward: parent_refs is None!")
         ref gradbox = output.gradbox[]
         var parent = output.ancestry().get(0)
-        ref parent_shape = parent.buffer().shape
+        ref parent_shape = parent.shape()
         if parent_shape != gradbox.shape():
             gradbox = gradbox.reshape(parent_shape)
         # Gradient of addition is 1 → just pass through incoming grad

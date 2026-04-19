@@ -61,6 +61,7 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
     No data, no device, no allocation.
     Device-agnostic — same for CPU and GPU.
     """
+
     var shape: Shape
     var strides: Strides
     var offset: Int
@@ -125,12 +126,14 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
                 max_idx += (self.shape[i] - 1) * self.strides[i]
         return max_idx
 
+
 struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
     """
     Pure data carrier — CPU buffer or GPU device state.
     No shape knowledge. No layout knowledge.
     copy() is cheap — just a refcount bump.
     """
+
     var buffer: Buffer[Self.dtype]
     var device_state: Optional[DeviceState[Self.dtype]]
 
@@ -147,7 +150,7 @@ struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
         self.device_state = Optional(device_state^)
 
     fn __copyinit__(out self, copy: Self):
-        self.buffer = copy.buffer.copy()          # Buffer refcount bump if shared
+        self.buffer = copy.buffer.copy()  # Buffer refcount bump if shared
         self.device_state = copy.device_state.copy()  # ArcPointer bump for GPU
 
     fn __moveinit__(out self, deinit take: Self):
@@ -167,6 +170,7 @@ struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
     fn copy(self) -> Self:
         """Explicit copy — refcount bump only, no data copy."""
         return self
+
 
 comptime TILE_SIZE = 32
 
@@ -280,6 +284,15 @@ struct NDBuffer[dtype: DType](
         )
         ndb.device_state = device_state^
         return ndb^
+
+    fn buffer_layout(self) -> Layout:
+        return Layout(self.shape, self.strides, self.offset)
+
+    fn buffer_storage(self) -> Storage[Self.dtype]:
+        var storage = Storage[Self.dtype]()
+        storage.buffer = self.buffer.copy()
+        storage.device_state = self.device_state.copy()
+        return storage^
 
     fn sync(self):
         comptime if has_accelerator():

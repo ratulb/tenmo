@@ -32,8 +32,9 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
         if A.requires_grad:
+            var B_buffer = B.buffer()
             var ndb = grad_out.buffer.matmul_2d(
-                B.buffer().transpose(IntArray(-1, -2))
+                B_buffer.transpose(IntArray(-1, -2))
             )
             var grad_A = Gradbox[Self.dtype](ndb^, share=False)
 
@@ -41,7 +42,8 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
         if B.requires_grad:
-            var A_buffer_transposed = A.buffer().transpose(IntArray(-1, -2))
+            var A_buffer = A.buffer()
+            var A_buffer_transposed = A_buffer.transpose(IntArray(-1, -2))
             var ndb = A_buffer_transposed.matmul_2d(grad_out.buffer)
             var grad_B = Gradbox[Self.dtype](ndb^, share=False)
 
@@ -99,8 +101,8 @@ struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref grad_out = output.gradients()[]
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
-        ref A_buffer = A.buffer()
-        ref B_buffer = B.buffer()
+        var A_buffer = A.buffer()
+        var B_buffer = B.buffer()
 
         ref A_shape = A_buffer.shape
         ref B_shape = B_buffer.shape

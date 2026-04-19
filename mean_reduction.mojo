@@ -18,7 +18,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref gradbox = output.gradients()[]
         ref gradbox_shape = gradbox.shape()
         var ancestor = output.ancestry().get(0)
-        ref ancestor_shape = ancestor.buffer().shape
+        ref ancestor_shape = ancestor.shape()
         if gradbox_shape == Shape():
             scalar_grad = gradbox.item() / Scalar[Self.dtype](
                 ancestor_shape.num_elements()

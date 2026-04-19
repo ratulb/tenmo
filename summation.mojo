@@ -18,7 +18,7 @@ struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var (axes, keepdims) = bwd_arg.axes, bwd_arg.keepdims
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
-        ref shape = ancestor.buffer().shape
+        ref shape = ancestor.shape()
 
         var grad_contrib: Gradbox[Self.dtype]
 

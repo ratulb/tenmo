@@ -2,15 +2,10 @@ from std.memory import Pointer
 from tenmo import Tensor
 from gradbox import Gradbox
 from backpropagation import BackwardFnArg
-from ndbuffer import NDBuffer
+from ndbuffer import NDBuffer, Layout, Storage
 from common_utils import panic
 from shapes import Shape
 from std.os.atomic import Consistency, fence
-
-# ========================================
-# Ancestor
-# ========================================
-
 
 struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     """
@@ -31,50 +26,58 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     var _id: UInt
     var requires_grad: Bool
     var gradbox: UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]
-    var nd_buffer: NDBuffer[Self.dtype]
+    var layout: Layout
+    var storage: Storage[Self.dtype]
     var parents: Optional[Ancestors[Self.dtype]]
-    var on_gpu: Bool
+
 
     fn __init__(out self):
         self._id = 0
         self.requires_grad = False
         self.gradbox = UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
-        self.nd_buffer = NDBuffer[Self.dtype]()
+        self.layout = Layout()
+        self.storage = Storage[Self.dtype]()
         self.parents = None
-        self.on_gpu = False
 
     fn __copyinit__(out self, copy: Self):
         self._id = copy._id
         self.requires_grad = copy.requires_grad
         self.gradbox = copy.gradbox
-        self.nd_buffer = copy.nd_buffer.copy()
+        self.layout = copy.layout.copy()
+        self.storage = copy.storage.copy()
         self.parents = copy.parents.copy()
-        self.on_gpu = copy.on_gpu
         if self.gradbox:
-            _ = (
-                self.gradbox[]
-                ._refcount[]
-                .fetch_add[ordering=Consistency.MONOTONIC](1)
-            )
+            _ = self.gradbox[]._refcount[].fetch_add[
+                   ordering=Consistency.MONOTONIC
+            ](1)
+
 
     fn __moveinit__(out self, deinit take: Self):
         self._id = take._id
         self.requires_grad = take.requires_grad
         self.gradbox = take.gradbox
-        self.nd_buffer = take.nd_buffer^
+        self.layout = take.layout^
+        self.storage = take.storage^
         self.parents = take.parents^
-        self.on_gpu = take.on_gpu
 
     fn has_ancestry(self) -> Bool:
         return (
             self.parents is not None and len(self.parents.value()) > 0
         )
 
-    fn shape(ref self) -> ref[self.nd_buffer.shape] Shape:
-        return self.nd_buffer.shape
+    fn shape(ref self) -> ref[self.layout.shape] Shape:
+        return self.layout.shape
 
-    fn buffer(ref self) -> ref[self.nd_buffer] NDBuffer[Self.dtype]:
-        return self.nd_buffer
+    fn buffer(ref self) -> NDBuffer[Self.dtype]:
+        """Reconstruct NDBuffer on demand for ops that need full access."""
+        var ndb = NDBuffer[Self.dtype]()
+        ndb.shape = self.layout.shape.copy()
+        ndb.strides = self.layout.strides.copy()
+        ndb.offset = self.layout.offset
+        ndb._contiguous = self.layout._contiguous
+        ndb.buffer = self.storage.buffer.copy()
+        ndb.device_state = self.storage.device_state.copy()
+        return ndb^
 
     fn gradients(self) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
         return self.gradbox
@@ -87,15 +90,15 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         return self.parents.value()
 
     fn is_on_gpu(self) -> Bool:
-        return self.on_gpu
+        return self.storage.is_on_gpu()
 
     @staticmethod
     fn from_tensor(ref tensor: Tensor[Self.dtype]) -> Ancestor[Self.dtype]:
         var out = Ancestor[Self.dtype]()
         out._id = tensor._id
         out.requires_grad = tensor.requires_grad
-        out.on_gpu = tensor.is_on_gpu()
-        out.nd_buffer = tensor.buffer.copy()
+        out.layout = tensor.buffer.buffer_layout()
+        out.storage = tensor.buffer.buffer_storage()
         if tensor.ancestors:
             out.parents = tensor.ancestors.copy()
         # Only bump and store if gradbox exists!
@@ -131,19 +134,19 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
 
 
 struct Ancestors[dtype: DType](Sized & Copyable & Movable):
-    var refs: List[Ancestor[Self.dtype]]
+    var origins: List[Ancestor[Self.dtype]]
     var backwardFnArg: BackwardFnArg[Self.dtype]
 
     fn __init__(out self, var backwardFnArg: BackwardFnArg[Self.dtype]):
-        self.refs = {}
+        self.origins = {}
         self.backwardFnArg = backwardFnArg^
 
     fn __copyinit__(out self, copy: Self):
-        self.refs = copy.refs.copy()
+        self.origins = copy.origins.copy()
         self.backwardFnArg = copy.backwardFnArg.copy()
 
     fn __moveinit__(out self, deinit take: Self):
-        self.refs = take.refs^
+        self.origins = take.origins^
         self.backwardFnArg = take.backwardFnArg^
 
     fn backward_fn_arg(
@@ -158,21 +161,21 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
 
     @always_inline
     fn append(mut self, ref parent: Tensor[Self.dtype]):
-        self.refs.append(Ancestor[Self.dtype].from_tensor(parent))
+        self.origins.append(Ancestor[Self.dtype].from_tensor(parent))
 
     @always_inline
     fn __del__(deinit self):
-        self.refs.clear()
+        self.origins.clear()
 
-    fn get(ref self, idx: Int) -> ref[self.refs] Ancestor[Self.dtype]:
-        return self.refs[idx]
+    fn get(ref self, idx: Int) -> ref[self.origins] Ancestor[Self.dtype]:
+        return self.origins[idx]
 
     fn tensor(ref self, idx: Int) -> Tensor[Self.dtype]:
         ref ancestor = self.get(idx)
         return Tensor[Self.dtype](ancestor.buffer(), requires_grad=ancestor.requires_grad)
 
     fn __len__(self) -> Int:
-        return len(self.refs)
+        return len(self.origins)
 
     fn __bool__(self) -> Bool:
         return len(self) > 0

@@ -19,7 +19,7 @@ struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
-        ref parent_buffer = parent.buffer()
+        var parent_buffer = parent.buffer()
         ref shape = parent_buffer.shape
 
         var gradbox_ancestor: Gradbox[Self.dtype]

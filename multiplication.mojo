@@ -45,7 +45,7 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var ancestor_lhs = output.ancestry().get(0)
 
         if count == 1:  # B = A * A, A is the only ancestor of B
-            gradbox_prod = Gradbox[Self.dtype](ancestor_lhs.buffer(), share=False) * gradbox
+            var gradbox_prod = Gradbox[Self.dtype](ancestor_lhs.buffer(), share=False) * gradbox
             gradbox_prod = gradbox_prod * Scalar[Self.dtype](2)
             return [(ancestor_lhs^, gradbox_prod^, AddTensor)]
 
