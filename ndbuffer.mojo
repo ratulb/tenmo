@@ -2194,20 +2194,7 @@ struct NDBuffer[dtype: DType](
         var own_rank = own_shape.rank()
         var target_rank = target_shape.rank()
 
-        _ = """if own_rank > target_rank:
-            panic("NDBuffer broadcast_to: own rank exceeds target rank")"""
-
         var extra_dims = target_rank - own_rank
-        _ = """for i in range(own_rank):
-            var own_dim = own_shape[i]
-            var target_dim = target_shape[i + extra_dims]
-            if own_dim != target_dim and own_dim != 1:
-                panic(
-                    "NDBuffer → broadcast_to: cannot broadcast dim "
-                    + String(i + extra_dims)
-                    + ": own=" + String(own_dim)
-                    + " target=" + String(target_dim)
-                )"""
 
         # Build expanded strides — prepend zeros for extra leading dims
         var new_strides = IntArray.with_capacity(target_rank)
@@ -2558,21 +2545,10 @@ struct NDBuffer[dtype: DType](
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
-            _ = """var result_buffer: Buffer[Self.dtype]
-            comptime if op_code == LOG:
-                result_buffer = self.buffer.log[epsilon](start, end)
-            elif op_code == SIGMOID_FORWARD:
-                result_buffer = self.buffer.sigmoid(start, end)
-            elif op_code == TANH_FORWARD:
-                result_buffer = self.buffer.tanh(start, end)
-            else:  # op_code == EXP:
-                result_buffer = self.buffer.exp(start, end)"""
             var result_buffer = self.buffer.float_unary_ops[op_code, epsilon](
                 start, end
             )
-
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
-
         else:
             var index = 0
             var result_buffer = Buffer[Self.dtype](self.numels())
@@ -3412,4 +3388,4 @@ struct NDBuffer[dtype: DType](
 
 
 fn main() raises:
-   print("passes")
+    print("passes")
