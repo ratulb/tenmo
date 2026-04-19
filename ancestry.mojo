@@ -229,4 +229,4 @@ struct AncestorIterator[dtype: DType, origin: ImmutOrigin](
 
 
 fn main() raises:
-    print("Does pass indeed")
+    print("passes")
