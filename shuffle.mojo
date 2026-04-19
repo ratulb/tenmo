@@ -15,6 +15,7 @@ from intarray import IntArray
 from array import Array
 from common_utils import panic
 from ancestry import Ancestor
+
 # ── GPU Kernels ──────────────────────────────────────────────────────────────
 
 
@@ -204,12 +205,12 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var result_state = DeviceState[Self.dtype](result_buffer^, gpu)
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
 
+
 # ── ShuffleBackward ──────────────────────────────────────────────────────────
 
 
 @fieldwise_init
 struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -252,6 +253,7 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
             gradbox_parent[parent_coord] = gradbox[grad_coord]
 
         return [(parent, gradbox_parent^, AddTensor)]
+
 
 # ── Shuffle forward ──────────────────────────────────────────────────────────
 
@@ -303,15 +305,12 @@ struct Shuffle[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg =
-                    BackwardFnArg[Self.dtype](
-                        BACKWARD_SHUFFLE, ShuffleArg(axis, permutation^)
-
+                var backwardFnArg = BackwardFnArg[Self.dtype](
+                    BACKWARD_SHUFFLE, ShuffleArg(axis, permutation^)
                 )
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
-
 
 
 fn main() raises:

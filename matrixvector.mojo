@@ -10,11 +10,11 @@ from ndbuffer import NDBuffer
 from matrixvector_kernel import MatrixVectorNdGpu
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct MatrixVectorMulNdBackward[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -24,8 +24,12 @@ struct MatrixVectorMulNdBackward[dtype: DType](
         ref grad_out = output.gradients()[]
         var M_ref = output.ancestry().get(0)
         var v_ref = output.ancestry().get(1)
-        var M = Tensor[Self.dtype](M_ref.buffer(), requires_grad=M_ref.requires_grad)
-        var v = Tensor[Self.dtype](v_ref.buffer(), requires_grad=v_ref.requires_grad)
+        var M = Tensor[Self.dtype](
+            M_ref.buffer(), requires_grad=M_ref.requires_grad
+        )
+        var v = Tensor[Self.dtype](
+            v_ref.buffer(), requires_grad=v_ref.requires_grad
+        )
 
         var M_shape = M.shape()
         var v_shape = v.shape()
@@ -389,10 +393,8 @@ struct MatrixVectorMulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var requires_grad = M.requires_grad or v.requires_grad
             if requires_grad:
                 result.requires_grad_(True)
-                var backwardFnArg =
-                    BackwardFnArg[Self.dtype].null_arg(
-                        BACKWARD_MATRIX_VECTOR_MUL
-
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_MATRIX_VECTOR_MUL
                 )
                 result.add_ancestry(backwardFnArg^, M, v)
 

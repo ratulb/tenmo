@@ -215,7 +215,9 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     try:
                         var ds = grad.buffer.device_state.value()
                         with ds.buffer.map_to_host() as host:
-                            var grad_ptr = host.unsafe_ptr().bitcast[Scalar[Self.dtype]]()
+                            var grad_ptr = host.unsafe_ptr().bitcast[
+                                Scalar[Self.dtype]
+                            ]()
                             var norm_vec = SIMD[Self.dtype, simd_w](0)
                             var j = 0
                             var vec_end = (num_elements // simd_w) * simd_w
@@ -228,9 +230,7 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                                 var g = grad_ptr[k]
                                 total_norm_sq += g * g
                     except e:
-                        panic(
-                            "SGD.compute_grad_norm GPU failed: " + String(e)
-                        )
+                        panic("SGD.compute_grad_norm GPU failed: " + String(e))
                     continue
 
             # CPU path
@@ -271,14 +271,14 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                                 var ds = grad.buffer.device_state.value()
                                 with ds.buffer.map_to_host() as host:
                                     self._apply_clip_norm_to_ptr[simd_w](
-                                        host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
+                                        host.unsafe_ptr().bitcast[
+                                            Scalar[Self.dtype]
+                                        ](),
                                         num_elements,
                                         clip_coef,
                                     )
                             except e:
-                                panic(
-                                    "SGD.clip_norm GPU failed: " + String(e)
-                                )
+                                panic("SGD.clip_norm GPU failed: " + String(e))
                             continue
 
                     self._apply_clip_norm_to_ptr[simd_w](
@@ -299,7 +299,10 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                             var ds = grad.buffer.device_state.value()
                             with ds.buffer.map_to_host() as host:
                                 self._apply_clip_value_to_ptr[simd_w](
-                                    host.unsafe_ptr().bitcast[Scalar[Self.dtype]](), num_elements
+                                    host.unsafe_ptr().bitcast[
+                                        Scalar[Self.dtype]
+                                    ](),
+                                    num_elements,
                                 )
                         except e:
                             panic("SGD.clip_value GPU failed: " + String(e))
@@ -346,16 +349,26 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                             var vel_ds = velocity.buffer.device_state.value()
                             with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host, vel_ds.buffer.map_to_host() as vel_host:
                                 self._apply_momentum[simd_w](
-                                    param_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
-                                    grad_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
-                                    vel_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
+                                    param_host.unsafe_ptr().bitcast[
+                                        Scalar[Self.dtype]
+                                    ](),
+                                    grad_host.unsafe_ptr().bitcast[
+                                        Scalar[Self.dtype]
+                                    ](),
+                                    vel_host.unsafe_ptr().bitcast[
+                                        Scalar[Self.dtype]
+                                    ](),
                                     num_elements,
                                 )
                         else:
                             with param_ds.buffer.map_to_host() as param_host, grad_ds.buffer.map_to_host() as grad_host:
                                 self._step_no_momentum[simd_w](
-                                    param_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
-                                    grad_host.unsafe_ptr().bitcast[Scalar[Self.dtype]](),
+                                    param_host.unsafe_ptr().bitcast[
+                                        Scalar[Self.dtype]
+                                    ](),
+                                    grad_host.unsafe_ptr().bitcast[
+                                        Scalar[Self.dtype]
+                                    ](),
                                     num_elements,
                                 )
 

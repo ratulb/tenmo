@@ -45,7 +45,6 @@ fn unary_ops[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -120,7 +119,6 @@ fn float_unary_ops[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -130,7 +128,9 @@ fn float_unary_ops[
                 var vec_result: SIMD[dtype, simd_width]
 
                 comptime if op_code == LOG:
-                    vec_result = log(max(vec_a, SIMD[dtype, simd_width](epsilon)))
+                    vec_result = log(
+                        max(vec_a, SIMD[dtype, simd_width](epsilon))
+                    )
                 elif op_code == EXP:
                     vec_result = exp(vec_a)
                 elif op_code == TANH_FORWARD:
@@ -160,6 +160,7 @@ fn float_unary_ops[
 
         base_idx += stride * CHUNK_SIZE
 
+
 # =============================================================================
 #
 # Writes two output buffers in a single kernel pass:
@@ -169,6 +170,7 @@ fn float_unary_ops[
 # No floating-point constraint — ReLU is safe for any dtype.
 # =============================================================================
 
+
 fn unary_ops_with_mask[
     op_code: Int,
     dtype: DType,
@@ -176,9 +178,9 @@ fn unary_ops_with_mask[
     simd_vectors_per_thread: Int = 2 * simd_width,
 ](
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    mask:   UnsafePointer[Scalar[dtype], MutAnyOrigin],
-    A:      UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
-    size:   Int,
+    mask: UnsafePointer[Scalar[dtype], MutAnyOrigin],
+    A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
+    size: Int,
 ):
     """Single-pass kernel: compute activation output AND gradient mask.
 
@@ -194,20 +196,19 @@ fn unary_ops_with_mask[
         A:      Input buffer (contiguous, same device).
         size:   Total number of elements.
     """
-    var tid   = thread_idx.x
-    var gtid  = Int(tid + block_dim.x * block_idx.x)
+    var tid = thread_idx.x
+    var gtid = Int(tid + block_dim.x * block_idx.x)
     var stride = Int(block_dim.x * grid_dim.x)
 
     comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
     var base_idx = gtid * CHUNK_SIZE
 
-    var zero_vec  = SIMD[dtype, simd_width](0)
-    var one_vec   = SIMD[dtype, simd_width](1)
-    var zero_s    = Scalar[dtype](0)
-    var one_s     = Scalar[dtype](1)
+    var zero_vec = SIMD[dtype, simd_width](0)
+    var one_vec = SIMD[dtype, simd_width](1)
+    var zero_s = Scalar[dtype](0)
+    var one_s = Scalar[dtype](1)
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -216,7 +217,7 @@ fn unary_ops_with_mask[
                 var vec_a = A.load[width=simd_width](i)
 
                 var vec_result: SIMD[dtype, simd_width]
-                var vec_mask:   SIMD[dtype, simd_width]
+                var vec_mask: SIMD[dtype, simd_width]
 
                 comptime if op_code == RELU_FORWARD:
                     vec_result = max(vec_a, zero_vec)
@@ -225,8 +226,8 @@ fn unary_ops_with_mask[
 
                 # Extend here for other ops that need a mask (e.g. leaky ReLU)
                 else:
-                    vec_result = vec_a   # identity fallback
-                    vec_mask   = one_vec
+                    vec_result = vec_a  # identity fallback
+                    vec_mask = one_vec
 
                 result.store[width=simd_width](i, vec_result)
                 mask.store[width=simd_width](i, vec_mask)
@@ -246,9 +247,10 @@ fn unary_ops_with_mask[
                         msk = one_s
 
                     result[i + j] = res
-                    mask[i + j]   = msk
+                    mask[i + j] = msk
 
         base_idx += stride * CHUNK_SIZE
+
 
 # ── UnaryOpsKernel launcher ───────────────────────────────────────────────────
 
@@ -299,14 +301,14 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     op_code=op_code,
                     dtype=Self.dtype,
                     simd_width=simdwidth,
-                    simd_vectors_per_thread = 2 * simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
                     epsilon=epsilon,
                 ],
                 float_unary_ops[
                     op_code=op_code,
                     dtype=Self.dtype,
                     simd_width=simdwidth,
-                    simd_vectors_per_thread = 2 * simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
                     epsilon=epsilon,
                 ],
             ]()
@@ -324,13 +326,13 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     op_code=op_code,
                     dtype=Self.dtype,
                     simd_width=simdwidth,
-                    simd_vectors_per_thread = 2 * simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
                 ],
                 unary_ops[
                     op_code=op_code,
                     dtype=Self.dtype,
                     simd_width=simdwidth,
-                    simd_vectors_per_thread = 2 * simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
                 ],
             ]()
             device_context.enqueue_function(
@@ -353,7 +355,9 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
     @staticmethod
     fn launch_with_mask[
         op_code: Int,
-    ](A: NDBuffer[Self.dtype]) raises -> Tuple[NDBuffer[Self.dtype], NDBuffer[Self.dtype]]:
+    ](A: NDBuffer[Self.dtype]) raises -> Tuple[
+        NDBuffer[Self.dtype], NDBuffer[Self.dtype]
+    ]:
         """Launch unary op + mask kernel. Returns (output, mask) as GPU NDBuffers.
 
         Both buffers are written in a single GPU kernel pass.
@@ -373,9 +377,11 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var numels = A.numels()
         comptime simdwidth = simd_width_of[Self.dtype]()
 
-        var (threads_per_block, num_blocks) = Self.launch_config(numels, simdwidth)
+        var (threads_per_block, num_blocks) = Self.launch_config(
+            numels, simdwidth
+        )
 
-        ref device_state   = A.device_state.value()
+        ref device_state = A.device_state.value()
         var device_context = device_state.gpu()
 
         # Non-contiguous fix: produce one contiguous GPU buffer in a single
@@ -383,29 +389,33 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         var contig_state = A.contiguous_device_state()
 
         # Allocate both output buffers on the same device
-        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](numels)
-        var mask_buffer   = device_context.enqueue_create_buffer[Self.dtype](numels)
+        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            numels
+        )
+        var mask_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            numels
+        )
 
         var compiled = device_context.compile_function[
             unary_ops_with_mask[
                 op_code=op_code,
                 dtype=Self.dtype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread=2*simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
             unary_ops_with_mask[
                 op_code=op_code,
                 dtype=Self.dtype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread=2*simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
         ]()
 
         # Single kernel dispatch — writes result AND mask simultaneously
         device_context.enqueue_function(
             compiled,
-            result_buffer,          # out: activated values
-            mask_buffer,            # out: gradient mask
+            result_buffer,  # out: activated values
+            mask_buffer,  # out: gradient mask
             contig_state.device_buffer(),  # in:  contiguous source
             numels,
             grid_dim=num_blocks,
@@ -414,11 +424,17 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](result_buffer^, device_state.gpu)
-        var mask_state   = DeviceState[Self.dtype](mask_buffer^,   device_state.gpu)
+        var result_state = DeviceState[Self.dtype](
+            result_buffer^, device_state.gpu
+        )
+        var mask_state = DeviceState[Self.dtype](mask_buffer^, device_state.gpu)
 
-        var out_ndb  = NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
-        var mask_ndb = NDBuffer[Self.dtype].with_device_state(mask_state^,   A.shape)
+        var out_ndb = NDBuffer[Self.dtype].with_device_state(
+            result_state^, A.shape
+        )
+        var mask_ndb = NDBuffer[Self.dtype].with_device_state(
+            mask_state^, A.shape
+        )
 
         return (out_ndb^, mask_ndb^)
 
@@ -438,10 +454,9 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             var total_chunks = (numels + (simdwidth * 2 * simdwidth - 1)) // (
                 simdwidth * 2 * simdwidth
             )
-            num_blocks = min(
-                (total_chunks + 255) // 256, 512
-            )
+            num_blocks = min((total_chunks + 255) // 256, 512)
         return threads_per_block, num_blocks
+
 
 fn main() raises:
     print("passes")

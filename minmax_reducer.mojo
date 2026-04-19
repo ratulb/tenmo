@@ -109,7 +109,6 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
                     best_value = cur
                     first_iteration = False
                 else:
-
                     comptime if is_max:
                         if cur > best_value:
                             best_value = cur

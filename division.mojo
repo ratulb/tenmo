@@ -16,12 +16,16 @@ from ancestry import Ancestor
 struct TrueDivBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        var scalar = (
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ScalarArg[Self.dtype]]()
+            .value
+        )
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         # ∂(x / s)/∂x = 1/s → incoming_grad / scalar
@@ -43,7 +47,12 @@ struct RightTrueDivBackwardScalar[dtype: DType](
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        var scalar = (
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ScalarArg[Self.dtype]]()
+            .value
+        )
         var gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         var nd_buffer = ancestor.buffer()
@@ -64,7 +73,6 @@ struct RightTrueDivBackwardScalar[dtype: DType](
 
 @fieldwise_init
 struct DivideBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -221,7 +229,7 @@ from shapes import Shape
 
 fn main() raises:
     comptime dtype = DType.float32
-    _="""var A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
+    _ = """var A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
     var B = Tensor[dtype].full(Shape.of(3, 1), 2, requires_grad=True)
     var C = (A / B) - 1 + (B * A) * 42
     #var C = (A / B) - 1

@@ -16,7 +16,6 @@ from ancestry import Ancestor
 
 @fieldwise_init
 struct ViewBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],

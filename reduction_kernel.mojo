@@ -9,6 +9,7 @@ from intarray import IntArray
 from std.math import exp, log
 from std.sys import simd_width_of
 
+
 fn output_to_input_base(
     out_idx: Int,
     in_shape: Array,
@@ -62,12 +63,12 @@ fn reduce[
     total_output: Int,
     reduced_volume: Int,
 ):
-    comptime assert
-        max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size"
+    comptime assert (
+        max_block_size.is_power_of_two() and max_block_size < 1024
+    ), "Invalid max_block_size"
 
     var smem = stack_allocation[
-        max_block_size, Scalar[dtype], address_space = AddressSpace.SHARED
+        max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
 
     var tid = Int(thread_idx.x)
@@ -106,13 +107,13 @@ fn reduce[
         stride >>= 1
 
     if tid == 0:
-
         comptime if mean:
             (out_buffer + out_idx)[] = smem[0] / Scalar[dtype](
                 max(reduced_volume, 1)
             )
         else:
             (out_buffer + out_idx)[] = smem[0]
+
 
 fn log_sum_exp_f32[
     simd_width: Int = simd_width_of[DType.float32](),
@@ -127,13 +128,12 @@ fn log_sum_exp_f32[
     total_output: Int,
     reduced_volume: Int,
 ):
-    comptime assert
-        max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size"
+    comptime assert (
+        max_block_size.is_power_of_two() and max_block_size < 1024
+    ), "Invalid max_block_size"
 
     var smem = stack_allocation[
-        max_block_size, Scalar[DType.float32],
-        address_space = AddressSpace.SHARED
+        max_block_size, Scalar[DType.float32], address_space=AddressSpace.SHARED
     ]()
 
     var tid = Int(thread_idx.x)
@@ -153,8 +153,13 @@ fn log_sum_exp_f32[
     var rank = tid
     while rank < reduced_volume:
         local += exp(
-            (in_buffer + input_base
-             + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes))[]
+            (
+                in_buffer
+                + input_base
+                + rank_to_reduced_offset(
+                    rank, in_shape, in_strides, reduction_axes
+                )
+            )[]
         )
         rank += block_size
 
@@ -185,13 +190,12 @@ fn log_sum_exp_f64[
     total_output: Int,
     reduced_volume: Int,
 ):
-    comptime assert
-        max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size"
+    comptime assert (
+        max_block_size.is_power_of_two() and max_block_size < 1024
+    ), "Invalid max_block_size"
 
     var smem = stack_allocation[
-        max_block_size, Scalar[DType.float64],
-        address_space = AddressSpace.SHARED
+        max_block_size, Scalar[DType.float64], address_space=AddressSpace.SHARED
     ]()
 
     var tid = Int(thread_idx.x)
@@ -211,8 +215,13 @@ fn log_sum_exp_f64[
     var rank = tid
     while rank < reduced_volume:
         local += exp(
-            (in_buffer + input_base
-             + rank_to_reduced_offset(rank, in_shape, in_strides, reduction_axes))[]
+            (
+                in_buffer
+                + input_base
+                + rank_to_reduced_offset(
+                    rank, in_shape, in_strides, reduction_axes
+                )
+            )[]
         )
         rank += block_size
 
@@ -231,7 +240,9 @@ fn log_sum_exp_f64[
 
 
 @fieldwise_init
-struct Reduction[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyable):
+struct Reduction[dtype: DType = DType.float32](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     fn launch[
         max_block_width: Int = 512, mean: Bool = False
@@ -256,7 +267,7 @@ struct Reduction[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopya
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
         var in_shape: Array = shape_A.array()
         var in_strides: Array = strides_A.array()
-        #var reduction_axes: Array = Array(normalized_axes)
+        # var reduction_axes: Array = Array(normalized_axes)
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
 
@@ -325,9 +336,9 @@ struct Reduction[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopya
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
 
-        var (threads_per_block, num_blocks) = Self.launch_config[max_block_width](
-            total_output, reduced_volume
-        )
+        var (threads_per_block, num_blocks) = Self.launch_config[
+            max_block_width
+        ](total_output, reduced_volume)
 
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
@@ -341,11 +352,11 @@ struct Reduction[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopya
             var compiled_func = device_context.compile_function[
                 log_sum_exp_f32[
                     max_block_size=max_block_width,
-                    epsilon = epsilon.cast[DType.float32](),
+                    epsilon=epsilon.cast[DType.float32](),
                 ],
                 log_sum_exp_f32[
                     max_block_size=max_block_width,
-                    epsilon = epsilon.cast[DType.float32](),
+                    epsilon=epsilon.cast[DType.float32](),
                 ],
             ]()
             device_context.enqueue_function(
@@ -364,11 +375,11 @@ struct Reduction[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopya
             var compiled_func = device_context.compile_function[
                 log_sum_exp_f64[
                     max_block_size=max_block_width,
-                    epsilon = epsilon.cast[DType.float64](),
+                    epsilon=epsilon.cast[DType.float64](),
                 ],
                 log_sum_exp_f64[
                     max_block_size=max_block_width,
-                    epsilon = epsilon.cast[DType.float64](),
+                    epsilon=epsilon.cast[DType.float64](),
                 ],
             ]()
             device_context.enqueue_function(
@@ -384,11 +395,15 @@ struct Reduction[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopya
                 block_dim=threads_per_block,
             )
         else:
-            panic("Reduction.launch_log_sum: only float32 and float64 supported")
+            panic(
+                "Reduction.launch_log_sum: only float32 and float64 supported"
+            )
 
         device_context.synchronize()
         var device_state = DeviceState[Self.dtype](result_buffer^, gpu)
-        return NDBuffer[Self.dtype].with_device_state(device_state^, output_shape)
+        return NDBuffer[Self.dtype].with_device_state(
+            device_state^, output_shape
+        )
 
     @staticmethod
     fn launch_config[
@@ -407,19 +422,22 @@ struct Reduction[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopya
 fn main() raises:
     test_mean()
 
+
 from tenmo import Tensor
 from std.testing import assert_true
 
 from device import GPU
 from shapes import Shape
+
+
 fn test_mean() raises:
     print("test_mean")
     comptime dtype = DType.float32
     var ndb = NDBuffer[dtype](10, 20, 30)
-    #ndb.print()
+    # ndb.print()
     s1 = ndb.sum(IntArray())
     s1.print()
     var ndb_gpu = ndb.to_gpu(GPU())
-    #ndb_gpu.print()
+    # ndb_gpu.print()
     s2 = ndb_gpu.sum(IntArray())
     s2.print()

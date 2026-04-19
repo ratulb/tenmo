@@ -6,9 +6,9 @@ from squeeze import Squeeze
 from gradbox import Gradbox
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -23,6 +23,7 @@ struct UnsqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             (ancestor, squeezed_gradbox^, AddTensor),
             (output, gradbox^, ZeroGrad),
         ]
+
 
 @fieldwise_init
 struct Unsqueeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -53,10 +54,9 @@ struct Unsqueeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     var n = axis if axis >= 0 else new_rank + axis
                     normalized.append(n)
                 normalized.sort()
-                var backwardFnArg =
-                    BackwardFnArg[Self.dtype].from_intarray(
-                        BACKWARD_UNSQUEEZE, normalized
-                    )
+                var backwardFnArg = BackwardFnArg[Self.dtype].from_intarray(
+                    BACKWARD_UNSQUEEZE, normalized
+                )
 
                 out.add_ancestry(backwardFnArg^, tensor)
 

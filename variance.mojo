@@ -5,6 +5,7 @@ from gradbox import Gradbox
 from common_utils import panic
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct VarianceBwdArg(ArgumentType):
     var axis: Int
@@ -14,7 +15,6 @@ struct VarianceBwdArg(ArgumentType):
 
 @fieldwise_init
 struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -27,7 +27,9 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
         var gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
-        var input_tensor = Tensor[Self.dtype](parent.buffer(), requires_grad=parent.requires_grad)
+        var input_tensor = Tensor[Self.dtype](
+            parent.buffer(), requires_grad=parent.requires_grad
+        )
         ref input_shape = input_tensor.shape()
 
         # Compute mean of input (always with keepdims=True)
@@ -77,7 +79,6 @@ struct VarianceBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         gradbox_ancestor = local_grad * gradbox_ancestor
 
         return [(parent^, gradbox_ancestor^, AddTensor)]
-
 
 
 @fieldwise_init

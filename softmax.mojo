@@ -20,12 +20,13 @@ comptime LogSoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, True]
 struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
     ImplicitlyCopyable & Movable
 ):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.ancestry().backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
+        var bwd_arg = (
+            output.ancestry().backward_fn_arg().get[SoftmaxArg[Self.dtype]]()
+        )
         var (axes, softmax_out) = bwd_arg.axes, bwd_arg.softmax_out
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)

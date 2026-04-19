@@ -5,9 +5,9 @@ from common_utils import panic
 from gradbox import Gradbox
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct FlattenBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -40,7 +40,9 @@ struct FlattenForward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_FLATTEN)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_FLATTEN
+                )
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^

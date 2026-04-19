@@ -12,9 +12,9 @@ from indexhelper import IndexCalculator
 from shapes import Shape
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -26,14 +26,18 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref grad_strides = grad_output.strides()
 
         var count = len(output.ancestry())
-        var result = List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]()
+        var result = List[
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
 
         # Fast path: axis 0
         if axis == 0:
             var src_offset = 0
             for i in range(count):
                 var parent = output.ancestry().get(i)
-                var tensor = Tensor[Self.dtype](parent.buffer(), requires_grad=parent.requires_grad)
+                var tensor = Tensor[Self.dtype](
+                    parent.buffer(), requires_grad=parent.requires_grad
+                )
                 var num_elements = tensor.numels()
                 if tensor.requires_grad:
                     var grad_input = Gradbox[Self.dtype].zeros(tensor.shape())
@@ -48,7 +52,9 @@ struct ConcatBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var offset = 0
         for i in range(count):
             var parent = output.ancestry().get(i)
-            var tensor = Tensor[Self.dtype](parent.buffer(), requires_grad=parent.requires_grad)
+            var tensor = Tensor[Self.dtype](
+                parent.buffer(), requires_grad=parent.requires_grad
+            )
             if not tensor.requires_grad:
                 offset += tensor.shape()[axis]
                 continue
@@ -174,7 +180,7 @@ struct Concate[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             grad_required = requires_grad.or_else(grad_required)
             if grad_required:
                 result.requires_grad_(True)
-                var backwardFnArg =  BackwardFnArg[Self.dtype].integer_arg(
+                var backwardFnArg = BackwardFnArg[Self.dtype].integer_arg(
                     BACKWARD_CONCAT, concat_axis
                 )
                 for i in range(len(tensors)):

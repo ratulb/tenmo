@@ -8,8 +8,8 @@ from gradbox import Gradbox
 from common_utils import panic
 from ancestry import Ancestor
 
-struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
+struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -65,6 +65,7 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
         ]
 
+
 @fieldwise_init
 struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @always_inline
@@ -88,9 +89,8 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg =  BackwardFnArg[Self.dtype](
-                        BACKWARD_MEAN, ReductionArg(normalized_axes, keepdims)
-
+                var backwardFnArg = BackwardFnArg[Self.dtype](
+                    BACKWARD_MEAN, ReductionArg(normalized_axes, keepdims)
                 )
                 out.add_ancestry(backwardFnArg^, tensor)
 

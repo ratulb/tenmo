@@ -296,7 +296,7 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     ) -> List[
         Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
     ] where Self.dtype.is_floating_point():
-        if not output.has_ancestry():          # guard!
+        if not output.has_ancestry():  # guard!
             print("Inside Backward invoke: output ancestry is not set")
             return []
         ref arg = output.ancestry().backward_fn_arg()
@@ -414,6 +414,7 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         else:
             return []
 
+
 fn main() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].rand(3, 5, 3, requires_grad=True)
@@ -423,5 +424,3 @@ fn main() raises:
     A.grad().print()
     B.grad().print()
     print("passes")
-
-

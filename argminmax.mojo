@@ -30,17 +30,17 @@ fn reduce_argminmax[
     and its index. Then a two-array shared-memory tree reduction picks the
     global best index for this output slot.
     """
-    comptime assert
-        max_block_size.is_power_of_two() and max_block_size < 1024,
-        "Invalid max_block_size"
+    comptime assert (
+        max_block_size.is_power_of_two() and max_block_size < 1024
+    ), "Invalid max_block_size"
 
     # Shared memory: interleaved [val, idx] pairs per thread
     # We store values in smem_val and indices in smem_idx
     var smem_val = stack_allocation[
-        max_block_size, Scalar[dtype], address_space = AddressSpace.SHARED
+        max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
     var smem_idx = stack_allocation[
-        max_block_size, Scalar[DType.int32], address_space = AddressSpace.SHARED
+        max_block_size, Scalar[DType.int32], address_space=AddressSpace.SHARED
     ]()
 
     var tid = Int(thread_idx.x)
@@ -89,7 +89,7 @@ fn reduce_argminmax[
         else:
             if val < local_val:
                 local_val = val
-                local_idx =Int32(r)
+                local_idx = Int32(r)
 
         r += block_size
 
@@ -101,7 +101,6 @@ fn reduce_argminmax[
     var stride = block_size >> 1
     while stride > 0:
         if tid < stride:
-
             comptime if is_max:
                 if smem_val[tid + stride] > smem_val[tid]:
                     smem_val[tid] = smem_val[tid + stride]
@@ -119,7 +118,7 @@ fn reduce_argminmax[
 
 
 @fieldwise_init
-struct ArgMinMaxReducer[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """
     Unified CPU + GPU argmin/argmax on NDBuffer.
     Returns an NDBuffer[DType.int32] with the output shape.

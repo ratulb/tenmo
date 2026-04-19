@@ -14,7 +14,6 @@ from ancestry import Ancestor
 
 @fieldwise_init
 struct AddBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],

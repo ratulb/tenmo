@@ -11,20 +11,27 @@ from std.sys import has_accelerator
 from ndbuffer import NDBuffer
 from mnemonics import GreaterThan, LessThan
 from ancestry import Ancestor
+
 # ── MaxBackwardScalar ─────────────────────────────────────────────────────────
 
 
 @fieldwise_init
 struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        var scalar = (
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ScalarArg[Self.dtype]]()
+            .value
+        )
         ref gradbox = output.gradients()[]
         var parent_ref = output.ancestry().get(0)
-        var parent = Tensor[Self.dtype](parent_ref.buffer(), requires_grad=parent_ref.requires_grad)
+        var parent = Tensor[Self.dtype](
+            parent_ref.buffer(), requires_grad=parent_ref.requires_grad
+        )
 
         # Work at NDBuffer level — avoids pulling in GPU kernel launchers
         var mask_bool: NDBuffer[DType.bool]
@@ -47,20 +54,27 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return [(parent_ref^, grad_input^, AddTensor)]
 
+
 # ── MinBackwardScalar ─────────────────────────────────────────────────────────
 
 
 @fieldwise_init
 struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var scalar = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        var scalar = (
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ScalarArg[Self.dtype]]()
+            .value
+        )
         ref gradbox = output.gradients()[]
         var parent_ref = output.ancestry().get(0)
-        var parent = Tensor[Self.dtype](parent_ref.buffer(), requires_grad=parent_ref.requires_grad)
+        var parent = Tensor[Self.dtype](
+            parent_ref.buffer(), requires_grad=parent_ref.requires_grad
+        )
 
         var mask_bool: NDBuffer[DType.bool]
 
@@ -100,10 +114,8 @@ struct MaxScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg =
-                    BackwardFnArg[Self.dtype].scalar_arg(
-                        BACKWARD_MAX_SCALAR, scalar
-
+                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
+                    BACKWARD_MAX_SCALAR, scalar
                 )
                 out.add_ancestry(backwardFnArg^, self)
 
@@ -131,10 +143,8 @@ struct MinScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg =
-                    BackwardFnArg[Self.dtype].scalar_arg(
-                        BACKWARD_MIN_SCALAR, scalar
-
+                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
+                    BACKWARD_MIN_SCALAR, scalar
                 )
                 out.add_ancestry(backwardFnArg^, self)
 

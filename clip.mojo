@@ -5,15 +5,17 @@ from gradbox import Gradbox
 from std.sys import simd_width_of
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct ClipBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         """Gradient passes where min ≤ x ≤ max, blocked elsewhere."""
-        var bwd_arg = output.ancestry().backward_fn_arg().get[ClipArg[Self.dtype]]()
+        var bwd_arg = (
+            output.ancestry().backward_fn_arg().get[ClipArg[Self.dtype]]()
+        )
         var (min_val, max_val) = bwd_arg.min_val, bwd_arg.max_val
         ref grad_output = output.gradients()[]
         var parent = output.ancestry().get(0)

@@ -9,11 +9,11 @@ from ndbuffer import NDBuffer
 from vectormatrix_kernel import VectorMatmulNdGpu
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct VectorMatmulNdBackward[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
-
     @staticmethod
     fn backward[
         simdwidth: Int = simd_width_of[Self.dtype]()
@@ -22,9 +22,13 @@ struct VectorMatmulNdBackward[dtype: DType](
     ]:
         ref grad_out = output.gradients()[]
         ref v_ref = output.ancestry().get(0)
-        var v = Tensor[Self.dtype](v_ref.buffer(), requires_grad=v_ref.requires_grad)
+        var v = Tensor[Self.dtype](
+            v_ref.buffer(), requires_grad=v_ref.requires_grad
+        )
         var M_ref = output.ancestry().get(1)
-        var M = Tensor[Self.dtype](M_ref.buffer(), requires_grad=M_ref.requires_grad)
+        var M = Tensor[Self.dtype](
+            M_ref.buffer(), requires_grad=M_ref.requires_grad
+        )
 
         var v_shape = v.shape()
         var M_shape = M.shape()
@@ -201,6 +205,7 @@ struct VectorMatmulNdBackward[dtype: DType](
 
         return results^
 
+
 @fieldwise_init
 struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -361,7 +366,9 @@ struct VectorMatmulNd[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var requires_grad = v.requires_grad or M.requires_grad
             if requires_grad:
                 result.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_VECTOR_MATMUL)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_VECTOR_MATMUL
+                )
                 result.add_ancestry(backwardFnArg^, v, M)
 
         return result^

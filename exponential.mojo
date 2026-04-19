@@ -4,6 +4,7 @@ from backpropagation import BackwardFnArg, BACKWARD_EXPONENTIAL
 from gradbox import Gradbox
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -15,7 +16,9 @@ struct ExponentialBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
         # Gradient of exp: incoming grad * exp(A) = incoming grad * output
-        var exp_grad = Gradbox[Self.dtype](gradbox.buffer * output.buffer(), share=False)
+        var exp_grad = Gradbox[Self.dtype](
+            gradbox.buffer * output.buffer(), share=False
+        )
         return [(parent, exp_grad, AddTensor)]
 
 
@@ -35,7 +38,9 @@ struct Exponential[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_EXPONENTIAL)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_EXPONENTIAL
+                )
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

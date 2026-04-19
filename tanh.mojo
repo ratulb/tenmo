@@ -4,9 +4,9 @@ from backpropagation import BackwardFnArg, BACKWARD_TANH
 from gradbox import Gradbox
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -19,6 +19,7 @@ struct TanhBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var gradbox_ancestor = Gradbox[Self.dtype](ndb^, share=False)
 
         return [(parent, gradbox_ancestor^, AddTensor)]
+
 
 @fieldwise_init
 struct Tanh[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -37,8 +38,9 @@ struct Tanh[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg =
-                    BackwardFnArg[Self.dtype].null_arg(BACKWARD_TANH)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_TANH
+                )
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^

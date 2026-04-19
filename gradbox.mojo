@@ -664,9 +664,7 @@ struct Gradbox[dtype: DType](
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Self) -> Bool:
-        comptime assert
-            Self.dtype.is_floating_point(),
-            "Gradbox → all_close(Self): is for floating point data types only"
+        comptime assert Self.dtype.is_floating_point(), "Gradbox → all_close(Self): is for floating point data types only"
         if self.shape() != other.shape():
             panic(
                 "Gradbox → all_close(Self): expects same shaped gradboxes: "

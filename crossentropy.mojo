@@ -384,9 +384,11 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_arg = output.ancestry().backward_fn_arg().get[
-            ClassIndicesBwdArg[Self.dtype]
-        ]()
+        ref bwd_arg = (
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ClassIndicesBwdArg[Self.dtype]]()
+        )
         var (
             softmax_probs,
             target_1d,
@@ -478,7 +480,6 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
             # grad_final = grad_final.reshape(self.logits_shape)
 
         return [(logits, grad_final, AddTensor)]
-
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -641,9 +642,11 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        ref bwd_arg = output.ancestry().backward_fn_arg().get[
-            ClassProbabilitiesBwdArg[Self.dtype]
-        ]()
+        ref bwd_arg = (
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ClassProbabilitiesBwdArg[Self.dtype]]()
+        )
         var (
             softmax_probs,
             smoothed_target,

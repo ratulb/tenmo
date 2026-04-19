@@ -17,7 +17,6 @@ from ancestry import Ancestor
 
 @fieldwise_init
 struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -30,8 +29,12 @@ struct DotBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var tensor_lhs_ref = output.ancestry().get(0)
         var tensor_rhs_ref = output.ancestry().get(1)
 
-        var tensor_lhs = Tensor[Self.dtype](tensor_lhs_ref.buffer(), requires_grad=tensor_lhs_ref.requires_grad)
-        var tensor_rhs = Tensor[Self.dtype](tensor_rhs_ref.buffer(), requires_grad=tensor_rhs_ref.requires_grad)
+        var tensor_lhs = Tensor[Self.dtype](
+            tensor_lhs_ref.buffer(), requires_grad=tensor_lhs_ref.requires_grad
+        )
+        var tensor_rhs = Tensor[Self.dtype](
+            tensor_rhs_ref.buffer(), requires_grad=tensor_rhs_ref.requires_grad
+        )
 
         print("check here 1")
 
@@ -110,7 +113,9 @@ struct Dot[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_DOT)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_DOT
+                )
 
                 out.add_ancestry(backwardFnArg^, lhs, rhs)
 
@@ -322,6 +327,7 @@ struct DotproductKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         return Tensor[Self.dtype].from_device_buffer(result_buffer, Shape())
 
+
 fn main() raises:
     test_tensor_dot()
     print("passes")
@@ -334,7 +340,7 @@ fn test_tensor_dot() raises:
     print("test_tensor_dot")
     comptime dtype = DType.float32
 
-    _="""a = Tensor[dtype].scalar(5, requires_grad=True)
+    _ = """a = Tensor[dtype].scalar(5, requires_grad=True)
     b = Tensor[dtype].scalar(15, requires_grad=True)
     c = a.matmul(b)
     c.backward()
@@ -350,19 +356,19 @@ fn test_tensor_dot() raises:
 
     print("passes till here")"""
 
-    #a = Tensor[dtype].arange(10, requires_grad=True)
+    # a = Tensor[dtype].arange(10, requires_grad=True)
     a = Tensor[dtype].arange(3, requires_grad=True)
-    #b = a[5::2]
+    # b = a[5::2]
     b = a.into_view()
     print("Goes past this too")
     b.print()
     c = Tensor[dtype].d1([3, 4, 5])
     print("==============")
-    #d = b.matmul(c)
+    # d = b.matmul(c)
     d = c * b
     d.print()
     print("**************")
-    _="""print("d")
+    _ = """print("d")
     d.backward()
     assert_true(
         a.grad().all_close(Tensor[dtype].d1([0, 0, 0, 0, 0, 3, 0, 4, 0, 5]))

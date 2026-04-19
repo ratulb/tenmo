@@ -8,9 +8,9 @@ from gradbox import Gradbox
 from indexhelper import IndexCalculator
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -57,6 +57,7 @@ struct TileBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             gradbox_parent = gradbox_parent.reshape(parent_shape)
 
         return [(parent^, gradbox_parent^, AddTensor)]
+
 
 @fieldwise_init
 struct Tile[dtype: DType](ImplicitlyCopyable, RegisterPassable):

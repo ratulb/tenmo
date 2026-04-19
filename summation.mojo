@@ -7,9 +7,9 @@ from validators import Validator
 from gradbox import Gradbox
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct SumBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -76,14 +76,12 @@ struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg =  BackwardFnArg[Self.dtype](
-                        BACKWARD_SUM, ReductionArg(reduction_axes, keepdims)
-
+                var backwardFnArg = BackwardFnArg[Self.dtype](
+                    BACKWARD_SUM, ReductionArg(reduction_axes, keepdims)
                 )
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^
-
 
 
 fn main() raises:
@@ -92,11 +90,14 @@ fn main() raises:
 
 from std.testing import assert_true
 
+
 fn test_sum_2d_backward_axis0_cpu() raises:
     """Test backward of sum along axis 0 on CPU."""
     print("test_sum_2d_backward_axis0_cpu")
     comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True)
+    var a = Tensor[dtype].d2(
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
+    )
     var loss = a.sum(axes=[0])
     loss.backward()
     var expected = Tensor[dtype].d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])

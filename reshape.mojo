@@ -8,9 +8,9 @@ from ndbuffer import NDBuffer
 from strides import Strides
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct ReshapeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -22,7 +22,6 @@ struct ReshapeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             (ancestor^, reshaped^, AddTensor),
             (output, gradbox, ZeroGrad),
         ]
-
 
 
 @fieldwise_init

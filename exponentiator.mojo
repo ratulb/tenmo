@@ -21,7 +21,10 @@ struct ExponentiationBackward[dtype: DType](
         All ops at NDBuffer level — GPU safe, no LLVM lowering issues.
         """
         var exponent = (
-            output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ScalarArg[Self.dtype]]()
+            .value
         )
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
@@ -65,8 +68,7 @@ struct Exponentiator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if grad_required:
                 out.requires_grad_(True)
                 var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
-                        BACKWARD_EXPONENTIATION, exponent
-
+                    BACKWARD_EXPONENTIATION, exponent
                 )
                 out.add_ancestry(backwardFnArg^, self)
 
@@ -89,7 +91,7 @@ fn test_exponentiation() raises:
     print("test_exponentiation")
     comptime dtype = DType.float32
     A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
-    #a = A.to_gpu()
+    # a = A.to_gpu()
     a = A
     expected = Tensor[dtype].full(Shape.of(3, 3), 7.389056)
     b = a.exp(True)
@@ -102,7 +104,7 @@ fn test_negation() raises:
     print("test_negation")
     comptime dtype = DType.float32
     A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
-    #a = A.to_gpu()
+    # a = A.to_gpu()
     a = A
     expected = Tensor[dtype].full(Shape.of(3, 3), -2)
     b = -a

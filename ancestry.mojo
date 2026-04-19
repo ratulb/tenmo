@@ -7,6 +7,7 @@ from common_utils import panic
 from shapes import Shape
 from std.os.atomic import Consistency, fence
 
+
 struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     """
     Lightweight handle for ancestry tracking.
@@ -30,7 +31,6 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
     var storage: Storage[Self.dtype]
     var parents: Optional[Ancestors[Self.dtype]]
 
-
     fn __init__(out self):
         self._id = 0
         self.requires_grad = False
@@ -47,10 +47,11 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         self.storage = copy.storage.copy()
         self.parents = copy.parents.copy()
         if self.gradbox:
-            _ = self.gradbox[]._refcount[].fetch_add[
-                   ordering=Consistency.MONOTONIC
-            ](1)
-
+            _ = (
+                self.gradbox[]
+                ._refcount[]
+                .fetch_add[ordering=Consistency.MONOTONIC](1)
+            )
 
     fn __moveinit__(out self, deinit take: Self):
         self._id = take._id
@@ -61,9 +62,7 @@ struct Ancestor[dtype: DType](ImplicitlyCopyable & Movable):
         self.parents = take.parents^
 
     fn has_ancestry(self) -> Bool:
-        return (
-            self.parents is not None and len(self.parents.value()) > 0
-        )
+        return self.parents is not None and len(self.parents.value()) > 0
 
     fn shape(ref self) -> ref[self.layout.shape] Shape:
         return self.layout.shape
@@ -155,7 +154,7 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
         return self.backwardFnArg
 
     fn set_backward_fn_arg(
-            mut self, var backwardFnArg: BackwardFnArg[Self.dtype]
+        mut self, var backwardFnArg: BackwardFnArg[Self.dtype]
     ):
         self.backwardFnArg = backwardFnArg^
 
@@ -172,7 +171,9 @@ struct Ancestors[dtype: DType](Sized & Copyable & Movable):
 
     fn tensor(ref self, idx: Int) -> Tensor[Self.dtype]:
         ref ancestor = self.get(idx)
-        return Tensor[Self.dtype](ancestor.buffer(), requires_grad=ancestor.requires_grad)
+        return Tensor[Self.dtype](
+            ancestor.buffer(), requires_grad=ancestor.requires_grad
+        )
 
     fn __len__(self) -> Int:
         return len(self.origins)

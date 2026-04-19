@@ -8,14 +8,14 @@ fn main():
 
 
 @fieldwise_init
-struct MatrixShapeValidator(RegisterPassable, ImplicitlyCopyable):
+struct MatrixShapeValidator(ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
     fn validate_matrix_shapes_nd(A_shape: Shape, B_shape: Shape):
         if len(A_shape) < 2 or len(B_shape) < 2:
             panic(
-                "MatrixShapeValidator → validate_matrix_shapes_nd: matmul_nd expects rank >="
-                " 2. Got A = "
+                "MatrixShapeValidator → validate_matrix_shapes_nd: matmul_nd"
+                " expects rank >= 2. Got A = "
                 + String(A_shape)
                 + ", B = "
                 + String(B_shape)
@@ -23,8 +23,8 @@ struct MatrixShapeValidator(RegisterPassable, ImplicitlyCopyable):
 
         if A_shape[-1] != B_shape[-2]:
             panic(
-                "MatrixShapeValidator → validate_matrix_shapes_nd: inner dimensions"
-                " mismatch: "
+                "MatrixShapeValidator → validate_matrix_shapes_nd: inner"
+                " dimensions mismatch: "
                 + "A(...,"
                 + String(A_shape[-1])
                 + ") vs "
@@ -48,8 +48,8 @@ struct MatrixShapeValidator(RegisterPassable, ImplicitlyCopyable):
     fn validate_matrix_shapes_2d(A_shape: Shape, B_shape: Shape):
         if len(A_shape) != 2 or len(B_shape) != 2:
             panic(
-                "MatrixShapeValidator → validate_matrix_shapes_2d: matmul_2d expects rank =="
-                " 2. Got A = "
+                "MatrixShapeValidator → validate_matrix_shapes_2d: matmul_2d"
+                " expects rank == 2. Got A = "
                 + String(A_shape)
                 + ", B = "
                 + String(B_shape)
@@ -57,8 +57,8 @@ struct MatrixShapeValidator(RegisterPassable, ImplicitlyCopyable):
 
         if A_shape[1] != B_shape[0]:
             panic(
-                "MatrixShapeValidator → validate_matrix_shapes_2d: inner dimensions mismatch"
-                " in matmul_2d: "
+                "MatrixShapeValidator → validate_matrix_shapes_2d: inner"
+                " dimensions mismatch in matmul_2d: "
                 + "A(m,"
                 + String(A_shape[1])
                 + ") vs "

@@ -9,6 +9,7 @@ from views import View
 from gradbox import Gradbox
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -21,7 +22,9 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         GPU safe: Gradbox.permute → NDBuffer.permute(shared=False)
                   → contiguous() → contiguous_device_state() on GPU.
         """
-        var permutation = output.ancestry().backward_fn_arg().get[IntArrayArg]().array
+        var permutation = (
+            output.ancestry().backward_fn_arg().get[IntArrayArg]().array
+        )
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
 
@@ -57,10 +60,8 @@ struct Permute[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg =
-                    BackwardFnArg[Self.dtype].from_intarray(
-                        BACKWARD_PERMUTE, axes
-
+                var backwardFnArg = BackwardFnArg[Self.dtype].from_intarray(
+                    BACKWARD_PERMUTE, axes
                 )
                 out.add_ancestry(backwardFnArg^, self)
 

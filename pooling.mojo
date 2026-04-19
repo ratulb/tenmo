@@ -10,6 +10,7 @@ from std.algorithm import parallelize
 from net import Module, Layer, MAXPOOL2D
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct MaxPool2dBwdArg(ArgumentType):
     var kernel_size: Int
@@ -21,7 +22,6 @@ struct MaxPool2dBwdArg(ArgumentType):
 
 @fieldwise_init
 struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -40,7 +40,10 @@ struct MaxPool2dBackward[dtype: DType](ImplicitlyCopyable & Movable):
         ]()
 
         var input_tensor_ref = output.ancestry().get(0)
-        var input_tensor = Tensor[Self.dtype](input_tensor_ref.buffer(), requires_grad=input_tensor_ref.requires_grad)
+        var input_tensor = Tensor[Self.dtype](
+            input_tensor_ref.buffer(),
+            requires_grad=input_tensor_ref.requires_grad,
+        )
 
         if input_tensor.requires_grad:
             var N = input_shape[0]

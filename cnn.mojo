@@ -12,6 +12,7 @@ from ndbuffer import NDBuffer
 from intarray import IntArray
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
     """
@@ -559,7 +560,9 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.ancestry().backward_fn_arg().get[FusedIm2ColBwdArg]()
+        var bwd_arg = (
+            output.ancestry().backward_fn_arg().get[FusedIm2ColBwdArg]()
+        )
         var (
             N,
             C_in,
@@ -591,11 +594,18 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ]()
 
         var padded_image_ref = output.ancestry().get(0)
-        var padded_image = Tensor[Self.dtype](padded_image_ref.buffer(), requires_grad=padded_image_ref.requires_grad)
+        var padded_image = Tensor[Self.dtype](
+            padded_image_ref.buffer(),
+            requires_grad=padded_image_ref.requires_grad,
+        )
         var kernel_ref = output.ancestry().get(1)
-        var kernel = Tensor[Self.dtype](kernel_ref.buffer(), requires_grad=kernel_ref.requires_grad)
+        var kernel = Tensor[Self.dtype](
+            kernel_ref.buffer(), requires_grad=kernel_ref.requires_grad
+        )
         var bias_ref = output.ancestry().get(2)
-        var bias = Tensor[Self.dtype](bias_ref.buffer(), requires_grad=bias_ref.requires_grad)
+        var bias = Tensor[Self.dtype](
+            bias_ref.buffer(), requires_grad=bias_ref.requires_grad
+        )
 
         # BIAS GRADIENT
         if bias.requires_grad:
@@ -643,7 +653,6 @@ struct FusedCol2ImBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             results.append((padded_image_ref^, grad_padded^, AddTensor))
 
         return results^
-
 
     # BIAS GRADIENT
     @always_inline

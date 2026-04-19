@@ -6,7 +6,7 @@ from common_utils import panic
 
 @fieldwise_init
 struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
-    RegisterPassable, ImplicitlyCopyable, Iterable, Iterator, Sized
+    ImplicitlyCopyable, Iterable, Iterator, RegisterPassable, Sized
 ):
     comptime Element = Int
     comptime IteratorType[
@@ -48,7 +48,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         return self
 
     fn __next__(mut self) raises StopIteration -> Self.Element:
-    #fn __next__(mut self) raises StopIteration -> Int:
+        # fn __next__(mut self) raises StopIteration -> Int:
         """
         Return next memory offset and advance iterator.
 
@@ -178,7 +178,7 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
 
 
 @fieldwise_init
-struct IndexCalculator(RegisterPassable, ImplicitlyCopyable):
+struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
     """Utility for calculating flat indices and coordinates in multi-dimensional arrays.
     """
 

@@ -11,6 +11,7 @@ from device import Device, CPU, GPU
 from std.sys import has_accelerator
 from ancestry import Ancestor
 
+
 struct Flow(RegisterPassable & Equatable, ImplicitlyCopyable):
     var direction: Int
     comptime Cpu2Gpu = Flow(0)
@@ -42,16 +43,19 @@ struct DeviceTransferBwdArg(ArgumentType):
 
 
 struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.ancestry().backward_fn_arg().get[DeviceTransferBwdArg]()
+        var bwd_arg = (
+            output.ancestry().backward_fn_arg().get[DeviceTransferBwdArg]()
+        )
         var (flow, device) = bwd_arg.flow, bwd_arg.device
         var gradbox = output.gradients()[]
         var ancestor_ref = output.ancestry().get(0)
-        var ancestor = Tensor[Self.dtype](ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad)
+        var ancestor = Tensor[Self.dtype](
+            ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad
+        )
         debug_assert(
             ancestor.shape() == gradbox.shape(),
             "DeviceTransferBackward: gradbox shape and ancestor shape mismatch",

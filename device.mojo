@@ -115,6 +115,7 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
     fn __call__(self) -> DeviceContext:
         return self.device_context.copy()[]
 
+
 struct DeviceState[dtype: DType](
     Equatable & ImplicitlyCopyable & Movable & Sized
 ):
@@ -207,7 +208,7 @@ struct DeviceState[dtype: DType](
     @staticmethod
     fn map_where(
         ref ndb: NDBuffer[Self.dtype],
-        pred: fn (Scalar[Self.dtype]) -> Bool,
+        pred: fn(Scalar[Self.dtype]) -> Bool,
         value: Scalar[Self.dtype],
         sync: Bool = True,
     ) raises -> DeviceState[Self.dtype]:
@@ -225,7 +226,6 @@ struct DeviceState[dtype: DType](
 
     fn fill(self, value: Scalar[Self.dtype], sync: Bool = True) raises:
         with self.buffer.map_to_host() as host_buffer:
-
             comptime if Self.dtype == DType.bool:
                 var storage_val = UInt8(1) if value.cast[
                     DType.bool
@@ -248,7 +248,6 @@ struct DeviceState[dtype: DType](
                 with self.buffer.map_to_host() as host_buffer:
                     var next_index = 0
                     for index in source.index_iterator():
-
                         comptime if Self.dtype == DType.bool:
                             var v = source.get(index).cast[DType.bool]()
                             host_buffer[next_index] = rebind[
@@ -288,7 +287,6 @@ struct DeviceState[dtype: DType](
             else:
                 var next_index = 0
                 for index in source.index_iterator():
-
                     comptime if Self.dtype == DType.bool:
                         device_ptr[next_index] = rebind[Scalar[Self.datatype]](
                             UInt8(1) if (src_ptr + index)[].cast[
@@ -338,17 +336,16 @@ struct DeviceState[dtype: DType](
 
     fn device_buffer(
         ref self,
-    ) -> ref [self.buffer] DeviceBuffer[Self.datatype]:
+    ) -> ref[self.buffer] DeviceBuffer[Self.datatype]:
         return self.buffer
 
     fn get_gpu(
         ref self,
-    ) -> ref [self.gpu] GPU:
+    ) -> ref[self.gpu] GPU:
         return self.gpu
 
     fn __getitem__(self, index: Int) raises -> Scalar[Self.dtype]:
         with self.buffer.map_to_host() as host_buffer:
-
             comptime if Self.dtype == DType.bool:
                 return Scalar[Self.dtype](
                     (host_buffer[index].cast[DType.uint8]() == UInt8(1))
@@ -358,7 +355,6 @@ struct DeviceState[dtype: DType](
 
     fn __setitem__(self, index: Int, value: Scalar[Self.dtype]) raises:
         with self.buffer.map_to_host() as host_buffer:
-
             comptime if Self.dtype == DType.bool:
                 host_buffer[index] = Scalar[Self.datatype](
                     UInt8(1) if value.cast[DType.bool]() else UInt8(0)
@@ -407,6 +403,7 @@ struct DeviceState[dtype: DType](
         except e:
             print(e)
             return False
+
 
 fn main() raises:
     print("passes")

@@ -3,7 +3,7 @@ from buffers import Buffer
 
 
 @fieldwise_init
-struct Utils[dtype: DType](RegisterPassable, ImplicitlyCopyable):
+struct Utils[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     @always_inline
     fn log_scalar(
@@ -96,7 +96,9 @@ struct Utils[dtype: DType](RegisterPassable, ImplicitlyCopyable):
 
     @staticmethod
     @always_inline
-    fn tanh_stable(x: Scalar[Self.dtype]) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
+    fn tanh_stable(
+        x: Scalar[Self.dtype],
+    ) -> Scalar[Self.dtype] where Self.dtype.is_floating_point():
         """
         More numerically stable tanh implementation.
         """
@@ -104,6 +106,7 @@ struct Utils[dtype: DType](RegisterPassable, ImplicitlyCopyable):
             return (1 - exp(-2 * x)) / (1 + exp(-2 * x))
         else:
             return (exp(2 * x) - 1) / (exp(2 * x) + 1)
+
 
 fn main() raises:
     pass

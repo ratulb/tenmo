@@ -9,9 +9,9 @@ from broadcasthelper import ShapeBroadcaster
 from views import View
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -22,6 +22,7 @@ struct ExpandBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         gradbox_contracted = gradbox.sum_over_broadcasted_axes(parent_shape)
 
         return [(ancestor, gradbox_contracted^, AddTensor)]
+
 
 @fieldwise_init
 struct Expand[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -71,7 +72,9 @@ struct Expand[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             if grad_required:
                 out.requires_grad_()
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_EXPAND)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_EXPAND
+                )
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

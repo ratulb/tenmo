@@ -70,10 +70,12 @@ fn reduce_minmax[
     total_output: Int,
     reduced_volume: Int,
 ):
-    comptime assert max_block_size.is_power_of_two() and max_block_size < 1024, "Invalid max_block_size"
+    comptime assert (
+        max_block_size.is_power_of_two() and max_block_size < 1024
+    ), "Invalid max_block_size"
 
     var smem = stack_allocation[
-        max_block_size, Scalar[dtype], address_space = AddressSpace.SHARED
+        max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
 
     var tid = Int(thread_idx.x)
@@ -125,7 +127,6 @@ fn reduce_minmax[
     var stride = block_size >> 1
     while stride > 0:
         if tid < stride:
-
             comptime if is_max:
                 if smem[tid + stride] > smem[tid]:
                     smem[tid] = smem[tid + stride]
@@ -153,11 +154,13 @@ fn build_minmax_mask[
     total_output: Int,
     reduced_volume: Int,
 ):
-    comptime assert max_block_size.is_power_of_two() and max_block_size < 1024, "Invalid max_block_size"
+    comptime assert (
+        max_block_size.is_power_of_two() and max_block_size < 1024
+    ), "Invalid max_block_size"
 
     # smem[0..block_size)  : tie counts (Int32 cast to dtype)
     var smem = stack_allocation[
-        max_block_size, Scalar[dtype], address_space = AddressSpace.SHARED
+        max_block_size, Scalar[dtype], address_space=AddressSpace.SHARED
     ]()
 
     var tid = Int(thread_idx.x)

@@ -7,15 +7,18 @@ from ndbuffer import NDBuffer
 from common_utils import Epsilon
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var epsilon = (
-            output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ScalarArg[Self.dtype]]()
+            .value
         )
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
@@ -51,6 +54,7 @@ struct SqrtBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return [(parent^, gradbox_ancestor^, AddTensor)]
 
+
 @fieldwise_init
 struct Sqrt[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -83,8 +87,9 @@ struct Sqrt[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg =
-                    BackwardFnArg[Self.dtype].scalar_arg(BACKWARD_SQRT, epsilon)
+                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
+                    BACKWARD_SQRT, epsilon
+                )
 
                 out.add_ancestry(backwardFnArg^, self)
 

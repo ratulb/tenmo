@@ -10,15 +10,18 @@ from net import Module, Layer
 from std.random import random_float64, seed
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct DropoutBackward[dtype: DType](ImplicitlyCopyable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var mask_buffer = (
-            output.ancestry().backward_fn_arg().get[BufferArg[Self.dtype]]().buffer
+            output.ancestry()
+            .backward_fn_arg()
+            .get[BufferArg[Self.dtype]]()
+            .buffer
         )
         var grad_output = output.gradients()[]
         var ancestor = output.ancestry().get(0)

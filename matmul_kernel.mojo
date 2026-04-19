@@ -52,18 +52,20 @@ fn matmul_2d_tiled[
     B_row_stride: Int,
     B_col_stride: Int,
 ):
-    comptime assert TILE_SIZE == 16 or TILE_SIZE == 32, "TILE_SIZE must be 16 or 32"
+    comptime assert (
+        TILE_SIZE == 16 or TILE_SIZE == 32
+    ), "TILE_SIZE must be 16 or 32"
 
     # Shared memory tiles
     var smem_A = stack_allocation[
         TILE_SIZE * TILE_SIZE,
         Scalar[dtype],
-        address_space = AddressSpace.SHARED,
+        address_space=AddressSpace.SHARED,
     ]()
     var smem_B = stack_allocation[
         TILE_SIZE * TILE_SIZE,
         Scalar[dtype],
-        address_space = AddressSpace.SHARED,
+        address_space=AddressSpace.SHARED,
     ]()
 
     var tx = Int(thread_idx.x)  # col within tile
@@ -119,7 +121,9 @@ fn matmul_2d_tiled[
 
 
 @fieldwise_init
-struct MatmulNdGpu[dtype: DType = DType.float32](RegisterPassable, ImplicitlyCopyable):
+struct MatmulNdGpu[dtype: DType = DType.float32](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     fn launch[
         tile_size: Int = 32,
@@ -301,14 +305,14 @@ fn main() raises:
     var B = Tensor[dtype].rand(80, 20)
     print("B.sum(): in driver program")
     B.sum().print()
-    print("B[0,0]:", B[[0,0]])
+    print("B[0,0]:", B[[0, 0]])
 
     C = A.matmul(B)
     var A_gpu = A.to_gpu()
     var B_gpu = B.to_gpu()
     print("B_gpu.sum() in same driver program:")
     B_gpu.sum().print()
-    print("B_gpu[0,0]:", B_gpu[[0,0]])
+    print("B_gpu[0,0]:", B_gpu[[0, 0]])
     var C_gpu = A_gpu.matmul(B_gpu)
     assert_true(C.all_close(C_gpu.to_cpu()))
 
@@ -321,18 +325,20 @@ fn main() raises:
     assert_true(A.grad().all_close(A_cpu_grad))
     print("Here I am ok")
 
+
 from intarray import IntArray
+
 
 fn main_200() raises:
     comptime dtype = DType.float32
 
     # Exact backward dimensions
-    var grad_out = Tensor[dtype].rand(9, 20)   # grad_out
-    var B = Tensor[dtype].rand(80, 20)          # B
+    var grad_out = Tensor[dtype].rand(9, 20)  # grad_out
+    var B = Tensor[dtype].rand(80, 20)  # B
 
     # CPU: grad_A = grad_out @ B.T
     var BT_cpu = B.transpose(axes=IntArray(-1, -2))  # (20, 80)
-    var grad_A_cpu = grad_out.matmul(BT_cpu)          # (9, 80)
+    var grad_A_cpu = grad_out.matmul(BT_cpu)  # (9, 80)
     print("CPU grad_A:")
     grad_A_cpu.print()
 
@@ -354,6 +360,7 @@ fn main_200() raises:
     # Compare
     assert_true(grad_A_cpu.all_close(grad_A_gpu.to_cpu()))
     print("PASSED")
+
 
 fn main_good() raises:
     comptime dtype = DType.float32
@@ -382,10 +389,17 @@ fn main_good() raises:
     assert_true(grad_A_cpu.all_close(grad_A_gpu))
 
     print("grad_out_gpu CPU buffer size:", len(grad_out_gpu.buffer.buffer))
-    print("grad_out_gpu GPU buffer size:", len(grad_out_gpu.buffer.device_state.value().buffer))
-    print("grad_out_gpu device ptr:", grad_out_gpu.buffer.device_state.value().buffer.unsafe_ptr())
+    print(
+        "grad_out_gpu GPU buffer size:",
+        len(grad_out_gpu.buffer.device_state.value().buffer),
+    )
+    print(
+        "grad_out_gpu device ptr:",
+        grad_out_gpu.buffer.device_state.value().buffer.unsafe_ptr(),
+    )
 
     print("Manual backward verified")
+
 
 fn main_100() raises:
     comptime dtype = DType.float32
@@ -444,7 +458,7 @@ fn main_100() raises:
     print("=== Test 5: Transposed matmul fidelity ===")
     var B3 = Tensor[dtype].rand(80, 20)
     var B3_gpu = B3.to_gpu()
-    var BT_cpu = B3.transpose(axes=IntArray(-1, -2))   # (20, 80)
+    var BT_cpu = B3.transpose(axes=IntArray(-1, -2))  # (20, 80)
     var BT_gpu = B3_gpu.buffer.transpose(axes=IntArray(-1, -2))
 
     # grad_out ones

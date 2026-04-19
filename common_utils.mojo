@@ -228,6 +228,7 @@ struct Epsilon[dtype: DType](RegisterPassable):
             panic("Epsilon value not supported for: ", String(Self.dtype))
             return Scalar[Self.dtype](0)
 
+
 struct One[dtype: DType](RegisterPassable):
     @staticmethod
     fn value() -> Scalar[Self.dtype]:
@@ -236,6 +237,7 @@ struct One[dtype: DType](RegisterPassable):
         else:
             return Scalar[Self.dtype](1)
 
+
 struct Zero[dtype: DType](RegisterPassable):
     @staticmethod
     fn value() -> Scalar[Self.dtype]:
@@ -243,7 +245,6 @@ struct Zero[dtype: DType](RegisterPassable):
             return Scalar[Self.dtype](0.0)
         else:
             return Scalar[Self.dtype](0)
-
 
 
 @always_inline("nodebug")
@@ -259,9 +260,9 @@ fn inf[dtype: DType]() -> Scalar[dtype]:
     Returns:
         The +inf value of the given dtype.
     """
-    comptime assert
-        dtype.is_floating_point(),
-        "Only floating point dtypes support +inf."
+    comptime assert (
+        dtype.is_floating_point()
+    ), "Only floating point dtypes support +inf."
 
     comptime if dtype == DType.bfloat16:
         return rebind[Scalar[dtype]](
@@ -306,7 +307,9 @@ fn nan[dtype: DType]() -> Scalar[dtype]:
     Returns:
         The NaN value of the given dtype.
     """
-    comptime assert dtype.is_floating_point(), "Only floating point dtypes support NaN."
+    comptime assert (
+        dtype.is_floating_point()
+    ), "Only floating point dtypes support NaN."
 
     comptime if dtype == DType.float32:
         return rebind[Scalar[dtype]](
@@ -618,7 +621,7 @@ from buffers import Buffer
 
 
 fn main():
-    #print(Epsilon[DType.int32].value())
+    # print(Epsilon[DType.int32].value())
     print(Epsilon[DType.float32].value())
     print(Epsilon[DType.float64].value())
-    #print(Epsilon[DType.bool].value())
+    # print(Epsilon[DType.bool].value())

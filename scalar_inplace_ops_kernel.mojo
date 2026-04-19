@@ -106,15 +106,15 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
         var compiled_func = device_context.compile_function[
             inplace_scalar_ops[
                 op_code=op_code,
-                dtype = Self.dtype,
+                dtype=Self.dtype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread = 2 * simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
             inplace_scalar_ops[
                 op_code=op_code,
-                dtype = Self.dtype,
+                dtype=Self.dtype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread = 2 * simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
         ]()
 
@@ -157,5 +157,6 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
             )  # Cap at 512 blocks
         return threads_per_block, num_blocks
 
+
 fn main() raises:
-   print("passes")
+    print("passes")

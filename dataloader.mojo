@@ -236,7 +236,7 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
             self._last_batch_size = 0
             self._last_batch = None
 
-    fn __iter__(mut self) -> ref [self] Self:
+    fn __iter__(mut self) -> ref[self] Self:
         self._current_idx = 0
         if self.shuffle_data:
             reshuffle(self._indices)
@@ -244,7 +244,7 @@ struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin](
 
     fn __next__(
         mut self,
-    ) -> ref [self._batch, self._last_batch.value()] Batch[
+    ) -> ref[self._batch, self._last_batch.value()] Batch[
         Self.DatasetSource._feature_dtype, Self.DatasetSource._label_dtype
     ]:
         """Get next batch with proper shape preservation."""

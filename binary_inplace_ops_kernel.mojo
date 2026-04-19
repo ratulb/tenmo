@@ -62,7 +62,6 @@ fn arithmetic_ops_both_contiguous[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -135,7 +134,6 @@ fn arithmetic_ops_A_contiguous[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -235,7 +233,6 @@ fn arithmetic_ops_B_contiguous[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -329,7 +326,6 @@ fn arithmetic_ops_both_strided[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -394,7 +390,7 @@ fn arithmetic_ops_both_strided[
 
 @fieldwise_init
 struct BinaryInplaceOperations[dtype: DType](
-    RegisterPassable, ImplicitlyCopyable
+    ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
     fn launch[
@@ -415,7 +411,10 @@ struct BinaryInplaceOperations[dtype: DType](
             raise Error(
                 "In-place op A op= B requires B to be broadcastable to A's "
                 "shape, but the broadcast result differs from A's shape. "
-                "A.shape=" + String(A_shape) + " B.shape=" + String(B_shape)
+                "A.shape="
+                + String(A_shape)
+                + " B.shape="
+                + String(B_shape)
             )
 
         var output_size = broadcast_shape.product()
@@ -424,7 +423,7 @@ struct BinaryInplaceOperations[dtype: DType](
         # needs_broadcasting is True when B's shape differs from
         # the output (A) shape, meaning B has stride-0 broadcast
         # axes and its physical buffer is smaller than output_size.
-        var needs_broadcasting = (B_shape != broadcast_shape)
+        var needs_broadcasting = B_shape != broadcast_shape
 
         var (threads_per_block, num_blocks) = Self.launch_config(output_size)
 
@@ -453,8 +452,12 @@ struct BinaryInplaceOperations[dtype: DType](
         # ════════════════════════════════════════════════════════
         if A_is_contiguous and B_is_contiguous and not needs_broadcasting:
             var compiled_func = device_context.compile_function[
-                arithmetic_ops_both_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
-                arithmetic_ops_both_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
+                arithmetic_ops_both_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+                arithmetic_ops_both_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
             ]()
             device_context.enqueue_function(
                 compiled_func,
@@ -496,8 +499,12 @@ struct BinaryInplaceOperations[dtype: DType](
         # ════════════════════════════════════════════════════════
         if A_is_contiguous and (not B_is_contiguous or needs_broadcasting):
             var compiled_func = device_context.compile_function[
-                arithmetic_ops_A_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
-                arithmetic_ops_A_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
+                arithmetic_ops_A_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+                arithmetic_ops_A_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
             ]()
             device_context.enqueue_function(
                 compiled_func,
@@ -531,8 +538,12 @@ struct BinaryInplaceOperations[dtype: DType](
         # ════════════════════════════════════════════════════════
         if not A_is_contiguous and B_is_contiguous and not needs_broadcasting:
             var compiled_func = device_context.compile_function[
-                arithmetic_ops_B_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
-                arithmetic_ops_B_contiguous[op_code, Self.dtype, simdwidth, 2 * simdwidth],
+                arithmetic_ops_B_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
+                arithmetic_ops_B_contiguous[
+                    op_code, Self.dtype, simdwidth, 2 * simdwidth
+                ],
             ]()
             device_context.enqueue_function(
                 compiled_func,
@@ -567,8 +578,12 @@ struct BinaryInplaceOperations[dtype: DType](
         # Result written at a_idx (A's physical address).
         # ════════════════════════════════════════════════════════
         var compiled_func = device_context.compile_function[
-            arithmetic_ops_both_strided[op_code, Self.dtype, simdwidth, 2 * simdwidth],
-            arithmetic_ops_both_strided[op_code, Self.dtype, simdwidth, 2 * simdwidth],
+            arithmetic_ops_both_strided[
+                op_code, Self.dtype, simdwidth, 2 * simdwidth
+            ],
+            arithmetic_ops_both_strided[
+                op_code, Self.dtype, simdwidth, 2 * simdwidth
+            ],
         ]()
         device_context.enqueue_function(
             compiled_func,
@@ -615,6 +630,7 @@ struct BinaryInplaceOperations[dtype: DType](
         # Return order matches caller destructuring:
         #   var (threads_per_block, num_blocks) = Self.launch_config(...)
         return threads_per_block, num_blocks
+
 
 fn main():
     print("passes")

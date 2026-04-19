@@ -85,7 +85,7 @@ fn matrix_vector_nd[
 
 @fieldwise_init
 struct MatrixVectorNdGpu[dtype: DType = DType.float32](
-    RegisterPassable, ImplicitlyCopyable
+    ImplicitlyCopyable, RegisterPassable
 ):
     @staticmethod
     fn launch[

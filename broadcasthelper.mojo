@@ -5,7 +5,7 @@ from strides import Strides
 
 
 @fieldwise_init
-struct ShapeBroadcaster(RegisterPassable, ImplicitlyCopyable):
+struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
     """Utility for broadcasting and manipulating shapes for tensor operations.
     """
 
@@ -170,10 +170,10 @@ struct ShapeBroadcaster(RegisterPassable, ImplicitlyCopyable):
         if own_rank > target_rank:
             return False
 
-        var offset = target_rank - own_rank   # leading dims own doesn't have
+        var offset = target_rank - own_rank  # leading dims own doesn't have
 
         for i in range(own_rank):
-            var own_dim    = own[i]
+            var own_dim = own[i]
             var target_dim = target[i + offset]
             if own_dim != target_dim and own_dim != 1:
                 return False
@@ -280,12 +280,14 @@ struct ShapeBroadcaster(RegisterPassable, ImplicitlyCopyable):
 
 from std.memory import stack_allocation
 
+
 fn main() raises:
     test_broadcast_strides()
     shape = Shape(10, 1)
     stack = stack_allocation[6144, Int]()
     stack[6143] = shape[0]
     print(stack[6143])
+
 
 from std.testing import assert_true
 
@@ -309,6 +311,3 @@ fn test_broadcast_strides() raises:
         input_shape, input_strides, target_shape
     )
     assert_true(result == Strides(4, 0, 1))
-
-
-

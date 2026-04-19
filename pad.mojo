@@ -52,7 +52,9 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
         var mode = bwd_arg.mode.copy()
         ref grad_out = output.gradients()[]
         var ancestor_ref = output.ancestry().get(0)
-        var parent = Tensor[Self.dtype](ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad)
+        var parent = Tensor[Self.dtype](
+            ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad
+        )
 
         var results = List[
             Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
@@ -86,8 +88,6 @@ struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
             results.append((ancestor_ref^, grad_parent^, AddTensor))
 
         return results^
-
-
 
     @staticmethod
     fn _extract_constant(

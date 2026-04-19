@@ -14,14 +14,16 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     fn fill(
         target: NDBuffer[Self.dtype],
         value: Scalar[Self.dtype],
-        #indices: VariadicListMem[Idx],
+        # indices: VariadicListMem[Idx],
         indices: VariadicList[Idx, _],
     ):
         # Compute view metadata
-        var(shape, strides, offset) = (
-            Validator.validate_and_compute_advanced_indexing_metadata(
-                target.shape, target.strides, indices
-            )
+        var (
+            shape,
+            strides,
+            offset,
+        ) = Validator.validate_and_compute_advanced_indexing_metadata(
+            target.shape, target.strides, indices
         )
         var absolute_offset = target.offset + offset
         ref buffer = target.data_buffer()
@@ -54,7 +56,7 @@ struct Filler[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     fn fill(
         target: NDBuffer[Self.dtype],
         source: NDBuffer[Self.dtype],
-        #indices: VariadicListMem[Idx],
+        # indices: VariadicListMem[Idx],
         indices: VariadicList[Idx, _],
     ):
         shape, strides, offset = (

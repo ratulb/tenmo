@@ -7,9 +7,9 @@ from shapes import Shape
 from common_utils import panic
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct SqueezeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -62,7 +62,9 @@ struct Squeeze[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(tensor.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_SQUEEZE)
+                var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                    BACKWARD_SQUEEZE
+                )
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^

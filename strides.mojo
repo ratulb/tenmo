@@ -5,9 +5,9 @@ from array import Array
 
 
 struct Strides(
-    RegisterPassable,
     Defaultable,
     ImplicitlyCopyable,
+    RegisterPassable,
     Sized,
     Writable,
 ):
@@ -71,7 +71,7 @@ struct Strides(
 
     fn __str__(self) -> String:
         var s = self.data.__str__()
-        return "(" + s[byte=1:len(s)-1] + ")"
+        return "(" + s[byte = 1 : len(s) - 1] + ")"
 
     fn __repr__(self) -> String:
         return self.__str__()
@@ -127,6 +127,6 @@ struct Strides(
 
 fn main():
     var s = Strides(10, 5, 2, 3, 8, 7, 1, 1)
-    #var array = s.array()
+    # var array = s.array()
     print(s[:-2].array())
     print(s[:-2])

@@ -138,7 +138,6 @@ fn pow_op_f32[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -172,7 +171,6 @@ fn pow_op_f64[
     var base_idx = gtid * CHUNK_SIZE
 
     while base_idx < size:
-
         comptime for item in range(simd_vectors_per_thread):
             var i = base_idx + item * simd_width
 
@@ -211,15 +209,15 @@ struct ScalarOperations[dtype: DType = DType.float32](
         var compiled_func = device_context.compile_function[
             scalar_ops[
                 op_code=op_code,
-                dtype = Self.dtype,
+                dtype=Self.dtype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread = 2 * simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
             scalar_ops[
                 op_code=op_code,
-                dtype = Self.dtype,
+                dtype=Self.dtype,
                 simd_width=simdwidth,
-                simd_vectors_per_thread = 2 * simdwidth,
+                simd_vectors_per_thread=2 * simdwidth,
             ],
         ]()
 
@@ -271,11 +269,11 @@ struct ScalarOperations[dtype: DType = DType.float32](
             var compiled = device_context.compile_function[
                 pow_op_f32[
                     simd_width=simdwidth,
-                    simd_vectors_per_thread = 2 * simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
                 ],
                 pow_op_f32[
                     simd_width=simdwidth,
-                    simd_vectors_per_thread = 2 * simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
                 ],
             ]()
             device_context.enqueue_function(
@@ -291,11 +289,11 @@ struct ScalarOperations[dtype: DType = DType.float32](
             var compiled = device_context.compile_function[
                 pow_op_f64[
                     simd_width=simdwidth,
-                    simd_vectors_per_thread = 2 * simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
                 ],
                 pow_op_f64[
                     simd_width=simdwidth,
-                    simd_vectors_per_thread = 2 * simdwidth,
+                    simd_vectors_per_thread=2 * simdwidth,
                 ],
             ]()
             device_context.enqueue_function(

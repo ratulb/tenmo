@@ -5,15 +5,18 @@ from gradbox import Gradbox
 from common_utils import Epsilon
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         var epsilon = (
-            output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ScalarArg[Self.dtype]]()
+            .value
         )
         ref gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
@@ -23,6 +26,7 @@ struct LogBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var parent_gradbox = Gradbox[Self.dtype](result_ndb^, share=False)
 
         return [(parent^, parent_gradbox^, AddTensor)]
+
 
 @fieldwise_init
 struct Logarithm[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -41,8 +45,9 @@ struct Logarithm[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg =
-                    BackwardFnArg[Self.dtype].scalar_arg(BACKWARD_LOG, epsilon)
+                var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
+                    BACKWARD_LOG, epsilon
+                )
 
                 out.add_ancestry(backwardFnArg^, self)
 

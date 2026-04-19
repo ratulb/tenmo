@@ -9,7 +9,6 @@ from ancestry import Ancestor
 
 @fieldwise_init
 struct ReLUBackward[dtype: DType](ImplicitlyCopyable & Movable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],

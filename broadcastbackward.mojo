@@ -5,14 +5,14 @@ from shapes import Shape
 from ancestry import Ancestor
 from broadcasthelper import ShapeBroadcaster
 
-@fieldwise_init
-struct BroadcastBackward[
-    dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int
-](RegisterPassable, ImplicitlyCopyable):
 
+@fieldwise_init
+struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
+    ImplicitlyCopyable, RegisterPassable
+):
     @staticmethod
     fn backward(
-        output: Ancestor[Self.dtype]
+        output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
         # This is the gradient flowing *into* this broadcasted op.
         # We need to call copy explicitly because we have not annotated Gradbox with `ImplicitlyCopyable` yet - Intententionally
@@ -30,7 +30,11 @@ struct BroadcastBackward[
         # For left parent: compute the gradient contribution if needed
         if left_parent.requires_grad:
             # This function reduces the broadcast grad back to left_tensor shape.
-            var left_parent_grad = Self.upstream_grad_share(left_parent.buffer(), right_parent.buffer(), incoming_grad.buffer)
+            var left_parent_grad = Self.upstream_grad_share(
+                left_parent.buffer(),
+                right_parent.buffer(),
+                incoming_grad.buffer,
+            )
 
             # Append to return list:
             #   - which ancestor gets the update
@@ -42,7 +46,11 @@ struct BroadcastBackward[
 
         # For right parent: compute its gradient if needed
         if right_parent.requires_grad:
-            var right_parent_grad = Self.upstream_grad_share(right_parent.buffer(), left_parent.buffer(), incoming_grad.buffer)
+            var right_parent_grad = Self.upstream_grad_share(
+                right_parent.buffer(),
+                left_parent.buffer(),
+                incoming_grad.buffer,
+            )
 
             parent_grad_list.append(
                 (right_parent^, right_parent_grad^, Self.rhs_op)
@@ -79,6 +87,7 @@ struct BroadcastBackward[
                 grad_contrib = grad_contrib.reshape(self.shape)
 
         return grad_contrib^
+
 
 fn main() raises:
     print("passes")

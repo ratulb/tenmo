@@ -6,9 +6,9 @@ from gradbox import Gradbox
 from intarray import IntArray
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct TransposeBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],

@@ -37,6 +37,7 @@ from ndbuffer import NDBuffer
 from std.random import seed, random_float64
 from std.sys import simd_width_of
 
+
 @fieldwise_init
 struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     """Fully connected layer: y = xW + b."""
@@ -171,7 +172,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         if self.training:
             var matmul_out = Matmul[Self.dtype].forward[
-                track_grad=True, mode = Self.mode
+                track_grad=True, mode=Self.mode
             ](xs, self.weight)
             result = Adder[Self.dtype].forward[track_grad=True](
                 matmul_out^, self.bias
@@ -179,7 +180,7 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         else:
             var matmul_out = Matmul[Self.dtype].forward[
-                track_grad=False, mode = Self.mode
+                track_grad=False, mode=Self.mode
             ](xs, self.weight)
             result = Adder[Self.dtype].forward[track_grad=False](
                 matmul_out^, self.bias
@@ -489,7 +490,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         if self.training:
             var matmul_out = Matmul[Self.dtype].forward[
-                track_grad=True, mode = Self.mode
+                track_grad=True, mode=Self.mode
             ](xs, self.weight)
             result = Adder[Self.dtype].forward[track_grad=True](
                 matmul_out^, self.bias
@@ -497,7 +498,7 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
         else:
             var matmul_out = Matmul[Self.dtype].forward[
-                track_grad=False, mode = Self.mode
+                track_grad=False, mode=Self.mode
             ](xs, self.weight)
             result = Adder[Self.dtype].forward[track_grad=False](
                 matmul_out^, self.bias
@@ -1136,7 +1137,9 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         if init_method == "xavier":
             # Xavier/Glorot uniform initialization
             var fan_out = out_channels * kernel_size * kernel_size
-            var limit = Scalar[Self.dtype](sqrt(6.0 / Float64(fan_in + fan_out)))
+            var limit = Scalar[Self.dtype](
+                sqrt(6.0 / Float64(fan_in + fan_out))
+            )
             self.weight = (
                 Tensor[Self.dtype].rand(
                     shape=weight_shape,

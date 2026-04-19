@@ -8,15 +8,16 @@ from std.sys.defines import get_defined_int
 
 comptime max_rank = get_defined_int["MAX_RANK", mnemonics.max_rank]()
 
+
 struct Array(
-    RegisterPassable,
     Defaultable,
     DevicePassable,
+    Equatable,
     ImplicitlyCopyable,
     Iterable,
+    RegisterPassable,
     Sized,
     Writable,
-    Equatable,
 ):
     comptime device_type: AnyType = Self
 
@@ -100,7 +101,8 @@ struct Array(
     @staticmethod
     @always_inline("nodebug")
     fn with_capacity(capacity: Int) -> Self:
-        """No-op for Array — always has max_rank capacity. Returns empty Array."""
+        """No-op for Array — always has max_rank capacity. Returns empty Array.
+        """
         return Self()
 
     # ========== Properties ==========
@@ -142,7 +144,10 @@ struct Array(
     @always_inline("nodebug")
     fn append(mut self, value: Int):
         if self.size >= max_rank:
-            panic("Array -> append: capacity exceeded. max_rank is", String(max_rank))
+            panic(
+                "Array -> append: capacity exceeded. max_rank is",
+                String(max_rank),
+            )
         self.storage[self.size] = value
         self.size += 1
 
@@ -150,7 +155,10 @@ struct Array(
     fn prepend(mut self, value: Int):
         """Prepend element — shifts existing elements right."""
         if self.size >= max_rank:
-            panic("Array -> prepend: capacity exceeded. max_rank is", String(max_rank))
+            panic(
+                "Array -> prepend: capacity exceeded. max_rank is",
+                String(max_rank),
+            )
         for i in range(self.size, 0, -1):
             self.storage[i] = self.storage[i - 1]
         self.storage[0] = value
@@ -347,13 +355,14 @@ struct Array(
 
 # ========== Iterator ==========
 
+
 @fieldwise_init
 struct ArrayIterator[
     mut: Bool,
     //,
     origin: Origin[mut=mut],
     forward: Bool = True,
-](RegisterPassable, ImplicitlyCopyable, Iterable, Iterator, Sized):
+](ImplicitlyCopyable, Iterable, Iterator, RegisterPassable, Sized):
     comptime Element = Int
 
     comptime IteratorType[

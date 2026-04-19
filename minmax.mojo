@@ -8,14 +8,16 @@ from gradbox import Gradbox
 from ndbuffer import NDBuffer
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct MinMaxBackward[dtype: DType](ImplicitlyCopyable & Movable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.ancestry().backward_fn_arg().get[MinMaxArg[Self.dtype]]()
+        var bwd_arg = (
+            output.ancestry().backward_fn_arg().get[MinMaxArg[Self.dtype]]()
+        )
         var (axes, keepdims, mask) = (
             bwd_arg.axes,
             bwd_arg.keepdims,
@@ -70,7 +72,7 @@ struct MinMax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg= BackwardFnArg[Self.dtype](
+                var backwardFnArg = BackwardFnArg[Self.dtype](
                     BACKWARD_MINMAX,
                     MinMaxArg[Self.dtype](normalized_axes, keepdims, mask_ndb^),
                 )

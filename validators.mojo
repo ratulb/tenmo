@@ -495,7 +495,7 @@ struct Validator:
     fn validate_and_compute_view_metadata(
         original_shape: Shape,
         original_strides: Strides,
-        #slices: VariadicListMem[Slice],
+        # slices: VariadicListMem[Slice],
         slices: VariadicList[Slice, _],
     ) -> Tuple[Shape, Strides, Int]:
         """
@@ -547,7 +547,7 @@ struct Validator:
     fn validate_and_compute_advanced_indexing_metadata(
         original_shape: Shape,
         original_strides: Strides,
-        #indices: VariadicListMem[Idx],
+        # indices: VariadicListMem[Idx],
         indices: VariadicList[Idx, _],
     ) -> Tuple[Shape, Strides, Int]:
         """
@@ -763,6 +763,7 @@ struct Validator:
             required_stride *= shape[dim]
 
         return True
+
 
 fn main():
     pass

@@ -3,9 +3,9 @@ from std.memory import memcpy
 
 
 struct IntArray(
-    RegisterPassable,
     ImplicitlyCopyable,
     Iterable,
+    RegisterPassable,
     Sized,
     Writable,
 ):
@@ -160,7 +160,7 @@ struct IntArray(
     # ========== Access ==========
 
     @always_inline("nodebug")
-    fn __getitem__(ref self, idx: Int) -> ref [self] Int:
+    fn __getitem__(ref self, idx: Int) -> ref[self] Int:
         """Get element at index (supports negative indexing)."""
         var index = idx if idx >= 0 else idx + self._size
         if index < 0 or index >= self._size:
@@ -252,7 +252,7 @@ struct IntArray(
         """Append element."""
         self.reserve(self._size + len(values))
         for i in range(len(values)):
-            self._data[self._size+i] = values[i]
+            self._data[self._size + i] = values[i]
         self._size += len(values)
 
     @always_inline
@@ -591,7 +591,7 @@ struct IntArrayIterator[
     //,
     origin: Origin[mut=mut],
     forward: Bool = True,
-](RegisterPassable, ImplicitlyCopyable, Iterable, Iterator, Sized):
+](ImplicitlyCopyable, Iterable, Iterator, RegisterPassable, Sized):
     comptime Element = Int
 
     comptime IteratorType[
@@ -606,7 +606,7 @@ struct IntArrayIterator[
 
     fn __next__(
         mut self,
-    ) raises StopIteration -> ref [Self.origin] Self.Element:
+    ) raises StopIteration -> ref[Self.origin] Self.Element:
         comptime if Self.forward:
             if self.index >= len(self.src[]):
                 raise StopIteration()

@@ -17,9 +17,9 @@ from std.sys.info import num_physical_cores
 from intarray import IntArray
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
@@ -28,7 +28,9 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var A = output.ancestry().get(0)
         var B = output.ancestry().get(1)
 
-        var result = List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]()
+        var result = List[
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
 
         # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
         if A.requires_grad:
@@ -50,6 +52,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             result.append((B^, grad_B^, AddTensor))
 
         return result^
+
 
 @fieldwise_init
 struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -93,7 +96,6 @@ struct Matmul2d[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 @fieldwise_init
 struct MatmulNdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],

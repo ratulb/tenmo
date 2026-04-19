@@ -13,16 +13,21 @@ from broadcastbackward import BroadcastBackward
 from ancestry import Ancestor
 from std.os.atomic import Atomic, Consistency, fence
 
+
 @fieldwise_init
 struct MultiplyBackwardScalar[dtype: DType](
     ImplicitlyCopyable, RegisterPassable
 ):
-
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var factor = output.ancestry().backward_fn_arg().get[ScalarArg[Self.dtype]]().value
+        var factor = (
+            output.ancestry()
+            .backward_fn_arg()
+            .get[ScalarArg[Self.dtype]]()
+            .value
+        )
         ref gradbox = output.gradients()[]
         var ancestor = output.ancestry().get(0)
         scaled_gradbox = gradbox * factor
@@ -33,6 +38,7 @@ struct MultiplyBackwardScalar[dtype: DType](
                 AddTensor,
             )
         ]
+
 
 @fieldwise_init
 struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -45,7 +51,10 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var ancestor_lhs = output.ancestry().get(0)
 
         if count == 1:  # B = A * A, A is the only ancestor of B
-            var gradbox_prod = Gradbox[Self.dtype](ancestor_lhs.buffer(), share=False) * gradbox
+            var gradbox_prod = (
+                Gradbox[Self.dtype](ancestor_lhs.buffer(), share=False)
+                * gradbox
+            )
             gradbox_prod = gradbox_prod * Scalar[Self.dtype](2)
             return [(ancestor_lhs^, gradbox_prod^, AddTensor)]
 
@@ -56,7 +65,9 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         var ancestor_rhs = output.ancestry().get(1)
 
         if ancestor_lhs.requires_grad:
-            var gradbox_prod = gradbox * Gradbox[Self.dtype](ancestor_rhs.buffer(), share=False)
+            var gradbox_prod = gradbox * Gradbox[Self.dtype](
+                ancestor_rhs.buffer(), share=False
+            )
 
             grad_shares.append(
                 (
@@ -67,7 +78,9 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
         if ancestor_rhs.requires_grad:
-            var gradbox_prod = gradbox * Gradbox[Self.dtype](ancestor_lhs.buffer(), share=False)
+            var gradbox_prod = gradbox * Gradbox[Self.dtype](
+                ancestor_lhs.buffer(), share=False
+            )
             grad_shares.append(
                 (
                     ancestor_rhs^,
@@ -78,12 +91,14 @@ struct MultiplyBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return grad_shares^
 
+
 comptime MultiplyBroadcastBackward[dtype: DType] = BroadcastBackward[
     dtype,
     augment=True,
     lhs_op=AddTensor,
     rhs_op=AddTensor,
 ]
+
 
 @fieldwise_init
 struct MultiplyScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -101,8 +116,7 @@ struct MultiplyScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             if self.requires_grad:
                 out.requires_grad_(True)
                 var backwardFnArg = BackwardFnArg[Self.dtype].scalar_arg(
-                        BACKWARD_MULTIPLY_SCALAR, factor
-
+                    BACKWARD_MULTIPLY_SCALAR, factor
                 )
                 out.add_ancestry(backwardFnArg^, self)
 
@@ -139,14 +153,16 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.requires_grad_(True)
 
                 if self.shape() == other.shape():
-                    var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(BACKWARD_MULTIPLY)
+                    var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
+                        BACKWARD_MULTIPLY
+                    )
                     if id(self) == id(other):  # B = A * A, self == other == A
                         out.add_ancestry(backwardFnArg^, self)
                     else:
                         out.add_ancestry(backwardFnArg^, self, other)
                 else:
                     var backwardFnArg = BackwardFnArg[Self.dtype].null_arg(
-                            BACKWARD_MULTIPLY_BROADCAST
+                        BACKWARD_MULTIPLY_BROADCAST
                     )
                     out.add_ancestry(backwardFnArg^, self, other)
 
@@ -161,12 +177,14 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
 
 from shapes import Shape
+
+
 fn main() raises:
     comptime dtype = DType.float32
     var A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
     var B = Tensor[dtype].full(Shape.of(3, 1), 2, requires_grad=True)
     var C = A * B
-    #var C = A * 10
+    # var C = A * 10
     C.backward(42)
     A.grad().print()  # grad() call detaches
     B.grad().print()

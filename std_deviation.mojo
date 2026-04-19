@@ -5,13 +5,16 @@ from gradbox import Gradbox
 from common_utils import panic, Epsilon
 from ancestry import Ancestor
 
+
 @fieldwise_init
 struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     fn backward(
         output: Ancestor[Self.dtype],
     ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
-        var bwd_arg = output.ancestry().backward_fn_arg().get[StdArg[Self.dtype]]()
+        var bwd_arg = (
+            output.ancestry().backward_fn_arg().get[StdArg[Self.dtype]]()
+        )
         var (axis, unbiased, keepdims, epsilon) = (
             bwd_arg.axis,
             bwd_arg.unbiased,
@@ -20,7 +23,9 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
         var gradbox = output.gradients()[]
         var parent = output.ancestry().get(0)
-        var input_tensor = Tensor[Self.dtype](parent.buffer(), requires_grad=parent.requires_grad)
+        var input_tensor = Tensor[Self.dtype](
+            parent.buffer(), requires_grad=parent.requires_grad
+        )
         ref input_shape = input_tensor.shape()
 
         var dim = List[Int]()
@@ -76,6 +81,7 @@ struct StdBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         gradbox_ancestor = local_grad.__mul__(gradbox_ancestor^)
 
         return [(parent^, gradbox_ancestor^, AddTensor)]
+
 
 @fieldwise_init
 struct StdDev[dtype: DType](ImplicitlyCopyable, RegisterPassable):

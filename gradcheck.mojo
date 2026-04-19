@@ -12,7 +12,7 @@ fn gradcheck_param[
     model: Sequential[dtype],
     x: Tensor[dtype],
     y: Tensor[DType.int32],
-    loss_fn: fn (Tensor[dtype], Tensor[DType.int32]) -> Tensor[dtype],
+    loss_fn: fn(Tensor[dtype], Tensor[DType.int32]) -> Tensor[dtype],
     eps: Scalar[dtype] = Scalar[dtype](1e-3),
     tol: Scalar[dtype] = Scalar[dtype](1e-2),
 ) raises -> Bool:
