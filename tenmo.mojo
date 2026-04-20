@@ -1236,31 +1236,6 @@ struct Tensor[dtype: DType](
         for i in range(len(elems)):
             tensor[i] = elems[i]
 
-        _ = """@staticmethod
-    fn of[
-        row_size: Int
-    ](*elems: Scalar[Self.dtype], requires_grad: Bool = False) -> Tensor[
-        Self.dtype
-    ]:
-        Validator.validate_dtype_consistency(
-            Self.dtype, requires_grad, "of[row_size]"
-        )
-
-        if not (row_size >= 1 and row_size <= len(elems)):
-            panic(
-                (
-                    "Tensor → of[row_size] → invalid row size or not enough"
-                    " elements"
-                ),
-            )
-        num_rows = len(elems) // row_size
-        axes_spans = variadic1or2(num_rows, row_size)
-        shape = Shape(axes_spans)
-        tensor = Tensor[Self.dtype](shape, requires_grad)
-        for i in range(num_rows):
-            for j in range(row_size):
-                tensor[i, j] = elems[i * row_size + j]
-        return tensor^"""
         return tensor^
 
     @staticmethod
