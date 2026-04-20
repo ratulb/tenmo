@@ -224,6 +224,8 @@ struct Epsilon[dtype: DType](RegisterPassable):
             return rebind[Scalar[Self.dtype]](min_finite[DType.uint8]())
         elif Self.dtype == DType.int16:
             return rebind[Scalar[Self.dtype]](min_finite[DType.int16]())
+        elif Self.dtype == DType.bool:
+            return Scalar[Self.dtype](False) #!
         else:
             panic("Epsilon value not supported for: ", String(Self.dtype))
             return Scalar[Self.dtype](0)
