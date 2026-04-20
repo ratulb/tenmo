@@ -14,6 +14,7 @@ from mnemonics import (
     NEGATE,
     SIGMOID_FORWARD,
     RELU_FORWARD,
+    INVERT,
 )
 from std.math import log, exp, sqrt
 
@@ -56,6 +57,8 @@ fn unary_ops[
                     vec_result = sqrt(vec_a)
                 elif op_code == NEGATE:
                     vec_result = -vec_a
+                elif op_code == INVERT:
+                    vec_result = ~vec_a
                 elif op_code == RELU_FORWARD:
                     vec_result = max(vec_a, SIMD[dtype, simd_width](0))
                 else:  # ABS
@@ -72,6 +75,8 @@ fn unary_ops[
                         res = sqrt(val)
                     elif op_code == NEGATE:
                         res = -val
+                    elif op_code == INVERT:
+                        res = ~val
                     elif op_code == RELU_FORWARD:
                         res = max(val, Scalar[dtype](0))
                     else:  # ABS
@@ -272,6 +277,9 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
           SQRT, NEGATE,
           ABS, RELU        → unary_ops        (any dtype)
         """
+        comptime if op_code == INVERT:
+            comptime assert (Self.dtype == DType.bool or Self.dtype.is_integral()), "INVERT only valid for bool and integer types"
+
         debug_assert(A.is_on_gpu())
 
         var numels = A.numels()
@@ -457,6 +465,21 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             num_blocks = min((total_chunks + 255) // 256, 512)
         return threads_per_block, num_blocks
 
+from device import GPU
 
 fn main() raises:
+    comptime dtype = DType.int32
+    var ndb1 = NDBuffer[dtype](1, 8, -3, 0, 21, 67, 9, 11, 45)
+    var gpu = GPU()
+    var ndb1_gpu = ndb1.to_gpu(gpu)
+    var res1 = UnaryOpsKernel[dtype].launch[INVERT](ndb1_gpu)
+    ndb1.print()
+    res1.print()
+    var ndb2 =  NDBuffer[DType.bool](True, True, False, True)
+    ndb2.print()
+    var ndb2_gpu = ndb2.to_gpu(gpu)
+    var res2 = UnaryOpsKernel[DType.bool].launch[INVERT](ndb2_gpu)
+    res2.print()
+    res2.to_cpu().print()
+
     print("passes")
