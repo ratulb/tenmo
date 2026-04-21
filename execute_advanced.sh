@@ -99,7 +99,7 @@ if [ $# -eq 0 ]; then
     echo "  -d, --debug       Enable debug mode (-D LOGGING_LEVEL=debug)"
     echo ""
     print_colored "$CYAN" "Available tests:"
-    echo "  tensors, gpu, item, contiguous, maxmin_scalar, onehot, power"
+    echo "  unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar, onehot, power"
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand"
     echo "  sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout"
@@ -151,6 +151,8 @@ PASSED_TESTS=()
 run_single_test() {
     local test=$1
     case $test in
+        unary)          run_test "sqrt" "tests/test_unary_ops.mojo" "$DEBUG_MODE" ;;
+        sqrt)           run_test "sqrt" "tests/test_sqrt.mojo" "$DEBUG_MODE" ;;
         tensors)        run_test "tensors" "tests/test_tensors.mojo" "$DEBUG_MODE" ;;
         gpu)            run_test "gpu" "tests/test_gpu.mojo" "$DEBUG_MODE" ;;
         item)           run_test "item" "tests/test_item.mojo" "$DEBUG_MODE" ;;
@@ -230,6 +232,8 @@ run_single_test() {
         all)
             print_colored "$BLUE" "Running ALL tests..."
             local all_tests=(
+                "unary|tests/test_unary_ops.mojo"
+                "sqrt|tests/test_sqrt.mojo"
                 "tensors|tests/test_tensors.mojo"
                 "gpu|tests/test_gpu.mojo"
                 "item|tests/test_item.mojo"

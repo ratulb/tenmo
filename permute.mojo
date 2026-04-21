@@ -33,8 +33,6 @@ struct PermuteBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         # Apply inverse permutation — GPU safe via NDBuffer.permute
         var parent_gradbox = gradbox.permute(inverted^)
-        print("In permute backward returning: \n")
-        parent_gradbox.print()
         return [
             (parent^, parent_gradbox^, AddTensor),
             (output, gradbox, ZeroGrad),

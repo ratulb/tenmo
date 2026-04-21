@@ -18,6 +18,40 @@ from mnemonics import (
 )
 from std.math import log, exp, sqrt
 
+# Invert DType.bool
+
+
+fn invert_bool[
+    simd_width: Int = simd_width_of[DType.uint8](),
+    simd_vectors_per_thread: Int = 2 * simd_width,
+](
+    result: UnsafePointer[Scalar[DType.uint8], MutAnyOrigin],
+    A: UnsafePointer[Scalar[DType.uint8], ImmutAnyOrigin],
+    size: Int,
+):
+    """Logical NOT for bool stored as uint8. 0 -> 1, 1 -> 0."""
+    var gtid = Int(thread_idx.x + block_dim.x * block_idx.x)
+    var stride = Int(block_dim.x * grid_dim.x)
+    comptime CHUNK_SIZE = simd_vectors_per_thread * simd_width
+    var base_idx = gtid * CHUNK_SIZE
+
+    while base_idx < size:
+        comptime for item in range(simd_vectors_per_thread):
+            var i = base_idx + item * simd_width
+            if i + simd_width <= size:
+                var vec_a = A.load[width=simd_width](i)
+                # logical NOT: 0->1, anything else->0
+                var vec_result = (
+                    vec_a.eq(SIMD[DType.uint8, simd_width](0))
+                ).cast[DType.uint8]()
+                result.store[width=simd_width](i, vec_result)
+            elif i < size:
+                for j in range(size - i):
+                    result[i + j] = UInt8(1) if A[i + j] == UInt8(0) else UInt8(
+                        0
+                    )
+        base_idx += stride * CHUNK_SIZE
+
 
 # ── Generic unary ops kernel (SQRT, NEGATE, ABS, RELU) ───────────────────────
 # Works for any dtype — no floating point constraint needed.
@@ -57,8 +91,7 @@ fn unary_ops[
                     vec_result = sqrt(vec_a)
                 elif op_code == NEGATE:
                     vec_result = -vec_a
-                elif op_code == INVERT:
-                    vec_result = ~vec_a
+
                 elif op_code == RELU_FORWARD:
                     vec_result = max(vec_a, SIMD[dtype, simd_width](0))
                 else:  # ABS
@@ -75,8 +108,6 @@ fn unary_ops[
                         res = sqrt(val)
                     elif op_code == NEGATE:
                         res = -val
-                    elif op_code == INVERT:
-                        res = ~val
                     elif op_code == RELU_FORWARD:
                         res = max(val, Scalar[dtype](0))
                     else:  # ABS
@@ -261,43 +292,29 @@ fn unary_ops_with_mask[
 
 
 struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
+    comptime datatype: DType = DType.uint8 if Self.dtype == DType.bool else Self.dtype
+
     @staticmethod
     fn launch[
         op_code: Int, epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](A: NDBuffer[Self.dtype]) raises -> NDBuffer[Self.dtype]:
-        """
-        Core launch — takes NDBuffer, returns NDBuffer.
-        Caller must ensure A is on GPU.
-        Result is contiguous with zero offset.
-
-        Dispatch:
-          LOG, EXP,
-          TANH_FORWARD,
-          SIGMOID_FORWARD  → float_unary_ops  (dtype.is_floating_point())
-          SQRT, NEGATE,
-          ABS, RELU        → unary_ops        (any dtype)
-        """
+        comptime epsilon_rebinded = rebind[Scalar[Self.datatype]](epsilon)
         comptime if op_code == INVERT:
-            comptime assert (Self.dtype == DType.bool or Self.dtype.is_integral()), "INVERT only valid for bool and integer types"
-
+            comptime assert (
+                Self.dtype == DType.bool or Self.dtype.is_integral()
+            ), "INVERT only valid for bool and integer types"
         debug_assert(A.is_on_gpu())
-
         var numels = A.numels()
-        comptime simdwidth = simd_width_of[Self.dtype]()
-
+        comptime simdwidth = simd_width_of[Self.datatype]()
         var (threads_per_block, num_blocks) = Self.launch_config(
             numels, simdwidth
         )
-
         ref device_state = A.device_state.value()
         var device_context = device_state.gpu()
-
         var contig_state = A.contiguous_device_state()
-
-        var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
+        var result_buffer = device_context.enqueue_create_buffer[Self.datatype](
             numels
         )
-
         comptime if op_code == LOG or op_code == EXP or op_code == TANH_FORWARD or op_code == SIGMOID_FORWARD:
             comptime if not Self.dtype.is_floating_point():
                 panic(
@@ -307,17 +324,17 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             var compiled = device_context.compile_function[
                 float_unary_ops[
                     op_code=op_code,
-                    dtype=Self.dtype,
+                    dtype=Self.datatype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
-                    epsilon=epsilon,
+                    epsilon=epsilon_rebinded,
                 ],
                 float_unary_ops[
                     op_code=op_code,
-                    dtype=Self.dtype,
+                    dtype=Self.datatype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
-                    epsilon=epsilon,
+                    epsilon=epsilon_rebinded,
                 ],
             ]()
             device_context.enqueue_function(
@@ -328,17 +345,31 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
+        elif op_code == INVERT:
+            var compiled = device_context.compile_function[
+                invert_bool[simdwidth, 2 * simdwidth],
+                invert_bool[simdwidth, 2 * simdwidth],
+            ]()
+            device_context.enqueue_function(
+                compiled,
+                result_buffer,
+                contig_state.device_buffer(),
+                numels,
+                grid_dim=num_blocks,
+                block_dim=threads_per_block,
+            )
+
         else:
             var compiled = device_context.compile_function[
                 unary_ops[
                     op_code=op_code,
-                    dtype=Self.dtype,
+                    dtype=Self.datatype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
                 ],
                 unary_ops[
                     op_code=op_code,
-                    dtype=Self.dtype,
+                    dtype=Self.datatype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
                 ],
@@ -354,7 +385,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
 
         device_context.synchronize()
 
-        var result_state = DeviceState[Self.dtype](
+        var result_state = DeviceState[Self.dtype].__init__[True](
             result_buffer^, device_state.gpu
         )
         return NDBuffer[Self.dtype].with_device_state(result_state^, A.shape)
@@ -465,21 +496,47 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             num_blocks = min((total_chunks + 255) // 256, 512)
         return threads_per_block, num_blocks
 
+
 from device import GPU
 
+
 fn main() raises:
-    comptime dtype = DType.int32
-    var ndb1 = NDBuffer[dtype](1, 8, -3, 0, 21, 67, 9, 11, 45)
+    test_invert()
+    _ = """comptime dtype = DType.int32
     var gpu = GPU()
+    var ndb1 = NDBuffer[dtype](1, 8, -3, 0, 21, 67, 9, 11, 45)
     var ndb1_gpu = ndb1.to_gpu(gpu)
     var res1 = UnaryOpsKernel[dtype].launch[INVERT](ndb1_gpu)
     ndb1.print()
     res1.print()
-    var ndb2 =  NDBuffer[DType.bool](True, True, False, True)
+    var ndb2 = NDBuffer[DType.bool](True, True, False, True)
     ndb2.print()
-    var ndb2_gpu = ndb2.to_gpu(gpu)
+    # var ndb2_gpu = ndb2.to_gpu(gpu)
+    # ndb2_gpu.print()
+    var ds = DeviceState[DType.bool](4, gpu)
+    ds.fill(ndb2)
+    var ndb2_gpu = NDBuffer[DType.bool].with_device_state(ds, Shape(4))
     var res2 = UnaryOpsKernel[DType.bool].launch[INVERT](ndb2_gpu)
     res2.print()
     res2.to_cpu().print()
+    # ndb2_gpu.print()"""
 
-    print("passes")
+
+from std.testing import assert_true
+
+
+fn test_invert() raises:
+    print("test_invert")
+    # comptime dtype = DType.int32
+    a = Tensor[DType.bool].full(Shape.of(3, 3), Scalar[DType.bool](True))
+    b = ~a
+    expected = Tensor[DType.bool].full(
+        Shape.of(3, 3), Scalar[DType.bool](False)
+    )
+    b.print()
+    assert_true((b == expected), "invertion assertion failed")
+    assert_true((~b == a), "invertion assertion 2 failed")
+    # var smd = SIMD[DType.int32, 2](11)
+    var smd = Tensor[DType.bool].scalar(-78)
+    var negated = smd.__abs__()
+    negated.print()

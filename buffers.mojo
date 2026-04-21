@@ -24,6 +24,9 @@ from mnemonics import (
     LOG_BACKWARD,
     ReverseDivide,
     SQRT,
+    INVERT,
+    NEGATE,
+    ABS,
     SQRT_BACKWARD,
     Equal,
     NotEqual,
@@ -710,7 +713,8 @@ struct Buffer[dtype: DType = DType.float32](
                     * self_block
                     * (One[Self.dtype].value() - self_block)
                 )
-
+            elif op_code == SQRT_BACKWARD:
+                op_result = other_block * (One[Self.dtype].value() / (epsilon + Scalar[Self.dtype](2) * sqrt(self_block)))
             else:  # Tanh backward
                 # fused tanh backward pass.
                 # self = tanh output (already computed in forward).
@@ -745,6 +749,9 @@ struct Buffer[dtype: DType = DType.float32](
                     * self[self_start + i]
                     * (One[Self.dtype].value() - self[self_start + i])
                 )
+            elif op_code == SQRT_BACKWARD:
+                out[i] = other[other_start + i] * (One[Self.dtype].value() / (epsilon + Scalar[Self.dtype](2) * sqrt(self[self_start + i])))
+
             else:  # Tanh backward
                 out[i] = other[other_start + i] * (
                     One[Self.dtype].value()
@@ -1001,23 +1008,6 @@ struct Buffer[dtype: DType = DType.float32](
 
         return self.arithmetic_ops_scalar[ReverseDivide](scalar)
 
-    # Helper for compile-time dispatch
-    @always_inline
-    @staticmethod
-    fn unary_ops_helper[
-        op_code: Int,
-        smdwidth: Int,
-        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
-    ](block: SIMD[Self.dtype, smdwidth]) -> SIMD[Self.dtype, smdwidth]:
-        comptime if op_code == RELU_FORWARD:
-            return max(block, 0.0)
-        elif op_code == SQRT:
-            return sqrt(block)
-        elif op_code == SQRT_BACKWARD:
-            return 1 / (epsilon + 2 * sqrt(block))
-        else:
-            return block
-
     @always_inline
     fn compare_buffer_full[
         op_code: Int
@@ -1244,14 +1234,34 @@ struct Buffer[dtype: DType = DType.float32](
 
         return out^
 
+    fn __abs__(self) -> Buffer[Self.dtype]:
+        return self.unary_ops[ABS]()
+
+    fn __neg__(self) -> Buffer[Self.dtype]:
+        return self.unary_ops[NEGATE]()
+
+    fn __invert__(self) -> Buffer[Self.dtype]:
+        return self.unary_ops[INVERT]()
+
     @always_inline
     fn unary_ops[
-        op_code: Int
+        op_code: Int,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](
         self: Buffer[Self.dtype],
         start_index: Int = 0,
         end_index: Optional[Int] = None,
     ) -> Buffer[Self.dtype]:
+        comptime if op_code == NEGATE:
+            comptime assert (
+                Self.dtype.is_numeric()
+            ), "Buffer → __neg__ is for numeric data types only"
+
+        comptime if op_code == INVERT:
+            comptime assert (
+                Self.dtype.is_integral() or DType.bool == Self.dtype
+            ), "Buffer → __invert__ is for Bool or integral data types only"
+
         var extent = end_index.or_else(self.size) - start_index
         var out = Buffer[Self.dtype](extent)
 
@@ -1280,6 +1290,27 @@ struct Buffer[dtype: DType = DType.float32](
                 out[idx] = result
 
         return out^
+
+    @always_inline
+    @staticmethod
+    fn unary_ops_helper[
+        op_code: Int,
+        smdwidth: Int,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
+    ](block: SIMD[Self.dtype, smdwidth]) -> SIMD[Self.dtype, smdwidth]:
+        comptime if op_code == RELU_FORWARD:
+            return max(block, 0.0)
+        elif op_code == SQRT:
+            return sqrt(block)
+        elif op_code == INVERT:
+            return block.__invert__()
+        elif op_code == NEGATE:
+            return block.__neg__()
+        elif op_code == ABS:
+            return block.__abs__()
+
+        else:
+            return block
 
     @always_inline
     fn unary_ops_with_mask[
@@ -1709,28 +1740,6 @@ struct Buffer[dtype: DType = DType.float32](
         return out^
 
     @always_inline
-    fn __abs__(self) -> Buffer[Self.dtype]:
-        comptime assert (
-            Self.dtype.is_numeric()
-        ), "Buffer → __abs__ is for numeric data types only"
-
-        var out = Buffer[Self.dtype](self.size)
-
-        comptime simd_width = simd_width_of[Self.dtype]()
-        var vectorized_end = (self.size // simd_width) * simd_width
-
-        # Vectorized absolute value
-        for idx in range(0, vectorized_end, simd_width):
-            var chunk = self.load[simdwidth=simd_width](idx)
-            out.store[simdwidth=simd_width](idx, chunk.__abs__())
-
-        # Scalar tail
-        for idx in range(vectorized_end, self.size):
-            out[idx] = self[idx].__abs__()
-
-        return out^
-
-    @always_inline
     fn clamp(
         self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]
     ) -> Buffer[Self.dtype]:
@@ -1807,53 +1816,6 @@ struct Buffer[dtype: DType = DType.float32](
             # Scalar tail
             for idx in range(vectorized_end, extent):
                 self[idx + start_index] = value
-
-    @always_inline
-    fn __neg__(self: Buffer[Self.dtype]) -> Buffer[Self.dtype]:
-        comptime assert (
-            Self.dtype.is_numeric()
-        ), "Buffer → __neg__ is for numeric data types only"
-
-        var out = Buffer[Self.dtype](self.size)
-
-        comptime simd_width = simd_width_of[Self.dtype]()
-        var vectorized_end = (self.size // simd_width) * simd_width
-
-        # Vectorized negation
-        for idx in range(0, vectorized_end, simd_width):
-            var chunk = self.load[simdwidth=simd_width](idx)
-            out.store[simdwidth=simd_width](idx, chunk.__neg__())
-
-        # Scalar tail
-        for idx in range(vectorized_end, self.size):
-            out[idx] = self[idx].__neg__()
-
-        return out^
-
-    @always_inline
-    fn __invert__(self) -> Buffer[Self.dtype]:
-        comptime assert (
-            Self.dtype.is_integral() or DType.bool == Self.dtype
-        ), "Buffer → __invert__ is for Bool or integral data types only"
-
-        var out = Buffer[Self.dtype](self.size)
-
-        comptime simd_width = 1 if Self.dtype == DType.bool else simd_width_of[
-            Self.dtype
-        ]()
-
-        var vectorized_end = (self.size // simd_width) * simd_width
-
-        # Vectorized invert
-        for idx in range(0, vectorized_end, simd_width):
-            var chunk = self.load[simdwidth=simd_width](idx)
-            out.store[simdwidth=simd_width](idx, chunk.__invert__())
-
-        # Scalar tail
-        for idx in range(vectorized_end, self.size):
-            out[idx] = self[idx].__invert__()
-
-        return out^
 
     @always_inline
     fn compare_scalar[

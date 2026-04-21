@@ -3171,7 +3171,7 @@ fn test_powering() raises:
 
 fn test_invert() raises:
     print("test_invert")
-    comptime dtype = DType.float32
+    comptime dtype = DType.int32
     a = Tensor[DType.bool].full(Shape.of(3, 3), Scalar[DType.bool](True))
     b = ~a
     expected = Tensor[DType.bool].full(

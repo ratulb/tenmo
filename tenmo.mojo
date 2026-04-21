@@ -1662,19 +1662,12 @@ struct Tensor[dtype: DType](
             zeros, self
         )
 
-    fn __invert__(self: Tensor[DType.bool]) -> Tensor[DType.bool]:
-        var buffer = self.buffer.map[
-            Utils[Self.dtype].invert_buffer, Utils[Self.dtype].invert_scalar
-        ]()
-        var nd_buffer = NDBuffer[DType.bool](buffer^, self.buffer.shape)
-        return Tensor[DType.bool](nd_buffer^, requires_grad=False)
+    fn __invert__(self: Tensor[Self.dtype]) -> Tensor[Self.dtype] where Self.dtype == DType.bool or Self.dtype.is_integral():
+        return Tensor[Self.dtype](self.buffer.unary_ops[INVERT](), requires_grad=False)
 
     fn __abs__(self) -> Tensor[Self.dtype]:
-        var buffer = self.buffer.map[
-            Utils[Self.dtype].abs_buffer, Utils[Self.dtype].abs_scalar
-        ]()
-        var nd_buffer = NDBuffer[Self.dtype](buffer^, self.buffer.shape)
-        return Tensor[Self.dtype](nd_buffer^, requires_grad=False)
+        #return Tensor[Self.dtype](self.buffer.unary_ops[ABS](), requires_grad=False)
+        return Tensor[Self.dtype](self.buffer.__abs__(), requires_grad=False)
 
     fn __radd__[
         track_grad: Bool = True

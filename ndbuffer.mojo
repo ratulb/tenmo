@@ -37,6 +37,7 @@ from mnemonics import (
     NEGATE,
     SQRT,
     ABS,
+    INVERT,
     LOG,
     EXP,
     SIGMOID_FORWARD,
@@ -44,6 +45,7 @@ from mnemonics import (
     TANH_FORWARD,
     TANH_BACKWARD,
     RELU_FORWARD,
+    SQRT_BACKWARD,
     Overwrite,
     ReverseDivide,
     Equal,
@@ -2059,6 +2061,10 @@ struct NDBuffer[dtype: DType](
         return self.unary_ops[NEGATE]()
 
     @always_inline
+    fn __abs__(self) -> NDBuffer[Self.dtype]:
+        return self.unary_ops[ABS]()
+
+    @always_inline
     fn log[
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value()
     ](self) -> NDBuffer[Self.dtype] where Self.dtype.is_floating_point():
@@ -2373,6 +2379,9 @@ struct NDBuffer[dtype: DType](
         elif op_code == SIGMOID_BACKWARD:
             # lhs = sigmoid output, rhs = grad
             return rhs * lhs * (One[Self.dtype].value() - lhs)
+
+        elif op_code == SQRT_BACKWARD:
+            return rhs * ( One[Self.dtype].value() / (epsilon + Scalar[Self.dtype](2) * sqrt(lhs)))
         elif op_code == TANH_BACKWARD:
             # lhs = tanh output, rhs = grad
             return rhs * (One[Self.dtype].value() - lhs * lhs)
@@ -2383,17 +2392,6 @@ struct NDBuffer[dtype: DType](
         else:  # op_code == ReverseDivide
             return rhs / lhs
 
-    @staticmethod
-    @always_inline
-    fn unary_fn_helper[
-        op_code: Int
-    ](scalar: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
-        comptime if op_code == NEGATE:
-            return -scalar
-        elif op_code == SQRT:
-            return sqrt(scalar)
-        else:  # op_code == ABS:
-            return scalar.__abs__()
 
     @staticmethod
     @always_inline
@@ -2488,6 +2486,7 @@ struct NDBuffer[dtype: DType](
     @always_inline
     fn unary_ops[
         op_code: Int,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         var out: NDBuffer[Self.dtype]
 
@@ -2515,19 +2514,13 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn unary_ops_cpu[
-        op_code: Int
+        op_code: Int,
+        epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
     ](self: NDBuffer[Self.dtype]) -> NDBuffer[Self.dtype]:
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
-            var result_buffer: Buffer[Self.dtype]
-
-            comptime if op_code == NEGATE:
-                result_buffer = self.buffer[start:end].__neg__()
-            elif op_code == SQRT:
-                result_buffer = self.buffer.unary_ops[SQRT](start, end)
-            else:  # op_code == ABS:
-                result_buffer = self.buffer[start:end].__abs__()
+            var result_buffer = self.buffer.unary_ops[op_code](start, end)
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
 
@@ -2542,6 +2535,18 @@ struct NDBuffer[dtype: DType](
                 index += 1
 
             return NDBuffer[Self.dtype](result_buffer^, self.shape)
+
+    @staticmethod
+    @always_inline
+    fn unary_fn_helper[
+        op_code: Int
+    ](scalar: Scalar[Self.dtype]) -> Scalar[Self.dtype]:
+        comptime if op_code == NEGATE:
+            return -scalar
+        elif op_code == SQRT:
+            return sqrt(scalar)
+        else:  # op_code == ABS:
+            return scalar.__abs__()
 
     @always_inline
     fn unary_ops_with_mask[

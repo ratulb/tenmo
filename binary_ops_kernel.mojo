@@ -9,6 +9,7 @@ from mnemonics import (
     SIGMOID_BACKWARD,
     TANH_BACKWARD,
     LOG_BACKWARD,
+    SQRT_BACKWARD,
 )
 from strides import Strides
 from broadcasthelper import ShapeBroadcaster
@@ -16,6 +17,7 @@ from device import DeviceState
 from array import Array
 from ndbuffer import NDBuffer
 from common_utils import One, Epsilon
+from std.math import sqrt
 
 
 fn arithmetic_ops_both_contiguous[
@@ -65,6 +67,12 @@ fn arithmetic_ops_both_contiguous[
                     vec_result = vec_b * vec_a * (one - vec_a)
                 elif op_code == TANH_BACKWARD:
                     vec_result = vec_b * (one - vec_a * vec_a)
+                elif op_code == SQRT_BACKWARD:
+                    vec_result = vec_b * (
+                        SIMD[dtype, simd_width](1)
+                        / (epsilon + SIMD[dtype, simd_width](2) * sqrt(vec_a))
+                    )
+
                 else:  # Log backward
                     vec_result = vec_b / max(vec_a, epsilon)
                 result.store[width=simd_width](i, vec_result)
@@ -88,6 +96,12 @@ fn arithmetic_ops_both_contiguous[
                         res = b * a * (One[dtype].value() - a)
                     elif op_code == TANH_BACKWARD:
                         res = b * (One[dtype].value() - a * a)
+                    elif op_code == SQRT_BACKWARD:
+                        res = b * (
+                            Scalar[dtype](1)
+                            / (epsilon + Scalar[dtype](2) * sqrt(a))
+                        )
+
                     else:
                         res = b / max(a, epsilon)
                     result[idx] = res
@@ -155,6 +169,12 @@ fn arithmetic_ops_A_contiguous[
                         vec_result[lane] = B[b_idx] * (
                             One[dtype].value() - vec_a[lane] * vec_a[lane]
                         )
+                    elif op_code == SQRT_BACKWARD:
+                        vec_result[lane] = B[b_idx] * (
+                            Scalar[dtype](1)
+                            / (epsilon + Scalar[dtype](2) * sqrt(vec_a[lane]))
+                        )
+
                     else:  # Log backward
                         vec_result[lane] = B[b_idx] / max(vec_a[lane], epsilon)
 
@@ -187,7 +207,13 @@ fn arithmetic_ops_A_contiguous[
                         res = b * a * (One[dtype].value() - a)
                     elif op_code == TANH_BACKWARD:
                         res = b * (One[dtype].value() - a * a)
-                    else:
+                    elif op_code == SQRT_BACKWARD:
+                        res = b * (
+                            Scalar[dtype](1)
+                            / (epsilon + Scalar[dtype](2) * sqrt(a))
+                        )
+
+                    else:  # Log backward
                         res = b / max(a, epsilon)
 
                     result[linear_idx] = res
@@ -255,6 +281,12 @@ fn arithmetic_ops_B_contiguous[
                         vec_result[lane] = vec_b[lane] * (
                             One[dtype].value() - A[a_idx] * A[a_idx]
                         )
+                    elif op_code == SQRT_BACKWARD:
+                        vec_result[lane] = vec_b[lane] * (
+                            Scalar[dtype](1)
+                            / (epsilon + Scalar[dtype](2) * sqrt(A[a_idx]))
+                        )
+
                     else:  # Log backward
                         vec_result[lane] = vec_b[lane] / max(A[a_idx], epsilon)
 
@@ -287,6 +319,12 @@ fn arithmetic_ops_B_contiguous[
                         res = b * a * (One[dtype].value() - a)
                     elif op_code == TANH_BACKWARD:
                         res = b * (One[dtype].value() - a * a)
+                    elif op_code == SQRT_BACKWARD:
+                        res = b * (
+                            Scalar[dtype](1)
+                            / (epsilon + Scalar[dtype](2) * sqrt(a))
+                        )
+
                     else:
                         res = b / max(a, epsilon)
 
@@ -357,6 +395,12 @@ fn arithmetic_ops_both_strided[
                         vec_result[lane] = B[b_idx] * (
                             One[dtype].value() - A[a_idx] * A[a_idx]
                         )
+                    elif op_code == SQRT_BACKWARD:
+                        vec_result[lane] = B[b_idx] * (
+                            Scalar[dtype](1)
+                            / (epsilon + Scalar[dtype](2) * sqrt(A[a_idx]))
+                        )
+
                     else:  # Log backward
                         vec_result[lane] = B[b_idx] / max(A[a_idx], epsilon)
 
@@ -391,6 +435,12 @@ fn arithmetic_ops_both_strided[
                         res = b * a * (One[dtype].value() - a)
                     elif op_code == TANH_BACKWARD:
                         res = b * (One[dtype].value() - a * a)
+                    elif op_code == SQRT_BACKWARD:
+                        res = b * (
+                            Scalar[dtype](1)
+                            / (epsilon + Scalar[dtype](2) * sqrt(a))
+                        )
+
                     else:  # Log backward
                         res = b / max(a, epsilon)
 

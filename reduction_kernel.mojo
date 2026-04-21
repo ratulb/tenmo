@@ -267,7 +267,6 @@ struct Reduction[dtype: DType = DType.float32](
         var reduced_shape = shape_A.reduced_shape(normalized_axes)
         var in_shape: Array = shape_A.array()
         var in_strides: Array = strides_A.array()
-        # var reduction_axes: Array = Array(normalized_axes)
         var total_output: Int = output_shape.product()
         var reduced_volume: Int = reduced_shape.product()
 
