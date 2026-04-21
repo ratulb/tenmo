@@ -332,7 +332,7 @@ fn test_sqrt_bwd_gpu_chain_mul() raises:
         var a_cpu = Tensor[dtype].d1([1.0, 4.0, 9.0], requires_grad=True)
         var a_gpu = a_cpu.to_gpu()
         var s = a_gpu.sqrt()
-        var scaled = s * Tensor[dtype].full_like(s, 2.0)
+        var scaled = s * Tensor[dtype].full_like(s, 2.0).to_gpu()
         var loss = scaled.sum()
         loss.backward()
         assert_true(

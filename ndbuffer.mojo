@@ -2168,6 +2168,9 @@ struct NDBuffer[dtype: DType](
                     )
                     # Unreachable
                     out = NDBuffer[Self.dtype].Empty()
+            elif (self.is_on_gpu() and other.is_on_cpu()) or (self.is_on_cpu() and other.is_on_gpu()):
+                panic("NDBuffer arithmetic_ops - both tensors must be on the same device - they are not")
+                out = NDBuffer[Self.dtype].Empty()
             else:
                 out = self.arithmetic_ops_cpu[op_code](other, epsilon)
         else:

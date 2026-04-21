@@ -770,7 +770,7 @@ struct Tensor[dtype: DType](
     ) -> Tensor[Self.dtype]:
         var shape = like.shape()
         return Tensor[Self.dtype].full(
-            shape^, value, requires_grad=requires_grad, device=device
+            shape^, value, requires_grad=requires_grad, device=device.or_else(like.device())
         )
 
     @staticmethod
@@ -1042,7 +1042,8 @@ struct Tensor[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu():
                 target_device = device.or_else(
-                    self.buffer.device_state.value().get_gpu().into()
+                    #self.buffer.device_state.value().get_gpu().into()
+                    self.device()
                 )
             else:
                 target_device = device.or_else(CPU().into())
