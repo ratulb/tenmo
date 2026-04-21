@@ -17,7 +17,7 @@ from device import DeviceState
 from array import Array
 from ndbuffer import NDBuffer
 from common_utils import One, Epsilon
-from std.math import sqrt
+from std.math import rsqrt
 
 
 fn arithmetic_ops_both_contiguous[
@@ -69,8 +69,8 @@ fn arithmetic_ops_both_contiguous[
                     vec_result = vec_b * (one - vec_a * vec_a)
                 elif op_code == SQRT_BACKWARD:
                     vec_result = vec_b * (
-                        SIMD[dtype, simd_width](1)
-                        / (epsilon + SIMD[dtype, simd_width](2) * sqrt(vec_a))
+                        SIMD[dtype, simd_width](0.5) * rsqrt(vec_a + epsilon)
+                        #/ (epsilon + SIMD[dtype, simd_width](2) * sqrt(vec_a))
                     )
 
                 else:  # Log backward
@@ -98,8 +98,8 @@ fn arithmetic_ops_both_contiguous[
                         res = b * (One[dtype].value() - a * a)
                     elif op_code == SQRT_BACKWARD:
                         res = b * (
-                            Scalar[dtype](1)
-                            / (epsilon + Scalar[dtype](2) * sqrt(a))
+                            Scalar[dtype](0.5) * rsqrt(a + epsilon)
+                            #/ (epsilon + Scalar[dtype](2) * sqrt(a))
                         )
 
                     else:
@@ -171,8 +171,8 @@ fn arithmetic_ops_A_contiguous[
                         )
                     elif op_code == SQRT_BACKWARD:
                         vec_result[lane] = B[b_idx] * (
-                            Scalar[dtype](1)
-                            / (epsilon + Scalar[dtype](2) * sqrt(vec_a[lane]))
+                            Scalar[dtype](0.5) * rsqrt(vec_a[lane]+ epsilon)
+                            #/ (epsilon + Scalar[dtype](2) * sqrt(vec_a[lane]))
                         )
 
                     else:  # Log backward
@@ -209,8 +209,8 @@ fn arithmetic_ops_A_contiguous[
                         res = b * (One[dtype].value() - a * a)
                     elif op_code == SQRT_BACKWARD:
                         res = b * (
-                            Scalar[dtype](1)
-                            / (epsilon + Scalar[dtype](2) * sqrt(a))
+                            Scalar[dtype](0.5) * rsqrt(a + epsilon)
+                            #/ (epsilon + Scalar[dtype](2) * sqrt(a))
                         )
 
                     else:  # Log backward
@@ -283,8 +283,8 @@ fn arithmetic_ops_B_contiguous[
                         )
                     elif op_code == SQRT_BACKWARD:
                         vec_result[lane] = vec_b[lane] * (
-                            Scalar[dtype](1)
-                            / (epsilon + Scalar[dtype](2) * sqrt(A[a_idx]))
+                            Scalar[dtype](0.5) * rsqrt(A[a_idx]+ epsilon)
+                            #/ (epsilon + Scalar[dtype](2) * sqrt(A[a_idx]))
                         )
 
                     else:  # Log backward
@@ -321,8 +321,8 @@ fn arithmetic_ops_B_contiguous[
                         res = b * (One[dtype].value() - a * a)
                     elif op_code == SQRT_BACKWARD:
                         res = b * (
-                            Scalar[dtype](1)
-                            / (epsilon + Scalar[dtype](2) * sqrt(a))
+                            Scalar[dtype](0.5) * rsqrt(a + epsilon)
+                            #/ (epsilon + Scalar[dtype](2) * sqrt(a))
                         )
 
                     else:
@@ -396,9 +396,12 @@ fn arithmetic_ops_both_strided[
                             One[dtype].value() - A[a_idx] * A[a_idx]
                         )
                     elif op_code == SQRT_BACKWARD:
-                        vec_result[lane] = B[b_idx] * (
+                        _="""vec_result[lane] = B[b_idx] * (
                             Scalar[dtype](1)
                             / (epsilon + Scalar[dtype](2) * sqrt(A[a_idx]))
+                        )"""
+                        vec_result[lane] = B[b_idx] * (
+                            Scalar[dtype](0.5) * rsqrt(A[a_idx]+epsilon)
                         )
 
                     else:  # Log backward
@@ -437,8 +440,8 @@ fn arithmetic_ops_both_strided[
                         res = b * (One[dtype].value() - a * a)
                     elif op_code == SQRT_BACKWARD:
                         res = b * (
-                            Scalar[dtype](1)
-                            / (epsilon + Scalar[dtype](2) * sqrt(a))
+                            Scalar[dtype](0.5) * rsqrt(a + epsilon)
+                            #/ (epsilon + Scalar[dtype](2) * sqrt(a))
                         )
 
                     else:  # Log backward
