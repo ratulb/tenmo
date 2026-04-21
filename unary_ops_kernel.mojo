@@ -91,6 +91,8 @@ fn unary_ops[
                     vec_result = sqrt(vec_a)
                 elif op_code == NEGATE:
                     vec_result = -vec_a
+                elif op_code == INVERT:
+                    vec_result = vec_a.__invert__()
 
                 elif op_code == RELU_FORWARD:
                     vec_result = max(vec_a, SIMD[dtype, simd_width](0))
@@ -108,6 +110,8 @@ fn unary_ops[
                         res = sqrt(val)
                     elif op_code == NEGATE:
                         res = -val
+                    elif op_code == INVERT:
+                        res = val.__invert__()
                     elif op_code == RELU_FORWARD:
                         res = max(val, Scalar[dtype](0))
                     else:  # ABS
@@ -345,7 +349,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                 grid_dim=num_blocks,
                 block_dim=threads_per_block,
             )
-        elif op_code == INVERT:
+        elif op_code == INVERT and Self.dtype == DType.bool:
             var compiled = device_context.compile_function[
                 invert_bool[simdwidth, 2 * simdwidth],
                 invert_bool[simdwidth, 2 * simdwidth],
