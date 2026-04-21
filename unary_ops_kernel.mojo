@@ -16,7 +16,7 @@ from mnemonics import (
     RELU_FORWARD,
     INVERT,
 )
-from std.math import log, exp, sqrt
+from std.math import log, exp, rsqrt
 
 # Invert DType.bool
 
@@ -63,6 +63,7 @@ fn unary_ops[
     dtype: DType,
     simd_width: Int = simd_width_of[dtype](),
     simd_vectors_per_thread: Int = 2 * simd_width,
+    epsilon: Scalar[dtype] = Epsilon[dtype].value(),
 ](
     result: UnsafePointer[Scalar[dtype], MutAnyOrigin],
     A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin],
@@ -88,7 +89,7 @@ fn unary_ops[
                 var vec_result: SIMD[dtype, simd_width]
 
                 comptime if op_code == SQRT:
-                    vec_result = sqrt(vec_a)
+                    vec_result = rsqrt(vec_a)
                 elif op_code == NEGATE:
                     vec_result = -vec_a
                 elif op_code == INVERT:
@@ -107,7 +108,7 @@ fn unary_ops[
                     var res: Scalar[dtype]
 
                     comptime if op_code == SQRT:
-                        res = sqrt(val)
+                        res = rsqrt(val)
                     elif op_code == NEGATE:
                         res = -val
                     elif op_code == INVERT:
@@ -370,12 +371,14 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
                     dtype=Self.datatype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
+                    epsilon=epsilon_rebinded,
                 ],
                 unary_ops[
                     op_code=op_code,
                     dtype=Self.datatype,
                     simd_width=simdwidth,
                     simd_vectors_per_thread=2 * simdwidth,
+                    epsilon=epsilon_rebinded,
                 ],
             ]()
             device_context.enqueue_function(

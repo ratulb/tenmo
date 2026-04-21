@@ -291,13 +291,13 @@ fn test_sig_gpu_4d_forward() raises:
 fn test_sig_gpu_f64_forward() raises:
     print("test_sig_gpu_f64_forward")
     comptime if has_accelerator():
-        comptime dtype = DType.float32
+        comptime dtype = DType.float64
         var x = Tensor[dtype].d1([0.0, 1.0, -1.0]).to_gpu()
         var y = x.sigmoid[track_grad=False]()
         var expected = Tensor[dtype].d1(
-            [0.5, 0.7310586, 0.26894147]
+            [0.5, 0.7310585975646973, 0.2689414024353027]
         )
-        assert_true(y.to_cpu().all_close[atol=1e-7](expected))
+        assert_true(y.to_cpu().all_close[atol=1e-10](expected))
 
 
 # ===----------------------------------------------------------------------=== #
@@ -374,13 +374,13 @@ fn test_sig_gpu_4d_backward() raises:
 fn test_sig_gpu_f64_backward() raises:
     print("test_sig_gpu_f64_backward")
     comptime if has_accelerator():
-        comptime dtype = DType.float32
+        comptime dtype = DType.float64
         var x_cpu = Tensor[dtype].d1([0.0], requires_grad=True)
         var x = x_cpu.to_gpu()
         var y = x.sigmoid()
         var loss = y.sum()
         loss.backward()
-        assert_true(x_cpu.grad().all_close[atol=1e-7](Tensor[dtype].d1([0.25])))
+        assert_true(x_cpu.grad().all_close[atol=1e-12](Tensor[dtype].d1([0.25])))
 
 
 # ===----------------------------------------------------------------------=== #
