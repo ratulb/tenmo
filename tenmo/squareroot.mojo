@@ -68,14 +68,3 @@ struct Sqrt[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         )
 
         return out^
-
-
-fn main() raises:
-    comptime dtype = DType.float32
-    var a = Tensor[dtype].ones(10, requires_grad=True)
-    var b = a.sqrt()
-    b.backward()
-    a.grad().print()
-    s = a.std()
-    s.backward()
-    a.grad().print()

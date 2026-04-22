@@ -276,38 +276,3 @@ struct ShapeBroadcaster(ImplicitlyCopyable, RegisterPassable):
             out_dim -= 1
 
         return result
-
-
-from std.memory import stack_allocation
-
-
-fn main() raises:
-    test_broadcast_strides()
-    shape = Shape(10, 1)
-    stack = stack_allocation[6144, Int]()
-    stack[6143] = shape[0]
-    print(stack[6143])
-
-
-from std.testing import assert_true
-
-
-fn test_broadcast_strides() raises:
-    print("test_broadcast_strides")
-    var input_shape = Shape(3)
-    var input_strides = Strides(1)
-    var target_shape = Shape(2, 3)
-
-    var result = ShapeBroadcaster.broadcast_strides(
-        input_shape, input_strides, target_shape
-    )
-    assert_true(result == Strides(0, 1))
-
-    input_shape = Shape(2, 1, 4)
-    input_strides = Strides(4, 4, 1)
-    target_shape = Shape(2, 3, 4)
-
-    result = ShapeBroadcaster.broadcast_strides(
-        input_shape, input_strides, target_shape
-    )
-    assert_true(result == Strides(4, 0, 1))

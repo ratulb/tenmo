@@ -631,6 +631,3 @@ struct BinaryInplaceOperations[dtype: DType](
         #   var (threads_per_block, num_blocks) = Self.launch_config(...)
         return threads_per_block, num_blocks
 
-
-fn main():
-    print("passes")

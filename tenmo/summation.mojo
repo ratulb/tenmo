@@ -82,24 +82,3 @@ struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^
-
-
-fn main() raises:
-    test_sum_2d_backward_axis0_cpu()
-
-
-from std.testing import assert_true
-
-
-fn test_sum_2d_backward_axis0_cpu() raises:
-    """Test backward of sum along axis 0 on CPU."""
-    print("test_sum_2d_backward_axis0_cpu")
-    comptime dtype = DType.float32
-    var a = Tensor[dtype].d2(
-        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], requires_grad=True
-    )
-    var loss = a.sum(axes=[0])
-    loss.backward()
-    var expected = Tensor[dtype].d2([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
-    assert_true(a.grad().all_close(expected))
-    print("✓ CPU 2D sum backward axis0 passed")

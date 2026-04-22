@@ -44,7 +44,3 @@ struct Tanh[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
-
-
-fn main() raises:
-    print("passes")

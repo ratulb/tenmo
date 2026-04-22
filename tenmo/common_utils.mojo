@@ -616,14 +616,3 @@ fn print_buffer[
                 print()  # Newline before closing bracket
 
         print(indent + "]", end="")
-
-
-from std.gpu.host import DeviceBuffer
-from .buffers import Buffer
-
-
-fn main():
-    # print(Epsilon[DType.int32].value())
-    print(Epsilon[DType.float32].value())
-    print(Epsilon[DType.float64].value())
-    # print(Epsilon[DType.bool].value())

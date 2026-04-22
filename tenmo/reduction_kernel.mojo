@@ -417,26 +417,3 @@ struct Reduction[dtype: DType = DType.float32](
         # total_output -> num_blocks
         return (block_size, total_output)
 
-
-fn main() raises:
-    test_mean()
-
-
-from .tensor import Tensor
-from std.testing import assert_true
-
-from .device import GPU
-from .shapes import Shape
-
-
-fn test_mean() raises:
-    print("test_mean")
-    comptime dtype = DType.float32
-    var ndb = NDBuffer[dtype](10, 20, 30)
-    # ndb.print()
-    s1 = ndb.sum(IntArray())
-    s1.print()
-    var ndb_gpu = ndb.to_gpu(GPU())
-    # ndb_gpu.print()
-    s2 = ndb_gpu.sum(IntArray())
-    s2.print()

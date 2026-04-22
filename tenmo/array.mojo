@@ -404,8 +404,3 @@ struct ArrayIterator[
             return len(self.src[]) - self.index
         else:
             return self.index
-
-
-fn main():
-    a = Array(3, 4, 5)
-    print(4 in a, 1 in a, a.product())

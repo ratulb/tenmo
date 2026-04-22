@@ -749,6 +749,3 @@ struct Gradbox[dtype: DType](
             .address_space_cast[address_space]()
         )
 
-
-fn main() raises:
-   print("passes")

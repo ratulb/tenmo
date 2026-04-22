@@ -183,6 +183,3 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
         )
         return out^
 
-
-fn main() raises:
-    pass

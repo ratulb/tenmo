@@ -348,6 +348,3 @@ struct Argmax[dtype: DType]:
             # Unreachable
             return Tensor[DType.int32].scalar(0)
 
-
-fn main() raises:
-    pass

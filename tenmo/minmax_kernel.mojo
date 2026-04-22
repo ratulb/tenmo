@@ -332,6 +332,3 @@ struct ReductionMinMax[dtype: DType = DType.float32](
         # total_output -> num_blocks
         return (block_size, total_output)
 
-
-fn main() raises:
-    pass

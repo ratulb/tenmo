@@ -403,7 +403,3 @@ struct DeviceState[dtype: DType](
         except e:
             print(e)
             return False
-
-
-fn main() raises:
-    print("passes")

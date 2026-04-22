@@ -764,6 +764,3 @@ struct Validator:
 
         return True
 
-
-fn main():
-    pass

@@ -88,6 +88,3 @@ struct BroadcastBackward[dtype: DType, augment: Bool, lhs_op: Int, rhs_op: Int](
 
         return grad_contrib^
 
-
-fn main() raises:
-    print("passes")

@@ -3576,7 +3576,3 @@ struct NDBuffer[dtype: DType](
     fn write_to[W: Writer](self, mut writer: W):
         """Write the string representation to a writer."""
         writer.write(self.__str__())
-
-
-fn main() raises:
-    print("Sure it passes")

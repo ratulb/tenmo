@@ -414,13 +414,3 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         else:
             return []
 
-
-fn main() raises:
-    comptime dtype = DType.float32
-    var A = Tensor[dtype].rand(3, 5, 3, requires_grad=True)
-    var B = Tensor[dtype].rand(3, 3, requires_grad=True)
-    C = A.matmul(B) + A * 42 + 100
-    C.backward()
-    A.grad().print()
-    B.grad().print()
-    print("passes")

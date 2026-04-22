@@ -546,6 +546,3 @@ struct CompareScalar[dtype: DType = DType.float32](
             )  # Cap at 512 blocks
         return threads_per_block, num_blocks
 
-
-fn main() raises:
-    print("passes")

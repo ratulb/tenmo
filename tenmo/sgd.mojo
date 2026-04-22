@@ -412,7 +412,3 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
     fn set_weight_decay(mut self, weight_decay: Scalar[Self.dtype]):
         self.weight_decay = weight_decay
-
-
-fn main() raises:
-    pass

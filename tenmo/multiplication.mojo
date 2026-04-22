@@ -174,18 +174,3 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ) -> Gradbox[Self.dtype]:
         var nd_buffer = self.buffer.arithmetic_ops[Multiply](other.buffer)
         return Gradbox[Self.dtype](nd_buffer^, share=False)
-
-
-from .shapes import Shape
-
-
-fn main() raises:
-    comptime dtype = DType.float32
-    var A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
-    var B = Tensor[dtype].full(Shape.of(3, 1), 2, requires_grad=True)
-    var C = A * B
-    # var C = A * 10
-    C.backward(42)
-    A.grad().print()  # grad() call detaches
-    B.grad().print()
-    print("passes")

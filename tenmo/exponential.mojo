@@ -45,6 +45,3 @@ struct Exponential[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return out^
 
-
-fn main() raises:
-    pass

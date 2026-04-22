@@ -2495,7 +2495,3 @@ struct ElementIterator[
             return len(self.src[]) - self.index
         else:
             return self.index
-
-
-fn main():
-    print("passes")

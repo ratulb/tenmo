@@ -90,36 +90,6 @@ fn from_ndarray[
         )
 
 
-from std.testing import assert_true
-
-
-fn main() raises:
-    comptime dtype = DType.float32
-    _ = """mnist = Python.import_module("mnist_datasets")
-    loader = mnist.MNISTLoader(folder="/tmp")
-
-    # Load train dataset
-    var train_data: PythonObject = loader.load()
-    var images = train_data[0]
-    var labels = train_data[1]
-    assert_true(len(images) == 60000 and len(labels) == 60000)
-
-    # Load test dataset
-    var test_data: PythonObject = loader.load(train=False)
-    var test_images = test_data[0]
-    var test_labels = test_data[1]
-    assert_true(len(test_images) == 10000 and len(test_labels) == 10000)"""
-    # test_to_ndarray()
-    _ = """var A = Tensor[dtype].arange(32)
-    var A_reshaped = A.reshape(2, 8, 2)
-    save(A_reshaped, "/tmp/mojo_data.npz")"""
-    # np = Python.import_module("numpy")
-    # data = np.load('/tmp/mojo_data.npz')
-    # print(data['array'])
-    var A = load[dtype]("/tmp/mojo_data.npz")
-    A.print()
-
-
 fn save[dtype: DType, //](t: Tensor[dtype], filename: StaticString) raises:
     var python_obj = to_ndarray(t)
     np = Python.import_module("numpy")

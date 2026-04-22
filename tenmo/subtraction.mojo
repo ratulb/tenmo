@@ -172,15 +172,3 @@ struct Subtractor[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                     out.add_ancestry(backwardFnArg^, self, other)
 
         return out^
-
-
-fn main() raises:
-    comptime dtype = DType.float32
-    var A = Tensor[dtype].rand(5, 3, requires_grad=True)
-    var B = Tensor[dtype].arange(3, requires_grad=True)
-    var C = A - B
-    C.backward(91)
-    A.grad().print()
-    B.grad().print()
-
-    print("passes")

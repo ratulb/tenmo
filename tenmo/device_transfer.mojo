@@ -155,7 +155,3 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         if code == -1:
             return self
         return Gradbox[Self.dtype](ndb^, share=False)
-
-
-fn main() raises:
-    pass

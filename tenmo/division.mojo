@@ -222,19 +222,3 @@ struct Divider[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, self, other)
 
         return out^
-
-
-from .shapes import Shape
-
-
-fn main() raises:
-    comptime dtype = DType.float32
-    _ = """var A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
-    var B = Tensor[dtype].full(Shape.of(3, 1), 2, requires_grad=True)
-    var C = (A / B) - 1 + (B * A) * 42
-    #var C = (A / B) - 1
-    # var C = 10/ A
-    C.backward(42)
-    A.grad().print()  # grad() call detaches
-    B.grad().print()"""
-    print("passes")

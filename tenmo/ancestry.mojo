@@ -226,7 +226,3 @@ struct AncestorIterator[dtype: DType, origin: ImmutOrigin](
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index
-
-
-fn main() raises:
-    print("passes")

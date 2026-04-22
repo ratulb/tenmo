@@ -303,13 +303,3 @@ struct View[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, tensor)
 
         return out^
-
-
-fn main() raises:
-    comptime dtype = DType.float32
-    a = Tensor[dtype].arange(10, requires_grad=True)
-    b = a.view(Shape(2, 5))
-    c = b * 42
-    c.backward()
-    a.grad().print()
-    pass

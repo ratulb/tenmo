@@ -106,7 +106,3 @@ struct Utils[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             return (1 - exp(-2 * x)) / (1 + exp(-2 * x))
         else:
             return (exp(2 * x) - 1) / (exp(2 * x) + 1)
-
-
-fn main() raises:
-    pass

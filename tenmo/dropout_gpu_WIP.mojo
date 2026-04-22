@@ -532,7 +532,3 @@ struct Dropout[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), DROPOUT)
-
-
-fn main() raises:
-    pass

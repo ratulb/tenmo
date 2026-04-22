@@ -113,23 +113,3 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return out^
 
 
-from std.testing import assert_true
-
-
-fn main() raises:
-    var A = Tensor[DType.float32].arange(5, 50, requires_grad=True)
-    var B = A.reshape(5, 9, requires_grad=True)
-    s = B.mean(IntArray(1), keepdims=True)
-    s.backward()
-
-    A.grad().print(num_first=1000, num_last=1000)
-    _ = """a_gpu = B.to_gpu()
-    b_cpu = a_gpu.reshape(3, 15)
-    c_gpu = b_cpu + 10
-    d_gpu = c_gpu * 42
-
-    gpu_mean = d_gpu.mean(keepdims=True)
-    gpu_mean.print()
-
-    s = gpu_mean.sum()
-    s.backward()"""

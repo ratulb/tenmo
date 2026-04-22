@@ -125,8 +125,3 @@ struct Strides(
         return Strides(IntArray.with_capacity(capacity))
 
 
-fn main():
-    var s = Strides(10, 5, 2, 3, 8, 7, 1, 1)
-    # var array = s.array()
-    print(s[:-2].array())
-    print(s[:-2])

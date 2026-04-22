@@ -61,12 +61,3 @@ struct Contiguous[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         return out^
 
-
-fn main() raises:
-    comptime dtype = DType.float32
-    var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]], requires_grad=True)
-    var v = a.view(Shape(2, 2), requires_grad=True)
-    var c = v.contiguous()
-    var d = c * 42
-    d.backward()
-    a.grad().print()

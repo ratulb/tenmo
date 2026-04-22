@@ -181,7 +181,3 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
             device_state^, out_shape
         )
         return out^
-
-
-fn main() raises:
-    pass

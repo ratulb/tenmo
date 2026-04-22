@@ -2477,7 +2477,3 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
 
     fn bounds(self) -> Tuple[Int, Optional[Int]]:
         return self.index_itr.bounds()
-
-
-fn main() raises:
-    print("passes")

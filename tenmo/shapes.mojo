@@ -360,8 +360,3 @@ struct ShapeIndexIterator[origin: ImmutOrigin](
     fn bounds(self) -> Tuple[Int, Optional[Int]]:
         var iter_len = len(self)
         return (iter_len, {iter_len})
-
-
-fn main():
-    array = Shape(4, 2, 1).array()
-    print(array)

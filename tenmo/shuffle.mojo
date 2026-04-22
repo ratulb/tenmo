@@ -311,7 +311,3 @@ struct Shuffle[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
-
-
-fn main() raises:
-    pass

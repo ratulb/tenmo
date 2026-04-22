@@ -202,16 +202,3 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
 
         return mask^
 
-
-from .buffers import Buffer
-
-
-fn main() raises:
-    comptime dtype = DType.float32
-    ndb = NDBuffer[dtype](Buffer[dtype]([2, 2, 3, 4, 2, 6]), Shape(2, 3))
-    ndb.print()
-    var res1 = MinMaxReducer[dtype].reduce_minmax[True](ndb, IntArray(), False)
-    var res2 = MinMaxReducer[dtype].reduce_minmax[True](ndb, IntArray(1), False)
-
-    res1.print()
-    res2.print()

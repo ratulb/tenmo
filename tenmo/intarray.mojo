@@ -700,7 +700,3 @@ struct ZipIterator[
         else:
             return self.index
 
-
-fn main():
-    var ia = IntArray(20, 30, 40)
-    print(ia)
