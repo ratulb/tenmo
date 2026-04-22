@@ -977,9 +977,8 @@ struct Tensor[dtype: DType](
         var out = Self.zeros(
             Shape(n, n), requires_grad=requires_grad, device=device
         )
-        for i, j in zip(range(n), range(n)):
-            if i == j:
-                out[i, j] = Scalar[Self.dtype](1)
+        for i in range(n):
+            out[i, i] = Scalar[Self.dtype](1)
         return out^
 
     @staticmethod
