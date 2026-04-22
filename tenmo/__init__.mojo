@@ -98,7 +98,6 @@ from  .exponentiator import *
 from  .filler import *
 from  .flatten import *
 from  .forwards import *
-from  .gpu_attributes import *
 from  .gradbox import *
 from  .indexhelper import *
 from  .intarray import *

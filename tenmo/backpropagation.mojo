@@ -9,8 +9,6 @@ from .ndbuffer import NDBuffer
 from .intarray import IntArray
 from .strides import Strides
 from .shapes import Shape
-from .device_transfer import Flow
-from .device import Device
 from .blashandle import BLASHandleLite
 from .crossentropy import Reduction
 

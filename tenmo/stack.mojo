@@ -298,6 +298,3 @@ struct Stack[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             tensors, axis=1, requires_grad=requires_grad
         )
 
-
-def main():
-    print("passes")
