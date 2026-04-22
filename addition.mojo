@@ -140,19 +140,3 @@ struct AddBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 pass
 
         return grad_shares^
-
-
-from common_utils import now
-from std.testing import assert_true
-from shapes import Shape
-
-
-fn main() raises:
-    comptime dtype = DType.float32
-    var A = Tensor[dtype].full(Shape.of(3, 3), 2, requires_grad=True)
-    var B = Tensor[dtype].full(Shape.of(3, 1), 2, requires_grad=True)
-    var C = A + B
-    # var C = A + 10
-    C.backward(42)
-    A.grad().print()  # grad() call detaches
-    B.grad().print()

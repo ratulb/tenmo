@@ -502,7 +502,3 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             )
             num_blocks = min((total_chunks + 255) // 256, 512)
         return threads_per_block, num_blocks
-
-
-fn main() raises:
-    print("passes")
