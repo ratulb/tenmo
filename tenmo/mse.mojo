@@ -9,7 +9,7 @@ struct MSELoss[dtype: DType = DType.float32]:
         pass
 
     fn __call__(
-        self, preds: Tensor[dtype], target: Tensor[dtype]
+        self, preds: Tensor[Self.dtype], target: Tensor[Self.dtype]
     ) -> Tensor[dtype]:
         # (1/N) * Σ (input - target)^2
         diff = preds - target
