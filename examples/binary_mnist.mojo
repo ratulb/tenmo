@@ -1,10 +1,10 @@
-from tensor import Tensor
-from net import Linear, ReLU, Sequential, BCELoss, Sigmoid
-from sgd import SGD
+from tenmo.tensor import Tensor
+from tenmo.net import Linear, ReLU, Sequential, BCELoss, Sigmoid
+from tenmo.sgd import SGD
 from std.python import Python, PythonObject
-from numpy_interop import from_ndarray
-from common_utils import now
-from dataloader import *
+from tenmo.numpy_interop import from_ndarray
+from tenmo.common_utils import now
+from tenmo.dataloader import *
 
 
 fn train_mnist_binary() raises:

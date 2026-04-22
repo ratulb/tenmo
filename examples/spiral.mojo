@@ -35,20 +35,20 @@ Performance:
     - Loss convergence: <0.05 final validation loss
 """
 
-from tensor import Tensor
-from sgd import SGD
-from net import (
+from tenmo.tensor import Tensor
+from tenmo.sgd import SGD
+from tenmo.net import (
     Sequential,
     Linear,
     ReLU,
     Sigmoid,
     BCELoss,
 )
-from dataloader import TensorDataset, DataLoader, Batch
+from tenmo.dataloader import TensorDataset, DataLoader, Batch
 from time import perf_counter_ns
 from std.math import sqrt, cos, sin, pi
 from std.random import randn_float64
-from intarray import IntArray
+from tenmo.intarray import IntArray
 
 
 fn generate_spiral_data(

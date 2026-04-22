@@ -1,3 +1,73 @@
+"""Tenmo — a lean tensor library and neural network framework in Mojo 🔥.
+
+A full-featured tensor library with automatic differentiation, GPU support,
+and end-to-end training pipelines built entirely in Mojo — with full
+visibility into every layer of the stack.
+
+## Core Types
+
+- `Tensor` — the central type. Tracks gradients, owns data, participates in
+  the autograd graph. Supports CPU and GPU.
+- `NDBuffer` — shape, strides, offset, and data. Single source of truth for
+  memory layout. Shared between tensors and views via ref-counting.
+- `Gradbox` — gradient storage. Independently ref-counted — survives ASAP
+  tensor destruction. Views have their own independent gradboxes.
+- `Ancestor` — lightweight parent handle in the autograd graph. Carries id,
+  grad routing, a refcounted gradbox pointer, `Layout`, and `Storage`. Does
+  not copy full tensors.
+- `Ancestors` — the ancestry list for a tensor. Carries the `BackwardFnArg`
+  directly — not stored on `Tensor`.
+- `Layout` — shape, strides, offset, contiguity. Pure metadata, no data.
+- `Storage` — CPU `Buffer` or GPU `DeviceState`. Refcount bump on copy.
+- `Buffer` — linear, SIMD-capable storage. Ref-counted when shared via views.
+
+## Quick Start
+
+```mojo
+from tenmo.tensor import Tensor
+
+fn main() raises:
+    var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
+    var b = a * 2
+    var c = a * 3
+    var d = b + c
+    var loss = d.sum()
+    loss.backward()
+    # a.grad() == [5.0, 5.0, 5.0]
+    a.grad().print()
+```
+
+## GPU Example
+
+```mojo
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
+
+fn main() raises:
+    var a = Tensor.d2([[1.0, 2.0], [3.0, 4.0]], requires_grad=True)
+    var a_gpu = a.to_gpu()
+    var b_gpu = Tensor.full_gpu(Shape.of(2, 2), 2.0)
+    var c_gpu = a_gpu * b_gpu
+    var loss = c_gpu.sum()
+    loss.backward()
+    a.grad().print()
+```
+
+## Training Example
+
+```mojo
+from tenmo.tensor import Tensor
+from tenmo.net import Sequential, Linear, ReLU
+from tenmo.sgd import SGD
+
+fn main() raises:
+    var model = Sequential[DType.float32]()
+    model.append(Linear[DType.float32](784, 128).into(), ReLU[DType.float32]().into())
+    var optimizer = SGD(model.parameters(), lr=0.01, momentum=0.9)
+    # ... training loop
+```
+"""
+
 from  .addition import *
 from  .ancestry import *
 from  .argminmax import *

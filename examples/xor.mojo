@@ -4,11 +4,11 @@ XOR Problem
 Classic non-linearly separable problem requiring hidden layers.
 """
 
-from tensor import Tensor
-from net import Sequential, Linear, Sigmoid, MSELoss
+from tenmo.tensor import Tensor
+from tenmo.net import Sequential, Linear, Sigmoid, MSELoss
 from time import perf_counter_ns
 from std.math import sqrt
-from sgd import SGD
+from tenmo.sgd import SGD
 
 
 fn xor_classification() -> None:

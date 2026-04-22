@@ -3,13 +3,13 @@ CIFAR-10 Training with Mojo - Profiled Version
 Includes detailed timing measurements to identify bottlenecks.
 """
 
-from tensor import Tensor
-from sgd import SGD
-from net import LinearBLAS, ReLU, SequentialBLAS, Dropout
-from crossentropy import CrossEntropyLoss
+from tenmo.tensor import Tensor
+from tenmo.sgd import SGD
+from tenmo.net import LinearBLAS, ReLU, SequentialBLAS, Dropout
+from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python
-from numpy_interop import from_ndarray, numpy_dtype
-from dataloader import NumpyDataset
+from tenmo.numpy_interop import from_ndarray, numpy_dtype
+from tenmo.dataloader import NumpyDataset
 from time import perf_counter_ns
 
 

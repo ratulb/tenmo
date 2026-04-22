@@ -3,16 +3,16 @@ MNIST Training with Mojo with Convolution layers
 A simple neural network implementation for MNIST digit classification.
 """
 
-from tensor import Tensor
-from sgd import SGD
-from net import Linear, ReLU, Sequential, Conv2D, Flatten, Dropout
-from forwards import MaxPool2d
-from crossentropy import CrossEntropyLoss
+from tenmo.tensor import Tensor
+from tenmo.sgd import SGD
+from tenmo.net import Linear, ReLU, Sequential, Conv2D, Flatten, Dropout
+from tenmo.forwards import MaxPool2d
+from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python
-from numpy_interop import from_ndarray, numpy_dtype
-from dataloader import NumpyDataset
-from forwards import Padding
-from common_utils import now
+from tenmo.numpy_interop import from_ndarray, numpy_dtype
+from tenmo.dataloader import NumpyDataset
+from tenmo.forwards import Padding
+from tenmo.common_utils import now
 
 
 fn train_mnist() raises:

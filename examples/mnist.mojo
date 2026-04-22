@@ -3,14 +3,14 @@ MNIST Training with Mojo
 A simple neural network implementation for MNIST digit classification.
 """
 
-from tensor import Tensor
-from sgd import SGD
-from net import Linear, ReLU, Sequential
-from crossentropy import CrossEntropyLoss
+from tenmo.tensor import Tensor
+from tenmo.sgd import SGD
+from tenmo.net import Linear, ReLU, Sequential
+from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python
-from numpy_interop import from_ndarray, numpy_dtype
-from dataloader import NumpyDataset
-from time import perf_counter_ns
+from tenmo.numpy_interop import from_ndarray, numpy_dtype
+from tenmo.dataloader import NumpyDataset
+from std.time import perf_counter_ns
 
 
 fn train_mnist() raises:
@@ -148,7 +148,7 @@ fn train_mnist() raises:
             loss.backward()
             optimizer.step()
 
-            train_loss += loss.item() * batch.batch_size
+            train_loss += loss.item() * Float32(batch.batch_size)
             train_correct += compute_accuracy(pred, batch.labels)
             train_total += batch.batch_size
 
@@ -165,16 +165,16 @@ fn train_mnist() raises:
             var pred = model(batch.features)
             var loss = criterion(pred, batch.labels)
 
-            val_loss += loss.item() * batch.batch_size
+            val_loss += loss.item() * Float32(batch.batch_size)
             val_correct += compute_accuracy(pred, batch.labels)
             val_total += batch.batch_size
 
         # --- Epoch Report ---
         var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9
-        var avg_train_loss = train_loss / train_total
-        var train_acc = 100.0 * train_correct / train_total
-        var avg_val_loss = val_loss / val_total
-        var val_acc = 100.0 * val_correct / val_total
+        var avg_train_loss = train_loss / Float32(train_total)
+        var train_acc = 100.0 * Float64(train_correct / train_total)
+        var avg_val_loss = val_loss / Float32(val_total)
+        var val_acc = 100.0 * Float64(val_correct / val_total)
 
         print(
             "Epoch",
