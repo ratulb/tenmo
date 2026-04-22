@@ -10,7 +10,7 @@ struct MSELoss[dtype: DType = DType.float32]:
 
     fn __call__(
         self, preds: Tensor[Self.dtype], target: Tensor[Self.dtype]
-    ) -> Tensor[dtype]:
+    ) -> Tensor[Self.dtype]:
         # (1/N) * Σ (input - target)^2
         diff = preds - target
         loss = (diff * diff).mean()
