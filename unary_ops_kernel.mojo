@@ -430,7 +430,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         ref device_state = A.device_state.value()
         var device_context = device_state.gpu()
 
-        # Non-contiguous fix: produce one contiguous GPU buffer in a single
+        # Non-contiguous: produce one contiguous GPU buffer in a single
         # map_to_host sweep — NOT one map_to_host call per index.
         var contig_state = A.contiguous_device_state()
 
@@ -504,46 +504,5 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         return threads_per_block, num_blocks
 
 
-from device import GPU
-
-
 fn main() raises:
-    test_invert()
-    _ = """comptime dtype = DType.int32
-    var gpu = GPU()
-    var ndb1 = NDBuffer[dtype](1, 8, -3, 0, 21, 67, 9, 11, 45)
-    var ndb1_gpu = ndb1.to_gpu(gpu)
-    var res1 = UnaryOpsKernel[dtype].launch[INVERT](ndb1_gpu)
-    ndb1.print()
-    res1.print()
-    var ndb2 = NDBuffer[DType.bool](True, True, False, True)
-    ndb2.print()
-    # var ndb2_gpu = ndb2.to_gpu(gpu)
-    # ndb2_gpu.print()
-    var ds = DeviceState[DType.bool](4, gpu)
-    ds.fill(ndb2)
-    var ndb2_gpu = NDBuffer[DType.bool].with_device_state(ds, Shape(4))
-    var res2 = UnaryOpsKernel[DType.bool].launch[INVERT](ndb2_gpu)
-    res2.print()
-    res2.to_cpu().print()
-    # ndb2_gpu.print()"""
-
-
-from std.testing import assert_true
-
-
-fn test_invert() raises:
-    print("test_invert")
-    # comptime dtype = DType.int32
-    a = Tensor[DType.bool].full(Shape.of(3, 3), Scalar[DType.bool](True))
-    b = ~a
-    expected = Tensor[DType.bool].full(
-        Shape.of(3, 3), Scalar[DType.bool](False)
-    )
-    b.print()
-    assert_true((b == expected), "invertion assertion failed")
-    assert_true((~b == a), "invertion assertion 2 failed")
-    # var smd = SIMD[DType.int32, 2](11)
-    var smd = Tensor[DType.bool].scalar(-78)
-    var negated = smd.__abs__()
-    negated.print()
+    print("passes")

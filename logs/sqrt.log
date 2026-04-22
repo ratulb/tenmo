@@ -1,51 +1,16 @@
-/content/tenmo/tests/test_unary_ops.mojo:592:4: error: function instantiation failed
-fn main() raises:
-   ^
-/content/tenmo/tests/test_unary_ops.mojo:642:31: note: call expansion failed
-    test_uop_invert_int_gpu_3d()
-                              ^
-/content/tenmo/tests/test_unary_ops.mojo:512:4: note: function instantiation failed
-fn test_uop_invert_int_gpu_3d() raises:
-   ^
-/content/tenmo/tests/test_unary_ops.mojo:518:22: note: call expansion failed with parameter value(s): (...)
-        var result = ~a_gpu
-                     ^
-Included from /content/tenmo/tests/test_unary_ops.mojo:2:
-/content/tenmo/./tenmo.mojo:1666:8: note: function instantiation failed
-    fn __invert__(self: Tensor[Self.dtype]) -> Tensor[Self.dtype] where Self.dtype == DType.bool or Self.dtype.is_integral():
-       ^
-Included from /content/tenmo/tests/test_unary_ops.mojo:2:
-/content/tenmo/./tenmo.mojo:1667:64: note: call expansion failed with parameter value(s): (..., "op_code": 48)
-        return Tensor[Self.dtype](self.buffer.unary_ops[INVERT](), requires_grad=False)
-                                                               ^
-Included from /content/tenmo/tests/test_unary_ops.mojo:2:
-Included from /content/tenmo/./tenmo.mojo:32:
-/content/tenmo/./ndbuffer.mojo:2490:8: note: function instantiation failed
-    fn unary_ops[
-       ^
-Included from /content/tenmo/tests/test_unary_ops.mojo:2:
-Included from /content/tenmo/./tenmo.mojo:32:
-/content/tenmo/./ndbuffer.mojo:2499:69: note: call expansion failed with parameter value(s): (..., "op_code": 48, ...)
-                    out = UnaryOpsKernel[Self.dtype].launch[op_code](self)
-                                                                    ^
-Included from /content/tenmo/tests/test_unary_ops.mojo:2:
-Included from /content/tenmo/./tenmo.mojo:32:
-Included from /content/tenmo/./ndbuffer.mojo:21:
-/content/tenmo/./unary_ops_kernel.mojo:298:8: note: function instantiation failed
-    fn launch[
-       ^
-Included from /content/tenmo/tests/test_unary_ops.mojo:2:
-Included from /content/tenmo/./tenmo.mojo:32:
-Included from /content/tenmo/./ndbuffer.mojo:21:
-/content/tenmo/./unary_ops_kernel.mojo:353:44: note: call expansion failed with parameter value(s): (..., ..., ..., ..., ...)
-            device_context.enqueue_function(
-                                           ^
-oss/modular/mojo/stdlib/std/gpu/host/device_context.mojo:4285:9: note: function instantiation failed
-oss/modular/mojo/stdlib/std/gpu/host/device_context.mojo:4348:31: note: call expansion failed with parameter value(s): (..., ..., ..., ..., ...)
-oss/modular/mojo/stdlib/std/gpu/host/device_context.mojo:5076:9: note: function instantiation failed
-oss/modular/mojo/stdlib/std/gpu/host/device_context.mojo:5090:34: note: call expansion failed with parameter value(s): (..., ..., ..., ..., ...)
-oss/modular/mojo/stdlib/std/gpu/host/device_context.mojo:2672:9: note: function instantiation failed
-oss/modular/mojo/stdlib/std/gpu/host/device_context.mojo:2700:14: note: call expansion failed with parameter value(s): (..., ..., "num_args": 3)
-oss/modular/mojo/stdlib/std/gpu/host/device_context.mojo:2469:9: note: function instantiation failed
-oss/modular/mojo/stdlib/std/gpu/host/device_context.mojo:2529:17: note: constraint failed: argument #1 of type 'DeviceBuffer[int32]' (which became device of type 'UnsafePointer[SIMD[DType.uint8, 1], mut=False, address_space=AddressSpace.GENERIC]') does not match the declared function argument type
-mojo: error: failed to run the pass manager
+test_sqrt_fwd_cpu_1d
+test_sqrt_fwd_cpu_2d
+test_sqrt_fwd_cpu_3d
+test_sqrt_fwd_cpu_scalar_like
+test_sqrt_fwd_cpu_zero
+test_sqrt_fwd_cpu_fractional
+test_sqrt_bwd_cpu_1d
+test_sqrt_bwd_cpu_2d
+test_sqrt_bwd_cpu_3d
+test_sqrt_bwd_cpu_chain_mul
+test_sqrt_bwd_cpu_chain_add
+test_sqrt_bwd_cpu_sqrt_of_sqrt
+test_sqrt_gradflow_cpu_no_grad_leaf
+test_sqrt_gradflow_cpu_multi_use_leaf
+test_sqrt_gradflow_cpu_intermediate_reuse_warning
+All sqrt tests passed ✓
