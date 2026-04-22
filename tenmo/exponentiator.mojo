@@ -1,9 +1,9 @@
-from tensor import Tensor
-from backpropagation import BackwardFnArg, ScalarArg, BACKWARD_EXPONENTIATION
-from mnemonics import AddTensor, Multiply
-from gradbox import Gradbox
-from ndbuffer import NDBuffer
-from ancestry import Ancestor
+from .tensor import Tensor
+from .backpropagation import BackwardFnArg, ScalarArg, BACKWARD_EXPONENTIATION
+from .mnemonics import AddTensor, Multiply
+from .gradbox import Gradbox
+from .ndbuffer import NDBuffer
+from .ancestry import Ancestor
 
 # ── ExponentiationBackward ────────────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ struct Exponentiator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return out^
 
 
-from shapes import Shape
+from .shapes import Shape
 
 
 fn main() raises:

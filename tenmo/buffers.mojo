@@ -3,10 +3,10 @@ from std.sys.info import num_physical_cores
 from std.sys import simd_width_of, size_of
 from std.memory import memset_zero, memcpy, AddressSpace
 from std.math import exp, log, ceil, tanh, sqrt
-from common_utils import log_debug, panic, Epsilon, One
+from .common_utils import log_debug, panic, Epsilon, One
 from std.utils.numerics import max_finite
 from std.os.atomic import Atomic, Consistency, fence
-from mnemonics import (
+from .mnemonics import (
     Multiply,
     Add,
     Subtract,

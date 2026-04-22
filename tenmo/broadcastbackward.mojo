@@ -1,9 +1,9 @@
-from tensor import Tensor
-from gradbox import Gradbox
-from ndbuffer import NDBuffer
-from shapes import Shape
-from ancestry import Ancestor
-from broadcasthelper import ShapeBroadcaster
+from .tensor import Tensor
+from .gradbox import Gradbox
+from .ndbuffer import NDBuffer
+from .shapes import Shape
+from .ancestry import Ancestor
+from .broadcasthelper import ShapeBroadcaster
 
 
 @fieldwise_init

@@ -1,63 +1,63 @@
-from backpropagation import BackwardFn
-from matmul import Matmul2dBackward, MatmulNdBackward
-from vectormatrix import VectorMatmulNdBackward
-from matrixvector import MatrixVectorMulNdBackward
-from summation import SumBackward
-from mean_reduction import MeanBackward
-from addition import AddBackward, AddBackwardScalar, AddBroadcastBackward
-from subtraction import (
+from .backpropagation import BackwardFn
+from .matmul import Matmul2dBackward, MatmulNdBackward
+from .vectormatrix import VectorMatmulNdBackward
+from .matrixvector import MatrixVectorMulNdBackward
+from .summation import SumBackward
+from .mean_reduction import MeanBackward
+from .addition import AddBackward, AddBackwardScalar, AddBroadcastBackward
+from .subtraction import (
     SubBackward,
     SubLeftRightBackwardScalar,
     SubtractBroadcastBackward,
 )
-from reshape import ReshapeBackward
-from multiplication import (
+from .reshape import ReshapeBackward
+from .multiplication import (
     MultiplyBackward,
     MultiplyBackwardScalar,
     MultiplyBroadcastBackward,
 )
 
-from exponentiator import ExponentiationBackward
-from division import (
+from .exponentiator import ExponentiationBackward
+from .division import (
     TrueDivBackwardScalar,
     RightTrueDivBackwardScalar,
     DivideBackward,
 )
-from transpose import TransposeBackward
-from views import ViewBackward
-from permute import PermuteBackward
-from dotproduct import DotBackward
-from unsqueeze import UnsqueezeBackward
-from squeeze import SqueezeBackward
-from expand import ExpandBackward
-from minmax import MinMaxBackward
-from shuffle import ShuffleBackward
-from relu import ReLUBackward
-from softmax import SoftmaxBackward, LogSoftmaxBackward
-from logarithm import LogBackward
-from crossentropy import (
+from .transpose import TransposeBackward
+from .views import ViewBackward
+from .permute import PermuteBackward
+from .dotproduct import DotBackward
+from .unsqueeze import UnsqueezeBackward
+from .squeeze import SqueezeBackward
+from .expand import ExpandBackward
+from .minmax import MinMaxBackward
+from .shuffle import ShuffleBackward
+from .relu import ReLUBackward
+from .softmax import SoftmaxBackward, LogSoftmaxBackward
+from .logarithm import LogBackward
+from .crossentropy import (
     CEClassIndicesBackward,
     CEProbabilitiesBackward,
     CEClassIndicesArg,
     CEProbabilitiesArg,
 )
-from tiles import TileBackward
-from flatten import FlattenBackward
-from contiguous import ContiguousBackward
-from sigmoid import SigmoidBackward
-from tanh import TanhBackward
-from clip import ClipBackward
+from .tiles import TileBackward
+from .flatten import FlattenBackward
+from .contiguous import ContiguousBackward
+from .sigmoid import SigmoidBackward
+from .tanh import TanhBackward
+from .clip import ClipBackward
 
-from squareroot import SqrtBackward
-from variance import VarianceBackward
-from std_deviation import StdBackward
-from blashandle import BLASMatmul2dBackward, BLASMatmul2dBwdArg
-from concate import ConcatBackward
-from stack import StackBackward
-from pad import PadBackward
-from cnn import FusedCol2ImBackward
-from pooling import MaxPool2dBackward
-from dropout import DropoutBackward
-from exponential import ExponentialBackward
-from device_transfer import DeviceTransferBackward
-from maxmin_scalar import MaxBackwardScalar, MinBackwardScalar
+from .squareroot import SqrtBackward
+from .variance import VarianceBackward
+from .std_deviation import StdBackward
+from .blashandle import BLASMatmul2dBackward, BLASMatmul2dBwdArg
+from .concate import ConcatBackward
+from .stack import StackBackward
+from .pad import PadBackward
+from .cnn import FusedCol2ImBackward
+from .pooling import MaxPool2dBackward
+from .dropout import DropoutBackward
+from .exponential import ExponentialBackward
+from .device_transfer import DeviceTransferBackward
+from .maxmin_scalar import MaxBackwardScalar, MinBackwardScalar

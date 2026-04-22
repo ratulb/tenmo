@@ -1,7 +1,7 @@
-from tensor import Tensor
-from intarray import IntArray
-from mnemonics import AddTensor, SubtractTensor, Subtract, ReverseSubtract
-from backpropagation import (
+from .tensor import Tensor
+from .intarray import IntArray
+from .mnemonics import AddTensor, SubtractTensor, Subtract, ReverseSubtract
+from .backpropagation import (
     BackwardFnArg,
     Boolean,
     IntArrayArg,
@@ -9,10 +9,10 @@ from backpropagation import (
     BACKWARD_SUB_SCALAR,
     BACKWARD_SUBTRACT_BROADCAST,
 )
-from common_utils import panic
-from gradbox import Gradbox
-from broadcastbackward import BroadcastBackward
-from ancestry import Ancestor
+from .common_utils import panic
+from .gradbox import Gradbox
+from .broadcastbackward import BroadcastBackward
+from .ancestry import Ancestor
 
 
 @fieldwise_init

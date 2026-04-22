@@ -1,23 +1,23 @@
 ### Mojo Tensor Gradbox
-from shapes import Shape
-from mnemonics import *
-from validators import Validator
-from tensor import Tensor
-from intarray import IntArray
-from ndbuffer import NDBuffer
-from broadcasthelper import ShapeBroadcaster
-from strides import Strides
+from .shapes import Shape
+from .mnemonics import *
+from .validators import Validator
+from .tensor import Tensor
+from .intarray import IntArray
+from .ndbuffer import NDBuffer
+from .broadcasthelper import ShapeBroadcaster
+from .strides import Strides
 from std.sys import simd_width_of, has_accelerator
-from matmul import Matmul
+from .matmul import Matmul
 from std.random import seed, random_float64
-from buffers import Buffer
-from forwards import Mean, Sqrt
-from utilities import Utils
-from indexhelper import IndexIterator
-from filler import Filler
-from common_utils import Idx, panic, print_buffer
-from device import Device, CPU, GPU
-from device_transfer import DeviceTransfer
+from .buffers import Buffer
+from .forwards import Mean, Sqrt
+from .utilities import Utils
+from .indexhelper import IndexIterator
+from .filler import Filler
+from .common_utils import Idx, panic, print_buffer
+from .device import Device, CPU, GPU
+from .device_transfer import DeviceTransfer
 from std.os.atomic import Atomic, Consistency, fence
 
 struct Gradbox[dtype: DType](

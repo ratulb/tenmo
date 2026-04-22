@@ -1,10 +1,10 @@
 from std.memory import Pointer
-from tensor import Tensor
-from gradbox import Gradbox
-from backpropagation import BackwardFnArg
-from ndbuffer import NDBuffer, Layout, Storage
-from common_utils import panic
-from shapes import Shape
+from .tensor import Tensor
+from .gradbox import Gradbox
+from .backpropagation import BackwardFnArg
+from .ndbuffer import NDBuffer, Layout, Storage
+from .common_utils import panic
+from .shapes import Shape
 from std.os.atomic import Consistency, fence
 
 

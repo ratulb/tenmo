@@ -1,16 +1,16 @@
-from tensor import Tensor
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_FUSED_CONV
-from mnemonics import AddTensor
-from common_utils import panic
-from forwards import Pad
-from shapes import Shape
-from gradbox import Gradbox
-from forwards import Padding
+from .tensor import Tensor
+from .backpropagation import BackwardFnArg, ArgumentType, BACKWARD_FUSED_CONV
+from .mnemonics import AddTensor
+from .common_utils import panic
+from .forwards import Pad
+from .shapes import Shape
+from .gradbox import Gradbox
+from .forwards import Padding
 from std.algorithm import parallelize
 from std.sys import simd_width_of
-from ndbuffer import NDBuffer
-from intarray import IntArray
-from ancestry import Ancestor
+from .ndbuffer import NDBuffer
+from .intarray import IntArray
+from .ancestry import Ancestor
 
 
 @fieldwise_init

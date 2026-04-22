@@ -1,10 +1,10 @@
-from tensor import Tensor
-from mnemonics import AddTensor, ZeroGrad
-from intarray import IntArray
-from backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_UNSQUEEZE
-from squeeze import Squeeze
-from gradbox import Gradbox
-from ancestry import Ancestor
+from .tensor import Tensor
+from .mnemonics import AddTensor, ZeroGrad
+from .intarray import IntArray
+from .backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_UNSQUEEZE
+from .squeeze import Squeeze
+from .gradbox import Gradbox
+from .ancestry import Ancestor
 
 
 @fieldwise_init

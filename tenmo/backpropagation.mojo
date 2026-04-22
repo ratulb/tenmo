@@ -1,18 +1,18 @@
-from ancestry import Ancestor
-from tensor import Tensor
+from .ancestry import Ancestor
+from .tensor import Tensor
 from std.utils import Variant
 from .walkback import *
-from common_utils import panic
-from gradbox import Gradbox
-from buffers import Buffer
-from ndbuffer import NDBuffer
-from intarray import IntArray
-from strides import Strides
-from shapes import Shape
-from device_transfer import Flow
-from device import Device
-from blashandle import BLASHandleLite
-from crossentropy import Reduction
+from .common_utils import panic
+from .gradbox import Gradbox
+from .buffers import Buffer
+from .ndbuffer import NDBuffer
+from .intarray import IntArray
+from .strides import Strides
+from .shapes import Shape
+from .device_transfer import Flow
+from .device import Device
+from .blashandle import BLASHandleLite
+from .crossentropy import Reduction
 
 # Centralized backward operation tags
 

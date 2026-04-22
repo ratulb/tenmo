@@ -1,9 +1,9 @@
-from tensor import Tensor
-from backpropagation import BackwardFnArg, BACKWARD_CONTIGUOUS
-from mnemonics import AddTensor
-from gradbox import Gradbox
-from shapes import Shape
-from ancestry import Ancestor
+from .tensor import Tensor
+from .backpropagation import BackwardFnArg, BACKWARD_CONTIGUOUS
+from .mnemonics import AddTensor
+from .gradbox import Gradbox
+from .shapes import Shape
+from .ancestry import Ancestor
 
 
 @fieldwise_init

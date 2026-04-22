@@ -43,15 +43,15 @@ from std.random import random_float64, seed as set_seed
 from std.sys import simd_width_of, has_accelerator
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx
 
-from tensor import Tensor
-from mnemonics import AddTensor, DROPOUT, RELU_FORWARD
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_DROPOUT
-from gradbox import Gradbox
-from common_utils import panic
-from ndbuffer import NDBuffer
-from device import DeviceState
-from buffers import Buffer
-from net import Module, Layer
+from .tensor import Tensor
+from .mnemonics import AddTensor, DROPOUT, RELU_FORWARD
+from .backpropagation import BackwardFnArg, ArgumentType, BACKWARD_DROPOUT
+from .gradbox import Gradbox
+from .common_utils import panic
+from .ndbuffer import NDBuffer
+from .device import DeviceState
+from .buffers import Buffer
+from .net import Module, Layer
 
 
 # =============================================================================

@@ -1,13 +1,13 @@
-from tensor import Tensor
-from backpropagation import BackwardFnArg, BACKWARD_VECTOR_MATMUL
-from mnemonics import AddTensor
-from gradbox import Gradbox
-from broadcasthelper import ShapeBroadcaster
-from common_utils import panic
+from .tensor import Tensor
+from .backpropagation import BackwardFnArg, BACKWARD_VECTOR_MATMUL
+from .mnemonics import AddTensor
+from .gradbox import Gradbox
+from .broadcasthelper import ShapeBroadcaster
+from .common_utils import panic
 from std.sys import simd_width_of, has_accelerator
-from ndbuffer import NDBuffer
-from vectormatrix_kernel import VectorMatmulNdGpu
-from ancestry import Ancestor
+from .ndbuffer import NDBuffer
+from .vectormatrix_kernel import VectorMatmulNdGpu
+from .ancestry import Ancestor
 
 
 @fieldwise_init

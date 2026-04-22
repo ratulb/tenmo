@@ -1,6 +1,6 @@
-from common_utils import panic
-from intarray import IntArray
-from array import Array
+from .common_utils import panic
+from .intarray import IntArray
+from .array import Array
 
 
 struct Shape(

@@ -1,7 +1,7 @@
-from shapes import Shape
-from common_utils import panic
-from intarray import IntArray
-from strides import Strides
+from .shapes import Shape
+from .common_utils import panic
+from .intarray import IntArray
+from .strides import Strides
 
 
 @fieldwise_init

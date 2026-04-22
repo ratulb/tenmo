@@ -1,11 +1,11 @@
-from tensor import Tensor
-from mnemonics import AddTensor, SQRT, SQRT_BACKWARD
-from backpropagation import BackwardFnArg, ScalarArg, BACKWARD_SQRT
-from gradbox import Gradbox
+from .tensor import Tensor
+from .mnemonics import AddTensor, SQRT, SQRT_BACKWARD
+from .backpropagation import BackwardFnArg, ScalarArg, BACKWARD_SQRT
+from .gradbox import Gradbox
 from std.math import sqrt
-from ndbuffer import NDBuffer
-from common_utils import Epsilon
-from ancestry import Ancestor
+from .ndbuffer import NDBuffer
+from .common_utils import Epsilon
+from .ancestry import Ancestor
 
 
 @fieldwise_init

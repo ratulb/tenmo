@@ -1,8 +1,8 @@
-from tensor import Tensor
-from mnemonics import AddTensor, TANH_BACKWARD
-from backpropagation import BackwardFnArg, BACKWARD_TANH
-from gradbox import Gradbox
-from ancestry import Ancestor
+from .tensor import Tensor
+from .mnemonics import AddTensor, TANH_BACKWARD
+from .backpropagation import BackwardFnArg, BACKWARD_TANH
+from .gradbox import Gradbox
+from .ancestry import Ancestor
 
 
 @fieldwise_init

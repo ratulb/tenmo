@@ -1,31 +1,31 @@
-from shapes import Shape
-from strides import Strides
-from buffers import Buffer
-from intarray import IntArray
-from indexhelper import IndexCalculator, IndexIterator
-from matrixshapevalidator import MatrixShapeValidator
-from broadcasthelper import ShapeBroadcaster
-from common_utils import panic, log_debug, print_buffer, Epsilon, One
-from validators import Validator
+from .shapes import Shape
+from .strides import Strides
+from .buffers import Buffer
+from .intarray import IntArray
+from .indexhelper import IndexCalculator, IndexIterator
+from .matrixshapevalidator import MatrixShapeValidator
+from .broadcasthelper import ShapeBroadcaster
+from .common_utils import panic, log_debug, print_buffer, Epsilon, One
+from .validators import Validator
 from std.memory import memcpy, AddressSpace, ArcPointer
 from std.gpu.host import DeviceBuffer, DeviceContext
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
-from device import Device, CPU, GPU, DeviceState
+from .device import Device, CPU, GPU, DeviceState
 from std.collections import Set
 from std.sys import simd_width_of, has_accelerator
-from scalar_ops_kernel import ScalarOperations
-from scalar_inplace_ops_kernel import InplaceScalarOperations
-from binary_ops_kernel import BinaryOperations
-from binary_inplace_ops_kernel import BinaryInplaceOperations
-from unary_ops_kernel import UnaryOpsKernel
-from matmul_kernel import MatmulNdGpu
-from compare_kernel import AllClose, Compare, CompareScalar
-from reduction_kernel import Reduction
-from minmax_kernel import ReductionMinMax
-from minmax_reducer import MinMaxReducer
+from .scalar_ops_kernel import ScalarOperations
+from .scalar_inplace_ops_kernel import InplaceScalarOperations
+from .binary_ops_kernel import BinaryOperations
+from .binary_inplace_ops_kernel import BinaryInplaceOperations
+from .unary_ops_kernel import UnaryOpsKernel
+from .matmul_kernel import MatmulNdGpu
+from .compare_kernel import AllClose, Compare, CompareScalar
+from .reduction_kernel import Reduction
+from .minmax_kernel import ReductionMinMax
+from .minmax_reducer import MinMaxReducer
 from std.math import sqrt, log, exp, tanh
-from mnemonics import (
+from .mnemonics import (
     Multiply,
     Add,
     Subtract,

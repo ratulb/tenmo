@@ -1,14 +1,14 @@
-from tensor import Tensor
-from shapes import Shape
-from gradbox import Gradbox
-from backpropagation import BackwardFnArg, ArgumentType, BACKWARD_MAXPOOL2D
-from mnemonics import AddTensor
-from ndbuffer import NDBuffer
+from .tensor import Tensor
+from .shapes import Shape
+from .gradbox import Gradbox
+from .backpropagation import BackwardFnArg, ArgumentType, BACKWARD_MAXPOOL2D
+from .mnemonics import AddTensor
+from .ndbuffer import NDBuffer
 from std.utils.numerics import neg_inf
-from common_utils import panic
+from .common_utils import panic
 from std.algorithm import parallelize
-from net import Module, Layer, MAXPOOL2D
-from ancestry import Ancestor
+from .net import Module, Layer, MAXPOOL2D
+from .ancestry import Ancestor
 
 
 @fieldwise_init

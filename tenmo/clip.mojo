@@ -1,9 +1,9 @@
-from tensor import Tensor
-from mnemonics import AddTensor
-from backpropagation import BackwardFnArg, ClipArg, BACKWARD_CLIP
-from gradbox import Gradbox
+from .tensor import Tensor
+from .mnemonics import AddTensor
+from .backpropagation import BackwardFnArg, ClipArg, BACKWARD_CLIP
+from .gradbox import Gradbox
 from std.sys import simd_width_of
-from ancestry import Ancestor
+from .ancestry import Ancestor
 
 
 @fieldwise_init

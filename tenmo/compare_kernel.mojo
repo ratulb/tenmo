@@ -4,7 +4,7 @@ from std.os.atomic import Atomic, Consistency
 from std.memory import AddressSpace, stack_allocation
 from std.utils.numerics import isnan, isinf
 
-from mnemonics import (
+from .mnemonics import (
     Equal,
     NotEqual,
     LessThan,
@@ -12,8 +12,8 @@ from mnemonics import (
     GreaterThan,
     GreaterThanEqual,
 )
-from device import DeviceState
-from ndbuffer import NDBuffer
+from .device import DeviceState
+from .ndbuffer import NDBuffer
 
 
 fn atomic_and[

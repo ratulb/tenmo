@@ -1,5 +1,5 @@
 from std.math import log, exp
-from buffers import Buffer
+from .buffers import Buffer
 
 
 @fieldwise_init

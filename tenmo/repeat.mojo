@@ -1,7 +1,7 @@
-from tensor import Tensor
-from intarray import IntArray
-from common_utils import panic
-from tiles import TileBackward, Tile
+from .tensor import Tensor
+from .intarray import IntArray
+from .common_utils import panic
+from .tiles import TileBackward, Tile
 
 
 @fieldwise_init

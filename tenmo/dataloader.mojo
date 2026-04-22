@@ -1,10 +1,10 @@
-from tensor import Tensor
-from common_utils import panic
+from .tensor import Tensor
+from .common_utils import panic
 from std.random import shuffle as reshuffle
 from std.python import PythonObject
-from numpy_interop import from_ndarray, numpy_dtype
+from .numpy_interop import from_ndarray, numpy_dtype
 from std.memory import memcpy, Pointer
-from shapes import Shape
+from .shapes import Shape
 
 # MNIST
 comptime MNIST_MEAN = 0.1307

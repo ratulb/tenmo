@@ -1,13 +1,13 @@
-from tensor import Tensor
-from intarray import IntArray
-from common_utils import panic
-from shapes import Shape
+from .tensor import Tensor
+from .intarray import IntArray
+from .common_utils import panic
+from .shapes import Shape
 from std.utils.numerics import max_finite, min_finite
 from std.gpu import thread_idx, block_idx, block_dim, barrier
 from std.memory import AddressSpace, stack_allocation
-from array import Array
-from device import DeviceState
-from ndbuffer import NDBuffer
+from .array import Array
+from .device import DeviceState
+from .ndbuffer import NDBuffer
 from std.sys import has_accelerator
 
 

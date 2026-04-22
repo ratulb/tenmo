@@ -1,10 +1,10 @@
-from tensor import Tensor
-from common_utils import Idx, panic
-from validators import Validator
-from broadcasthelper import ShapeBroadcaster
-from indexhelper import IndexIterator
+from .tensor import Tensor
+from .common_utils import Idx, panic
+from .validators import Validator
+from .broadcasthelper import ShapeBroadcaster
+from .indexhelper import IndexIterator
 from std.memory import memcpy
-from ndbuffer import NDBuffer
+from .ndbuffer import NDBuffer
 
 
 @fieldwise_init

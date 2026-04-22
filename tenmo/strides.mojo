@@ -1,7 +1,7 @@
-from intarray import IntArray
-from shapes import Shape
-from common_utils import panic
-from array import Array
+from .intarray import IntArray
+from .shapes import Shape
+from .common_utils import panic
+from .array import Array
 
 
 struct Strides(

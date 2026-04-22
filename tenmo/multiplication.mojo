@@ -1,16 +1,16 @@
-from tensor import Tensor
-from backpropagation import (
+from .tensor import Tensor
+from .backpropagation import (
     BackwardFnArg,
     ScalarArg,
     BACKWARD_MULTIPLY,
     BACKWARD_MULTIPLY_SCALAR,
     BACKWARD_MULTIPLY_BROADCAST,
 )
-from mnemonics import AddTensor, Multiply
-from common_utils import panic, id
-from gradbox import Gradbox
-from broadcastbackward import BroadcastBackward
-from ancestry import Ancestor
+from .mnemonics import AddTensor, Multiply
+from .common_utils import panic, id
+from .gradbox import Gradbox
+from .broadcastbackward import BroadcastBackward
+from .ancestry import Ancestor
 from std.os.atomic import Atomic, Consistency, fence
 
 
@@ -176,7 +176,7 @@ struct Multiplicator[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
 
-from shapes import Shape
+from .shapes import Shape
 
 
 fn main() raises:

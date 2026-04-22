@@ -1,13 +1,13 @@
 from std.ffi import OwnedDLHandle, _DLHandle
-from tensor import Tensor
-from shapes import Shape
-from common_utils import panic
-from mnemonics import AddTensor
-from backpropagation import BlasArg, BackwardFnArg, BLAS_BACKWARD_MATMUL_2D
+from .tensor import Tensor
+from .shapes import Shape
+from .common_utils import panic
+from .mnemonics import AddTensor
+from .backpropagation import BlasArg, BackwardFnArg, BLAS_BACKWARD_MATMUL_2D
 from std.sys.defines import get_defined_string
-from gradbox import Gradbox
+from .gradbox import Gradbox
 from std.memory import ArcPointer
-from ancestry import Ancestor
+from .ancestry import Ancestor
 
 
 @fieldwise_init

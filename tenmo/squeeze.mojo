@@ -1,11 +1,11 @@
-from tensor import Tensor
-from mnemonics import AddTensor, ZeroGrad
-from intarray import IntArray
-from backpropagation import BackwardFnArg, BACKWARD_SQUEEZE
-from gradbox import Gradbox
-from shapes import Shape
-from common_utils import panic
-from ancestry import Ancestor
+from .tensor import Tensor
+from .mnemonics import AddTensor, ZeroGrad
+from .intarray import IntArray
+from .backpropagation import BackwardFnArg, BACKWARD_SQUEEZE
+from .gradbox import Gradbox
+from .shapes import Shape
+from .common_utils import panic
+from .ancestry import Ancestor
 
 
 @fieldwise_init

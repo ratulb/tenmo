@@ -1,11 +1,11 @@
-from common_utils import panic, now
+from .common_utils import panic, now
 from std.gpu.host import DeviceContext, DeviceBuffer
 from std.memory import ArcPointer, memcpy
 from std.sys import has_accelerator, simd_width_of
 from std.utils import Variant
-from ndbuffer import NDBuffer
-from shapes import Shape
-from buffers import Buffer
+from .ndbuffer import NDBuffer
+from .shapes import Shape
+from .buffers import Buffer
 
 comptime DeviceType = Variant[CPU, GPU]
 

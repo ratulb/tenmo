@@ -1,9 +1,9 @@
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
 from std.memory import AddressSpace, stack_allocation
-from array import Array
-from device import DeviceState
-from ndbuffer import NDBuffer
-from intarray import IntArray
+from .array import Array
+from .device import DeviceState
+from .ndbuffer import NDBuffer
+from .intarray import IntArray
 from std.utils.numerics import min_or_neg_inf, max_or_inf
 
 

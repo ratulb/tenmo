@@ -1,21 +1,21 @@
-from tensor import Tensor
+from .tensor import Tensor
 from std.sys import simd_width_of
-from matrixshapevalidator import MatrixShapeValidator
-from backpropagation import (
+from .matrixshapevalidator import MatrixShapeValidator
+from .backpropagation import (
     BackwardFnArg,
     BACKWARD_MATMUL_ND,
     BACKWARD_MATMUL_2D,
 )
-from mnemonics import AddTensor, mm, vm, mv, dot, invalid
-from gradbox import Gradbox
-from shapes import Shape
-from common_utils import panic
-from vectormatrix import VectorMatmulNd
-from matrixvector import MatrixVectorMulNd
+from .mnemonics import AddTensor, mm, vm, mv, dot, invalid
+from .gradbox import Gradbox
+from .shapes import Shape
+from .common_utils import panic
+from .vectormatrix import VectorMatmulNd
+from .matrixvector import MatrixVectorMulNd
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
-from intarray import IntArray
-from ancestry import Ancestor
+from .intarray import IntArray
+from .ancestry import Ancestor
 
 
 @fieldwise_init
@@ -270,7 +270,7 @@ fn classify_matmul(a: Shape, b: Shape) -> Int:
 
 from std.time import perf_counter_ns as now
 from std.sys import argv
-from blashandle import BLASHandle
+from .blashandle import BLASHandle
 
 
 fn test_gflops_blas() raises:

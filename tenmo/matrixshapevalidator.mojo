@@ -1,6 +1,6 @@
-from shapes import Shape
-from broadcasthelper import ShapeBroadcaster
-from common_utils import panic
+from .shapes import Shape
+from .broadcasthelper import ShapeBroadcaster
+from .common_utils import panic
 
 
 fn main():

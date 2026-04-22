@@ -1,10 +1,10 @@
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx
 from std.sys import simd_width_of
 
-from tensor import Tensor
-from common_utils import panic
-from shapes import Shape
-from mnemonics import (
+from .tensor import Tensor
+from .common_utils import panic
+from .shapes import Shape
+from .mnemonics import (
     Multiply,
     Add,
     Subtract,
@@ -14,8 +14,8 @@ from mnemonics import (
     MIN,
     POW,
 )
-from device import DeviceState
-from ndbuffer import NDBuffer
+from .device import DeviceState
+from .ndbuffer import NDBuffer
 
 # Kernel template for various arithmetic ops involving ND Tensor and a single scalar
 # Simplification - views becomes contiguous when copied to device and offset becomes 0
@@ -337,7 +337,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
 
 
 from std.testing import assert_true
-from common_utils import now
+from .common_utils import now
 from std.sys import has_accelerator
 
 

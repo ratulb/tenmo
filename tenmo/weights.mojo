@@ -1,6 +1,6 @@
 from std.memory import UnsafePointer, memcpy
 from std.python import Python, PythonObject
-from tensor import Tensor
+from .tensor import Tensor
 from std.utils import StaticTuple, Variant
 
 comptime TensorVariant = Variant[

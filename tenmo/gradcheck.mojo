@@ -1,5 +1,5 @@
 from tensors import Tensor
-from common_utils import log_debug, RED, CYAN
+from .common_utils import log_debug, RED, CYAN
 from layers import Sequential
 
 
@@ -79,7 +79,7 @@ fn gradcheck_param[
 # --------------------
 # Example test in main
 # --------------------
-from crossentropy import CrossEntropyLoss
+from .crossentropy import CrossEntropyLoss
 from layers import Linear, ReLU
 
 
@@ -115,7 +115,7 @@ fn test_gradcheck1() raises:
     _ = model
 
 
-from mse import MSELoss
+from .mse import MSELoss
 
 
 fn test_gradcheck2() raises:

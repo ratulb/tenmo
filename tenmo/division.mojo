@@ -1,15 +1,15 @@
-from tensor import Tensor
-from backpropagation import (
+from .tensor import Tensor
+from .backpropagation import (
     BackwardFnArg,
     ScalarArg,
     BACKWARD_DIVIDE,
     BACKWARD_DIV_SCALAR,
     BACKWARD_RIGHT_DIV_SCALAR,
 )
-from mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
-from common_utils import panic
-from gradbox import Gradbox
-from ancestry import Ancestor
+from .mnemonics import AddTensor, SubtractTensor, Divide, ReverseDivide
+from .common_utils import panic
+from .gradbox import Gradbox
+from .ancestry import Ancestor
 
 
 @fieldwise_init
@@ -224,7 +224,7 @@ struct Divider[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return out^
 
 
-from shapes import Shape
+from .shapes import Shape
 
 
 fn main() raises:

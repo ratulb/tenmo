@@ -1,9 +1,9 @@
-from tensor import Tensor
-from mnemonics import AddTensor, LOG, LOG_BACKWARD
-from backpropagation import BackwardFnArg, ScalarArg, BACKWARD_LOG
-from gradbox import Gradbox
-from common_utils import Epsilon
-from ancestry import Ancestor
+from .tensor import Tensor
+from .mnemonics import AddTensor, LOG, LOG_BACKWARD
+from .backpropagation import BackwardFnArg, ScalarArg, BACKWARD_LOG
+from .gradbox import Gradbox
+from .common_utils import Epsilon
+from .ancestry import Ancestor
 
 
 @fieldwise_init

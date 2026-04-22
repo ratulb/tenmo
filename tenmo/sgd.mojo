@@ -1,8 +1,8 @@
-from tensor import Tensor
-from gradbox import Gradbox
+from .tensor import Tensor
+from .gradbox import Gradbox
 from std.math import sqrt
 from std.sys import simd_width_of, has_accelerator
-from common_utils import panic
+from .common_utils import panic
 
 
 @fieldwise_init

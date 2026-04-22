@@ -1,12 +1,12 @@
-from tensor import Tensor
-from mnemonics import AddTensor, ZeroGrad
-from backpropagation import BackwardFnArg, BACKWARD_RESHAPE
-from shapes import Shape
-from validators import Validator
-from gradbox import Gradbox
-from ndbuffer import NDBuffer
-from strides import Strides
-from ancestry import Ancestor
+from .tensor import Tensor
+from .mnemonics import AddTensor, ZeroGrad
+from .backpropagation import BackwardFnArg, BACKWARD_RESHAPE
+from .shapes import Shape
+from .validators import Validator
+from .gradbox import Gradbox
+from .ndbuffer import NDBuffer
+from .strides import Strides
+from .ancestry import Ancestor
 
 
 @fieldwise_init

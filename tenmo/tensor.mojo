@@ -5,11 +5,11 @@ from std.random import seed, random_float64
 from std.sys import simd_width_of
 from std.utils.numerics import min_finite
 from std.memory import memcpy, memset, memset_zero, AddressSpace, ArcPointer
-from shapes import Shape, ShapeIndexIterator
-from ancestry import Ancestors, Ancestor
-from strides import Strides
+from .shapes import Shape, ShapeIndexIterator
+from .ancestry import Ancestors, Ancestor
+from .strides import Strides
 from std.os.atomic import Atomic, Consistency, fence
-from common_utils import (
+from .common_utils import (
     IDGen,
     log_warning,
     now,
@@ -19,20 +19,20 @@ from common_utils import (
     Epsilon,
     One,
 )
-from mnemonics import *
-from indexhelper import IndexIterator
-from backpropagation import Backward, BackwardFnArg
-from forwards import *
-from buffers import Buffer
-from validators import Validator
+from .mnemonics import *
+from .indexhelper import IndexIterator
+from .backpropagation import Backward, BackwardFnArg
+from .forwards import *
+from .buffers import Buffer
+from .validators import Validator
 from std.collections import Set, Deque
-from gradbox import Gradbox
-from intarray import IntArray
-from broadcasthelper import ShapeBroadcaster
-from ndbuffer import NDBuffer
-from utilities import Utils
+from .gradbox import Gradbox
+from .intarray import IntArray
+from .broadcasthelper import ShapeBroadcaster
+from .ndbuffer import NDBuffer
+from .utilities import Utils
 from std.gpu.host import DeviceBuffer, DeviceContext
-from device import Device, CPU, GPU
+from .device import Device, CPU, GPU
 from std.sys.info import has_accelerator
 
 

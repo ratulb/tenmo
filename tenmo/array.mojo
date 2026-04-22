@@ -1,7 +1,7 @@
-from common_utils import panic
+from .common_utils import panic
 from std.builtin.device_passable import DevicePassable
 from std.utils import StaticTuple
-from intarray import IntArray
+from .intarray import IntArray
 import mnemonics
 from std.sys.defines import get_defined_int
 

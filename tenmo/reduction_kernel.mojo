@@ -1,11 +1,11 @@
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
 from std.memory import AddressSpace, stack_allocation
 
-from array import Array
-from common_utils import Epsilon, panic
-from device import DeviceState
-from ndbuffer import NDBuffer
-from intarray import IntArray
+from .array import Array
+from .common_utils import Epsilon, panic
+from .device import DeviceState
+from .ndbuffer import NDBuffer
+from .intarray import IntArray
 from std.math import exp, log
 from std.sys import simd_width_of
 
@@ -422,11 +422,11 @@ fn main() raises:
     test_mean()
 
 
-from tensor import Tensor
+from .tensor import Tensor
 from std.testing import assert_true
 
-from device import GPU
-from shapes import Shape
+from .device import GPU
+from .shapes import Shape
 
 
 fn test_mean() raises:

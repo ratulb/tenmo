@@ -1,14 +1,14 @@
-from tensor import Tensor
-from mnemonics import AddTensor, DROPOUT
-from backpropagation import BackwardFnArg, BufferArg, BACKWARD_DROPOUT
-from gradbox import Gradbox
-from common_utils import panic
-from ndbuffer import NDBuffer
-from buffers import Buffer
+from .tensor import Tensor
+from .mnemonics import AddTensor, DROPOUT
+from .backpropagation import BackwardFnArg, BufferArg, BACKWARD_DROPOUT
+from .gradbox import Gradbox
+from .common_utils import panic
+from .ndbuffer import NDBuffer
+from .buffers import Buffer
 from std.sys import simd_width_of
-from net import Module, Layer
+from .net import Module, Layer
 from std.random import random_float64, seed
-from ancestry import Ancestor
+from .ancestry import Ancestor
 
 
 @fieldwise_init

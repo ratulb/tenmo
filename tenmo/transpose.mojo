@@ -1,10 +1,10 @@
-from tensor import Tensor
-from backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_TRANSPOSE
-from mnemonics import AddTensor
-from validators import Validator
-from gradbox import Gradbox
-from intarray import IntArray
-from ancestry import Ancestor
+from .tensor import Tensor
+from .backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_TRANSPOSE
+from .mnemonics import AddTensor
+from .validators import Validator
+from .gradbox import Gradbox
+from .intarray import IntArray
+from .ancestry import Ancestor
 
 
 @fieldwise_init

@@ -1,13 +1,13 @@
-from tensor import Tensor
-from backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_PERMUTE
-from mnemonics import AddTensor, ZeroGrad
-from intarray import IntArray
-from shapes import Shape
-from strides import Strides
-from common_utils import panic
-from views import View
-from gradbox import Gradbox
-from ancestry import Ancestor
+from .tensor import Tensor
+from .backpropagation import BackwardFnArg, IntArrayArg, BACKWARD_PERMUTE
+from .mnemonics import AddTensor, ZeroGrad
+from .intarray import IntArray
+from .shapes import Shape
+from .strides import Strides
+from .common_utils import panic
+from .views import View
+from .gradbox import Gradbox
+from .ancestry import Ancestor
 
 
 @fieldwise_init

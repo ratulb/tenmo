@@ -1,10 +1,10 @@
-from tensor import Tensor
-from shapes import Shape
-from gradbox import Gradbox
+from .tensor import Tensor
+from .shapes import Shape
+from .gradbox import Gradbox
 from std.math import sqrt
-from common_utils import panic, now
+from .common_utils import panic, now
 from std.utils import Variant
-from forwards import (
+from .forwards import (
     Matmul,
     Adder,
     Multiplicator,
@@ -15,7 +15,7 @@ from forwards import (
     MaxPool2d,
     Dropout,
 )
-from mnemonics import (
+from .mnemonics import (
     mm,
     mv,
     vm,
@@ -30,10 +30,10 @@ from mnemonics import (
     FLATTEN,
     MAXPOOL2D,
 )
-from blashandle import BLASHandle, BLASHandleLite
+from .blashandle import BLASHandle, BLASHandleLite
 from std.utils.numerics import neg_inf
 from std.algorithm import parallelize
-from ndbuffer import NDBuffer
+from .ndbuffer import NDBuffer
 from std.random import seed, random_float64
 from std.sys import simd_width_of
 

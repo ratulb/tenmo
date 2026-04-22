@@ -1,5 +1,5 @@
 from tensors import Tensor
-from shapes import Shape
+from .shapes import Shape
 
 
 fn main() raises:

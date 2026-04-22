@@ -1,15 +1,15 @@
-from tensor import Tensor
-from backpropagation import (
+from .tensor import Tensor
+from .backpropagation import (
     BackwardFnArg,
     ArgumentType,
     BACKWARD_DEVICE_TRANSFER,
 )
-from mnemonics import AddTensor
-from common_utils import panic
-from gradbox import Gradbox
-from device import Device, CPU, GPU
+from .mnemonics import AddTensor
+from .common_utils import panic
+from .gradbox import Gradbox
+from .device import Device, CPU, GPU
 from std.sys import has_accelerator
-from ancestry import Ancestor
+from .ancestry import Ancestor
 
 
 struct Flow(RegisterPassable & Equatable, ImplicitlyCopyable):

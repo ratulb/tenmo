@@ -1,16 +1,16 @@
-from tensor import Tensor
-from mnemonics import AddTensor, MAX, MIN
-from backpropagation import (
+from .tensor import Tensor
+from .mnemonics import AddTensor, MAX, MIN
+from .backpropagation import (
     BackwardFnArg,
     ScalarArg,
     BACKWARD_MAX_SCALAR,
     BACKWARD_MIN_SCALAR,
 )
-from gradbox import Gradbox
+from .gradbox import Gradbox
 from std.sys import has_accelerator
-from ndbuffer import NDBuffer
-from mnemonics import GreaterThan, LessThan
-from ancestry import Ancestor
+from .ndbuffer import NDBuffer
+from .mnemonics import GreaterThan, LessThan
+from .ancestry import Ancestor
 
 # ── MaxBackwardScalar ─────────────────────────────────────────────────────────
 

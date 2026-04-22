@@ -1,12 +1,12 @@
-from tensor import Tensor
-from mnemonics import AddTensor
-from shapes import Shape
-from backpropagation import BackwardFnArg, MinMaxArg, BACKWARD_MINMAX
-from validators import Validator
-from intarray import IntArray
-from gradbox import Gradbox
-from ndbuffer import NDBuffer
-from ancestry import Ancestor
+from .tensor import Tensor
+from .mnemonics import AddTensor
+from .shapes import Shape
+from .backpropagation import BackwardFnArg, MinMaxArg, BACKWARD_MINMAX
+from .validators import Validator
+from .intarray import IntArray
+from .gradbox import Gradbox
+from .ndbuffer import NDBuffer
+from .ancestry import Ancestor
 
 
 @fieldwise_init

@@ -1,17 +1,17 @@
-from tensor import Tensor
-from shapes import Shape
-from strides import Strides
-from backpropagation import BackwardFnArg, ViewArg, BACKWARD_VIEW
-from mnemonics import AddTensor, ZeroGrad
-from validators import Validator
-from gradbox import Gradbox
-from intarray import IntArray
-from common_utils import panic, log_warning
+from .tensor import Tensor
+from .shapes import Shape
+from .strides import Strides
+from .backpropagation import BackwardFnArg, ViewArg, BACKWARD_VIEW
+from .mnemonics import AddTensor, ZeroGrad
+from .validators import Validator
+from .gradbox import Gradbox
+from .intarray import IntArray
+from .common_utils import panic, log_warning
 from std.sys import simd_width_of
-from device import DeviceState
+from .device import DeviceState
 from std.sys import has_accelerator
-from ndbuffer import NDBuffer
-from ancestry import Ancestor
+from .ndbuffer import NDBuffer
+from .ancestry import Ancestor
 
 
 @fieldwise_init

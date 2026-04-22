@@ -1,11 +1,11 @@
 from std.sys import simd_width_of
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim
-from mnemonics import Add, Multiply, Subtract, Divide
-from strides import Strides
-from broadcasthelper import ShapeBroadcaster
-from device import DeviceState
-from array import Array
-from ndbuffer import NDBuffer
+from .mnemonics import Add, Multiply, Subtract, Divide
+from .strides import Strides
+from .broadcasthelper import ShapeBroadcaster
+from .device import DeviceState
+from .array import Array
+from .ndbuffer import NDBuffer
 
 
 # ============================================================

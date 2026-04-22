@@ -1,10 +1,10 @@
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim, barrier
 from std.gpu.host import Dim
 from std.memory import AddressSpace, stack_allocation
-from shapes import Shape
-from device import DeviceState
-from ndbuffer import NDBuffer
-from broadcasthelper import ShapeBroadcaster
+from .shapes import Shape
+from .device import DeviceState
+from .ndbuffer import NDBuffer
+from .broadcasthelper import ShapeBroadcaster
 
 
 # ── 2D Tiled Core Kernel ──────────────────────────────────────────────────────
@@ -295,7 +295,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
         return grid, block
 
 
-from tensor import Tensor
+from .tensor import Tensor
 from std.testing import assert_true
 
 
@@ -326,7 +326,7 @@ fn main() raises:
     print("Here I am ok")
 
 
-from intarray import IntArray
+from .intarray import IntArray
 
 
 fn main_200() raises:

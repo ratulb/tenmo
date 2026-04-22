@@ -1,16 +1,16 @@
-from tensor import Tensor
-from backpropagation import (
+from .tensor import Tensor
+from .backpropagation import (
     BackwardFnArg,
     Integer,
     BACKWARD_CONCAT,
 )
-from mnemonics import AddTensor
-from common_utils import panic
-from gradbox import Gradbox
-from intarray import IntArray
-from indexhelper import IndexCalculator
-from shapes import Shape
-from ancestry import Ancestor
+from .mnemonics import AddTensor
+from .common_utils import panic
+from .gradbox import Gradbox
+from .intarray import IntArray
+from .indexhelper import IndexCalculator
+from .shapes import Shape
+from .ancestry import Ancestor
 
 
 @fieldwise_init

@@ -1,8 +1,8 @@
-from tensor import Tensor
-from mnemonics import AddTensor, EXP
-from backpropagation import BackwardFnArg, BACKWARD_EXPONENTIAL
-from gradbox import Gradbox
-from ancestry import Ancestor
+from .tensor import Tensor
+from .mnemonics import AddTensor, EXP
+from .backpropagation import BackwardFnArg, BACKWARD_EXPONENTIAL
+from .gradbox import Gradbox
+from .ancestry import Ancestor
 
 
 @fieldwise_init

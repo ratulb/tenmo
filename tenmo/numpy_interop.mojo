@@ -1,9 +1,9 @@
 from std.python import Python, PythonObject
-from tensor import Tensor
+from .tensor import Tensor
 from std.memory import memcpy
-from shapes import Shape
-from buffers import Buffer
-from ndbuffer import NDBuffer
+from .shapes import Shape
+from .buffers import Buffer
+from .ndbuffer import NDBuffer
 
 
 fn numpy_dtype(dtype: DType) raises -> PythonObject:

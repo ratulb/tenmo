@@ -1,7 +1,7 @@
-from ndbuffer import NDBuffer
-from intarray import IntArray
-from shapes import Shape
-from indexhelper import IndexCalculator
+from .ndbuffer import NDBuffer
+from .intarray import IntArray
+from .shapes import Shape
+from .indexhelper import IndexCalculator
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
 from std.utils.numerics import min_or_neg_inf, max_or_inf
@@ -203,7 +203,7 @@ struct MinMaxReducer[dtype: DType](ImplicitlyCopyable):
         return mask^
 
 
-from buffers import Buffer
+from .buffers import Buffer
 
 
 fn main() raises:

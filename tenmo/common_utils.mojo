@@ -1,19 +1,19 @@
-from shapes import Shape
-from tensor import Tensor
-from gradbox import Gradbox
+from .shapes import Shape
+from .tensor import Tensor
+from .gradbox import Gradbox
 from std.sys import simd_width_of
 from std.sys.defines import get_defined_string
 from std.logger import Level, Logger
-from net import Sequential, Linear, ReLU
+from .net import Sequential, Linear, ReLU
 from std.time import perf_counter_ns, monotonic
 from std.math import cos, sin, pi
 from std.os import abort
 from std.utils import Variant
 from std.utils.numerics import min_finite
 from std.testing import assert_true
-from intarray import IntArray
+from .intarray import IntArray
 from std.random import randn_float64
-from ndbuffer import NDBuffer
+from .ndbuffer import NDBuffer
 from std.sys import prefetch, PrefetchOptions
 
 comptime LOG_LEVEL = get_defined_string["LOGGING_LEVEL", "INFO"]()
@@ -619,7 +619,7 @@ fn print_buffer[
 
 
 from std.gpu.host import DeviceBuffer
-from buffers import Buffer
+from .buffers import Buffer
 
 
 fn main():

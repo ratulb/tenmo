@@ -1,13 +1,13 @@
 from std.gpu import thread_idx, block_idx, block_dim, barrier
 from std.memory import AddressSpace, stack_allocation
 
-from array import Array
-from device import DeviceState
-from ndbuffer import NDBuffer
-from intarray import IntArray
-from mnemonics import max_rank
-from strides import Strides
-from broadcasthelper import ShapeBroadcaster
+from .array import Array
+from .device import DeviceState
+from .ndbuffer import NDBuffer
+from .intarray import IntArray
+from .mnemonics import max_rank
+from .strides import Strides
+from .broadcasthelper import ShapeBroadcaster
 
 # ── Kernel ────────────────────────────────────────────────────────────────────
 

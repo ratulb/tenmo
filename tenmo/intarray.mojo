@@ -1,4 +1,4 @@
-from common_utils import panic
+from .common_utils import panic
 from std.memory import memcpy
 
 

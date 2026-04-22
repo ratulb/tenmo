@@ -1,10 +1,10 @@
-from tensor import Tensor
-from mnemonics import AddTensor, RELU_FORWARD, RELU_BACKWARD
-from backpropagation import BackwardFnArg, BufferArg, NDBufferArg, BACKWARD_RELU
-from gradbox import Gradbox
-from ndbuffer import NDBuffer
-from buffers import Buffer
-from ancestry import Ancestor
+from .tensor import Tensor
+from .mnemonics import AddTensor, RELU_FORWARD, RELU_BACKWARD
+from .backpropagation import BackwardFnArg, BufferArg, NDBufferArg, BACKWARD_RELU
+from .gradbox import Gradbox
+from .ndbuffer import NDBuffer
+from .buffers import Buffer
+from .ancestry import Ancestor
 
 
 @fieldwise_init

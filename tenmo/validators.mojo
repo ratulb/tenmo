@@ -1,6 +1,6 @@
-from shapes import Shape
-from strides import Strides
-from common_utils import (
+from .shapes import Shape
+from .strides import Strides
+from .common_utils import (
     Slicer,
     panic,
     Idx,
@@ -11,8 +11,8 @@ from common_utils import (
     newaxis,
     log_warning,
 )
-from tensor import Tensor
-from intarray import IntArray
+from .tensor import Tensor
+from .intarray import IntArray
 
 
 struct Validator:

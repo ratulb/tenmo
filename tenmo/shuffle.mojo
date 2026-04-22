@@ -1,20 +1,20 @@
-from tensor import Tensor
-from mnemonics import AddTensor
-from validators import Validator
-from backpropagation import BackwardFnArg, ShuffleArg, BACKWARD_SHUFFLE
+from .tensor import Tensor
+from .mnemonics import AddTensor
+from .validators import Validator
+from .backpropagation import BackwardFnArg, ShuffleArg, BACKWARD_SHUFFLE
 from std.random import shuffle, seed
-from gradbox import Gradbox
+from .gradbox import Gradbox
 
 from std.gpu import thread_idx, block_idx, block_dim, grid_dim
 from std.gpu.host import DeviceBuffer
 from std.memory import AddressSpace
 from std.sys import has_accelerator
-from device import DeviceState, GPU
-from ndbuffer import NDBuffer
-from intarray import IntArray
-from array import Array
-from common_utils import panic
-from ancestry import Ancestor
+from .device import DeviceState, GPU
+from .ndbuffer import NDBuffer
+from .intarray import IntArray
+from .array import Array
+from .common_utils import panic
+from .ancestry import Ancestor
 
 # ── GPU Kernels ──────────────────────────────────────────────────────────────
 

@@ -21,17 +21,17 @@ Examples:
   - Pad W with 2 on each side
 """
 
-from tensor import Tensor
-from shapes import Shape
-from gradbox import Gradbox
-from backpropagation import BackwardFnArg, PadArg, BACKWARD_PAD
-from mnemonics import AddTensor
-from common_utils import panic
-from intarray import IntArray
+from .tensor import Tensor
+from .shapes import Shape
+from .gradbox import Gradbox
+from .backpropagation import BackwardFnArg, PadArg, BACKWARD_PAD
+from .mnemonics import AddTensor
+from .common_utils import panic
+from .intarray import IntArray
 from std.utils import Variant
 from std.sys import simd_width_of
 from std.algorithm import parallelize
-from ancestry import Ancestor
+from .ancestry import Ancestor
 
 comptime Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
 

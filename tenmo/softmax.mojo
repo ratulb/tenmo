@@ -1,16 +1,16 @@
-from intarray import IntArray
-from gradbox import Gradbox
-from ndbuffer import NDBuffer
-from backpropagation import (
+from .intarray import IntArray
+from .gradbox import Gradbox
+from .ndbuffer import NDBuffer
+from .backpropagation import (
     BackwardFnArg,
     SoftmaxArg,
     BACKWARD_SOFTMAX,
     BACKWARD_LOG_SOFTMAX,
 )
-from mnemonics import AddTensor
-from tensor import Tensor
-from validators import Validator
-from ancestry import Ancestor
+from .mnemonics import AddTensor
+from .tensor import Tensor
+from .validators import Validator
+from .ancestry import Ancestor
 
 comptime SoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, False]
 comptime LogSoftmaxBackward[dtype: DType] = SoftmaxBackwardDelegate[dtype, True]

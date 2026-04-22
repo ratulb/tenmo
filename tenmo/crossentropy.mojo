@@ -1,18 +1,18 @@
-from tensor import Tensor
-from shapes import Shape
-from common_utils import panic
-from subtraction import Subtractor
-from backpropagation import (
+from .tensor import Tensor
+from .shapes import Shape
+from .common_utils import panic
+from .subtraction import Subtractor
+from .backpropagation import (
     BackwardFnArg,
     ArgumentType,
     BACKWARD_CE_CLASS_INDICES,
     BACKWARD_CE_PROBABILITIES,
 )
-from mnemonics import AddTensor, NotEqual
-from gradbox import Gradbox
-from ndbuffer import NDBuffer
-from intarray import IntArray
-from ancestry import Ancestor
+from .mnemonics import AddTensor, NotEqual
+from .gradbox import Gradbox
+from .ndbuffer import NDBuffer
+from .intarray import IntArray
+from .ancestry import Ancestor
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Reduction

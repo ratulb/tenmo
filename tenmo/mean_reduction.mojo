@@ -1,12 +1,12 @@
-from tensor import Tensor
-from intarray import IntArray
-from mnemonics import AddTensor
-from shapes import Shape
-from backpropagation import BackwardFnArg, ReductionArg, BACKWARD_MEAN
-from validators import Validator
-from gradbox import Gradbox
-from common_utils import panic
-from ancestry import Ancestor
+from .tensor import Tensor
+from .intarray import IntArray
+from .mnemonics import AddTensor
+from .shapes import Shape
+from .backpropagation import BackwardFnArg, ReductionArg, BACKWARD_MEAN
+from .validators import Validator
+from .gradbox import Gradbox
+from .common_utils import panic
+from .ancestry import Ancestor
 
 
 struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):

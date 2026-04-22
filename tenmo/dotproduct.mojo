@@ -1,9 +1,9 @@
-from tensor import Tensor
-from common_utils import panic
-from backpropagation import BackwardFnArg, BACKWARD_DOT
-from mnemonics import AddTensor
-from gradbox import Gradbox
-from shapes import Shape
+from .tensor import Tensor
+from .common_utils import panic
+from .backpropagation import BackwardFnArg, BACKWARD_DOT
+from .mnemonics import AddTensor
+from .gradbox import Gradbox
+from .shapes import Shape
 from std.memory import stack_allocation, AddressSpace
 from std.gpu import thread_idx, block_dim, grid_dim, block_idx, barrier
 from std.os.atomic import Atomic, Consistency
@@ -12,7 +12,7 @@ from std.gpu.primitives.id import lane_id, warp_id
 from std.gpu.primitives.warp import shuffle_down
 from std.gpu.globals import WARP_SIZE
 from std.sys import simd_width_of
-from ancestry import Ancestor
+from .ancestry import Ancestor
 
 
 @fieldwise_init
