@@ -1,8 +1,8 @@
-from tensor import Tensor
-from net import MSELoss, BCELoss, BCEWithLogitsLoss, Linear, Sigmoid
-from common_utils import isnan, isinf
+from tenmo.tensor import Tensor
+from tenmo.net import MSELoss, BCELoss, BCEWithLogitsLoss, Linear, Sigmoid
+from tenmo.common_utils import isnan, isinf
 from std.testing import assert_true
-from intarray import IntArray
+from tenmo.intarray import IntArray
 
 # ============================================================================
 # MSE Loss Tests

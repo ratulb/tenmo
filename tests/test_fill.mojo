@@ -1,7 +1,7 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true
-from common_utils import i, il, s, newaxis, Idx
-from intarray import IntArray
+from tenmo.common_utils import i, il, s, newaxis, Idx
+from tenmo.intarray import IntArray
 
 # ============================================================================
 # SCALAR FILL TESTS - Basic Integer Indexing

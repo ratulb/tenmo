@@ -1,8 +1,8 @@
-from tensor import Tensor
-from net import Tanh, Linear
-from common_utils import isnan, isinf
-from shapes import Shape
-from intarray import IntArray
+from tenmo.tensor import Tensor
+from tenmo.net import Tanh, Linear
+from tenmo.common_utils import isnan, isinf
+from tenmo.shapes import Shape
+from tenmo.intarray import IntArray
 from std.testing import assert_true
 from std.sys import has_accelerator
 from std.math import tanh as scalar_tanh, abs as scalar_abs

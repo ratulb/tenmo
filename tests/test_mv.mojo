@@ -1,6 +1,6 @@
-from tensor import Tensor
-from shapes import Shape
-from mnemonics import mv
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
+from tenmo.mnemonics import mv
 
 # comptime mv = 2 # matrix vector
 
@@ -20,7 +20,7 @@ fn main() raises:
 # ===== BASIC MATRIX-VECTOR TESTS =====
 
 from std.testing import assert_true
-from strides import Strides
+from tenmo.strides import Strides
 
 
 fn test_matrix_vector_no_batch() raises:

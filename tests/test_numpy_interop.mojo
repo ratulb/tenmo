@@ -1,5 +1,5 @@
-from tensor import Tensor
-from numpy_interop import to_ndarray, from_ndarray
+from tenmo.tensor import Tensor
+from tenmo.numpy_interop import to_ndarray, from_ndarray
 
 from std.testing import assert_true
 

@@ -1,11 +1,11 @@
 from std.testing import assert_true, assert_false, assert_raises
-from tensor import Tensor
-from intarray import IntArray
-from shapes import Shape
-from common_utils import *
+from tenmo.tensor import Tensor
+from tenmo.intarray import IntArray
+from tenmo.shapes import Shape
+from tenmo.common_utils import *
 from std.utils.numerics import min_finite
-from mnemonics import AddTensor
-from strides import Strides
+from tenmo.mnemonics import AddTensor
+from tenmo.strides import Strides
 
 
 fn test_count() raises:

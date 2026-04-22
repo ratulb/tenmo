@@ -1,6 +1,6 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true
-from shapes import Shape
+from tenmo.shapes import Shape
 
 # ============================================================================
 # FORWARD PASS TESTS - STACK OPERATIONS

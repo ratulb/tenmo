@@ -1,10 +1,10 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true, assert_false
-from common_utils import isnan, isinf, Epsilon
+from tenmo.common_utils import isnan, isinf, Epsilon
 from std.math import log
 from std.sys import has_accelerator
 from std.math import log
-from shapes import Shape
+from tenmo.shapes import Shape
 
 
 # ============================================================================

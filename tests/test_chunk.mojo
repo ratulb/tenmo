@@ -1,6 +1,6 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true
-from common_utils import s, i
+from tenmo.common_utils import s, i
 
 # ============================================================================
 # 1D TENSOR chunking TESTS

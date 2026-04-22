@@ -1,8 +1,8 @@
-from tensor import Tensor
-from relu import ReLU
+from tenmo.tensor import Tensor
+from tenmo.relu import ReLU
 from std.sys import has_accelerator
 from std.testing import assert_true, assert_equal
-from shapes import Shape
+from tenmo.shapes import Shape
 from std.math import abs
 
 

@@ -1,7 +1,7 @@
-from shapes import Shape
-from strides import Strides
+from tenmo.shapes import Shape
+from tenmo.strides import Strides
 from std.testing import assert_true
-from intarray import IntArray
+from tenmo.intarray import IntArray
 
 # ============================================
 # STRIDES TESTS

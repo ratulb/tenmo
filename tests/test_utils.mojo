@@ -1,7 +1,7 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 
 # from common_utils import binary_accuracy as accuracy
-from common_utils import now
+from tenmo.common_utils import now
 from std.testing import assert_true
 
 

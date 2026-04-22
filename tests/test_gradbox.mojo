@@ -1,11 +1,11 @@
-from buffers import Buffer
+from tenmo.buffers import Buffer
 from std.testing import assert_true
-from ndbuffer import NDBuffer
-from shapes import Shape
-from gradbox import Gradbox
-from unsqueeze import Unsqueeze
-from tensor import Tensor
-from intarray import IntArray
+from tenmo.ndbuffer import NDBuffer
+from tenmo.shapes import Shape
+from tenmo.gradbox import Gradbox
+from tenmo.unsqueeze import Unsqueeze
+from tenmo.tensor import Tensor
+from tenmo.intarray import IntArray
 
 
 fn main() raises:

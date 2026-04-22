@@ -1,7 +1,7 @@
-from tensor import Tensor
-from common_utils import panic, now
+from tenmo.tensor import Tensor
+from tenmo.common_utils import panic, now
 from std.testing import assert_true, assert_equal, assert_false
-from dataloader import *
+from tenmo.dataloader import *
 from std.python import Python, PythonObject
 
 # Comprehensive tests for TensorDataset, Batch, and DataLoader

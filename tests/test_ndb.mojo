@@ -1,12 +1,12 @@
 from std.testing import assert_true, assert_false
-from buffers import Buffer
-from intarray import IntArray
-from shapes import Shape
-from strides import Strides
-from ndbuffer import NDBuffer
-from mnemonics import *
+from tenmo.buffers import Buffer
+from tenmo.intarray import IntArray
+from tenmo.shapes import Shape
+from tenmo.strides import Strides
+from tenmo.ndbuffer import NDBuffer
+from tenmo.mnemonics import *
 from std.sys import has_accelerator
-from tensor import Tensor
+from tenmo.tensor import Tensor
 
 # ============================================
 # Test Constants

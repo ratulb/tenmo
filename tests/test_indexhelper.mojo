@@ -1,10 +1,10 @@
-from shapes import Shape
-from strides import Strides
-from common_utils import now
-from buffers import Buffer
+from tenmo.shapes import Shape
+from tenmo.strides import Strides
+from tenmo.common_utils import now
+from tenmo.buffers import Buffer
 from std.testing import assert_equal, assert_true, assert_false
-from indexhelper import IndexIterator
-from indexhelper import IndexCalculator
+from tenmo.indexhelper import IndexIterator
+from tenmo.indexhelper import IndexCalculator
 
 # from inline_index_iterator import IndexIterator
 

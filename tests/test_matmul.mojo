@@ -11,10 +11,10 @@ Broadcasting rules for matmul:
 from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false
 from std.math import sqrt
 from std.random import random_float64
-from tensor import Tensor
-from shapes import Shape
-from common_utils import isnan, isinf
-from gradbox import Gradbox
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
+from tenmo.common_utils import isnan, isinf
+from tenmo.gradbox import Gradbox
 
 fn matmul[
     dtype: DType, //, track_grad: Bool = True

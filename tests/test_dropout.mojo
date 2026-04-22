@@ -1,7 +1,7 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.random import seed
 from std.testing import assert_true
-from net import Dropout
+from tenmo.net import Dropout
 
 # ============================================================================
 # FORWARD PASS TESTS

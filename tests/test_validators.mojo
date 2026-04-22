@@ -1,7 +1,7 @@
-from shapes import Shape
-from validators import Validator
+from tenmo.shapes import Shape
+from tenmo.validators import Validator
 from std.testing import assert_true
-from intarray import IntArray
+from tenmo.intarray import IntArray
 
 
 # ============================================

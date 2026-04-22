@@ -1,11 +1,11 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true, assert_equal, assert_almost_equal
-from shapes import Shape
+from tenmo.shapes import Shape
 
 # ============================================================================
 # FORWARD PASS TESTS - CONSTANT PADDING
 # ============================================================================
-from forwards import Conv2dFused, Padding
+from tenmo.forwards import Conv2dFused, Padding
 
 
 fn test_pad_constant_2d_symmetric() raises:

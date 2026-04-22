@@ -1,6 +1,6 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true
-from device import GPU, has_accelerator
+from tenmo.device import GPU, has_accelerator
 from std.sys import has_accelerator
 
 # ═══════════════════════════════════════════════════════════════════════════════

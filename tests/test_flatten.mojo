@@ -1,7 +1,7 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true
-from shapes import Shape
-from strides import Strides
+from tenmo.shapes import Shape
+from tenmo.strides import Strides
 from std.sys import has_accelerator
 
 

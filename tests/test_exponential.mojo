@@ -1,9 +1,9 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true
-from numpy_interop import to_ndarray
+from tenmo.numpy_interop import to_ndarray
 from std.python import Python
 
-from shapes import Shape
+from tenmo.shapes import Shape
 from std.sys import has_accelerator
 from std.math import exp as scalar_exp
 

@@ -1,7 +1,7 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true
-from intarray import IntArray
-from shapes import Shape
+from tenmo.intarray import IntArray
+from tenmo.shapes import Shape
 from std.sys import has_accelerator
 
 

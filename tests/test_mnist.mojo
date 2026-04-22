@@ -1,10 +1,10 @@
 from tensors import Tensor
 from layers import Linear, ReLU, Sequential
-from crossentropy import CrossEntropyLoss
-from sgd import SGD
+from tenmo.crossentropy import CrossEntropyLoss
+from tenmo.sgd import SGD
 from std.testing import assert_true
 from std.python import Python, PythonObject
-from numpy_interop import from_ndarray
+from tenmo.numpy_interop import from_ndarray
 
 
 fn load_mnist_subset(

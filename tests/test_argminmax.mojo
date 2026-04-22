@@ -1,6 +1,6 @@
-from tensor import Tensor
-from shapes import Shape
-from argminmax import Argmin, Argmax
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
+from tenmo.argminmax import Argmin, Argmax
 from std.sys import has_accelerator
 
 

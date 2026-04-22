@@ -2,18 +2,18 @@
 Comprehensive test suite for Conv2D implementation.
 Tests forward pass, backward pass, edge cases, and numerical gradients.
 """
-from tensor import Tensor
-from cnn import Conv2dFused
+from tenmo.tensor import Tensor
+from tenmo.cnn import Conv2dFused
 
 from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false
 from std.math import sqrt
-from common_utils import isnan, isinf
+from tenmo.common_utils import isnan, isinf
 from std.math import sqrt
 from std.random import seed
-from gradbox import Gradbox
-from shapes import Shape
-from common_utils import i, s
-from forwards import Padding
+from tenmo.gradbox import Gradbox
+from tenmo.shapes import Shape
+from tenmo.common_utils import i, s
+from tenmo.forwards import Padding
 
 
 fn test_basic_forward() raises:

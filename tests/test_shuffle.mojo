@@ -1,7 +1,7 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true
-from shapes import Shape
-from shuffle import Shuffle
+from tenmo.shapes import Shape
+from tenmo.shuffle import Shuffle
 from std.sys import has_accelerator
 
 

@@ -1,7 +1,7 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.math import sqrt
 from std.testing import assert_true
-from common_utils import isnan, isinf
+from tenmo.common_utils import isnan, isinf
 
 
 fn test_sqrt_backward() raises:

@@ -1,4 +1,4 @@
-from intarray import IntArray
+from tenmo.intarray import IntArray
 from std.testing import assert_equal, assert_true, assert_false
 
 # ========== Construction Tests ==========

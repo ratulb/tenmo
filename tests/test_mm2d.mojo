@@ -1,6 +1,6 @@
-from tensor import Tensor
-from shapes import Shape
-from common_utils import panic
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
+from tenmo.common_utils import panic
 from std.sys import simd_width_of
 
 
@@ -460,8 +460,8 @@ fn test_matmul_2d_mixed_stride_views() raises:
 # ===== BASIC MATRIX MULTIPLICATION =====
 
 from std.testing import assert_true
-from shapes import Shape
-from strides import Strides
+from tenmo.shapes import Shape
+from tenmo.strides import Strides
 
 
 fn test_matmul_2d_1x1_identity() raises:

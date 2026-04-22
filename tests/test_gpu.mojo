@@ -1,12 +1,12 @@
-from tensor import Tensor
-from ndbuffer import NDBuffer
-from intarray import IntArray
-from shapes import Shape
+from tenmo.tensor import Tensor
+from tenmo.ndbuffer import NDBuffer
+from tenmo.intarray import IntArray
+from tenmo.shapes import Shape
 from std.testing import assert_true
 from std.sys import has_accelerator
-from mnemonics import vm, mv
-from gradbox import Gradbox
-from matmul_kernel import MatmulNdGpu
+from tenmo.mnemonics import vm, mv
+from tenmo.gradbox import Gradbox
+from tenmo.matmul_kernel import MatmulNdGpu
 
 comptime dtype = DType.float32
 

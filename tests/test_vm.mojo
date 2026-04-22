@@ -1,8 +1,8 @@
-from tensor import Tensor
-from shapes import Shape
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
 from std.testing import assert_true
-from strides import Strides
-from mnemonics import vm
+from tenmo.strides import Strides
+from tenmo.mnemonics import vm
 
 fn main() raises:
     test_vector_matrix_no_batch()

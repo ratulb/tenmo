@@ -1,8 +1,8 @@
-from tensor import Tensor
-from intarray import IntArray
-from shapes import Shape
+from tenmo.tensor import Tensor
+from tenmo.intarray import IntArray
+from tenmo.shapes import Shape
 from std.testing import assert_true
-from permute import Permute
+from tenmo.permute import Permute
 from std.sys import has_accelerator
 
 #Old tests

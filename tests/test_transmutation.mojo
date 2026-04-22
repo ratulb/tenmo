@@ -1,9 +1,9 @@
-from tensor import Tensor
-from gradbox import Gradbox
-from shapes import Shape
+from tenmo.tensor import Tensor
+from tenmo.gradbox import Gradbox
+from tenmo.shapes import Shape
 from std.testing import assert_true
 from std.sys import has_accelerator
-from ndbuffer import NDBuffer
+from tenmo.ndbuffer import NDBuffer
 
 comptime dtype = DType.float32
 

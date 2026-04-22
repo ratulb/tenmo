@@ -1,8 +1,8 @@
-from tensor import Tensor
-from shapes import Shape
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
 
 from std.testing import assert_true, assert_raises
-from intarray import IntArray
+from tenmo.intarray import IntArray
 
 # ============================================
 # SHAPE TESTS

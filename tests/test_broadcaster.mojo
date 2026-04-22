@@ -1,8 +1,8 @@
-from tensor import Tensor
-from shapes import Shape
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
 from std.testing import assert_true, assert_raises
-from broadcasthelper import ShapeBroadcaster
-from intarray import IntArray
+from tenmo.broadcasthelper import ShapeBroadcaster
+from tenmo.intarray import IntArray
 
 
 fn test_empty_shape_broadcastable() raises:

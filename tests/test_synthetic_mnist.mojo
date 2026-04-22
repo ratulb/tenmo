@@ -1,11 +1,11 @@
-from tensor import Tensor
-from shapes import Shape
-from net import Linear, ReLU, Sequential
-from sgd import SGD
-from crossentropy import CrossEntropyLoss
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
+from tenmo.net import Linear, ReLU, Sequential
+from tenmo.sgd import SGD
+from tenmo.crossentropy import CrossEntropyLoss
 from std.testing import assert_true
 from std.utils.numerics import max_finite
-from common_utils import log_debug, s, i as Row
+from tenmo.common_utils import log_debug, s, i as Row
 
 
 # Synthetic dataset generator

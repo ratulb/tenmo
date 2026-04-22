@@ -1,4 +1,4 @@
-from tensor import Tensor
+from tenmo.tensor import Tensor
 from std.testing import assert_true
 from std.sys import has_accelerator
 # ===----------------------------------------------------------------------=== #

@@ -1,8 +1,8 @@
-from tensor import Tensor
-from shapes import Shape
+from tenmo.tensor import Tensor
+from tenmo.shapes import Shape
 from std.testing import assert_true
-from strides import Strides
-from common_utils import s, il
+from tenmo.strides import Strides
+from tenmo.common_utils import s, il
 
 
 fn main() raises:
