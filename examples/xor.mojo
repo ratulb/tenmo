@@ -4,7 +4,7 @@ XOR Problem
 Classic non-linearly separable problem requiring hidden layers.
 """
 
-from tenmo import Tensor
+from tensor import Tensor
 from net import Sequential, Linear, Sigmoid, MSELoss
 from time import perf_counter_ns
 from std.math import sqrt

@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from shapes import Shape
 from net import Linear, ReLU, Sequential
 from sgd import SGD

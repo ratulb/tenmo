@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from std.testing import assert_true
 from std.testing import assert_false
 from std.time import perf_counter_ns

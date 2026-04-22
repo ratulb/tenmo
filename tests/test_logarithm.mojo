@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from std.testing import assert_true, assert_false
 from common_utils import isnan, isinf, Epsilon
 from std.math import log

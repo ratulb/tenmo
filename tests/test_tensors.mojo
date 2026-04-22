@@ -1,5 +1,5 @@
 from std.testing import assert_true, assert_false, assert_raises
-from tenmo import Tensor
+from tensor import Tensor
 from intarray import IntArray
 from shapes import Shape
 from common_utils import *

@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from shapes import Shape
 from std.time import perf_counter_ns
 from blashandle import BLASHandle

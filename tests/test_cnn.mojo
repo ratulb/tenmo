@@ -2,7 +2,7 @@
 Comprehensive test suite for Conv2D implementation.
 Tests forward pass, backward pass, edge cases, and numerical gradients.
 """
-from tenmo import Tensor
+from tensor import Tensor
 from cnn import Conv2dFused
 
 from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false

@@ -1,6 +1,6 @@
 from std.testing import assert_true
 from std.sys import has_accelerator
-from tenmo import Tensor  # adjust import path to your project
+from tensor import Tensor  # adjust import path to your project
 
 
 # ─────────────────────────────────────────────────────────────────────────────

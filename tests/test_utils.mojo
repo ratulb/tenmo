@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 
 # from common_utils import binary_accuracy as accuracy
 from common_utils import now

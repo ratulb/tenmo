@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from net import MSELoss, BCELoss, BCEWithLogitsLoss, Linear, Sigmoid
 from common_utils import isnan, isinf
 from std.testing import assert_true

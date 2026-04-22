@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from shapes import Shape
 from common_utils import panic
 from std.sys import simd_width_of

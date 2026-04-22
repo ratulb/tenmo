@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from numpy_interop import to_ndarray, from_ndarray
 
 from std.testing import assert_true

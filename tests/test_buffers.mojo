@@ -1,5 +1,5 @@
-from buffers import Buffer
-from mnemonics import *
+from tenmo.buffers import Buffer
+from tenmo.mnemonics import *
 from std.sys import simd_width_of
 from std.time import perf_counter_ns
 from std.testing import assert_almost_equal

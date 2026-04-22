@@ -1,5 +1,5 @@
 from std.testing import assert_true
-from tenmo import Tensor
+from tensor import Tensor
 from shapes import Shape
 # ============================================================
 # EXPAND TESTS — forward shape, values, and backward grad flow

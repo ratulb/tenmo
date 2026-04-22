@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from net import Linear, ReLU, Sequential, BCELoss, Sigmoid
 from sgd import SGD
 from std.python import Python, PythonObject

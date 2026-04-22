@@ -1,0 +1,617 @@
+# Generalized Padding Implementation for Mojo Tensor Library
+# Supports arbitrary dimensions with asymmetric padding and gradient flow
+
+"""
+PADDING SPECIFICATION:
+
+For N-dimensional tensor, padding is specified as a list of tuples:
+[(before_0, after_0), (before_1, after_1), ..., (before_N-1, after_N-1)]
+
+Or as a flat list (PyTorch style, applied from last to first dimension):
+[before_last, after_last, before_second_last, after_second_last, ...]
+
+Examples:
+- 2D tensor (H, W): pad = [(1, 2), (3, 4)] means:
+  - Dimension 0 (H): add 1 before, 2 after
+  - Dimension 1 (W): add 3 before, 4 after
+
+- 4D tensor (N, C, H, W): pad = [(0, 0), (0, 0), (1, 1), (2, 2)] means:
+  - No padding on batch and channel dimensions
+  - Pad H with 1 on each side
+  - Pad W with 2 on each side
+"""
+
+from tensor import Tensor
+from shapes import Shape
+from gradbox import Gradbox
+from backpropagation import BackwardFnArg, PadArg, BACKWARD_PAD
+from mnemonics import AddTensor
+from common_utils import panic
+from intarray import IntArray
+from std.utils import Variant
+from std.sys import simd_width_of
+from std.algorithm import parallelize
+from ancestry import Ancestor
+
+comptime Padding = Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]]
+
+
+@fieldwise_init
+struct PadBackward[dtype: DType](ImplicitlyCopyable & Movable):
+    """Backward pass for padding operation - handles all modes."""
+
+    @staticmethod
+    fn backward(
+        output: Ancestor[Self.dtype],
+    ) -> List[Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]]:
+        """
+        Backward pass: Accumulate gradients based on padding mode.
+        """
+        ref bwd_arg = output.ancestry().backward_fn_arg().get[PadArg]()
+        var pad = bwd_arg.pad.copy()
+        var mode = bwd_arg.mode.copy()
+        ref grad_out = output.gradients()[]
+        var ancestor_ref = output.ancestry().get(0)
+        var parent = Tensor[Self.dtype](
+            ancestor_ref.buffer(), requires_grad=ancestor_ref.requires_grad
+        )
+
+        var results = List[
+            Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
+        ]()
+
+        if parent.requires_grad:
+            ref parent_shape = parent.shape()
+            var grad_parent = Gradbox[Self.dtype].zeros(
+                parent_shape, share=False
+            )
+
+            # Different backward pass based on mode
+            if mode == "constant":
+                if parent_shape.rank() == 4:
+                    Self._extract_4d_constant_simd(
+                        grad_out, grad_parent, pad, parent_shape
+                    )
+                else:
+                    Self._extract_constant(
+                        grad_out, grad_parent, pad, parent_shape
+                    )
+            elif mode == "circular":
+                Self._extract_circular(grad_out, grad_parent, pad, parent_shape)
+            elif mode == "replicate":
+                Self._extract_replicate(
+                    grad_out, grad_parent, pad, parent_shape
+                )
+            elif mode == "reflect":
+                Self._extract_reflect(grad_out, grad_parent, pad, parent_shape)
+
+            results.append((ancestor_ref^, grad_parent^, AddTensor))
+
+        return results^
+
+    @staticmethod
+    fn _extract_constant(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """Extract gradients for constant padding - simple extraction from center.
+        """
+        var ndim = parent_shape.rank()
+
+        # Calculate offset where input data starts in padded output
+        var offset_list = List[Int]()
+        for i in range(ndim):
+            offset_list.append(pad[i][0])
+
+        # Iterate over parent's shape and extract gradients
+        for coord in parent_shape:
+            var grad_out_coord = coord  # Copy it
+            grad_out_coord += offset_list
+            grad_parent[coord] += grad_out[grad_out_coord^]
+
+    @staticmethod
+    fn _extract_4d_constant_simd(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """
+        Highly optimized 4D extraction for Conv2D.
+
+        Input: (N, C, H_in, W_in)
+        Padded: (N, C, H_pad, W_pad)
+
+        Assumes: pad[0] = (0, 0) and pad[1] = (0, 0) (no batch/channel padding)
+        Handles: Asymmetric height/width padding:
+                 pad[2] = (pad_top, pad_bottom)   # Can be different!
+                 pad[3] = (pad_left, pad_right)   # Can be different!
+
+        Strategy: Extract row-by-row using SIMD from correct offsets
+        """
+        var N = parent_shape[0]
+        var C = parent_shape[1]
+        var H_in = parent_shape[2]
+        var W_in = parent_shape[3]
+
+        # Extract padding amounts (only height/width)
+        var pad_top = pad[2][0]
+        var pad_left = pad[3][0]
+
+        ref grad_out_shape = grad_out.shape()
+        var H_pad = grad_out_shape[2]
+        var W_pad = grad_out_shape[3]
+
+        var grad_out_ptr = grad_out.data_ptr()
+        var grad_in_ptr = grad_parent.data_ptr().unsafe_mut_cast[True]()
+
+        comptime simd_w = simd_width_of[Self.dtype]()
+        # Strides
+        var out_stride_N = C * H_pad * W_pad
+        var out_stride_C = H_pad * W_pad
+        var out_stride_H = W_pad
+
+        var in_stride_N = C * H_in * W_in
+        var in_stride_C = H_in * W_in
+        var in_stride_H = W_in
+
+        # Parallelize over N×C
+        var total_slices = N * C
+
+        @parameter
+        fn extract_slice(slice_idx: Int):
+            var n = slice_idx // C
+            var c = slice_idx % C
+
+            # Source position in padded gradient (no batch/channel offset!)
+            var out_nc_base = n * out_stride_N + c * out_stride_C
+
+            # Destination position in input gradient
+            var in_nc_base = n * in_stride_N + c * in_stride_C
+
+            # Extract each row
+            for h in range(H_in):
+                # Source row in padded gradient (account for height and width padding)
+                var out_row_start = (
+                    out_nc_base + (h + pad_top) * out_stride_H + pad_left
+                )
+
+                # Destination row in input gradient
+                var in_row_start = in_nc_base + h * in_stride_H
+
+                # Copy entire row (SIMD vectorized)
+                var w = 0
+                var vec_end = (W_in // simd_w) * simd_w
+
+                # Vectorized copy
+                for _ in range(vec_end // simd_w):
+                    var vec = grad_out_ptr.load[width=simd_w](out_row_start + w)
+                    grad_in_ptr.store[width=simd_w](in_row_start + w, vec)
+                    w += simd_w
+
+                # Scalar tail
+                for w_tail in range(vec_end, W_in):
+                    grad_in_ptr[in_row_start + w_tail] = grad_out_ptr[
+                        out_row_start + w_tail
+                    ]
+
+        parallelize[extract_slice](total_slices)
+
+    @staticmethod
+    fn _extract_circular(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """Extract gradients for circular padding - accumulate from all wrapped positions.
+        """
+        var ndim = parent_shape.rank()
+        var grad_out_shape = grad_out.shape()
+
+        # Iterate over ALL output positions and accumulate gradients
+        for out_coord in grad_out_shape:
+            # Map output coordinate back to input coordinate (same logic as forward)
+            var in_coord = IntArray.with_capacity(ndim)
+
+            for i in range(ndim):
+                var before = pad[i][0]
+                var out_idx = out_coord[i]
+                var in_size = parent_shape[i]
+
+                # Same wrapping logic as forward pass
+                var in_idx = (out_idx - before) % in_size
+                if in_idx < 0:
+                    in_idx += in_size
+                in_coord.append(in_idx)
+
+            # ACCUMULATE gradient (not replace!)
+            grad_parent[in_coord] += grad_out[out_coord]
+
+    @staticmethod
+    fn _extract_replicate(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """Extract gradients for replicate padding - accumulate from all replicated positions.
+        """
+        var ndim = parent_shape.rank()
+        var grad_out_shape = grad_out.shape()
+
+        # Iterate over ALL output positions and accumulate gradients
+        for out_coord in grad_out_shape:
+            # Map output coordinate back to input coordinate (same logic as forward)
+            var in_coord = IntArray.with_capacity(ndim)
+
+            for i in range(ndim):
+                var before = pad[i][0]
+                var out_idx = out_coord[i]
+                var in_size = parent_shape[i]
+
+                # Same clamping logic as forward pass (replicate edges)
+                var in_idx = out_idx - before
+                in_idx = max(0, min(in_size - 1, in_idx))
+                in_coord.append(in_idx)
+
+            # ACCUMULATE gradient
+            grad_parent[in_coord] += grad_out[out_coord]
+
+    @staticmethod
+    fn _extract_reflect(
+        grad_out: Gradbox[Self.dtype],
+        grad_parent: Gradbox[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        parent_shape: Shape,
+    ):
+        """Extract gradients for reflect padding - accumulate from all reflected positions.
+        """
+        var ndim = parent_shape.rank()
+        var grad_out_shape = grad_out.shape()
+
+        # Iterate over ALL output positions and accumulate gradients
+        for out_coord in grad_out_shape:
+            # Map output coordinate back to input coordinate (same logic as forward)
+            var in_coord = IntArray.with_capacity(ndim)
+
+            for i in range(ndim):
+                var before = pad[i][0]
+                var out_idx = out_coord[i]
+                var in_size = parent_shape[i]
+
+                # Same reflection logic as forward pass
+                var in_idx: Int
+                if out_idx < before:
+                    # Reflect from left border
+                    in_idx = before - out_idx
+                    in_idx = min(in_idx, in_size - 1)
+                elif out_idx >= before + in_size:
+                    # Reflect from right border
+                    var offset = out_idx - (before + in_size)
+                    in_idx = in_size - 2 - offset
+                    in_idx = max(0, in_idx)
+                else:
+                    # Inside original region
+                    in_idx = out_idx - before
+
+                # Final clamp
+                in_idx = max(0, min(in_size - 1, in_idx))
+                in_coord.append(in_idx)
+
+            # ACCUMULATE gradient
+            grad_parent[in_coord] += grad_out[out_coord]
+
+
+@fieldwise_init
+struct Pad[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+    """
+    Generalized padding operation supporting:
+    - Arbitrary dimensions.
+    - Asymmetric padding (different on each side).
+    - Multiple padding modes.
+    - Proper gradient flow in backward pass.
+    """
+
+    @staticmethod
+    fn forward[
+        track_grad: Bool = True
+    ](
+        x: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        mode: String = "constant",
+        value: Scalar[Self.dtype] = 0.0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """Pad tensor along specified dimensions."""
+        var x_shape = x.shape()
+        var ndim = x_shape.rank()
+
+        # Validate padding specification
+        if len(pad) != ndim:
+            panic("Pad: padding must be specified for all dimensions")
+
+        # Calculate output shape
+        var out_shape = List[Int]()
+        for i in range(ndim):
+            var before = pad[i][0]
+            var after = pad[i][1]
+            out_shape.append(x_shape[i] + before + after)
+
+        # Create output tensor
+        var result = Tensor[Self.dtype].zeros(out_shape)
+
+        # Apply padding based on mode
+        if mode == "constant":
+            # Use optimized path for 4D
+            if ndim == 4:
+                Self._pad_4d_constant_simd(x, result, pad, value)
+            else:
+                Self._pad_constant(x, result, pad, value)
+        elif mode == "reflect":
+            Self._pad_reflect(x, result, pad)
+        elif mode == "replicate":
+            Self._pad_replicate(x, result, pad)
+        elif mode == "circular":
+            Self._pad_circular(x, result, pad)
+        else:
+            panic("Pad: unsupported mode")
+
+        comptime if track_grad:
+            var req_grad = requires_grad.or_else(x.requires_grad)
+            if req_grad:
+                result.requires_grad_(True)
+                # PASS MODE TO BACKWARD!
+                var backwardFnArg = BackwardFnArg[Self.dtype](
+                    BACKWARD_PAD, PadArg(pad.copy(), mode)  # Add mode here
+                )
+                result.add_ancestry(backwardFnArg^, x)
+
+        return result^
+
+    @staticmethod
+    fn _pad_constant(
+        x: Tensor[Self.dtype],
+        mut result: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        value: Scalar[Self.dtype],
+    ):
+        """Apply constant padding (most common for CNNs)."""
+        # Fill with pad value
+        result.fill(value)
+
+        # Copy input data to center region
+        # We need to map input indices to output indices
+        Self._copy_to_padded_region(x, result, pad)
+
+    @staticmethod
+    fn _copy_to_padded_region(
+        x: Tensor[Self.dtype],
+        mut result: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+    ):
+        """Copy input tensor to the non-padded region of output."""
+        var x_shape = x.shape()
+        # var result_shape = result.shape()
+        var ndim = x_shape.rank()
+
+        # Calculate offset in output for where input data starts
+        var offset_list = List[Int]()
+        for i in range(ndim):
+            offset_list.append(pad[i][0])  # before padding
+
+        # Iterate over all elements of input
+        for coord in x_shape:
+            var result_indices = coord  # Copy it
+            result_indices += offset_list
+            result[result_indices] = x[coord]
+
+    @staticmethod
+    fn _pad_4d_constant_simd(
+        x: Tensor[Self.dtype],
+        mut result: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+        value: Scalar[Self.dtype],
+    ):
+        """
+        Highly optimized 4D constant padding for Conv2D.
+
+        Assumes: pad[0] = (0, 0) and pad[1] = (0, 0) (no batch/channel padding)
+        Handles: Asymmetric height/width padding:
+                 pad[2] = (pad_top, pad_bottom)   # Can be different!
+                 pad[3] = (pad_left, pad_right)   # Can be different!
+
+        Strategy:
+        1. Fill entire output with pad value (SIMD vectorized)
+        2. Copy input data row-by-row to correct offset
+        3. Parallelize over N×C slices
+        """
+        var x_shape = x.shape()
+        var result_shape = result.shape()
+
+        var N = x_shape[0]
+        var C = x_shape[1]
+        var H_in = x_shape[2]
+        var W_in = x_shape[3]
+
+        var H_out = result_shape[2]
+        var W_out = result_shape[3]
+
+        # Extract padding amounts (only height/width can be asymmetric)
+        var pad_top = pad[2][0]
+        var pad_left = pad[3][0]
+        # Note: pad[0] and pad[1] are assumed to be (0,0) for Conv2D
+
+        var x_ptr = x.data_ptr()
+        var result_ptr = result.data_ptr()
+
+        comptime simd_w = simd_width_of[Self.dtype]()
+        # ═══════════════════════════════════════════════════════════
+        # Step 1: Fill with pad value (SIMD vectorized)
+        # ═══════════════════════════════════════════════════════════
+        var total_elements = N * C * H_out * W_out
+        var fill_vec = SIMD[Self.dtype, simd_w](value)
+
+        var i = 0
+        var vec_end = (total_elements // simd_w) * simd_w
+
+        for _ in range(vec_end // simd_w):
+            result_ptr.store[width=simd_w](i, fill_vec)
+            i += simd_w
+
+        for j in range(vec_end, total_elements):
+            result_ptr[j] = value
+
+        # ═══════════════════════════════════════════════════════════
+        # Step 2: Copy input data (simplified - no batch/channel offset!)
+        # ═══════════════════════════════════════════════════════════
+        var x_stride_N = C * H_in * W_in
+        var x_stride_C = H_in * W_in
+        var x_stride_H = W_in
+
+        var result_stride_N = C * H_out * W_out
+        var result_stride_C = H_out * W_out
+        var result_stride_H = W_out
+
+        var total_slices = N * C
+
+        @parameter
+        fn copy_slice(slice_idx: Int):
+            var n = slice_idx // C
+            var c = slice_idx % C
+
+            # Source position in input
+            var x_nc_base = n * x_stride_N + c * x_stride_C
+
+            # Destination position in output (no batch/channel offset needed!)
+            var result_nc_base = n * result_stride_N + c * result_stride_C
+
+            # Copy each row
+            for h in range(H_in):
+                var x_row_start = x_nc_base + h * x_stride_H
+
+                # Destination row (account for height and width padding)
+                var result_row_start = (
+                    result_nc_base + (h + pad_top) * result_stride_H + pad_left
+                )
+
+                # SIMD-vectorized row copy
+                var w = 0
+                var vec_end = (W_in // simd_w) * simd_w
+
+                for _ in range(vec_end // simd_w):
+                    var vec = x_ptr.load[width=simd_w](x_row_start + w)
+                    result_ptr.store[width=simd_w](result_row_start + w, vec)
+                    w += simd_w
+
+                # Scalar tail
+                for w_tail in range(vec_end, W_in):
+                    result_ptr[result_row_start + w_tail] = x_ptr[
+                        x_row_start + w_tail
+                    ]
+
+        parallelize[copy_slice](total_slices)
+
+    @staticmethod
+    fn _pad_replicate(
+        x: Tensor[Self.dtype],
+        mut result: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+    ):
+        """Apply replicate padding - repeat edge values using coordinate iteration.
+        """
+        var x_shape = x.shape()
+        var result_shape = result.shape()
+        var ndim = x_shape.rank()
+
+        # Iterate over all output coordinates
+        for out_coord in result_shape:
+            # Map to input with edge replication
+            var in_coord = IntArray.with_capacity(ndim)
+
+            for i in range(ndim):
+                var before = pad[i][0]
+                var out_idx = out_coord[i]
+                var in_size = x_shape[i]
+
+                # Clamp to valid input range (replicate edges)
+                var in_idx = out_idx - before
+                in_idx = max(0, min(in_size - 1, in_idx))
+                in_coord.append(in_idx)
+
+            result[out_coord] = x[in_coord]
+
+    @staticmethod
+    fn _pad_reflect(
+        x: Tensor[Self.dtype],
+        mut result: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+    ):
+        """Apply reflect padding - mirror at borders using coordinate iteration.
+        """
+        var x_shape = x.shape()
+        var result_shape = result.shape()
+        var ndim = x_shape.rank()
+
+        # Iterate over all output coordinates
+        for out_coord in result_shape:
+            # Map output coordinates to input coordinates with reflection
+            var in_coord = IntArray.with_capacity(ndim)
+
+            for i in range(ndim):
+                var before = pad[i][0]
+                var out_idx = out_coord[i]
+                var in_size = x_shape[i]
+
+                var in_idx: Int
+                if out_idx < before:
+                    # Reflect from left border
+                    in_idx = before - out_idx
+                    # Clamp to avoid out of bounds
+                    in_idx = min(in_idx, in_size - 1)
+                elif out_idx >= before + in_size:
+                    # Reflect from right border
+                    var offset = out_idx - (before + in_size)
+                    in_idx = in_size - 2 - offset
+                    # Clamp to avoid out of bounds
+                    in_idx = max(0, in_idx)
+                else:
+                    # Inside original region
+                    in_idx = out_idx - before
+
+                # Final clamp to ensure valid range
+                in_idx = max(0, min(in_size - 1, in_idx))
+                in_coord.append(in_idx)
+
+            result[out_coord] = x[in_coord]
+
+    @staticmethod
+    fn _pad_circular(
+        x: Tensor[Self.dtype],
+        mut result: Tensor[Self.dtype],
+        pad: List[Tuple[Int, Int]],
+    ):
+        """Apply circular padding - wrap around using coordinate iteration."""
+        var x_shape = x.shape()
+        var result_shape = result.shape()
+        var ndim = x_shape.rank()
+
+        # Iterate over all output coordinates
+        for out_coord in result_shape:
+            # Map to input with wrapping
+            var in_coord = IntArray.with_capacity(ndim)
+
+            for i in range(ndim):
+                var before = pad[i][0]
+                var out_idx = out_coord[i]
+                var in_size = x_shape[i]
+
+                # Wrap around using modulo
+                var in_idx = (out_idx - before) % in_size
+                if in_idx < 0:
+                    in_idx += in_size
+                in_coord.append(in_idx)
+
+            result[out_coord] = x[in_coord]

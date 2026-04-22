@@ -3,7 +3,7 @@ MNIST Training with Mojo
 A simple neural network implementation for MNIST digit classification.
 """
 
-from tenmo import Tensor
+from tensor import Tensor
 from sgd import SGD
 from net import Linear, ReLU, Sequential
 from crossentropy import CrossEntropyLoss

@@ -1,5 +1,5 @@
 from std.testing import assert_true
-from tenmo import Tensor
+from tensor import Tensor
 from std.sys import has_accelerator
 from shapes import Shape
 

@@ -11,7 +11,7 @@ Broadcasting rules for matmul:
 from std.testing import assert_almost_equal, assert_equal, assert_true, assert_false
 from std.math import sqrt
 from std.random import random_float64
-from tenmo import Tensor
+from tensor import Tensor
 from shapes import Shape
 from common_utils import isnan, isinf
 from gradbox import Gradbox

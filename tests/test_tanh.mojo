@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from net import Tanh, Linear
 from common_utils import isnan, isinf
 from shapes import Shape

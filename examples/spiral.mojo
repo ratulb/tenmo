@@ -35,7 +35,7 @@ Performance:
     - Loss convergence: <0.05 final validation loss
 """
 
-from tenmo import Tensor
+from tensor import Tensor
 from sgd import SGD
 from net import (
     Sequential,

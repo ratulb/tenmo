@@ -1,5 +1,5 @@
 from time import perf_counter_ns
-from tenmo import Tensor
+from tensor import Tensor
 from std.testing import assert_true
 from std.algorithm import vectorize
 from std.sys import simd_width_of

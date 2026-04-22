@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from ndbuffer import NDBuffer
 from intarray import IntArray
 from shapes import Shape

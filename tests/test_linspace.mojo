@@ -1,5 +1,5 @@
 from std.testing import assert_true
-from tenmo import Tensor
+from tensor import Tensor
 
 
 fn main() raises:

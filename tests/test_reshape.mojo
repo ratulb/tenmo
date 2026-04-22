@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from shapes import Shape
 from strides import Strides
 from std.testing import assert_true

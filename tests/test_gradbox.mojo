@@ -4,7 +4,7 @@ from ndbuffer import NDBuffer
 from shapes import Shape
 from gradbox import Gradbox
 from unsqueeze import Unsqueeze
-from tenmo import Tensor
+from tensor import Tensor
 from intarray import IntArray
 
 

@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from shapes import Shape
 from argminmax import Argmin, Argmax
 from std.sys import has_accelerator

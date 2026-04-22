@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from std.random import seed
 from std.testing import assert_true
 from net import Dropout

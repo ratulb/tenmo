@@ -6,7 +6,7 @@ from strides import Strides
 from ndbuffer import NDBuffer
 from mnemonics import *
 from std.sys import has_accelerator
-from tenmo import Tensor
+from tensor import Tensor
 
 # ============================================
 # Test Constants

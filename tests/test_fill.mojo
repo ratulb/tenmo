@@ -1,4 +1,4 @@
-from tenmo import Tensor
+from tensor import Tensor
 from std.testing import assert_true
 from common_utils import i, il, s, newaxis, Idx
 from intarray import IntArray
