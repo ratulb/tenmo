@@ -2168,8 +2168,13 @@ struct NDBuffer[dtype: DType](
                     )
                     # Unreachable
                     out = NDBuffer[Self.dtype].Empty()
-            elif (self.is_on_gpu() and other.is_on_cpu()) or (self.is_on_cpu() and other.is_on_gpu()):
-                panic("NDBuffer arithmetic_ops - both tensors must be on the same device - they are not")
+            elif (self.is_on_gpu() and other.is_on_cpu()) or (
+                self.is_on_cpu() and other.is_on_gpu()
+            ):
+                panic(
+                    "NDBuffer arithmetic_ops - both tensors must be on the same"
+                    " device - they are not"
+                )
                 out = NDBuffer[Self.dtype].Empty()
             else:
                 out = self.arithmetic_ops_cpu[op_code](other, epsilon)
@@ -2384,7 +2389,10 @@ struct NDBuffer[dtype: DType](
             return rhs * lhs * (One[Self.dtype].value() - lhs)
 
         elif op_code == SQRT_BACKWARD:
-            return rhs * ( One[Self.dtype].value() / (epsilon + Scalar[Self.dtype](2) * sqrt(lhs)))
+            return rhs * (
+                One[Self.dtype].value()
+                / (epsilon + Scalar[Self.dtype](2) * sqrt(lhs))
+            )
         elif op_code == TANH_BACKWARD:
             # lhs = tanh output, rhs = grad
             return rhs * (One[Self.dtype].value() - lhs * lhs)
@@ -2394,7 +2402,6 @@ struct NDBuffer[dtype: DType](
 
         else:  # op_code == ReverseDivide
             return rhs / lhs
-
 
     @staticmethod
     @always_inline
@@ -3520,7 +3527,3 @@ struct NDBuffer[dtype: DType](
         parallelize[process_tile](total_tiles, num_physical_cores())
 
         return C^
-
-
-fn main() raises:
-    print("passes")
