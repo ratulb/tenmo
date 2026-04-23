@@ -164,7 +164,7 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
         var result_buffer = device_context.enqueue_create_buffer[DType.uint8](1)
         result_buffer.enqueue_fill(1)
 
@@ -327,7 +327,7 @@ struct Compare[dtype: DType = DType.float32](
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         var result_buffer = device_context.enqueue_create_buffer[DType.uint8](
             output_size
@@ -471,7 +471,7 @@ struct CompareScalar[dtype: DType = DType.float32](
         )
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         var compiled_func = device_context.compile_function[
             compare_scalar[

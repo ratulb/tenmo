@@ -252,7 +252,7 @@ struct ReductionMinMax[dtype: DType = DType.float32](
 
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
         ref A_buffer = A_device_state.device_buffer()
 
         var (threads_per_block, num_blocks) = Self.launch_config[

@@ -4,7 +4,7 @@ from std.math import exp, floor, log, cos, sin, sqrt, pi
 from std.random import seed, random_float64
 from std.sys import simd_width_of
 from std.utils.numerics import min_finite
-from std.memory import memcpy, memset, memset_zero, AddressSpace, ArcPointer
+from std.memory import memcpy, memset, memset_zero, AddressSpace
 from .shapes import Shape, ShapeIndexIterator
 from .ancestry import Ancestors, Ancestor
 from .strides import Strides
@@ -507,7 +507,7 @@ struct Tensor[dtype: DType](
     fn device(self) -> Device:
         return self.buffer.device()
 
-    fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+    fn device_context(self) -> Optional[DeviceContext]:
         comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.buffer.device_context()

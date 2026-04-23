@@ -430,7 +430,7 @@ struct BinaryInplaceOperations[dtype: DType](
         ref A_device_state = A.device_state.value()
         ref B_device_state = B.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         ref A_buffer = A_device_state.device_buffer()
         ref B_buffer = B_device_state.device_buffer()

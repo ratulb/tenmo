@@ -315,7 +315,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
             numels, simdwidth
         )
         ref device_state = A.device_state.value()
-        var device_context = device_state.gpu()
+        var device_context = device_state.gpu[]
         var contig_state = A.contiguous_device_state()
         var result_buffer = device_context.enqueue_create_buffer[Self.datatype](
             numels
@@ -428,7 +428,7 @@ struct UnaryOpsKernel[dtype: DType](ImplicitlyCopyable & Movable):
         )
 
         ref device_state = A.device_state.value()
-        var device_context = device_state.gpu()
+        var device_context = device_state.gpu[]
 
         # Non-contiguous: produce one contiguous GPU buffer in a single
         # map_to_host sweep — NOT one map_to_host call per index.

@@ -91,7 +91,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         gpu: GPU,
     ) raises -> DeviceBuffer[DType.int64]:
         """Upload permutation list to a DeviceBuffer of Int64."""
-        var device_context = gpu()
+        var device_context = gpu[]
         var n = len(permutation)
         var perm_buffer = device_context.enqueue_create_buffer[DType.int64](n)
         with perm_buffer.map_to_host() as host:
@@ -110,7 +110,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         ref device_state = A.device_state.value()
         ref gpu = device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         var in_shape = shape.array()
         var in_strides = A.strides.array()
@@ -161,7 +161,7 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
         ref device_state = grad.device_state.value()
         ref gpu = device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         var in_shape = shape.array()
         var in_strides = grad.strides.array()

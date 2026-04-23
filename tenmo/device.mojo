@@ -1,11 +1,12 @@
-from .common_utils import panic, now
+from .common_utils import panic, IDGen
 from std.gpu.host import DeviceContext, DeviceBuffer
-from std.memory import ArcPointer, memcpy
+from std.memory import memcpy
 from std.sys import has_accelerator, simd_width_of
 from std.utils import Variant
 from .ndbuffer import NDBuffer
 from .shapes import Shape
 from .buffers import Buffer
+from std.sys.defines import get_defined_int
 
 comptime DeviceType = Variant[CPU, GPU]
 
@@ -20,7 +21,7 @@ struct Device(Equatable, ImplicitlyCopyable, Movable, Writable):
     fn __eq__(self, other: Self) -> Bool:
         if self.kind.isa[CPU]():
             if other.kind.isa[CPU]():
-                return True
+                return self.kind[CPU] == other.kind[CPU]
             else:
                 return False
         else:
@@ -49,49 +50,56 @@ struct Device(Equatable, ImplicitlyCopyable, Movable, Writable):
 
 @fieldwise_init
 struct CPU(Equatable, ImplicitlyCopyable, Movable, Writable):
+    var id: Int
+
+    fn __init__(out self):
+        self.id = get_defined_int["CPU", 0]()
+
     fn __eq__(self, other: Self) -> Bool:
-        return True
+        return self.id == other.id
 
     fn __ne__(self, other: Self) -> Bool:
-        return False
+        return not self == other
 
     fn into(self) -> Device:
         return Device(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write("CPU")
+        writer.write("CPU[" + String(self.id) + "]")
 
 
 @fieldwise_init
 struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
     """Essentially a shared DeviceContext."""
 
-    var device_context: ArcPointer[DeviceContext]
+    var device_context: DeviceContext
     var id: Int64
+    var _id: UInt
 
     fn into(self) -> Device:
         return Device(self)
 
     fn __init__(out self, device_id: Int = 0) raises:
-        self.device_context = ArcPointer(DeviceContext(device_id))
+        self.device_context = DeviceContext(device_id)
         self.id = Int64(device_id)
+        self._id = IDGen.generate_id()
 
     fn __copyinit__(out self, copy: Self):
         self.device_context = copy.device_context.copy()
         self.id = copy.id
+        self._id = copy._id
 
     fn __moveinit__(out self, deinit take: Self):
         self.device_context = take.device_context^
         self.id = take.id
+        self._id = take._id
 
     fn write_to[W: Writer](self, mut writer: W):
+        # Not printing _id
         writer.write("GPU[" + String(self.id) + "]")
 
     fn __eq__(self, other: Self) -> Bool:
-        return (
-            self.device_context.__is__(other.device_context)
-            or self.id == other.id
-        )
+        return self._id == other._id and self.id == other.id
 
     fn __ne__(self, other: Self) -> Bool:
         return not (self == other)
@@ -101,19 +109,13 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
 
     fn __exit__(mut self):
         try:
-            self.device_context[].synchronize()
+            self.device_context.synchronize()
         except e:
             print(e)
             print("Error synchronizing GPU device context: ", String(e))
 
-    fn __getitem__(self) -> ArcPointer[DeviceContext]:
+    fn __getitem__(self) -> DeviceContext:
         return self.device_context.copy()
-
-    fn handle(self) -> ArcPointer[DeviceContext]:
-        return self.device_context.copy()
-
-    fn __call__(self) -> DeviceContext:
-        return self.device_context.copy()[]
 
 
 struct DeviceState[dtype: DType](
@@ -137,7 +139,7 @@ struct DeviceState[dtype: DType](
         gpu: Optional[GPU] = None,
     ) raises:
         var device_ctx = gpu.or_else(GPU())
-        var device_buffer = device_ctx().enqueue_create_buffer[Self.datatype](
+        var device_buffer = device_ctx[].enqueue_create_buffer[Self.datatype](
             size
         )
         self.buffer = device_buffer^
@@ -182,7 +184,7 @@ struct DeviceState[dtype: DType](
 
     @always_inline
     fn sync(self) raises:
-        self.gpu().synchronize()
+        self.gpu[].synchronize()
 
     fn new(
         self,

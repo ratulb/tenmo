@@ -204,7 +204,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
         )
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         var compiled_func = device_context.compile_function[
             scalar_ops[
@@ -257,7 +257,7 @@ struct ScalarOperations[dtype: DType = DType.float32](
         )
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         # Ensure contiguous GPU input
         var contig_state = A.contiguous_device_state()

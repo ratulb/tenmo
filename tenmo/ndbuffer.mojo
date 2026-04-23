@@ -7,7 +7,7 @@ from .matrixshapevalidator import MatrixShapeValidator
 from .broadcasthelper import ShapeBroadcaster
 from .common_utils import panic, log_debug, print_buffer, Epsilon, One
 from .validators import Validator
-from std.memory import memcpy, AddressSpace, ArcPointer
+from std.memory import memcpy, AddressSpace
 from std.gpu.host import DeviceBuffer, DeviceContext
 from std.algorithm import parallelize
 from std.sys.info import num_physical_cores
@@ -153,7 +153,7 @@ struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
 
     fn __copyinit__(out self, copy: Self):
         self.buffer = copy.buffer.copy()  # Buffer refcount bump if shared
-        self.device_state = copy.device_state.copy()  # ArcPointer bump for GPU
+        self.device_state = copy.device_state.copy()  # Ref count bump for GPU
 
     fn __moveinit__(out self, deinit take: Self):
         self.buffer = take.buffer^
@@ -357,7 +357,7 @@ struct NDBuffer[dtype: DType](
                 return self.device_state.value().get_gpu().into()
         return CPU().into()
 
-    fn device_context(self) -> Optional[ArcPointer[DeviceContext]]:
+    fn device_context(self) -> Optional[DeviceContext]:
         if self.is_on_gpu():
             return self.device_state.value().gpu[]
         return None

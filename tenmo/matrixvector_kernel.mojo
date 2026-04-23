@@ -142,7 +142,7 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
         # ── Device setup ──────────────────────────────────────────────────────
         ref M_device_state = M.device_state.value()
         ref gpu = M_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
             total_output

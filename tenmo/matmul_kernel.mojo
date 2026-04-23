@@ -217,7 +217,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
 
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         var result_buffer = device_context.enqueue_create_buffer[Self.dtype](
             total_output

@@ -101,7 +101,7 @@ struct InplaceScalarOperations[dtype: DType = DType.float32](
         )
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         var compiled_func = device_context.compile_function[
             inplace_scalar_ops[

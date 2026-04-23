@@ -180,7 +180,7 @@ struct ArgMinMaxReducer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ) raises -> NDBuffer[DType.int32]:
         ref A_device_state = A.device_state.value()
         ref gpu = A_device_state.get_gpu()
-        var device_context = gpu()
+        var device_context = gpu[]
 
         var in_shape: Array = A.shape.array()
         var in_strides: Array = A.strides.array()
