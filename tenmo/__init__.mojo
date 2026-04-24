@@ -1,5 +1,4 @@
-"""Tenmo — a lean tensor library and neural network framework in Mojo 🔥.
-
+"""
 A full-featured tensor library with automatic differentiation, GPU support,
 and end-to-end training pipelines built entirely in Mojo — with full
 visibility into every layer of the stack.
