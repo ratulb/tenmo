@@ -172,9 +172,9 @@ fn train_mnist() raises:
         # --- Epoch Report ---
         var epoch_time = Float64(perf_counter_ns() - epoch_start) / 1e9
         var avg_train_loss = train_loss / Float32(train_total)
-        var train_acc = 100.0 * Float64(train_correct / train_total)
+        var train_acc = 100.0 * Float64(train_correct) / Float64(train_total)
         var avg_val_loss = val_loss / Float32(val_total)
-        var val_acc = 100.0 * Float64(val_correct / val_total)
+        var val_acc = 100.0 * Float64(val_correct) / Float64(val_total)
 
         print(
             "Epoch",
