@@ -77,7 +77,7 @@ fn train_mnist_binary() raises:
             optimizer.step()
 
             var loss_val = loss.item()
-            epoch_loss += loss_val * batch.batch_size
+            epoch_loss += loss_val * Scalar[dtype](batch.batch_size)
             epoch_correct += accuracy(pred, batch.labels)
             epoch_total += batch.batch_size
 
@@ -87,12 +87,12 @@ fn train_mnist_binary() raises:
         print("\n" + "=" * 80)
         print("EPOCH", epoch+1, "COMPLETED")
         print("Total epoch time:", epoch_time, "seconds")
-        print("Avg time per batch:", epoch_time / batch_num, "seconds")
+        print("Avg time per batch:", Float64(epoch_time) / Float64(batch_num), "seconds")
         print(
             "Loss:",
-            epoch_loss / epoch_total,
+            epoch_loss / Scalar[dtype](epoch_total),
             "| Acc:",
-            100.0 * epoch_correct / epoch_total,
+            Float64(100.0) * Float64(epoch_correct) / Float64(epoch_total),
             "%",
         )
         print("=" * 80 + "\n")
