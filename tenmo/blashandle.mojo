@@ -39,7 +39,6 @@ struct BLASMatmul2dBackward[dtype: DType](
         var result = List[
             Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
-        # ===== GRADIENT FOR A =====
         if A.requires_grad:
             var grad_A: Gradbox[Self.dtype]
 
@@ -67,7 +66,6 @@ struct BLASMatmul2dBackward[dtype: DType](
 
             result.append((A_ancestor, grad_A^, AddTensor))
 
-        # ===== GRADIENT FOR B =====
         if B.requires_grad:
             var grad_B: Gradbox[Self.dtype]
 
@@ -195,7 +193,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
     fn get_error(ref self) -> ref[self._error_msg] String:
         return self._error_msg
 
-    # ========== FIXED: REQUIRED PARAMS BEFORE OPTIONAL ==========
+    # REQUIRED PARAMS BEFORE OPTIONAL ==========
     fn matmul_f32(
         self,
         A: UnsafePointer[Float32, MutAnyOrigin],
@@ -420,7 +418,7 @@ struct BLASHandle[dtype: DType](ImplicitlyCopyable, Movable):
     ) -> Gradbox[Self.dtype]:
         """
         Matrix multiplication: Gradbox @ Tensor.
-        FIXED: Proper dimension checks for all transpose combinations.
+        Proper dimension checks for all transpose combinations.
         """
         # Get stored dimensions
         var A_rows = A.shape()[0]

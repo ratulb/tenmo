@@ -16,8 +16,6 @@ from .array import Array
 from .common_utils import panic
 from .ancestry import Ancestor
 
-# ── GPU Kernels ──────────────────────────────────────────────────────────────
-
 
 fn shuffle_gather[
     dtype: DType
@@ -79,8 +77,6 @@ fn shuffle_scatter[
 
     out_buffer[dst_flat] = in_buffer[tid]
 
-
-# ── ShuffleGPU launcher ──────────────────────────────────────────────────────
 
 
 @fieldwise_init
@@ -206,8 +202,6 @@ struct ShuffleGPU[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return NDBuffer[Self.dtype].with_device_state(result_state^, shape)
 
 
-# ── ShuffleBackward ──────────────────────────────────────────────────────────
-
 
 @fieldwise_init
 struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
@@ -253,9 +247,6 @@ struct ShuffleBackward[dtype: DType](ImplicitlyCopyable & Movable):
             gradbox_parent[parent_coord] = gradbox[grad_coord]
 
         return [(parent, gradbox_parent^, AddTensor)]
-
-
-# ── Shuffle forward ──────────────────────────────────────────────────────────
 
 
 @fieldwise_init

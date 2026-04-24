@@ -48,9 +48,6 @@ struct SoftmaxBackwardDelegate[dtype: DType, is_log: Bool](
         return [(ancestor^, local_grad^, AddTensor)]
 
 
-# ── Softmax forward ───────────────────────────────────────────────────────────
-
-
 @fieldwise_init
 struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -86,9 +83,6 @@ struct Softmax[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, this)
 
         return out^
-
-
-# ── LogSoftmax forward ────────────────────────────────────────────────────────
 
 
 @fieldwise_init

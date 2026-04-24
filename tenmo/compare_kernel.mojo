@@ -36,9 +36,6 @@ fn atomic_and[
             return expected
 
 
-# ── all_close kernel — unchanged ──────────────────────────────────────────────
-
-
 fn all_close[
     dtype: DType,
     rtol: Scalar[dtype] = 1e-5,
@@ -224,7 +221,7 @@ struct AllClose[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return num_blocks, threads_per_block
 
 
-# ── compare kernel ────────────────────────────────────────────────────────────
+# compare kernel
 # Kernel output pointer is DType.uint8 — enqueue_create_buffer[DType.bool]
 # is not supported by Mojo GPU runtime.
 # DeviceState[DType.bool] internally uses DeviceBuffer[DType.uint8] via the
@@ -380,7 +377,7 @@ struct Compare[dtype: DType = DType.float32](
         return num_blocks, threads_per_block
 
 
-# ── compare_scalar kernel ─────────────────────────────────────────────────────
+# compare_scalar kernel
 # Same pattern as compare — uint8 output, wrapped in DeviceState[DType.bool]
 
 

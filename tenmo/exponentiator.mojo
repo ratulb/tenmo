@@ -5,8 +5,6 @@ from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
 from .ancestry import Ancestor
 
-# ── ExponentiationBackward ────────────────────────────────────────────────────
-
 
 @fieldwise_init
 struct ExponentiationBackward[dtype: DType](
@@ -42,8 +40,6 @@ struct ExponentiationBackward[dtype: DType](
 
         return [(ancestor, parent_gradbox^, AddTensor)]
 
-
-# ── Exponentiator forward ─────────────────────────────────────────────────────
 
 
 @fieldwise_init

@@ -21,8 +21,6 @@ comptime RELU_BACKWARD = 19
 comptime SQRT = 20
 comptime SQRT_BACKWARD = 21
 comptime LOG = 22
-###################
-### matul ###########
 comptime dot = 23  # dot product
 comptime vm = 24  # vector & tensor matmul
 comptime mv = 25  # tensor & vector matmul

@@ -15,7 +15,6 @@ struct FlattenBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         ref gradbox = output.gradients()[]
         ancestor = output.ancestry().get(0)
         ancestor_shape = ancestor.shape()
-        # Just reshape gradient back to original
         var reshaped_grad = gradbox.reshape(ancestor_shape)
         return [
             (ancestor, reshaped_grad^, AddTensor),

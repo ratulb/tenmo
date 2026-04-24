@@ -12,8 +12,6 @@ from .ndbuffer import NDBuffer
 from .mnemonics import GreaterThan, LessThan
 from .ancestry import Ancestor
 
-# ── MaxBackwardScalar ─────────────────────────────────────────────────────────
-
 
 @fieldwise_init
 struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -55,8 +53,6 @@ struct MaxBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return [(parent_ref^, grad_input^, AddTensor)]
 
 
-# ── MinBackwardScalar ─────────────────────────────────────────────────────────
-
 
 @fieldwise_init
 struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -93,9 +89,6 @@ struct MinBackwardScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         return [(parent_ref^, grad_input^, AddTensor)]
 
 
-# ── MaxScalar forward ─────────────────────────────────────────────────────────
-
-
 @fieldwise_init
 struct MaxScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -120,9 +113,6 @@ struct MaxScalar[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.add_ancestry(backwardFnArg^, self)
 
         return out^
-
-
-# ── MinScalar forward ─────────────────────────────────────────────────────────
 
 
 @fieldwise_init

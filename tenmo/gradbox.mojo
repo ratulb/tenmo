@@ -1,4 +1,3 @@
-### Mojo Tensor Gradbox
 from .shapes import Shape
 from .mnemonics import *
 from .validators import Validator
@@ -42,11 +41,6 @@ struct Gradbox[dtype: DType](
         self._refcount = alloc[Atomic[DType.uint64]](1)
         self._refcount[] = Atomic[DType.uint64](1)
 
-        _="""fn __init__1(out self: Self, shape: Shape, share: Bool = True):
-        self._refcount = alloc[Atomic[DType.uint64]](1)
-        self._refcount[] = Atomic[DType.uint64](1)
-        buffer = NDBuffer[Self.dtype](shape)
-        self.buffer = buffer.share() if share else buffer^"""
 
     fn __init__(out self, var buffer: NDBuffer[Self.dtype], share: Bool = True):
         self._refcount = alloc[Atomic[DType.uint64]](1)
@@ -75,9 +69,6 @@ struct Gradbox[dtype: DType](
         self._refcount.destroy_pointee()
         self._refcount.free()
 
-    # ========================================
-    # Refcount inspection
-    # ========================================
 
     fn ref_count(self) -> UInt64:
         return self._refcount[].load[ordering=Consistency.MONOTONIC]()

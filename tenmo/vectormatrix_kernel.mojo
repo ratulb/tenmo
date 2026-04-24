@@ -9,8 +9,6 @@ from .mnemonics import max_rank
 from .strides import Strides
 from .broadcasthelper import ShapeBroadcaster
 
-# ── Kernel ────────────────────────────────────────────────────────────────────
-
 
 fn vector_matmul_nd[
     dtype: DType,
@@ -79,9 +77,6 @@ fn vector_matmul_nd[
     out_buffer[tid] = acc
 
 
-# ── Host-side launch wrapper ──────────────────────────────────────────────────
-
-
 @fieldwise_init
 struct VectorMatmulNdGpu[dtype: DType = DType.float32](
     RegisterPassable & ImplicitlyCopyable & Movable
@@ -95,11 +90,9 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
     ) raises -> NDBuffer[
         Self.dtype
     ]:
-        # ── Shape extraction ──────────────────────────────────────────────────
         var v_shape = v.shape
         var M_shape = M.shape
 
-        # ── Validation ────────────────────────────────────────────────────────
         if v_shape.rank() < 1:
             raise Error("VectorMatmulNdGpu: vector must have rank >= 1")
         if M_shape.rank() < 2:
@@ -112,7 +105,6 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
         if k != k_M:
             raise Error("VectorMatmulNdGpu: inner dims must match")
 
-        # ── Batch shapes ──────────────────────────────────────────────────────
         var v_batch_shape = v_shape[:-1]  # v_shape minus last dim
         var M_batch_shape = M_shape[:-2]  # M_shape minus last 2 dims
 
@@ -120,25 +112,20 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
             v_batch_shape, M_batch_shape
         )
 
-        # ── Output shape and sizes ────────────────────────────────────────────
         var out_shape = batch_shape + [n]
         var total_batch = batch_shape.product()
         var total_output = total_batch * n
 
-        # ── Strides (row-major, contiguous — to_gpu() guarantee) ─────────────
         var batch_strides = Strides.default(batch_shape).array()
         var v_batch_strides = v.strides[:-1].array()
         var M_batch_strides = M.strides[:-2].array()
 
-        # Convert batch shapes to Array for kernel
         var batch_shape_arr = batch_shape.array()
         var v_batch_shape_arr = v_batch_shape.array()
         var M_batch_shape_arr = M_batch_shape.array()
 
-        # ── Launch config ─────────────────────────────────────────────────────
         var num_blocks = (total_output + block_size - 1) // block_size
 
-        # ── Device setup ──────────────────────────────────────────────────────
         ref v_device_state = v.device_state.value()
         ref gpu = v_device_state.get_gpu()
         var device_context = gpu[]
@@ -150,7 +137,6 @@ struct VectorMatmulNdGpu[dtype: DType = DType.float32](
         ref v_buf = v_device_state.device_buffer()
         ref M_buf = M.device_state.value().device_buffer()
 
-        # ── Compile and enqueue ───────────────────────────────────────────────
         var compiled_func = device_context.compile_function[
             vector_matmul_nd[Self.dtype, block_size],
             vector_matmul_nd[Self.dtype, block_size],

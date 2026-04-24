@@ -50,7 +50,6 @@ struct MeanBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 )
             )
 
-        # Broadcast and divide
         var broadcasted = expanded.broadcast_to(ancestor_shape)
         # Compute total count of elements being reduced
         var count = ancestor_shape.reduced_shape(bwd_arg.axes).product()

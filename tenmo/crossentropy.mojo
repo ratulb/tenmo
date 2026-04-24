@@ -14,10 +14,6 @@ from .ndbuffer import NDBuffer
 from .intarray import IntArray
 from .ancestry import Ancestor
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Reduction
-# ═══════════════════════════════════════════════════════════════════════════════
-
 
 struct Reduction(ImplicitlyCopyable, RegisterPassable):
     var reduction: Int
@@ -58,9 +54,7 @@ struct Reduction(ImplicitlyCopyable, RegisterPassable):
         return self.reduction == 2
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-#  Cetralized validation
-# ═════════════════════════════════════════════════════════════════════════════
+# Validation
 @fieldwise_init
 struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -180,10 +174,7 @@ struct CEValidation[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# CECommon — shared utilities for forward and backward
-# ═════════════════════════════════════════════════════════════════════════════
-
+# CECommon — Shared utilities for forward and backward
 
 @fieldwise_init
 struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
@@ -364,10 +355,7 @@ struct CECommon[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             return grad * (ug_scalar / scale)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # CEClassIndicesBackward
-# ═════════════════════════════════════════════════════════════════════════════
-
 
 @fieldwise_init
 struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
@@ -482,9 +470,7 @@ struct CEClassIndicesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         return [(logits, grad_final, AddTensor)]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # CEClassIndicesForward
-# ═════════════════════════════════════════════════════════════════════════════
 @fieldwise_init
 struct ClassIndicesBwdArg[dtype: DType](ArgumentType):
     var softmax_probs: NDBuffer[Self.dtype]
@@ -623,10 +609,7 @@ struct CEClassIndicesForward[dtype: DType](
         return out^
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # CEProbabilitiesBackward
-# ═════════════════════════════════════════════════════════════════════════════
-
 
 @fieldwise_init
 struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
@@ -692,9 +675,7 @@ struct CEProbabilitiesBackward[dtype: DType](ImplicitlyCopyable & Movable):
         ]
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # CEProbabilitiesForward
-# ═════════════════════════════════════════════════════════════════════════════
 @fieldwise_init
 struct ClassProbabilitiesBwdArg[dtype: DType](ArgumentType):
     var softmax_probs: NDBuffer[Self.dtype]
@@ -796,11 +777,7 @@ struct CEProbabilitiesForward[dtype: DType](
 
         return out^
 
-
-# ═════════════════════════════════════════════════════════════════════════════
 # CrossEntropyLoss
-# ═════════════════════════════════════════════════════════════════════════════
-
 
 @fieldwise_init
 struct CrossEntropyLoss[dtype: DType](ImplicitlyCopyable, RegisterPassable):

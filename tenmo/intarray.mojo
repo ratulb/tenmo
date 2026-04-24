@@ -23,7 +23,6 @@ struct IntArray(
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
     ]: Iterator = IntArrayIterator[iterable_origin, True]
 
-    # ========== Construction ==========
 
     @always_inline("nodebug")
     fn __init__(out self):
@@ -78,7 +77,6 @@ struct IntArray(
         if self._data.__bool__():
             self._data.free()
 
-    # ========== Static Constructors ==========
 
     @staticmethod
     @always_inline("nodebug")
@@ -135,7 +133,6 @@ struct IntArray(
             inverted[perm[i]] = i
         return inverted^
 
-    # ========== Properties ==========
 
     @always_inline("nodebug")
     fn size(self) -> Int:
@@ -157,7 +154,6 @@ struct IntArray(
         """Check if empty."""
         return self._size == 0
 
-    # ========== Access ==========
 
     @always_inline("nodebug")
     fn __getitem__(ref self, idx: Int) -> ref[self] Int:
@@ -226,7 +222,6 @@ struct IntArray(
 
         return result^
 
-    # ========== Growth Operations ==========
 
     @always_inline("nodebug")
     fn reserve(mut self, required: Int):
@@ -438,7 +433,6 @@ struct IntArray(
         result.sort(asc)
         return result^
 
-    # ========== Operations ==========
     @always_inline("nodebug")
     fn indices_of(self, val: Int) -> Self:
         """Return indices where value equals val."""
@@ -480,7 +474,6 @@ struct IntArray(
                 return False
         return True
 
-    # ========== Conversions ==========
 
     @always_inline("nodebug")
     fn tolist(self) -> List[Int]:
@@ -511,7 +504,6 @@ struct IntArray(
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self.__str__())
 
-    # ========== Math Operations ==========
 
     @always_inline("nodebug")
     fn product(self) -> Int:
@@ -531,7 +523,6 @@ struct IntArray(
             s += self._data[i]
         return s
 
-    # ========== Functional Operations ==========
 
     @always_inline("nodebug")
     fn reverse(mut self):

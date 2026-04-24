@@ -48,7 +48,6 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         return self
 
     fn __next__(mut self) raises StopIteration -> Self.Element:
-        # fn __next__(mut self) raises StopIteration -> Int:
         """
         Return next memory offset and advance iterator.
 

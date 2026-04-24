@@ -10,8 +10,6 @@ from .strides import Strides
 from .broadcasthelper import ShapeBroadcaster
 
 
-# ── Kernel ────────────────────────────────────────────────────────────────────
-
 
 fn matrix_vector_nd[
     dtype: DType,
@@ -80,8 +78,6 @@ fn matrix_vector_nd[
     out_buffer[tid] = acc
 
 
-# ── Host-side launch wrapper ──────────────────────────────────────────────────
-
 
 @fieldwise_init
 struct MatrixVectorNdGpu[dtype: DType = DType.float32](
@@ -96,11 +92,9 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
     ) raises -> NDBuffer[
         Self.dtype
     ]:
-        # ── Shape extraction ──────────────────────────────────────────────────
         var M_shape = M.shape
         var v_shape = v.shape
 
-        # ── Validation ────────────────────────────────────────────────────────
         if M_shape.rank() < 2:
             raise Error("MatrixVectorNdGpu: matrix must have rank >= 2")
         if v_shape.rank() < 1:
@@ -113,7 +107,6 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
         if k != k_v:
             raise Error("MatrixVectorNdGpu: inner dims must match")
 
-        # ── Batch shapes ──────────────────────────────────────────────────────
         var M_batch_shape = M_shape[:-2]  # M_shape minus last 2 dims
         var v_batch_shape = v_shape[:-1]  # v_shape minus last dim
 
@@ -121,12 +114,10 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
             M_batch_shape, v_batch_shape
         )
 
-        # ── Output shape and sizes ────────────────────────────────────────────
         var out_shape = batch_shape + [m]
         var total_batch = batch_shape.product()
         var total_output = total_batch * m
 
-        # ── Strides (row-major, contiguous — to_gpu() guarantee) ─────────────
         var batch_strides = Strides.default(batch_shape).array()
         var M_batch_strides = M.strides[:-2].array()  # slice off inner k,n
         var v_batch_strides = v.strides[:-1].array()  # slice off inner k
@@ -136,10 +127,8 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
         var M_batch_shape_arr = M_batch_shape.array()
         var v_batch_shape_arr = v_batch_shape.array()
 
-        # ── Launch config ─────────────────────────────────────────────────────
         var num_blocks = (total_output + block_size - 1) // block_size
 
-        # ── Device setup ──────────────────────────────────────────────────────
         ref M_device_state = M.device_state.value()
         ref gpu = M_device_state.get_gpu()
         var device_context = gpu[]
@@ -151,7 +140,6 @@ struct MatrixVectorNdGpu[dtype: DType = DType.float32](
         ref M_buf = M_device_state.device_buffer()
         ref v_buf = v.device_state.value().device_buffer()
 
-        # ── Compile and enqueue ───────────────────────────────────────────────
         var compiled_func = device_context.compile_function[
             matrix_vector_nd[Self.dtype, block_size],
             matrix_vector_nd[Self.dtype, block_size],

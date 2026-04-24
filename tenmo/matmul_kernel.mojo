@@ -7,7 +7,7 @@ from .ndbuffer import NDBuffer
 from .broadcasthelper import ShapeBroadcaster
 
 
-# ── 2D Tiled Core Kernel ──────────────────────────────────────────────────────
+# 2D Tiled Core Kernel
 #
 # Computes C = A @ B for a batch of 2D matrix multiplications.
 #
@@ -78,7 +78,7 @@ fn matmul_2d_tiled[
     var row = block_row + ty  # global output row
     var col = block_col + tx  # global output col
 
-    # ── FIX 1: A_base/B_base are pointers offset from A/B ────────────────────
+    # A_base/B_base are pointers offset from A/B ────────────────────
     var A_base = A + A_batch_offsets[batch]
     var B_base = B + B_batch_offsets[batch]
     var out_base = batch * m * n
@@ -115,7 +115,7 @@ fn matmul_2d_tiled[
 
         barrier()
 
-    # ── FIX 2: use C not out_buffer ───────────────────────────────────────────
+    # use C not out_buffer
     if row < m and col < n:
         C[out_base + row * n + col] = acc
 
@@ -237,7 +237,6 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
             for b in range(total_batch):
                 h[b] = Int64(B_offsets[b])
 
-        # ── 4: consistent names A_buf/B_buf ───────────────────────────────
         ref A_buf = A_device_state.device_buffer()
         ref B_buf = B.device_state.value().device_buffer()
 
@@ -250,7 +249,7 @@ struct MatmulNdGpu[dtype: DType = DType.float32](
 
         var (grid, block) = Self.launch_config[tile_size](m, n, total_batch)
 
-        # ── FIX 3: single template arg for compile_function ───────────────────
+        # Single template arg for compile_function
         var compiled_func = device_context.compile_function[
             matmul_2d_tiled[Self.dtype, tile_size],
             matmul_2d_tiled[Self.dtype, tile_size],

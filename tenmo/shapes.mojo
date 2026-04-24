@@ -151,7 +151,6 @@ struct Shape(
             result[i] = self[i]
         return result^
 
-    # ========== Operations ==========
 
     @always_inline("nodebug")
     fn __add__(self, other: Shape) -> Shape:

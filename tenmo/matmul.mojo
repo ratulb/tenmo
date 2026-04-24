@@ -32,7 +32,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
 
-        # ===== GRADIENT FOR A: dL/dA = grad_out × B^T =====
+        # GRADIENT FOR A: dL/dA = grad_out × B^T
         if A.requires_grad:
             var B_buffer = B.buffer()
             var ndb = grad_out.buffer.matmul_2d(
@@ -42,7 +42,7 @@ struct Matmul2dBackward[dtype: DType](ImplicitlyCopyable, RegisterPassable):
 
             result.append((A, grad_A^, AddTensor))
 
-        # ===== GRADIENT FOR B: dL/dB = A^T × grad_out =====
+        # GRADIENT FOR B: dL/dB = A^T × grad_out
         if B.requires_grad:
             var A_buffer = A.buffer()
             var A_buffer_transposed = A_buffer.transpose(IntArray(-1, -2))

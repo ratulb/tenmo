@@ -87,7 +87,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         self.use_momentum = take.use_momentum
         self.velocities = take.velocities^
 
-    # ── Core SIMD update logic — device-agnostic ──────────────────────────────
 
     @always_inline
     fn _step_no_momentum[
@@ -197,7 +196,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
         for k in range(vec_end, num_elements):
             grad_ptr[k] = max(min_val, min(max_val, grad_ptr[k]))
 
-    # ── Grad norm computation ─────────────────────────────────────────────────
 
     fn compute_grad_norm(self) -> Scalar[Self.dtype]:
         var total_norm_sq: Scalar[Self.dtype] = 0.0
@@ -249,7 +247,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
 
         return sqrt(total_norm_sq)
 
-        # ── Gradient clipping ─────────────────────────────────────────────────────
 
     fn clip_gradients(mut self):
         comptime simd_w = simd_width_of[Self.dtype]()
@@ -312,7 +309,6 @@ struct SGD[dtype: DType, //](ImplicitlyCopyable & Movable):
                     grad.data_ptr(), num_elements
                 )
 
-    # ── Step ──────────────────────────────────────────────────────────────────
 
     @always_inline
     fn step(mut self):

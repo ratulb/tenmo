@@ -47,7 +47,7 @@ struct MatrixVectorMulNdBackward[dtype: DType](
             Tuple[Ancestor[Self.dtype], Gradbox[Self.dtype], Int]
         ]()
 
-        # Gradient for M: dM[m, k] = grad_out[m] ⊗ v[k] (outer product)
+        # Gradient for M: dM[m, k] = grad_out[m] *(elementwise) v[k] (outer product)
         if M.requires_grad:
             var grad_M = Gradbox[Self.dtype].zeros(M_shape, share=True)
 
