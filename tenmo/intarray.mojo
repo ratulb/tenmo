@@ -297,7 +297,7 @@ struct IntArray(
         """Get slice as new array.
 
         Args:
-            slice: Slice object specifying start, stop, and step values
+            slice: Slice specifying start, stop, and step values
 
         Returns:
             New IntArray containing the sliced elements
