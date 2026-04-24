@@ -62,8 +62,6 @@ struct Array(
     var storage: StaticTuple[Int, max_rank]
     var size: Int
 
-    # ========== Construction ==========
-
     @always_inline("nodebug")
     fn __init__(out self):
         self.storage = StaticTuple[Int, max_rank]()
