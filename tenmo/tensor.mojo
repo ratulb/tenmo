@@ -1,5 +1,3 @@
-### Mojo Tensor
-### Implement tensor library in mojo
 from std.math import exp, floor, log, cos, sin, sqrt, pi
 from std.random import seed, random_float64
 from std.sys import simd_width_of
