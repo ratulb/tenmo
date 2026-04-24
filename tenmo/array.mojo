@@ -8,6 +8,30 @@ from std.sys.defines import get_defined_int
 
 comptime max_rank = get_defined_int["MAX_RANK", mnemonics.max_rank]()
 
+"""Fixed-size array with compile-time maximum rank (dimensions).
+
+A hybrid between static and dynamic arrays. Storage is statically allocated
+with size `max_rank` (set at compile time), but the actual `size` of the
+array can vary at runtime up to `max_rank`.
+
+Features:
+- **Fixed capacity**: Determined by `MAX_RANK` compile-time constant
+- **Dynamic size**: Runtime size tracking for active elements
+- **Fast access**: O(1) indexing with bounds checking in debug builds
+- **Rich operations**: Element-wise arithmetic, concatenation, dot products
+- **Iteration support**: Forward and reverse iterators
+- **Device compatible**: Implements DevicePassable for GPU/accelerator use
+
+Example:
+    ```mojo
+    var arr = Array(1, 2, 3)
+    print(arr)           # [1, 2, 3]
+    arr.append(4)        # [1, 2, 3, 4]
+    print(arr[1])        # 2
+    arr[0] = 10
+    print(arr.sum())     # 19
+
+"""
 
 struct Array(
     Defaultable,
