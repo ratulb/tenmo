@@ -597,19 +597,19 @@ struct NDBuffer[dtype: DType](
 
     fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
-            self.shape, indices, self.strides, self.offset
+            self.shape, IntArray(indices), self.strides, self.offset
         )
         return self.get(index)
 
     fn __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
         index = IndexCalculator.flatten_index(
-            self.shape, indices, self.strides, self.offset
+            self.shape, IntArray(indices), self.strides, self.offset
         )
         self.set(index, value)
 
     fn __getitem__(self, indices: VariadicList[Int, _]) -> Scalar[Self.dtype]:
         index = IndexCalculator.flatten_index(
-            self.shape, indices, self.strides, self.offset
+            self.shape, IntArray(indices), self.strides, self.offset
         )
         return self.get(index)
 
@@ -617,7 +617,7 @@ struct NDBuffer[dtype: DType](
         self, indices: VariadicList[Int, _], value: Scalar[Self.dtype]
     ):
         index = IndexCalculator.flatten_index(
-            self.shape, indices, self.strides, self.offset
+            self.shape, IntArray(indices), self.strides, self.offset
         )
         self.set(index, value)
 

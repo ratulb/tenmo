@@ -2,6 +2,7 @@ from tenmo.shapes import Shape
 from tenmo.strides import Strides
 from tenmo.common_utils import now
 from tenmo.buffers import Buffer
+from tenmo.intarray import IntArray
 from std.testing import assert_equal, assert_true, assert_false
 from tenmo.indexhelper import IndexIterator
 from tenmo.indexhelper import IndexCalculator
@@ -530,6 +531,145 @@ fn run_all_tests() raises:
     print("=" * 70 + "\n")
 
 
+# ========== INDEX CALCULATOR TESTS ==========
+
+fn test_flatten_index_with_intarray() raises:
+    """Test flatten_index with IntArray indices."""
+    print("test_flatten_index_with_intarray")
+
+    # Test basic case
+    var shape = Shape(3, 4, 5)
+    var strides = Strides(20, 5, 1)
+    var indices = IntArray(1, 2, 3)
+    var offset = IndexCalculator.flatten_index(shape, indices, strides, 10)
+    assert_equal(offset, 43)  # 1*20 + 2*5 + 3*1 + 10
+
+    # Test zero offset
+    var indices2 = IntArray(2, 3)
+    var strides2 = Strides(4, 1)
+    var shape2 = Shape(3, 4)
+    var offset2 = IndexCalculator.flatten_index(shape2, indices2, strides2, 0)
+    assert_equal(offset2, 11)  # 2*4 + 3*1
+
+    print("  ✓ flatten_index with IntArray works")
+
+
+fn test_flatten_index_from_list_conversion() raises:
+    """Test flatten_index by converting List[Int] to IntArray."""
+    print("test_flatten_index_from_list_conversion")
+
+    var shape = Shape(3, 4)
+    var strides = Strides(4, 1)
+    var indices_list = List[Int](capacity=2)
+    indices_list.append(2)
+    indices_list.append(3)
+    # Convert List to IntArray before calling
+    var flat = IndexCalculator.flatten_index(shape, IntArray(indices_list), strides, 0)
+    assert_equal(flat, 11)  # 2*4 + 3*1
+
+    print("  ✓ List[Int] to IntArray conversion works")
+
+
+fn test_flatten_index_from_variadic_conversion() raises:
+    """Test flatten_index by converting VariadicList to IntArray."""
+    print("test_flatten_index_from_variadic_conversion")
+
+    var shape = Shape(3, 4)
+    var strides = Strides(4, 1)
+    
+    # Convert variadic args to IntArray, then call main function
+    var flat = IndexCalculator.flatten_index(shape, IntArray(2, 3), strides, 0)
+    assert_equal(flat, 11)  # 2*4 + 3*1
+
+    print("  ✓ VariadicList to IntArray conversion works")
+
+
+
+fn test_index_to_coord() raises:
+    """Test converting flat index to multi-dimensional coordinates."""
+    print("test_index_to_coord")
+
+    var shape = Shape(3, 4, 5)
+
+    # Test first element
+    var coords0 = IndexCalculator.index_to_coord(shape, 0)
+    assert_equal(coords0[0], 0)
+    assert_equal(coords0[1], 0)
+    assert_equal(coords0[2], 0)
+
+    # Test middle element (17 -> row 0, col 3, depth 2)
+    var coords17 = IndexCalculator.index_to_coord(shape, 17)
+    assert_equal(coords17[0], 0)
+    assert_equal(coords17[1], 3)
+    assert_equal(coords17[2], 2)
+
+    # Test last element
+    var coords59 = IndexCalculator.index_to_coord(shape, 59)
+    assert_equal(coords59[0], 2)
+    assert_equal(coords59[1], 3)
+    assert_equal(coords59[2], 4)
+
+    print("  ✓ index_to_coord works")
+
+
+fn test_max_index() raises:
+    """Test max_index calculation."""
+    print("test_max_index")
+
+    var shape = Shape(3, 4, 5)
+    var strides = Strides(20, 5, 1)
+    var offset = 10
+    var max_idx = IndexCalculator.max_index(shape, strides, offset)
+    # max at (2, 3, 4): 2*20 + 3*5 + 4*1 + 10 = 69
+    assert_equal(max_idx, 69)
+
+    # Edge case: offset=0
+    var max_idx2 = IndexCalculator.max_index(shape, strides, 0)
+    assert_equal(max_idx2, 59)
+
+    print("  ✓ max_index works")
+
+
+fn test_index_calculator_edge_cases() raises:
+    """Test edge cases for IndexCalculator."""
+    print("test_index_calculator_edge_cases")
+
+    # 1D tensor
+    var shape1d = Shape(10)
+    var strides1d = Strides(1)
+    var idx1d = IndexCalculator.flatten_index(shape1d, IntArray(5), strides1d, 0)
+    assert_equal(idx1d, 5)
+
+    # Scalar tensor (0D)
+    var shape0d = Shape()
+    var strides0d = Strides()
+    var idx0d = IndexCalculator.flatten_index(shape0d, IntArray(), strides0d, 100)
+    assert_equal(idx0d, 100)
+
+    # Test 2D
+    var shape2d = Shape(5, 6)
+    var strides2d = Strides(6, 1)
+    var indices2d = IntArray(4, 5)
+    var idx2d = IndexCalculator.flatten_index(shape2d, indices2d, strides2d, 0)
+    assert_equal(idx2d, 4*6 + 5*1)  # = 29
+
+    print("  ✓ IndexCalculator edge cases work")
+
+
+fn run_all_index_calculator_tests() raises:
+    """Run all IndexCalculator tests."""
+    print("\n=== INDEX CALCULATOR TESTS ===\n")
+
+    test_flatten_index_with_intarray()
+    test_flatten_index_from_list_conversion()
+    test_flatten_index_from_variadic_conversion()
+    test_index_to_coord()
+    test_max_index()
+    test_index_calculator_edge_cases()
+
+    print("\n✅ All IndexCalculator Tests Passed!\n")
+
+
 fn test_carry_calculation_correctness_idx() raises:
     """Test that carry calculation is correct (addressing review comment 1)."""
     print("test_carry_calculation_correctness_idx")
@@ -741,5 +881,6 @@ fn run_all_index_iterator_review_tests() raises:
 
 fn main() raises:
     run_all_tests()
+    run_all_index_calculator_tests()
     run_all_benchmarks()
     run_all_index_iterator_review_tests()

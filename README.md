@@ -18,6 +18,8 @@ Tenmo brings modern, ergonomic ML abstractions to Mojo with automatic differenti
 
 ## ⚡︎ Performance
 
+> ⚠️ **These benchmarks reflect an earlier version of Tenmo.** The architectural work since (lightweight ancestry, gradbox refcounting, BackwardFnArg, GPU support) has added overhead on the CPU path. Updated benchmarks — including GPU training numbers — are in progress.
+
 ### MNIST Training Benchmark (15 Epochs, 105K Parameters)
 
 Training the same 4-layer MLP (784→128→32→10) on identical hardware:
@@ -28,25 +30,36 @@ Training the same 4-layer MLP (784→128→32→10) on identical hardware:
 | PyTorch | CPU | 14.5s | 218s | 98.26% |
 | PyTorch | GPU (Tesla T4) | 15.2s | 227s | 97.87% |
 
-**Key Observations:**
-- ⚡︎ **1.3x faster than PyTorch CPU** - Pure Mojo implementation with SIMD optimization
+**Key Observations (historical):**
+- ⚡︎ **1.3× faster than PyTorch CPU** — Pure Mojo with SIMD optimization
 - ⚡︎ **Competitive with PyTorch GPU for small models**
-- 🎯︎ **97.4% accuracy** - Comparable to PyTorch with proper initialization
-- 📉 **Zero Python overhead** - Runs entirely in compiled Mojo
+- 🎯︎ **97.4% accuracy** — Comparable to PyTorch with proper initialization
+- 📉 **Zero Python overhead** — Runs entirely in compiled Mojo
 
-*All runs were performed sequentially on the same system, batch_size=64*
+*All runs were performed sequentially on the same system, batch_size=64. The MNIST example does not use BLAS — pure Mojo only.*
 
-**Why is Tenmo competitive?**
-- GPU overhead (kernel launch + data movement) dominates for small MNIST models
-- Tenmo benefits from:
-  - Zero Python overhead
-  - SIMD-vectorized operations on contiguous buffers
-  - Zero-copy batch loading
-  - Compile-time specialization (eliminates graph overhead in eval mode)
+**Why was Tenmo competitive?**
+- GPU overhead (kernel launch + data transfer) dominates for small MNIST models
+- Zero Python overhead
+- SIMD-vectorized operations on contiguous buffers
+- Zero-copy batch loading
+- Compile-time specialization eliminates graph overhead in eval mode
 
- The MNIST example does not use BLAS - it executes pure Mojo code.
+---
 
-For larger models where GPU compute advantages outweigh transfer costs, GPU acceleration becomes more beneficial. Tenmo's current focus is proving out the fundamentals on CPU before adding GPU support.
+## What's New
+
+The library has undergone significant architectural work since the benchmarks above. The changes prioritize correctness, safety, and GPU support — at a measured cost to raw CPU throughput. Updated benchmarks are in progress.
+
+### Major Recent Work
+
+**Backward system redesign** — moved from stateful handler instances to pure static methods with a type-erased `BackwardFnArg`. Dispatch is now a direct integer-tag jump table. No variant extraction, no handler instances, no redundant copies.
+
+**Ancestry redesign** — `Ancestors` no longer stores full `Tensor` copies. Each ancestor is now a lightweight `Ancestor` handle carrying only what backward needs: an id, a `requires_grad` flag, a refcounted gradbox pointer, a `Layout` (shape/strides/offset), and a `Storage` (CPU Buffer or GPU DeviceState). The recursive deep-copy explosion on every `add_ancestry` call is gone.
+
+**GPU support** — tensor operations, backward passes, and gradient flow now work on GPU. `DType.bool` is handled correctly via internal `uint8` storage throughout kernels.
+
+> 📖 **Deep Dive**: For a complete explanation of forward and backward pass mechanics, see [`README_AUTOGRAD.md`](README_AUTOGRAD.md).
 
 ---
 
@@ -54,8 +67,8 @@ For larger models where GPU compute advantages outweigh transfer costs, GPU acce
 
 #### Tensor operation with backpropagation
 ```mojo
-from testing import assert_true
-from tenmo import Tensor
+from std.testing import assert_true
+from tenmo.tensor import Tensor
 
 fn main() raises:
     # Defaults to DType.float32
@@ -76,7 +89,7 @@ fn main() raises:
 #### Broadcast matmul
 ```mojo
 
-from tenmo import Tensor
+from tenmo.tensor import Tensor
 
 fn main() raises:
     """Broadcasting (2,3) @ (1,3,4)."""
@@ -109,9 +122,9 @@ A's gradients
 ```
 #### Solve XOR
 ```mojo
-from tenmo import Tensor
-from net import Sequential, Linear, Sigmoid, MSELoss
-from sgd import SGD
+from tenmo.tensor import Tensor
+from tenmo.net import Sequential, Linear, Sigmoid, MSELoss
+from tenmo.sgd import SGD
 
 fn main():
     """
@@ -238,7 +251,19 @@ Tenmo provides a broad set of tensor operations. Below is a representative (not 
 - `TensorDataset`, `NumpyDataset` wrappers
 
 ### BLAS Integration
-Tenmo supports configurable BLAS backends for linear algebra operations. When the `BLAS_PATH` environment variable is specified, the `LinearBLAS` layer will dispatch operations to the configured BLAS library. However, **Tenmo's pure Mojo implementation is competitive and recommended** — BLAS support is maintained for compatibility.
+
+Tenmo supports configurable BLAS backends for linear algebra operations. Use `SequentialBLAS` with `LinearBLAS` layers for automatic BLAS acceleration:
+
+- **Auto-profiling**: `LinearBLAS` automatically profiles native Mojo vs BLAS matmul at runtime and selects the faster path
+- **Runtime dispatch**: No compile-time configuration needed — profiling happens on first forward calls
+- **Gradient-aware**: Full backward pass support through BLAS for training
+
+```mojo
+var model = SequentialBLAS[dtype]()
+model.append(LinearBLAS[dtype](784, 128, profile_samples=10).into())
+```
+
+Set `BLAS_PATH` environment variable to use a custom BLAS library (defaults to OpenBLAS).
 
 ---
 
@@ -273,6 +298,9 @@ Buffer[dtype: DType]
 **Gradbox is not a Tensor**
 Gradients don't need the full Tensor API. A `Gradbox` encapsulates only an `NDBuffer`, keeping gradient storage minimal and explicit — **70% less code than full Tensors**.
 
+**Ancestors is not a Tensor**
+The autograd graph no longer stores full `Tensor` copies. An `Ancestor` handle carries only: an id, `requires_grad` flag, a refcounted gradbox pointer, a `Layout` (shape/strides/offset), and a `Storage` (refcount bump). This eliminates the recursive deep-copy explosion on every `add_ancestry` call.
+
 **NDBuffer as Single Source of Truth**
 Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both `Tensor` and `Gradbox`. This ensures views, slicing, and broadcasting behave consistently across the system.
 
@@ -282,6 +310,9 @@ Shape, strides, and offset logic is centralized in `NDBuffer`, which serves both
 **Backpropagation**
 The innermost linear buffer is shared (ref-counted) between user tensors and the autograd engine, ensuring gradients flow correctly through the computation graph.
 
+**Minimal Module System**
+Tenmo includes a minimal neural network module system: `Sequential`, `Linear`, `LinearBLAS`, `ReLU`, `Sigmoid`, `Tanh`, `Dropout`, `Conv2d`, `Flatten`, `MaxPool2d`, and loss functions. Intentionally minimal — build on top as needed.
+
 This architecture keeps the system **explicit, predictable, and close to the metal**.
 
 ---
@@ -289,7 +320,7 @@ This architecture keeps the system **explicit, predictable, and close to the met
 ## 📖 Examples
 
 ### Prerequisites
-- Mojo 0.25.7.0
+- Mojo 0.26.2
 - Python 3.10-3.12 (for NumPy interop in examples)
 
 ### Setup
