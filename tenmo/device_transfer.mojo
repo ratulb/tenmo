@@ -66,7 +66,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
 
         comptime if has_accelerator():
             if flow == Flow.Cpu2Gpu:
-                # Forward was CPU→GPU, backward transfers grad GPU→CPU
+                # Forward was CPU->GPU, backward transfers grad GPU->CPU
                 try:
                     return [
                         (
@@ -82,7 +82,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                     )
                     return [(ancestor_ref^, gradbox, AddTensor)]  # unreachable
             else:
-                # Forward was GPU→CPU, backward transfers grad CPU→GPU
+                # Forward was GPU->CPU, backward transfers grad CPU->GPU
                 try:
                     return [
                         (
@@ -96,7 +96,7 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
                     ]
                 except e:
                     panic(
-                        "DeviceTransferBackward: CPU→GPU transfer failed: "
+                        "DeviceTransferBackward: CPU->GPU transfer failed: "
                         + String(e)
                     )
                     return [(ancestor_ref^, gradbox, AddTensor)]  # unreachable
@@ -115,7 +115,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         requires_grad: Optional[Bool] = None,
     ) raises -> Tensor[Self.dtype]:
         var (code, ndb) = self.buffer.to_device(device)
-        # Either CPU→CPU or GPU→GPU on same device — no transfer needed
+        # Either CPU->CPU or GPU->GPU on same device — no transfer needed
         if code == -1:
             return self
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
@@ -126,7 +126,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                 out.requires_grad_(True)
                 var backwardFnArg: BackwardFnArg[Self.dtype]
                 if device.is_cpu():
-                    # Forward was GPU→CPU
+                    # Forward was GPU->CPU
                     backwardFnArg = BackwardFnArg[Self.dtype](
                         BACKWARD_DEVICE_TRANSFER,
                         DeviceTransferBwdArg(
@@ -135,7 +135,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
                         ),
                     )
                 else:
-                    # Forward was CPU→GPU
+                    # Forward was CPU->GPU
                     backwardFnArg = BackwardFnArg[Self.dtype](
                         BACKWARD_DEVICE_TRANSFER,
                         DeviceTransferBwdArg(Flow.Cpu2Gpu, CPU().into()),
@@ -151,7 +151,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         device: Device,
     ) raises -> Gradbox[Self.dtype]:
         var (code, ndb) = self.buffer.to_device(device)
-        # Either CPU→CPU or GPU→GPU on same device — no transfer needed
+        # Either CPU->CPU or GPU->GPU on same device — no transfer needed
         if code == -1:
             return self
         return Gradbox[Self.dtype](ndb^, share=False)

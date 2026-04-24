@@ -45,7 +45,7 @@ from tenmo.net import (
     BCELoss,
 )
 from tenmo.dataloader import TensorDataset, DataLoader, Batch
-from time import perf_counter_ns
+from std.time import perf_counter_ns
 from std.math import sqrt, cos, sin, pi
 from std.random import randn_float64
 from tenmo.intarray import IntArray
@@ -281,7 +281,7 @@ fn train_spiral_classifier():
             optimizer.step()
 
             # Accumulate metrics
-            epoch_train_loss += loss.item() * train_batch.batch_size
+            epoch_train_loss += loss.item() * Float64(train_batch.batch_size)
 
             var batch_correct_count, _ = accuracy(
                 predictions,
@@ -308,7 +308,7 @@ fn train_spiral_classifier():
             var val_loss = criterion(val_predictions, val_batch.labels)
 
             # Accumulate metrics
-            epoch_val_loss += val_loss.item() * val_batch.batch_size
+            epoch_val_loss += val_loss.item() * Float64(val_batch.batch_size)
 
             var val_correct_count, _ = accuracy(
                 # var val_correct_count, _ = binary_accuracy(
@@ -324,23 +324,23 @@ fn train_spiral_classifier():
 
         if epoch % log_interval == 0 or epoch == num_epochs - 1:
             # Calculate average metrics
-            var avg_train_loss = epoch_train_loss / epoch_train_total
-            var train_accuracy = 100.0 * epoch_train_correct / epoch_train_total
-            var avg_val_loss = epoch_val_loss / epoch_val_total
-            var val_accuracy = 100.0 * epoch_val_correct / epoch_val_total
+            var avg_train_loss = epoch_train_loss / Float64(epoch_train_total)
+            var train_accuracy = 100.0 * Float64(epoch_train_correct) / Float64(epoch_train_total)
+            var avg_val_loss = epoch_val_loss / Float64(epoch_val_total)
+            var val_accuracy = 100.0 * Float64(epoch_val_correct) / Float64(epoch_val_total)
 
             print(
                 "Epoch",
-                String(epoch).rjust(5),
+                String(epoch).ascii_rjust(5),
                 "| Train Loss:",
-                String(avg_train_loss)[:7].rjust(7),
+                String(avg_train_loss)[byte=0:7].ascii_rjust(7),
                 "Acc:",
-                String(train_accuracy)[:6].rjust(6),
+                String(train_accuracy)[byte=0:6].ascii_rjust(6),
                 "%",
                 "| Val Loss:",
-                String(avg_val_loss)[:7].rjust(7),
+                String(avg_val_loss)[byte=0:7].ascii_rjust(7),
                 "Acc:",
-                String(val_accuracy)[:6].rjust(6),
+                String(val_accuracy)[byte=0:6].ascii_rjust(6),
                 "%",
             )
 
@@ -374,15 +374,15 @@ fn train_spiral_classifier():
         var val_predictions = model(val_batch.features)
         var val_loss = criterion(val_predictions, val_batch.labels)
 
-        final_val_loss += val_loss.item() * val_batch.batch_size
+        final_val_loss += val_loss.item() * Float64(val_batch.batch_size)
 
         var val_correct_count, _ = accuracy(val_predictions, val_batch.labels)
         # var val_correct_count, _ = binary_accuracy(val_predictions, val_batch.labels)
         final_val_correct += val_correct_count
         final_val_total += val_batch.batch_size
 
-    var final_avg_val_loss = final_val_loss / final_val_total
-    var final_val_accuracy = 100.0 * final_val_correct / final_val_total
+    var final_avg_val_loss = final_val_loss / Float64(final_val_total)
+    var final_val_accuracy = 100.0 * Float64(final_val_correct) / Float64(final_val_total)
 
     print("Final Validation Loss:", final_avg_val_loss)
     print("Final Validation Accuracy:", final_val_accuracy, "%")
@@ -394,7 +394,7 @@ fn train_spiral_classifier():
 
     var batches_per_epoch = len(train_loader)
     var total_batches = num_epochs * batches_per_epoch
-    var ms_per_batch = (training_time_minutes * 60 * 1000) / total_batches
+    var ms_per_batch = (training_time_minutes * 60 * 1000) / Float64(total_batches)
 
     print("=" * 80)
     print("Performance Summary")
@@ -402,7 +402,7 @@ fn train_spiral_classifier():
     print("Total epochs:", num_epochs)
     print("Total batches processed:", total_batches)
     print("Average time per batch:", ms_per_batch, "ms")
-    print("Average time per epoch:", ms_per_batch * batches_per_epoch, "ms")
+    print("Average time per epoch:", ms_per_batch * Float64(batches_per_epoch), "ms")
     print()
 
     # Determine if training was successful

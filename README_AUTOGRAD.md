@@ -76,7 +76,7 @@ struct BackwardFnArg[dtype: DType]:
     var copy_fn: CopyFn                # custom copier
 ```
 
-This is the key innovation: a **jump table** dispatch instead of variant extraction.
+This is the key: a **jump table** dispatch instead of variant extraction.
 
 ---
 

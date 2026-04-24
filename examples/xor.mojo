@@ -6,7 +6,7 @@ Classic non-linearly separable problem requiring hidden layers.
 
 from tenmo.tensor import Tensor
 from tenmo.net import Sequential, Linear, Sigmoid, MSELoss
-from time import perf_counter_ns
+from std.time import perf_counter_ns
 from std.math import sqrt
 from tenmo.sgd import SGD
 
@@ -63,19 +63,19 @@ fn xor_classification() -> None:
 
             var loss_str = String(loss.item())
             if len(loss_str) > 8:
-                loss_str = loss_str[:8].__str__()
+                loss_str = String(loss_str[byte=0:8])
 
             var grad_str = String(sqrt(grad_norm_sq))
             if len(grad_str) > 8:
-                grad_str = grad_str[:8].__str__()
+                grad_str = String(grad_str[byte=0:8])
 
             print(
                 "Epoch "
-                + String(epoch).rjust(4)
+                + String(epoch).ascii_rjust(4)
                 + " | Loss: "
-                + loss_str.rjust(8)
+                + loss_str.ascii_rjust(8)
                 + " | Grad: "
-                + grad_str.rjust(8)
+                + grad_str.ascii_rjust(8)
             )
 
             # Show predictions at key epochs
@@ -90,11 +90,11 @@ fn xor_classification() -> None:
                     var pred_val = final_pred[i, 0]
                     var pred_str = String(pred_val)
                     if len(pred_str) > 6:
-                        pred_str = pred_str[:6].__str__()
-                    var err = abs(exp - pred_val)
+                        pred_str = String(pred_str[byte=0:6])
+                    var err = abs(Float64(exp) - Float64(pred_val))
                     var err_str = String(err)
                     if len(err_str) > 6:
-                        err_str = err_str[:6].__str__()
+                        err_str = String(err_str[byte=0:6])
 
                     print(
                         "  ("
@@ -130,10 +130,10 @@ fn xor_classification() -> None:
     print("\n" + "=" * 50)
     print("RESULTS")
     print("=" * 50)
-    print("Training time: " + String(train_time)[:6] + "s")
+    print("Training time: " + String(String(train_time)[byte=0:6]) + "s")
     print("Final loss: " + String(final_loss.item()))
-    print("Accuracy: " + String(100.0 * correct / 4) + "%")
-    print("Avg error: " + String(total_error / 4))
+    print("Accuracy: " + String(Float64(100.0) * Float64(correct) / Float64(4)) + "%")
+    print("Avg error: " + String(Float64(total_error) / Float64(4)))
     print()
 
     # Success check

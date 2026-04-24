@@ -71,7 +71,7 @@ struct Strides(
 
     fn __str__(self) -> String:
         var s = self.data.__str__()
-        return "(" + s[byte = 1 : len(s) - 1] + ")"
+        return "(" + s[byte=1:len(s)-1] + ")"
 
     fn __repr__(self) -> String:
         return self.__str__()

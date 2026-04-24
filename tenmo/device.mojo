@@ -99,7 +99,7 @@ struct GPU(Equatable, ImplicitlyCopyable, Movable, Writable):
         writer.write("GPU[" + String(self.id) + "]")
 
     fn __eq__(self, other: Self) -> Bool:
-        return self._id == other._id and self.id == other.id
+        return self._id == other._id
 
     fn __ne__(self, other: Self) -> Bool:
         return not (self == other)
