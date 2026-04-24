@@ -9,6 +9,24 @@ from std.sys.defines import get_defined_int
 comptime max_rank = get_defined_int["MAX_RANK", mnemonics.max_rank]()
 
 
+"""A fixed-size array of integers with static capacity.
+
+The Array struct provides a simple, stack-allocated array with a maximum
+rank (capacity) defined at compile time. It supports common operations
+like append, prepend, iterate, and element-wise arithmetic.
+
+Args:
+    max_rank: Maximum number of elements the array can hold.
+
+Example:
+    ```mojo
+    var arr = Array(1, 2, 3)
+    arr.append(4)
+    for i in arr:
+        print(i)
+    ```
+"""
+
 struct Array(
     Defaultable,
     DevicePassable,
@@ -33,17 +51,26 @@ struct Array(
         target.bitcast[Self.device_type]()[] = self
 
     var storage: StaticTuple[Int, max_rank]
+    """Storage for elements."""
+
     var size: Int
+    """Current number of elements in the array."""
 
     # ========== Construction ==========
 
     @always_inline("nodebug")
     fn __init__(out self):
+        """Create an empty array."""
         self.storage = StaticTuple[Int, max_rank]()
         self.size = 0
 
     @always_inline("nodebug")
     fn __init__(out self, *values: Int):
+        """Create an array from variadic integer arguments.
+
+        Args:
+            *values: Variable number of integer values to initialize the array with.
+        """
         self = Self()
         self.size = len(values)
         for i in range(len(self)):
@@ -51,6 +78,11 @@ struct Array(
 
     @always_inline("nodebug")
     fn __init__(out self, values: VariadicList[Int, _]):
+        """Create an array from a VariadicList.
+
+        Args:
+            values: A VariadicList of integers.
+        """
         var n = len(values)
         if n > max_rank:
             panic("Array: VariadicList size exceeds max_rank", String(max_rank))
@@ -61,6 +93,11 @@ struct Array(
 
     @always_inline("nodebug")
     fn __init__(out self, values: List[Int]):
+        """Create an array from a List.
+
+        Args:
+            values: A List of integers.
+        """
         var n = len(values)
         if n > max_rank:
             panic("Array: List size exceeds max_rank", String(max_rank))
@@ -71,6 +108,11 @@ struct Array(
 
     @always_inline("nodebug")
     fn __init__(out self, intarray: IntArray):
+        """Create an array from an IntArray.
+
+        Args:
+            intarray: An IntArray to copy elements from.
+        """
         var length = len(intarray)
         if length > max_rank:
             panic("Array: IntArray size exceeds max_rank", String(max_rank))
@@ -109,20 +151,40 @@ struct Array(
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        return self.size
+        """Get the current number of elements in the array.
+
+        Returns:
+            The number of elements.
+        """
 
     @always_inline("nodebug")
     fn capacity(self) -> Int:
-        return max_rank
+        """Get the maximum capacity of the array.
+
+        Returns:
+            The maximum number of elements the array can hold.
+        """
 
     @always_inline("nodebug")
     fn is_empty(self) -> Bool:
-        return self.size == 0
+        """Check if the array is empty.
+
+        Returns:
+            True if the array has no elements.
+        """
 
     # ========== Access ==========
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
+        """Get element at index.
+
+        Args:
+            idx: Index of the element (negative indices wrap from end).
+
+        Returns:
+            The value at the given index.
+        """
         var index = idx if idx >= 0 else idx + self.size
         debug_assert(
             index >= 0 and index < self.size,
@@ -132,6 +194,18 @@ struct Array(
 
     @always_inline("nodebug")
     fn __setitem__(mut self, idx: Int, value: Int):
+        """Set element at index.
+
+        Args:
+            idx: Index of the element (negative indices wrap from end).
+            value: The value to set.
+        """
+        var index = idx if idx >= 0 else idx + self.size
+        debug_assert(
+            index >= 0 and index < self.size,
+            "Array -> __setitem__: index out of bounds",
+        )
+        self.storage[index] = value
         var index = idx if idx >= 0 else idx + self.size
         debug_assert(
             index >= 0 and index < self.size,
