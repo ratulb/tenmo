@@ -2,6 +2,41 @@
 
 A lean tensor library and neural network framework built in Mojo.
 
+## Documentation Conventions (mojodoc)
+
+Follow [mojodoc](https://github.com/ehsanmok/mojodoc) format for all documentation:
+
+```mojo
+"""Brief one-line summary.
+
+Detailed description with more context about what
+this function does and when to use it.
+
+Args:
+    name: The user's name.
+    age: The user's age in years.
+
+Returns:
+    A greeting message.
+
+Raises:
+    Error: If name is empty.
+
+Example:
+    ```mojo
+    var greeting = greet("Alice", 30)
+    print(greeting)  # Hello, Alice!
+    ```
+"""
+```
+
+Key terminology rules:
+- Use **"instance"** NOT "object" (Mojo has structs, not objects)
+- Use **"Mojo List"** for `List[Int]` type, NOT "Python list" or just "list"
+- Use **"IntArray"** for the tenmo IntArray type
+- Document all public methods with Args, Returns, Raises, and Notes where applicable
+- Keep docstrings concise but complete
+
 ## Setup
 
 ```bash
