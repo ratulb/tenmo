@@ -109,7 +109,6 @@ struct Array(
         self.storage = copy.storage
         self.size = copy.size
 
-    # ========== Static Constructors ==========
 
     @staticmethod
     @always_inline("nodebug")
@@ -130,7 +129,6 @@ struct Array(
         """
         return Self()
 
-    # ========== Properties ==========
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -143,8 +141,6 @@ struct Array(
     @always_inline("nodebug")
     fn is_empty(self) -> Bool:
         return self.size == 0
-
-    # ========== Access ==========
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
@@ -164,7 +160,6 @@ struct Array(
         )
         self.storage[index] = value
 
-    # ========== Growth / Mutation ==========
 
     @always_inline("nodebug")
     fn append(mut self, value: Int):
@@ -212,7 +207,6 @@ struct Array(
         for i in range(self.size):
             self.storage[i] = value
 
-    # ========== Arithmetic ==========
 
     @always_inline("nodebug")
     fn __iadd__(mut self, other: Self):
@@ -277,7 +271,6 @@ struct Array(
             result += self.storage[i] * other[i]
         return result
 
-    # ========== Search / Query ==========
 
     fn __contains__(self, value: Int) -> Bool:
         for i in range(self.size):
@@ -304,7 +297,6 @@ struct Array(
                 return False
         return True
 
-    # ========== Conversions ==========
 
     @always_inline("nodebug")
     fn tolist(self) -> List[Int]:
@@ -317,7 +309,6 @@ struct Array(
     fn copy(self) -> Self:
         return self  # register-passable structs copy by value
 
-    # ========== Math ==========
 
     fn product(self) -> Int:
         var result = 1
@@ -331,7 +322,6 @@ struct Array(
             s += self.storage[i]
         return s
 
-    # ========== Functional ==========
 
     @always_inline("nodebug")
     fn reverse(mut self):
@@ -341,7 +331,6 @@ struct Array(
             self.storage[i] = self.storage[self.size - 1 - i]
             self.storage[self.size - 1 - i] = tmp
 
-    # ========== Iteration ==========
 
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
@@ -355,7 +344,6 @@ struct Array(
     fn __reversed__(ref self) -> ArrayIterator[origin_of(self), False]:
         return ArrayIterator[forward=False](len(self), Pointer(to=self))
 
-    # ========== String / IO ==========
 
     @no_inline
     fn write_to[W: Writer](self, mut writer: W):
@@ -376,9 +364,6 @@ struct Array(
     @no_inline
     fn __repr__(self) -> String:
         return self.__str__()
-
-
-# ========== Iterator ==========
 
 
 @fieldwise_init
