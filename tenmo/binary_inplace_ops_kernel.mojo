@@ -8,7 +8,6 @@ from .array import Array
 from .ndbuffer import NDBuffer
 
 
-# ============================================================
 # SEMANTIC CONTRACT (in-place operations: A op= B)
 #
 #   - A is the in-place accumulator. Its shape NEVER changes.
@@ -38,13 +37,10 @@ from .ndbuffer import NDBuffer
 #   PATH 4  everything else (both strided, or either/both
 #             needs broadcasting and is not contiguous)
 #           — both via stride decomposition; universal fallback
-# ============================================================
 
 
-# ============================================================
 # PATH 1: Both contiguous, same shape, no broadcasting.
 # Linear index maps directly to both A and B.
-# ============================================================
 fn arithmetic_ops_both_contiguous[
     op_code: Int,
     dtype: DType,
@@ -106,14 +102,12 @@ fn arithmetic_ops_both_contiguous[
         base_idx += grid_stride * CHUNK_SIZE
 
 
-# ============================================================
 # PATH 2: A contiguous, B strided or broadcast-expanded.
 #
 # A is indexed at its linear position i (contiguous, safe).
 # B is stride-decomposed through B_strides, which carry
 # stride-0 on any axis where B is broadcast-replicated.
 # Result is written back to A at the same linear index.
-# ============================================================
 fn arithmetic_ops_A_contiguous[
     op_code: Int,
     dtype: DType,
@@ -199,7 +193,6 @@ fn arithmetic_ops_A_contiguous[
         base_idx += grid_stride * CHUNK_SIZE
 
 
-# ============================================================
 # PATH 3: A strided, B contiguous, NO broadcasting.
 #
 # Precondition (enforced by the dispatcher): B_shape == A_shape,
@@ -212,7 +205,6 @@ fn arithmetic_ops_A_contiguous[
 # NOTE: This path MUST NOT be taken when needs_broadcasting is
 # true, because then B's physical buffer is smaller than
 # output_size and the linear load at i would be out of bounds.
-# ============================================================
 fn arithmetic_ops_B_contiguous[
     op_code: Int,
     dtype: DType,
@@ -297,14 +289,12 @@ fn arithmetic_ops_B_contiguous[
         base_idx += grid_stride * CHUNK_SIZE
 
 
-# ============================================================
 # PATH 4: Both strided, or B needs broadcasting alongside
 #         a non-contiguous A, or any other case.
 #
 # Both A and B are stride-decomposed independently.
 # Result is written back at a_idx (A's physical address).
 # Universal fallback: handles all remaining cases correctly.
-# ============================================================
 fn arithmetic_ops_both_strided[
     op_code: Int,
     dtype: DType,
@@ -400,7 +390,6 @@ struct BinaryInplaceOperations[dtype: DType](
         var A_shape = A.shape
         var B_shape = B.shape
 
-        # ── Semantic contract enforcement ─────────────────────
         # For A op= B, broadcasting is valid only when B's shape
         # is broadcastable TO A's shape. The broadcast result must
         # equal A's shape; A's shape must not grow. Validate here
@@ -438,7 +427,6 @@ struct BinaryInplaceOperations[dtype: DType](
         var A_is_contiguous = A.is_contiguous()
         var B_is_contiguous = B.is_contiguous()
 
-        # ════════════════════════════════════════════════════════
         # PATH 1: Both contiguous, same shape, no broadcasting.
         #
         # Conditions:
@@ -449,7 +437,6 @@ struct BinaryInplaceOperations[dtype: DType](
         #   • No broadcast expansion needed
         #
         # Fastest path: purely linear indexing, full SIMD on both.
-        # ════════════════════════════════════════════════════════
         if A_is_contiguous and B_is_contiguous and not needs_broadcasting:
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_both_contiguous[
@@ -482,7 +469,6 @@ struct BinaryInplaceOperations[dtype: DType](
             B_shape, Strides.default(B_shape), broadcast_shape
         )
 
-        # ════════════════════════════════════════════════════════
         # PATH 2: A contiguous, B strided or broadcast-expanded.
         #
         # Conditions:
@@ -496,7 +482,6 @@ struct BinaryInplaceOperations[dtype: DType](
         # B is always stride-decomposed — safe regardless of
         # whether B is a strided view or a broadcast-expanded
         # smaller tensor.
-        # ════════════════════════════════════════════════════════
         if A_is_contiguous and (not B_is_contiguous or needs_broadcasting):
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_A_contiguous[
@@ -520,7 +505,6 @@ struct BinaryInplaceOperations[dtype: DType](
             device_context.synchronize()
             return
 
-        # ════════════════════════════════════════════════════════
         # PATH 3: A strided, B contiguous, NO broadcasting.
         #
         # Conditions:
@@ -535,7 +519,6 @@ struct BinaryInplaceOperations[dtype: DType](
         # smaller than output_size, and B.load[width](i) would
         # read past the end of B's allocation. Such cases fall
         # through to Path 4, which stride-decomposes B safely.
-        # ════════════════════════════════════════════════════════
         if not A_is_contiguous and B_is_contiguous and not needs_broadcasting:
             var compiled_func = device_context.compile_function[
                 arithmetic_ops_B_contiguous[
@@ -559,7 +542,6 @@ struct BinaryInplaceOperations[dtype: DType](
             device_context.synchronize()
             return
 
-        # ════════════════════════════════════════════════════════
         # PATH 4: Universal fallback — both strided and/or
         #         B needs broadcasting.
         #
@@ -576,7 +558,6 @@ struct BinaryInplaceOperations[dtype: DType](
         # A_broadcast_strides has no stride-0 axes (contract).
         # B_broadcast_strides has stride-0 on broadcast axes.
         # Result written at a_idx (A's physical address).
-        # ════════════════════════════════════════════════════════
         var compiled_func = device_context.compile_function[
             arithmetic_ops_both_strided[
                 op_code, Self.dtype, simdwidth, 2 * simdwidth
