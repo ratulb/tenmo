@@ -34,7 +34,7 @@ jobs:
         run: |
           export PATH="$HOME/.pixi/bin:$PATH"
           source $HOME/.bashrc
-          pixi run -e default -- python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/docs/
+          pixi run -e default -- python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/md/
 
       - name: Install Node
         uses: actions/setup-node@v4
