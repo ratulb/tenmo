@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Buffer - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct Buffer[dtype: DType = DType.float32]</code></p>
+</div><p>Unified buffer with optional reference counting built-in. This buffer lives only on the CPU. When unshared: Just manages data pointer. When shared: Adds atomic refcount in same allocation as data.</p>
+<h2>Fields</h2>
+<ul>
+<li>​<b>size</b> (<code>Int</code>): </li>
+<li>​<b>data</b> (<code>UnsafePointer[Scalar[dtype], MutExternalOrigin]</code>): </li>
+<li>​<b>external</b> (<code>Bool</code>):</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/math/math/Absable"><code>Absable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/iter/Iterable"><code>Iterable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/len/Sized"><code>Sized</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/format/Writable"><code>Writable</code></a></p>
+<h2><code>comptime</code> members</h2>
+<div class='mojo-alias-header'><h3><code>IteratorType</code></h3>
+</div><div class='mojo-alias-detail'>
+<div class="mojo-alias-sig"><p><code>comptime IteratorType[iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]] = ElementIterator[dtype, iterable_origin]</code></p>
+</div><h4>Parameters</h4>
+<ul>
+<li>​<b>iterable_mut</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): </li>
+<li>​<b>iterable_origin</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/type_aliases/Origin"><code>Origin</code></a>): </div></li>
+</ul>
+<h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, size: Int, external: Bool = False)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, elems: List[Scalar[dtype]])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *elems: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__[size: Int, datatype: DType, //](out self: Buffer[datatype], vector: SIMD[datatype, vector.size])</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, size: Int, data: UnsafePointer[Scalar[dtype], MutAnyOrigin], copy: Bool = False)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, copy: Self)</code></p>
+</div><p>Copy buffer - increment refcount if shared.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, deinit take: Self)</code></p>
+</div><p>Move buffer - no refcount change.</p>
+</div><h3><code>__del__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__del__(deinit self)</code></p>
+</div><p>Destroy buffer - handle both shared and unshared cases.</p>
+</div><h3><code>__getitem__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__(self, slice: Slice) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__(ref self, index: Int) -&gt; ref[self_is_mut] Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>__setitem__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__setitem__(self, index: Int, scalar: Scalar[dtype])</code></p>
+</div></div><h3><code>__neg__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__neg__(self) -&gt; Self</code></p>
+</div></div><h3><code>__invert__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__invert__(self) -&gt; Self</code></p>
+</div></div><h3><code>__lt__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__lt__(self, scalar: Scalar[dtype]) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__lt__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__le__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__le__(self, scalar: Scalar[dtype]) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__le__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__eq__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__eq__(self, scalar: Scalar[dtype]) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__eq__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__ne__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__ne__(self, scalar: Scalar[dtype]) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__ne__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__gt__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__gt__(self, scalar: Scalar[dtype]) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__gt__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__ge__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__ge__(self, scalar: Scalar[dtype]) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__ge__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__add__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__add__(self, other: Self) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__add__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__sub__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__sub__(self, other: Self) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__sub__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__mul__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__mul__(self, other: Self) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__mul__(self, factor: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__truediv__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__truediv__(self, other: Self) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__truediv__(self, divisor: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__pow__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__pow__(self, exponent: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__radd__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__radd__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__rsub__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__rsub__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__rmul__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__rmul__(self, factor: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__rtruediv__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__rtruediv__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__iadd__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__iadd__(self, other: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__iadd__(self, scalar: Scalar[dtype])</code></p>
+</div></div><h3><code>__isub__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__isub__(self, other: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__isub__(self, scalar: Scalar[dtype])</code></p>
+</div></div><h3><code>__imul__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__imul__(self, other: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__imul__(self, scalar: Scalar[dtype])</code></p>
+</div></div><h3><code>__itruediv__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__itruediv__(self, other: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__itruediv__(self, scalar: Scalar[dtype])</code></p>
+</div></div><h3><code>is_shared</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_shared(self) -&gt; Bool</code></p>
+</div><p>Check if this buffer has ref counting enabled.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>shared</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>shared(mut self)</code></p>
+</div><p>Convert this buffer to shared mode (enable ref counting).</p>
+<p>Memory layout transformation:
+Before: [data array]
+After:  [refcount: 8 bytes][data array]</p>
+</div><h3><code>ref_count</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>ref_count(self) -&gt; UInt64</code></p>
+</div><p>Count the amount of current references.</p>
+<p><strong>Returns:</strong></p>
+<p><code>UInt64</code>: The current amount of references to the pointee.</p>
+</div><h3><code>unsafe_ptr</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unsafe_ptr[origin: Origin[mut=origin.mut], address_space: AddressSpace, //](ref[origin.mut, origin] self) -&gt; UnsafePointer[Scalar[dtype], origin, address_space=address_space]</code></p>
+</div><p>Retrieves a pointer to the underlying memory.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li>​<b>origin</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/type_aliases/Origin"><code>Origin</code></a>): The origin of the <code>Buffer</code>.</li>
+<li>​<b>address_space</b> (<a href="https://docs.modular.com/mojo/stdlib/memory/pointer/AddressSpace"><code>AddressSpace</code></a>): The <code>AddressSpace</code> of the <code>Buffer</code>.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/memory/unsafe_pointer/UnsafePointer"><code>UnsafePointer</code></a>: The pointer to the underlying memory.</p>
+</div><h3><code>__iter__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__iter__(ref self) -&gt; ElementIterator[dtype, origin_of(self)]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ElementIterator</code></p>
+</div><h3><code>__len__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__len__(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>load</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>load[simdwidth: Int = 1](self, offset: Int) -&gt; SIMD[dtype, simdwidth]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/SIMD"><code>SIMD</code></a></p>
+</div><h3><code>store</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>store[simdwidth: Int = 1](self, offset: Int, values: SIMD[dtype, simdwidth])</code></p>
+</div></div><h3><code>inplace_ops_scalar</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>inplace_ops_scalar[op_code: Int](self, scalar: Scalar[dtype], start_index: Int = 0, end_index: Optional[Int] = None)</code></p>
+</div></div><h3><code>inplace_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>inplace_ops[op_code: Int, validate: Bool = True](self, other: Self, self_start: Int = 0, self_end: Optional[Int] = None, other_start: Int = 0, other_end: Optional[Int] = None)</code></p>
+</div></div><h3><code>arithmetic_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>arithmetic_ops[op_code: Int, validate: Bool = True](self, other: Self, self_start: Int = 0, self_end: Optional[Int] = None, other_start: Int = 0, other_end: Optional[Int] = None, epsilon: Scalar[dtype] = Epsilon.value()) -&gt; Self</code></p>
+</div></div><h3><code>arithmetic_ops_scalar</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>arithmetic_ops_scalar[op_code: Int](self, scalar: Scalar[dtype], start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Self</code></p>
+</div></div><h3><code>compare_buffer_full</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>compare_buffer_full[op_code: Int](self, other: Self) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>compare_scalar_full</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>compare_scalar_full[op_code: Int](self, scalar: Scalar[dtype]) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>select</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>select[op_code: Int, validate: Bool = True](self, other: Self, self_start: Int = 0, self_end: Optional[Int] = None, other_start: Int = 0, other_end: Optional[Int] = None) -&gt; Self</code></p>
+</div></div><h3><code>__abs__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__abs__(self) -&gt; Self</code></p>
+</div></div><h3><code>unary_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unary_ops[op_code: Int, epsilon: Scalar[dtype] = Epsilon.value()](self, start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Self</code></p>
+</div></div><h3><code>unary_ops_helper</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static unary_ops_helper[op_code: Int, smdwidth: Int, epsilon: Scalar[dtype] = Epsilon.value()](block: SIMD[dtype, smdwidth]) -&gt; SIMD[dtype, smdwidth]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/SIMD"><code>SIMD</code></a></p>
+</div><h3><code>unary_ops_with_mask</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unary_ops_with_mask[op_code: Int](self, start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Tuple[Buffer[dtype], Buffer[dtype]]</code></p>
+</div><p>Compute unary operation and mask simultaneously.</p>
+<p>For ReLU: output = max(0, x), mask = (x &gt; 0) ? 1.0 : 0.0</p>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code>: Tuple of (output_buffer, mask_buffer).</p>
+</div><h3><code>exp</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>exp(self, start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>log</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>log(self, start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>float_unary_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>float_unary_ops[op_code: Int, epsilon: Scalar[dtype] = Epsilon.value()](self, start_index: Int = 0, end_index: Optional[Int] = None, *, threshold: Int = 100000) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>sigmoid</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sigmoid(self, start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>full</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static full(value: Scalar[dtype], size: Int) -&gt; Self</code></p>
+</div></div><h3><code>arange</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static arange[max_arange_elements: Int = 10000000](*args: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static arange[max_arange_elements: Int = 10000000](args: VariadicList[Scalar[dtype], args.is_owned]) -&gt; Self</code></p>
+</div></div><h3><code>zeros</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static zeros(size: Int) -&gt; Self</code></p>
+</div></div><h3><code>linspace</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static linspace(start: Scalar[dtype], end: Scalar[dtype], steps: Int) -&gt; Self</code></p>
+</div></div><h3><code>zero</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>zero(self)</code></p>
+</div></div><h3><code>sum</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sum(self, start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>product</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>product(self, start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>clamp</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>clamp(self, lower_bound: Scalar[dtype], upper_bound: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>clamp_in_place</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>clamp_in_place(self, lower_bound: Scalar[dtype], upper_bound: Scalar[dtype])</code></p>
+</div></div><h3><code>fill</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>fill(self, value: Scalar[dtype], start_index: Int = 0, end_index: Optional[Int] = None)</code></p>
+</div><p>Fill a segment or the whole buffer with a value.</p>
+</div><h3><code>compare_scalar</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>compare_scalar[op_code: Int](self, scalar: Scalar[dtype]) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>eq</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>eq(self, scalar: Scalar[dtype]) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>eq(self, other: Self) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>ne</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>ne(self, scalar: Scalar[dtype]) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>ne(self, other: Self) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>ge</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>ge(self, scalar: Scalar[dtype]) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>ge(self, other: Self) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>gt</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>gt(self, scalar: Scalar[dtype]) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>gt(self, other: Self) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>le</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>le(self, scalar: Scalar[dtype]) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>le(self, other: Self) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>lt</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>lt(self, scalar: Scalar[dtype]) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>lt(self, other: Self) -&gt; Buffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>compare_buffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>compare_buffer[op_code: Int](self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>compare_pair</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static compare_pair[op_code: Int](left: Scalar[dtype], right: Scalar[dtype]) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>float</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>float(self) -&gt; Buffer</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>float64</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>float64(self) -&gt; Buffer[DType.float64]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>to_dtype</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>to_dtype[NewType: DType, simdwidth: Int = simd_width_of[NewType]()](self) -&gt; Buffer[NewType]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>dot</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>dot(lhs, rhs: Self, start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>overwrite</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>overwrite(self, other: Self, self_start: Int = 0, self_end: Optional[Int] = None, other_start: Int = 0, other_end: Optional[Int] = None)</code></p>
+</div></div><h3><code>count</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>count(self, key: Scalar[dtype], start_index: Int = 0, end_index: Optional[Int] = None) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>tolist</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>tolist(self) -&gt; List[Scalar[dtype]]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a></p>
+</div><h3><code>all_close</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>all_close[rtol: Scalar[dtype] = 1.0000000000000001E-5, atol: Scalar[dtype] = 1.0E-8](self, other: Self) -&gt; Bool</code></p>
+</div><p>Check if all elements are close within tolerance: |a - b| &lt;= atol + rtol * |b|.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>any</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>any(self, pred: def(Scalar[dtype]) -&gt; Bool) -&gt; Bool</code></p>
+</div><p>Check if any element satisfies the predicate.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>all</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>all(self, pred: def(Scalar[dtype]) -&gt; Bool) -&gt; Bool</code></p>
+</div><p>Check if all elements satisfy the predicate.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>map_to_bool</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>map_to_bool(self, pred: def(Scalar[dtype]) -&gt; Bool) -&gt; Buffer[DType.bool]</code></p>
+</div><p>Apply predicate to each element, returning a boolean buffer.</p>
+<p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>all_true</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>all_true(self: Buffer[DType.bool]) -&gt; Bool</code></p>
+</div><p>Check if all elements in a boolean buffer are True.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>any_true</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>any_true(self: Buffer[DType.bool]) -&gt; Bool</code></p>
+</div><p>Check if any element in a boolean buffer is True.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>map_where</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>map_where(self, pred: def(Scalar[dtype]) -&gt; Bool, value: Scalar[dtype]) -&gt; Self</code></p>
+</div><p>Apply predicate to each element, setting value where predicate holds, returning a new buffer.</p>
+</div><h3><code>string</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>string(self) -&gt; String</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>String</code></p>
+</div><h3><code>__str__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__str__(self) -&gt; String</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>String</code></p>
+</div><h3><code>write_to</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>write_to[W: Writer](self, mut writer: W)</code></p>
+</div></div><h3><code>__repr__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__repr__(self) -&gt; String</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>String</code></p>
+</div></section>
+</body>
+</html>

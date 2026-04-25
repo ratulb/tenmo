@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ArgumentType - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a></p>
+<h2>Required methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self: _Self, *, copy: _Self)</code></p>
+</div><p>Create a new instance of the value by copying an existing one.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>copy</b> (<code>_Self</code>): The value to copy.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>_Self</code></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self: _Self, *, deinit take: _Self)</code></p>
+</div><p>Create a new instance of the value by moving the value of another.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>take</b> (<code>_Self</code>): The value to move.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>_Self</code></p>
+</div><h2>Provided methods</h2>
+<h3><code>copy</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>copy(self: _Self) -&gt; _Self</code></p>
+</div><p>Explicitly construct a copy of self, a convenience method for <code>Self(copy=self)</code> when the type is inconvenient to write out.</p>
+<p><strong>Returns:</strong></p>
+<p><code>_Self</code>: A copy of this value.</p>
+</div></section>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DataLoader - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct DataLoader[DatasetSource: Dataset, origin: ImmutOrigin]</code></p>
+</div><p>Zero-copy batched data loading that preserves tensor shapes.</p>
+<h2>Fields</h2>
+<ul>
+<li>​<b>dataset</b> (<code>Pointer[DatasetSource, origin]</code>): </li>
+<li>​<b>batch_size</b> (<code>Int</code>): </li>
+<li>​<b>shuffle_data</b> (<code>Bool</code>): </li>
+<li>​<b>drop_last</b> (<code>Bool</code>):</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/len/Sized"><code>Sized</code></a></p>
+<h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, copy: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, dataset: Pointer[DatasetSource, origin], batch_size: Int, shuffle: Bool = False, drop_last: Bool = False)</code></p>
+</div></div><h3><code>__iter__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__iter__(mut self) -&gt; ref[self] Self</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>__next__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__next__(mut self) -&gt; ref[self._batch, self._last_batch._value] Batch[DatasetSource._feature_dtype, DatasetSource._label_dtype]</code></p>
+</div><p>Get next batch with proper shape preservation.</p>
+<p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>__has_next__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__has_next__(self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__len__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__len__(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>reset</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reset(mut self)</code></p>
+</div><p>Reset for new epoch.</p>
+</div></section>
+</body>
+</html>

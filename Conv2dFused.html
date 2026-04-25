@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Conv2dFused - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct Conv2dFused[dtype: DType]</code></p>
+</div><p>Batched, multi-channel, multi-filter 2D convolution using fused im2col + matmul + bias. Args:     image: (N, C_in, H_in, W_in).     kernel: (C_out, C_in, KH, KW).     bias: Optional (C_out,).     stride: Stride for spatial dimensions.     dilation: Dilation factor for atrous convolution.     padding: &#39;valid&#39;, &#39;same&#39;, int, tuple, or list of tuples. Returns:     output: (N, C_out, H_out, W_out).</p>
+<h2>Fields</h2>
+<ul>
+<li>​<b>initialized</b> (<code>Bool</code>): </li>
+<li>​<b>pad_spec</b> (<code>List[Tuple[Int, Int]]</code>):</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a></p>
+<h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, copy: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self)</code></p>
+</div></div><h3><code>__call__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__call__[track_grad: Bool](mut self, image: Tensor[dtype], mut kernel: Tensor[dtype], bias: Optional[Tensor[dtype]] = None, stride: Int = 1, dilation: Int = 1, padding: Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]] = &quot;valid&quot;, requires_grad: Optional[Bool] = None) -&gt; Tensor[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>forward</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static forward[track_grad: Bool = True](image: Tensor[dtype], mut kernel: Tensor[dtype], bias: Optional[Tensor[dtype]] = None, stride: Int = 1, dilation: Int = 1, padding: Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]] = &quot;valid&quot;, requires_grad: Optional[Bool] = None) -&gt; Tensor[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>invoke</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static invoke[track_grad: Bool = True](image: Tensor[dtype], mut kernel: Tensor[dtype], bias: Optional[Tensor[dtype]] = None, stride: Int = 1, dilation: Int = 1, pad_spec: List[Tuple[Int, Int]] = List(VariadicList(), Tuple()), requires_grad: Optional[Bool] = None) -&gt; Tensor[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static invoke[track_grad: Bool = True](image: Tensor[dtype], mut kernel: Tensor[dtype], bias: Optional[Tensor[dtype]] = None, stride: Int = 1, dilation: Int = 1, padding: Variant[String, Int, Tuple[Int, Int], List[Tuple[Int, Int]]] = &quot;valid&quot;, requires_grad: Optional[Bool] = None) -&gt; Tuple[Tensor[dtype], List[Tuple[Int, Int]]]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>Tuple</code></p>
+</div></section>
+</body>
+</html>

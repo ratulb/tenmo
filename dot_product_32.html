@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>dot_product_32 - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>dot_product_32[dtype: DType, BLOCK_SIZE: Int = 512](result: UnsafePointer[Scalar[dtype], MutAnyOrigin], a: UnsafePointer[Scalar[dtype], ImmutAnyOrigin], b: UnsafePointer[Scalar[dtype], ImmutAnyOrigin], size: UInt)</code></p>
+</div><p>Warp-optimized dot product kernel.</p>
+<p>Uses warp shuffle for efficient reduction:</p>
+<ul>
+<li>Grid-stride loop for workload distribution</li>
+<li>Warp-level shuffle reduction (faster than shared memory)</li>
+<li>Single atomic write per block</li>
+</ul>
+<p>Performance: ~1.5-2× faster than tree reduction.</p>
+</div></section>
+</body>
+</html>

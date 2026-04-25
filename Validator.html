@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Validator - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct Validator</code></p>
+</div><h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a></p>
+<h2>Methods</h2>
+<h3><code>validate_repeat_args</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_repeat_args(original_shape: Shape, repeat: IntArray)</code></p>
+</div></div><h3><code>check_permutation</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static check_permutation(permutation: List[Int], axis_length: Int)</code></p>
+</div></div><h3><code>validate_dtype_consistency</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_dtype_consistency(dtype: DType, requires_grad: Bool, label: String)</code></p>
+</div></div><h3><code>normalize_reduction_axes</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static normalize_reduction_axes(shape: Shape, axes: IntArray) -&gt; IntArray</code></p>
+</div><p>Normalize reduction axes: handle empty list, negative indices, sort, and deduplicate.</p>
+<p><strong>Returns:</strong></p>
+<p><a intarray/IntArray"><code>IntArray</code></a></p>
+</div><h3><code>validate_and_normalize_axes</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_and_normalize_axes(shape: Shape, axes: IntArray, ordered: Bool = True, fill_missing: Bool = False) -&gt; IntArray</code></p>
+</div><p>Validate and normalize axes for reduction operations.</p>
+<p>Behavior:
+    - For scalar tensors (rank=0):
+        - Empty or <code>[-1]</code> → empty array (reduce all).
+        - Any other non-empty axes → error.
+    - For non-scalar tensors:
+        - Empty array → reduce all axes (return 0..rank-1).
+        - Normalize negative indices.
+        - Validate bounds.
+        - Error on duplicate axes.
+        - Fill missing axes if explicitly asked.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a shapes/Shape"><code>Shape</code></a>): Tensor shape to validate against.</li>
+<li>​<b>axes</b> (<a intarray/IntArray"><code>IntArray</code></a>): Input axes to normalize.</li>
+<li>​<b>ordered</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to sort the axes.</li>
+<li>​<b>fill_missing</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to add missing axes.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a intarray/IntArray"><code>IntArray</code></a>: Normalized, sorted (default) axes.</p>
+</div><h3><code>validate_and_construct_new_shape</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_and_construct_new_shape(current_shape: Shape, newdims: IntArray) -&gt; Shape</code></p>
+</div><p>Validate if a tensor can be reshaped from current_shape to new shape.</p>
+<p>Behavior:
+    - Infers dimension marked with <code>-1</code>.
+    - Validates total element count matches.
+    - Handles scalar ↔ 1-element tensor conversions.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>current_shape</b> (<a shapes/Shape"><code>Shape</code></a>): Original shape of the tensor (e.g., <code>(3, 4, 5)</code>).</li>
+<li>​<b>newdims</b> (<a intarray/IntArray"><code>IntArray</code></a>): Requested new shape (e.g., <code>[2, -1, 10]</code>). May contain at most one <code>-1</code>.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a shapes/Shape"><code>Shape</code></a>: Validated concrete shape (e.g., <code>Shape(2, 6, 10)</code>).</p>
+</div><h3><code>validate_and_compute_slice_metadata</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_and_compute_slice_metadata(original_shape: Shape, original_strides: Strides, axis: Int, start: Int, end: Int, step: Int = 1) -&gt; Tuple[Shape, Strides, Int]</code></p>
+</div><p>Compute new shape, strides, and offset for a single-axis slice.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>original_shape</b> (<a shapes/Shape"><code>Shape</code></a>): Shape of the tensor.</li>
+<li>​<b>original_strides</b> (<a strides/Strides"><code>Strides</code></a>): Strides of the tensor.</li>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Axis to slice (can be negative).</li>
+<li>​<b>start</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Slice start index.</li>
+<li>​<b>end</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Slice end index.</li>
+<li>​<b>step</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Slice step (cannot be 0).</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code>: Tuple of (new_shape, new_strides, new_offset).</p>
+</div><h3><code>validate_and_compute_slice_metadata_multi</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_and_compute_slice_metadata_multi(original_shape: Shape, original_strides: Strides, axes: List[Int], starts: List[Int], ends: List[Int], steps: IntArray) -&gt; Tuple[Shape, Strides, Int]</code></p>
+</div><p>Compute new shape, strides, offset for multi-axis slicing.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>original_shape</b> (<a shapes/Shape"><code>Shape</code></a>): Shape of the tensor.</li>
+<li>​<b>original_strides</b> (<a strides/Strides"><code>Strides</code></a>): Strides of the tensor.</li>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of axes to slice (can be negative).</li>
+<li>​<b>starts</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of start indices.</li>
+<li>​<b>ends</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of end indices.</li>
+<li>​<b>steps</b> (<a intarray/IntArray"><code>IntArray</code></a>): List of steps (cannot be 0).</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code>: Tuple of (new_shape, new_strides, new_offset).</p>
+</div><h3><code>validate_and_compute_view_metadata</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_and_compute_view_metadata(original_shape: Shape, original_strides: Strides, slices: VariadicList[Slice, slices.is_owned]) -&gt; Tuple[Shape, Strides, Int]</code></p>
+</div><p>Computes the new shape, strides, and offset for a tensor view after slicing.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>original_shape</b> (<a shapes/Shape"><code>Shape</code></a>): The shape of the original tensor.</li>
+<li>​<b>original_strides</b> (<a strides/Strides"><code>Strides</code></a>): The strides of the original tensor.</li>
+<li>​<b>slices</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/variadics/VariadicList"><code>VariadicList</code></a>): VariadicList of slice objects for each dimension.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code>: Tuple[Shape, Strides, int]: New shape, strides, and offset.</p>
+</div><h3><code>validate_and_compute_advanced_indexing_metadata</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_and_compute_advanced_indexing_metadata(original_shape: Shape, original_strides: Strides, indices: VariadicList[Idx, indices.is_owned]) -&gt; Tuple[Shape, Strides, Int]</code></p>
+</div><p>Computes view metadata (shape, strides, offset) for advanced indexing operations. Args:     original_shape: Shape of the original tensor.     original_strides: Strides of the original tensor.     indices: VariadicListMem of Idx variants (NewAxis/Int/Slice). Returns:     Tuple[Shape, Strides, int]: New shape, strides, and offset.</p>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code></p>
+</div><h3><code>validate_view_params</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_view_params(storage_size: Int, shape: Shape, strides: Strides, offset: Int) -&gt; Tuple[Int, Strides]</code></p>
+</div><p>Validate absolute view parameters. Both strides and offset are absolute w.r.t. the underlying buffer.</p>
+<p>Precondition: All shape dimensions are &gt;= 1 (enforced by Shape constructor).</p>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code></p>
+</div><h3><code>is_non_overlapping</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static is_non_overlapping(shape: Shape, strides: Strides) -&gt; Bool</code></p>
+</div><p>Check if view has self-overlapping positions.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div></section>
+</body>
+</html>

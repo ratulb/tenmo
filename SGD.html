@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SGD - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct SGD[dtype: DType, //]</code></p>
+</div><p>SGD with momentum, weight decay, and gradient clipping.</p>
+<h2>Fields</h2>
+<ul>
+<li>​<b>parameters</b> (<code>List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]</code>): </li>
+<li>​<b>lr</b> (<code>Scalar[dtype]</code>): </li>
+<li>​<b>momentum</b> (<code>Scalar[dtype]</code>): </li>
+<li>​<b>weight_decay</b> (<code>Scalar[dtype]</code>): </li>
+<li>​<b>clip_norm</b> (<code>Scalar[dtype]</code>): </li>
+<li>​<b>clip_value</b> (<code>Scalar[dtype]</code>): </li>
+<li>​<b>velocities</b> (<code>List[Gradbox[dtype]]</code>): </li>
+<li>​<b>use_momentum</b> (<code>Bool</code>):</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a></p>
+<h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, parameters: List[UnsafePointer[Tensor[dtype], MutAnyOrigin]], lr: Scalar[dtype] = 0.01, momentum: Scalar[dtype] = 0, weight_decay: Scalar[dtype] = 0, clip_norm: Scalar[dtype] = 0, clip_value: Scalar[dtype] = 0)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, copy: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, deinit take: Self)</code></p>
+</div></div><h3><code>compute_grad_norm</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>compute_grad_norm(self) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>clip_gradients</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>clip_gradients(mut self)</code></p>
+</div></div><h3><code>step</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>step(mut self)</code></p>
+</div><p>Optimized parameter update.</p>
+<p>Single pass per parameter:</p>
+<ol>
+<li>Clip gradient (if needed)</li>
+<li>Update velocity (if momentum)</li>
+<li>Apply weight decay</li>
+<li>Update parameter</li>
+</ol>
+</div><h3><code>zero_grad</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>zero_grad(self)</code></p>
+</div></div><h3><code>set_lr</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>set_lr(mut self, lr: Scalar[dtype])</code></p>
+</div></div><h3><code>get_lr</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>get_lr(self) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>set_clip_norm</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>set_clip_norm(mut self, clip_norm: Scalar[dtype])</code></p>
+</div></div><h3><code>set_clip_value</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>set_clip_value(mut self, clip_value: Scalar[dtype])</code></p>
+</div></div><h3><code>set_weight_decay</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>set_weight_decay(mut self, weight_decay: Scalar[dtype])</code></p>
+</div></div></section>
+</body>
+</html>

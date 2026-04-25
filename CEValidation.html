@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CEValidation - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct CEValidation[dtype: DType]</code></p>
+</div><h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/RegisterPassable"><code>RegisterPassable</code></a></p>
+<h2>Methods</h2>
+<h3><code>validate_label_smoothing</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_label_smoothing(ls: Scalar[dtype])</code></p>
+</div></div><h3><code>validate_logits_rank</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_logits_rank(logits_shape: Shape)</code></p>
+</div></div><h3><code>validate_class_indices_shapes</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_class_indices_shapes(logits_shape: Shape, target_shape: Shape)</code></p>
+</div><p>Logits: (N, C, d1, ..., dk). target: (N, d1, ..., dk). → target rank must be logits_rank - 1. → batch size and all spatial dims must match.</p>
+</div><h3><code>validate_probability_shapes</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_probability_shapes(logits_shape: Shape, target_shape: Shape)</code></p>
+</div><p>Logits and target must have identical shapes.</p>
+</div><h3><code>validate_target_indices</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_target_indices(target: Tensor[DType.int32], num_classes: Int, ignore_index: Int)</code></p>
+</div><p>All target indices must be in [0, num_classes) or == ignore_index. ignore_index is always valid regardless of its value.</p>
+</div><h3><code>validate_num_classes</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static validate_num_classes(C: Int)</code></p>
+</div></div></section>
+</body>
+</html>

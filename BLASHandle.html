@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BLASHandle - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct BLASHandle[dtype: DType]</code></p>
+</div><h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a></p>
+<h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, copy: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, deinit take: Self)</code></p>
+</div></div><h3><code>lite_handle</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>lite_handle(self) -&gt; BLASHandleLite[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>BLASHandleLite</code></p>
+</div><h3><code>is_initialized</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_initialized(self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>get_error</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>get_error(ref self) -&gt; ref[self_is_mut._error_msg] String</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>matmul_f32</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul_f32(self, A: UnsafePointer[Float32, MutAnyOrigin], B: UnsafePointer[Float32, MutAnyOrigin], C: UnsafePointer[Float32, MutAnyOrigin], M: Int, N: Int, K: Int, lda: Int, ldb: Int, alpha: Float32 = 1, beta: Float32 = 0, transpose_A: Bool = False, transpose_B: Bool = False)</code></p>
+</div><p>Compute C = alpha * op(A) @ op(B) + beta * C (Float32).</p>
+<p>Parameter order FIX: Required parameters (lda, ldb) come before optional ones.</p>
+</div><h3><code>matmul_f64</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul_f64(self, A: UnsafePointer[Float64, MutAnyOrigin], B: UnsafePointer[Float64, MutAnyOrigin], C: UnsafePointer[Float64, MutAnyOrigin], M: Int, N: Int, K: Int, lda: Int, ldb: Int, alpha: Float64 = 1, beta: Float64 = 0, transpose_A: Bool = False, transpose_B: Bool = False)</code></p>
+</div><p>Double precision version with correct parameter ordering.</p>
+</div><h3><code>matmul</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul[track_grad: Bool = True](self, A: Tensor[dtype], B: Tensor[dtype], transpose_A: Bool = False, transpose_B: Bool = False, requires_grad: Optional[Bool] = None) -&gt; Tensor[dtype]</code></p>
+</div><p>Matrix multiplication using BLAS.</p>
+<p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul(self, A: Gradbox[dtype], B: Tensor[dtype], transpose_A: Bool = False, transpose_B: Bool = False) -&gt; Gradbox[dtype]</code></p>
+</div><p>Matrix multiplication: Gradbox @ Tensor. Proper dimension checks for all transpose combinations.</p>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul(self, A: Tensor[dtype], B: Gradbox[dtype], transpose_A: Bool = False, transpose_B: Bool = False) -&gt; Gradbox[dtype]</code></p>
+</div><p>Matrix multiplication using BLAS for gradient calculation.</p>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a></p>
+</div></section>
+</body>
+</html>

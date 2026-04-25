@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NDBuffer - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct NDBuffer[dtype: DType]</code></p>
+</div><h2>Fields</h2>
+<ul>
+<li>​<b>shape</b> (<code>Shape</code>): </li>
+<li>​<b>strides</b> (<code>Strides</code>): </li>
+<li>​<b>offset</b> (<code>Int</code>): </li>
+<li>​<b>buffer</b> (<code>Buffer[dtype]</code>): </li>
+<li>​<b>device_state</b> (<code>Optional[DeviceState[dtype]]</code>):</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/comparable/Equatable"><code>Equatable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/len/Sized"><code>Sized</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/format/Writable"><code>Writable</code></a></p>
+<h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *values: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, var buffer: Buffer[dtype] = Buffer(), shape: Optional[Shape] = None, strides: Optional[Strides] = None, offset: Int = 0)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, shape: Shape, strides: Optional[Strides] = None, offset: Int = 0)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, device_buffer: DeviceBuffer[dtype], shape: Shape, *, copy: Bool = False)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, deinit take: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, copy: Self)</code></p>
+</div><p>Copy NDBuffer - Buffer handles ref counting automatically.</p>
+</div><h3><code>__getitem__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__(self, indices: IntArray) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__(self, indices: List[Int]) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__(self, indices: VariadicList[Int, indices.is_owned]) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>__setitem__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__setitem__(self, indices: IntArray, value: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__setitem__(self, indices: List[Int], value: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__setitem__(self, indices: VariadicList[Int, indices.is_owned], value: Scalar[dtype])</code></p>
+</div></div><h3><code>__neg__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__neg__(self) -&gt; Self</code></p>
+</div></div><h3><code>__eq__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__eq__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__ne__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__ne__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__is__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__is__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__add__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__add__(self, other: Self) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__add__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__sub__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__sub__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__sub__(self, other: Self) -&gt; Self</code></p>
+</div></div><h3><code>__mul__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__mul__(self, other: Self) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__mul__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__truediv__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__truediv__(self, other: Self) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__truediv__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__pow__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__pow__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__rmul__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__rmul__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__rtruediv__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__rtruediv__(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__iadd__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__iadd__(self, scalar: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__iadd__(self, other: Self)</code></p>
+</div></div><h3><code>__isub__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__isub__(self, scalar: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__isub__(self, other: Self)</code></p>
+</div></div><h3><code>__imul__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__imul__(self, factor: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__imul__(self, other: Self)</code></p>
+</div></div><h3><code>__itruediv__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__itruediv__(self, scalar: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__itruediv__(self, other: Self)</code></p>
+</div></div><h3><code>with_device_state</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static with_device_state(var device_state: DeviceState[dtype], shape: Shape) -&gt; Self</code></p>
+</div></div><h3><code>buffer_layout</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>buffer_layout(self) -&gt; Layout</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>Layout</code></p>
+</div><h3><code>buffer_storage</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>buffer_storage(self) -&gt; Storage[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>Storage</code></p>
+</div><h3><code>sync</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sync(self)</code></p>
+</div></div><h3><code>zeros</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static zeros(shape: Shape, device: Device = CPU().into()) -&gt; Self</code></p>
+</div></div><h3><code>get_gpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>get_gpu(ref self) -&gt; ref[self_is_mut.device_state._value.gpu] GPU</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>to_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>to_cpu(self) -&gt; Self</code></p>
+</div></div><h3><code>to_gpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>to_gpu(self, gpu: GPU) -&gt; Self</code></p>
+</div></div><h3><code>device</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>device(self) -&gt; Device</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a device/Device"><code>Device</code></a></p>
+</div><h3><code>device_context</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>device_context(self) -&gt; Optional[DeviceContext]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a></p>
+</div><h3><code>get_device_state</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>get_device_state(ref self) -&gt; ref[self_is_mut.device_state._value] DeviceState[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>to_device</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>to_device(self, device: Device) -&gt; Tuple[Int, NDBuffer[dtype]]</code></p>
+</div><p>Materialize this buffer onto another device.</p>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code>: - None if already on target device.</p>
+<ul>
+<li>New NDBuffer if transfer occurs.</li>
+</ul>
+</div><h3><code>is_on_gpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_on_gpu(self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>gpu_id</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>gpu_id(self) -&gt; Int64</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>Int64</code></p>
+</div><h3><code>is_on_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_on_cpu(self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>full</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static full(shape: Shape, scalar: Scalar[dtype], device: Device = CPU().into()) -&gt; Self</code></p>
+</div></div><h3><code>onehot</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static onehot(indices, num_classes: Int, device: Optional[Device] = None, ignore_index: Optional[Int] = None) -&gt; Self</code></p>
+</div><p>Convert NDBuffer of class indices to one-hot encoding. Args:     indices: Tensor of shape (...,) containing class indices.     num_classes: Number of classes.     device: Target device.     ignore_index: If provided, rows where index == ignore_index become all zeros. Returns: Tensor of shape (..., num_classes).</p>
+</div><h3><code>shuffle</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>shuffle(self, permutation: List[Int], axis: Int) -&gt; Self</code></p>
+</div></div><h3><code>index_iterator</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>index_iterator(self) -&gt; IndexIterator[origin_of(self.shape), origin_of(self.strides)]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>IndexIterator</code></p>
+</div><h3><code>Empty</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static Empty() -&gt; Self</code></p>
+</div></div><h3><code>arange</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static arange(args: VariadicList[Scalar[dtype], args.is_owned]) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static arange(*args: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>linspace</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static linspace(start: Scalar[dtype], end: Scalar[dtype], steps: Int) -&gt; Self</code></p>
+</div></div><h3><code>is_contiguous</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_contiguous(self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>size</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>size(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>item</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>item(self) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>get</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>get(self, index: Int) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>set</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>set(self, index: Int, value: Scalar[dtype])</code></p>
+</div></div><h3><code>load</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>load[simdwidth: Int = simd_width_of[dtype](), validated: Bool = False](self, row: Int, col: Int) -&gt; SIMD[dtype, simdwidth]</code></p>
+</div><p>SIMD load of a row segment from a 2D NDBuffer.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/SIMD"><code>SIMD</code></a></p>
+</div><h3><code>store</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>store[simdwidth: Int = simd_width_of[dtype](), validated: Bool = False](self, row: Int, col: Int, value: SIMD[dtype, simdwidth])</code></p>
+</div><p>SIMD store of a row segment into a 2D NDBuffer.</p>
+</div><h3><code>__str__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__str__(self) -&gt; String</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/string/string/String"><code>String</code></a></p>
+</div><h3><code>print</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>print(self, num_first: Int = 10, num_last: Int = 10)</code></p>
+</div></div><h3><code>__repr__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__repr__(self) -&gt; String</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/string/string/String"><code>String</code></a></p>
+</div><h3><code>write_to</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>write_to[W: Writer](self, mut writer: W)</code></p>
+</div></div><h3><code>data_buffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>data_buffer(ref self) -&gt; ref[self_is_mut.buffer] Buffer[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>is_scalar</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_scalar(self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>numels</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>numels(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>__len__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__len__(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>rank</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>rank(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>max_index</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>max_index(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>min_index</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>min_index(self) -&gt; Int</code></p>
+</div><p>Calculate the lowest accessible memory offset.</p>
+<p>For dimensions with negative strides, the minimum is reached at the
+last index of that dimension. For positive strides, the lowest
+address is already at index 0 (the base offset), so those dimensions
+do not contribute.</p>
+<p>Example:</p>
+<pre><code class="language-mojo">var buf = NDBuffer[DType.float32](Shape(3, 2), strides=Strides(4, -1), offset=10)
+print(buf.min_index())  # 10 + 1*(-1) = 9
+</code></pre>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>: The lowest valid memory offset.</p>
+</div><h3><code>offset_at</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>offset_at(self, indices: IntArray) -&gt; Int</code></p>
+</div><p>Return the absolute linear offset in the underlying buffer for the given multidimensional indices.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>to_dtype</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>to_dtype[NewType: DType](self) -&gt; NDBuffer[NewType]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a ndbuffer/NDBuffer"><code>NDBuffer</code></a></p>
+</div><h3><code>shared</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>shared(self) -&gt; Bool</code></p>
+</div><p>Check if underlying buffer is shared.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>share</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>share(mut self, shape: Optional[Shape] = None, strides: Optional[Strides] = None, offset: Int = 0) -&gt; Self</code></p>
+</div><p>Create shared view of this buffer. First call enables ref counting. Subsequent calls just create views.</p>
+</div><h3><code>transpose</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>transpose(mut self, axes: IntArray = IntArray(), *, shared: Bool = True) -&gt; Self</code></p>
+</div></div><h3><code>data_ptr</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>data_ptr[origin: Origin[mut=origin.mut], address_space: AddressSpace, //](ref[origin.mut, origin] self) -&gt; UnsafePointer[Scalar[dtype], origin, address_space=address_space]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/memory/unsafe_pointer/UnsafePointer"><code>UnsafePointer</code></a></p>
+</div><h3><code>zero</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>zero(self)</code></p>
+</div></div><h3><code>softmax</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>softmax(self, axes: IntArray, validated: Bool = False) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>log_softmax</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>log_softmax(self, axes: IntArray, validated: Bool = False) -&gt; Tuple[NDBuffer[dtype], NDBuffer[dtype]] where dtype.is_floating_point()</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>Tuple</code></p>
+</div><h3><code>fill</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>fill(self, value: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>fill(self, cpu_buffer: Self)</code></p>
+</div><p>Fill this NDBuffer from a CPU NDBuffer.</p>
+</div><h3><code>fill_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>fill_cpu(self, value: Scalar[dtype])</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>fill_cpu(self, other: Self)</code></p>
+</div></div><h3><code>reshape</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reshape(self, new_shape: Shape, validated: Bool = False) -&gt; Self</code></p>
+</div></div><h3><code>reshape_gpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reshape_gpu(self, shape: Shape) -&gt; Self</code></p>
+</div></div><h3><code>map_where</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>map_where(self, pred: def(Scalar[dtype]) -&gt; Bool, value: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>map_where_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>map_where_cpu(self, pred: def(Scalar[dtype]) -&gt; Bool, value: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>map</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>map[map_buffer: def(Buffer[dtype]) -&gt; Buffer[dtype], map_element: def(Scalar[dtype]) -&gt; Scalar[dtype]](self) -&gt; Buffer[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>reduce</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reduce[reduce_buffer: def(Buffer[dtype], Int, Optional[Int]) -&gt; Scalar[dtype], reduce_elements: def(Scalar[dtype], Scalar[dtype]) -&gt; Scalar[dtype], unit: Scalar[dtype] = 0](self) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reduce[mean: Bool = False](self, normalized_axes: IntArray, keepdims: Bool = False) -&gt; Self</code></p>
+</div><p>Axes must be already normalized.</p>
+</div><h3><code>sum_all</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sum_all(self) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>sum</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sum(self, normalized_axes: IntArray, keepdims: Bool = False) -&gt; Self</code></p>
+</div></div><h3><code>reduce_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reduce_cpu[mean: Bool = False](self, normalized_axes: IntArray, keepdims: Bool) -&gt; Self</code></p>
+</div></div><h3><code>log_sum</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>log_sum(self, normalized_axes: IntArray, keepdims: Bool = False) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>reduce_log_sum_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reduce_log_sum_cpu(self, normalized_axes: IntArray, keepdims: Bool) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>flatten</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>flatten(self, start_dim: Int = 0, end_dim: Optional[Int] = None) -&gt; Self</code></p>
+</div></div><h3><code>contiguous_buffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>contiguous_buffer(self) -&gt; Buffer[dtype]</code></p>
+</div><p>Returns a contiguous copy of the buffer with the same data - CPU only.</p>
+<p><strong>Returns:</strong></p>
+<p><a buffers/Buffer"><code>Buffer</code></a></p>
+</div><h3><code>contiguous_device_state</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>contiguous_device_state(self) -&gt; DeviceState[dtype]</code></p>
+</div><p>Returns a fresh independent contiguous DeviceState. Caller must ensure self is on GPU. Fast path: enqueue_copy_to for contiguous source. Slow path: DeviceState.fill for non-contiguous (handles strided iteration).</p>
+<p><strong>Returns:</strong></p>
+<p><a device/DeviceState"><code>DeviceState</code></a></p>
+</div><h3><code>contiguous</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>contiguous(self, new_shape: Optional[Shape] = None) -&gt; Self</code></p>
+</div></div><h3><code>squeeze</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>squeeze(mut self, axes: IntArray, *, shared: Bool = True) -&gt; Self</code></p>
+</div></div><h3><code>unsqueeze</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unsqueeze(mut self, axes: IntArray, *, shared: Bool = True) -&gt; Self</code></p>
+</div></div><h3><code>permute</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>permute(mut self, perm: IntArray, *, shared: Bool = True) -&gt; Self</code></p>
+</div><p>Permute axes of this NDBuffer. perm[i] = j means: new axis i takes old axis j. Example: perm=[2,0,1] on shape [A,B,C] → shape [C,A,B].</p>
+<p>shared=True  → view with reordered shape/strides, same buffer.
+               used by Tensor.permute — no data movement.
+shared=False → owned contiguous copy with permuted layout.
+               used by Gradbox.permute — GPU safe via contiguous().
+GPU safety: shared=True is always safe — just metadata.
+            shared=False delegates to contiguous() which handles.
+            GPU via contiguous_device_state().</p>
+</div><h3><code>count</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>count(self, key: Scalar[dtype]) -&gt; Int</code></p>
+</div><p>Count occurrences of key in the buffer.</p>
+<p>GPU path:
+    1. contiguous_device_state() — materialises logical view correctly,
+       handles offset (contiguous fast path) and non-contiguous strides
+       (slow path via fill/index_iterator). Result is flat, offset=0.
+    2. map_to_host once — SIMD vectorized count on flat buffer.
+CPU path:
+    Contiguous: delegates to Buffer.count (SIMD vectorized).
+    Non-contiguous: index_iterator.
+Result is always a CPU scalar Int.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>unique</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unique(self) -&gt; Self</code></p>
+</div><p>Get unique values in the buffer.</p>
+<p>GPU path:
+    1. contiguous_device_state() — materialises logical view correctly,
+       handles offset (contiguous fast path) and non-contiguous strides
+       (slow path via fill/index_iterator). Result is flat, offset=0.
+    2. map_to_host once — collect uniques via Set on CPU.
+CPU path:
+    Contiguous: iterates buffer directly respecting offset.
+    Non-contiguous: index_iterator.
+Result is always a CPU NDBuffer — Set is CPU-side and unique
+results are typically small, no benefit keeping on GPU.</p>
+</div><h3><code>copy_from_alike</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>copy_from_alike[overwrite: Bool = True, validate: Bool = True](self, other: Self)</code></p>
+</div></div><h3><code>inplace_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>inplace_ops[op_code: Int](self, other: Self)</code></p>
+</div></div><h3><code>inplace_ops_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>inplace_ops_cpu[op_code: Int](self, other: Self)</code></p>
+</div></div><h3><code>inplace_scalar_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>inplace_scalar_ops[op_code: Int](self, scalar: Scalar[dtype])</code></p>
+</div></div><h3><code>inplace_scalar_ops_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>inplace_scalar_ops_cpu[op_code: Int](self, scalar: Scalar[dtype])</code></p>
+</div></div><h3><code>__abs__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__abs__(self) -&gt; Self</code></p>
+</div></div><h3><code>log</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>log[epsilon: Scalar[dtype] = Epsilon.value()](self) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>exp</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>exp(self) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>sigmoid</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sigmoid(self) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>tanh</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>tanh(self) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>max</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>max(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>min</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>min(self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>arithmetic_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>arithmetic_ops[op_code: Int](self, other: Self, epsilon: Scalar[dtype] = Epsilon.value()) -&gt; Self</code></p>
+</div></div><h3><code>arithmetic_ops_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>arithmetic_ops_cpu[op_code: Int](self, other: Self, epsilon: Scalar[dtype] = Epsilon.value()) -&gt; Self</code></p>
+</div></div><h3><code>broadcast_buffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>broadcast_buffer[op_code: Int](self, other: Self) -&gt; Self</code></p>
+</div></div><h3><code>broadcast_scalar_buffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>broadcast_scalar_buffer[op_code: Int](self, other: Self) -&gt; Self</code></p>
+</div></div><h3><code>broadcast_nd_buffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>broadcast_nd_buffer[op_code: Int](self, other: Self) -&gt; Self</code></p>
+</div></div><h3><code>broadcast_to</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>broadcast_to(self, target_shape: Shape) -&gt; Self</code></p>
+</div><p>Broadcast this NDBuffer to target_shape. Uses stride=0 trick for broadcast dims — pure metadata, no data copy. Then contiguous() materialises the view correctly on CPU or GPU.</p>
+<p>GPU safe: share() is metadata only, contiguous() uses
+          contiguous_device_state() on GPU.
+CPU safe: contiguous() uses contiguous_buffer().</p>
+</div><h3><code>scalar_fn</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static scalar_fn[op_code: Int](lhs: Scalar[dtype], rhs: Scalar[dtype], epsilon: Scalar[dtype] = Epsilon.value()) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>float_unary_fn_helper</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static float_unary_fn_helper[op_code: Int, epsilon: Scalar[dtype] = Epsilon.value()](scalar: Scalar[dtype]) -&gt; Scalar[dtype] where dtype.is_floating_point()</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>scalar_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>scalar_ops[op_code: Int](self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>scalar_ops_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>scalar_ops_cpu[op_code: Int, epsilon: Scalar[dtype] = Epsilon.value()](self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>unary_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unary_ops[op_code: Int, epsilon: Scalar[dtype] = Epsilon.value()](self) -&gt; Self</code></p>
+</div></div><h3><code>unary_ops_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unary_ops_cpu[op_code: Int, epsilon: Scalar[dtype] = Epsilon.value()](self) -&gt; Self</code></p>
+</div></div><h3><code>unary_fn_helper</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static unary_fn_helper[op_code: Int](scalar: Scalar[dtype]) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>unary_ops_with_mask</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unary_ops_with_mask[op_code: Int](self) -&gt; Tuple[NDBuffer[dtype], NDBuffer[dtype]]</code></p>
+</div><p>Device-aware unary op + mask. Returns (output, mask).</p>
+<p>CPU path: delegates to Buffer.unary_ops_with_mask (vectorized).
+GPU path: single kernel pass via UnaryOpsKernel.launch_with_mask.</p>
+<p>Non-contiguous input is handled efficiently on both paths:</p>
+<ul>
+<li>CPU: index_iterator() loop (acceptable, matches existing slow path).</li>
+<li>GPU: contiguous_device_state() does ONE map_to_host copy, then
+ the kernel runs on the flat buffer — no per-element host calls.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code>: Tuple of (output NDBuffer, mask NDBuffer).
+Both share the same device as self.</p>
+</div><h3><code>unary_ops_with_mask_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unary_ops_with_mask_cpu[op_code: Int](self) -&gt; Tuple[NDBuffer[dtype], NDBuffer[dtype]]</code></p>
+</div><p>CPU path for unary_ops_with_mask. Delegates to Buffer.</p>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code></p>
+</div><h3><code>float_unary_ops</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>float_unary_ops[op_code: Int, epsilon: Scalar[dtype] = Epsilon.value()](self) -&gt; Self where dtype.is_floating_point()</code></p>
+</div><p>For LOG/EXP/SIGMOID/TANH.</p>
+</div><h3><code>float_unary_ops_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>float_unary_ops_cpu[op_code: Int, epsilon: Scalar[dtype] = Epsilon.value()](self) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>minmax</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>minmax[is_max: Bool](self, axes: IntArray, keepdims: Bool = False, paired: Bool = False) -&gt; Tuple[NDBuffer[dtype], NDBuffer[dtype]]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>Tuple</code></p>
+</div><h3><code>minmax_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>minmax_cpu[is_max: Bool](self, normalized_axes: IntArray, keepdims: Bool = False, paired: Bool = False) -&gt; Tuple[NDBuffer[dtype], NDBuffer[dtype]]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>Tuple</code></p>
+</div><h3><code>clamp</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>clamp(self, lower_bound: Scalar[dtype], upper_bound: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>clamp_in_place</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>clamp_in_place(self, lower_bound: Scalar[dtype], upper_bound: Scalar[dtype])</code></p>
+</div></div><h3><code>compare</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>compare[op_code: Int](self, other: Self) -&gt; NDBuffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a ndbuffer/NDBuffer"><code>NDBuffer</code></a></p>
+</div><h3><code>compare_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>compare_cpu[op_code: Int](self, other: Self) -&gt; NDBuffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a ndbuffer/NDBuffer"><code>NDBuffer</code></a></p>
+</div><h3><code>compare_scalar</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>compare_scalar[op_code: Int](self, scalar: Scalar[dtype]) -&gt; NDBuffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a ndbuffer/NDBuffer"><code>NDBuffer</code></a></p>
+</div><h3><code>compare_scalar_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>compare_scalar_cpu[op_code: Int](self, scalar: Scalar[dtype]) -&gt; NDBuffer[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a ndbuffer/NDBuffer"><code>NDBuffer</code></a></p>
+</div><h3><code>all_close</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>all_close[rtol: Scalar[dtype] = 1.0000000000000001E-5, atol: Scalar[dtype] = 1.0E-8](self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>map_to_bool</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>map_to_bool(self, pred: def(Scalar[dtype]) -&gt; Bool) -&gt; NDBuffer[DType.bool]</code></p>
+</div><p>Apply predicate to each element, returning a boolean NDBuffer. GPU path: transfers to CPU, applies pred, transfers back if needed. CPU path: delegates to Buffer.map_to_bool via contiguous buffer. Note: pred is a CPU function — GPU path materialises through CPU.</p>
+<p><strong>Returns:</strong></p>
+<p><a ndbuffer/NDBuffer"><code>NDBuffer</code></a></p>
+</div><h3><code>all_true</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>all_true(self: NDBuffer[DType.bool]) -&gt; Bool</code></p>
+</div><p>Returns True if all elements are True. GPU path: delegates to DeviceState[DType.bool].all_true().           which checks all uint8 values == 1 internally. CPU path: delegates to Buffer[DType.bool].all_true().</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>any_true</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>any_true(self: NDBuffer[DType.bool]) -&gt; Bool</code></p>
+</div><p>Returns True if any element is True. GPU path: delegates to DeviceState[DType.bool].any_true()           which checks any uint8 value == 1 internally. CPU path: delegates to Buffer[DType.bool] iteration.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>sum_over_broadcasted_axes</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sum_over_broadcasted_axes(extended_buffer, target_shape: Shape) -&gt; Self</code></p>
+</div></div><h3><code>matmul_2d</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul_2d(A, B: Self) -&gt; Self</code></p>
+</div></div><h3><code>matmul_2d_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul_2d_cpu(A, B: Self) -&gt; Self</code></p>
+</div></div><h3><code>matmul_nd</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul_nd(A, B: Self) -&gt; Self</code></p>
+</div></div><h3><code>matmul_nd_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul_nd_cpu(A, B: Self) -&gt; Self</code></p>
+</div></div></section>
+</body>
+</html>

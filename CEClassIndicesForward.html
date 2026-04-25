@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CEClassIndicesForward - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct CEClassIndicesForward[dtype: DType]</code></p>
+</div><p>Forward pass for class index targets.</p>
+<p>Steps:
+    1. Flatten spatial: logits (N,C,d..) → (M,C), target → (M,)
+    2. log_softmax + softmax along C dim
+    3. ignore_mask from original target
+    4. onehot from target (ignore_index rows → all zeros via onehot)
+    5. NLL with optional label smoothing
+    6. Zero losses at ignored positions
+    7. Apply reduction
+    8. Attach backward</p>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/RegisterPassable"><code>RegisterPassable</code></a></p>
+<h2>Methods</h2>
+<h3><code>forward</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static forward[track_grad: Bool](logits: Tensor[dtype], target: Tensor[DType.int32], reduction: Reduction, ignore_index: Int, label_smoothing: Scalar[dtype], validate: Bool) -&gt; Tensor[dtype] where dtype.is_floating_point()</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div></section>
+</body>
+</html>

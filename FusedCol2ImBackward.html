@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FusedCol2ImBackward - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct FusedCol2ImBackward[dtype: DType]</code></p>
+</div><p>Convolution backward pass.</p>
+<ol>
+<li>Direct buffer access (no repeated indexing)</li>
+<li>SIMD vectorization on innermost loops</li>
+<li>Separate kernel/input gradients (no race conditions)</li>
+<li>Work with 4D directly (no reshape overhead)</li>
+<li>Cache-friendly access patterns</li>
+</ol>
+<p>Parallelization strategy:</p>
+<ul>
+<li>Bias grad: Over C_out (each thread owns one channel)</li>
+<li>Kernel grad: Over C_out (each thread owns grad_kernel[co, :, :, :])</li>
+<li>Input grad: Over N (each thread owns grad_padded[n, :, :, :])</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/RegisterPassable"><code>RegisterPassable</code></a></p>
+<h2>Methods</h2>
+<h3><code>backward</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static backward(output: Ancestor[dtype]) -&gt; List[Tuple[Ancestor[dtype], Gradbox[dtype], Int]]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a></p>
+</div><h3><code>compute_bias_gradient</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static compute_bias_gradient(grad_output: Gradbox[dtype], N: Int, C_out: Int, H_out: Int, W_out: Int) -&gt; Gradbox[dtype]</code></p>
+</div><p>Vectorized bias gradient: sum over (N, H_out, W_out) for each C_out.</p>
+<p>Memory layout: grad_output is contiguous (N, C_out, H_out, W_out).
+For each channel co, data is at indices:
+  [n<em>C_out</em>H_out<em>W_out + co</em>H_out*W_out + spatial_pos]</p>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a></p>
+</div><h3><code>compute_kernel_gradient</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static compute_kernel_gradient(grad_output: Gradbox[dtype], padded_image: Tensor[dtype], N: Int, C_in: Int, C_out: Int, H_pad: Int, W_pad: Int, H_out: Int, W_out: Int, KH: Int, KW: Int, stride: Int, dilation: Int) -&gt; Gradbox[dtype]</code></p>
+</div><p>We need to transpose (N,C_out,H,W) → (C_out,N,H,W) before matmul.</p>
+<p>Strategy:</p>
+<ol>
+<li>Convert Gradbox → Tensor (to use view operations)</li>
+<li>Transpose + reshape Tensor (views, no copy!)</li>
+<li>Matmul</li>
+<li>Convert result back to Gradbox</li>
+</ol>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a></p>
+</div><h3><code>compute_input_gradient</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static compute_input_gradient(grad_output: Gradbox[dtype], kernel: Tensor[dtype], N: Int, C_in: Int, C_out: Int, H_pad: Int, W_pad: Int, H_out: Int, W_out: Int, KH: Int, KW: Int, stride: Int, dilation: Int) -&gt; Gradbox[dtype]</code></p>
+</div><p>Vectorized input gradient.</p>
+<p>Parallelized over N (no race - each n owns grad_padded[n, :, :, :]).</p>
+<p>Formula:
+  grad_input[n, ci, y, x] += sum_{co, ky, kx | y=oy<em>s+ky</em>d, x=ox<em>s+kx</em>d}
+    kernel[co, ci, ky, kx] * grad_output[n, co, oy, ox]</p>
+<p>Note: Hard to vectorize due to scatter pattern. Focus on cache optimization.</p>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a></p>
+</div></section>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ancestor - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct Ancestor[dtype: DType]</code></p>
+</div><p>Lightweight handle for ancestry tracking.</p>
+<p>Carries everything needed for:</p>
+<ol>
+<li>Graph traversal        — _id</li>
+<li>Grad routing           — requires_grad, gradbox ptr</li>
+<li>Data (CPU+GPU)   — nd_buffer (shared NDBuffer, refcount bump only)</li>
+<li>Backward compute       — nd_buffer (shape/strides/data for matmul etc.)</li>
+<li>Backward invoke        — backwardFnArg, parents</li>
+</ol>
+<p>What is NOT here vs full Tensor copy:</p>
+<ul>
+<li>No new gradbox allocation</li>
+<li>No recursive Tensor ancestor chain copy</li>
+</ul>
+<h2>Fields</h2>
+<ul>
+<li>​<b>requires_grad</b> (<code>Bool</code>): </li>
+<li>​<b>gradbox</b> (<code>UnsafePointer[Gradbox[dtype], MutAnyOrigin]</code>): </li>
+<li>​<b>layout</b> (<code>Layout</code>): </li>
+<li>​<b>storage</b> (<code>Storage[dtype]</code>): </li>
+<li>​<b>parents</b> (<code>Optional[Ancestors[dtype]]</code>):</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a></p>
+<h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, copy: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, deinit take: Self)</code></p>
+</div></div><h3><code>__del__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__del__(deinit self)</code></p>
+</div></div><h3><code>has_ancestry</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>has_ancestry(self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>shape</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>shape(ref self) -&gt; ref[self_is_mut.layout.shape] Shape</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>buffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>buffer(ref self) -&gt; NDBuffer[dtype]</code></p>
+</div><p>Reconstruct NDBuffer on demand for ops that need full access.</p>
+<p><strong>Returns:</strong></p>
+<p><code>NDBuffer</code></p>
+</div><h3><code>gradients</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>gradients(self) -&gt; UnsafePointer[Gradbox[dtype], MutAnyOrigin]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>UnsafePointer</code></p>
+</div><h3><code>ancestry</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>ancestry(ref self) -&gt; ref[self_is_mut.parents._value] Ancestors[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>is_on_gpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_on_gpu(self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>from_tensor</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static from_tensor(ref tensor: Tensor[dtype]) -&gt; Self</code></p>
+</div></div></section>
+</body>
+</html>

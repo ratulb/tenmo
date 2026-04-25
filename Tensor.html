@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tensor - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct Tensor[dtype: DType]</code></p>
+</div><h2>Fields</h2>
+<ul>
+<li>​<b>buffer</b> (<code>NDBuffer[dtype]</code>): </li>
+<li>​<b>requires_grad</b> (<code>Bool</code>): </li>
+<li>​<b>gradbox</b> (<code>UnsafePointer[Gradbox[dtype], MutAnyOrigin]</code>): </li>
+<li>​<b>ancestors</b> (<code>Optional[Ancestors[dtype]]</code>):</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/math/math/Absable"><code>Absable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/comparable/Equatable"><code>Equatable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/iter/Iterable"><code>Iterable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/len/Sized"><code>Sized</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/format/Writable"><code>Writable</code></a></p>
+<h2><code>comptime</code> members</h2>
+<div class='mojo-alias-header'><h3><code>Block</code></h3>
+</div><div class='mojo-alias-detail'>
+<div class="mojo-alias-sig"><p><code>comptime Block = List[Tensor[dtype].Rows]</code></p>
+</div></div><div class='mojo-alias-header'><h3><code>Blocks</code></h3>
+</div><div class='mojo-alias-detail'>
+<div class="mojo-alias-sig"><p><code>comptime Blocks = List[Tensor[dtype].Block]</code></p>
+</div></div><div class='mojo-alias-header'><h3><code>IteratorType</code></h3>
+</div><div class='mojo-alias-detail'>
+<div class="mojo-alias-sig"><p><code>comptime IteratorType[iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]] = ElemIterator[dtype, origin_of(_mlir_origin)]</code></p>
+</div><h4>Parameters</h4>
+<ul>
+<li>​<b>iterable_mut</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): </li>
+<li>​<b>iterable_origin</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/type_aliases/Origin"><code>Origin</code></a>): </div></li>
+</ul>
+<div class='mojo-alias-header'><h3><code>Row</code></h3>
+</div><div class='mojo-alias-detail'>
+<div class="mojo-alias-sig"><p><code>comptime Row = List[Scalar[dtype]]</code></p>
+</div></div><div class='mojo-alias-header'><h3><code>Rows</code></h3>
+</div><div class='mojo-alias-detail'>
+<div class="mojo-alias-sig"><p><code>comptime Rows = List[Tensor[dtype].Row]</code></p>
+</div></div><h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *axes_spans: Int, *, requires_grad: Bool = False)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, row: List[Scalar[dtype]], requires_grad: Bool = False)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, shape: Shape, requires_grad: Bool = False)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, ptr: UnsafePointer[Scalar[dtype], MutAnyOrigin], shape: Shape, strides: Optional[Strides] = None, offset: Int = 0, requires_grad: Bool = False, *, copy: Bool = True)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, var buffer: NDBuffer[dtype], requires_grad: Bool = False)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, deinit take: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, copy: Self)</code></p>
+</div></div><h3><code>__del__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__del__(deinit self)</code></p>
+</div></div><h3><code>__getitem__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__(self, indices: List[Int]) -&gt; Scalar[dtype]</code></p>
+</div><p>Index tensor with a List of integers.</p>
+<pre><code>Panic if tensor is scalar but indices are provided.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>indices</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of axis indices.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>: Scalar value at the specified coordinates.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__(ref self, indices: IntArray) -&gt; Scalar[dtype]</code></p>
+</div><p>Index tensor with an IntArray of indices.</p>
+<pre><code>Panic if tensor is scalar but indices are provided.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>indices</b> (<a intarray/IntArray"><code>IntArray</code></a>): IntArray of axis indices.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>: Scalar value at the specified coordinates.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__(self, *indices: Int) -&gt; Scalar[dtype]</code></p>
+</div><p>Index tensor with variadic integer indices.</p>
+<pre><code>Panic if tensor is scalar or if index count is unsupported.
+</code></pre>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>: Scalar value at the specified coordinates.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__[track_grad: Bool = True](mut self, *slices: Slice) -&gt; Self</code></p>
+</div><p>Slice tensor using Slice objects along each axis.</p>
+<p>Example:</p>
+<pre><code class="language-mojo">var t = Tensor[DType.float32].zeros(10, 10)
+var view = t[1:5, 2:8]
+</code></pre>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A view tensor with computed shape, strides, and offset.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__getitem__[track_grad: Bool = True](mut self, *indices: Variant[Int, IntArray, Slice, NewAxis]) -&gt; Self</code></p>
+</div><p>Advanced indexing with Idx objects (integers or slices).</p>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A view tensor over the indexed region.</p>
+</div><h3><code>__setitem__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__setitem__(self, *indices: Int, *, value: Scalar[dtype])</code></p>
+</div><p>Set a scalar value at given coordinates.</p>
+<pre><code>Panic if tensor is scalar.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to write.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__setitem__(self, indices: List[Int], value: Scalar[dtype])</code></p>
+</div><p>Set a scalar value at given coordinates.</p>
+<pre><code>Panic if tensor is scalar but indices are provided.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>indices</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of axis indices.</li>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to write.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__setitem__(self, coord: IntArray, value: Scalar[dtype])</code></p>
+</div><p>Set a scalar value at given coordinates.</p>
+<pre><code>Panic if tensor is scalar but indices are provided.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>coord</b> (<a intarray/IntArray"><code>IntArray</code></a>): IntArray of axis indices.</li>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to write.</li>
+</ul>
+</div><h3><code>__neg__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__neg__[track_grad: Bool = True](self) -&gt; Self</code></p>
+</div><p>Negate all elements.</p>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with negated values.</p>
+</div><h3><code>__invert__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__invert__(self) -&gt; Self where (dtype == DType.bool) if (dtype == DType.bool) else dtype.is_integral()</code></p>
+</div><p>Bitwise invert (logical NOT for bool, bitwise NOT for integers).</p>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with inverted values.</p>
+</div><h3><code>__lt__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__lt__(self, scalar: Scalar[dtype]) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__lt__(self, other: Self) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>__le__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__le__(self, scalar: Scalar[dtype]) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__le__(self, other: Self) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>__eq__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__eq__(self, scalar: Scalar[dtype]) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__eq__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__ne__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__ne__(self, scalar: Scalar[dtype]) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__ne__(self, other: Self) -&gt; Bool</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>__gt__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__gt__(self, scalar: Scalar[dtype]) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__gt__(self, other: Self) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>__ge__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__ge__(self, scalar: Scalar[dtype]) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__ge__(self, other: Self) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>__add__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__add__[track_grad: Bool = True](self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div><p>Add a scalar to all elements.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to add.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with scalar added to all elements.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__add__[track_grad: Bool = True](self, other: Self) -&gt; Self</code></p>
+</div><p>Element-wise addition of two tensors.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): Tensor to add.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with element-wise sum.</p>
+</div><h3><code>__sub__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__sub__[track_grad: Bool = True](self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div><p>Subtract a scalar from all elements.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to subtract.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with scalar subtracted from each element.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__sub__[track_grad: Bool = True](self, other: Self) -&gt; Self</code></p>
+</div><p>Element-wise subtraction of two tensors.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): Tensor to subtract.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with element-wise difference.</p>
+</div><h3><code>__mul__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__mul__[track_grad: Bool = True](self, factor: Scalar[dtype]) -&gt; Self</code></p>
+</div><p>Multiply all elements by a scalar.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>factor</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to multiply by.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with each element multiplied by factor.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__mul__[track_grad: Bool = True](self, other: Self) -&gt; Self</code></p>
+</div><p>Element-wise multiplication of two tensors.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): Tensor to multiply by.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with element-wise product.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__mul__(self, other: Gradbox[dtype]) -&gt; Gradbox[dtype]</code></p>
+</div><p>Element-wise multiplication with a Gradbox.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<a gradbox/Gradbox"><code>Gradbox</code></a>): Gradbox to multiply by.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a>: Gradbox with element-wise product.</p>
+</div><h3><code>__truediv__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__truediv__[track_grad: Bool = True](self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__truediv__[track_grad: Bool = True](self, other: Self) -&gt; Self</code></p>
+</div></div><h3><code>__pow__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__pow__[track_grad: Bool = True](self, exponent: Scalar[dtype], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Element-wise power: self^exponent.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>exponent</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar exponent value.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with each element raised to the exponent power.</p>
+</div><h3><code>__radd__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__radd__[track_grad: Bool = True](self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div><p>Right-side addition (scalar + tensor).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value on the left.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with scalar added to all elements.</p>
+</div><h3><code>__rsub__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__rsub__[track_grad: Bool = True](self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div><p>Right-side subtraction (scalar - tensor).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value on the left.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with scalar minus each element.</p>
+</div><h3><code>__rmul__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__rmul__[track_grad: Bool = True](self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div><p>Right-side multiplication (scalar * tensor).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value on the left.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with each element multiplied by scalar.</p>
+</div><h3><code>__rtruediv__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__rtruediv__[track_grad: Bool = True](self, scalar: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>__iadd__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__iadd__(self, other: Self)</code></p>
+</div><p>In-place addition of another tensor.</p>
+<pre><code>Panic if called on a leaf tensor that requires gradients.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): Tensor to add.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__iadd__(self, scalar: Scalar[dtype])</code></p>
+</div><p>In-place addition of a scalar.</p>
+<pre><code>Panic if called on a leaf tensor that requires gradients.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to add.</li>
+</ul>
+</div><h3><code>__isub__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__isub__(self, other: Self)</code></p>
+</div><p>In-place subtraction of another tensor.</p>
+<pre><code>Panic if called on a leaf tensor that requires gradients.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): Tensor to subtract.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__isub__(self, other: Gradbox[dtype])</code></p>
+</div><p>In-place subtraction of a Gradbox.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<a gradbox/Gradbox"><code>Gradbox</code></a>): Gradbox to subtract.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__isub__(self, scalar: Scalar[dtype])</code></p>
+</div><p>In-place subtraction of a scalar.</p>
+<pre><code>Panic if called on a leaf tensor that requires gradients.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to subtract.</li>
+</ul>
+</div><h3><code>__imul__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__imul__(self, other: Self)</code></p>
+</div><p>In-place multiplication by another tensor.</p>
+<pre><code>Panic if called on a leaf tensor that requires gradients.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): Tensor to multiply by.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__imul__(self, scalar: Scalar[dtype])</code></p>
+</div><p>In-place multiplication by a scalar.</p>
+<pre><code>Panic if called on a leaf tensor that requires gradients.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to multiply by.</li>
+</ul>
+</div><h3><code>__itruediv__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__itruediv__(self, other: Self)</code></p>
+</div><p>In-place division by another tensor.</p>
+<pre><code>Panic if called on a leaf tensor that requires gradients.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): Tensor to divide by.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__itruediv__(self, scalar: Scalar[dtype])</code></p>
+</div><p>In-place division by a scalar.</p>
+<pre><code>Panic if called on a leaf tensor that requires gradients.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to divide by.</li>
+</ul>
+</div><h3><code>from_device_buffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static from_device_buffer(buffer: DeviceBuffer[dtype], shape: Optional[Shape] = None, strides: Optional[Strides] = None, offset: Int = 0, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a tensor from a GPU device buffer.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>buffer</b> (<a href="https://docs.modular.com/mojo/stdlib/gpu/host/device_context/DeviceBuffer"><code>DeviceBuffer</code></a>): GPU device buffer containing the data.</li>
+<li>​<b>shape</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Tensor shape. If None, inferred from buffer length.</li>
+<li>​<b>strides</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Memory strides. If None, inferred from shape.</li>
+<li>​<b>offset</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Base memory offset (default: 0).</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether this tensor requires gradient tracking.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A new tensor wrapping the device buffer.</p>
+<p><strong>Raises:</strong></p>
+<p>Any error from mapping device buffer to host.</p>
+</div><h3><code>as_gradbox</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>as_gradbox(deinit self, share: Bool = False, *, contiguous: Bool = True) -&gt; Gradbox[dtype]</code></p>
+</div><p>Convert tensor to a Gradbox for gradient operations.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>share</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, shared gradbox. If False, gradbox is not shared.</li>
+<li>​<b>contiguous</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, materializes a contiguous copy first.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a>: A Gradbox containing the tensor&#39;s data.</p>
+</div><h3><code>as_list</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>as_list(self) -&gt; List[Scalar[dtype]]</code></p>
+</div><p>Copy tensor data into a Mojo List.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>: List containing all tensor elements in row-major order.</p>
+</div><h3><code>shallow_copy</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>shallow_copy(self) -&gt; Self</code></p>
+</div><p>Create a shallow copy with the underlying buffer.</p>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A new tensor with its which just copies the buffer.</p>
+</div><h3><code>id</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>id(self) -&gt; UInt</code></p>
+</div><p>Get the unique identifier for this tensor.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#uint"><code>UInt</code></a>: Unique UInt ID assigned at tensor creation.</p>
+</div><h3><code>init_gradbox</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>init_gradbox(mut self)</code></p>
+</div><p>Initialize gradient storage if requires_grad is True.</p>
+<p>Allocates GPU memory for gradients if the tensor is on GPU.</p>
+</div><h3><code>is_contiguous</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_contiguous(self) -&gt; Bool</code></p>
+</div><p>Check if tensor memory layout is contiguous.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if the tensor is stored contiguously in row-major order.</p>
+</div><h3><code>shared</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>shared(self) -&gt; Bool</code></p>
+</div><p>Check if the underlying buffer is shared by multiple views.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if the buffer is reference-counted and shared.</p>
+</div><h3><code>is_leaf</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_leaf(self) -&gt; Bool</code></p>
+</div><p>Check if this tensor is a leaf in the autograd graph.</p>
+<p>A leaf tensor is one that requires gradients but has no ancestors
+(operations that produced it). Leaf tensors are the starting points
+of gradient computation.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if this is a leaf tensor, False otherwise.</p>
+</div><h3><code>__len__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__len__(self) -&gt; Int</code></p>
+</div><p>Get the total number of elements in the tensor.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>: The total number of elements (product of shape dimensions).
+Returns 0 for scalar tensors with Shape().</p>
+</div><h3><code>shape</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>shape(ref self) -&gt; ref[self_is_mut.buffer.shape] Shape</code></p>
+</div><p>Get the shape of this tensor.</p>
+<p><strong>Returns:</strong></p>
+<p><code>ref</code>: Reference to the tensor&#39;s shape.</p>
+</div><h3><code>strides</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>strides(ref self) -&gt; ref[self_is_mut.buffer.strides] Strides</code></p>
+</div><p>Get the strides of this tensor.</p>
+<p><strong>Returns:</strong></p>
+<p><code>ref</code>: Reference to the tensor&#39;s strides.</p>
+</div><h3><code>offset</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>offset(self) -&gt; Int</code></p>
+</div><p>Get the base memory offset of this tensor&#39;s view.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>: The offset into the underlying buffer.</p>
+</div><h3><code>numels</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>numels(self) -&gt; Int</code></p>
+</div><p>Get the total number of elements.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>: The product of all shape dimensions.</p>
+</div><h3><code>num_elements</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>num_elements(self) -&gt; Int</code></p>
+</div><p>Get the total number of elements.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>: The product of all shape dimensions.</p>
+</div><h3><code>rank</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>rank(self) -&gt; Int</code></p>
+</div><p>Get the number of dimensions.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>: The number of axes in the tensor&#39;s shape.</p>
+</div><h3><code>max_index</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>max_index(self) -&gt; Int</code></p>
+</div><p>Get the highest valid memory offset.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>: The maximum flat index accessible in this tensor.</p>
+</div><h3><code>index_iterator</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>index_iterator(self) -&gt; IndexIterator[origin_of(self.buffer.shape), origin_of(self.buffer.strides)]</code></p>
+</div><p>Get an iterator over memory offsets.</p>
+<p><strong>Returns:</strong></p>
+<p><code>IndexIterator</code>: IndexIterator for iterating over physical memory offsets.</p>
+</div><h3><code>chunk</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>chunk(self, *indices: Variant[Int, IntArray, Slice, NewAxis], *, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Extract independent chunks along the first axis by indices.</p>
+<p>Allocates a new buffer — gradients do not flow back to the source.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether the result tracks gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A new tensor containing the selected chunks.</p>
+</div><h3><code>fill</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>fill(self, value: Scalar[dtype], *indices: Variant[Int, IntArray, Slice, NewAxis])</code></p>
+</div><p>Fill a region with a scalar value using advanced indexing.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to write.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>fill(self, tensor: Self, *indices: Variant[Int, IntArray, Slice, NewAxis])</code></p>
+</div><p>Copy data from another tensor into a region using advanced indexing.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>tensor</b> (<code>Self</code>): Source tensor to copy from.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>fill(self, gradbox: Gradbox[dtype], *indices: Variant[Int, IntArray, Slice, NewAxis])</code></p>
+</div><p>Copy data from a Gradbox into a region using advanced indexing.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>gradbox</b> (<a gradbox/Gradbox"><code>Gradbox</code></a>): Source Gradbox to copy from.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>fill(self, value: Scalar[dtype])</code></p>
+</div><p>Fill the entire tensor with a scalar value.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to write to all elements.</li>
+</ul>
+</div><h3><code>item</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>item(self) -&gt; Scalar[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a></p>
+</div><h3><code>__str__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__str__(self) -&gt; String</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/string/string/String"><code>String</code></a></p>
+</div><h3><code>__repr__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__repr__(self) -&gt; String</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/string/string/String"><code>String</code></a></p>
+</div><h3><code>write_to</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>write_to[W: Writer](self, mut writer: W)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>write_to(self, buffer: DeviceBuffer[dtype])</code></p>
+</div></div><h3><code>to_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>to_cpu(self, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Transfer tensor to CPU.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides the requires_grad flag
+on the returned tensor.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A new tensor on CPU, with data copied over.</p>
+<p><strong>Raises:</strong></p>
+<p>Error if system has no accelerator.</p>
+</div><h3><code>to_gpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>to_gpu(self, gpu: Optional[GPU] = None, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Transfer tensor to GPU.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>gpu</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Specific GPU to move to. If None, uses the default GPU.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides the requires_grad flag
+on the returned tensor.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A new tensor on the GPU, with data copied over.</p>
+<p><strong>Raises:</strong></p>
+<p>Error if system has no accelerator device.</p>
+</div><h3><code>device</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>device(self) -&gt; Device</code></p>
+</div><p>Get the device this tensor is on.</p>
+<p><strong>Returns:</strong></p>
+<p><a device/Device"><code>Device</code></a>: The CPU or GPU device the tensor resides on.</p>
+</div><h3><code>device_context</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>device_context(self) -&gt; Optional[DeviceContext]</code></p>
+</div><p>Get GPU device context for this tensor.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>: GPU device context if tensor is on GPU, None otherwise.</p>
+</div><h3><code>has_grad</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>has_grad(self) -&gt; Bool</code></p>
+</div><p>Check if gradient storage has been initialized.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if a gradient buffer exists for this tensor, False otherwise.</p>
+</div><h3><code>zero_grad</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>zero_grad(self)</code></p>
+</div><p>Zero out accumulated gradients.</p>
+<p>Call this before backward() to reset gradients to zero.
+Only affects tensors that require and have gradients.</p>
+</div><h3><code>gradients</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>gradients(self) -&gt; UnsafePointer[Gradbox[dtype], MutAnyOrigin]</code></p>
+</div><p>Get raw pointer to the gradient buffer.</p>
+<pre><code>Panic if called on a tensor that does not require grad or has no gradient.
+</code></pre>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/memory/unsafe_pointer/UnsafePointer"><code>UnsafePointer</code></a>: Pointer to the Gradbox storing accumulated gradients.</p>
+</div><h3><code>grad</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>grad(self) -&gt; Gradbox[dtype]</code></p>
+</div><p>Get accumulated gradients as a Gradbox.</p>
+<pre><code>Panic if called on a tensor that does not require grad or has no gradient.
+</code></pre>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a>: The Gradbox containing accumulated gradients.</p>
+</div><h3><code>rows</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>rows(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>cols</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>cols(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>is_scalar</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_scalar(self) -&gt; Bool</code></p>
+</div><p>Check if this tensor is a scalar (zero-dimensional).</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if the tensor has a single element, False otherwise.</p>
+</div><h3><code>is_on_gpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_on_gpu(self) -&gt; Bool</code></p>
+</div><p>Check if this tensor is stored on a GPU.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if the tensor is on a GPU, False otherwise.</p>
+</div><h3><code>is_on_cpu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>is_on_cpu(self) -&gt; Bool</code></p>
+</div><p>Check if this tensor is stored on the CPU.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if the tensor is on the CPU, False otherwise.</p>
+</div><h3><code>gt</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>gt(self, scalar: Scalar[dtype]) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>lt</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>lt(self, scalar: Scalar[dtype]) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>eq</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>eq(self, other: Self) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>ne</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>ne(self, other: Self) -&gt; Tensor[DType.bool]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>float</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>float(self) -&gt; Tensor[DType.float32]</code></p>
+</div><p>Convert tensor to float32 dtype.</p>
+<p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a>: A new tensor with dtype float32.</p>
+</div><h3><code>float64</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>float64(self) -&gt; Tensor[DType.float64]</code></p>
+</div><p>Convert tensor to float64 dtype.</p>
+<p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a>: A new tensor with dtype float64.</p>
+</div><h3><code>to_dtype</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>to_dtype[NewType: DType](self, requires_grad: Optional[Bool] = None) -&gt; Tensor[NewType]</code></p>
+</div><p>Convert tensor to a different data type.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides the requires_grad flag
+on the returned tensor.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a>: A new tensor with the specified dtype.</p>
+</div><h3><code>add_ancestry</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>add_ancestry(mut self, var backwardFnArg: BackwardFnArg[dtype], *parents: Self)</code></p>
+</div><p>Register parent tensors and backward function for autograd.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>backwardFnArg</b> (<a backpropagation/BackwardFnArg"><code>BackwardFnArg</code></a>): Backward pass function and metadata.</li>
+</ul>
+</div><h3><code>has_ancestry</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>has_ancestry(self) -&gt; Bool</code></p>
+</div><p>Check if this tensor has registered parent dependencies.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if parent tensors have been registered, False otherwise.</p>
+</div><h3><code>ancestry</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>ancestry(ref self) -&gt; ref[self_is_mut.ancestors._value] Ancestors[dtype]</code></p>
+</div><p>Get the ancestry graph for backward pass traversal.</p>
+<pre><code>Panic if ancestry has not been initialized.
+</code></pre>
+<p><strong>Returns:</strong></p>
+<p><code>ref</code>: Reference to the Ancestors containing parent dependencies.</p>
+</div><h3><code>broadcastable</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>broadcastable(self, to: Self) -&gt; Bool</code></p>
+</div><p>Check if this tensor can broadcast to a target shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>to</b> (<code>Self</code>): Target tensor to check broadcasting compatibility with.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if this tensor&#39;s shape can broadcast to to.shape().</p>
+</div><h3><code>log</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>log[track_grad: Bool = True, epsilon: Scalar[dtype] = Epsilon.value()](self, requires_grad: Optional[Bool] = None) -&gt; Self where dtype.is_floating_point()</code></p>
+</div></div><h3><code>all_close</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>all_close[rtol: Scalar[dtype] = 1.0000000000000001E-5, atol: Scalar[dtype] = 1.0E-8](self, other: Self) -&gt; Bool</code></p>
+</div><p>Check if two tensors are element-wise close within tolerance.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): Tensor to compare against.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>: True if all elements are within tolerance, False otherwise.</p>
+</div><h3><code>all</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>all(self, pred: def(Scalar[dtype]) -&gt; Bool) -&gt; Bool</code></p>
+</div><p>Returns True if pred holds for all elements. Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>any</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>any(self, pred: def(Scalar[dtype]) -&gt; Bool) -&gt; Bool</code></p>
+</div><p>Returns True if pred holds for any element. Uses NDBuffer.map_to_bool — handles GPU via CPU materialisation.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>all_true</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>all_true(self: Tensor[DType.bool]) -&gt; Bool</code></p>
+</div><p>Returns True if all elements are True. GPU path: NDBuffer.all_true → DeviceState.all_true (maps to host). CPU path: NDBuffer.all_true → Buffer.all_true.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>any_true</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>any_true(self: Tensor[DType.bool]) -&gt; Bool</code></p>
+</div><p>Returns True if any element is True. GPU path: NDBuffer.any_true → DeviceState.any_true (maps to host). CPU path: NDBuffer.any_true → Buffer.any_true.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a></p>
+</div><h3><code>unsafe_ptr</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unsafe_ptr[origin: Origin[mut=origin.mut], address_space: AddressSpace, //](ref[origin.mut, origin] self) -&gt; UnsafePointer[Tensor[dtype], origin, address_space=address_space]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/memory/unsafe_pointer/UnsafePointer"><code>UnsafePointer</code></a></p>
+</div><h3><code>data_ptr</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>data_ptr[origin: Origin[mut=origin.mut], address_space: AddressSpace, //](ref[origin.mut, origin] self) -&gt; UnsafePointer[Scalar[dtype], origin, address_space=address_space]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/memory/unsafe_pointer/UnsafePointer"><code>UnsafePointer</code></a></p>
+</div><h3><code>seed_grad</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>seed_grad(mut self, with_tensor: Self)</code></p>
+</div><p>Seed gradient accumulation with a specific tensor.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>with_tensor</b> (<code>Self</code>): Tensor containing gradient values to seed with.</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>seed_grad(mut self, value: Scalar[dtype])</code></p>
+</div><p>Seed gradient accumulation with a scalar value.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar gradient value to seed with.</li>
+</ul>
+</div><h3><code>map_where</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>map_where(self, pred: def(Scalar[dtype]) -&gt; Bool, value: Scalar[dtype], requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Replace elements matching a predicate with a scalar value.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>pred</b> (<code>def(Scalar[dtype]) -&gt; Bool</code>): Function that returns True for elements to replace.</li>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to write where pred returns True.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether the result tracks gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A new tensor with replaced values.</p>
+</div><h3><code>full_like</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static full_like(like, value: Scalar[dtype], requires_grad: Bool = False, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a tensor filled with a value, matching another tensor&#39;s shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>like</b> (<code>Self</code>): Reference tensor whose shape to copy.</li>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to fill with.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether the result tracks gradients.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to like&#39;s device.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A new tensor with the same shape as like, filled with value.</p>
+</div><h3><code>full</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static full(shape: List[Int], value: Scalar[dtype], requires_grad: Bool = False, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a tensor filled with a scalar value.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Dimensions as a list of ints.</li>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to fill with.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to CPU.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape filled with value.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static full(shape: Shape, scalar: Scalar[dtype], requires_grad: Bool = False, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a tensor filled with a scalar value.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a shapes/Shape"><code>Shape</code></a>): Tensor shape.</li>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to fill with.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to CPU.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape filled with scalar.</p>
+</div><h3><code>rand</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static rand(*dims: Int, *, low: Scalar[dtype] = 0, high: Scalar[dtype] = 1, init_seed: Optional[Int] = None, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a tensor with uniform random values in [low, high).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>low</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Lower bound (inclusive).</li>
+<li>​<b>high</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Upper bound (exclusive).</li>
+<li>​<b>init_seed</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Random seed. If None, randomizes each call.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape with uniform random values.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static rand(shape: List[Int], low: Scalar[dtype] = 0, high: Scalar[dtype] = 1, init_seed: Optional[Int] = None, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a tensor with uniform random values in [low, high).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Shape as a list of ints.</li>
+<li>​<b>low</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Lower bound (inclusive).</li>
+<li>​<b>high</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Upper bound (exclusive).</li>
+<li>​<b>init_seed</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Random seed. If None, randomizes each call.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape with uniform random values.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static rand(shape: Shape, min: Scalar[dtype] = 0, max: Scalar[dtype] = 1, init_seed: Optional[Int] = None, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a tensor with uniform random values in [min, max).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a shapes/Shape"><code>Shape</code></a>): Tensor shape.</li>
+<li>​<b>min</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Lower bound (inclusive).</li>
+<li>​<b>max</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Upper bound (exclusive).</li>
+<li>​<b>init_seed</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Random seed. If None, randomizes each call.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape with uniform random values.</p>
+</div><h3><code>randn</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static randn(*dims: Int, *, mean: Float64 = 0, std: Float64 = 1, init_seed: Optional[Int] = None, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a tensor with values from a normal distribution.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>mean</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#float64"><code>Float64</code></a>): Distribution mean.</li>
+<li>​<b>std</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#float64"><code>Float64</code></a>): Distribution standard deviation.</li>
+<li>​<b>init_seed</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Random seed. If None, randomizes each call.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape with normally distributed values.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static randn(shape: Shape, mean: Float64 = 0, std: Float64 = 1, init_seed: Optional[Int] = None, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a tensor with values from a normal distribution.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a shapes/Shape"><code>Shape</code></a>): Tensor shape.</li>
+<li>​<b>mean</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#float64"><code>Float64</code></a>): Distribution mean.</li>
+<li>​<b>std</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#float64"><code>Float64</code></a>): Distribution standard deviation.</li>
+<li>​<b>init_seed</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Random seed. If None, randomizes each call.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape with normally distributed values.</p>
+</div><h3><code>arange</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static arange(*args: Scalar[dtype], *, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a 1D tensor with evenly spaced values.</p>
+<p>Example:</p>
+<pre><code class="language-mojo">Tensor[DType.float32].arange(0, 5)      # [0, 1, 2, 3, 4]
+Tensor[DType.float32].arange(0, 10, 2)  # [0, 2, 4, 6, 8]
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A 1D tensor with values from start to stop.</p>
+</div><h3><code>linspace</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static linspace(start: Scalar[dtype], end: Scalar[dtype], steps: Int, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a 1D tensor with linearly spaced values.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>start</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Starting value.</li>
+<li>​<b>end</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Ending value.</li>
+<li>​<b>steps</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Number of samples.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A 1D tensor with steps values from start to end (inclusive).</p>
+</div><h3><code>zeros</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static zeros(axes_spans: List[Int], requires_grad: Bool = False, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a tensor of zeros.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes_spans</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Shape as a list of ints.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to CPU.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape filled with zeros.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static zeros(*axes_spans: Int, *, requires_grad: Bool = False, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a tensor of zeros.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to CPU.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape filled with zeros.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static zeros(shape: Shape, requires_grad: Bool = False, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a tensor of zeros.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a shapes/Shape"><code>Shape</code></a>): Tensor shape.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to CPU.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape filled with zeros.</p>
+</div><h3><code>eye</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static eye(n: Int, requires_grad: Bool = False, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a 2D identity matrix of size n x n.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>n</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Number of rows and columns.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to CPU.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: An n x n tensor with ones on the diagonal and zeros elsewhere.</p>
+</div><h3><code>zeros_like</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static zeros_like(self, requires_grad: Optional[Bool] = None, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a zeros tensor matching another tensor&#39;s shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to self&#39;s device.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of zeros with the same shape as self.</p>
+</div><h3><code>ones_like</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static ones_like(self, requires_grad: Optional[Bool] = None, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a ones tensor matching another tensor&#39;s shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to self&#39;s device.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of ones with the same shape as self.</p>
+</div><h3><code>onehot</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static onehot(indices, num_classes: Int, device: Optional[Device] = None, ignore_index: Optional[Int] = None) -&gt; Self</code></p>
+</div><p>Convert tensor of class indices to one-hot encoding. Args:     indices: Tensor of shape (...,) containing class indices.     num_classes: Number of classes.     device: Target device.     ignore_index: If provided, rows where index == ignore_index become all zeros. Returns: Tensor of shape (..., num_classes).</p>
+</div><h3><code>d1</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static d1(row: List[Scalar[dtype]], requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a 1D tensor from a list of scalar values.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>row</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of scalar values forming the single dimension.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A 1D tensor with len(row) elements.</p>
+</div><h3><code>d2</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static d2(rows: List[Tensor[dtype].Row], requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a 2D tensor from a list of rows.</p>
+<pre><code>Panic if rows have inconsistent lengths.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>rows</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of rows, each row must have equal length.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A 2D tensor of shape (len(rows), len(rows[0])).</p>
+</div><h3><code>d3</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static d3(blocks: List[Tensor[dtype].Rows], requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a 3D tensor from a list of 2D blocks.</p>
+<pre><code>Panic if blocks have inconsistent dimensions.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>blocks</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of 2D matrices, each matrix must have equal dimensions.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A 3D tensor.</p>
+</div><h3><code>d4</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static d4(blockgrid: List[Tensor[dtype].Block], requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a 4D tensor from a nested list structure.</p>
+<pre><code>Panic if blockgrid has inconsistent dimensions.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>blockgrid</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of 3D blocks, each block must have equal dimensions.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A 4D tensor.</p>
+</div><h3><code>d5</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static d5(blockhive: List[Tensor[dtype].Blocks], requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a 5D tensor from a deeply nested list structure.</p>
+<pre><code>Panic if blockhive has inconsistent dimensions.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>blockhive</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of 4D blocks, each block must have equal dimensions.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A 5D tensor.</p>
+</div><h3><code>of</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static of(*elems: Scalar[dtype], *, requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a 1D tensor from variadic scalar elements.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A 1D tensor with len(elems) elements.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static of(elems: List[Scalar[dtype]], requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a 1D tensor from a list of scalar elements.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>elems</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of scalar values.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A 1D tensor with len(elems) elements.</p>
+</div><h3><code>scalar</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static scalar(val: Scalar[dtype], requires_grad: Bool = False) -&gt; Self</code></p>
+</div><p>Create a scalar (0D) tensor from a single value.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>val</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): The scalar value.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A scalar tensor containing val.</p>
+</div><h3><code>ones</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static ones(*axes_spans: Int, *, requires_grad: Bool = False, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a tensor of ones.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to CPU.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape filled with ones.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static ones(shape: Shape, requires_grad: Bool = False, device: Optional[Device] = None) -&gt; Self</code></p>
+</div><p>Create a tensor of ones.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a shapes/Shape"><code>Shape</code></a>): Tensor shape.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): Whether to track gradients.</li>
+<li>​<b>device</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Target device. Defaults to CPU.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor of given shape filled with ones.</p>
+</div><h3><code>broadcast_to</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>broadcast_to(self, target_shape: Shape, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Broadcast tensor to a target shape.</p>
+<pre><code>Panic if current shape cannot broadcast to target_shape.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>target_shape</b> (<a shapes/Shape"><code>Shape</code></a>): Shape to broadcast to.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with the target shape.</p>
+</div><h3><code>load</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>load[simdwidth: Int = simd_width_of[dtype](), validated: Bool = False](self, row: Int, col: Int) -&gt; SIMD[dtype, simdwidth]</code></p>
+</div><p>SIMD load of a row segment from a 2D Tensor.</p>
+<p>Preconditions:
+    - Tensor must be 2D.
+    - Columns must be contiguous (stride[1] == 1) for SIMD loads.
+    - <code>col + simdwidth</code> must not exceed the number of columns.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/SIMD"><code>SIMD</code></a></p>
+</div><h3><code>store</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>store[simdwidth: Int = simd_width_of[dtype](), validated: Bool = False](self, row: Int, col: Int, value: SIMD[dtype, simdwidth])</code></p>
+</div><p>SIMD store of a row segment into a 2D Tensor.</p>
+<p>Preconditions:
+    - Tensor must be 2D.
+    - Columns must be contiguous for SIMD stores (stride[1] == 1).
+    - Caller may set validated=True if these checks are already ensured.</p>
+</div><h3><code>flatten</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>flatten[track_grad: Bool = True](self, start_dim: Int = 0, end_dim: Optional[Int] = None, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Flatten the tensor by collapsing a range of dimensions.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>start_dim</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): First dimension to flatten (default: 0).</li>
+<li>​<b>end_dim</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Last dimension to flatten (default: last).</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with flattened dimensions.</p>
+</div><h3><code>repeat</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>repeat[track_grad: Bool = True](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Repeat tensor along each axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>repeat</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Number of repeats per dimension.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with repeated data.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>repeat[track_grad: Bool = True](self, *repeat: Int, *, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Repeat tensor along each axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with repeated data.</p>
+</div><h3><code>tile</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>tile[track_grad: Bool = True](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Tile the tensor by repeating it along each axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>repeat</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Number of tiles per dimension.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tiled tensor.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>tile[track_grad: Bool = True](self, *repeat: Int, *, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Tile the tensor by repeating it along each axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tiled tensor.</p>
+</div><h3><code>contiguous</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>contiguous[track_grad: Bool = True](self, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Return a contiguous copy of the tensor.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A contiguous tensor with the same data.</p>
+</div><h3><code>reshape</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reshape[track_grad: Bool = True](self, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Reshape a single-element tensor to a scalar.</p>
+<pre><code>Panic if tensor has more than one element.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A scalar tensor.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reshape[track_grad: Bool = True](self, *newdims: Int, *, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Reshape tensor to new dimensions.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with the new shape.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reshape[track_grad: Bool = True](self, shape: List[Int], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Reshape tensor to new dimensions.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): New shape as a list of ints.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with the new shape.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>reshape[track_grad: Bool = True](self, new_shape: Shape, requires_grad: Optional[Bool] = None, validated: Bool = False) -&gt; Self</code></p>
+</div><p>Reshape tensor to new dimensions.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>new_shape</b> (<a shapes/Shape"><code>Shape</code></a>): Target shape.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+<li>​<b>validated</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, skips shape validation.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with the new shape.</p>
+</div><h3><code>upstream_grad_share</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>upstream_grad_share[augment: Bool](self, other: Self, upstream_grad: Gradbox[dtype]) -&gt; Gradbox[dtype]</code></p>
+</div><p>Handle gradient broadcasting and augmentation during backprop.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): The other tensor involved in the operation.</li>
+<li>​<b>upstream_grad</b> (<a gradbox/Gradbox"><code>Gradbox</code></a>): Incoming gradient to be processed.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a>: Processed Gradbox compatible with self&#39;s shape for accumulation.</p>
+</div><h3><code>sum</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sum[track_grad: Bool = True](self, axes: List[Int] = List(VariadicList(), Tuple()), keepdims: Bool = False, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Sum tensor elements along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Axes along which to sum.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axes with size 1.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with summed values along the specified axes.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sum[track_grad: Bool = True](self, axes: IntArray, keepdims: Bool = False, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Sum tensor elements along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a intarray/IntArray"><code>IntArray</code></a>): Axes along which to sum.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axes with size 1.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with summed values along the specified axes.</p>
+</div><h3><code>sqrt</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sqrt[track_grad: Bool = True](self, epsilon: Scalar[dtype] = Epsilon.value(), requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Element-wise square root.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>epsilon</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Small value added for numerical stability.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with square root of each element.</p>
+</div><h3><code>mean</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>mean[track_grad: Bool = True](self, axes: List[Int] = List(VariadicList(), Tuple()), keepdims: Bool = False, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Compute mean along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Axes along which to compute mean.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axes with size 1.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with mean values along the specified axes.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>mean[track_grad: Bool = True](self, axes: IntArray, keepdims: Bool = False, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Compute mean along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a intarray/IntArray"><code>IntArray</code></a>): Axes along which to compute mean.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axes with size 1.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with mean values along the specified axes.</p>
+</div><h3><code>variance</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>variance[track_grad: Bool = True](self, axis: Int = -100, keepdims: Bool = False, unbiased: Bool = True, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Compute variance along an axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Axis along which to compute variance.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axis with size 1.</li>
+<li>​<b>unbiased</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, use n-1 (sample variance). If False, use n (population).</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with variance along the specified axis.</p>
+</div><h3><code>std</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>std[track_grad: Bool = True](self, axis: Int = -100, keepdims: Bool = False, unbiased: Bool = True, epsilon: Scalar[dtype] = 9.9999999999999998E-13, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Compute standard deviation along an axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Axis along which to compute std.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axis with size 1.</li>
+<li>​<b>unbiased</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, use n-1. If False, use n.</li>
+<li>​<b>epsilon</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Small value for numerical stability.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with std deviation along the specified axis.</p>
+</div><h3><code>norm</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>norm(self, p: Float64 = 2, axis: Optional[Int] = None, keepdims: Bool = False) -&gt; Self</code></p>
+</div><p>Compute Lp norm of the tensor.</p>
+<pre><code>Panic if p != 2.0 (only L2 norm supported).
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>p</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#float64"><code>Float64</code></a>): Power for the norm computation (only p=2.0 supported).</li>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): Axis along which to compute. If None, computes global norm.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axes with size 1.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with the Lp norm value.</p>
+</div><h3><code>update_grad</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>update_grad[opcode: Int](mut self, incoming: Gradbox[dtype])</code></p>
+</div><p>Update gradient using an incoming gradient and operation type.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>incoming</b> (<a gradbox/Gradbox"><code>Gradbox</code></a>): Gradbox containing upstream gradients.</li>
+</ul>
+</div><h3><code>unique</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unique(self) -&gt; Self</code></p>
+</div><p>Return a tensor with duplicate elements removed.</p>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with the same data but duplicates removed.</p>
+</div><h3><code>count</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>count(self, key: Scalar[dtype]) -&gt; Int</code></p>
+</div><p>Count occurrences of a value in the tensor.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>key</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar value to count.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>: Number of elements equal to key.</p>
+</div><h3><code>sum_all</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sum_all(self) -&gt; Scalar[dtype]</code></p>
+</div><p>Sum all elements into a single scalar.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>: Sum of all elements in the tensor.</p>
+</div><h3><code>product_all</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>product_all(self) -&gt; Scalar[dtype]</code></p>
+</div><p>Compute the product of all elements.</p>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>: Product of all elements in the tensor.</p>
+</div><h3><code>exp</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>exp[track_grad: Bool = True](self, requires_grad: Optional[Bool] = None) -&gt; Self where dtype.is_floating_point()</code></p>
+</div><p>Element-wise exponential (e^x).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with exponential of each element.</p>
+</div><h3><code>__abs__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__abs__(self) -&gt; Self</code></p>
+</div><p>Element-wise absolute value.</p>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with absolute values.</p>
+</div><h3><code>max</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>max[track_grad: Bool = True](self, scalar: Scalar[dtype], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Element-wise maximum with a scalar.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar to compare against.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with max(self, scalar) for each element.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>max(self, axes: List[Int] = List(VariadicList(), Tuple()), keepdims: Bool = False, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Maximum value along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Axes along which to find max.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axes with size 1.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with max values along the specified axes.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>max(self, axes: IntArray, keepdims: Bool = False, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Maximum value along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a intarray/IntArray"><code>IntArray</code></a>): Axes along which to find max.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axes with size 1.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with max values along the specified axes.</p>
+</div><h3><code>min</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>min[track_grad: Bool = True](self, scalar: Scalar[dtype], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Element-wise minimum with a scalar.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>scalar</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Scalar to compare against.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with min(self, scalar) for each element.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>min(self, axes: List[Int] = List(VariadicList(), Tuple()), keepdims: Bool = False, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Minimum value along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Axes along which to find min.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axes with size 1.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with min values along the specified axes.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>min(self, axes: IntArray, keepdims: Bool = False, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Minimum value along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a intarray/IntArray"><code>IntArray</code></a>): Axes along which to find min.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axes with size 1.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with min values along the specified axes.</p>
+</div><h3><code>dot</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>dot[track_grad: Bool = True](self, other: Self) -&gt; Self</code></p>
+</div><p>Compute the dot product (matrix multiplication) with another tensor.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>other</b> (<code>Self</code>): Tensor to multiply with.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Result of matrix multiplication.</p>
+</div><h3><code>print</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>print(self, num_first: Int = 10, num_last: Int = 10)</code></p>
+</div><p>Print the tensor&#39;s metadata and data preview.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>num_first</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Number of elements to print from the start.</li>
+<li>​<b>num_last</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Number of elements to print from the end.</li>
+</ul>
+</div><h3><code>mse</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>mse[track_grad: Bool = True](self, target: Self) -&gt; Self</code></p>
+</div><p>Mean squared error loss.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>target</b> (<code>Self</code>): Target tensor to compare against.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Scalar tensor with the MSE loss value.</p>
+</div><h3><code>backward</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>backward[graph_size: Int = 50](mut output, start_grad: Scalar[dtype] = 1) where dtype.is_floating_point()</code></p>
+</div><p>Run backward pass to compute gradients.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>start_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Initial gradient value (default: 1.0).</li>
+</ul>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>backward[graph_size: Int = 50](mut output, seed_tensor: Self) where dtype.is_floating_point()</code></p>
+</div><p>Run backward pass with a specific seed tensor.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>seed_tensor</b> (<code>Self</code>): Tensor containing initial gradients.</li>
+</ul>
+</div><h3><code>requires_grad_</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>requires_grad_(mut self, requires_grad: Bool = True)</code></p>
+</div><p>Enable or disable gradient tracking in-place.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): True to enable gradient tracking, False to disable.</li>
+</ul>
+</div><h3><code>__iter__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__iter__(ref self) -&gt; ElemIterator[dtype, origin_of(self)]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ElemIterator</code></p>
+</div><h3><code>get</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>get(self, index: Int) -&gt; Scalar[dtype]</code></p>
+</div><p>Get element at a flat index with bounds checking.</p>
+<pre><code>Panic if index is out of bounds.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>index</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Flat (linear) index into the tensor&#39;s memory.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>: The scalar value at that index.</p>
+</div><h3><code>view</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>view[track_grad: Bool = True](mut self, shape: Shape, strides: Strides, offset: Int = 0, requires_grad: Optional[Bool] = None, validated: Bool = False) -&gt; Self</code></p>
+</div><p>Create a view with explicit shape, strides, and offset.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a shapes/Shape"><code>Shape</code></a>): Target shape.</li>
+<li>​<b>strides</b> (<a strides/Strides"><code>Strides</code></a>): Memory strides for the view.</li>
+<li>​<b>offset</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Base memory offset.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+<li>​<b>validated</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, skips validation.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A view tensor over the same buffer.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>view[track_grad: Bool = True](mut self, shape: List[Int], strides: List[Int], offset: Int = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Create a view with explicit shape and strides as lists.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Target shape as a list.</li>
+<li>​<b>strides</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Memory strides as a list.</li>
+<li>​<b>offset</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Base memory offset.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A view tensor over the same buffer.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>view[track_grad: Bool = True](mut self, *shape_dims: Int, *, offset: Int = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Create a contiguous view with the given shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>offset</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Base memory offset.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A contiguous view tensor.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>view[track_grad: Bool = True](mut self, shape: List[Int], offset: Int = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Create a contiguous view with the given shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Target shape as a list of ints.</li>
+<li>​<b>offset</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Base memory offset.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A contiguous view tensor.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>view[track_grad: Bool = True](mut self, shape: Shape, offset: Int = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Create a contiguous view with the given shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>shape</b> (<a shapes/Shape"><code>Shape</code></a>): Target shape.</li>
+<li>​<b>offset</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Base memory offset.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A contiguous view tensor.</p>
+</div><h3><code>into_view</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>into_view[track_grad: Bool = True](mut self, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Convert this tensor into a shared view.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A view tensor sharing the underlying buffer.</p>
+</div><h3><code>transpose</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>transpose[track_grad: Bool = True](mut self, *axes: Int, *, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Transpose tensor by reversing or permuting axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A transposed view tensor.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>transpose[track_grad: Bool = True](mut self, axes: List[Int] = List(VariadicList(), Tuple()), requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Transpose tensor by reversing or permuting axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Axes to permute as a list.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A transposed view tensor.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>transpose[track_grad: Bool = True](mut self, axes: IntArray, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Transpose tensor by reversing or permuting axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a intarray/IntArray"><code>IntArray</code></a>): Axes to permute as an IntArray.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A transposed view tensor.</p>
+</div><h3><code>slice</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>slice[track_grad: Bool = True](mut self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -&gt; Self</code></p>
+</div><p>Slice tensor along a single axis with start, end, and step.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>start</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Start index.</li>
+<li>​<b>end</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): End index.</li>
+<li>​<b>step</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Step size (default: 1).</li>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Axis to slice along (default: 0).</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A view tensor over the sliced region.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>slice[track_grad: Bool = True](mut self, axes: List[Int], starts: List[Int], ends: List[Int], steps: List[Int] = List(VariadicList(), Tuple())) -&gt; Self</code></p>
+</div><p>Slice tensor along multiple axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Axes to slice along.</li>
+<li>​<b>starts</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Start indices per axis.</li>
+<li>​<b>ends</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): End indices per axis.</li>
+<li>​<b>steps</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Step sizes per axis (default: 1 for all).</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A view tensor over the sliced region.</p>
+</div><h3><code>expand</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>expand[track_grad: Bool = True](mut self, target: Shape, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Broadcast tensor to a target shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>target</b> (<a shapes/Shape"><code>Shape</code></a>): Shape to broadcast to.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor broadcasted to the target shape.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>expand[track_grad: Bool = True](mut self, *target_dims: Int, *, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Broadcast tensor to a target shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor broadcasted to the target shape.</p>
+</div><h3><code>squeeze</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>squeeze[track_grad: Bool = True](mut self, axes: List[Int] = List(VariadicList(), Tuple()), requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Remove axes of size 1.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Axes to squeeze. If empty, removes all size-1 axes.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with size-1 axes removed.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>squeeze[track_grad: Bool = True](mut self, *axes: Int, *, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Remove axes of size 1.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with size-1 axes removed.</p>
+</div><h3><code>unsqueeze</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unsqueeze[track_grad: Bool = True](mut self, *axes: Int, *, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Insert axes of size 1.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with size-1 axes inserted.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unsqueeze[track_grad: Bool = True](mut self, axes: List[Int] = List(VariadicList(), Tuple()), requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Insert axes of size 1.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Axes at which to insert size-1 dimensions.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with size-1 axes inserted.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unsqueeze[track_grad: Bool = True](mut self, axes: IntArray, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Insert axes of size 1.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a intarray/IntArray"><code>IntArray</code></a>): Axes at which to insert size-1 dimensions.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with size-1 axes inserted.</p>
+</div><h3><code>permute</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>permute[track_grad: Bool = True](mut self, axes: List[Int], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Permute axes according to a given ordering.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Permutation order (e.g. [2, 0, 1] for 3D).</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with axes permuted.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>permute[track_grad: Bool = True](mut self, axes: IntArray, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Permute axes according to a given ordering.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a intarray/IntArray"><code>IntArray</code></a>): Permutation order as IntArray.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A tensor with axes permuted.</p>
+</div><h3><code>argmax</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>argmax(self, axis: Int = 0, keepdims: Bool = False) -&gt; Tensor[DType.int32]</code></p>
+</div><p>Index of the maximum value along an axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Axis along which to find the argmax.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axis with size 1.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a>: Tensor of indices indicating the position of the max value.</p>
+</div><h3><code>argmin</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>argmin(self, axis: Int = 0, keepdims: Bool = False) -&gt; Tensor[DType.int32]</code></p>
+</div><p>Index of the minimum value along an axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Axis along which to find the argmin.</li>
+<li>​<b>keepdims</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/bool/Bool"><code>Bool</code></a>): If True, keep reduced axis with size 1.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a>: Tensor of indices indicating the position of the min value.</p>
+</div><h3><code>shuffle</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>shuffle[track_grad: Bool = True](self, perm: List[Int] = List(VariadicList(), Tuple()), axis: Int = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Shuffle tensor elements along an axis according to a permutation.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>perm</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Permutation indices for the given axis.</li>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Axis along which to shuffle.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A shuffled tensor.</p>
+</div><h3><code>relu</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>relu[track_grad: Bool = True](self, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Rectified Linear Unit: max(0, x).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with ReLU applied element-wise.</p>
+</div><h3><code>clip</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>clip[track_grad: Bool = True](self, min_val: Scalar[dtype], max_val: Scalar[dtype], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Clip tensor values to a range [min_val, max_val].</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>min_val</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Minimum value.</li>
+<li>​<b>max_val</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Maximum value.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with values clipped to [min_val, max_val].</p>
+</div><h3><code>tanh</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>tanh[track_grad: Bool = True](self, requires_grad: Optional[Bool] = None) -&gt; Self where dtype.is_floating_point()</code></p>
+</div><p>Hyperbolic tangent activation.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with tanh applied element-wise.</p>
+</div><h3><code>sigmoid</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sigmoid[track_grad: Bool = True](self, requires_grad: Optional[Bool] = None) -&gt; Self where dtype.is_floating_point()</code></p>
+</div><p>Sigmoid activation: 1 / (1 + exp(-x)).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with sigmoid applied element-wise.</p>
+</div><h3><code>softmax</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>softmax[track_grad: Bool = True, log: Bool = False](self, axes: List[Int] = List(VariadicList(), Tuple()), requires_grad: Optional[Bool] = None) -&gt; Self where dtype.is_floating_point()</code></p>
+</div><p>Softmax activation along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): Axes along which to apply softmax.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with softmax probabilities. Use log=True for log-softmax.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>softmax[track_grad: Bool = True, log: Bool = False](self, axes: IntArray, requires_grad: Optional[Bool] = None) -&gt; Self where dtype.is_floating_point()</code></p>
+</div><p>Softmax activation along given axes.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>axes</b> (<a intarray/IntArray"><code>IntArray</code></a>): Axes along which to apply softmax.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor with softmax probabilities. Use log=True for log-softmax.</p>
+</div><h3><code>binary_cross_entropy</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>binary_cross_entropy[track_grad: Bool = True](pred, target: Self, epsilon: Scalar[dtype] = 1.0000000000000001E-9) -&gt; Self where dtype.is_floating_point()</code></p>
+</div><p>Binary cross entropy loss.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>pred</b> (<code>Self</code>): Predicted probabilities.</li>
+<li>​<b>target</b> (<code>Self</code>): Ground truth labels (0 or 1).</li>
+<li>​<b>epsilon</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Small value for numerical stability.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Scalar tensor with the BCE loss.</p>
+</div><h3><code>binary_cross_entropy_with_logits</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>binary_cross_entropy_with_logits[track_grad: Bool = True](logits, target: Self, epsilon: Scalar[dtype] = 1.0000000000000001E-9) -&gt; Self where dtype.is_floating_point()</code></p>
+</div><p>BCE loss with logits (sigmoid applied internally).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>logits</b> (<code>Self</code>): Raw unnormalized predictions.</li>
+<li>​<b>target</b> (<code>Self</code>): Ground truth labels (0 or 1).</li>
+<li>​<b>epsilon</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Small value for numerical stability.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Scalar tensor with the BCE with logits loss.</p>
+</div><h3><code>sum_over_broadcasted_axes</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>sum_over_broadcasted_axes(batch_tensor, target_shape: Shape) -&gt; Self</code></p>
+</div><p>Sum broadcasted tensor over axes matching target shape.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>batch_tensor</b> (<code>Self</code>): Tensor to sum.</li>
+<li>​<b>target_shape</b> (<a shapes/Shape"><code>Shape</code></a>): Shape to broadcast to before summing.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Tensor summed over broadcasted axes.</p>
+</div><h3><code>matmul</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul[track_grad: Bool = True, mode: Int = 26](A, B: Self) -&gt; Self</code></p>
+</div><p>Matrix multiplication of two tensors.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>A</b> (<code>Self</code>): Left-hand tensor.</li>
+<li>​<b>B</b> (<code>Self</code>): Right-hand tensor.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Result of matrix multiplication.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>matmul(A, B: Gradbox[dtype]) -&gt; Gradbox[dtype]</code></p>
+</div><p>Matrix multiplication with a Gradbox.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>A</b> (<code>Self</code>): Left-hand tensor.</li>
+<li>​<b>B</b> (<a gradbox/Gradbox"><code>Gradbox</code></a>): Right-hand Gradbox.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><a gradbox/Gradbox"><code>Gradbox</code></a>: Result of matrix multiplication as Gradbox.</p>
+</div><h3><code>concat</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static concat[track_grad: Bool = True](tensors: List[Tensor[dtype]], axis: Int = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Concatenate tensors along an axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>tensors</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of tensors to concatenate.</li>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Axis along which to concatenate.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A single concatenated tensor.</p>
+</div><h3><code>stack</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static stack[track_grad: Bool = True](tensors: List[Tensor[dtype]], axis: Int = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Stack tensors along a new axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>tensors</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of tensors to stack.</li>
+<li>​<b>axis</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Axis at which to insert the new dimension.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: A stacked tensor with shape extended by one dimension.</p>
+</div><h3><code>vstack</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static vstack[track_grad: Bool = True](tensors: List[Tensor[dtype]], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Vertical stack (concatenate along axis 0, then flatten 2D).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>tensors</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of 1D tensors to stack vertically.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Stacked tensor.</p>
+</div><h3><code>hstack</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static hstack[track_grad: Bool = True](tensors: List[Tensor[dtype]], requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Horizontal stack (concatenate along last axis).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>tensors</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of 1D tensors to stack horizontally.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Stacked tensor.</p>
+</div><h3><code>pad</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static pad[track_grad: Bool = True](x, pad: List[Tuple[Int, Int]], mode: String = &quot;constant&quot;, value: Scalar[dtype] = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Pad tensor along each axis.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>x</b> (<code>Self</code>): Input tensor to pad.</li>
+<li>​<b>pad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of (before, after) padding pairs per axis.</li>
+<li>​<b>mode</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/string/string/String"><code>String</code></a>): Padding mode (&quot;constant&quot;, etc.).</li>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Fill value for constant mode.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Padded tensor.</p>
+</div><h3><code>pad_constant</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static pad_constant[track_grad: Bool = True](x, pad: List[Tuple[Int, Int]], value: Scalar[dtype] = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Pad tensor with a constant value.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>x</b> (<code>Self</code>): Input tensor to pad.</li>
+<li>​<b>pad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a>): List of (before, after) padding pairs per axis.</li>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Fill value (default: 0.0).</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Padded tensor.</p>
+</div><h3><code>pad2d</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static pad2d[track_grad: Bool = True](x, pad_left: Int, pad_right: Int, pad_top: Int, pad_bottom: Int, mode: String = &quot;constant&quot;, value: Scalar[dtype] = 0, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>2D padding for image tensors (last two axes).</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>x</b> (<code>Self</code>): Input tensor.</li>
+<li>​<b>pad_left</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Padding on the left.</li>
+<li>​<b>pad_right</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Padding on the right.</li>
+<li>​<b>pad_top</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Padding on the top.</li>
+<li>​<b>pad_bottom</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Padding on the bottom.</li>
+<li>​<b>mode</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/string/string/String"><code>String</code></a>): Padding mode.</li>
+<li>​<b>value</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/simd/#scalar"><code>Scalar</code></a>): Fill value for constant mode.</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: 2D-padded tensor.</p>
+</div><h3><code>pad_for_conv</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static pad_for_conv[track_grad: Bool = True](x, pad: Int, requires_grad: Optional[Bool] = None) -&gt; Self</code></p>
+</div><p>Same-padding for 4D tensors (N, C, H, W), common in CNNs.</p>
+<pre><code>Panic if tensor is not 4D.
+</code></pre>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>x</b> (<code>Self</code>): Input 4D tensor.</li>
+<li>​<b>pad</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Padding amount for spatial dimensions (H and W).</li>
+<li>​<b>requires_grad</b> (<a href="https://docs.modular.com/mojo/stdlib/collections/optional/Optional"><code>Optional</code></a>): If provided, overrides requires_grad.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Self</code>: Padded 4D tensor.</p>
+</div></section>
+</body>
+</html>

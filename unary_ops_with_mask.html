@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>unary_ops_with_mask - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>unary_ops_with_mask[op_code: Int, dtype: DType, simd_width: Int = simd_width_of[dtype](), simd_vectors_per_thread: Int = (2 * simd_width)](result: UnsafePointer[Scalar[dtype], MutAnyOrigin], mask: UnsafePointer[Scalar[dtype], MutAnyOrigin], A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin], size: Int)</code></p>
+</div><p>Single-pass kernel: compute activation output AND gradient mask.</p>
+<p>Both result and mask are written in one GPU pass — no second kernel needed.</p>
+<p>For RELU_FORWARD:
+    result[i] = max(A[i], 0)
+    mask[i]   = 1.0 if A[i] &gt; 0 else 0.0</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>result</b> (<a href="https://docs.modular.com/mojo/stdlib/memory/unsafe_pointer/UnsafePointer"><code>UnsafePointer</code></a>): Output buffer for activated values.</li>
+<li>​<b>mask</b> (<a href="https://docs.modular.com/mojo/stdlib/memory/unsafe_pointer/UnsafePointer"><code>UnsafePointer</code></a>): Output buffer for gradient mask.</li>
+<li>​<b>A</b> (<a href="https://docs.modular.com/mojo/stdlib/memory/unsafe_pointer/UnsafePointer"><code>UnsafePointer</code></a>): Input buffer (contiguous, same device).</li>
+<li>​<b>size</b> (<a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a>): Total number of elements.</li>
+</ul>
+</div></section>
+</body>
+</html>

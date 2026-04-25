@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dropout - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct Dropout[dtype: DType]</code></p>
+</div><p>Optimized Dropout layer.</p>
+<ol>
+<li>Direct buffer manipulation (no intermediate tensors)</li>
+<li>SIMD vectorization</li>
+<li>Fused mask generation and scaling</li>
+<li>Fast random number generation</li>
+<li>Zero overhead in eval mode</li>
+</ol>
+<h2>Fields</h2>
+<ul>
+<li>​<b>training</b> (<code>Bool</code>): </li>
+<li>​<b>p</b> (<code>Scalar[dtype]</code>): </li>
+<li>​<b>scale</b> (<code>Scalar[dtype]</code>): </li>
+<li>​<b>seed</b> (<code>Int</code>):</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/RegisterPassable"><code>RegisterPassable</code></a></p>
+<h2><code>comptime</code> members</h2>
+<div class='mojo-alias-header'><h3><code>TAG</code></h3>
+</div><div class='mojo-alias-detail'>
+<div class="mojo-alias-sig"><p><code>comptime TAG = DROPOUT</code></p>
+</div></div><h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(p: Scalar[dtype] = 0.5) -&gt; Self</code></p>
+</div><p>Initialize Dropout layer.</p>
+</div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(*, copy: Self) -&gt; Self</code></p>
+</div></div><h3><code>__call__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__call__(self, x: Tensor[dtype]) -&gt; Tensor[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a tensor/Tensor"><code>Tensor</code></a></p>
+</div><h3><code>parameters</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>parameters(ref self) -&gt; List[UnsafePointer[Tensor[dtype], MutAnyOrigin]]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/collections/list/List"><code>List</code></a></p>
+</div><h3><code>num_parameters</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>num_parameters(self) -&gt; Int</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/int/Int"><code>Int</code></a></p>
+</div><h3><code>train</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>train(mut self)</code></p>
+</div></div><h3><code>eval</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>eval(mut self)</code></p>
+</div></div><h3><code>set_seed</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>set_seed(mut self, seed_val: Int)</code></p>
+</div><p>Set random seed for reproducibility.</p>
+</div><h3><code>into</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>into(self) -&gt; Module[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>Module</code></p>
+</div></section>
+</body>
+</html>

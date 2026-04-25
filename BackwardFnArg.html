@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BackwardFnArg - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct BackwardFnArg[dtype: DType]</code></p>
+</div><h2>Fields</h2>
+<ul>
+<li>​<b>op_code</b> (<code>Int</code>): </li>
+<li>​<b>ptr</b> (<code>UnsafePointer[UInt8, MutAnyOrigin]</code>): </li>
+<li>​<b>destroy</b> (<code>DestroyerFn</code>): </li>
+<li>​<b>copy_fn</b> (<code>CopyFn</code>):</li>
+</ul>
+<h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a></p>
+<h2>Methods</h2>
+<h3><code>__init__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__[T: ArgumentType, //](out self, op_code: Int, var arg: T)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, deinit take: Self)</code></p>
+</div></div><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__init__(out self, *, copy: Self)</code></p>
+</div></div><h3><code>__del__</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>__del__(deinit self)</code></p>
+</div></div><h3><code>get</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>get[T: ArgumentType](ref self) -&gt; ref[self_is_mut.ptr] T</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>ref</code></p>
+</div><h3><code>null_arg</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static null_arg(op_code: Int) -&gt; Self</code></p>
+</div></div><h3><code>boolean_arg</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static boolean_arg(op_code: Int, is_true: Bool) -&gt; Self</code></p>
+</div></div><h3><code>scalar_arg</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static scalar_arg(op_code: Int, value: Scalar[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>integer_arg</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static integer_arg(op_code: Int, value: Int) -&gt; Self</code></p>
+</div></div><h3><code>from_intarray</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static from_intarray(op_code: Int, array: IntArray) -&gt; Self</code></p>
+</div></div><h3><code>from_buffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static from_buffer(op_code: Int, buffer: Buffer[dtype]) -&gt; Self</code></p>
+</div></div><h3><code>from_ndbuffer</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static from_ndbuffer(op_code: Int, ndb: NDBuffer[dtype]) -&gt; Self</code></p>
+</div></div></section>
+</body>
+</html>

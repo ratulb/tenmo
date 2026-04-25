@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>scalar_ops - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>scalar_ops[op_code: Int, dtype: DType, simd_width: Int = simd_width_of[dtype](), simd_vectors_per_thread: Int = (2 * simd_width)](result: UnsafePointer[Scalar[dtype], MutAnyOrigin], A: UnsafePointer[Scalar[dtype], ImmutAnyOrigin], scalar: Scalar[dtype], size: Int)</code></p>
+</div><p>Element-wise scalar operations.</p>
+<ul>
+<li>Each thread processes multiple items (better ILP)</li>
+<li>SIMD vectorization within each item</li>
+<li>Loop unrolling</li>
+<li>Minimal divergence</li>
+</ul>
+</div></section>
+</body>
+</html>

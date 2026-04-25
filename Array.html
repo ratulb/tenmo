@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Array - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct Array</code></p>
+</div><p>Fixed-size array with compile-time maximum rank (dimensions).</p>
+<p>A hybrid between static and dynamic arrays. Storage is statically allocated
+with size <code>max_rank</code> (set at compile time), but the actual <code>size</code> of the
+array can vary at runtime up to <code>max_rank</code>.</p>
+<p>Features:</p>
+<ul>
+<li><strong>Fixed capacity</strong>: Determined by <code>MAX_RANK</code> compile-time constant</li>
+<li><strong>Dynamic size</strong>: Runtime size tracking for active elements</li>
+<li><strong>Fast access</strong>: O(1) indexing with bounds checking in debug builds</li>
+<li><strong>Rich operations</strong>: Element-wise arithmetic, concatenation, dot products</li>
+<li><strong>Iteration support</strong>: Forward and reverse iterators</li>
+<li><strong>Device compatible</strong>: Implements DevicePassable for GPU/accelerator use</li>
+</ul>
+<p>Example:</p>
+<pre><code class="language-mojo">var arr = Array(1, 2, 3)
+print(arr)           # [1, 2, 3]
+arr.append(4)        # [1, 2, 3, 4]
+print(arr[1])        # 2
+arr[0] = 10
+print(arr.sum())     # 19
+
+
+
+
+
+
+## Fields
+
+* ​&lt;b&gt;storage&lt;/b&gt; (``StaticTuple[Int, max_rank]``): 
+* ​&lt;b&gt;size&lt;/b&gt; (``Int``): 
+
+## Implemented traits
+
+[`AnyType`](/mojo/std/builtin/anytype/AnyType), 
+[`Copyable`](/mojo/std/builtin/value/Copyable), 
+[`Defaultable`](/mojo/std/builtin/value/Defaultable), 
+[`DevicePassable`](/mojo/std/builtin/device_passable/DevicePassable), 
+[`Equatable`](/mojo/std/builtin/comparable/Equatable), 
+[`ImplicitlyCopyable`](/mojo/std/builtin/value/ImplicitlyCopyable), 
+[`ImplicitlyDestructible`](/mojo/std/builtin/anytype/ImplicitlyDestructible), 
+[`Iterable`](/mojo/std/iter/Iterable), 
+[`Movable`](/mojo/std/builtin/value/Movable), 
+[`RegisterPassable`](/mojo/std/builtin/value/RegisterPassable), 
+[`Sized`](/mojo/std/builtin/len/Sized), 
+[`Writable`](/mojo/std/format/Writable)
+
+
+## `comptime` members
+
+
+&lt;div class=&#39;mojo-alias-header&#39;&gt;
+
+###  `device_type`
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-alias-detail&#39;&gt;
+&lt;div class=&quot;mojo-alias-sig&quot;&gt;
+
+`` comptime device_type = Array ``
+
+&lt;/div&gt;
+
+
+&lt;/div&gt;
+
+
+&lt;div class=&#39;mojo-alias-header&#39;&gt;
+
+###  `IteratorType`
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-alias-detail&#39;&gt;
+&lt;div class=&quot;mojo-alias-sig&quot;&gt;
+
+`` comptime IteratorType[iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]] = ArrayIterator[iterable_origin] ``
+
+&lt;/div&gt;
+
+
+
+#### Parameters
+
+*   ​&lt;b&gt;iterable_mut&lt;/b&gt; ([``Bool``](/mojo/std/builtin/bool/Bool)): 
+*   ​&lt;b&gt;iterable_origin&lt;/b&gt; ([``Origin``](/mojo/std/builtin/type_aliases/Origin)): 
+&lt;/div&gt;
+
+
+## Methods
+
+### `__init__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __init__() -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __init__(*values: Int) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __init__(values: VariadicList[Int, values.is_owned]) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __init__(values: List[Int]) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __init__(intarray: IntArray) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __init__(*, copy: Self) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `__getitem__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __getitem__(self, idx: Int) -&gt; Int ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Int``](/mojo/std/builtin/int/Int)
+
+&lt;/div&gt;
+
+
+
+### `__setitem__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __setitem__(mut self, idx: Int, value: Int) ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `__eq__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __eq__(self, other: Self) -&gt; Bool ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Bool``](/mojo/std/builtin/bool/Bool)
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __eq__(self, other: List[Int]) -&gt; Bool ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Bool``](/mojo/std/builtin/bool/Bool)
+
+&lt;/div&gt;
+
+
+
+### `__ne__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __ne__(self, other: Self) -&gt; Bool ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Bool``](/mojo/std/builtin/bool/Bool)
+
+&lt;/div&gt;
+
+
+
+### `__contains__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __contains__(self, value: Int) -&gt; Bool ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Bool``](/mojo/std/builtin/bool/Bool)
+
+&lt;/div&gt;
+
+
+
+### `__add__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __add__(self, value: Int) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+Return new Array with value appended.
+
+
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __add__(self, other: Self) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+Return new Array concatenating self + other.
+
+
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __add__(self, other: List[Int]) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `__radd__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __radd__(self, value: Int) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __radd__(self, other: List[Int]) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `__iadd__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __iadd__(mut self, other: Self) ``
+
+
+&lt;/div&gt;
+
+Element-wise += with other Array.
+
+
+
+
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __iadd__(mut self, other: List[Int]) ``
+
+
+&lt;/div&gt;
+
+Element-wise += with List[Int].
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `get_type_name`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` static get_type_name() -&gt; String ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+``String``
+
+&lt;/div&gt;
+
+
+
+### `get_device_type_name`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` static get_device_type_name() -&gt; String ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+``String``
+
+&lt;/div&gt;
+
+
+
+### `filled`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` static filled(size: Int, value: Int) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+Create array of given size filled with value.
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `with_capacity`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` static with_capacity(capacity: Int) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+No-op for Array — always has max_rank capacity. Returns empty Array.
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `__len__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __len__(self) -&gt; Int ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Int``](/mojo/std/builtin/int/Int)
+
+&lt;/div&gt;
+
+
+
+### `capacity`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` capacity(self) -&gt; Int ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Int``](/mojo/std/builtin/int/Int)
+
+&lt;/div&gt;
+
+
+
+### `is_empty`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` is_empty(self) -&gt; Bool ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Bool``](/mojo/std/builtin/bool/Bool)
+
+&lt;/div&gt;
+
+
+
+### `append`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` append(mut self, value: Int) ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `prepend`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` prepend(mut self, value: Int) ``
+
+
+&lt;/div&gt;
+
+Prepend element — shifts existing elements right.
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `pop`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` pop(mut self, index: Int = -1) -&gt; Int ``
+
+
+&lt;/div&gt;
+
+Remove and return element at index.
+
+
+
+
+**Returns:**
+
+[``Int``](/mojo/std/builtin/int/Int)
+
+&lt;/div&gt;
+
+
+
+### `clear`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` clear(mut self) ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `fill`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` fill(mut self, value: Int) ``
+
+
+&lt;/div&gt;
+
+Fill all existing elements with value (does not change size).
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `fma`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` fma(self, other: Self, offset: Int = 0) -&gt; Int ``
+
+
+&lt;/div&gt;
+
+Dot product of self and other, plus offset. Typical use: strides.fma(indices, base_offset) -&gt; flat index.
+
+
+
+
+**Returns:**
+
+[``Int``](/mojo/std/builtin/int/Int)
+
+&lt;/div&gt;
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` fma(self, other: IntArray, offset: Int = 0) -&gt; Int ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Int``](/mojo/std/builtin/int/Int)
+
+&lt;/div&gt;
+
+
+
+### `tolist`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` tolist(self) -&gt; List[Int] ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``List``](/mojo/std/collections/list/List)
+
+&lt;/div&gt;
+
+
+
+### `copy`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` copy(self) -&gt; Self ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `product`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` product(self) -&gt; Int ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Int``](/mojo/std/builtin/int/Int)
+
+&lt;/div&gt;
+
+
+
+### `sum`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` sum(self) -&gt; Int ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+[``Int``](/mojo/std/builtin/int/Int)
+
+&lt;/div&gt;
+
+
+
+### `reverse`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` reverse(mut self) ``
+
+
+&lt;/div&gt;
+
+Reverse in place.
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `__iter__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __iter__(ref self) -&gt; ArrayIterator[origin_of(self)] ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+``ArrayIterator``
+
+&lt;/div&gt;
+
+
+
+### `__reversed__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __reversed__(ref self) -&gt; ArrayIterator[origin_of(self), False] ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+``ArrayIterator``
+
+&lt;/div&gt;
+
+
+
+### `write_to`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` write_to[W: Writer](self, mut writer: W) ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+&lt;/div&gt;
+
+
+
+### `__str__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __str__(self) -&gt; String ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+``String``
+
+&lt;/div&gt;
+
+
+
+### `__repr__`
+
+&lt;div class=&#39;mojo-function-detail&#39;&gt;
+
+
+&lt;div class=&quot;mojo-function-sig&quot;&gt;
+
+`` __repr__(self) -&gt; String ``
+
+
+&lt;/div&gt;
+
+
+
+
+
+
+**Returns:**
+
+``String``
+
+&lt;/div&gt;
+
+
+
+
+
+&lt;/section&gt;
+</code></pre>
+
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>UnaryOpsKernel - Tenmo</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+    h1, h2, h3 { color: #333; }
+    a { color: #ff5500; }
+    .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="index.html">Home</a>
+    <a href="Tensor.html">Tensor</a>
+    <a href="Shape.html">Shapes</a>
+  </div>
+  <section class='mojo-docs'><div class="mojo-function-sig"><p><code>struct UnaryOpsKernel[dtype: DType]</code></p>
+</div><h2>Implemented traits</h2>
+<p><a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/AnyType"><code>AnyType</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Copyable"><code>Copyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/ImplicitlyCopyable"><code>ImplicitlyCopyable</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/anytype/ImplicitlyDestructible"><code>ImplicitlyDestructible</code></a>, 
+<a href="https://docs.modular.com/mojo/stdlib/builtin/value/Movable"><code>Movable</code></a></p>
+<h2><code>comptime</code> members</h2>
+<div class='mojo-alias-header'><h3><code>datatype</code></h3>
+</div><div class='mojo-alias-detail'>
+<div class="mojo-alias-sig"><p><code>comptime datatype = DType.uint8 if (dtype == DType.bool) else dtype</code></p>
+</div></div><h2>Methods</h2>
+<h3><code>launch</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static launch[op_code: Int, epsilon: Scalar[dtype] = Epsilon.value()](A: NDBuffer[dtype]) -&gt; NDBuffer[dtype]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><a ndbuffer/NDBuffer"><code>NDBuffer</code></a></p>
+</div><h3><code>launch_with_mask</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static launch_with_mask[op_code: Int](A: NDBuffer[dtype]) -&gt; Tuple[NDBuffer[dtype], NDBuffer[dtype]]</code></p>
+</div><p>Launch unary op + mask kernel. Returns (output, mask) as GPU NDBuffers.</p>
+<p>Both buffers are written in a single GPU kernel pass.</p>
+<p>Non-contiguous input is handled via contiguous_device_state() —
+which performs ONE map_to_host copy (not one per element), then
+the kernel operates on the resulting flat buffer.</p>
+<p><strong>Args:</strong></p>
+<ul>
+<li>​<b>A</b> (<a ndbuffer/NDBuffer"><code>NDBuffer</code></a>): Input NDBuffer. Must be on GPU.</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p><code>Tuple</code>: Tuple of (output NDBuffer, mask NDBuffer), both contiguous on GPU.</p>
+</div><h3><code>launch_config</code></h3>
+<div class='mojo-function-detail'><div class="mojo-function-sig"><p><code>static launch_config(numels: Int, simdwidth: Int) -&gt; Tuple[Int, Int]</code></p>
+</div><p><strong>Returns:</strong></p>
+<p><code>Tuple</code></p>
+</div></section>
+</body>
+</html>
