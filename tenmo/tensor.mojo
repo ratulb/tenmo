@@ -34,6 +34,23 @@ from .device import Device, CPU, GPU
 from std.sys.info import has_accelerator
 
 
+"""A multi-dimensional array with automatic differentiation support.
+
+Tensor is the central type for all tensor operations in tenmo. It wraps an
+NDBuffer for memory layout and tracks gradients through the autograd graph.
+
+A Tensor can live on CPU or GPU, supports broadcasting, views, and gradient
+computation via backpropagation.
+
+Example:
+    ```mojo
+    var a = Tensor[DType.float32].zeros(3, 4)
+    var b = Tensor[DType.float32].randn(3, 4)
+    var c = a + b
+    c.backward()
+    ```
+"""
+
 struct Tensor[dtype: DType](
     Copyable
     & Movable
