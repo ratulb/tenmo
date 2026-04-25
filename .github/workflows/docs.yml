@@ -36,12 +36,6 @@ jobs:
           source $HOME/.bashrc
           pixi run -e default -- python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/docs/
 
-      - name: Generate mojo doc JSON
-        run: mojo doc ./tenmo -o tenmo.json
-
-      - name: Generate Markdown
-        run: python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/docs/
-
       - name: Install Node
         uses: actions/setup-node@v4
         with:
