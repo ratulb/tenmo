@@ -43,10 +43,13 @@ jobs:
 
       - name: Install dependencies
         run: |
+          cd docs
           npm install --prefer-offline
 
       - name: Build Docusaurus
-        run: npm run build
+        run: |
+          cd docs
+          npm run build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
