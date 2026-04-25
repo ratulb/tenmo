@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const rootDir = fs.realpathSync(__dirname);
-const docsDir = path.join(rootDir, 'md');
+const docsDir = path.join(rootDir, 'docs');
 const outDir = path.join(rootDir, 'generated');
 
 console.log('rootDir:', rootDir);
