@@ -5,6 +5,9 @@ const path = require('path');
 const docsDir = path.join(__dirname, 'md');
 const outDir = path.join(__dirname, 'md', 'generated');
 
+console.log('docsDir:', docsDir);
+console.log('outDir:', outDir);
+
 // Convert /mojo/std/... to docs.modular.com/mojo/stdlib/...
 function fixExternalLinks(html) {
   return html
