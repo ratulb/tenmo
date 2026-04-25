@@ -2363,7 +2363,6 @@ struct Tensor[dtype: DType](
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
         return DivideByScalar[Self.dtype].forward[track_grad](self, scalar)
 
-    # Element wise division of two tensors
     fn __truediv__[
         track_grad: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
