@@ -26,7 +26,7 @@ jobs:
 
       - name: Generate mojo doc JSON
         run: |
-          source $HOME/.bashrc
+          source /root/.bashrc
           pixi shell
           mojo doc ./tenmo -o tenmo.json
 
