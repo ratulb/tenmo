@@ -54,6 +54,8 @@ jobs:
         run: |
           npm install marked
           node docs/generate.js
+          ls -la docs/generated/
+          find docs/generated -name "*.html" | wc -l
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
