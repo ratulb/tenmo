@@ -24,16 +24,11 @@ jobs:
       - name: Install Pixi
         run: curl -fsSL https://pixi.sh/install.sh | sh
 
-      - name: Show directory
-        run: ls -la
-
       - name: Generate mojo doc JSON
         run: |
           export PATH="$HOME/.pixi/bin:$PATH"
           source $HOME/.bashrc
-          ls pixi.lock
           pixi run -e default -- mojo doc ./tenmo -o tenmo.json
-          ls tenmo.json
 
       - name: Generate Markdown
         run: |
@@ -46,17 +41,16 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install marked
-        run: npm install marked
-
-      - name: Generate HTML
-        run: node docs/generate.js
+      - name: Install marked and generate HTML
+        run: |
+          npm install marked
+          node docs/generate.js
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: docs
-          path: docs/build/
+          path: docs/md/generated/
           retention-days: 1
 
   deploy:

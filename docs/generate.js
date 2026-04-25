@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const docsDir = path.join(__dirname, 'md');
-const outDir = path.join(__dirname, 'md', 'build');
+const outDir = path.join(__dirname, 'md', 'generated');
 
 // Convert /mojo/std/... to docs.modular.com/mojo/stdlib/...
 function fixExternalLinks(html) {
