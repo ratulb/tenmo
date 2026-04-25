@@ -154,7 +154,7 @@ struct Tensor[dtype: DType](
         """Convert tensor to a Gradbox for gradient operations.
 
         Args:
-            share: If True, shares the underlying buffer. If False, copies.
+            share: If True, shared gradbox. If False, gradbox is not shared.
             contiguous: If True, materializes a contiguous copy first.
 
         Returns:
@@ -195,10 +195,10 @@ struct Tensor[dtype: DType](
         self.ancestors = copy.ancestors.copy()
 
     fn shallow_copy(self) -> Tensor[Self.dtype]:
-        """Create a shallow copy sharing the underlying buffer.
+        """Create a shallow copy with the underlying buffer.
 
         Returns:
-            A new tensor with its own shape/stride metadata but shared buffer.
+            A new tensor with its which just copies the buffer.
         """
         var out = Tensor[Self.dtype]()
         out._id = IDGen.generate_id()
@@ -793,8 +793,8 @@ struct Tensor[dtype: DType](
         """
         if not self.requires_grad or not self.has_grad():
             panic(
-                "Tensor → gradients(self): called on a tensor that does not require"
-                " grad or grad not initialized"
+                "Tensor → gradients(self): called on a tensor that does not"
+                " require grad or grad not initialized"
             )
         return self.gradbox
 
@@ -1146,7 +1146,10 @@ struct Tensor[dtype: DType](
         """
         var shape = like.shape()
         return Tensor[Self.dtype].full(
-            shape^, value, requires_grad=requires_grad, device=device.or_else(like.device())
+            shape^,
+            value,
+            requires_grad=requires_grad,
+            device=device.or_else(like.device()),
         )
 
     @staticmethod
@@ -1566,9 +1569,7 @@ struct Tensor[dtype: DType](
 
         comptime if has_accelerator():
             if self.is_on_gpu():
-                target_device = device.or_else(
-                    self.device()
-                )
+                target_device = device.or_else(self.device())
             else:
                 target_device = device.or_else(CPU().into())
         else:
@@ -1959,6 +1960,16 @@ struct Tensor[dtype: DType](
         end_dim: Optional[Int] = None,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Flatten the tensor by collapsing a range of dimensions.
+
+        Args:
+            start_dim: First dimension to flatten (default: 0).
+            end_dim: Last dimension to flatten (default: last).
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with flattened dimensions.
+        """
         return FlattenForward[Self.dtype].forward[track_grad](
             self, start_dim, end_dim, requires_grad
         )
@@ -1968,6 +1979,15 @@ struct Tensor[dtype: DType](
     ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Repeat tensor along each axis.
+
+        Args:
+            repeat: Number of repeats per dimension.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with repeated data.
+        """
         return Repeat[Self.dtype].forward[track_grad](
             self, IntArray(repeat), requires_grad
         )
@@ -1977,6 +1997,15 @@ struct Tensor[dtype: DType](
     ](self, *repeat: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Repeat tensor along each axis.
+
+        Args:
+            *repeat: Number of repeats per dimension as variadic ints.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with repeated data.
+        """
         return Repeat[Self.dtype].forward[track_grad](
             self, IntArray(repeat), requires_grad
         )
@@ -1986,6 +2015,15 @@ struct Tensor[dtype: DType](
     ](self, repeat: List[Int], requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Tile the tensor by repeating it along each axis.
+
+        Args:
+            repeat: Number of tiles per dimension.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tiled tensor.
+        """
         return Tile[Self.dtype].forward[track_grad](
             self, IntArray(repeat), requires_grad
         )
@@ -1995,6 +2033,15 @@ struct Tensor[dtype: DType](
     ](self, *repeat: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Tile the tensor by repeating it along each axis.
+
+        Args:
+            *repeat: Number of tiles per dimension as variadic ints.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tiled tensor.
+        """
         return Tile[Self.dtype].forward[track_grad](
             self, IntArray(repeat), requires_grad
         )
@@ -2002,11 +2049,30 @@ struct Tensor[dtype: DType](
     fn contiguous[
         track_grad: Bool = True
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
+        """Return a contiguous copy of the tensor.
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A contiguous tensor with the same data.
+        """
         return Contiguous[Self.dtype].forward[track_grad](self, requires_grad)
 
     fn reshape[
         track_grad: Bool = True
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
+        """Reshape a single-element tensor to a scalar.
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A scalar tensor.
+
+        Raises:
+            Panic if tensor has more than one element.
+        """
         if self.numels() != 1:
             panic(
                 "Tensor → reshape: only tensor with single element can be"
@@ -2021,6 +2087,15 @@ struct Tensor[dtype: DType](
     ](self, *newdims: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Reshape tensor to new dimensions.
+
+        Args:
+            *newdims: New shape as variadic ints.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with the new shape.
+        """
         if len(newdims) == 1 and newdims[0] == 0:
             return self.reshape[track_grad](requires_grad=requires_grad)
         shape = Validator.validate_and_construct_new_shape(
@@ -2039,6 +2114,15 @@ struct Tensor[dtype: DType](
     ) -> Tensor[
         Self.dtype
     ]:
+        """Reshape tensor to new dimensions.
+
+        Args:
+            shape: New shape as a list of ints.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with the new shape.
+        """
         new_shape = Validator.validate_and_construct_new_shape(
             self.shape(), IntArray(shape)
         )
@@ -2054,6 +2138,16 @@ struct Tensor[dtype: DType](
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[Self.dtype]:
+        """Reshape tensor to new dimensions.
+
+        Args:
+            new_shape: Target shape.
+            requires_grad: If provided, overrides requires_grad.
+            validated: If True, skips shape validation.
+
+        Returns:
+            A tensor with the new shape.
+        """
         return Reshape[Self.dtype].forward[track_grad](
             self, new_shape, requires_grad, validated
         )
@@ -2065,6 +2159,16 @@ struct Tensor[dtype: DType](
         other: Tensor[Self.dtype],
         upstream_grad: Gradbox[Self.dtype],
     ) -> Gradbox[Self.dtype]:
+        """Handle gradient broadcasting and augmentation during backprop.
+
+        Args:
+            augment: If True, multiplies upstream_grad by other before accumulating.
+            other: The other tensor involved in the operation.
+            upstream_grad: Incoming gradient to be processed.
+
+        Returns:
+            Processed Gradbox compatible with self's shape for accumulation.
+        """
         var grad_contrib: Gradbox[Self.dtype]
         if upstream_grad.shape() == Shape():
             grad_contrib = Gradbox[Self.dtype].full(
@@ -2097,6 +2201,16 @@ struct Tensor[dtype: DType](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Sum tensor elements along given axes.
+
+        Args:
+            axes: Axes along which to sum.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with summed values along the specified axes.
+        """
         return self.sum[track_grad](IntArray(axes), keepdims, requires_grad)
 
     fn sum[
@@ -2107,6 +2221,16 @@ struct Tensor[dtype: DType](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Sum tensor elements along given axes.
+
+        Args:
+            axes: Axes along which to sum.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with summed values along the specified axes.
+        """
         return Summer[Self.dtype].forward[track_grad](
             self, axes, keepdims, requires_grad
         )
@@ -2118,6 +2242,15 @@ struct Tensor[dtype: DType](
         epsilon: Scalar[Self.dtype] = Epsilon[Self.dtype].value(),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Element-wise square root.
+
+        Args:
+            epsilon: Small value added for numerical stability.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with square root of each element.
+        """
         return Sqrt[Self.dtype].forward[track_grad](
             self, epsilon, requires_grad
         )
@@ -2130,6 +2263,16 @@ struct Tensor[dtype: DType](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Compute mean along given axes.
+
+        Args:
+            axes: Axes along which to compute mean.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with mean values along the specified axes.
+        """
         return self.mean[track_grad](IntArray(axes), keepdims, requires_grad)
 
     fn mean[
@@ -2140,6 +2283,16 @@ struct Tensor[dtype: DType](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Compute mean along given axes.
+
+        Args:
+            axes: Axes along which to compute mean.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with mean values along the specified axes.
+        """
         return Mean[Self.dtype].forward[track_grad](
             self, axes, keepdims, requires_grad
         )
@@ -2153,6 +2306,17 @@ struct Tensor[dtype: DType](
         unbiased: Bool = True,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Compute variance along an axis.
+
+        Args:
+            axis: Axis along which to compute variance.
+            keepdims: If True, keep reduced axis with size 1.
+            unbiased: If True, use n-1 (sample variance). If False, use n (population).
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with variance along the specified axis.
+        """
         return Variance[Self.dtype].forward[track_grad](
             self, axis, keepdims, unbiased, requires_grad
         )
@@ -2167,6 +2331,18 @@ struct Tensor[dtype: DType](
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-12),
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Compute standard deviation along an axis.
+
+        Args:
+            axis: Axis along which to compute std.
+            keepdims: If True, keep reduced axis with size 1.
+            unbiased: If True, use n-1. If False, use n.
+            epsilon: Small value for numerical stability.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with std deviation along the specified axis.
+        """
         return StdDev[Self.dtype].forward[track_grad](
             self, axis, keepdims, unbiased, epsilon, requires_grad
         )
@@ -2177,9 +2353,20 @@ struct Tensor[dtype: DType](
         axis: Optional[Int] = None,
         keepdims: Bool = False,
     ) -> Tensor[Self.dtype]:
-        """Compute Lp norm. Supports L2 (p=2) only."""
+        """Compute Lp norm of the tensor.
+
+        Args:
+            p: Power for the norm computation (only p=2.0 supported).
+            axis: Axis along which to compute. If None, computes global norm.
+            keepdims: If True, keep reduced axes with size 1.
+
+        Returns:
+            Tensor with the Lp norm value.
+
+        Raises:
+            Panic if p != 2.0 (only L2 norm supported).
+        """
         if p == 2.0:
-            # L2 norm: sqrt(sum(x²))
             var squared = self.__mul__[track_grad=False](self)
             var dim = [axis.value()] if axis else List[Int]()
             var sum_sq = squared.sum[track_grad=False](dim, keepdims=keepdims)
@@ -2222,6 +2409,14 @@ struct Tensor[dtype: DType](
             self.zero_grad()
 
     fn __iadd__(self, other: Self):
+        """In-place addition of another tensor.
+
+        Args:
+            other: Tensor to add.
+
+        Raises:
+            Panic if called on a leaf tensor that requires gradients.
+        """
         if self.is_leaf():
             panic(
                 "Tensor → __iadd__(self, other): can not perform in-place"
@@ -2230,6 +2425,14 @@ struct Tensor[dtype: DType](
         self.buffer.__iadd__(other.buffer)
 
     fn __isub__(self, other: Self):
+        """In-place subtraction of another tensor.
+
+        Args:
+            other: Tensor to subtract.
+
+        Raises:
+            Panic if called on a leaf tensor that requires gradients.
+        """
         if self.is_leaf():
             panic(
                 "Tensor → __isub__(self, other): can not perform in-place"
@@ -2239,9 +2442,22 @@ struct Tensor[dtype: DType](
         self.buffer.__isub__(other.buffer)
 
     fn __isub__(self, other: Gradbox[Self.dtype]):
+        """In-place subtraction of a Gradbox.
+
+        Args:
+            other: Gradbox to subtract.
+        """
         self.buffer.__isub__(other.buffer)
 
     fn __imul__(self, other: Self):
+        """In-place multiplication by another tensor.
+
+        Args:
+            other: Tensor to multiply by.
+
+        Raises:
+            Panic if called on a leaf tensor that requires gradients.
+        """
         if self.is_leaf():
             panic(
                 "Tensor → __imul__(self, other): can not perform in-place"
@@ -2251,6 +2467,14 @@ struct Tensor[dtype: DType](
         self.buffer.__imul__(other.buffer)
 
     fn __itruediv__(self, other: Self):
+        """In-place division by another tensor.
+
+        Args:
+            other: Tensor to divide by.
+
+        Raises:
+            Panic if called on a leaf tensor that requires gradients.
+        """
         if self.is_leaf():
             panic(
                 "Tensor → __itruediv__(self, other): can not perform in-place"
@@ -2279,13 +2503,22 @@ struct Tensor[dtype: DType](
         return self.buffer.count(key)
 
     fn sum_all(self) -> Scalar[Self.dtype]:
+        """Sum all elements into a single scalar.
+
+        Returns:
+            Sum of all elements in the tensor.
+        """
         comptime assert (
             Self.dtype.is_numeric()
         ), "Tensor → sum_all is for numeric data types only"
-
         return self.buffer.sum_all()
 
     fn product_all(self) -> Scalar[Self.dtype]:
+        """Compute the product of all elements.
+
+        Returns:
+            Product of all elements in the tensor.
+        """
         comptime assert (
             Self.dtype.is_numeric()
         ), "Tensor → product_all is for numeric data types only"
@@ -2301,41 +2534,84 @@ struct Tensor[dtype: DType](
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ] where Self.dtype.is_floating_point():
-        comptime assert (
-            Self.dtype.is_floating_point()
-        ), "Tensor → exp is for floating point data types only"
+        """Element-wise exponential (e^x).
 
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with exponential of each element.
+        """
         return Exponential[Self.dtype].forward[track_grad=track_grad](
             self, requires_grad=requires_grad
         )
 
     fn __neg__[track_grad: Bool = True](self) -> Tensor[Self.dtype]:
+        """Negate all elements.
+
+        Args:
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with negated values.
+        """
         comptime assert (
             Self.dtype.is_numeric()
         ), "Tensor → __neg__ is for numeric data types only"
-        # Create a zero tensor with same shape and properties
-        var zeros = Tensor[Self.dtype].zeros_like(self, requires_grad=False)
 
-        # Use subtraction: 0 - self
+        var zeros = Tensor[Self.dtype].zeros_like(self, requires_grad=False)
         return Subtractor[Self.dtype].forward[track_grad=track_grad](
             zeros, self
         )
 
-    fn __invert__(self: Tensor[Self.dtype]) -> Tensor[Self.dtype] where Self.dtype == DType.bool or Self.dtype.is_integral():
-        return Tensor[Self.dtype](self.buffer.unary_ops[INVERT](), requires_grad=False)
+    fn __invert__(
+        self: Tensor[Self.dtype],
+    ) -> Tensor[Self.dtype] where (
+        Self.dtype == DType.bool or Self.dtype.is_integral()
+    ):
+        """Bitwise invert (logical NOT for bool, bitwise NOT for integers).
+
+        Returns:
+            Tensor with inverted values.
+        """
+        return Tensor[Self.dtype](
+            self.buffer.unary_ops[INVERT](), requires_grad=False
+        )
 
     fn __abs__(self) -> Tensor[Self.dtype]:
-        #return Tensor[Self.dtype](self.buffer.unary_ops[ABS](), requires_grad=False)
+        """Element-wise absolute value.
+
+        Returns:
+            Tensor with absolute values.
+        """
         return Tensor[Self.dtype](self.buffer.__abs__(), requires_grad=False)
 
     fn __radd__[
         track_grad: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        """Right-side addition (scalar + tensor).
+
+        Args:
+            scalar: Scalar value on the left.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with scalar added to all elements.
+        """
         return self.__add__[track_grad](scalar)
 
     fn __add__[
         track_grad: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        """Add a scalar to all elements.
+
+        Args:
+            scalar: Scalar value to add.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with scalar added to all elements.
+        """
         return AddScalar[Self.dtype].forward[track_grad](self, scalar)
 
     fn max[
@@ -2343,6 +2619,15 @@ struct Tensor[dtype: DType](
     ](
         self, scalar: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
+        """Element-wise maximum with a scalar.
+
+        Args:
+            scalar: Scalar to compare against.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with max(self, scalar) for each element.
+        """
         return MaxScalar[Self.dtype].forward[track_grad](
             self, scalar, requires_grad
         )
@@ -2352,6 +2637,15 @@ struct Tensor[dtype: DType](
     ](
         self, scalar: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
+        """Element-wise minimum with a scalar.
+
+        Args:
+            scalar: Scalar to compare against.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with min(self, scalar) for each element.
+        """
         return MinScalar[Self.dtype].forward[track_grad](
             self, scalar, requires_grad
         )
@@ -2359,40 +2653,111 @@ struct Tensor[dtype: DType](
     fn __add__[
         track_grad: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
+        """Element-wise addition of two tensors.
+
+        Args:
+            other: Tensor to add.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with element-wise sum.
+        """
         return Adder[Self.dtype].forward[track_grad](self, other)
 
     fn __rsub__[
         track_grad: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        """Right-side subtraction (scalar - tensor).
+
+        Args:
+            scalar: Scalar value on the left.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with scalar minus each element.
+        """
         return SubtractFromScalar[Self.dtype].forward[track_grad](self, scalar)
 
     fn __sub__[
         track_grad: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        """Subtract a scalar from all elements.
+
+        Args:
+            scalar: Scalar value to subtract.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with scalar subtracted from each element.
+        """
         return SubtractScalar[Self.dtype].forward[track_grad](self, scalar)
 
     fn __sub__[
         track_grad: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
+        """Element-wise subtraction of two tensors.
+
+        Args:
+            other: Tensor to subtract.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with element-wise difference.
+        """
         return Subtractor[Self.dtype].forward[track_grad](self, other)
 
     fn __rmul__[
         track_grad: Bool = True
     ](self, scalar: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        """Right-side multiplication (scalar * tensor).
+
+        Args:
+            scalar: Scalar value on the left.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with each element multiplied by scalar.
+        """
         return self.__mul__[track_grad](scalar)
 
     fn __mul__[
         track_grad: Bool = True
     ](self, factor: Scalar[Self.dtype]) -> Tensor[Self.dtype]:
+        """Multiply all elements by a scalar.
+
+        Args:
+            factor: Scalar value to multiply by.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with each element multiplied by factor.
+        """
         return MultiplyScalar[Self.dtype].forward[track_grad](self, factor)
 
     # Element wise multiplication of two tensors
     fn __mul__[
         track_grad: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
+        """Element-wise multiplication of two tensors.
+
+        Args:
+            other: Tensor to multiply by.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Tensor with element-wise product.
+        """
         return Multiplicator[Self.dtype].forward[track_grad](self, other)
 
     fn __mul__(self, other: Gradbox[Self.dtype]) -> Gradbox[Self.dtype]:
+        """Element-wise multiplication with a Gradbox.
+
+        Args:
+            other: Gradbox to multiply by.
+
+        Returns:
+            Gradbox with element-wise product.
+        """
         return Multiplicator[Self.dtype].forward(self, other)
 
     fn __pow__[
@@ -2400,6 +2765,15 @@ struct Tensor[dtype: DType](
     ](
         self, exponent: Scalar[Self.dtype], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
+        """Element-wise power: self^exponent.
+
+        Args:
+            exponent: Scalar exponent value.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with each element raised to the exponent power.
+        """
         comptime assert (
             Self.dtype.is_numeric()
         ), "Tensor → __pow__ is for numeric data types only"
@@ -2409,9 +2783,26 @@ struct Tensor[dtype: DType](
         )
 
     fn dot[track_grad: Bool = True](self, other: Self) -> Tensor[Self.dtype]:
+        """Compute the dot product (matrix multiplication) with another tensor.
+
+        Args:
+            other: Tensor to multiply with.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Result of matrix multiplication.
+        """
         return Dot[Self.dtype].forward[track_grad](self, other)
 
     fn __iadd__(self, scalar: Scalar[Self.dtype]):
+        """In-place addition of a scalar.
+
+        Args:
+            scalar: Scalar value to add.
+
+        Raises:
+            Panic if called on a leaf tensor that requires gradients.
+        """
         if self.is_leaf():
             panic(
                 "Tensor → __iadd__: can not perform in-place operation on a"
@@ -2420,6 +2811,14 @@ struct Tensor[dtype: DType](
         self.buffer.__iadd__(scalar)
 
     fn __isub__(self, scalar: Scalar[Self.dtype]):
+        """In-place subtraction of a scalar.
+
+        Args:
+            scalar: Scalar value to subtract.
+
+        Raises:
+            Panic if called on a leaf tensor that requires gradients.
+        """
         if self.is_leaf():
             panic(
                 "Tensor → __isub__: can not perform in-place operation on a"
@@ -2428,6 +2827,14 @@ struct Tensor[dtype: DType](
         self.buffer.__isub__(scalar)
 
     fn __imul__(self, scalar: Scalar[Self.dtype]):
+        """In-place multiplication by a scalar.
+
+        Args:
+            scalar: Scalar value to multiply by.
+
+        Raises:
+            Panic if called on a leaf tensor that requires gradients.
+        """
         if self.is_leaf():
             panic(
                 "Tensor → __imul__: can not perform in-place operation on a"
@@ -2436,6 +2843,14 @@ struct Tensor[dtype: DType](
         self.buffer.__imul__(scalar)
 
     fn __itruediv__(self, scalar: Scalar[Self.dtype]):
+        """In-place division by a scalar.
+
+        Args:
+            scalar: Scalar value to divide by.
+
+        Raises:
+            Panic if called on a leaf tensor that requires gradients.
+        """
         if self.is_leaf():
             panic(
                 "Tensor → __itruediv__: can not perform in-place operation on a"
@@ -2479,6 +2894,15 @@ struct Tensor[dtype: DType](
     fn mse[
         track_grad: Bool = True
     ](self, target: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        """Mean squared error loss.
+
+        Args:
+            target: Target tensor to compare against.
+            track_grad: Whether to track gradients.
+
+        Returns:
+            Scalar tensor with the MSE loss value.
+        """
         var diff = Subtractor[Self.dtype].forward[track_grad](self, target)
         var squared = Multiplicator[Self.dtype].forward[track_grad](diff, diff)
         return squared.mean[track_grad]()
@@ -2488,6 +2912,12 @@ struct Tensor[dtype: DType](
     ](
         mut output: Tensor[Self.dtype], start_grad: Scalar[Self.dtype] = 1.0
     ) where Self.dtype.is_floating_point():
+        """Run backward pass to compute gradients.
+
+        Args:
+            start_grad: Initial gradient value (default: 1.0).
+            graph_size: Maximum graph size for traversal.
+        """
         if not output.requires_grad:
             return
         var shape = output.shape()
@@ -2504,22 +2934,21 @@ struct Tensor[dtype: DType](
         if requires_grad and not self.has_grad():
             self.init_gradbox()
 
-    # ========================================
-    # backward — parallel to existing backward
-    # Only called for tensors built with add_ancestry.
-    # Drop this into Tensor as a new method alongside existing backward.
-    # ========================================
-
     fn backward[
         graph_size: Int = 50,
     ](
         mut output: Tensor[Self.dtype],
         seed_tensor: Tensor[Self.dtype],
     ) where Self.dtype.is_floating_point():
+        """Run backward pass with a specific seed tensor.
+
+        Args:
+            seed_tensor: Tensor containing initial gradients.
+            graph_size: Maximum graph size for traversal.
+        """
         if not output.requires_grad:
             return
 
-        # seed_grad on the live Tensor before crossing into Ancestor world
         output.seed_grad(seed_tensor)
 
         try:
@@ -2530,13 +2959,11 @@ struct Tensor[dtype: DType](
             var fanin = Dict[UInt, Int]()
             var id_to_index = Dict[UInt, Int]()
 
-            # Root — the ONE crossing point from Tensor to Ancestor
             var root = Ancestor[Self.dtype].from_tensor(output)
             dfs_stack.append(root._id)
             node_list.append(root)
             id_to_index[root._id] = 0
 
-            # DFS — pure Ancestor from here
             while len(dfs_stack) > 0:
                 var node_id = dfs_stack.pop()
 
@@ -2560,7 +2987,6 @@ struct Tensor[dtype: DType](
                             id_to_index[parent_id] = new_idx
                             dfs_stack.append(parent_id)
 
-            # Execute backward
             var ready_queue = Deque[UInt](capacity=graph_size)
             ready_queue.append(root._id)
 
@@ -2576,15 +3002,14 @@ struct Tensor[dtype: DType](
 
                 if node.has_ancestry():
                     for result in Backward[Self.dtype].invoke(node):
-                        ref target_ref = result[0]  # Ancestor
-                        ref grad = result[1]  # Gradbox
+                        ref target_ref = result[0]
+                        ref grad = result[1]
                         var op_code = result[2]
                         var target_id = target_ref._id
 
                         if target_id in id_to_index:
                             var target_idx = id_to_index[target_id]
                             ref target = node_list[target_idx]
-                            # Direct grad accumulation via gradbox pointer
                             if target.requires_grad and target.gradbox:
                                 if op_code == AddTensor:
                                     target.gradbox[] += grad
@@ -2634,6 +3059,18 @@ struct Tensor[dtype: DType](
         requires_grad: Optional[Bool] = None,
         validated: Bool = False,
     ) -> Tensor[Self.dtype]:
+        """Create a view with explicit shape, strides, and offset.
+
+        Args:
+            shape: Target shape.
+            strides: Memory strides for the view.
+            offset: Base memory offset.
+            requires_grad: If provided, overrides requires_grad.
+            validated: If True, skips validation.
+
+        Returns:
+            A view tensor over the same buffer.
+        """
         return View[Self.dtype].forward[track_grad](
             self, shape, strides, offset, requires_grad, validated
         )
@@ -2647,6 +3084,17 @@ struct Tensor[dtype: DType](
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a view with explicit shape and strides as lists.
+
+        Args:
+            shape: Target shape as a list.
+            strides: Memory strides as a list.
+            offset: Base memory offset.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A view tensor over the same buffer.
+        """
         view_shape, view_strides = Shape(shape), Strides(strides)
         return View[Self.dtype].forward[track_grad](
             self, view_shape, view_strides, offset, requires_grad, False
@@ -2660,6 +3108,16 @@ struct Tensor[dtype: DType](
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a contiguous view with the given shape.
+
+        Args:
+            *shape_dims: Target shape as variadic ints.
+            offset: Base memory offset.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A contiguous view tensor.
+        """
         shape = Shape(shape_dims)
         strides = Strides.default(shape)
         return View[Self.dtype].forward[track_grad](
@@ -2674,6 +3132,16 @@ struct Tensor[dtype: DType](
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a contiguous view with the given shape.
+
+        Args:
+            shape: Target shape as a list of ints.
+            offset: Base memory offset.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A contiguous view tensor.
+        """
         view_shape = Shape(shape)
         strides = Strides.default(view_shape)
         return View[Self.dtype].forward[track_grad](
@@ -2688,6 +3156,16 @@ struct Tensor[dtype: DType](
         offset: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a contiguous view with the given shape.
+
+        Args:
+            shape: Target shape.
+            offset: Base memory offset.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A contiguous view tensor.
+        """
         return View[Self.dtype].forward[track_grad](
             self, shape, Strides.default(shape), offset, requires_grad, False
         )
@@ -2695,6 +3173,14 @@ struct Tensor[dtype: DType](
     fn into_view[
         track_grad: Bool = True
     ](mut self, requires_grad: Optional[Bool] = None) -> Tensor[Self.dtype]:
+        """Convert this tensor into a shared view.
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A view tensor sharing the underlying buffer.
+        """
         if self.shared():
             log_warning("Tensor → into_view: already shared")
             return self.copy()
@@ -2709,6 +3195,15 @@ struct Tensor[dtype: DType](
     ](mut self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Transpose tensor by reversing or permuting axes.
+
+        Args:
+            *axes: Axes to permute. If empty, reverses all axes.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A transposed view tensor.
+        """
         return self.transpose[track_grad](IntArray(axes), requires_grad)
 
     fn transpose[
@@ -2716,6 +3211,15 @@ struct Tensor[dtype: DType](
     ](
         mut self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
+        """Transpose tensor by reversing or permuting axes.
+
+        Args:
+            axes: Axes to permute as a list.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A transposed view tensor.
+        """
         return self.transpose[track_grad](IntArray(axes), requires_grad)
 
     fn transpose[
@@ -2723,6 +3227,15 @@ struct Tensor[dtype: DType](
     ](mut self, axes: IntArray, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Transpose tensor by reversing or permuting axes.
+
+        Args:
+            axes: Axes to permute as an IntArray.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A transposed view tensor.
+        """
         return Transpose.forward[track_grad](self, axes, requires_grad)
 
     fn slice[
@@ -2730,14 +3243,23 @@ struct Tensor[dtype: DType](
     ](mut self, start: Int, end: Int, step: Int = 1, axis: Int = 0) -> Tensor[
         Self.dtype
     ]:
-        # Call Validator to compute everything
+        """Slice tensor along a single axis with start, end, and step.
+
+        Args:
+            start: Start index.
+            end: End index.
+            step: Step size (default: 1).
+            axis: Axis to slice along (default: 0).
+
+        Returns:
+            A view tensor over the sliced region.
+        """
         var shape, strides, offset = (
             Validator.validate_and_compute_slice_metadata(
                 self.shape(), self.strides(), axis, start, end, step
             )
         )
 
-        # Return view
         return View[Self.dtype].forward[track_grad](
             self,
             shape,
@@ -2756,12 +3278,21 @@ struct Tensor[dtype: DType](
         ends: List[Int],
         steps: List[Int] = [],
     ) -> Tensor[Self.dtype]:
-        # Default step = 1 if not provided
+        """Slice tensor along multiple axes.
+
+        Args:
+            axes: Axes to slice along.
+            starts: Start indices per axis.
+            ends: End indices per axis.
+            steps: Step sizes per axis (default: 1 for all).
+
+        Returns:
+            A view tensor over the sliced region.
+        """
         step_sizes = IntArray(steps) if steps else IntArray.filled(len(axes), 1)
         if len(step_sizes) != len(axes):
             panic("Tensor → slice: length of steps must match axes length")
 
-        # Call Validator
         var shape, strides, offset = (
             Validator.validate_and_compute_slice_metadata_multi(
                 self.shape(),
@@ -2773,7 +3304,6 @@ struct Tensor[dtype: DType](
             )
         )
 
-        # Return view
         return View[Self.dtype].forward[track_grad](
             self,
             shape,
@@ -2790,6 +3320,15 @@ struct Tensor[dtype: DType](
         target: Shape,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Broadcast tensor to a target shape.
+
+        Args:
+            target: Shape to broadcast to.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor broadcasted to the target shape.
+        """
         return Expand[Self.dtype].forward[track_grad](
             self, target, requires_grad
         )
@@ -2801,11 +3340,19 @@ struct Tensor[dtype: DType](
         *target_dims: Int,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Broadcast tensor to a target shape.
+
+        Args:
+            *target_dims: Target shape as variadic ints.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor broadcasted to the target shape.
+        """
         return Expand[Self.dtype].forward[track_grad](
             self, Shape(target_dims), requires_grad
         )
 
-    # Squeeze specified axes or all dims of size 1 if no axes provided
     fn squeeze[
         track_grad: Bool = True
     ](
@@ -2813,6 +3360,15 @@ struct Tensor[dtype: DType](
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Remove axes of size 1.
+
+        Args:
+            axes: Axes to squeeze. If empty, removes all size-1 axes.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with size-1 axes removed.
+        """
         return Squeeze[Self.dtype].forward[track_grad](
             self, IntArray(axes), requires_grad
         )
@@ -2826,6 +3382,15 @@ struct Tensor[dtype: DType](
     ) -> Tensor[
         Self.dtype
     ]:
+        """Remove axes of size 1.
+
+        Args:
+            *axes: Axes to squeeze as variadic ints.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with size-1 axes removed.
+        """
         return Squeeze[Self.dtype].forward[track_grad](
             self, IntArray(axes), requires_grad
         )
@@ -2835,6 +3400,15 @@ struct Tensor[dtype: DType](
     ](mut self, *axes: Int, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Insert axes of size 1.
+
+        Args:
+            *axes: Axes at which to insert size-1 dimensions.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with size-1 axes inserted.
+        """
         return Unsqueeze[Self.dtype].forward[track_grad](
             self, IntArray(axes), requires_grad
         )
@@ -2844,6 +3418,15 @@ struct Tensor[dtype: DType](
     ](
         mut self, axes: List[Int] = [], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
+        """Insert axes of size 1.
+
+        Args:
+            axes: Axes at which to insert size-1 dimensions.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with size-1 axes inserted.
+        """
         return Unsqueeze[Self.dtype].forward[track_grad](
             self, IntArray(axes), requires_grad
         )
@@ -2853,6 +3436,15 @@ struct Tensor[dtype: DType](
     ](mut self, axes: IntArray, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Insert axes of size 1.
+
+        Args:
+            axes: Axes at which to insert size-1 dimensions.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with size-1 axes inserted.
+        """
         return Unsqueeze[Self.dtype].forward[track_grad](
             self, axes, requires_grad
         )
@@ -2862,6 +3454,15 @@ struct Tensor[dtype: DType](
     ](
         mut self, axes: List[Int], requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
+        """Permute axes according to a given ordering.
+
+        Args:
+            axes: Permutation order (e.g. [2, 0, 1] for 3D).
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with axes permuted.
+        """
         return Permute[Self.dtype].forward[track_grad](
             self, IntArray(axes), requires_grad
         )
@@ -2871,6 +3472,15 @@ struct Tensor[dtype: DType](
     ](mut self, axes: IntArray, requires_grad: Optional[Bool] = None) -> Tensor[
         Self.dtype
     ]:
+        """Permute axes according to a given ordering.
+
+        Args:
+            axes: Permutation order as IntArray.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with axes permuted.
+        """
         return Permute[Self.dtype].forward[track_grad](
             self, axes, requires_grad
         )
@@ -2878,6 +3488,15 @@ struct Tensor[dtype: DType](
     fn argmax(
         self, axis: Int = 0, keepdims: Bool = False
     ) -> Tensor[DType.int32]:
+        """Index of the maximum value along an axis.
+
+        Args:
+            axis: Axis along which to find the argmax.
+            keepdims: If True, keep reduced axis with size 1.
+
+        Returns:
+            Tensor of indices indicating the position of the max value.
+        """
         return Argmax[Self.dtype].argmax(
             tensor=self, axis=axis, keepdims=keepdims
         )
@@ -2885,6 +3504,15 @@ struct Tensor[dtype: DType](
     fn argmin(
         self, axis: Int = 0, keepdims: Bool = False
     ) -> Tensor[DType.int32]:
+        """Index of the minimum value along an axis.
+
+        Args:
+            axis: Axis along which to find the argmin.
+            keepdims: If True, keep reduced axis with size 1.
+
+        Returns:
+            Tensor of indices indicating the position of the min value.
+        """
         return Argmin[Self.dtype].argmin(
             tensor=self, axis=axis, keepdims=keepdims
         )
@@ -2895,6 +3523,16 @@ struct Tensor[dtype: DType](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Maximum value along given axes.
+
+        Args:
+            axes: Axes along which to find max.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with max values along the specified axes.
+        """
         return MinMax[Self.dtype].forward[True](
             self, IntArray(axes), keepdims, requires_grad
         )
@@ -2905,6 +3543,16 @@ struct Tensor[dtype: DType](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Maximum value along given axes.
+
+        Args:
+            axes: Axes along which to find max.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with max values along the specified axes.
+        """
         return MinMax[Self.dtype].forward[True](
             self, axes, keepdims, requires_grad
         )
@@ -2915,6 +3563,16 @@ struct Tensor[dtype: DType](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Minimum value along given axes.
+
+        Args:
+            axes: Axes along which to find min.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with min values along the specified axes.
+        """
         return MinMax[Self.dtype].forward[False](
             self, IntArray(axes), keepdims, requires_grad
         )
@@ -2925,6 +3583,16 @@ struct Tensor[dtype: DType](
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Minimum value along given axes.
+
+        Args:
+            axes: Axes along which to find min.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with min values along the specified axes.
+        """
         return MinMax[Self.dtype].forward[False](
             self, axes, keepdims, requires_grad
         )
@@ -2937,6 +3605,16 @@ struct Tensor[dtype: DType](
         axis: Int = 0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Shuffle tensor elements along an axis according to a permutation.
+
+        Args:
+            perm: Permutation indices for the given axis.
+            axis: Axis along which to shuffle.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A shuffled tensor.
+        """
         return Shuffle[Self.dtype].forward[track_grad](
             self, perm, axis, requires_grad
         )
@@ -2944,6 +3622,14 @@ struct Tensor[dtype: DType](
     fn relu[
         track_grad: Bool = True
     ](self, requires_grad: Optional[Bool] = None,) -> Tensor[Self.dtype]:
+        """Rectified Linear Unit: max(0, x).
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with ReLU applied element-wise.
+        """
         return ReLU[Self.dtype].forward[track_grad](self, requires_grad)
 
     fn clip[
@@ -2954,6 +3640,16 @@ struct Tensor[dtype: DType](
         max_val: Scalar[Self.dtype],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Clip tensor values to a range [min_val, max_val].
+
+        Args:
+            min_val: Minimum value.
+            max_val: Maximum value.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with values clipped to [min_val, max_val].
+        """
         return Clip[Self.dtype].forward[track_grad](
             self, min_val, max_val, requires_grad
         )
@@ -2966,6 +3662,14 @@ struct Tensor[dtype: DType](
     ) -> Tensor[
         Self.dtype
     ] where Self.dtype.is_floating_point():
+        """Hyperbolic tangent activation.
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with tanh applied element-wise.
+        """
         return Tanh[Self.dtype].forward[track_grad](self, requires_grad)
 
     fn sigmoid[
@@ -2976,15 +3680,32 @@ struct Tensor[dtype: DType](
     ) -> Tensor[
         Self.dtype
     ] where Self.dtype.is_floating_point():
+        """Sigmoid activation: 1 / (1 + exp(-x)).
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with sigmoid applied element-wise.
+        """
         return Sigmoid[Self.dtype].forward[track_grad](self, requires_grad)
 
     fn softmax[
-        track_grad: Bool = True, log: Bool = False  # Whether to use LogSoftmax
+        track_grad: Bool = True, log: Bool = False
     ](
         self,
         axes: List[Int] = [],
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        """Softmax activation along given axes.
+
+        Args:
+            axes: Axes along which to apply softmax.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with softmax probabilities. Use log=True for log-softmax.
+        """
         comptime if log:
             return LogSoftmax[Self.dtype].forward[track_grad](
                 self, IntArray(axes), requires_grad
@@ -3003,6 +3724,15 @@ struct Tensor[dtype: DType](
     ) -> Tensor[
         Self.dtype
     ] where Self.dtype.is_floating_point():
+        """Softmax activation along given axes.
+
+        Args:
+            axes: Axes along which to apply softmax.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with softmax probabilities. Use log=True for log-softmax.
+        """
         comptime if log:
             return LogSoftmax[Self.dtype].forward[track_grad](
                 self, axes, requires_grad
@@ -3019,6 +3749,16 @@ struct Tensor[dtype: DType](
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        """Binary cross entropy loss.
+
+        Args:
+            pred: Predicted probabilities.
+            target: Ground truth labels (0 or 1).
+            epsilon: Small value for numerical stability.
+
+        Returns:
+            Scalar tensor with the BCE loss.
+        """
         return BCELoss[Self.dtype].forward[track_grad](pred, target, epsilon)
 
     fn binary_cross_entropy_with_logits[
@@ -3028,6 +3768,16 @@ struct Tensor[dtype: DType](
         target: Tensor[Self.dtype],
         epsilon: Scalar[Self.dtype] = Scalar[Self.dtype](1e-9),
     ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        """BCE loss with logits (sigmoid applied internally).
+
+        Args:
+            logits: Raw unnormalized predictions.
+            target: Ground truth labels (0 or 1).
+            epsilon: Small value for numerical stability.
+
+        Returns:
+            Scalar tensor with the BCE with logits loss.
+        """
         return BCEWithLogitsLoss[Self.dtype].forward[track_grad](
             logits, target, epsilon
         )
@@ -3035,6 +3785,15 @@ struct Tensor[dtype: DType](
     fn sum_over_broadcasted_axes(
         batch_tensor: Tensor[Self.dtype], target_shape: Shape
     ) -> Tensor[Self.dtype]:
+        """Sum broadcasted tensor over axes matching target shape.
+
+        Args:
+            batch_tensor: Tensor to sum.
+            target_shape: Shape to broadcast to before summing.
+
+        Returns:
+            Tensor summed over broadcasted axes.
+        """
         var nd_buffer = batch_tensor.buffer.sum_over_broadcasted_axes(
             target_shape
         )
@@ -3043,6 +3802,17 @@ struct Tensor[dtype: DType](
     fn matmul[
         track_grad: Bool = True, mode: Int = mnemonics.mm
     ](A: Tensor[Self.dtype], B: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
+        """Matrix multiplication of two tensors.
+
+        Args:
+            A: Left-hand tensor.
+            B: Right-hand tensor.
+            track_grad: Whether to track gradients.
+            mode: Matrix multiplication mode (default: mm).
+
+        Returns:
+            Result of matrix multiplication.
+        """
         return Matmul[Self.dtype].forward[track_grad=track_grad, mode=mode](
             A, B
         )
@@ -3050,7 +3820,96 @@ struct Tensor[dtype: DType](
     fn matmul(
         A: Tensor[Self.dtype], B: Gradbox[Self.dtype]
     ) -> Gradbox[Self.dtype]:
+        """Matrix multiplication with a Gradbox.
+
+        Args:
+            A: Left-hand tensor.
+            B: Right-hand Gradbox.
+
+        Returns:
+            Result of matrix multiplication as Gradbox.
+        """
         return Matmul[Self.dtype].forward(A, B)
+
+    @staticmethod
+    fn concat[
+        track_grad: Bool = True
+    ](
+        tensors: List[Tensor[Self.dtype]],
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """Concatenate tensors along an axis.
+
+        Args:
+            tensors: List of tensors to concatenate.
+            axis: Axis along which to concatenate.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A single concatenated tensor.
+        """
+        return Concate[Self.dtype].forward[track_grad](
+            tensors, axis, requires_grad
+        )
+
+    @staticmethod
+    fn stack[
+        track_grad: Bool = True
+    ](
+        tensors: List[Tensor[Self.dtype]],
+        axis: Int = 0,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """Stack tensors along a new axis.
+
+        Args:
+            tensors: List of tensors to stack.
+            axis: Axis at which to insert the new dimension.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A stacked tensor with shape extended by one dimension.
+        """
+        return Stack[Self.dtype].forward[track_grad](
+            tensors, axis, requires_grad
+        )
+
+    @staticmethod
+    fn vstack[
+        track_grad: Bool = True
+    ](
+        tensors: List[Tensor[Self.dtype]],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """Vertical stack (concatenate along axis 0, then flatten 2D).
+
+        Args:
+            tensors: List of 1D tensors to stack vertically.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Stacked tensor.
+        """
+        return Stack[Self.dtype].vstack[track_grad](tensors, requires_grad)
+
+    @staticmethod
+    fn hstack[
+        track_grad: Bool = True
+    ](
+        tensors: List[Tensor[Self.dtype]],
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """Horizontal stack (concatenate along last axis).
+
+        Args:
+            tensors: List of 1D tensors to stack horizontally.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Stacked tensor.
+        """
+        return Stack[Self.dtype].hstack[track_grad](tensors, requires_grad)
 
     @staticmethod
     fn pad[
@@ -3062,6 +3921,18 @@ struct Tensor[dtype: DType](
         value: Scalar[Self.dtype] = 0.0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Pad tensor along each axis.
+
+        Args:
+            x: Input tensor to pad.
+            pad: List of (before, after) padding pairs per axis.
+            mode: Padding mode ("constant", etc.).
+            value: Fill value for constant mode.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Padded tensor.
+        """
         return Pad[Self.dtype].forward[track_grad](
             x, pad, mode, value, requires_grad
         )
@@ -3075,6 +3946,17 @@ struct Tensor[dtype: DType](
         value: Scalar[Self.dtype] = 0.0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
+        """Pad tensor with a constant value.
+
+        Args:
+            x: Input tensor to pad.
+            pad: List of (before, after) padding pairs per axis.
+            value: Fill value (default: 0.0).
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Padded tensor.
+        """
         return Pad[Self.dtype].forward[track_grad](
             x, pad, "constant", value, requires_grad
         )
@@ -3092,7 +3974,21 @@ struct Tensor[dtype: DType](
         value: Scalar[Self.dtype] = 0.0,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        # Convenience for 2D padding
+        """2D padding for image tensors (last two axes).
+
+        Args:
+            x: Input tensor.
+            pad_left: Padding on the left.
+            pad_right: Padding on the right.
+            pad_top: Padding on the top.
+            pad_bottom: Padding on the bottom.
+            mode: Padding mode.
+            value: Fill value for constant mode.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            2D-padded tensor.
+        """
         var pad = List[Tuple[Int, Int]]()
         pad.append((pad_top, pad_bottom))
         pad.append((pad_left, pad_right))
@@ -3105,19 +4001,35 @@ struct Tensor[dtype: DType](
         track_grad: Bool = True
     ](
         x: Tensor[Self.dtype],
-        pad: Int,  # Same padding on all spatial sides
+        pad: Int,
         requires_grad: Optional[Bool] = None,
     ) -> Tensor[Self.dtype]:
-        # For 4D tensors (N, C, H, W) - common in CNNs
+        """Same-padding for 4D tensors (N, C, H, W), common in CNNs.
+
+        Args:
+            x: Input 4D tensor.
+            pad: Padding amount for spatial dimensions (H and W).
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Padded 4D tensor.
+
+        Raises:
+            Panic if tensor is not 4D.
+        """
         var x_shape = x.shape()
         if x_shape.rank() != 4:
             panic("pad_for_conv: expected 4D tensor")
 
         var pad_spec = List[Tuple[Int, Int]]()
-        pad_spec.append((0, 0))  # No padding on batch
-        pad_spec.append((0, 0))  # No padding on channels
-        pad_spec.append((pad, pad))  # Pad height
-        pad_spec.append((pad, pad))  # Pad width
+        # No padding on batch
+        pad_spec.append((0, 0))
+        # No padding on channels
+        pad_spec.append((0, 0))
+        # Pad height
+        pad_spec.append((pad, pad))
+        # Pad width
+        pad_spec.append((pad, pad))
 
         return Pad[Self.dtype].forward[track_grad](
             x, pad_spec, "constant", 0.0, requires_grad
@@ -3128,6 +4040,11 @@ struct Tensor[dtype: DType](
 struct ElemIterator[dtype: DType, origin: ImmutOrigin](
     RegisterPassable & ImplicitlyCopyable & Iterable & Iterator & Sized
 ):
+    """Iterator over (coordinate, value) pairs in a tensor.
+
+    Yields tuples of IntArray coordinates and their corresponding scalar values.
+    """
+
     comptime Element = Tuple[IntArray, Scalar[Self.dtype]]
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
@@ -3137,6 +4054,11 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
     var index_itr: ShapeIndexIterator[ImmutAnyOrigin]
 
     fn __init__(out self, src: Pointer[Tensor[Self.dtype], Self.origin]):
+        """Initialize iterator over a tensor.
+
+        Args:
+            src: Pointer to the tensor to iterate over.
+        """
         self.src = src
         self.index_itr = rebind[ShapeIndexIterator[ImmutAnyOrigin]](
             src[].shape().__iter__()
@@ -3146,14 +4068,37 @@ struct ElemIterator[dtype: DType, origin: ImmutOrigin](
         return self
 
     fn __next__(mut self) raises StopIteration -> Self.Element:
+        """Return next (coordinate, value) pair.
+
+        Returns:
+            Tuple of (IntArray coordinates, scalar value at that position).
+
+        Raises:
+            StopIteration: When all elements have been visited.
+        """
         next = self.index_itr.__next__()
         return next, self.src[][next]
 
     fn __len__(self) -> Int:
+        """Number of elements remaining.
+
+        Returns:
+            Number of elements yet to be visited.
+        """
         return self.index_itr.__len__()
 
     fn __has_next__(self) -> Bool:
+        """Check if there are more elements to visit.
+
+        Returns:
+            True if more elements remain, False otherwise.
+        """
         return self.index_itr.__has_next__()
 
     fn bounds(self) -> Tuple[Int, Optional[Int]]:
+        """Get the bounds of the iterator.
+
+        Returns:
+            Tuple of (remaining length, Optional of the same length).
+        """
         return self.index_itr.bounds()

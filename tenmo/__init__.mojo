@@ -1,6 +1,5 @@
 """
 ## Core Types
-
 - `Tensor` — the central type. Tracks gradients, owns data, participates in
   the autograd graph. Supports CPU and GPU.
 - `NDBuffer` — shape, strides, offset, and data. Single source of truth for
