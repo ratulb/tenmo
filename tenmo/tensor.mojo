@@ -2711,7 +2711,6 @@ struct Tensor[dtype: DType](
         """
         return MultiplyScalar[Self.dtype].forward[track_grad](self, factor)
 
-    # Element wise multiplication of two tensors
     fn __mul__[
         track_grad: Bool = True
     ](self, other: Self) -> Tensor[Self.dtype]:
