@@ -35,7 +35,7 @@ jobs:
           timeout_minutes: 5
           max_attempts: 3
           retry_wait_seconds: 30
-          command: pixi run -e dev docs-build
+          command: pixi run -e docs docs-build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
