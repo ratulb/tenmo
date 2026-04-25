@@ -52,7 +52,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.5-h2d0b736_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/nodejs-24.14.1-h3d65ac4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openssl-3.6.2-h35e630c_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.1-pyhc364b38_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.2-pyhc364b38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-1.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.9.6-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/python-3.14.4-habeac84_100_cp314.conda
@@ -126,7 +126,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.5-h2d0b736_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/nodejs-24.14.1-h3d65ac4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openssl-3.6.2-h35e630c_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.1-pyhc364b38_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.2-pyhc364b38_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-1.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.9.6-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/python-3.14.4-habeac84_100_cp314.conda
@@ -677,18 +677,17 @@ packages:
   purls: []
   size: 3167099
   timestamp: 1775587756857
-- conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.1-pyhc364b38_0.conda
-  sha256: 171d977bc977fd80f2a05de3d4b7d571c4ec3cdea436ed364e5cd50547c50881
-  md5: b8ae38639d323d808da535fb71e31be8
+- conda: https://conda.anaconda.org/conda-forge/noarch/packaging-26.2-pyhc364b38_0.conda
+  sha256: 3906abfb6511a3bb309e39b9b1b7bc38f50a723971de2395489fd1f379255890
+  md5: 4c06a92e74452cfa53623a81592e8934
   depends:
   - python >=3.8
   - python
   license: Apache-2.0
-  license_family: APACHE
   purls:
   - pkg:pypi/packaging?source=compressed-mapping
-  size: 89360
-  timestamp: 1776209387231
+  size: 91574
+  timestamp: 1777103621679
 - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-1.1.0-pyhd8ed1ab_0.conda
   sha256: 3207efeaad254d368362b0044c33b11b17e1b8136b67550c79ef5ab55045b5b1
   md5: 7908df552fbe396607e02bf8bdf62ee9
