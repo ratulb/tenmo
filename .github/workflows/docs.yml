@@ -21,6 +21,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tenmo/docs/package-lock.json
+
       - name: Install Pixi
         run: curl -fsSL https://pixi.sh/install.sh | sh
 
@@ -34,17 +41,22 @@ jobs:
         run: |
           export PATH="$HOME/.pixi/bin:$PATH"
           source $HOME/.bashrc
-          python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/md/
+          python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o tenmo/docs/docs/
 
-      - name: Install Node and generate HTML
+      - name: Install dependencies
         run: |
-          npm install marked
-          node docs/generate.js
+          cd tenmo/docs
+          npm install
+
+      - name: Build Docusaurus
+        run: |
+          cd tenmo/docs
+          npm run build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/generated
+          publish_dir: ./tenmo/docs/build/tenmo
           force_orphan: true
           allow_empty_commit: true
