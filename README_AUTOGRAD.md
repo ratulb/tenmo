@@ -5,7 +5,11 @@ This document explains **how forward and backward pass work** in Tenmo's autogra
 > ⚠️ **WIP** — Created to document the architecture clearly for users and contributors.
 
 ---
+## 🏗️ Architecture
 
+![Tenmo Architecture](docs/architecture.svg)
+
+---
 ## Why This Matters
 
 You could use PyTorch. It works. So why does Tenmo reimplement autograd from scratch in Mojo?

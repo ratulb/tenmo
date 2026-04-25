@@ -120,7 +120,21 @@ struct Tensor[dtype: DType](
         offset: Int = 0,
         requires_grad: Bool = False,
     ) raises -> Tensor[Self.dtype]:
-        """Materialize a Tensor/View from DeviceBuffer."""
+        """Create a tensor from a GPU device buffer.
+
+        Args:
+            buffer: GPU device buffer containing the data.
+            shape: Tensor shape. If None, inferred from buffer length.
+            strides: Memory strides. If None, inferred from shape.
+            offset: Base memory offset (default: 0).
+            requires_grad: Whether this tensor requires gradient tracking.
+
+        Returns:
+            A new tensor wrapping the device buffer.
+
+        Raises:
+            Any error from mapping device buffer to host.
+        """
         var out: Tensor[Self.dtype]
         with buffer.map_to_host() as host_buffer:
             var shape_realized = shape.or_else(Shape(len(host_buffer)))
@@ -137,12 +151,26 @@ struct Tensor[dtype: DType](
     fn as_gradbox(
         deinit self, share: Bool = False, *, contiguous: Bool = True
     ) -> Gradbox[Self.dtype]:
+        """Convert tensor to a Gradbox for gradient operations.
+
+        Args:
+            share: If True, shares the underlying buffer. If False, copies.
+            contiguous: If True, materializes a contiguous copy first.
+
+        Returns:
+            A Gradbox containing the tensor's data.
+        """
         if contiguous:
             return Gradbox[Self.dtype](self^.buffer.contiguous(), share=share)
         else:
             return Gradbox[Self.dtype](self^.buffer^, share=share)
 
     fn as_list(self) -> List[Scalar[Self.dtype]]:
+        """Copy tensor data into a Mojo List.
+
+        Returns:
+            List containing all tensor elements in row-major order.
+        """
         var count = self.numels()
         var tensor_data = List[Scalar[Self.dtype]](capacity=count)
         memcpy(dest=tensor_data.unsafe_ptr(), src=self.data_ptr(), count=count)
@@ -167,6 +195,11 @@ struct Tensor[dtype: DType](
         self.ancestors = copy.ancestors.copy()
 
     fn shallow_copy(self) -> Tensor[Self.dtype]:
+        """Create a shallow copy sharing the underlying buffer.
+
+        Returns:
+            A new tensor with its own shape/stride metadata but shared buffer.
+        """
         var out = Tensor[Self.dtype]()
         out._id = IDGen.generate_id()
         out.buffer = self.buffer.copy()
@@ -174,9 +207,18 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn id(self) -> UInt:
+        """Get the unique identifier for this tensor.
+
+        Returns:
+            Unique UInt ID assigned at tensor creation.
+        """
         return self._id
 
     fn init_gradbox(mut self):
+        """Initialize gradient storage if requires_grad is True.
+
+        Allocates GPU memory for gradients if the tensor is on GPU.
+        """
         if (
             self.requires_grad
             and self.gradbox
@@ -214,10 +256,20 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn is_contiguous(self) -> Bool:
+        """Check if tensor memory layout is contiguous.
+
+        Returns:
+            True if the tensor is stored contiguously in row-major order.
+        """
         return self.buffer.is_contiguous()
 
     @always_inline
     fn shared(self) -> Bool:
+        """Check if the underlying buffer is shared by multiple views.
+
+        Returns:
+            True if the buffer is reference-counted and shared.
+        """
         return self.buffer.shared()
 
     fn is_leaf(self) -> Bool:
@@ -320,7 +372,18 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn __getitem__(self, indices: List[Int]) -> Scalar[Self.dtype]:
-        if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
+        """Index tensor with a List of integers.
+
+        Args:
+            indices: List of axis indices.
+
+        Returns:
+            Scalar value at the specified coordinates.
+
+        Raises:
+            Panic if tensor is scalar but indices are provided.
+        """
+        if self.rank() == 0 and len(indices) != 0:
             panic(
                 "Tensor → __getitem__(List[Int]): Scalar tensor expects no"
                 " indices"
@@ -329,7 +392,18 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn __getitem__(ref self, indices: IntArray) -> Scalar[Self.dtype]:
-        if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
+        """Index tensor with an IntArray of indices.
+
+        Args:
+            indices: IntArray of axis indices.
+
+        Returns:
+            Scalar value at the specified coordinates.
+
+        Raises:
+            Panic if tensor is scalar but indices are provided.
+        """
+        if self.rank() == 0 and len(indices) != 0:
             panic(
                 "Tensor → __getitem__(IntArray): Scalar tensor expects no"
                 " indices"
@@ -338,7 +412,18 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn __getitem__(self, *indices: Int) -> Scalar[Self.dtype]:
-        if self.rank() == 0:  # Tensor with Shape ()
+        """Index tensor with variadic integer indices.
+
+        Args:
+            *indices: One index per axis.
+
+        Returns:
+            Scalar value at the specified coordinates.
+
+        Raises:
+            Panic if tensor is scalar or if index count is unsupported.
+        """
+        if self.rank() == 0:
             panic(
                 "Tensor → __getitem__(*indices: Int): api not supported for"
                 " scalar tensor. Use __getitem__(List[Int])"
@@ -349,7 +434,20 @@ struct Tensor[dtype: DType](
     fn __getitem__[
         track_grad: Bool = True
     ](mut self, *slices: Slice) -> Tensor[Self.dtype]:
-        # Delegate shape/strides/offset computation
+        """Slice tensor using Slice objects along each axis.
+
+        Args:
+            *slices: One Slice per axis, specifying start, stop, step.
+
+        Returns:
+            A view tensor with computed shape, strides, and offset.
+
+        Example:
+            ```mojo
+            var t = Tensor[DType.float32].zeros(10, 10)
+            var view = t[1:5, 2:8]
+            ```
+        """
         var (
             shape,
             strides,
@@ -371,11 +469,17 @@ struct Tensor[dtype: DType](
     fn chunk(
         self, *indices: Idx, requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
-        """
-        Get allocated independent chunks. Gradients would not flow back to the original chunk source.
-        """
+        """Extract independent chunks along the first axis by indices.
 
-        # Delegate shape/strides/offset computation
+        Allocates a new buffer — gradients do not flow back to the source.
+
+        Args:
+            *indices: Indices along the first axis to extract.
+            requires_grad: Whether the result tracks gradients.
+
+        Returns:
+            A new tensor containing the selected chunks.
+        """
         shape, strides, offset = (
             Validator.validate_and_compute_advanced_indexing_metadata(
                 self.shape(),
@@ -410,7 +514,15 @@ struct Tensor[dtype: DType](
     fn __getitem__[
         track_grad: Bool = True
     ](mut self, *indices: Idx) -> Tensor[Self.dtype]:
-        # Compute view metadata
+        """Advanced indexing with Idx objects (integers or slices).
+
+        Args:
+            *indices: Idx per axis — either an integer or a Slice.
+                Missing axes default to full slices.
+
+        Returns:
+            A view tensor over the indexed region.
+        """
         var (
             view_shape,
             view_strides,
@@ -419,7 +531,6 @@ struct Tensor[dtype: DType](
             self.shape(), self.strides(), indices
         )
 
-        # Handle scalar (rank-0) case
         is_scalar = len(view_shape) == 0
         shape = Shape() if is_scalar else view_shape
         strides = Strides() if is_scalar else view_strides
@@ -435,7 +546,16 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn __setitem__(self, *indices: Int, value: Scalar[Self.dtype]):
-        if self.rank() == 0:  # Tensor with Shape()
+        """Set a scalar value at given coordinates.
+
+        Args:
+            *indices: One index per axis.
+            value: Scalar value to write.
+
+        Raises:
+            Panic if tensor is scalar.
+        """
+        if self.rank() == 0:
             panic(
                 "Tensor → __setitem__(*indices: Int): api not supported for"
                 " scalar tensor. Use __setitem__(List[Int])"
@@ -444,7 +564,16 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn __setitem__(self, indices: List[Int], value: Scalar[Self.dtype]):
-        if self.rank() == 0 and len(indices) != 0:  # Tensor with Shape ()
+        """Set a scalar value at given coordinates.
+
+        Args:
+            indices: List of axis indices.
+            value: Scalar value to write.
+
+        Raises:
+            Panic if tensor is scalar but indices are provided.
+        """
+        if self.rank() == 0 and len(indices) != 0:
             panic(
                 "Tensor → __setitem__(List[Int]): Scalar tensor expects no"
                 " indices"
@@ -453,7 +582,16 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn __setitem__(self, coord: IntArray, value: Scalar[Self.dtype]):
-        if self.rank() == 0 and len(coord) != 0:  # Tensor with Shape ()
+        """Set a scalar value at given coordinates.
+
+        Args:
+            coord: IntArray of axis indices.
+            value: Scalar value to write.
+
+        Raises:
+            Panic if tensor is scalar but indices are provided.
+        """
+        if self.rank() == 0 and len(coord) != 0:
             panic(
                 "Tensor → __setitem__(IntArray): Scalar tensor expects no"
                 " indices"
@@ -462,12 +600,30 @@ struct Tensor[dtype: DType](
         self.buffer[coord] = value
 
     fn fill(self, value: Scalar[Self.dtype], *indices: Idx):
+        """Fill a region with a scalar value using advanced indexing.
+
+        Args:
+            value: Scalar value to write.
+            *indices: Idx objects (integers or slices) defining the region.
+        """
         Filler[Self.dtype].fill(self.buffer, value, indices)
 
     fn fill(self, tensor: Tensor[Self.dtype], *indices: Idx):
+        """Copy data from another tensor into a region using advanced indexing.
+
+        Args:
+            tensor: Source tensor to copy from.
+            *indices: Idx objects (integers or slices) defining the destination region.
+        """
         Filler[Self.dtype].fill(self.buffer, tensor.buffer, indices)
 
     fn fill(self, gradbox: Gradbox[Self.dtype], *indices: Idx):
+        """Copy data from a Gradbox into a region using advanced indexing.
+
+        Args:
+            gradbox: Source Gradbox to copy from.
+            *indices: Idx objects (integers or slices) defining the destination region.
+        """
         Filler[Self.dtype].fill(self.buffer, gradbox.buffer, indices)
 
     fn item(self) -> Scalar[Self.dtype]:
@@ -756,9 +912,19 @@ struct Tensor[dtype: DType](
         )
 
     fn float(self) -> Tensor[DType.float32]:
+        """Convert tensor to float32 dtype.
+
+        Returns:
+            A new tensor with dtype float32.
+        """
         return self.to_dtype[DType.float32]()
 
     fn float64(self) -> Tensor[DType.float64]:
+        """Convert tensor to float64 dtype.
+
+        Returns:
+            A new tensor with dtype float64.
+        """
         return self.to_dtype[DType.float64]()
 
     fn to_dtype[
@@ -821,6 +987,14 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn broadcastable(self, to: Tensor[Self.dtype]) -> Bool:
+        """Check if this tensor can broadcast to a target shape.
+
+        Args:
+            to: Target tensor to check broadcasting compatibility with.
+
+        Returns:
+            True if this tensor's shape can broadcast to to.shape().
+        """
         return ShapeBroadcaster.broadcastable(self.shape(), to.shape())
 
     fn log[
@@ -840,6 +1014,16 @@ struct Tensor[dtype: DType](
         rtol: Scalar[Self.dtype] = 1e-5,
         atol: Scalar[Self.dtype] = 1e-8,
     ](self, other: Self,) -> Bool:
+        """Check if two tensors are element-wise close within tolerance.
+
+        Args:
+            rtol: Relative tolerance.
+            atol: Absolute tolerance.
+            other: Tensor to compare against.
+
+        Returns:
+            True if all elements are within tolerance, False otherwise.
+        """
         return self.buffer.all_close[rtol=rtol, atol=atol](other.buffer)
 
     fn all(self, pred: fn(Scalar[Self.dtype]) -> Bool) -> Bool:
@@ -916,6 +1100,11 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn fill(self, value: Scalar[Self.dtype]):
+        """Fill the entire tensor with a scalar value.
+
+        Args:
+            value: Scalar value to write to all elements.
+        """
         self.buffer.fill(value)
 
     fn map_where(
@@ -924,6 +1113,16 @@ struct Tensor[dtype: DType](
         value: Scalar[Self.dtype],
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
+        """Replace elements matching a predicate with a scalar value.
+
+        Args:
+            pred: Function that returns True for elements to replace.
+            value: Scalar value to write where pred returns True.
+            requires_grad: Whether the result tracks gradients.
+
+        Returns:
+            A new tensor with replaced values.
+        """
         var ndb = self.buffer.map_where(pred, value)
         return Tensor[Self.dtype](ndb^, requires_grad=requires_grad)
 
@@ -934,6 +1133,17 @@ struct Tensor[dtype: DType](
         requires_grad: Bool = False,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor filled with a value, matching another tensor's shape.
+
+        Args:
+            like: Reference tensor whose shape to copy.
+            value: Scalar value to fill with.
+            requires_grad: Whether the result tracks gradients.
+            device: Target device. Defaults to like's device.
+
+        Returns:
+            A new tensor with the same shape as like, filled with value.
+        """
         var shape = like.shape()
         return Tensor[Self.dtype].full(
             shape^, value, requires_grad=requires_grad, device=device.or_else(like.device())
@@ -946,6 +1156,17 @@ struct Tensor[dtype: DType](
         requires_grad: Bool = False,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor filled with a scalar value.
+
+        Args:
+            shape: Dimensions as a list of ints.
+            value: Scalar value to fill with.
+            requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+
+        Returns:
+            A tensor of given shape filled with value.
+        """
         return Self.full(Shape(shape), value, requires_grad, device=device)
 
     @staticmethod
@@ -955,6 +1176,17 @@ struct Tensor[dtype: DType](
         requires_grad: Bool = False,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor filled with a scalar value.
+
+        Args:
+            shape: Tensor shape.
+            scalar: Scalar value to fill with.
+            requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+
+        Returns:
+            A tensor of given shape filled with scalar.
+        """
         var target_device = device.or_else(CPU().into())
         return Tensor[Self.dtype](
             NDBuffer[Self.dtype].full(shape, scalar, target_device),
@@ -969,10 +1201,18 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        comptime assert (
-            Self.dtype.is_numeric()
-        ), "Tensor → randint: is supported only for numeric type"
+        """Create a tensor with uniform random values in [low, high).
 
+        Args:
+            *dims: Shape dimensions as variadic ints.
+            low: Lower bound (inclusive).
+            high: Upper bound (exclusive).
+            init_seed: Random seed. If None, randomizes each call.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A tensor of given shape with uniform random values.
+        """
         return Self.rand(Shape(dims), low, high, init_seed, requires_grad)
 
     @staticmethod
@@ -983,6 +1223,18 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor with uniform random values in [low, high).
+
+        Args:
+            shape: Shape as a list of ints.
+            low: Lower bound (inclusive).
+            high: Upper bound (exclusive).
+            init_seed: Random seed. If None, randomizes each call.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A tensor of given shape with uniform random values.
+        """
         return Self.rand(Shape(shape), low, high, init_seed, requires_grad)
 
     @staticmethod
@@ -993,10 +1245,18 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        comptime assert (
-            Self.dtype.is_numeric()
-        ), "Tensor → rand: is supported only for numeric type"
+        """Create a tensor with uniform random values in [min, max).
 
+        Args:
+            shape: Tensor shape.
+            min: Lower bound (inclusive).
+            max: Upper bound (exclusive).
+            init_seed: Random seed. If None, randomizes each call.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A tensor of given shape with uniform random values.
+        """
         if init_seed:
             seed(init_seed.value())
         else:
@@ -1022,6 +1282,18 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor with values from a normal distribution.
+
+        Args:
+            *dims: Shape dimensions as variadic ints.
+            mean: Distribution mean.
+            std: Distribution standard deviation.
+            init_seed: Random seed. If None, randomizes each call.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A tensor of given shape with normally distributed values.
+        """
         return Self.randn(Shape(dims), mean, std, init_seed, requires_grad)
 
     @staticmethod
@@ -1032,10 +1304,18 @@ struct Tensor[dtype: DType](
         init_seed: Optional[Int] = None,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
-        comptime assert (
-            Self.dtype.is_numeric()
-        ), "Tensor → randn: is supported only for numeric type"
+        """Create a tensor with values from a normal distribution.
 
+        Args:
+            shape: Tensor shape.
+            mean: Distribution mean.
+            std: Distribution standard deviation.
+            init_seed: Random seed. If None, randomizes each call.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A tensor of given shape with normally distributed values.
+        """
         if init_seed:
             seed(init_seed.value())
         else:
@@ -1069,6 +1349,21 @@ struct Tensor[dtype: DType](
         *args: Scalar[Self.dtype],
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
+        """Create a 1D tensor with evenly spaced values.
+
+        Args:
+            *args: Start, stop, and optionally step values.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 1D tensor with values from start to stop.
+
+        Example:
+            ```mojo
+            Tensor[DType.float32].arange(0, 5)      # [0, 1, 2, 3, 4]
+            Tensor[DType.float32].arange(0, 10, 2)  # [0, 2, 4, 6, 8]
+            ```
+        """
         nd_buffer = NDBuffer[Self.dtype].arange(args)
         tensor = Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
         return tensor^
@@ -1122,6 +1417,17 @@ struct Tensor[dtype: DType](
         steps: Int,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
+        """Create a 1D tensor with linearly spaced values.
+
+        Args:
+            start: Starting value.
+            end: Ending value.
+            steps: Number of samples.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 1D tensor with steps values from start to end (inclusive).
+        """
         nd_buffer = NDBuffer[Self.dtype].linspace(start, end, steps)
         tensor = Tensor[Self.dtype](nd_buffer^, requires_grad=requires_grad)
         return tensor^
@@ -1132,6 +1438,16 @@ struct Tensor[dtype: DType](
         requires_grad: Bool = False,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor of zeros.
+
+        Args:
+            axes_spans: Shape as a list of ints.
+            requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+
+        Returns:
+            A tensor of given shape filled with zeros.
+        """
         return Self.zeros(
             Shape(axes_spans), requires_grad=requires_grad, device=device
         )
@@ -1140,6 +1456,16 @@ struct Tensor[dtype: DType](
     fn eye(
         n: Int, requires_grad: Bool = False, device: Optional[Device] = None
     ) -> Tensor[Self.dtype]:
+        """Create a 2D identity matrix of size n x n.
+
+        Args:
+            n: Number of rows and columns.
+            requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+
+        Returns:
+            An n x n tensor with ones on the diagonal and zeros elsewhere.
+        """
         var out = Self.zeros(
             Shape(n, n), requires_grad=requires_grad, device=device
         )
@@ -1153,6 +1479,16 @@ struct Tensor[dtype: DType](
         requires_grad: Bool = False,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor of zeros.
+
+        Args:
+            *axes_spans: Shape dimensions as variadic ints.
+            requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+
+        Returns:
+            A tensor of given shape filled with zeros.
+        """
         shape = Shape(axes_spans)
         return Self.zeros(shape, requires_grad=requires_grad, device=device)
 
@@ -1162,6 +1498,15 @@ struct Tensor[dtype: DType](
         requires_grad: Optional[Bool] = None,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a zeros tensor matching another tensor's shape.
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+            device: Target device. Defaults to self's device.
+
+        Returns:
+            A tensor of zeros with the same shape as self.
+        """
         var target_device: Optional[Device]
 
         comptime if has_accelerator():
@@ -1186,6 +1531,16 @@ struct Tensor[dtype: DType](
         requires_grad: Bool = False,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor of zeros.
+
+        Args:
+            shape: Tensor shape.
+            requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+
+        Returns:
+            A tensor of given shape filled with zeros.
+        """
         var target_device = device.or_else(CPU().into())
         return Tensor[Self.dtype](
             NDBuffer[Self.dtype].zeros(shape, target_device),
@@ -1198,16 +1553,20 @@ struct Tensor[dtype: DType](
         requires_grad: Optional[Bool] = None,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
-        """
-        Creates a ones tensor with same shape as self.
-        Defaults to same device and requires_grad as self.
+        """Create a ones tensor matching another tensor's shape.
+
+        Args:
+            requires_grad: If provided, overrides requires_grad.
+            device: Target device. Defaults to self's device.
+
+        Returns:
+            A tensor of ones with the same shape as self.
         """
         var target_device: Optional[Device]
 
         comptime if has_accelerator():
             if self.is_on_gpu():
                 target_device = device.or_else(
-                    #self.buffer.device_state.value().get_gpu().into()
                     self.device()
                 )
             else:
@@ -1243,8 +1602,16 @@ struct Tensor[dtype: DType](
 
     @staticmethod
     fn d1(row: Self.Row, requires_grad: Bool = False) -> Tensor[Self.dtype]:
+        """Create a 1D tensor from a list of scalar values.
+
+        Args:
+            row: List of scalar values forming the single dimension.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 1D tensor with len(row) elements.
+        """
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d1")
-        # Attention! Tensor([])
         if len(row) == 0:
             return Tensor[Self.dtype].scalar(
                 min_finite[Self.dtype](), requires_grad=requires_grad
@@ -1260,6 +1627,18 @@ struct Tensor[dtype: DType](
     fn d2(
         rows: List[Self.Row], requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
+        """Create a 2D tensor from a list of rows.
+
+        Args:
+            rows: List of rows, each row must have equal length.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 2D tensor of shape (len(rows), len(rows[0])).
+
+        Raises:
+            Panic if rows have inconsistent lengths.
+        """
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d2")
         dims = IntArray(len(rows), len(rows[0]))
         flattened = List[Scalar[Self.dtype]](capacity=dims.product())
@@ -1278,6 +1657,18 @@ struct Tensor[dtype: DType](
     fn d3(
         blocks: List[Self.Rows], requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
+        """Create a 3D tensor from a list of 2D blocks.
+
+        Args:
+            blocks: List of 2D matrices, each matrix must have equal dimensions.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 3D tensor.
+
+        Raises:
+            Panic if blocks have inconsistent dimensions.
+        """
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d3")
         dims = IntArray(len(blocks), len(blocks[0]), len(blocks[0][0]))
         flattened = List[Scalar[Self.dtype]](capacity=dims.product())
@@ -1300,6 +1691,18 @@ struct Tensor[dtype: DType](
     fn d4(
         blockgrid: List[Self.Block], requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
+        """Create a 4D tensor from a nested list structure.
+
+        Args:
+            blockgrid: List of 3D blocks, each block must have equal dimensions.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 4D tensor.
+
+        Raises:
+            Panic if blockgrid has inconsistent dimensions.
+        """
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d4")
         dims = IntArray(
             len(blockgrid),
@@ -1338,6 +1741,18 @@ struct Tensor[dtype: DType](
     fn d5(
         blockhive: List[Self.Blocks], requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
+        """Create a 5D tensor from a deeply nested list structure.
+
+        Args:
+            blockhive: List of 4D blocks, each block must have equal dimensions.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 5D tensor.
+
+        Raises:
+            Panic if blockhive has inconsistent dimensions.
+        """
         Validator.validate_dtype_consistency(Self.dtype, requires_grad, "d5")
         dims = IntArray(
             len(blockhive),
@@ -1380,6 +1795,15 @@ struct Tensor[dtype: DType](
     fn of(
         *elems: Scalar[Self.dtype], requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
+        """Create a 1D tensor from variadic scalar elements.
+
+        Args:
+            *elems: Scalar values as variadic arguments.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 1D tensor with len(elems) elements.
+        """
         Validator.validate_dtype_consistency(
             Self.dtype, requires_grad, "of(*elems)"
         )
@@ -1394,6 +1818,15 @@ struct Tensor[dtype: DType](
         elems: Self.Row,
         requires_grad: Bool = False,
     ) -> Tensor[Self.dtype]:
+        """Create a 1D tensor from a list of scalar elements.
+
+        Args:
+            elems: List of scalar values.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A 1D tensor with len(elems) elements.
+        """
         Validator.validate_dtype_consistency(
             Self.dtype, requires_grad, "of(elems)"
         )
@@ -1408,6 +1841,15 @@ struct Tensor[dtype: DType](
     fn scalar(
         val: Scalar[Self.dtype], requires_grad: Bool = False
     ) -> Tensor[Self.dtype]:
+        """Create a scalar (0D) tensor from a single value.
+
+        Args:
+            val: The scalar value.
+            requires_grad: Whether to track gradients.
+
+        Returns:
+            A scalar tensor containing val.
+        """
         result = Tensor[Self.dtype](Shape(), requires_grad=requires_grad)
         result[IntArray()] = val
         return result^
@@ -1418,6 +1860,16 @@ struct Tensor[dtype: DType](
         requires_grad: Bool = False,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor of ones.
+
+        Args:
+            *axes_spans: Shape dimensions as variadic ints.
+            requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+
+        Returns:
+            A tensor of given shape filled with ones.
+        """
         return Self.ones(Shape(axes_spans), requires_grad, device)
 
     @staticmethod
@@ -1426,6 +1878,16 @@ struct Tensor[dtype: DType](
         requires_grad: Bool = False,
         device: Optional[Device] = None,
     ) -> Tensor[Self.dtype]:
+        """Create a tensor of ones.
+
+        Args:
+            shape: Tensor shape.
+            requires_grad: Whether to track gradients.
+            device: Target device. Defaults to CPU.
+
+        Returns:
+            A tensor of given shape filled with ones.
+        """
         var target_device = device.or_else(CPU().into())
         var value = One[Self.dtype].value()
         return Tensor[Self.dtype](
@@ -1436,6 +1898,18 @@ struct Tensor[dtype: DType](
     fn broadcast_to(
         self, target_shape: Shape, requires_grad: Optional[Bool] = None
     ) -> Tensor[Self.dtype]:
+        """Broadcast tensor to a target shape.
+
+        Args:
+            target_shape: Shape to broadcast to.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            A tensor with the target shape.
+
+        Raises:
+            Panic if current shape cannot broadcast to target_shape.
+        """
         if not ShapeBroadcaster.broadcastable(self.shape(), target_shape):
             panic(
                 "Tensor → broadcast_to: shape "
@@ -1731,6 +2205,12 @@ struct Tensor[dtype: DType](
         return Divider[Self.dtype].forward[track_grad](self, other)
 
     fn update_grad[opcode: Int](mut self, incoming: Gradbox[Self.dtype]):
+        """Update gradient using an incoming gradient and operation type.
+
+        Args:
+            opcode: Operation mnemonic (MulTensor, AddTensor, etc.)
+            incoming: Gradbox containing upstream gradients.
+        """
         ref gradbox = self.gradbox[]
         if opcode == MulTensor:
             gradbox *= incoming
@@ -1780,9 +2260,22 @@ struct Tensor[dtype: DType](
         self.buffer.__itruediv__(other.buffer)
 
     fn unique(self) -> Tensor[Self.dtype]:
+        """Return a tensor with duplicate elements removed.
+
+        Returns:
+            A tensor with the same data but duplicates removed.
+        """
         return Tensor[Self.dtype](self.buffer.unique(), requires_grad=False)
 
     fn count(self, key: Scalar[Self.dtype]) -> Int:
+        """Count occurrences of a value in the tensor.
+
+        Args:
+            key: Scalar value to count.
+
+        Returns:
+            Number of elements equal to key.
+        """
         return self.buffer.count(key)
 
     fn sum_all(self) -> Scalar[Self.dtype]:
@@ -1951,6 +2444,12 @@ struct Tensor[dtype: DType](
         self.buffer.__itruediv__(scalar)
 
     fn print(self, num_first: Int = 10, num_last: Int = 10):
+        """Print the tensor's metadata and data preview.
+
+        Args:
+            num_first: Number of elements to print from the start.
+            num_last: Number of elements to print from the end.
+        """
         print(
             "\n",
             String(self),
@@ -1996,7 +2495,11 @@ struct Tensor[dtype: DType](
         output.backward[graph_size](seed_tensor)
 
     fn requires_grad_(mut self, requires_grad: Bool = True):
-        # Note cleaning up existing gradbox
+        """Enable or disable gradient tracking in-place.
+
+        Args:
+            requires_grad: True to enable gradient tracking, False to disable.
+        """
         self.requires_grad = requires_grad
         if requires_grad and not self.has_grad():
             self.init_gradbox()
@@ -2108,6 +2611,17 @@ struct Tensor[dtype: DType](
         return {Pointer(to=self).get_immutable()}
 
     fn get(self, index: Int) -> Scalar[Self.dtype]:
+        """Get element at a flat index with bounds checking.
+
+        Args:
+            index: Flat (linear) index into the tensor's memory.
+
+        Returns:
+            The scalar value at that index.
+
+        Raises:
+            Panic if index is out of bounds.
+        """
         return self.buffer.get(index)
 
     fn view[
