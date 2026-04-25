@@ -2,8 +2,13 @@ const { marked } = require('marked');
 const fs = require('fs');
 const path = require('path');
 
-const docsDir = path.join(__dirname, 'docs', 'docs');
-const outDir = path.join(__dirname, 'generated');
+const rootDir = fs.realpathSync(__dirname);
+const docsDir = path.join(rootDir, 'docs', 'docs');
+const outDir = path.join(rootDir, 'docs', 'generated');
+
+console.log('rootDir:', rootDir);
+console.log('docsDir:', docsDir);
+console.log('outDir:', outDir);
 
 // Convert /mojo/std/... to docs.modular.com/mojo/stdlib/...
 function fixExternalLinks(html) {
@@ -25,8 +30,6 @@ const template = (title, content) => `<!DOCTYPE html>
     h1, h2, h3 { color: #333; }
     a { color: #ff5500; }
     .nav { display: flex; gap: 20px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
-    .toc { position: fixed; right: 20px; top: 100px; font-size: 14px; }
-    @media (max-width: 900px) { .toc { display: none; } }
   </style>
 </head>
 <body>
