@@ -26,15 +26,15 @@ jobs:
 
       - name: Generate mojo doc JSON
         run: |
+          pip install pixi -q
           source $HOME/.bashrc
-          pixi shell
-          mojo doc ./tenmo -o tenmo.json
+          pixi run -e default -- mojo doc ./tenmo -o tenmo.json
 
       - name: Generate Markdown
         run: |
+          pip install pixi -q
           source $HOME/.bashrc
-          pixi shell
-          python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/docs/
+          pixi run -e default -- python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/docs/
 
       - name: Generate mojo doc JSON
         run: mojo doc ./tenmo -o tenmo.json
