@@ -21,6 +21,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Mojo
+        run: |
+          curl -fsSL https://install.modular.com | sh
+          echo "$HOME/.modular/bin" >> $GITHUB_PATH
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
