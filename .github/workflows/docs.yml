@@ -63,8 +63,6 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        with:
-          static_site_generator: 'docusaurus'
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
