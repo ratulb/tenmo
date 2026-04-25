@@ -1,0 +1,252 @@
+<svg width="680" viewBox="0 0 680 940" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Tenmo architecture diagram</title>
+<desc>Structural diagram showing how Tensor, NDBuffer, Buffer, Gradbox, Ancestor, Ancestors, BackwardFnArg, Layout, Storage and GPU components fit together in Tenmo</desc>
+
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+<style>
+  text { font-family: ui-sans-serif, system-ui, sans-serif; }
+  .th  { font-size: 13px; font-weight: 600; fill: #1a1a2e; }
+  .ts  { font-size: 11px; font-weight: 400; fill: #444466; }
+  .thl { font-size: 11px; font-weight: 500; fill: #555577; }
+  .arr { stroke: #9090aa; stroke-width: 0.8; fill: none; }
+  .sep { stroke: #ccccdd; stroke-width: 0.5; stroke-dasharray: 4 4; }
+  .note-box { fill: none; stroke: #ccccdd; stroke-width: 0.5; stroke-dasharray: 4 3; }
+  .note-text { font-size: 10.5px; font-weight: 400; fill: #666688; }
+
+  .b-purple  { fill: #EEEDFE; stroke: #534AB7; }
+  .b-teal    { fill: #E1F5EE; stroke: #0F6E56; }
+  .b-coral   { fill: #FAECE7; stroke: #993C1D; }
+  .b-blue    { fill: #E6F1FB; stroke: #185FA5; }
+  .b-amber   { fill: #FAEEDA; stroke: #854F0B; }
+  .b-gray    { fill: #F1EFE8; stroke: #5F5E5A; }
+  .b-green   { fill: #EAF3DE; stroke: #3B6D11; }
+
+  .t-purple  { fill: #3C3489; }
+  .t-teal    { fill: #085041; }
+  .t-coral   { fill: #712B13; }
+  .t-blue    { fill: #0C447C; }
+  .t-amber   { fill: #633806; }
+  .t-gray    { fill: #2C2C2A; }
+  .t-green   { fill: #27500A; }
+
+  .s-purple  { fill: #534AB7; }
+  .s-teal    { fill: #0F6E56; }
+  .s-coral   { fill: #993C1D; }
+  .s-blue    { fill: #185FA5; }
+  .s-amber   { fill: #854F0B; }
+  .s-gray    { fill: #5F5E5A; }
+  .s-green   { fill: #3B6D11; }
+
+  @media (prefers-color-scheme: dark) {
+    .th  { fill: #e8e8f8; }
+    .ts  { fill: #b0b0cc; }
+    .thl { fill: #a0a0bb; }
+    .note-text { fill: #9090aa; }
+    .sep { stroke: #444466; }
+    .note-box { stroke: #444466; }
+    .arr { stroke: #666688; }
+
+    .b-purple  { fill: #26215C; stroke: #AFA9EC; }
+    .b-teal    { fill: #04342C; stroke: #5DCAA5; }
+    .b-coral   { fill: #4A1B0C; stroke: #F0997B; }
+    .b-blue    { fill: #042C53; stroke: #85B7EB; }
+    .b-amber   { fill: #412402; stroke: #EF9F27; }
+    .b-gray    { fill: #2C2C2A; stroke: #B4B2A9; }
+    .b-green   { fill: #173404; stroke: #97C459; }
+
+    .t-purple  { fill: #CECBF6; }
+    .t-teal    { fill: #9FE1CB; }
+    .t-coral   { fill: #F5C4B3; }
+    .t-blue    { fill: #B5D4F4; }
+    .t-amber   { fill: #FAC775; }
+    .t-gray    { fill: #D3D1C7; }
+    .t-green   { fill: #C0DD97; }
+
+    .s-purple  { fill: #AFA9EC; }
+    .s-teal    { fill: #5DCAA5; }
+    .s-coral   { fill: #F0997B; }
+    .s-blue    { fill: #85B7EB; }
+    .s-amber   { fill: #EF9F27; }
+    .s-gray    { fill: #B4B2A9; }
+    .s-green   { fill: #97C459; }
+  }
+</style>
+</defs>
+
+<!-- ══════════════════════════════════════════
+     ROW 1 — Tensor
+     ══════════════════════════════════════════ -->
+<rect x="200" y="30" width="280" height="54" rx="8" stroke-width="0.5" class="b-purple"/>
+<text class="th t-purple" x="340" y="52" text-anchor="middle" dominant-baseline="central">Tensor[dtype]</text>
+<text class="ts s-purple" x="340" y="69" text-anchor="middle" dominant-baseline="central">_id · buffer · requires_grad · gradbox · ancestors</text>
+
+<!-- Tensor → NDBuffer -->
+<line x1="276" y1="84" x2="178" y2="196" class="arr" marker-end="url(#arrow)"/>
+<!-- Tensor → Gradbox -->
+<line x1="340" y1="84" x2="340" y2="196" class="arr" marker-end="url(#arrow)"/>
+<!-- Tensor → Ancestors -->
+<line x1="404" y1="84" x2="500" y2="196" class="arr" marker-end="url(#arrow)"/>
+
+<!-- ══════════════════════════════════════════
+     ROW 2 — NDBuffer · Gradbox · Ancestors
+     ══════════════════════════════════════════ -->
+
+<!-- NDBuffer -->
+<rect x="40" y="196" width="218" height="54" rx="8" stroke-width="0.5" class="b-teal"/>
+<text class="th t-teal" x="149" y="218" text-anchor="middle" dominant-baseline="central">NDBuffer[dtype]</text>
+<text class="ts s-teal" x="149" y="235" text-anchor="middle" dominant-baseline="central">shape · strides · offset · buffer · device_state</text>
+
+<!-- Gradbox -->
+<rect x="230" y="196" width="218" height="54" rx="8" stroke-width="0.5" class="b-coral"/>
+<text class="th t-coral" x="339" y="218" text-anchor="middle" dominant-baseline="central">Gradbox[dtype]</text>
+<text class="ts s-coral" x="339" y="235" text-anchor="middle" dominant-baseline="central">NDBuffer · _refcount (atomic)</text>
+
+<!-- Ancestors -->
+<rect x="420" y="196" width="220" height="54" rx="8" stroke-width="0.5" class="b-blue"/>
+<text class="th t-blue" x="530" y="218" text-anchor="middle" dominant-baseline="central">Ancestors[dtype]</text>
+<text class="ts s-blue" x="530" y="235" text-anchor="middle" dominant-baseline="central">refs: List[Ancestor] · backward_arg</text>
+
+<!-- NDBuffer → Layout -->
+<line x1="110" y1="250" x2="96"  y2="346" class="arr" marker-end="url(#arrow)"/>
+<!-- NDBuffer → Storage -->
+<line x1="180" y1="250" x2="246" y2="346" class="arr" marker-end="url(#arrow)"/>
+<!-- Ancestors → BackwardFnArg -->
+<line x1="475" y1="250" x2="398" y2="346" class="arr" marker-end="url(#arrow)"/>
+<!-- Ancestors → Ancestor -->
+<line x1="530" y1="250" x2="548" y2="346" class="arr" marker-end="url(#arrow)"/>
+
+<!-- ══════════════════════════════════════════
+     ROW 3 — Layout · Storage · BackwardFnArg · Ancestor
+     ══════════════════════════════════════════ -->
+
+<!-- Layout -->
+<rect x="30" y="346" width="148" height="54" rx="8" stroke-width="0.5" class="b-teal"/>
+<text class="th t-teal" x="104" y="368" text-anchor="middle" dominant-baseline="central">Layout</text>
+<text class="ts s-teal" x="104" y="385" text-anchor="middle" dominant-baseline="central">shape · strides · offset</text>
+
+<!-- Storage -->
+<rect x="194" y="346" width="148" height="54" rx="8" stroke-width="0.5" class="b-teal"/>
+<text class="th t-teal" x="268" y="368" text-anchor="middle" dominant-baseline="central">Storage[dtype]</text>
+<text class="ts s-teal" x="268" y="385" text-anchor="middle" dominant-baseline="central">Buffer · DeviceState</text>
+
+<!-- BackwardFnArg -->
+<rect x="358" y="346" width="152" height="54" rx="8" stroke-width="0.5" class="b-amber"/>
+<text class="th t-amber" x="434" y="368" text-anchor="middle" dominant-baseline="central">BackwardFnArg</text>
+<text class="ts s-amber" x="434" y="385" text-anchor="middle" dominant-baseline="central">op_code · type-erased arg</text>
+
+<!-- Ancestor -->
+<rect x="526" y="346" width="124" height="54" rx="8" stroke-width="0.5" class="b-blue"/>
+<text class="th t-blue" x="588" y="368" text-anchor="middle" dominant-baseline="central">Ancestor[dtype]</text>
+<text class="ts s-blue" x="588" y="385" text-anchor="middle" dominant-baseline="central">id · gradbox* · layout · storage</text>
+
+<!-- Storage → Buffer -->
+<line x1="230" y1="400" x2="164" y2="486" class="arr" marker-end="url(#arrow)"/>
+<!-- Storage → DeviceState -->
+<line x1="306" y1="400" x2="368" y2="486" class="arr" marker-end="url(#arrow)"/>
+<!-- BackwardFnArg → Backward.invoke -->
+<line x1="480" y1="400" x2="532" y2="486" class="arr" marker-end="url(#arrow)"/>
+
+<!-- ══════════════════════════════════════════
+     ROW 4 — Buffer · DeviceState · Backward.invoke
+     ══════════════════════════════════════════ -->
+
+<!-- Buffer -->
+<rect x="50" y="486" width="198" height="54" rx="8" stroke-width="0.5" class="b-gray"/>
+<text class="th t-gray" x="149" y="508" text-anchor="middle" dominant-baseline="central">Buffer[dtype]</text>
+<text class="ts s-gray" x="149" y="525" text-anchor="middle" dominant-baseline="central">UnsafePointer · size · refcount</text>
+
+<!-- DeviceState -->
+<rect x="264" y="486" width="198" height="54" rx="8" stroke-width="0.5" class="b-green"/>
+<text class="th t-green" x="363" y="508" text-anchor="middle" dominant-baseline="central">DeviceState[dtype]</text>
+<text class="ts s-green" x="363" y="525" text-anchor="middle" dominant-baseline="central">DeviceBuffer[uint8] · GPU</text>
+
+<!-- Backward.invoke -->
+<rect x="478" y="486" width="162" height="54" rx="8" stroke-width="0.5" class="b-amber"/>
+<text class="th t-amber" x="559" y="508" text-anchor="middle" dominant-baseline="central">Backward.invoke</text>
+<text class="ts s-amber" x="559" y="525" text-anchor="middle" dominant-baseline="central">tag dispatch → static fn</text>
+
+<!-- ══════════════════════════════════════════
+     SEPARATOR — Neural network
+     ══════════════════════════════════════════ -->
+<line x1="40" y1="580" x2="640" y2="580" class="sep"/>
+<text class="thl" x="340" y="596" text-anchor="middle" dominant-baseline="central">Neural network layers</text>
+
+<!-- Sequential -->
+<rect x="40"  y="610" width="118" height="40" rx="8" stroke-width="0.5" class="b-purple"/>
+<text class="th t-purple" x="99"  y="630" text-anchor="middle" dominant-baseline="central">Sequential</text>
+
+<!-- Linear -->
+<rect x="170" y="610" width="90"  height="40" rx="8" stroke-width="0.5" class="b-purple"/>
+<text class="th t-purple" x="215" y="630" text-anchor="middle" dominant-baseline="central">Linear</text>
+
+<!-- Activations -->
+<rect x="272" y="610" width="176" height="40" rx="8" stroke-width="0.5" class="b-purple"/>
+<text class="th t-purple" x="360" y="630" text-anchor="middle" dominant-baseline="central">ReLU · Sigmoid · Tanh</text>
+
+<!-- Conv/Pool -->
+<rect x="460" y="610" width="180" height="40" rx="8" stroke-width="0.5" class="b-purple"/>
+<text class="th t-purple" x="550" y="630" text-anchor="middle" dominant-baseline="central">Conv2d · MaxPool2d</text>
+
+<!-- ══════════════════════════════════════════
+     SEPARATOR — Training
+     ══════════════════════════════════════════ -->
+<line x1="40" y1="664" x2="640" y2="664" class="sep"/>
+<text class="thl" x="340" y="680" text-anchor="middle" dominant-baseline="central">Training infrastructure</text>
+
+<!-- SGD -->
+<rect x="40"  y="694" width="90"  height="40" rx="8" stroke-width="0.5" class="b-coral"/>
+<text class="th t-coral" x="85"  y="714" text-anchor="middle" dominant-baseline="central">SGD</text>
+
+<!-- Losses -->
+<rect x="142" y="694" width="206" height="40" rx="8" stroke-width="0.5" class="b-coral"/>
+<text class="th t-coral" x="245" y="714" text-anchor="middle" dominant-baseline="central">MSELoss · BCE · CrossEntropy</text>
+
+<!-- DataLoader -->
+<rect x="360" y="694" width="128" height="40" rx="8" stroke-width="0.5" class="b-coral"/>
+<text class="th t-coral" x="424" y="714" text-anchor="middle" dominant-baseline="central">DataLoader</text>
+
+<!-- train/eval -->
+<rect x="500" y="694" width="140" height="40" rx="8" stroke-width="0.5" class="b-coral"/>
+<text class="th t-coral" x="570" y="714" text-anchor="middle" dominant-baseline="central">.train() / .eval()</text>
+
+<!-- ══════════════════════════════════════════
+     SEPARATOR — GPU kernels
+     ══════════════════════════════════════════ -->
+<line x1="40" y1="748" x2="640" y2="748" class="sep"/>
+<text class="thl" x="340" y="764" text-anchor="middle" dominant-baseline="central">GPU kernel dispatch</text>
+
+<!-- Binary ops -->
+<rect x="40"  y="778" width="112" height="52" rx="8" stroke-width="0.5" class="b-green"/>
+<text class="th t-green" x="96"  y="798" text-anchor="middle" dominant-baseline="central">Binary ops</text>
+<text class="ts s-green" x="96"  y="814" text-anchor="middle" dominant-baseline="central">+ - * / broadcast</text>
+
+<!-- Unary ops -->
+<rect x="164" y="778" width="112" height="52" rx="8" stroke-width="0.5" class="b-green"/>
+<text class="th t-green" x="220" y="798" text-anchor="middle" dominant-baseline="central">Unary ops</text>
+<text class="ts s-green" x="220" y="814" text-anchor="middle" dominant-baseline="central">sqrt relu ~ neg abs</text>
+
+<!-- Matmul -->
+<rect x="288" y="778" width="100" height="52" rx="8" stroke-width="0.5" class="b-green"/>
+<text class="th t-green" x="338" y="798" text-anchor="middle" dominant-baseline="central">Matmul</text>
+<text class="ts s-green" x="338" y="814" text-anchor="middle" dominant-baseline="central">tiled kernel</text>
+
+<!-- Compare -->
+<rect x="400" y="778" width="110" height="52" rx="8" stroke-width="0.5" class="b-green"/>
+<text class="th t-green" x="455" y="798" text-anchor="middle" dominant-baseline="central">Compare</text>
+<text class="ts s-green" x="455" y="814" text-anchor="middle" dominant-baseline="central">eq ne gt lt bool</text>
+
+<!-- Reduce -->
+<rect x="522" y="778" width="118" height="52" rx="8" stroke-width="0.5" class="b-green"/>
+<text class="th t-green" x="581" y="798" text-anchor="middle" dominant-baseline="central">Reduce</text>
+<text class="ts s-green" x="581" y="814" text-anchor="middle" dominant-baseline="central">sum mean multi-axis</text>
+
+<!-- ══════════════════════════════════════════
+     FOOTER NOTE
+     ══════════════════════════════════════════ -->
+<rect x="40" y="862" width="600" height="26" rx="6" class="note-box"/>
+<text class="note-text" x="340" y="878" text-anchor="middle" dominant-baseline="central">track_grad: Bool — compile-time parameter eliminates graph overhead entirely in eval mode</text>
+
+</svg>
