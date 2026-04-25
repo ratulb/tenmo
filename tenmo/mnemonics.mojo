@@ -29,9 +29,8 @@ comptime mv = 25  # tensor & vector matmul
 comptime mm = 26  # tensor & tensor matmul
 comptime invalid = 27  # Invalid case
 
-#net
 
-comptime LINEAR = 28
+comptime LINEAR = 28 #Net
 comptime LINEAR_BLAS = 29
 comptime RELU = 30
 comptime SIGMOID = 31
