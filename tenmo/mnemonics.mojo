@@ -1,3 +1,5 @@
+"""Mnemonics for tensor operations - internal constants used by the autograd engine.
+"""
 comptime Noop = 0
 comptime MulTensor = 1
 comptime AddTensor = 2
@@ -27,7 +29,7 @@ comptime mv = 25  # tensor & vector matmul
 comptime mm = 26  # tensor & tensor matmul
 comptime invalid = 27  # Invalid case
 
-########net##############
+#net
 
 comptime LINEAR = 28
 comptime LINEAR_BLAS = 29
@@ -39,7 +41,6 @@ comptime CONV2D = 34
 comptime FLATTEN = 35
 comptime MAXPOOL2D = 36
 
-#####################
 comptime max_rank = 8  # Change this to extend/reduce max supported dimension
 comptime EXP = 37
 comptime NEGATE = 38
