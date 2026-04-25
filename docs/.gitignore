@@ -2,5 +2,4 @@ node_modules/
 build/
 .docusaurus/
 package-lock.json
-*.html
-!index.html
+docs/*.md

@@ -2,7 +2,7 @@ const { marked } = require('marked');
 const fs = require('fs');
 const path = require('path');
 
-const docsDir = path.join(__dirname, 'docs');
+const docsDir = path.join(__dirname, 'docs', 'docs');
 const outDir = path.join(__dirname, 'build');
 
 // Convert /mojo/std/... to docs.modular.com/mojo/stdlib/...
