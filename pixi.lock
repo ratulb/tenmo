@@ -47,7 +47,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-0.26.2.0-release.conda
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-0.26.2.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-0.26.2.0-release.conda
-      - conda: git+https://github.com/ratulb/mojodoc?branch=main#3e5db018691d9862ed72c91b78daa49960870b20
+      - conda: git+https://github.com/ehsanmok/mojodoc?branch=main#9915e596ada1d7c3a1c5d2fcfa7ec9f962325dfa
       - conda: https://conda.anaconda.org/conda-forge/noarch/mypy_extensions-1.1.0-pyha770c72_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.5-h2d0b736_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/nodejs-24.14.1-h3d65ac4_0.conda
@@ -121,7 +121,7 @@ environments:
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-0.26.2.0-release.conda
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-0.26.2.0-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mojo-python-0.26.2.0-release.conda
-      - conda: git+https://github.com/ratulb/mojodoc?branch=main#3e5db018691d9862ed72c91b78daa49960870b20
+      - conda: git+https://github.com/ehsanmok/mojodoc?branch=main#9915e596ada1d7c3a1c5d2fcfa7ec9f962325dfa
       - conda: https://conda.anaconda.org/conda-forge/noarch/mypy_extensions-1.1.0-pyha770c72_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.5-h2d0b736_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/nodejs-24.14.1-h3d65ac4_0.conda
@@ -604,7 +604,7 @@ packages:
   license: LicenseRef-Modular-Proprietary
   size: 22936
   timestamp: 1773780198161
-- conda: git+https://github.com/ratulb/mojodoc?branch=main#3e5db018691d9862ed72c91b78daa49960870b20
+- conda: git+https://github.com/ehsanmok/mojodoc?branch=main#9915e596ada1d7c3a1c5d2fcfa7ec9f962325dfa
   name: mojodoc
   version: 0.0.1
   build: hb0f4dca_0
