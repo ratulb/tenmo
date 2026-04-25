@@ -8,6 +8,12 @@ from .common_utils import panic
 struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
     ImplicitlyCopyable, Iterable, Iterator, RegisterPassable, Sized
 ):
+    """Iterator over memory offsets for a tensor with given shape and strides.
+
+    This iterator generates the physical memory offsets for each logical element
+    in a multi-dimensional tensor. It handles both contiguous and strided tensors
+    efficiently, using an odometer-like increment strategy for non-contiguous data.
+    """
     comptime Element = Int
     comptime IteratorType[
         iterable_mut: Bool, //, iterable_origin: Origin[mut=iterable_mut]
@@ -30,6 +36,13 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
         strides: Pointer[Strides, Self.strides_origin],
         start_offset: Int = 0,
     ):
+        """Initialize the index iterator.
+
+        Args:
+            shape: Pointer to the Shape of the tensor
+            strides: Pointer to the Strides of the tensor
+            start_offset: Initial memory offset (default: 0)
+        """
         self.shape = shape
         self.strides = strides
         self.start_offset = start_offset
@@ -45,16 +58,25 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
     ) -> Self.IteratorType[
         origin_of(self, Self.shape_origin, Self.strides_origin)
     ]:
+        """Get the iterator itself.
+
+        Returns:
+            Self reference as iterator.
+        """
         return self
 
     fn __next__(mut self) raises StopIteration -> Self.Element:
-        """
-        Return next memory offset and advance iterator.
+        """Return next memory offset and advance iterator.
 
-        Incrementally update coordinates like an odometer.
+        Incrementally updates coordinates like an odometer.
+        Uses fast path for contiguous tensors and odometer-style
+        increment for strided tensors.
 
         Returns:
             Physical memory offset for current logical element.
+
+        Raises:
+            StopIteration: When all elements have been iterated.
         """
         if not self.__has_next__():
             raise StopIteration()
@@ -90,28 +112,42 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
 
     @always_inline("nodebug")
     fn __has_next__(self) -> Bool:
+        """Check if there are more elements to iterate.
+
+        Returns:
+            True if there are more elements, False otherwise.
+        """
         return self.current_index < self.total_elements
 
     fn bounds(self) -> Tuple[Int, Optional[Int]]:
+        """Get the bounds of the iterator.
+
+        Returns:
+            Tuple of (remaining length, Optional of the same length).
+        """
         var iter_len: Int = len(self)
         return (iter_len, {iter_len})
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
+        """Get the number of remaining elements.
+
+        Returns:
+            Number of elements yet to be iterated.
+        """
         return self.total_elements - self.current_index
 
     @always_inline("nodebug")
     fn skip(mut self, n: Int, small_skip: Int = 100):
-        """
-        Skip n elements forward.
+        """Skip n elements forward efficiently.
 
         Uses hybrid strategy:
-        - Small skips (n < 100): Incremental updates.
-        - Large skips (n >= 100): Direct computation.
+        - Small skips (n < small_skip): Incremental updates.
+        - Large skips (n >= small_skip): Direct computation.
 
         Args:
             n: Number of elements to skip (must be >= 0).
-            small_skip: Threshold for deciding whether to call __next__ or calculate.
+            small_skip: Threshold for deciding whether to use incremental or direct calculation.
         """
         if n <= 0:
             return
@@ -164,21 +200,32 @@ struct IndexIterator[shape_origin: ImmutOrigin, strides_origin: ImmutOrigin](
 
     @always_inline("nodebug")
     fn reset(mut self):
-        """Reset iterator to beginning."""
+        """Reset iterator to the beginning.
+
+        Resets the current offset, index, and coordinates to their initial values.
+        """
         self.current_offset = self.start_offset
         self.current_index = 0
         for i in range(self.rank):
             self.coords[i] = 0
 
+
     @always_inline("nodebug")
     fn peek(self) -> Int:
-        """Get current offset without advancing."""
+        """Get current offset without advancing.
+
+        Returns:
+            The current memory offset without modifying iterator state.
+        """
         return self.current_offset
 
 
 @fieldwise_init
 struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
     """Utility for calculating flat indices and coordinates in multi-dimensional arrays.
+
+    Provides static methods for converting between flat (linear) indices and
+    multi-dimensional coordinates, which is essential for tensor operations.
     """
 
     @always_inline
@@ -186,7 +233,20 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
     fn flatten_index(
         shape: Shape, indices: IntArray, strides: Strides, offset: Int = 0
     ) -> Int:
-        """Calculate flat index from IntArray indices."""
+        """Calculate flat (linear) index from multi-dimensional indices.
+
+        Args:
+            shape: Shape of the tensor
+            indices: IntArray of indices, one per dimension
+            strides: Strides of the tensor
+            offset: Base offset to add (default: 0)
+
+        Returns:
+            The flat memory offset corresponding to the given indices
+
+        Raises:
+            Panic if indices or strides have wrong rank, or if any index is out of bounds.
+        """
         # 1. Rank check
         var rank = shape.rank()
         if len(indices) != rank or len(strides) != rank:
@@ -238,7 +298,18 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
     @always_inline
     @staticmethod
     fn index_to_coord(shape: Shape, flat_index: Int) -> IntArray:
-        """Convert flat index to multi-dimensional coordinates."""
+        """Convert flat (linear) index to multi-dimensional coordinates.
+
+        Args:
+            shape: Shape of the tensor
+            flat_index: Linear index to convert
+
+        Returns:
+            IntArray of coordinates corresponding to the flat index
+
+        Raises:
+            Panic if flat_index is out of bounds.
+        """
         if flat_index < 0 or flat_index >= shape.num_elements():
             panic(
                 "IndexCalculator → index_to_coord: flat_index",
@@ -259,7 +330,18 @@ struct IndexCalculator(ImplicitlyCopyable, RegisterPassable):
     @staticmethod
     @always_inline
     fn max_index(shape: Shape, strides: Strides, offset: Int) -> Int:
-        var max_index = offset
+        """Calculate the maximum valid flat index for the given shape and strides.
+
+        Args:
+            shape: Shape of the tensor
+            strides: Strides of the tensor
+            offset: Base offset to add
+
+        Returns:
+            The maximum flat index that can be accessed in the tensor.
+        """
+        var max_idx = offset
         for i in range(shape.rank()):
-            max_index += (shape[i] - 1) * strides[i]
-        return max_index
+            if strides[i] > 0:
+                max_idx += (shape[i] - 1) * strides[i]
+        return max_idx

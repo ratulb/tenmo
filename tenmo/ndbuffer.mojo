@@ -122,6 +122,22 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
 
     @always_inline
     fn max_index(self) -> Int:
+        """Calculate the highest accessible memory offset.
+
+        For dimensions with positive strides, the maximum is reached at the
+        last index of that dimension. For negative strides, the highest
+        address is already at index 0 (the base offset), so those dimensions
+        do not contribute.
+
+        Returns:
+            The highest valid memory offset.
+
+        Example:
+            ```mojo
+            var buf = NDBuffer[DType.float32](Shape(3, 2), strides=Strides(4, -1), offset=10)
+            print(buf.max_index())  # 10 + 1*4 = 14
+            ```
+        """
         var max_idx = self.offset
         for i in range(self.shape.rank()):
             if self.strides[i] > 0:
@@ -867,11 +883,26 @@ struct NDBuffer[dtype: DType](
 
     @always_inline
     fn min_index(self) -> Int:
+        """Calculate the lowest accessible memory offset.
+
+        For dimensions with negative strides, the minimum is reached at the
+        last index of that dimension. For positive strides, the lowest
+        address is already at index 0 (the base offset), so those dimensions
+        do not contribute.
+
+        Returns:
+            The lowest valid memory offset.
+
+        Example:
+            ```mojo
+            var buf = NDBuffer[DType.float32](Shape(3, 2), strides=Strides(4, -1), offset=10)
+            print(buf.min_index())  # 10 + 1*(-1) = 9
+            ```
+        """
         var min_idx = self.offset
         for i in range(self.shape.rank()):
             if self.strides[i] < 0:
                 min_idx += (self.shape[i] - 1) * self.strides[i]
-            # positive stride: lowest address is already at offset
         return min_idx
 
     @always_inline
