@@ -221,38 +221,88 @@ struct Tensor[dtype: DType](
         return self.buffer.shared()
 
     fn is_leaf(self) -> Bool:
+        """Check if this tensor is a leaf in the autograd graph.
+
+        A leaf tensor is one that requires gradients but has no ancestors
+        (operations that produced it). Leaf tensors are the starting points
+        of gradient computation.
+
+        Returns:
+            True if this is a leaf tensor, False otherwise.
+        """
         return self.requires_grad and not self.ancestors is None
 
     @always_inline
     fn __len__(self) -> Int:
+        """Get the total number of elements in the tensor.
+
+        Returns:
+            The total number of elements (product of shape dimensions).
+            Returns 0 for scalar tensors with Shape().
+        """
         return self.shape()[0] if self.shape() != Shape() else 0
 
     @always_inline
     fn shape(ref self) -> ref[self.buffer.shape] Shape:
+        """Get the shape of this tensor.
+
+        Returns:
+            Reference to the tensor's shape.
+        """
         return self.buffer.shape
 
     @always_inline
     fn strides(ref self) -> ref[self.buffer.strides] Strides:
+        """Get the strides of this tensor.
+
+        Returns:
+            Reference to the tensor's strides.
+        """
         return self.buffer.strides
 
     @always_inline
     fn offset(self) -> Int:
+        """Get the base memory offset of this tensor's view.
+
+        Returns:
+            The offset into the underlying buffer.
+        """
         return self.buffer.offset
 
     @always_inline
     fn numels(self) -> Int:
+        """Get the total number of elements.
+
+        Returns:
+            The product of all shape dimensions.
+        """
         return self.buffer.numels()
 
     @always_inline
     fn num_elements(self) -> Int:
+        """Get the total number of elements.
+
+        Returns:
+            The product of all shape dimensions.
+        """
         return self.buffer.numels()
 
     @always_inline
     fn rank(self) -> Int:
+        """Get the number of dimensions.
+
+        Returns:
+            The number of axes in the tensor's shape.
+        """
         return self.buffer.rank()
 
     @always_inline
     fn max_index(self) -> Int:
+        """Get the highest valid memory offset.
+
+        Returns:
+            The maximum flat index accessible in this tensor.
+        """
         return self.buffer.max_index()
 
     @always_inline
@@ -261,6 +311,11 @@ struct Tensor[dtype: DType](
     ) -> IndexIterator[
         origin_of(self.buffer.shape), origin_of(self.buffer.strides)
     ]:
+        """Get an iterator over memory offsets.
+
+        Returns:
+            IndexIterator for iterating over physical memory offsets.
+        """
         return self.buffer.index_iterator()
 
     @always_inline
@@ -476,6 +531,18 @@ struct Tensor[dtype: DType](
                     offset += 1
 
     fn to_cpu(self, requires_grad: Optional[Bool] = None) raises -> Self:
+        """Transfer tensor to CPU.
+
+        Args:
+            requires_grad: If provided, overrides the requires_grad flag
+                on the returned tensor.
+
+        Returns:
+            A new tensor on CPU, with data copied over.
+
+        Raises:
+            Error if system has no accelerator.
+        """
         comptime if has_accelerator():
             return DeviceTransfer[Self.dtype].forward[True](
                 self, CPU().into(), requires_grad
@@ -487,6 +554,19 @@ struct Tensor[dtype: DType](
         gpu: Optional[GPU] = None,
         requires_grad: Optional[Bool] = None,
     ) raises -> Self:
+        """Transfer tensor to GPU.
+
+        Args:
+            gpu: Specific GPU to move to. If None, uses the default GPU.
+            requires_grad: If provided, overrides the requires_grad flag
+                on the returned tensor.
+
+        Returns:
+            A new tensor on the GPU, with data copied over.
+
+        Raises:
+            Error if system has no accelerator device.
+        """
         comptime if has_accelerator():
             if gpu:
                 return DeviceTransfer[Self.dtype].forward[True](
@@ -503,9 +583,19 @@ struct Tensor[dtype: DType](
             )
 
     fn device(self) -> Device:
+        """Get the device this tensor is on.
+
+        Returns:
+            The CPU or GPU device the tensor resides on.
+        """
         return self.buffer.device()
 
     fn device_context(self) -> Optional[DeviceContext]:
+        """Get GPU device context for this tensor.
+
+        Returns:
+            GPU device context if tensor is on GPU, None otherwise.
+        """
         comptime if has_accelerator():
             if self.is_on_gpu():
                 return self.buffer.device_context()
@@ -515,27 +605,53 @@ struct Tensor[dtype: DType](
 
     @always_inline
     fn has_grad(self) -> Bool:
+        """Check if gradient storage has been initialized.
+
+        Returns:
+            True if a gradient buffer exists for this tensor, False otherwise.
+        """
         return (
             self.gradbox != UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]()
         )
 
     @always_inline
     fn zero_grad(self):
+        """Zero out accumulated gradients.
+
+        Call this before backward() to reset gradients to zero.
+        Only affects tensors that require and have gradients.
+        """
         if self.requires_grad and self.has_grad():
             ref gradbox = self.gradbox[]
             gradbox.zero_grad()
 
     @always_inline
     fn gradients(self) -> UnsafePointer[Gradbox[Self.dtype], MutAnyOrigin]:
+        """Get raw pointer to the gradient buffer.
+
+        Returns:
+            Pointer to the Gradbox storing accumulated gradients.
+
+        Raises:
+            Panic if called on a tensor that does not require grad or has no gradient.
+        """
         if not self.requires_grad or not self.has_grad():
             panic(
-                "Tensor → grad(self): called on a tensor that does not require"
+                "Tensor → gradients(self): called on a tensor that does not require"
                 " grad or grad not initialized"
             )
         return self.gradbox
 
     @always_inline
     fn grad(self) -> Gradbox[Self.dtype]:
+        """Get accumulated gradients as a Gradbox.
+
+        Returns:
+            The Gradbox containing accumulated gradients.
+
+        Raises:
+            Panic if called on a tensor that does not require grad or has no gradient.
+        """
         if not self.requires_grad or not self.has_grad():
             panic(
                 "Tensor → grad(self): called on a tensor that does not require"
@@ -554,12 +670,27 @@ struct Tensor[dtype: DType](
         return self.shape()[1]
 
     fn is_scalar(self) -> Bool:
+        """Check if this tensor is a scalar (zero-dimensional).
+
+        Returns:
+            True if the tensor has a single element, False otherwise.
+        """
         return self.buffer.is_scalar()
 
     fn is_on_gpu(self) -> Bool:
+        """Check if this tensor is stored on a GPU.
+
+        Returns:
+            True if the tensor is on a GPU, False otherwise.
+        """
         return self.buffer.is_on_gpu()
 
     fn is_on_cpu(self) -> Bool:
+        """Check if this tensor is stored on the CPU.
+
+        Returns:
+            True if the tensor is on the CPU, False otherwise.
+        """
         return self.is_on_gpu() == False
 
     fn __eq__(self, scalar: Scalar[Self.dtype]) -> Tensor[DType.bool]:
@@ -633,6 +764,15 @@ struct Tensor[dtype: DType](
     fn to_dtype[
         NewType: DType
     ](self, requires_grad: Optional[Bool] = None) -> Tensor[NewType]:
+        """Convert tensor to a different data type.
+
+        Args:
+            requires_grad: If provided, overrides the requires_grad flag
+                on the returned tensor.
+
+        Returns:
+            A new tensor with the specified dtype.
+        """
         var new_type_buffer = self.buffer.to_dtype[NewType]()
         var grad_required = requires_grad.or_else(self.requires_grad)
         return Tensor[NewType](new_type_buffer^, requires_grad=grad_required)
@@ -642,7 +782,12 @@ struct Tensor[dtype: DType](
         var backwardFnArg: BackwardFnArg[Self.dtype],
         *parents: Tensor[Self.dtype],
     ):
-        # Initialize ancestors if needed
+        """Register parent tensors and backward function for autograd.
+
+        Args:
+            backwardFnArg: Backward pass function and metadata.
+            *parents: Parent tensors whose gradients this tensor depends on.
+        """
         if not self.ancestors:
             self.ancestors = Optional(Ancestors[Self.dtype](backwardFnArg^))
         else:
@@ -653,10 +798,23 @@ struct Tensor[dtype: DType](
             ancestors.append(parent)
 
     fn has_ancestry(self) -> Bool:
+        """Check if this tensor has registered parent dependencies.
+
+        Returns:
+            True if parent tensors have been registered, False otherwise.
+        """
         return self.ancestors != None
 
     @always_inline
     fn ancestry(ref self) -> ref[self.ancestors.value()] Ancestors[Self.dtype]:
+        """Get the ancestry graph for backward pass traversal.
+
+        Returns:
+            Reference to the Ancestors containing parent dependencies.
+
+        Raises:
+            Panic if ancestry has not been initialized.
+        """
         if self.ancestors == None:
             panic("Tensor → ancestry: ancestry not initialized")
         return self.ancestors.value()
@@ -736,6 +894,11 @@ struct Tensor[dtype: DType](
         )
 
     fn seed_grad(mut self, with_tensor: Tensor[Self.dtype]):
+        """Seed gradient accumulation with a specific tensor.
+
+        Args:
+            with_tensor: Tensor containing gradient values to seed with.
+        """
         if not self.requires_grad:
             return
         if not self.has_grad():
@@ -743,6 +906,11 @@ struct Tensor[dtype: DType](
         self.gradbox[].seed_grad(with_tensor)
 
     fn seed_grad(mut self, value: Scalar[Self.dtype]):
+        """Seed gradient accumulation with a scalar value.
+
+        Args:
+            value: Scalar gradient value to seed with.
+        """
         with_tensor = Tensor[Self.dtype].full(self.shape(), value)
         self.seed_grad(with_tensor)
 
