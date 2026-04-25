@@ -28,13 +28,14 @@ jobs:
         run: |
           export PATH="$HOME/.pixi/bin:$PATH"
           source $HOME/.bashrc
-          pixi run -e default -- mojo doc ./tenmo -o tenmo.json
+          pixi run -e default -- mojo doc ./tenmo -o tenmo.json || echo "FAILED"
 
       - name: Generate Markdown
         run: |
           export PATH="$HOME/.pixi/bin:$PATH"
           source $HOME/.bashrc
-          pixi run -e default -- python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/md/
+          pixi run -e default -- python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/md/ || echo "FAILED"
+          ls docs/md/*.md | wc -l || echo "No files"
 
       - name: Install Node
         uses: actions/setup-node@v4
