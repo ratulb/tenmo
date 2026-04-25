@@ -3998,14 +3998,10 @@ struct Tensor[dtype: DType](
             panic("pad_for_conv: expected 4D tensor")
 
         var pad_spec = List[Tuple[Int, Int]]()
-        # No padding on batch
-        pad_spec.append((0, 0))
-        # No padding on channels
-        pad_spec.append((0, 0))
-        # Pad height
-        pad_spec.append((pad, pad))
-        # Pad width
-        pad_spec.append((pad, pad))
+        pad_spec.append((0, 0)) #No padding on batch
+        pad_spec.append((0, 0)) #No padding on channels
+        pad_spec.append((pad, pad))# Pad height
+        pad_spec.append((pad, pad)) # Pad width
 
         return Pad[Self.dtype].forward[track_grad](
             x, pad_spec, "constant", 0.0, requires_grad
