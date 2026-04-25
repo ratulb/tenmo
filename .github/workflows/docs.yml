@@ -44,7 +44,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd docs
-          npm install --prefer-offline
+          npm install --legacy-peer-deps
 
       - name: Build Docusaurus
         run: |
