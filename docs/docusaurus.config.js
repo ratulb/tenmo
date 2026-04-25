@@ -20,7 +20,7 @@ const config = {
           showLastUpdateTime: true,
           showLastUpdateAuthor: true,
           sidebarPath: './sidebars.js',
-          editUrl: 'https://github.com/ratulb/tenmo/edit/development/tenmo/docs/',
+          editUrl: 'https://github.com/ratulb/tenmo/edit/development/',
         },
         blog: false,
         theme: {

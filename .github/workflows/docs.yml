@@ -39,22 +39,19 @@ jobs:
         run: |
           export PATH="$HOME/.pixi/bin:$PATH"
           source $HOME/.bashrc
-          python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o tenmo/docs/docs/
+          python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/docs/
 
       - name: Install dependencies
         run: |
-          cd tenmo/docs
           npm install --prefer-offline
 
       - name: Build Docusaurus
-        run: |
-          cd tenmo/docs
-          npm run build
+        run: npm run build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./tenmo/docs/build/tenmo
+          publish_dir: ./build/tenmo
           force_orphan: true
           allow_empty_commit: true
