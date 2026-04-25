@@ -1,8 +1,0 @@
-{
-  "name": "tenmo-docs",
-  "version": "0.1.0",
-  "private": true,
-  "dependencies": {
-    "marked": "4.3.0"
-  }
-}

@@ -1,12 +1,14 @@
-name: Build and Deploy Docs
+name: Docs
 
 on:
   push:
     branches: [document]
+  pull_request:
+    branches: [document]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -15,37 +17,44 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Pixi
-        run: curl -fsSL https://pixi.sh/install.sh | sh
-
-      - name: Install dependencies (including mojodoc fork)
-        run: |
-          export PATH="$HOME/.pixi/bin:$PATH"
-          source $HOME/.bashrc
-          pixi install
+      - name: Setup Pixi
+        uses: prefix-dev/setup-pixi@v0.8.8
+        with:
+          environments: dev
+          cache: false
+          post-cleanup: false
 
       - name: Generate docs with mojodoc
-        run: |
-          export PATH="$HOME/.pixi/bin:$PATH"
-          source $HOME/.bashrc
-          pixi run docs-build
-
-      - name: Install Node and generate HTML
-        run: |
-          cd docs
-          npm install marked@4
-          node generate.js
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: nick-fields/retry@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/generated
-          force_orphan: true
-          allow_empty_commit: true
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: pixi run -e dev docs-build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/doc
+
+  deploy:
+    if: github.ref == 'refs/heads/document' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
