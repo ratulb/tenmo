@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const rootDir = __dirname;
-const docsDir = path.join(rootDir, 'docs');
+const docsDir = path.join(rootDir, 'md');
 const outDir = path.join(rootDir, 'generated');
 
 console.log('rootDir:', rootDir);
