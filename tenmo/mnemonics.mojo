@@ -53,3 +53,6 @@ comptime SIGMOID_BACKWARD = 45
 comptime TANH_BACKWARD = 46
 comptime LOG_BACKWARD = 47
 comptime INVERT = 48
+comptime SUM = 49
+comptime MEAN = 50
+comptime PRODUCT = 51
