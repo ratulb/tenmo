@@ -1,16 +1,10 @@
 """
 # Core Types
-- `Tensor` — the central type. Tracks gradients, owns data, participates in
-  the autograd graph. Supports CPU and GPU.
-- `NDBuffer` — shape, strides, offset, and data. Single source of truth for
-  memory layout. Shared between tensors and views via ref-counting.
-- `Gradbox` — gradient storage. Independently ref-counted — survives ASAP
-  tensor destruction. Views have their own independent gradboxes.
-- `Ancestor` — lightweight parent handle in the autograd graph. Carries id,
-  grad routing, a refcounted gradbox pointer, `Layout`, and `Storage`. Does
-  not copy full tensors.
-- `Ancestors` — the ancestry list for a tensor. Carries the `BackwardFnArg`
-  directly — not stored on `Tensor`.
+- `Tensor` — the central type. Tracks gradients, owns data, participates in the autograd graph. Supports CPU and GPU.
+- `NDBuffer` — shape, strides, offset, and data. Single source of truth for memory layout. Shared between tensors and views via ref-counting.
+- `Gradbox` — gradient storage. Independently ref-counted — survives ASAP tensor destruction. Views have their own independent gradboxes.
+- `Ancestor` — lightweight parent handle in the autograd graph. Carries id, grad routing, a refcounted gradbox pointer, `Layout`, and `Storage`. Does not copy full tensors.
+- `Ancestors` — the ancestry list for a tensor. Carries the `BackwardFnArg` directly — not stored on `Tensor`.
 - `Layout` — shape, strides, offset, contiguity. Pure metadata, no data.
 - `Storage` — CPU `Buffer` or GPU `DeviceState`. Refcount bump on copy.
 - `Buffer` — linear, SIMD-capable storage. Ref-counted when shared via views.
@@ -146,4 +140,5 @@ from  .vectormatrix import *
 from  .vectormatrix_kernel import *
 from  .views import *
 from  .walkback import *
+
 
