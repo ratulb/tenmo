@@ -3,8 +3,11 @@ const fs = require('fs');
 const path = require('path');
 
 const rootDir = fs.realpathSync(__dirname);
-const docsDir = path.join(rootDir, 'docs', 'docs');
-const outDir = path.join(rootDir, 'docs', 'generated');
+const docsDir = path.join(rootDir, 'md');
+const outDir = path.join(rootDir, 'generated');
+
+console.log('rootDir:', rootDir);
+console.log('docsDir:', docsDir);
 
 console.log('rootDir:', rootDir);
 console.log('docsDir:', docsDir);
