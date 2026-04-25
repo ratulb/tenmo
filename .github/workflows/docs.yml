@@ -47,3 +47,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/generated
           force_orphan: true
+          allow_empty_commit: true
