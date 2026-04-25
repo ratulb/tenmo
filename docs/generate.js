@@ -14,7 +14,7 @@ function fixExternalLinks(html) {
   return html.replace(/href="\/mojo\/std\//g, 'href="https://docs.modular.com/mojo/stdlib/');
 }
 
-const template = (title, content) => `<!DOCTYPE html>
+const template = (title, content, isIndex) => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -28,7 +28,7 @@ const template = (title, content) => `<!DOCTYPE html>
 </head>
 <body>
   <div style="margin-bottom: 20px; border-bottom: 1px solid #eee;">
-    <a href="/tenmo/">Home</a> | <a href="/tenmo/tensor/index.html">Tensor</a> | <a href="/tenmo/shapes/index.html">Shapes</a>
+    <a href="index.html">Home</a> | <a href="tensor/index.html">Tensor</a> | <a href="shapes/index.html">Shapes</a>
   </div>
   ${content}
 </body>

@@ -28,33 +28,18 @@ jobs:
         run: |
           export PATH="$HOME/.pixi/bin:$PATH"
           source $HOME/.bashrc
-          set -x
-          which mojo || pip install mojo
           pixi run -e default -- mojo doc ./tenmo -o tenmo.json
-          ls -la tenmo.json
 
       - name: Generate Markdown
         run: |
           export PATH="$HOME/.pixi/bin:$PATH"
           source $HOME/.bashrc
-          set -x
-          ls tenmo.json
           python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/md/
-          ls docs/md/
-          find docs/md -name "*.md" | wc -l
-          du -sh docs/md/
 
-      - name: Install Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install marked and generate HTML
+      - name: Install Node and generate HTML
         run: |
           npm install marked
           node docs/generate.js
-          ls -la docs/generated/
-          find docs/generated -name "*.html" | wc -l
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -78,6 +63,8 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
+        with:
+          static_site_generator: 'docusaurus'
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
