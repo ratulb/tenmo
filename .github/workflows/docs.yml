@@ -42,6 +42,8 @@ jobs:
           ls tenmo.json
           python3 scripts/mojodoc_json_to_markdown.py tenmo.json -o docs/md/
           ls docs/md/
+          find docs/md -name "*.md" | head -5
+          find docs/md -name "*.md" | wc -l
 
       - name: Install Node
         uses: actions/setup-node@v4
