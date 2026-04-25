@@ -44,7 +44,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd docs
-          npm install --legacy-peer-deps
+          npm install --force
 
       - name: Build Docusaurus
         run: |
