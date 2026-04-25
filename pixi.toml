@@ -14,8 +14,8 @@ mnist-datasets = ">=0.14, <0.15"
 pure-cifar-10 = ">=0.1.1"
 
 [feature.dev.dependencies]
-mojodoc = { git = "https://github.com/ehsanmok/mojodoc.git", branch = "main" }
-#mojodoc = { git = "https://github.com/ratulb/mojodoc.git", branch = "main" }
+#mojodoc = { git = "https://github.com/ehsanmok/mojodoc.git", branch = "main" }
+mojodoc = { git = "https://github.com/ratulb/mojodoc.git", branch = "main" }
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }
