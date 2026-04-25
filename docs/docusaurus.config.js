@@ -8,7 +8,6 @@ const config = {
   favicon: 'img/favicon.ico',
   organizationName: 'ratulb',
   projectName: 'tenmo',
-  githubUrl: 'https://github.com/ratulb/tenmo',
   trailingSlash: false,
   presets: [
     [
