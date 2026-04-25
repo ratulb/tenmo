@@ -28,7 +28,6 @@ from .gradbox import Gradbox
 from .intarray import IntArray
 from .broadcasthelper import ShapeBroadcaster
 from .ndbuffer import NDBuffer
-from .utilities import Utils
 from std.gpu.host import DeviceBuffer, DeviceContext
 from .device import Device, CPU, GPU
 from std.sys.info import has_accelerator
@@ -2191,14 +2190,15 @@ struct Tensor[dtype: DType](
         """
         return self.sum[track_grad](IntArray(axes), keepdims, requires_grad)
 
+
     fn sum[
-        track_grad: Bool = True
-    ](
-        self,
-        axes: IntArray,
-        keepdims: Bool = False,
-        requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype]:
+         track_grad: Bool = True
+     ](
+         self,
+         axes: IntArray,
+         keepdims: Bool = False,
+         requires_grad: Optional[Bool] = None,
+     ) -> Tensor[Self.dtype]:
         """Sum tensor elements along given axes.
 
         Args:
@@ -2209,7 +2209,50 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with summed values along the specified axes.
         """
-        return Summer[Self.dtype].forward[track_grad](
+
+         return Summer[Self.dtype].forward[track_grad](
+             self, axes, keepdims, requires_grad
+         )
+
+    fn product[
+        track_grad: Bool = True
+    ](
+        self,
+        axes: List[Int] = [],
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+        """Compute product along given axes.
+
+        Args:
+            axes: Axes along which to compute product.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with product values along the specified axes.
+        """
+        return self.product[track_grad](IntArray(axes), keepdims, requires_grad)
+
+    fn product[
+        track_grad: Bool = True
+    ](
+        self,
+        axes: IntArray,
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
+        """Product tensor elements along given axes.
+
+        Args:
+            axes: Axes along which to compute product.
+            keepdims: If True, keep reduced axes with size 1.
+            requires_grad: If provided, overrides requires_grad.
+
+        Returns:
+            Tensor with product values along the specified axes.
+        """
+        return Product[Self.dtype].forward[track_grad](
             self, axes, keepdims, requires_grad
         )
 
@@ -2480,7 +2523,7 @@ struct Tensor[dtype: DType](
         return self.buffer.count(key)
 
     fn sum_all(self) -> Scalar[Self.dtype]:
-        """Sum all elements into a single scalar.
+        """Sum all elements into a single scalar - CPU only op.
 
         Returns:
             Sum of all elements in the tensor.
@@ -2491,7 +2534,7 @@ struct Tensor[dtype: DType](
         return self.buffer.sum_all()
 
     fn product_all(self) -> Scalar[Self.dtype]:
-        """Compute the product of all elements.
+        """Compute the product of all elements - CPU only op.
 
         Returns:
             Product of all elements in the tensor.
@@ -2500,11 +2543,7 @@ struct Tensor[dtype: DType](
             Self.dtype.is_numeric()
         ), "Tensor → product_all is for numeric data types only"
 
-        return self.buffer.reduce[
-            Utils[Self.dtype].product_buffer,
-            Utils[Self.dtype].product_scalars,
-            unit=Scalar[Self.dtype](1),
-        ]()
+        return self.buffer.prodcut_all()
 
     fn exp[
         track_grad: Bool = True

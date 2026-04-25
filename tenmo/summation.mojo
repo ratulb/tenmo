@@ -1,5 +1,5 @@
 from .tensor import Tensor
-from .mnemonics import AddTensor
+from .mnemonics import AddTensor, SUM
 from .intarray import IntArray
 from .shapes import Shape
 from .backpropagation import BackwardFnArg, ReductionArg, BACKWARD_SUM
@@ -68,7 +68,7 @@ struct Summer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     ) -> Tensor[Self.dtype]:
         var shape = tensor.shape()
         var reduction_axes = Validator.normalize_reduction_axes(shape, axes)
-        var nd_buffer = tensor.buffer.reduce(reduction_axes, keepdims)
+        var nd_buffer = tensor.buffer.reduce[SUM](reduction_axes, keepdims)
         var out = Tensor[Self.dtype](nd_buffer^, requires_grad=False)
 
         comptime if track_grad:

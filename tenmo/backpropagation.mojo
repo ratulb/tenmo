@@ -69,6 +69,7 @@ comptime BACKWARD_DEVICE_TRANSFER = 51
 comptime BACKWARD_MAX_SCALAR = 52
 comptime BACKWARD_MIN_SCALAR = 53
 comptime BACKWARD_MULTIPLY_BROADCAST = 54
+comptime BACKWARD_PRODUCT = 55
 
 
 trait ArgumentType(ImplicitlyCopyable & Movable):
@@ -284,7 +285,6 @@ struct StdArg[dtype: DType](ArgumentType):
     var unbiased: Bool
     var keepdims: Bool
     var epsilon: Scalar[Self.dtype]
-
 
 @fieldwise_init
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):

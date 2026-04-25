@@ -133,7 +133,6 @@ from  .tiles import *
 from  .transpose import *
 from  .unary_ops_kernel import *
 from  .unsqueeze import *
-from  .utilities import *
 from  .validators import *
 from  .variance import *
 from  .vectormatrix import *

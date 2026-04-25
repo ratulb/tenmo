@@ -21,7 +21,7 @@ from .binary_inplace_ops_kernel import BinaryInplaceOperations
 from .unary_ops_kernel import UnaryOpsKernel
 from .matmul_kernel import MatmulNdGpu
 from .compare_kernel import AllClose, Compare, CompareScalar
-from .reduction_kernel import Reduction
+from .reduction_kernel import Reduction, ProductArg
 from .minmax_kernel import ReductionMinMax
 from .minmax_reducer import MinMaxReducer
 from std.math import sqrt, log, exp, tanh
@@ -54,6 +54,8 @@ from .mnemonics import (
     LessThanEqual,
     GreaterThan,
     GreaterThanEqual,
+    SUM,
+    MEAN,
 )
 
 
@@ -143,6 +145,7 @@ struct Layout(ImplicitlyCopyable & Movable & Equatable):
             if self.strides[i] > 0:
                 max_idx += (self.shape[i] - 1) * self.strides[i]
         return max_idx
+
 
 
 struct Storage[dtype: DType](ImplicitlyCopyable & Movable):
@@ -1194,42 +1197,20 @@ struct NDBuffer[dtype: DType](
             index += 1
         return NDBuffer[Self.dtype](buffer^, self.shape)
 
-    fn map[
-        map_buffer: fn(Buffer[Self.dtype]) -> Buffer[Self.dtype],
-        map_element: fn(Scalar[Self.dtype]) -> Scalar[Self.dtype],
-    ](self) -> Buffer[Self.dtype]:
+    fn product_all(self) -> Scalar[Self.dtype]:
+        """CPU only operation."""
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
-            return map_buffer(self.buffer[start:end])
+            return self.buffer.product(start, end)
         else:
-            var buffer = Buffer[Self.dtype](self.numels())
-            var index = 0
-            for idx in self.index_iterator():
-                buffer[index] = map_element(self.buffer[idx])
-                index += 1
-            return buffer^
-
-    fn reduce[
-        reduce_buffer: fn(Buffer[Self.dtype], Int, Optional[Int]) -> Scalar[
-            Self.dtype
-        ],
-        reduce_elements: fn(Scalar[Self.dtype], Scalar[Self.dtype]) -> Scalar[
-            Self.dtype
-        ],
-        unit: Scalar[Self.dtype] = Scalar[Self.dtype](0),
-    ](self) -> Scalar[Self.dtype]:
-        if self.is_contiguous():
-            var start = self.offset
-            var end = start + self.numels()
-            return reduce_buffer(self.buffer, start, end)
-        else:
-            var accum: Scalar[Self.dtype] = unit
+            var product: Scalar[Self.dtype] = Scalar[Self.dtype](1)
             for index in self.index_iterator():
-                accum = reduce_elements(self.buffer[index], accum)
-            return accum
+                product *= self.buffer[index]
+            return product
 
     fn sum_all(self) -> Scalar[Self.dtype]:
+        """CPU only operation."""
         if self.is_contiguous():
             var start = self.offset
             var end = start + self.numels()
@@ -1243,14 +1224,344 @@ struct NDBuffer[dtype: DType](
     fn sum(
         self, normalized_axes: IntArray, keepdims: Bool = False
     ) -> NDBuffer[Self.dtype]:
-        return self.reduce[mean=False](normalized_axes, keepdims)
+        return self.reduce[op_code=SUM](normalized_axes, keepdims)
 
     fn reduce[
+        op_code: Int = SUM
+    ](self, normalized_axes: IntArray, keepdims: Bool = False) -> NDBuffer[
+        Self.dtype
+    ]:
+        """Sum / mean reduction. Axes must be already normalized.
+        op_code: SUM or MEAN. For PRODUCT use product()."""
+
+        var out: NDBuffer[Self.dtype]
+
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    out = Reduction[Self.dtype].launch[op_code](
+                        self, normalized_axes, keepdims
+                    )
+                except e:
+                    print(e)
+                    panic(
+                        "NDBuffer reduce — GPU operation failed for op_code: ",
+                        String(op_code),
+                    )
+                    out = NDBuffer[Self.dtype].Empty()
+            else:
+                out = self.reduce_cpu[op_code](normalized_axes, keepdims)
+        else:
+            out = self.reduce_cpu[op_code](normalized_axes, keepdims)
+
+        return out^
+
+    fn reduce_cpu[
+        op_code: Int = SUM
+    ](self, normalized_axes: IntArray, keepdims: Bool) -> NDBuffer[Self.dtype]:
+        """CPU sum / mean. op_code: SUM or MEAN."""
+        var reduced_volume = Scalar[Self.dtype](1)
+
+        comptime if op_code == MEAN:
+            var volume = self.shape.reduced_shape(normalized_axes).product()
+            reduced_volume = reduced_volume if volume == 0 else Scalar[
+                Self.dtype
+            ](volume)
+
+        var out_shape = self.shape.compute_output_shape(
+            normalized_axes, keepdims, validated=True
+        )
+        var out = NDBuffer[Self.dtype].zeros(out_shape)
+
+        if out_shape == Shape():
+            comptime if op_code == MEAN:
+                out[IntArray()] = self.sum_all() / reduced_volume
+            else:
+                out[IntArray()] = self.sum_all()
+        else:
+            var reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
+            for out_coord in out_shape:
+                var accum = Scalar[Self.dtype](0)
+                for red_coord in reduction_axes_shape:
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        normalized_axes, red_coord
+                    )
+                    accum += self[self_coord]
+                comptime if op_code == MEAN:
+                    out[out_coord] = accum / reduced_volume
+                else:
+                    out[out_coord] = accum
+
+        return out^
+
+    # ── product: NEW ─────────────────────────────────────────────────────────
+    # Returns Tuple[NDBuffer, ProductArg] — result + backward arg.
+    # ProductArg is passed up to Product.forward which stores it in BackwardFnArg.
+
+    fn product[
+        store_excl_product: Bool = True,
+    ](
+        self,
+        normalized_axes: IntArray,
+        keepdims: Bool = False,
+    ) -> Tuple[NDBuffer[Self.dtype], ProductArg[Self.dtype]]:
+        """Product reduction. Axes must be already normalized.
+
+        Returns (result NDBuffer, ProductArg) — caller stores ProductArg
+        in BackwardFnArg for backward pass.
+
+        All dtypes. Float64 log-space accumulation — overflow safe.
+        """
+        var out: NDBuffer[Self.dtype]
+        var arg: ProductArg[Self.dtype]
+
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    var result = Reduction[Self.dtype].launch_product[
+                        store_excl_product
+                    ](self, normalized_axes, keepdims)
+                    out = result[0]
+                    arg = result[1]
+                except e:
+                    print(e)
+                    panic("NDBuffer product — GPU operation failed: ", String(e))
+                    # Unreachable
+                    out = NDBuffer[Self.dtype].Empty()
+                    arg = ProductArg[Self.dtype].Empty()
+            else:
+                (out, arg) = self.product_cpu[store_excl_product](
+                    normalized_axes, keepdims
+                )
+        else:
+            (out, arg) = self.product_cpu[store_excl_product](
+                normalized_axes, keepdims
+            )
+
+        return (out^, arg^)
+
+    fn product_cpu[
+        store_excl_product: Bool = True,
+    ](
+        self,
+        normalized_axes: IntArray,
+        keepdims: Bool,
+    ) -> Tuple[NDBuffer[Self.dtype], ProductArg[Self.dtype]]:
+        """CPU product reduction. Float64 log-space — overflow safe.
+
+        Mirrors GPU product_reduce kernel logic exactly so CPU and GPU
+        produce identical results (within float64 precision).
+        """
+        var out_shape = self.shape.compute_output_shape(
+            normalized_axes, keepdims, validated=True
+        )
+        var out         = NDBuffer[Self.dtype].zeros(out_shape)
+        var zero_counts = NDBuffer[DType.int32].zeros(out_shape)
+
+        var f64_zero = Scalar[DType.float64](0)
+
+        if out_shape == Shape():
+            # Full reduction to scalar
+            var log_abs_sum = f64_zero
+            var neg_count   = 0
+            var zero_count  = 0
+            for idx in self.index_iterator():
+                var val = self.buffer[idx].cast[DType.float64]()
+                if val == f64_zero:
+                    zero_count += 1
+                else:
+                    if val < f64_zero:
+                        neg_count += 1
+                    log_abs_sum += log(abs(val))
+            zero_counts[IntArray()] = Scalar[DType.int32](zero_count)
+            if zero_count > 0:
+                out[IntArray()] = Scalar[Self.dtype](0)
+            else:
+                var sign = Scalar[DType.float64](-1 if neg_count % 2 == 1 else 1)
+                out[IntArray()] = (sign * exp(log_abs_sum)).cast[Self.dtype]()
+        else:
+            var reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
+            for out_coord in out_shape:
+                var log_abs_sum = f64_zero
+                var neg_count   = 0
+                var zero_count  = 0
+                for red_coord in reduction_axes_shape:
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        normalized_axes, red_coord
+                    )
+                    var val = self[self_coord].cast[DType.float64]()
+                    if val == f64_zero:
+                        zero_count += 1
+                    else:
+                        if val < f64_zero:
+                            neg_count += 1
+                        log_abs_sum += log(abs(val))
+                zero_counts[out_coord] = Scalar[DType.int32](zero_count)
+                if zero_count > 0:
+                    out[out_coord] = Scalar[Self.dtype](0)
+                else:
+                    var sign = Scalar[DType.float64](
+                        -1 if neg_count % 2 == 1 else 1
+                    )
+                    out[out_coord] = (sign * exp(log_abs_sum)).cast[Self.dtype]()
+
+        # excl_product: compute now or defer to backward
+        var excl_optional: Optional[NDBuffer[Self.dtype]] = None
+        comptime if store_excl_product:
+            excl_optional = Optional(self.excl_product_cpu(normalized_axes, keepdims))
+
+        var reduced_volume = self.shape.reduced_shape(normalized_axes).product()
+
+        var arg = ProductArg[Self.dtype](
+            input          = self,
+            excl_product   = excl_optional^,
+            zero_counts    = zero_counts^,
+            axes           = normalized_axes,
+            keepdims       = keepdims,
+            reduced_volume = reduced_volume,
+        )
+
+        return (out^, arg^)
+
+    fn compute_excl_product(
+        self,
+        normalized_axes: IntArray,
+        keepdims: Bool,
+    ) -> NDBuffer[Self.dtype]:
+        """Compute exclusive product buffer for backward recompute path.
+
+        Called by ProductBackward when store_excl_product=False.
+        Dispatches to GPU kernel or CPU reference.
+        """
+        comptime if has_accelerator():
+            if self.is_on_gpu():
+                try:
+                    return Reduction[Self.dtype].compute_excl_product(
+                        self, normalized_axes, keepdims
+                    )
+                except e:
+                    panic(
+                        "NDBuffer compute_excl_product — GPU failed: ",
+                        String(e),
+                    )
+                    return NDBuffer[Self.dtype].Empty()  # Unreachable
+        return self.excl_product_cpu(normalized_axes, keepdims)
+
+    fn excl_product_cpu(
+        self,
+        normalized_axes: IntArray,
+        keepdims: Bool,
+    ) -> NDBuffer[Self.dtype]:
+        """CPU exclusive product: excl[i] = product of all others in slice.
+
+        Mirrors excl_product_kernel logic. Float64 log-space — overflow safe.
+        Output is input-shaped.
+        """
+        var excl = NDBuffer[Self.dtype].zeros(self.shape)
+        var f64_zero = Scalar[DType.float64](0)
+        var out_shape = self.shape.compute_output_shape(
+            normalized_axes, keepdims, validated=True
+        )
+        var reduction_axes_shape = self.shape.reduced_shape(normalized_axes)
+
+        # For each output (slice), compute total log_abs, neg_count, zero_count
+        # then for each element in the slice compute excl via subtraction
+        if out_shape == Shape():
+            # Full reduction — one slice, all elements
+            var total_log  = f64_zero
+            var total_neg  = 0
+            var total_zero = 0
+            for idx in self.index_iterator():
+                var val = self.buffer[idx].cast[DType.float64]()
+                if val == f64_zero:
+                    total_zero += 1
+                else:
+                    if val < f64_zero:
+                        total_neg += 1
+                    total_log += log(abs(val))
+
+            for idx in self.index_iterator():
+                var val = self.buffer[idx].cast[DType.float64]()
+                excl.set(idx, Self._excl_one_cpu(
+                    val, total_log, total_neg, total_zero, f64_zero
+                ))
+        else:
+            for out_coord in out_shape:
+                # Pass 1: totals for this slice
+                var total_log  = f64_zero
+                var total_neg  = 0
+                var total_zero = 0
+                for red_coord in reduction_axes_shape:
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        normalized_axes, red_coord
+                    )
+                    var val = self[self_coord].cast[DType.float64]()
+                    if val == f64_zero:
+                        total_zero += 1
+                    else:
+                        if val < f64_zero:
+                            total_neg += 1
+                        total_log += log(abs(val))
+
+                # Pass 2: excl for each element in slice
+                for red_coord in reduction_axes_shape:
+                    var self_coord = out_coord.replace(
+                        normalized_axes, red_coord
+                    ) if keepdims else out_coord.insert(
+                        normalized_axes, red_coord
+                    )
+                    var val = self[self_coord].cast[DType.float64]()
+                    excl[self_coord] = Self._excl_one_cpu(
+                        val, total_log, total_neg, total_zero, f64_zero
+                    )
+
+        return excl^
+
+    @staticmethod
+    fn _excl_one_cpu(
+        val:        Scalar[DType.float64],
+        total_log:  Scalar[DType.float64],
+        total_neg:  Int,
+        total_zero: Int,
+        f64_zero:   Scalar[DType.float64],
+    ) -> Scalar[Self.dtype]:
+        """Compute exclusive product for one element. CPU helper."""
+        if total_zero > 1:
+            return Scalar[Self.dtype](0)
+        elif total_zero == 1:
+            if val == f64_zero:
+                # This is the zero — excl = product of all non-zero others
+                var sign = Scalar[DType.float64](
+                    -1 if total_neg % 2 == 1 else 1
+                )
+                return (sign * exp(total_log)).cast[Self.dtype]()
+            else:
+                # Non-zero element in a one-zero slice → excl contains zero
+                return Scalar[Self.dtype](0)
+        else:
+            # No zeros
+            if val == f64_zero:
+                return Scalar[Self.dtype](0)  # Shouldn't reach here
+            var val_neg  = 1 if val < f64_zero else 0
+            var excl_log = total_log - log(abs(val))
+            var excl_neg = total_neg - val_neg
+            var sign = Scalar[DType.float64](
+                -1 if excl_neg % 2 == 1 else 1
+            )
+            #return (sign * exp(excl_log)).cast[Self.dtype]()
+
+
+            _=""" fn reduce[
         mean: Bool = False
     ](self, normalized_axes: IntArray, keepdims: Bool = False) -> NDBuffer[
         Self.dtype
     ]:
-        """Axes must be already normalized."""
 
         var out: NDBuffer[Self.dtype]
 
@@ -1320,7 +1631,8 @@ struct NDBuffer[dtype: DType](
                 else:
                     out[out_coord] = accum_sum
 
-        return out^
+        return out^"""
+            return (sign * exp(excl_log)).cast[Self.dtype]()
 
     fn log_sum(
         self, normalized_axes: IntArray, keepdims: Bool = False

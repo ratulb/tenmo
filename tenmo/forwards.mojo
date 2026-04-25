@@ -11,6 +11,7 @@ from .multiplication import MultiplyScalar, Multiplicator
 from .division import DivideByScalar, DivideScalar, Divider
 from .summation import Summer
 from .mean_reduction import Mean
+from .product_reduction import Product
 from .transpose import Transpose
 from .dotproduct import Dot
 from .expand import Expand

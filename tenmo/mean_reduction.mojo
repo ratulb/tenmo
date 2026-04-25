@@ -1,6 +1,6 @@
 from .tensor import Tensor
 from .intarray import IntArray
-from .mnemonics import AddTensor
+from .mnemonics import AddTensor, MEAN
 from .shapes import Shape
 from .backpropagation import BackwardFnArg, ReductionArg, BACKWARD_MEAN
 from .validators import Validator
@@ -80,7 +80,7 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         normalized_axes = Validator.validate_and_normalize_axes(
             tensor.shape(), axes
         )
-        var ndb = tensor.buffer.reduce[mean=True](normalized_axes, keepdims)
+        var ndb = tensor.buffer.reduce[op_code=MEAN](normalized_axes, keepdims)
         var out = Tensor[Self.dtype](ndb^, requires_grad=False)
 
         comptime if track_grad:
@@ -106,7 +106,7 @@ struct Mean[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         normalized_axes = Validator.validate_and_normalize_axes(
             gradbox_shape, axes
         )
-        var ndb = gradbox.buffer.reduce[mean=True](normalized_axes, keepdims)
+        var ndb = gradbox.buffer.reduce[op_code=MEAN](normalized_axes, keepdims)
         var out = Gradbox[Self.dtype](ndb^, share=False)
 
         return out^

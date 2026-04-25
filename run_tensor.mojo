@@ -1,5 +1,7 @@
 # run_tensor.mojo  (sits at repo root, outside tenmo/)
 from tenmo.tensor import Tensor
+from tenmo.ndbuffer import NDBuffer
+from tenmo.backpropagation import ProductArg
 
 fn main_1() raises:
     # whatever quick test you want
@@ -7,7 +9,7 @@ fn main_1() raises:
     t.print()
 
 
-fn main() raises:
+fn main_2() raises:
     var a = Tensor.d1([1.0, 2.0, 3.0], requires_grad=True)
     var b = a * 2
     var c = a * 3
@@ -16,3 +18,10 @@ fn main() raises:
     loss.backward()
     # a.grad() == [5.0, 5.0, 5.0]
     a.grad().print()
+
+fn main_3() raises:
+    var a = NDBuffer[DType.float32](1.0, 2.0, 3.0)
+    a.print()
+
+fn main() raises:
+   print("passes")

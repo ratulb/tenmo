@@ -11,7 +11,6 @@ from .matmul import Matmul
 from std.random import seed, random_float64
 from .buffers import Buffer
 from .forwards import Mean, Sqrt
-from .utilities import Utils
 from .indexhelper import IndexIterator
 from .filler import Filler
 from .common_utils import Idx, panic, print_buffer
@@ -99,11 +98,7 @@ struct Gradbox[dtype: DType](
         return Gradbox[Self.dtype](nd_buffer^, share=False)
 
     fn __abs__(self) -> Gradbox[Self.dtype]:
-        var buffer = self.buffer.map[
-            Utils[Self.dtype].abs_buffer, Utils[Self.dtype].abs_scalar
-        ]()
-        var nd_buffer = NDBuffer[Self.dtype](buffer^, self.buffer.shape)
-        return Gradbox[Self.dtype](nd_buffer^, share=False)
+        return Gradbox[Self.dtype](self.buffer.__abs__(), share=False)
 
     fn sqrt(
         self,
