@@ -36,7 +36,7 @@ from std.algorithm import parallelize
 from .ndbuffer import NDBuffer
 from std.random import seed, random_float64
 from std.sys import simd_width_of
-
+from .device import GPU
 
 @fieldwise_init
 struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
@@ -217,6 +217,19 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
+    fn to_gpu(
+        deinit self,
+        gpu: Optional[GPU] = None
+    ) raises -> Linear[Self.dtype, Self.mode]:
+        """Move this Linear layer to GPU.
+        Consumes self — original CPU Linear is destroyed.
+        """
+        var weight_gpu = self.weight.to_gpu(gpu=gpu, stop_grad=True)
+        var bias_gpu   = self.bias.to_gpu(gpu=gpu, stop_grad=True)
+        var out = self^
+        out.weight = weight_gpu^
+        out.bias   = bias_gpu^
+        return out^
 
 @fieldwise_init
 struct Profile(RegisterPassable & ImplicitlyCopyable):
@@ -484,6 +497,17 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
 
                 return result^
 
+    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Linear[Self.dtype, Self.mode]:
+        """LinearBLAS does not support GPU.
+
+        BLAS operates on CPU memory. Use Linear for GPU models.
+        """
+        panic(
+         "LinearBLAS does not support GPU — use Linear[dtype] for GPU models"
+        )
+        # Unreachable — satisfies compiler
+        return Linear[Self.dtype, Self.mode](self.in_features, self.out_features)
+
     @always_inline
     fn matmul(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         var result: Tensor[Self.dtype]
@@ -591,6 +615,9 @@ struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
+    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
+        """No-op — activation layer have no parameters to move."""
+        return self
 
 struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
@@ -627,6 +654,10 @@ struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
+    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
+        """No-op — activation layer have no parameters to move."""
+        return self
+
 
 struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
@@ -662,6 +693,10 @@ struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
+
+    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
+        """No-op — activation layer have no parameters to move."""
+        return self
 
 
 # Refer to operators & matmul
@@ -797,6 +832,34 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         elif self.tag == MAXPOOL2D:
             self.layer[MaxPool2d[Self.dtype]].eval()
 
+    fn to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Module[Self.dtype]:
+        """Move this module to GPU.
+
+        Dispatches to the appropriate layer's to_gpu().
+        Activation layers (ReLU, Sigmoid, Tanh, Dropout, Flatten, MaxPool2d)
+        are returned unchanged — they have no parameters.
+        LinearBLAS panics — use Linear for GPU models.
+
+        Args:
+            gpu: Target GPU. Uses default GPU if None.
+
+        Returns:
+            New Module with GPU parameters.
+        """
+        if self.tag == LINEAR:
+            var l = self.layer[Linear[Self.dtype, mm]]
+            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)^), self.tag)
+        elif self.tag == LINEAR_BLAS:
+            var l = self.layer[LinearBLAS[Self.dtype, mm]]
+            _ = l.to_gpu(gpu)  # panics here
+            return self        # unreachable
+        elif self.tag == CONV2D:
+            var l = self.layer[Conv2D[Self.dtype]]
+            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)^), self.tag)
+        else:
+            # RELU, SIGMOID, TANH, DROPOUT, FLATTEN, MAXPOOL2D
+            # No parameters — return unchanged
+            return self
 
 @fieldwise_init
 struct Sequential[dtype: DType](Copyable & Movable):
@@ -822,6 +885,47 @@ struct Sequential[dtype: DType](Copyable & Movable):
             ref m = self.modules[i]
             out = m(out)
         return out
+
+    fn to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Sequential[Self.dtype]:
+        """Move all layers in this Sequential model to GPU.
+
+        Each layer's to_gpu() is called. Layers with no parameters
+        (ReLU, Sigmoid etc.) are returned unchanged.
+        LinearBLAS layers will panic — use Linear for GPU models.
+
+        Args:
+            gpu: Target GPU. Uses default GPU if None.
+
+        Returns:
+            New Sequential with all parameterised layers on GPU.
+
+        Example:
+            ```mojo
+            var model = Sequential[DType.float32]()
+            model.append(
+                Linear[DType.float32](784, 128, init_method="he").into(),
+                ReLU[DType.float32]().into(),
+                Linear[DType.float32](128, 10).into(),
+            )
+            var model_gpu = model.to_gpu()
+            var optimizer = SGD(model_gpu.parameters(), lr=0.01, momentum=0.9)
+
+            for epoch in range(epochs):
+                for batch in train_loader:
+                    var x_gpu = batch.features.to_gpu()
+                    var loss = criterion(model_gpu(x_gpu), batch.labels.to_gpu())
+                    optimizer.zero_grad()
+                    var l = loss.sum()
+                    l.backward()
+                    optimizer.step()
+                    # Read GPU grads if needed:
+                    # model_gpu.parameters()[0][].grad().to_cpu().print()
+            ```
+        """
+        var out = Sequential[Self.dtype]()
+        for i in range(len(self.modules)):
+            out.modules.append(self.modules[i].to_gpu(gpu))
+        return out^
 
     fn parameters(
         ref self,
@@ -1308,6 +1412,28 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
         """Convert to Module for Sequential."""
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
 
+    fn to_gpu(deinit self, gpu: Optional[GPU] = None) raises -> Conv2D[Self.dtype]:
+        """Move this Conv2D layer to GPU.
+
+        Consumes self.
+
+        Weights and bias become permanent GPU residents.
+        Gradients accumulate on GPU.
+
+        Args:
+            gpu: Target GPU. Uses default GPU if None.
+
+        Returns:
+            New Conv2D layer with GPU weights and bias.
+        """
+        var weight_gpu = self.weight.to_gpu(gpu=gpu, stop_grad=True)
+        var bias_gpu   = self.bias.to_gpu(gpu=gpu, stop_grad=True)
+
+        var out = self^
+        out.weight = weight_gpu^
+        out.bias = bias_gpu^
+
+        return out^
 
 struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     """
@@ -1362,3 +1488,8 @@ struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     fn into(self) -> Module[Self.dtype]:
         return Module[Self.dtype](Layer[Self.dtype](self), Self.TAG)
+
+    fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
+        """No-op — activation layer have no parameters to move."""
+        return self
+

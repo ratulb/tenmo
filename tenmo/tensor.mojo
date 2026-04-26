@@ -703,13 +703,47 @@ struct Tensor[dtype: DType](
                     (ptr + offset)[] = data_buffer[index]
                     offset += 1
 
-    fn to_cpu(self, requires_grad: Optional[Bool] = None) raises -> Self:
+    fn to_gpu(
+        self,
+        gpu: Optional[GPU] = None,
+        requires_grad: Optional[Bool] = None,
+        stop_grad: Bool = False,
+    ) raises -> Tensor[Self.dtype]:
+        """Transfer tensor to GPU.
+
+        Args:
+            gpu: Target GPU. Uses default GPU if None.
+            stop_grad: If True, gradient stops at this GPU tensor —
+                       no DeviceTransferBackward registered. Use for
+                       permanent GPU residents (model weights).
+                       Default False preserves existing grad flow behaviour.
+        """
+        comptime if has_accelerator():
+            var target_gpu = gpu.or_else(GPU())
+            return DeviceTransfer[Self.dtype].forward(
+                self,
+                target_gpu.into(),
+                stop_grad=stop_grad,
+            )
+        else:
+            raise Error(
+                "Can not move to GPU. System does not have any accelerator"
+                " device"
+            )
+
+    fn to_cpu(
+        self,
+        requires_grad: Optional[Bool] = None,
+        stop_grad: Bool = False,
+    ) raises -> Tensor[Self.dtype]:
         """Transfer tensor to CPU.
 
         Args:
             requires_grad: If provided, overrides the requires_grad flag
                 on the returned tensor.
-
+            stop_grad: If True, gradient stops at this CPU tensor —
+                       no DeviceTransferBackward registered.
+                       Default False preserves existing grad flow behaviour.
         Returns:
             A new tensor on CPU, with data copied over.
 
@@ -718,42 +752,13 @@ struct Tensor[dtype: DType](
         """
         comptime if has_accelerator():
             return DeviceTransfer[Self.dtype].forward[True](
-                self, CPU().into(), requires_grad
+                self,
+                CPU().into(),
+                requires_grad=requires_grad,
+                stop_grad=stop_grad,
             )
+
         raise Error("System does not have any accelerator")
-
-    fn to_gpu(
-        self,
-        gpu: Optional[GPU] = None,
-        requires_grad: Optional[Bool] = None,
-    ) raises -> Self:
-        """Transfer tensor to GPU.
-
-        Args:
-            gpu: Specific GPU to move to. If None, uses the default GPU.
-            requires_grad: If provided, overrides the requires_grad flag
-                on the returned tensor.
-
-        Returns:
-            A new tensor on the GPU, with data copied over.
-
-        Raises:
-            Error if system has no accelerator device.
-        """
-        comptime if has_accelerator():
-            if gpu:
-                return DeviceTransfer[Self.dtype].forward[True](
-                    self, gpu.value().into(), requires_grad
-                )
-            else:
-                return DeviceTransfer[Self.dtype].forward[True](
-                    self, GPU().into(), requires_grad
-                )
-        else:
-            raise Error(
-                "Can not move to GPU. System does not have any accelerator"
-                " device"
-            )
 
     fn device(self) -> Device:
         """Get the device this tensor is on.

@@ -103,7 +103,6 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
 
         return [(ancestor_ref^, gradbox, AddTensor)]
 
-
 @fieldwise_init
 struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     @staticmethod
@@ -113,6 +112,7 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
         self: Tensor[Self.dtype],
         device: Device,
         requires_grad: Optional[Bool] = None,
+        stop_grad: Bool = False,
     ) raises -> Tensor[Self.dtype]:
         var (code, ndb) = self.buffer.to_device(device)
         # Either CPU->CPU or GPU->GPU on same device — no transfer needed
@@ -124,23 +124,24 @@ struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
             var grad_required = requires_grad.or_else(self.requires_grad)
             if grad_required:
                 out.requires_grad_(True)
-                var backwardFnArg: BackwardFnArg[Self.dtype]
-                if device.is_cpu():
-                    # Forward was GPU->CPU
-                    backwardFnArg = BackwardFnArg[Self.dtype](
-                        BACKWARD_DEVICE_TRANSFER,
-                        DeviceTransferBwdArg(
-                            Flow.Gpu2Cpu,
-                            self.buffer.device_state.value().get_gpu().into(),
-                        ),
-                    )
-                else:
-                    # Forward was CPU->GPU
-                    backwardFnArg = BackwardFnArg[Self.dtype](
-                        BACKWARD_DEVICE_TRANSFER,
-                        DeviceTransferBwdArg(Flow.Cpu2Gpu, CPU().into()),
-                    )
-                out.add_ancestry(backwardFnArg^, self)
+                if not stop_grad:
+                    var backwardFnArg: BackwardFnArg[Self.dtype]
+                    if device.is_cpu():
+                        # Forward was GPU->CPU
+                        backwardFnArg = BackwardFnArg[Self.dtype](
+                            BACKWARD_DEVICE_TRANSFER,
+                            DeviceTransferBwdArg(
+                                Flow.Gpu2Cpu,
+                                self.buffer.device_state.value().get_gpu().into(),
+                            ),
+                        )
+                    else:
+                        # Forward was CPU->GPU
+                        backwardFnArg = BackwardFnArg[Self.dtype](
+                            BACKWARD_DEVICE_TRANSFER,
+                            DeviceTransferBwdArg(Flow.Cpu2Gpu, CPU().into()),
+                        )
+                    out.add_ancestry(backwardFnArg^, self)
 
         return out^
 

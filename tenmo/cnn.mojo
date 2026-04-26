@@ -11,7 +11,7 @@ from std.sys import simd_width_of
 from .ndbuffer import NDBuffer
 from .intarray import IntArray
 from .ancestry import Ancestor
-
+from .device import GPU
 
 @fieldwise_init
 struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
@@ -267,6 +267,7 @@ struct Conv2dFused[dtype: DType](ImplicitlyCopyable):
             requires_grad=requires_grad,
         )
         return output^, pad_spec^
+
 
 
 @fieldwise_init
