@@ -1460,7 +1460,7 @@ struct NDBuffer[dtype: DType](
                     ].launch_product[store_excl_product=True](
                         self, normalized_axes, keepdims
                     )
-                    return productArg.excl_product.value()^
+                    return productArg.excl_product.value()
                 except e:
                     panic(
                         "NDBuffer compute_excl_product — GPU failed: ",
