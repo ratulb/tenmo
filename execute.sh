@@ -102,7 +102,7 @@ if [ $# -eq 0 ]; then
     echo "  product, unary, sqrt, tensors, gpu, item, contiguous, maxmin_scalar"
     echo "  allany, compare, count_unique, transmute, exp, summean, sigmoid"
     echo "  gpusummean, broadcast, scalar, inplace, expand, gpu_expand"
-    echo "  sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout"
+    echo "  sgd, npiop, fill, chunk, cnn, matmul, pad, blas, dropout, dev_transfer"
     echo "  std_variance, stack, logarithm, concat, variance, utils, onehot, power"
     echo "  indexhelper, losses, tanh, data, softmax, repeat, mmnd"
     echo "  intarray, mm2d, vm, mv, slice, tiles, linspace, argminmax"
@@ -183,6 +183,7 @@ run_single_test() {
         pad)            run_test "pad" "tests/test_pad.mojo" "$DEBUG_MODE" ;;
         blas)           run_test "blas" "tests/test_blas.mojo" "$DEBUG_MODE" ;;
         dropout)        run_test "dropout" "tests/test_dropout.mojo" "$DEBUG_MODE" ;;
+        dev_transfer)   run_test "dev_transfer" "tests/test_device_transfer_gradflow.mojo" "$DEBUG_MODE" ;;
         std_variance)   run_test "std_variance" "tests/test_std_variance.mojo" "$DEBUG_MODE" ;;
         stack)          run_test "stack" "tests/test_stack.mojo" "$DEBUG_MODE" ;;
         logarithm)      run_test "logarithm" "tests/test_logarithm.mojo" "$DEBUG_MODE" ;;
@@ -265,6 +266,7 @@ run_single_test() {
                 "pad|tests/test_pad.mojo"
                 "blas|tests/test_blas.mojo"
                 "dropout|tests/test_dropout.mojo"
+                "dev_transfer|tests/test_device_transfer_gradflow.mojo"
                 "std_variance|tests/test_std_variance.mojo"
                 "stack|tests/test_stack.mojo"
                 "logarithm|tests/test_logarithm.mojo"
