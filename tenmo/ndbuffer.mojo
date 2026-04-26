@@ -1440,7 +1440,7 @@ struct NDBuffer[dtype: DType](
         comptime if has_accelerator():
             if self.is_on_gpu():
                 try:
-                    return Reduction[Self.dtype].compute_excl_product(
+                    return Reduction[Self.dtype].launch_product[store_excl_product=True](
                         self, normalized_axes, keepdims
                     )
                 except e:

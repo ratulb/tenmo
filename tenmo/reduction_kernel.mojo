@@ -1113,7 +1113,3 @@ struct Reduction[dtype: DType = DType.float32](
                 block_size = max_block_size
                 break
         return (block_size, total_output)
-
-
-fn main() raises:
-    pass

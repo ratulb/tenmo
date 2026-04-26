@@ -2543,7 +2543,7 @@ struct Tensor[dtype: DType](
             Self.dtype.is_numeric()
         ), "Tensor → product_all is for numeric data types only"
 
-        return self.buffer.prodcut_all()
+        return self.buffer.product_all()
 
     fn exp[
         track_grad: Bool = True
