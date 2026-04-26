@@ -286,6 +286,7 @@ struct StdArg[dtype: DType](ArgumentType):
     var keepdims: Bool
     var epsilon: Scalar[Self.dtype]
 
+
 @fieldwise_init
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     @staticmethod
@@ -409,6 +410,8 @@ struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
             return MatrixVectorMulNdBackward[Self.dtype].backward(output)
         elif op_code == BACKWARD_DOT:
             return DotBackward[Self.dtype].backward(output)
+        elif op_code == BACKWARD_PRODUCT:
+            return ProductBackward[Self.dtype].backward(output)
+
         else:
             return []
-

@@ -33,7 +33,6 @@ from .device import Device, CPU, GPU
 from std.sys.info import has_accelerator
 
 
-
 struct Tensor[dtype: DType](
     Copyable
     & Movable
@@ -61,7 +60,6 @@ struct Tensor[dtype: DType](
     c.backward()
     ```
     """
-
 
     comptime Row = List[Scalar[Self.dtype]]
     comptime Rows = List[Self.Row]
@@ -2190,15 +2188,14 @@ struct Tensor[dtype: DType](
         """
         return self.sum[track_grad](IntArray(axes), keepdims, requires_grad)
 
-
     fn sum[
-         track_grad: Bool = True
-     ](
-         self,
-         axes: IntArray,
-         keepdims: Bool = False,
-         requires_grad: Optional[Bool] = None,
-     ) -> Tensor[Self.dtype]:
+        track_grad: Bool = True
+    ](
+        self,
+        axes: IntArray,
+        keepdims: Bool = False,
+        requires_grad: Optional[Bool] = None,
+    ) -> Tensor[Self.dtype]:
         """Sum tensor elements along given axes.
 
         Args:
@@ -2210,18 +2207,19 @@ struct Tensor[dtype: DType](
             Tensor with summed values along the specified axes.
         """
 
-         return Summer[Self.dtype].forward[track_grad](
-             self, axes, keepdims, requires_grad
-         )
+        return Summer[Self.dtype].forward[track_grad](
+            self, axes, keepdims, requires_grad
+        )
 
     fn product[
-        track_grad: Bool = True
+        track_grad: Bool = True,
+        store_excl_product: Bool = True,
     ](
         self,
         axes: List[Int] = [],
         keepdims: Bool = False,
         requires_grad: Optional[Bool] = None,
-    ) -> Tensor[Self.dtype] where Self.dtype.is_floating_point():
+    ) -> Tensor[Self.dtype]:
         """Compute product along given axes.
 
         Args:
@@ -2232,10 +2230,13 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with product values along the specified axes.
         """
-        return self.product[track_grad](IntArray(axes), keepdims, requires_grad)
+        return self.product[track_grad, store_excl_product](
+            IntArray(axes), keepdims, requires_grad
+        )
 
     fn product[
-        track_grad: Bool = True
+        track_grad: Bool = True,
+        store_excl_product: Bool = True,
     ](
         self,
         axes: IntArray,
@@ -2252,7 +2253,7 @@ struct Tensor[dtype: DType](
         Returns:
             Tensor with product values along the specified axes.
         """
-        return Product[Self.dtype].forward[track_grad](
+        return Product[Self.dtype].forward[track_grad, store_excl_product](
             self, axes, keepdims, requires_grad
         )
 
@@ -4037,10 +4038,10 @@ struct Tensor[dtype: DType](
             panic("pad_for_conv: expected 4D tensor")
 
         var pad_spec = List[Tuple[Int, Int]]()
-        pad_spec.append((0, 0)) #No padding on batch
-        pad_spec.append((0, 0)) #No padding on channels
-        pad_spec.append((pad, pad))# Pad height
-        pad_spec.append((pad, pad)) # Pad width
+        pad_spec.append((0, 0))  # No padding on batch
+        pad_spec.append((0, 0))  # No padding on channels
+        pad_spec.append((pad, pad))  # Pad height
+        pad_spec.append((pad, pad))  # Pad width
 
         return Pad[Self.dtype].forward[track_grad](
             x, pad_spec, "constant", 0.0, requires_grad
