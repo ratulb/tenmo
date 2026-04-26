@@ -1059,6 +1059,66 @@ struct Reduction[dtype: DType = DType.float32](
 
         return (out_ndb^, arg^)
 
+    @staticmethod
+    def compute_excl_product(
+        A: NDBuffer[Self.dtype],
+        normalized_axes: IntArray,
+        keepdims: Bool,
+    ) raises -> NDBuffer[Self.dtype]:
+        var shape_A      = A.shape
+        var strides_A    = A.strides
+        var output_shape = shape_A.compute_output_shape(
+            normalized_axes, keepdims, validated=True
+        )
+        var normalized_axes_copy = normalized_axes
+        if len(normalized_axes_copy) == 0:
+            normalized_axes_copy = IntArray(len(shape_A))
+            for i in range(len(shape_A)):
+                normalized_axes_copy[i] = i
+
+        var reduction_axes: Array = Array(normalized_axes_copy)
+        var in_shape: Array       = shape_A.array()
+        var in_strides: Array     = strides_A.array()
+        var total_output: Int     = output_shape.product()
+        var reduced_volume: Int   = shape_A.reduced_shape(normalized_axes).product()
+        var input_numels: Int     = A.numels()
+
+        var (threads_per_block, num_blocks) = Self.launch_config[512](
+            total_output, reduced_volume
+        )
+
+        ref A_device_state = A.device_state.value()
+        ref gpu            = A_device_state.get_gpu()
+        var device_context = gpu[]
+
+        var excl_buffer = device_context.enqueue_create_buffer[Self.dtype](
+            input_numels
+        )
+        ref A_buffer = A_device_state.device_buffer()
+
+        var compiled = device_context.compile_function[
+            excl_product_kernel[Self.dtype, 512],
+            excl_product_kernel[Self.dtype, 512],
+        ]()
+
+        device_context.enqueue_function(
+            compiled,
+            excl_buffer,
+            A_buffer,
+            in_shape,
+            in_strides,
+            reduction_axes,
+            total_output,
+            reduced_volume,
+            grid_dim=num_blocks,
+            block_dim=threads_per_block,
+        )
+
+        device_context.synchronize()
+
+        var excl_state = DeviceState[Self.dtype](excl_buffer^, gpu)
+        return NDBuffer[Self.dtype].with_device_state(excl_state^, shape_A)
+
     # ── LOG SUM EXP (unchanged) ───────────────────────────────────────────────
 
     @staticmethod
