@@ -105,7 +105,6 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
 
 @fieldwise_init
 struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
-    struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
     """Handles tensor transfers between CPU and GPU devices, with full
     autograd support.
 
