@@ -105,6 +105,68 @@ struct DeviceTransferBackward[dtype: DType](ImplicitlyCopyable):
 
 @fieldwise_init
 struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+    struct DeviceTransfer[dtype: DType](ImplicitlyCopyable, RegisterPassable):
+    """Handles tensor transfers between CPU and GPU devices, with full
+    autograd support.
+
+    ## Grad Flow Rules
+
+    The `stop_grad` parameter on `to_gpu()` and `to_cpu()` controls whether
+    the transfer registers a backward node in the compute graph.
+
+    **Rule 1 — Default behaviour (`stop_grad=False`):**
+        The transfer is transparent to autograd. Gradients tunnel through
+        device boundaries as if the transfer never happened. The origin
+        tensor receives gradients exactly as it would from a purely
+        same-device computation.
+
+        Example: A(CPU) -> to_gpu() -> ops -> loss.backward()
+                 => A.grad is populated.
+
+    **Rule 2 — `stop_grad=True` severs the graph at that boundary:**
+        The destination tensor becomes a new leaf on the target device.
+        No backward node is registered for the transfer. Gradients
+        accumulate on the destination leaf and never cross back to the
+        source tensor.
+
+        Example: A(CPU) -> to_gpu(stop_grad=True) -> B(GPU leaf)
+                 -> ops -> loss.backward()
+                 => B.grad is populated, A.grad is untouched.
+
+    **Rule 3 — Each transfer is an independent boundary:**
+        In a multi-hop chain (CPU->GPU->CPU or longer), each transfer
+        applies Rule 1 or Rule 2 independently. Grad flow is only as
+        wide as the narrowest `stop_grad=True` cut in the chain.
+
+        Example: A(CPU) -> to_gpu() -> ops -> to_cpu(stop_grad=False)
+                 -> ops -> loss.backward()
+                 => A.grad is populated (both boundaries are transparent).
+
+        Example: A(CPU) -> to_gpu(stop_grad=True) -> ops
+                 -> to_cpu(stop_grad=False) -> loss.backward()
+                 => B(GPU leaf).grad is populated, A.grad is untouched.
+
+    **Rule 4 — When both transfers are `stop_grad=True`:**
+        Each transfer creates a fresh leaf. Backward only reaches the
+        last leaf in the chain. Earlier leaves, including the origin,
+        are completely isolated and their grad buffers are never touched.
+        Do not assert on grad buffers of isolated tensors.
+
+        Example: A(CPU) -> to_gpu(stop_grad=True) -> ops
+                 -> to_cpu(stop_grad=True) -> D(CPU leaf)
+                 -> loss.backward()
+                 => D.grad is populated, B.grad and A.grad are untouched.
+
+    **Rule 5 — Intended use of `stop_grad=True` in training:**
+        Transfer weights to GPU once at the start of training using
+        `stop_grad=True`, making them native GPU leaves. Run the entire
+        training loop on GPU. Transfer weights back to CPU after training
+        using `to_cpu(stop_grad=True)` if persistence is needed.
+        This avoids a cross-device grad transfer on every backward pass.
+    """
+
+
+
     @staticmethod
     fn forward[
         track_grad: Bool = True
