@@ -231,6 +231,17 @@ struct Linear[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         out.bias   = bias_gpu^
         return out^
 
+    fn to_cpu(deinit self) raises -> Linear[Self.dtype, Self.mode]:
+        """Move this Linear layer back to CPU.
+        Consumes self — original GPU Linear is destroyed.
+        """
+        var weight_cpu = self.weight.to_cpu(stop_grad=True)
+        var bias_cpu   = self.bias.to_cpu(stop_grad=True)
+        var out = self^
+        out.weight = weight_cpu^
+        out.bias   = bias_cpu^
+        return out^
+
 @fieldwise_init
 struct Profile(RegisterPassable & ImplicitlyCopyable):
     """Profile for a specific batch size."""
@@ -508,6 +519,10 @@ struct LinearBLAS[dtype: DType, mode: Int = mm](ImplicitlyCopyable & Movable):
         # Unreachable — satisfies compiler
         return Linear[Self.dtype, Self.mode](self.in_features, self.out_features)
 
+    fn to_cpu(self) raises -> Self:
+        panic("LinearBLAS does not support GPU — nothing to transfer back")
+        return self  # unreachable
+
     @always_inline
     fn matmul(mut self, mut xs: Tensor[Self.dtype]) -> Tensor[Self.dtype]:
         var result: Tensor[Self.dtype]
@@ -619,6 +634,10 @@ struct ReLU[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         """No-op — activation layer have no parameters to move."""
         return self
 
+    fn to_cpu(self) raises -> Self:
+        """No-op — no parameters to move."""
+        return self
+
 struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
     comptime TAG = SIGMOID
@@ -658,6 +677,9 @@ struct Sigmoid[dtype: DType](RegisterPassable & ImplicitlyCopyable):
         """No-op — activation layer have no parameters to move."""
         return self
 
+    fn to_cpu(self) raises -> Self:
+        """No-op — no parameters to move."""
+        return self
 
 struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     var training: Bool
@@ -696,6 +718,10 @@ struct Tanh[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         """No-op — activation layer have no parameters to move."""
+        return self
+
+    fn to_cpu(self) raises -> Self:
+        """No-op — no parameters to move."""
         return self
 
 
@@ -861,6 +887,21 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
             # No parameters — return unchanged
             return self
 
+    fn to_cpu(mut self) raises -> Module[Self.dtype]:
+        if self.tag == LINEAR:
+            var l = self.layer[Linear[Self.dtype, mm]]
+            return Module[Self.dtype](Layer[Self.dtype](l.to_cpu()), self.tag)
+        elif self.tag == LINEAR_BLAS:
+            var l = self.layer[LinearBLAS[Self.dtype, mm]]
+            _ = l.to_cpu()  # panics
+            return self     # unreachable
+        elif self.tag == CONV2D:
+            var l = self.layer[Conv2D[Self.dtype]]
+            return Module[Self.dtype](Layer[Self.dtype](l.to_cpu()), self.tag)
+        else:
+            # RELU, SIGMOID, TANH, DROPOUT, FLATTEN, MAXPOOL2D — no-op
+            return self
+
 @fieldwise_init
 struct Sequential[dtype: DType](Copyable & Movable):
     var modules: List[Module[Self.dtype]]
@@ -885,6 +926,31 @@ struct Sequential[dtype: DType](Copyable & Movable):
             ref m = self.modules[i]
             out = m(out)
         return out
+
+    fn parameters(
+        ref self,
+    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
+        var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
+        for module in self.modules:
+            params.extend(module.parameters())
+        return params^
+
+    fn num_parameters(self) -> Int:
+        var total: Int = 0
+        for parameter in self.parameters():
+            total += parameter[].numels()
+        return total
+
+    fn train(mut self):
+        """Set all modules to training mode."""
+        for i in range(len(self.modules)):
+            self.modules[i].train()
+
+    fn eval(mut self):
+        """Set all modules to evaluation mode."""
+        for i in range(len(self.modules)):
+            self.modules[i].eval()
+
 
     fn to_gpu(mut self, gpu: Optional[GPU] = None, stop_grad: Bool=True) raises -> Sequential[Self.dtype]:
         """Move all layers in this Sequential model to GPU.
@@ -927,29 +993,19 @@ struct Sequential[dtype: DType](Copyable & Movable):
             out.modules.append(self.modules[i].to_gpu(gpu))
         return out^
 
-    fn parameters(
-        ref self,
-    ) -> List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]:
-        var params = List[UnsafePointer[Tensor[Self.dtype], MutAnyOrigin]]()
-        for module in self.modules:
-            params.extend(module.parameters())
-        return params^
+    fn to_cpu(mut self) raises -> Sequential[Self.dtype]:
+        """Move all layers back to CPU after training.
 
-    fn num_parameters(self) -> Int:
-        var total: Int = 0
-        for parameter in self.parameters():
-            total += parameter[].numels()
-        return total
-
-    fn train(mut self):
-        """Set all modules to training mode."""
+        Example:
+            var model = model.to_gpu(stop_grad=True)
+            # ... training loop ...
+            model = model.to_cpu(stop_grad=True)  # persist weights
+        """
+        var out = Sequential[Self.dtype]()
         for i in range(len(self.modules)):
-            self.modules[i].train()
+            out.modules.append(self.modules[i].to_cpu())
+        return out^
 
-    fn eval(mut self):
-        """Set all modules to evaluation mode."""
-        for i in range(len(self.modules)):
-            self.modules[i].eval()
 
 
 @fieldwise_init
@@ -1435,6 +1491,14 @@ struct Conv2D[dtype: DType](ImplicitlyCopyable & Movable):
 
         return out^
 
+    fn to_cpu(deinit self) raises -> Conv2D[Self.dtype]:
+        var weight_cpu = self.weight.to_cpu(stop_grad=True)
+        var bias_cpu   = self.bias.to_cpu(stop_grad=True)
+        var out = self^
+        out.weight = weight_cpu^
+        out.bias   = bias_cpu^
+        return out^
+
 struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
     """
     Flatten spatial dimensions: (N, C, H, W) → (N, C*H*W).
@@ -1491,5 +1555,9 @@ struct Flatten[dtype: DType](RegisterPassable & ImplicitlyCopyable):
 
     fn to_gpu(self, gpu: Optional[GPU] = None) raises -> Self:
         """No-op — activation layer have no parameters to move."""
+        return self
+
+    fn to_cpu(self) raises -> Self:
+        """No-op — no parameters to move."""
         return self
 
