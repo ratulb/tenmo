@@ -7,6 +7,7 @@ from std.sys import has_accelerator
 from tenmo.mnemonics import vm, mv
 from tenmo.gradbox import Gradbox
 from tenmo.matmul_kernel import MatmulNdGpu
+from tenmo.mnemonics import MEAN, SUM
 
 comptime dtype = DType.float32
 
@@ -308,7 +309,7 @@ fn test_v2_ndbuffer_mean_2d_axis0() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> mean axis0 -> [2.5, 3.5, 4.5]
-    var result = ndb.reduce[mean=True](normalized_axes=IntArray(0))
+    var result = ndb.reduce[MEAN](normalized_axes=IntArray(0))
     assert_true(result[IntArray(0)] == 2.5)
     assert_true(result[IntArray(1)] == 3.5)
     assert_true(result[IntArray(2)] == 4.5)
@@ -324,7 +325,7 @@ fn test_v2_ndbuffer_mean_2d_axis1() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # [[1,2,3],[4,5,6]] -> mean axis1 -> [2.0, 5.0]
-    var result = ndb.reduce[mean=True](normalized_axes=IntArray(1))
+    var result = ndb.reduce[MEAN](normalized_axes=IntArray(1))
     assert_true(result[IntArray(0)] == 2.0)
     assert_true(result[IntArray(1)] == 5.0)
     print("test_v2_ndbuffer_mean_2d_axis1 passed")
@@ -355,7 +356,7 @@ fn test_v2_ndbuffer_mean_keepdims() raises:
             ndb[IntArray(i, j)] = Float32(val)
             val += 1
     # keepdims -> shape (2, 1)
-    var result = ndb.reduce[mean=True](
+    var result = ndb.reduce[MEAN](
         normalized_axes=IntArray(1), keepdims=True
     )
     assert_true(result[IntArray(0, 0)] == 2.0)
@@ -543,7 +544,7 @@ fn test_v2_gpu_ndbuffer_sum_2d_axis1() raises:
         var a = Tensor[dtype].d2([[1, 2, 3], [4, 5, 6]])
         var a_gpu = a.to_gpu()
         var gpu_ndb = a_gpu.buffer
-        var gpu_result = gpu_ndb.reduce[mean=False](IntArray(1), keepdims=False)
+        var gpu_result = gpu_ndb.reduce[SUM](IntArray(1), keepdims=False)
         var tensor = Tensor[dtype].d1([6, 15])
         var g_tensor = tensor.to_gpu()
         assert_true(g_tensor.buffer.all_close(gpu_result))
@@ -558,7 +559,7 @@ fn test_v2_gpu_ndbuffer_mean_2d_axis0() raises:
         var a = Tensor[dtype].d2([[1, 2, 3], [3, 4, 5]])
         var a_gpu = a.to_gpu()
         var gpu_ndb = a_gpu.buffer
-        var gpu_result = gpu_ndb.reduce[mean=True](IntArray(0), keepdims=False)
+        var gpu_result = gpu_ndb.reduce[MEAN](IntArray(0), keepdims=False)
         var expected = Tensor[dtype].d1([2, 3, 4])
         expected = expected.to_gpu()
         assert_true(expected.buffer.all_close(gpu_result))
