@@ -58,7 +58,7 @@ fn main() raises:
 ```
 """
 
-# Core Types
+# Core Types - explicit exports for documentation links
 from .tensor import Tensor
 from .ndbuffer import NDBuffer
 from .gradbox import Gradbox
