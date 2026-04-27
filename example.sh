@@ -18,7 +18,10 @@ case $1 in
         echo "Running binary mnist training loop"
         mojo -I . $DEBUG_MODE examples/binary_mnist.mojo
         ;;
-
+    mnist_gpu)
+        echo "Running mnist training loop"
+        mojo -I . $DEBUG_MODE examples/mnist_gpu.mojo
+        ;;
     mnist)
         echo "Running mnist training loop"
         mojo -I . $DEBUG_MODE examples/mnist.mojo

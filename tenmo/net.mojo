@@ -848,14 +848,14 @@ struct Module[dtype: DType](ImplicitlyCopyable & Movable):
         """
         if self.tag == LINEAR:
             var l = self.layer[Linear[Self.dtype, mm]]
-            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)^), self.tag)
+            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
         elif self.tag == LINEAR_BLAS:
             var l = self.layer[LinearBLAS[Self.dtype, mm]]
             _ = l.to_gpu(gpu)  # panics here
             return self        # unreachable
         elif self.tag == CONV2D:
             var l = self.layer[Conv2D[Self.dtype]]
-            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)^), self.tag)
+            return Module[Self.dtype](Layer[Self.dtype](l.to_gpu(gpu)), self.tag)
         else:
             # RELU, SIGMOID, TANH, DROPOUT, FLATTEN, MAXPOOL2D
             # No parameters — return unchanged
@@ -886,7 +886,7 @@ struct Sequential[dtype: DType](Copyable & Movable):
             out = m(out)
         return out
 
-    fn to_gpu(mut self, gpu: Optional[GPU] = None) raises -> Sequential[Self.dtype]:
+    fn to_gpu(mut self, gpu: Optional[GPU] = None, stop_grad: Bool=True) raises -> Sequential[Self.dtype]:
         """Move all layers in this Sequential model to GPU.
 
         Each layer's to_gpu() is called. Layers with no parameters
