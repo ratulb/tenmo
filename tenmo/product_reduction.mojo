@@ -49,7 +49,8 @@ from .reduction_kernel import ProductArg
 from .backpropagation import BackwardFnArg, BACKWARD_PRODUCT
 from .gradbox import Gradbox
 from .ndbuffer import NDBuffer
-from .tenmo import Tensor, Ancestor
+from .tensor import Tensor
+from .ancestry import Ancestor
 from .shapes import Shape
 from .common_utils import panic
 from .validators import Validator
