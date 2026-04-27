@@ -9,8 +9,8 @@ This module provides the core infrastructure for Tenmo's autograd system:
 
 Related:
   - [README_AUTOGRAD.md](https://github.com/ratulb/tenmo/blob/document/README_AUTOGRAD.md) — Full autograd architecture
-  - [ancestry.mojo](ancestry.mojo) — Ancestor and Ancestors types
-  - [gradbox.mojo](gradbox.mojo) — Gradient storage with refcounting
+  - [ancestry.mojo](https://github.com/ratulb/tenmo/blob/document/tenmo/ancestry.mojo) — Ancestor and Ancestors types
+  - [gradbox.mojo](https://github.com/ratulb/tenmo/blob/document/tenmo/gradbox.mojo) — Gradient storage with refcounting
 """
 
 from .ancestry import Ancestor
