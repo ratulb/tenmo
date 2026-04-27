@@ -1,3 +1,20 @@
+"""Backpropagation — Autograd Dispatch and Backward Operations.
+
+This module provides the core infrastructure for Tenmo's autograd system:
+
+1. **Operation tags** — 56 compile-time constants (BACKWARD_*) for dispatch
+2. **Type-erased arguments** — BackwardFnArg for passing operation-specific data
+3. **Backward dispatcher** — Backward.invoke() jump table to backward implementations
+
+See [docs/operations_reference.md](../docs/operations_reference.md) for the
+full table of 56 operations, their backward structs, and module locations.
+
+Related:
+  - [README_AUTOGRAD.md](../README_AUTOGRAD.md) — Full autograd architecture
+  - tenmo/ancestry.mojo — Ancestor and Ancestors types
+  - tenmo/gradbox.mojo — Gradient storage with refcounting
+"""
+
 from .ancestry import Ancestor
 from .tensor import Tensor
 from std.utils import Variant
@@ -103,6 +120,13 @@ def make_copier[T: ArgumentType]() -> CopyFn:
     return copy_it
 
 
+# ============================================================================
+# BackwardFnArg — Type-Erased Container
+# ============================================================================
+# Type-erased container for backward operation arguments.
+# Stores op_code, type-erased ptr, destroy, and copy_fn.
+# ============================================================================
+
 @fieldwise_init
 struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
     var op_code: Int
@@ -173,15 +197,27 @@ struct BackwardFnArg[dtype: DType](ImplicitlyCopyable & Movable):
         return BackwardFnArg[Self.dtype](op_code, NDBufferArg[Self.dtype](ndb))
 
 
+# ============================================================================
+# Argument Payload Types
+# ============================================================================
+# NullArg: Empty payload (used by BACKWARD_ADD, BACKWARD_MULTIPLY)
+# Boolean: Bool (used by BACKWARD_DROPOUT)
+# ScalarArg: Scalar value (used by *_SCALAR ops)
+# ============================================================================
+
 @fieldwise_init
 struct NullArg(ArgumentType):
     var zero: UInt8
 
 
+# Boolean: Bool (used by BACKWARD_DROPOUT)
+
 @fieldwise_init
 struct Boolean(ArgumentType):
     var is_true: Bool
 
+
+# ScalarArg: Scalar value (used by *_SCALAR ops)
 
 @fieldwise_init
 struct ScalarArg[dtype: DType](ArgumentType):
@@ -286,6 +322,13 @@ struct StdArg[dtype: DType](ArgumentType):
     var keepdims: Bool
     var epsilon: Scalar[Self.dtype]
 
+
+# ============================================================================
+# Backward — Jump Table Dispatcher
+# ============================================================================
+# Reads op_code from Ancestor's backwardFnArg and dispatches to backward struct.
+# Each branch calls a static backward() method from its module.
+# ============================================================================
 
 @fieldwise_init
 struct Backward[dtype: DType](RegisterPassable & ImplicitlyCopyable):
