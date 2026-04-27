@@ -1,5 +1,7 @@
 """
+
 # Core Types
+
 - `Tensor` — the central type. Tracks gradients, owns data, participates in the autograd graph. Supports CPU and GPU.
 - `NDBuffer` — shape, strides, offset, and data. Single source of truth for memory layout. Shared between tensors and views via ref-counting.
 - `Gradbox` — gradient storage. Independently ref-counted — survives ASAP tensor destruction. Views have their own independent gradboxes.
@@ -56,6 +58,15 @@ fn main() raises:
 ```
 """
 
+# Core Types - explicit exports for documentation links
+from .tensor import Tensor
+from .ndbuffer import NDBuffer
+from .gradbox import Gradbox
+from .ancestry import Ancestor, Ancestors
+from .ndbuffer import Layout, Storage
+from .buffers import Buffer
+
+# Modules
 from  .addition import *
 from  .ancestry import *
 from  .argminmax import *
@@ -139,5 +150,3 @@ from  .vectormatrix import *
 from  .vectormatrix_kernel import *
 from  .views import *
 from  .walkback import *
-
-
