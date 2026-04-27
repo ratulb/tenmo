@@ -15,7 +15,7 @@ pure-cifar-10 = ">=0.1.1"
 
 [feature.dev.dependencies]
 #mojodoc = { git = "https://github.com/ehsanmok/mojodoc.git", branch = "main" }
-mojodoc = { git = "https://github.com/ratulb/mojodoc.git", branch = "main" }
+mojodoc = { git = "https://github.com/ratulb/mojodoc.git", branch = "experiment" }
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }
