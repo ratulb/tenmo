@@ -6,13 +6,11 @@ This module provides the core infrastructure for Tenmo's autograd system:
 2. **Type-erased arguments** — BackwardFnArg for passing operation-specific data
 3. **Backward dispatcher** — Backward.invoke() jump table to backward implementations
 
-See [docs/operations_reference.md](../docs/operations_reference.md) for the
-full table of 56 operations, their backward structs, and module locations.
 
 Related:
-  - [README_AUTOGRAD.md](../README_AUTOGRAD.md) — Full autograd architecture
-  - tenmo/ancestry.mojo — Ancestor and Ancestors types
-  - tenmo/gradbox.mojo — Gradient storage with refcounting
+  - [README_AUTOGRAD.md](https://github.com/ratulb/tenmo/blob/document/README_AUTOGRAD.md) — Full autograd architecture
+  - [ancestry.mojo](ancestry.mojo) — Ancestor and Ancestors types
+  - [gradbox.mojo](gradbox.mojo) — Gradient storage with refcounting
 """
 
 from .ancestry import Ancestor
