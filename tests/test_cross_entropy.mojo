@@ -608,7 +608,6 @@ fn test_ce_spatial_with_ignore_index() raises:
             + String(c)
             + " grad should be 0",
         )
-        print(logits.grad()[0, c, 1])
 
     # Batch 1, spatial position 2 is ignored (target=-100)
     # So gradients for all classes at [1, :, 2] should be zero
