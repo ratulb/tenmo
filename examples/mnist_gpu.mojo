@@ -11,6 +11,7 @@ from tenmo.crossentropy import CrossEntropyLoss
 from std.python import Python
 from tenmo.numpy_interop import from_ndarray, numpy_dtype
 from tenmo.dataloader import NumpyDataset
+from tenmo.device import GPU
 from std.time import perf_counter_ns
 from std.sys import has_accelerator
 
@@ -116,7 +117,8 @@ fn train_mnist() raises:
     # Gradients accumulate on GPU and never cross back to CPU
     # during the training loop — only transferred back once at the end.
     print("Transferring model parameters to GPU...")
-    model = model.to_gpu(stop_grad=True)
+    var gpu = GPU()
+    model = model.to_gpu(gpu, stop_grad=True)
     print("  Model is now resident on GPU\n")
 
     var optimizer = SGD(
@@ -161,8 +163,8 @@ fn train_mnist() raises:
             # Transfer batch to GPU each iteration — stop_grad=False so
             # grad flows back through the batch if needed, but since
             # batch tensors are not leaves we care about, this is fine.
-            var features_gpu = batch.features.to_gpu()
-            var labels_gpu = batch.labels.to_gpu()
+            var features_gpu = batch.features.to_gpu(gpu)
+            var labels_gpu = batch.labels.to_gpu(gpu)
 
             var pred = model(features_gpu)
             var loss = criterion(pred, labels_gpu)
@@ -187,8 +189,8 @@ fn train_mnist() raises:
         while test_loader.__has_next__():
             ref batch = test_loader.__next__()
 
-            var features_gpu = batch.features.to_gpu()
-            var labels_gpu = batch.labels.to_gpu()
+            var features_gpu = batch.features.to_gpu(gpu)
+            var labels_gpu = batch.labels.to_gpu(gpu)
 
             var pred = model(features_gpu)
             var loss = criterion(pred, labels_gpu)
